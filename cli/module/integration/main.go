@@ -1419,6 +1419,46 @@ func buildCLIRequestMetadataMap(metadata *AgentOutput) map[string]interface{} {
 	return metaMap
 }
 
+func resolveCurrentPageSessionChatID() string {
+	if cronDB == nil {
+		return ""
+	}
+	var chatID string
+	if err := cronDB.QueryRow(`SELECT chat_id FROM chat_log WHERE chat_type = ? AND chat_id != '' ORDER BY created_at DESC, id DESC LIMIT 1`, chatTypePageSession).Scan(&chatID); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(chatID)
+}
+
+func lookupLastSSEResponseTimestamp(chatID string) (int64, bool) {
+	if cronDB == nil {
+		return 0, false
+	}
+	chatID = strings.TrimSpace(chatID)
+	if chatID == "" {
+		return 0, false
+	}
+	var createdAt string
+	if err := cronDB.QueryRow(`SELECT created_at FROM agent_message_log WHERE chat_id = ? AND log_type = ? ORDER BY created_at DESC, id DESC LIMIT 1`, chatID, logTypeChatCompletionResponse).Scan(&createdAt); err != nil {
+		return 0, false
+	}
+	parsed, err := parseRoundLogTimeValue(createdAt)
+	if err != nil {
+		return 0, false
+	}
+	return parsed.UnixMilli(), true
+}
+
+func injectLastResponseMetadata(metaMap map[string]interface{}, chatID string) {
+	if metaMap == nil {
+		return
+	}
+	delete(metaMap, "lastResponse")
+	if lastResponse, ok := lookupLastSSEResponseTimestamp(chatID); ok {
+		metaMap["lastResponse"] = lastResponse
+	}
+}
+
 func pruneForwardedKnowledgeCommit(metaMap map[string]interface{}) {
 	if metaMap == nil {
 		return
@@ -1827,6 +1867,7 @@ func integrationHTTPTimeoutError(err error) bool {
 
 func heartbeat(client *http.Client, host string, metadata *AgentOutput, cfg *Config) (*TaskContent, error) {
 	metaMap := buildCLIRequestMetadataMap(metadata)
+	injectLastResponseMetadata(metaMap, resolveCurrentPageSessionChatID())
 	injectLiveAgentKnowledgeIntoAgentList(metaMap)
 	pruneForwardedKnowledgeCommit(metaMap)
 	reqBody, _ := json.Marshal(map[string]interface{}{
@@ -3833,6 +3874,16 @@ func handleAppStatic(cfg *Config) http.HandlerFunc {
 			http.Error(w, "path escapes app root", http.StatusBadRequest)
 			return
 		}
+		if info, statErr := os.Stat(target); statErr == nil && !info.IsDir() {
+			file, openErr := os.Open(target)
+			if openErr != nil {
+				http.Error(w, "Failed to open app file: "+openErr.Error(), http.StatusInternalServerError)
+				return
+			}
+			defer file.Close()
+			http.ServeContent(w, r, info.Name(), info.ModTime(), file)
+			return
+		}
 
 		served := r.Clone(r.Context())
 		if r.URL != nil {
@@ -3843,6 +3894,14 @@ func handleAppStatic(cfg *Config) http.HandlerFunc {
 			served.URL.Path = "/"
 		} else {
 			served.URL.Path = "/" + filepath.ToSlash(relPath)
+			// Preserve a caller-provided trailing slash for directories so
+			// FileServer does not emit a relative redirect against the outer
+			// /app/{agentId}/ URL and accidentally duplicate the subdirectory.
+			if strings.HasSuffix(r.URL.Path, "/") {
+				if info, statErr := os.Stat(target); statErr == nil && info.IsDir() {
+					served.URL.Path += "/"
+				}
+			}
 		}
 		served.URL.RawPath = ""
 		http.FileServer(http.Dir(root)).ServeHTTP(w, served)
@@ -10309,6 +10368,8 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 		}
 		injectLiveAgentMediaIntoAgentList(metaMap)
 		injectLiveAgentKnowledgeIntoAgentList(metaMap)
+		_, mergedChatID := requestChatContext(metaMap)
+		injectLastResponseMetadata(metaMap, mergedChatID)
 		reqData["metadata"] = metaMap
 		syncForwardedChatRequestFlags(reqData, metaMap)
 
@@ -11776,6 +11837,7 @@ func printCLIHelp() {
 	fmt.Println("  integration log-round --agent A --chat chat-001 --round 3")
 	fmt.Println("  integration skills-warning [--refresh]")
 	fmt.Println("  integration file-last-update [options]")
+	fmt.Println("  integration backup-clean [options]")
 	fmt.Println("  integration connect <subcommand> [options]")
 	fmt.Println("  integration help")
 	fmt.Println("")
@@ -11803,6 +11865,7 @@ func printCLIHelp() {
 	fmt.Println("  log-round          Export the latest N rounds of chat and cli logs to agent tmp")
 	fmt.Println("  skills-warning     Read current SKILL parse warnings from shared sqlite")
 	fmt.Println("  file-last-update   Print milliseconds since the target file was last updated")
+	fmt.Println("  backup-clean       Move stale User/Soul backup files into bak and delete stale bak files")
 	fmt.Println("  help               Show this help")
 	fmt.Println("")
 	fmt.Println("Help shortcuts:")
@@ -11823,6 +11886,7 @@ func printCLIHelp() {
 	fmt.Println("  integration skills-warning --refresh")
 	fmt.Println("  integration file-last-update --agent A --file USER.md")
 	fmt.Println("  integration file-last-update --file /abs/path/to/file.md")
+	fmt.Println("  integration backup-clean --agent-dir ./agent")
 	fmt.Println("")
 	fmt.Println("Serve options:")
 	fmt.Println("  --agent-dir=DIR    Agent 根目录；macOS 默认 ~/Library/Application Support/deepright/agent，WSL 默认 ~/deepright/agent，不存在时自动创建")
@@ -11839,6 +11903,11 @@ func printCLIHelp() {
 	fmt.Println("  --install_app=CSV               额外 install_app 条目，逗号分隔，接口返回会自动去重合并")
 	fmt.Println("  --pid-file=PATH    后台进程 pid 文件，默认当前应用目录下的 integration.pid（WSL 为 ~/deepright/integration.pid）")
 	fmt.Println("  --log-file=PATH    后台进程日志文件，默认当前应用目录下的 integration.log（WSL 为 ~/deepright/integration.log）")
+	fmt.Println("")
+	fmt.Println("Backup-clean options:")
+	fmt.Println("  --agent-dir DIR               Agent 根目录；未传时会复用主应用 config/config.json / AGENT_DIR / 默认目录")
+	fmt.Println("  --archive-after DURATION      备份文件在工作目录停留多久后移入 bak，默认 24h")
+	fmt.Println("  --delete-after DURATION       bak 目录中的文件保留多久后删除，默认 72h")
 	fmt.Println("")
 	fmt.Println("Splash options:")
 	fmt.Println("  --logo=PATH        启动 Logo 图片路径，默认自动读取当前 integration 资源目录下的 site/icon.png")
@@ -13833,6 +13902,267 @@ func runIntegrationFileLastUpdateCLI(args []string, cfg *Config) {
 	fmt.Println(strconv.FormatInt(value, 10))
 }
 
+type backupCleanupMove struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+}
+
+type backupCleanupSummary struct {
+	AgentCount int                 `json:"agentCount"`
+	Archived   []backupCleanupMove `json:"archived,omitempty"`
+	Deleted    []string            `json:"deleted,omitempty"`
+}
+
+const (
+	defaultBackupArchiveAfter = 24 * time.Hour
+	defaultBackupDeleteAfter  = 72 * time.Hour
+)
+
+func printBackupCleanHelp() {
+	fmt.Println("Usage:")
+	fmt.Println("  integration backup-clean [options]")
+	fmt.Println("")
+	fmt.Println("Description:")
+	fmt.Println("  Scan every Agent workspace for stale User/Soul backup files.")
+	fmt.Println("  Files in the workspace root that look like USER.md / SOUL.md backups and")
+	fmt.Println("  are older than --archive-after are moved into workspace/bak.")
+	fmt.Println("  Files already under workspace/bak and older than --delete-after are deleted.")
+	fmt.Println("")
+	fmt.Println("Options:")
+	fmt.Println("  --agent-dir DIR          Agent 根目录；未传时会复用主应用 config/config.json / AGENT_DIR / 默认目录")
+	fmt.Println("  --archive-after DURATION 归档阈值，默认 24h")
+	fmt.Println("  --delete-after DURATION  删除阈值，默认 72h")
+	fmt.Println("")
+	fmt.Println("Examples:")
+	fmt.Println("  integration backup-clean")
+	fmt.Println("  integration backup-clean --agent-dir ./agent")
+	fmt.Println("  integration backup-clean --archive-after 24h --delete-after 72h")
+}
+
+func runIntegrationBackupCleanCLI(args []string, stdout, stderr io.Writer) int {
+	if hasHelpFlag(args) {
+		printBackupCleanHelp()
+		return 0
+	}
+
+	fs := flag.NewFlagSet("integration backup-clean", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	agentDir := fs.String("agent-dir", "", "agent root dir")
+	archiveAfter := fs.Duration("archive-after", defaultBackupArchiveAfter, "move stale workspace backups into bak after this duration")
+	deleteAfter := fs.Duration("delete-after", defaultBackupDeleteAfter, "delete stale bak files after this duration")
+	fs.Usage = func() { printBackupCleanHelp() }
+	if err := fs.Parse(args); err != nil {
+		return 1
+	}
+	if *archiveAfter < 0 {
+		fmt.Fprintln(stderr, "archive-after must be >= 0")
+		return 1
+	}
+	if *deleteAfter < 0 {
+		fmt.Fprintln(stderr, "delete-after must be >= 0")
+		return 1
+	}
+
+	resolvedAgentDir, err := resolveIntegrationAgentDir(*agentDir)
+	if err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1
+	}
+	summary, err := cleanupIntegrationAgentBackups(resolvedAgentDir, time.Now(), *archiveAfter, *deleteAfter)
+	if err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1
+	}
+
+	out, err := json.MarshalIndent(map[string]any{
+		"status":      0,
+		"agentDir":    resolvedAgentDir,
+		"agentCount":  summary.AgentCount,
+		"archived":    summary.Archived,
+		"archivedCnt": len(summary.Archived),
+		"deleted":     summary.Deleted,
+		"deletedCnt":  len(summary.Deleted),
+	}, "", "  ")
+	if err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1
+	}
+	fmt.Fprintln(stdout, string(out))
+	return 0
+}
+
+func cleanupIntegrationAgentBackups(agentRoot string, now time.Time, archiveAfter, deleteAfter time.Duration) (backupCleanupSummary, error) {
+	entries, err := os.ReadDir(agentRoot)
+	if err != nil {
+		return backupCleanupSummary{}, err
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		return strings.ToLower(entries[i].Name()) < strings.ToLower(entries[j].Name())
+	})
+
+	summary := backupCleanupSummary{}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		agentID := strings.TrimSpace(entry.Name())
+		if agentID == "" || strings.HasPrefix(agentID, ".") {
+			continue
+		}
+		if err := integrationagentarchive.ValidateAgentID(agentID); err != nil {
+			continue
+		}
+		summary.AgentCount++
+		if err := cleanupAgentWorkspaceBackups(filepath.Join(agentRoot, entry.Name()), now, archiveAfter, deleteAfter, &summary); err != nil {
+			return backupCleanupSummary{}, fmt.Errorf("cleanup agent %s: %w", agentID, err)
+		}
+	}
+	return summary, nil
+}
+
+func cleanupAgentWorkspaceBackups(workspace string, now time.Time, archiveAfter, deleteAfter time.Duration, summary *backupCleanupSummary) error {
+	entries, err := os.ReadDir(workspace)
+	if err != nil {
+		return err
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		return strings.ToLower(entries[i].Name()) < strings.ToLower(entries[j].Name())
+	})
+
+	bakDir := filepath.Join(workspace, "bak")
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !isAgentBackupFileName(name) {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if now.Sub(info.ModTime()) < archiveAfter {
+			continue
+		}
+		if err := os.MkdirAll(bakDir, 0o755); err != nil {
+			return err
+		}
+		src := filepath.Join(workspace, name)
+		dst, err := nextAvailableBackupPath(bakDir, name)
+		if err != nil {
+			return err
+		}
+		if err := os.Rename(src, dst); err != nil {
+			return err
+		}
+		summary.Archived = append(summary.Archived, backupCleanupMove{From: src, To: dst})
+	}
+
+	info, err := os.Stat(bakDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("bak exists but is not a directory: %s", bakDir)
+	}
+	return filepath.WalkDir(bakDir, func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if path == bakDir || d.IsDir() {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		if now.Sub(info.ModTime()) < deleteAfter {
+			return nil
+		}
+		if err := os.Remove(path); err != nil {
+			return err
+		}
+		summary.Deleted = append(summary.Deleted, path)
+		return nil
+	})
+}
+
+func isAgentBackupFileName(name string) bool {
+	lower := strings.ToLower(strings.TrimSpace(name))
+	if lower == "" {
+		return false
+	}
+	if lower == "user.md" || lower == "soul.md" {
+		return false
+	}
+	if !hasAgentBackupStem(lower) {
+		return false
+	}
+	return strings.Contains(lower, "bak") || hasTimestampLike(lower)
+}
+
+func hasAgentBackupStem(lower string) bool {
+	for _, stem := range []string{"user.md", "soul.md"} {
+		if strings.Contains(lower, stem) {
+			return true
+		}
+	}
+	return hasBackupStemPrefix(lower, "user") || hasBackupStemPrefix(lower, "soul")
+}
+
+func hasBackupStemPrefix(lower, stem string) bool {
+	if !strings.HasPrefix(lower, stem) || len(lower) <= len(stem) {
+		return false
+	}
+	next := lower[len(stem)]
+	if next >= '0' && next <= '9' {
+		return true
+	}
+	switch next {
+	case '.', '_', '-', ' ', '(', '[':
+		return true
+	default:
+		return false
+	}
+}
+
+func hasTimestampLike(name string) bool {
+	digits := 0
+	for i := 0; i < len(name); i++ {
+		if name[i] >= '0' && name[i] <= '9' {
+			digits++
+			if digits >= 8 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func nextAvailableBackupPath(dir, name string) (string, error) {
+	target := filepath.Join(dir, name)
+	if _, err := os.Stat(target); os.IsNotExist(err) {
+		return target, nil
+	} else if err != nil {
+		return "", err
+	}
+
+	ext := filepath.Ext(name)
+	base := strings.TrimSuffix(name, ext)
+	for idx := 1; ; idx++ {
+		candidate := filepath.Join(dir, fmt.Sprintf("%s.%d%s", base, idx, ext))
+		if _, err := os.Stat(candidate); os.IsNotExist(err) {
+			return candidate, nil
+		} else if err != nil {
+			return "", err
+		}
+	}
+}
+
 func runIntegrationNotifyCLI(args []string) {
 	fs := flag.NewFlagSet("notify", flag.ExitOnError)
 	title := fs.String("title", integrationCompletionNotificationTitle, "notification title")
@@ -14754,6 +15084,7 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 		metaMap["router_disable"] = t.RouterDisable
 		injectLiveAgentMediaIntoAgentList(metaMap)
 		injectLiveAgentKnowledgeIntoAgentList(metaMap)
+		injectLastResponseMetadata(metaMap, chatID)
 		if routerRemote := readAgentRouterRemote(cfg.AgentDir, cfg.Device, t.AgentID, agentTTL); len(routerRemote) > 0 {
 			metaMap["router_remote"] = routerRemote
 		}
@@ -14860,6 +15191,7 @@ func initCronDB() {
 	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_chat_agent_chat ON chat_log(agent_id, chat_id)`)
 	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_chat_agent_chat_time ON chat_log(agent_id, chat_id, created_at)`)
 	cronDB.Exec(`CREATE TABLE IF NOT EXISTS agent_message_log (id INTEGER PRIMARY KEY AUTOINCREMENT, agent_id TEXT NOT NULL DEFAULT '', chat_id TEXT NOT NULL DEFAULT '', content TEXT NOT NULL, log_type INTEGER NOT NULL, created_at TEXT NOT NULL)`)
+	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_agent_message_log_chat_type_time ON agent_message_log(chat_id, log_type, created_at)`)
 	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_agent_message_log_agent_chat_type_time ON agent_message_log(agent_id, chat_id, log_type, created_at)`)
 	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_agent_message_log_agent_chat_time ON agent_message_log(agent_id, chat_id, created_at)`)
 	cronDB.Exec(`CREATE TABLE IF NOT EXISTS cmd_log (id INTEGER PRIMARY KEY AUTOINCREMENT, agent_id TEXT NOT NULL, chat_id TEXT NOT NULL, tid TEXT NOT NULL, cmd TEXT NOT NULL, result TEXT NOT NULL DEFAULT '', status INTEGER NOT NULL DEFAULT -1, received_at TEXT NOT NULL, completed_at TEXT NOT NULL DEFAULT '')`)
@@ -14960,9 +15292,11 @@ func main() {
 	if shouldHandleIntegrationBundleAppLaunch(args) {
 		os.Exit(handleIntegrationBundleAppLaunch(os.Stderr))
 	}
-	if err := prepareIntegrationRuntimeLayout(); err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(1)
+	if shouldPrepareIntegrationRuntimeLayout(args) {
+		if err := prepareIntegrationRuntimeLayout(); err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			os.Exit(1)
+		}
 	}
 	if len(args) > 0 {
 		switch args[0] {
@@ -15045,6 +15379,8 @@ func main() {
 			}
 			runIntegrationFileLastUpdateCLI(args[1:], cfg)
 			return
+		case "backup-clean":
+			os.Exit(runIntegrationBackupCleanCLI(args[1:], os.Stdout, os.Stderr))
 		}
 		if !strings.HasPrefix(args[0], "-") && isIntegrationConnectSubcommand(args[0]) {
 			runIntegrationConnectCLI(args)
@@ -15052,6 +15388,18 @@ func main() {
 		}
 	}
 	os.Exit(runIntegrationForeground(args, os.Stderr))
+}
+
+func shouldPrepareIntegrationRuntimeLayout(args []string) bool {
+	if len(args) == 0 {
+		return true
+	}
+	switch strings.TrimSpace(args[0]) {
+	case "--help", "-h", "help", "backup-clean", "file-last-update":
+		return false
+	default:
+		return true
+	}
 }
 
 func normalizeIntegrationLaunchArgs(args []string) []string {

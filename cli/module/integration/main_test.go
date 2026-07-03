@@ -383,6 +383,82 @@ func TestProxyChatCompletions(t *testing.T) {
 	}
 }
 
+func TestProxyChatCompletionsInjectsLastResponseMetadata(t *testing.T) {
+	disableIntegrationNotificationsForTest(t)
+	agentDir, err := filepath.Abs("../agent/test-case")
+	if err != nil {
+		t.Fatalf("resolve agent dir: %v", err)
+	}
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tmp, "knowledge"), 0o755); err != nil {
+		t.Fatalf("mkdir knowledge: %v", err)
+	}
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	initCronDB()
+	defer func() {
+		if cronDB != nil {
+			_ = cronDB.Close()
+			cronDB = nil
+		}
+	}()
+
+	expectedAt := time.Date(2026, time.July, 3, 11, 22, 33, 444000000, time.Local)
+	if _, err := cronDB.Exec(`INSERT INTO agent_message_log (agent_id, chat_id, content, log_type, created_at) VALUES (?,?,?,?,?)`,
+		"A", "chat-last-response", "data: {\"choices\":[{\"delta\":{\"content\":\"ok\"}}]}\n\n", logTypeChatCompletionResponse, expectedAt.Format(roundLogStorageTimeLayout)); err != nil {
+		t.Fatalf("insert agent_message_log: %v", err)
+	}
+
+	var capturedBody map[string]interface{}
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &capturedBody)
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, "data: [DONE]\n\n")
+	}))
+	defer upstream.Close()
+
+	cfg := &Config{
+		Host:         upstream.URL,
+		AgentDir:     agentDir,
+		Device:       "test-dev-last-response",
+		AgentCacheMs: 120000,
+	}
+	proxyClient := &http.Client{Timeout: 10 * time.Second}
+	server := httptest.NewServer(http.HandlerFunc(handleChatCompletions(cfg, proxyClient)))
+	defer server.Close()
+
+	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"HELLO LAST RESPONSE"}],"metadata":{"agentId":"A","chat":"chat-last-response"}}`
+	req, err := http.NewRequest(http.MethodPost, server.URL, strings.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
+
+	meta, ok := capturedBody["metadata"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("metadata missing: %#v", capturedBody["metadata"])
+	}
+	gotLastResponse, ok := meta["lastResponse"].(float64)
+	if !ok || int64(gotLastResponse) != expectedAt.UnixMilli() {
+		t.Fatalf("metadata.lastResponse = %#v, want %d", meta["lastResponse"], expectedAt.UnixMilli())
+	}
+}
+
 func TestProxyChatCompletionsSendsNotificationOnCompletion(t *testing.T) {
 	agentDir, err := filepath.Abs("../agent/test-case")
 	if err != nil {
@@ -2989,6 +3065,99 @@ func TestHandleFileLastUpdate(t *testing.T) {
 	}
 }
 
+func TestCleanupIntegrationAgentBackupsMovesAndDeletesFiles(t *testing.T) {
+	now := time.Date(2026, 7, 3, 12, 0, 0, 0, time.UTC)
+	agentRoot := filepath.Join(t.TempDir(), "agents")
+	workspaceA := filepath.Join(agentRoot, "A")
+	workspaceB := filepath.Join(agentRoot, "B")
+	if err := os.MkdirAll(workspaceA, 0o755); err != nil {
+		t.Fatalf("mkdir workspaceA: %v", err)
+	}
+	if err := os.MkdirAll(workspaceB, 0o755); err != nil {
+		t.Fatalf("mkdir workspaceB: %v", err)
+	}
+
+	mustWriteWithModTime := func(path string, body string, modTime time.Time) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatalf("mkdir parent for %s: %v", path, err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatalf("write %s: %v", path, err)
+		}
+		if err := os.Chtimes(path, modTime, modTime); err != nil {
+			t.Fatalf("chtimes %s: %v", path, err)
+		}
+	}
+
+	mustWriteWithModTime(filepath.Join(workspaceA, "USER.md"), "current-user", now.Add(-2*time.Hour))
+	mustWriteWithModTime(filepath.Join(workspaceA, "SOUL.md"), "current-soul", now.Add(-2*time.Hour))
+	mustWriteWithModTime(filepath.Join(workspaceA, "USER.md.bak"), "stale-user-backup", now.Add(-30*time.Hour))
+	mustWriteWithModTime(filepath.Join(workspaceA, "Soul-20260701-120000.md"), "stale-soul-backup", now.Add(-36*time.Hour))
+	mustWriteWithModTime(filepath.Join(workspaceA, "USER_20260703.md"), "fresh-user-backup", now.Add(-3*time.Hour))
+	mustWriteWithModTime(filepath.Join(workspaceA, "USER_GUIDE.md"), "guide", now.Add(-96*time.Hour))
+	mustWriteWithModTime(filepath.Join(workspaceA, "bak", "USER.md.bak"), "existing-bak", now.Add(-10*time.Hour))
+	mustWriteWithModTime(filepath.Join(workspaceA, "bak", "SOUL.md.20260628.bak"), "too-old-in-bak", now.Add(-80*time.Hour))
+	mustWriteWithModTime(filepath.Join(workspaceA, "bak", "SOUL.md.20260702.bak"), "fresh-in-bak", now.Add(-40*time.Hour))
+
+	mustWriteWithModTime(filepath.Join(workspaceB, "SOUL_20260628_120000.md"), "very-old-root-backup", now.Add(-90*time.Hour))
+
+	summary, err := cleanupIntegrationAgentBackups(agentRoot, now, 24*time.Hour, 72*time.Hour)
+	if err != nil {
+		t.Fatalf("cleanupIntegrationAgentBackups: %v", err)
+	}
+	if summary.AgentCount != 2 {
+		t.Fatalf("agentCount = %d, want 2", summary.AgentCount)
+	}
+	if len(summary.Archived) != 3 {
+		t.Fatalf("archived count = %d, want 3; summary=%+v", len(summary.Archived), summary)
+	}
+	if len(summary.Deleted) != 2 {
+		t.Fatalf("deleted count = %d, want 2; summary=%+v", len(summary.Deleted), summary)
+	}
+
+	if _, err := os.Stat(filepath.Join(workspaceA, "USER.md")); err != nil {
+		t.Fatalf("USER.md should remain: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(workspaceA, "SOUL.md")); err != nil {
+		t.Fatalf("SOUL.md should remain: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(workspaceA, "USER_20260703.md")); err != nil {
+		t.Fatalf("fresh backup should remain in workspace root: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(workspaceA, "USER_GUIDE.md")); err != nil {
+		t.Fatalf("USER_GUIDE.md should not be treated as backup: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(workspaceA, "USER.md.bak")); !os.IsNotExist(err) {
+		t.Fatalf("stale root USER.md.bak should have been moved, err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(workspaceA, "Soul-20260701-120000.md")); !os.IsNotExist(err) {
+		t.Fatalf("stale root Soul backup should have been moved, err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(workspaceB, "SOUL_20260628_120000.md")); !os.IsNotExist(err) {
+		t.Fatalf("very old root backup should be removed from workspace root, err=%v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(workspaceA, "bak", "USER.md.bak")); err != nil {
+		t.Fatalf("existing bak file should remain: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(workspaceA, "bak", "USER.md.1.bak")); err != nil {
+		t.Fatalf("moved bak file should use collision-safe name: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(workspaceA, "bak", "Soul-20260701-120000.md")); err != nil {
+		t.Fatalf("stale soul backup should move into bak: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(workspaceA, "bak", "SOUL.md.20260628.bak")); !os.IsNotExist(err) {
+		t.Fatalf("old bak file should be deleted, err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(workspaceA, "bak", "SOUL.md.20260702.bak")); err != nil {
+		t.Fatalf("fresh bak file should remain: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(workspaceB, "bak", "SOUL_20260628_120000.md")); !os.IsNotExist(err) {
+		t.Fatalf("very old file should also be deleted from bak, err=%v", err)
+	}
+}
+
 func TestHandleAgentCreateAllowsNestedRelativePath(t *testing.T) {
 	flushAgentCache()
 	agentRoot := t.TempDir()
@@ -5453,11 +5622,17 @@ func TestAppStaticFiles(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(appRoot, "assets"), 0o755); err != nil {
 		t.Fatalf("mkdir app assets: %v", err)
 	}
+	if err := os.MkdirAll(filepath.Join(appRoot, "demos", "nested"), 0o755); err != nil {
+		t.Fatalf("mkdir nested demo dir: %v", err)
+	}
 	if err := os.WriteFile(filepath.Join(appRoot, "index.html"), []byte("APP HOME\n"), 0o644); err != nil {
 		t.Fatalf("write app index: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(appRoot, "assets", "hello.js"), []byte("console.log('hello app')\n"), 0o644); err != nil {
 		t.Fatalf("write app asset: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appRoot, "demos", "nested", "index.html"), []byte("NESTED HOME\n"), 0o644); err != nil {
+		t.Fatalf("write nested app index: %v", err)
 	}
 
 	mux := http.NewServeMux()
@@ -5471,6 +5646,9 @@ func TestAppStaticFiles(t *testing.T) {
 		want string
 	}{
 		{"/app/demo-agent/", "APP HOME"},
+		{"/app/demo-agent/index.html", "APP HOME"},
+		{"/app/demo-agent/demos/nested/", "NESTED HOME"},
+		{"/app/demo-agent/demos/nested/index.html", "NESTED HOME"},
 		{"/app/demo-agent/assets/hello.js", "console.log('hello app')"},
 	}
 	for _, tt := range tests {
@@ -5486,6 +5664,47 @@ func TestAppStaticFiles(t *testing.T) {
 		if strings.TrimSpace(string(body)) != tt.want {
 			t.Errorf("GET %s: %q, want %q", tt.path, strings.TrimSpace(string(body)), tt.want)
 		}
+	}
+}
+
+func TestAppStaticExplicitIndexDoesNotRedirect(t *testing.T) {
+	tmp := t.TempDir()
+	agentRoot := filepath.Join(tmp, "agent")
+	appRoot := filepath.Join(agentRoot, "demo-agent", "app")
+	if err := os.MkdirAll(appRoot, 0o755); err != nil {
+		t.Fatalf("mkdir app root: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appRoot, "index.html"), []byte("APP HOME\n"), 0o644); err != nil {
+		t.Fatalf("write app index: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	registerAppStatic(mux, &Config{AgentDir: agentRoot})
+
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	client := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
+	resp, err := client.Get(server.URL + "/app/demo-agent/index.html")
+	if err != nil {
+		t.Fatalf("GET explicit index: %v", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET explicit index status = %d, body = %s", resp.StatusCode, string(body))
+	}
+	if location := resp.Header.Get("Location"); strings.TrimSpace(location) != "" {
+		t.Fatalf("GET explicit index should not redirect, Location = %q", location)
+	}
+	if strings.TrimSpace(string(body)) != "APP HOME" {
+		t.Fatalf("GET explicit index body = %q", strings.TrimSpace(string(body)))
 	}
 }
 
@@ -6780,6 +6999,78 @@ func TestHeartbeatRefreshesMediaWithoutWaitingForAgentCache(t *testing.T) {
 	}
 }
 
+func TestHeartbeatInjectsLastResponseForLatestPageSessionChat(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	initCronDB()
+	defer func() {
+		if cronDB != nil {
+			_ = cronDB.Close()
+			cronDB = nil
+		}
+	}()
+
+	expectedAt := time.Date(2026, time.July, 3, 12, 34, 56, 789000000, time.Local)
+	createdAt := expectedAt.Format(roundLogStorageTimeLayout)
+	if _, err := cronDB.Exec(`INSERT INTO chat_log (agent_id, chat_id, chat_type, role, response_type, content, created_at) VALUES (?,?,?,?,?,?,?)`,
+		"A", "chat-current", chatTypePageSession, "A", "normal", "data: {\"choices\":[{\"delta\":{\"content\":\"ok\"}}]}\n\n", createdAt); err != nil {
+		t.Fatalf("insert chat_log: %v", err)
+	}
+	if _, err := cronDB.Exec(`INSERT INTO agent_message_log (agent_id, chat_id, content, log_type, created_at) VALUES (?,?,?,?,?)`,
+		"A", "chat-current", "data: {\"choices\":[{\"delta\":{\"content\":\"ok\"}}]}\n\n", logTypeChatCompletionResponse, createdAt); err != nil {
+		t.Fatalf("insert agent_message_log: %v", err)
+	}
+
+	var capturedGet map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &capturedGet)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(ResponsePayload{
+			Code: 200,
+			Choices: []struct {
+				Message struct {
+					Role    string      `json:"role"`
+					Content interface{} `json:"content"`
+				} `json:"message"`
+			}{
+				{Message: struct {
+					Role    string      `json:"role"`
+					Content interface{} `json:"content"`
+				}{Role: "assistant", Content: nil}},
+			},
+		})
+	}))
+	defer server.Close()
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	metadata := &AgentOutput{
+		DeviceID: "d",
+		Agents:   []Agent{{AgentID: "A", Workspace: "/tmp/a"}},
+	}
+
+	if _, err := heartbeat(client, server.URL, metadata, nil); err != nil {
+		t.Fatalf("heartbeat: %v", err)
+	}
+
+	meta, ok := capturedGet["metadata"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("metadata missing: %#v", capturedGet["metadata"])
+	}
+	gotLastResponse, ok := meta["lastResponse"].(float64)
+	if !ok || int64(gotLastResponse) != expectedAt.UnixMilli() {
+		t.Fatalf("metadata.lastResponse = %#v, want %d", meta["lastResponse"], expectedAt.UnixMilli())
+	}
+}
+
 func TestCliGetWritesUnifiedEventLogs(t *testing.T) {
 	oldwd, err := os.Getwd()
 	if err != nil {
@@ -8041,6 +8332,34 @@ func TestEnsureTokenStoreRenamesProviderLogTable(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("proxy_agent_provider_log count = %d, want 1", count)
+	}
+}
+
+func TestInitCronDBCreatesChatScopedAgentMessageLogIndex(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	initCronDB()
+	defer func() {
+		if cronDB != nil {
+			_ = cronDB.Close()
+			cronDB = nil
+		}
+	}()
+
+	var count int
+	if err := cronDB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_agent_message_log_chat_type_time'`).Scan(&count); err != nil {
+		t.Fatalf("query sqlite_master: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("idx_agent_message_log_chat_type_time count = %d, want 1", count)
 	}
 }
 
@@ -11262,6 +11581,18 @@ func TestIntegrationCLIHelpIncludesFileLastUpdate(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "file-last-update   Print milliseconds since the target file was last updated") {
 		t.Fatalf("missing file-last-update command description: %s", stdout)
+	}
+}
+
+func TestIntegrationCLIHelpIncludesBackupClean(t *testing.T) {
+	stdout := captureIntegrationStdout(t, func() {
+		printCLIHelp()
+	})
+	if !strings.Contains(stdout, "integration backup-clean [options]") {
+		t.Fatalf("missing backup-clean usage: %s", stdout)
+	}
+	if !strings.Contains(stdout, "backup-clean       Move stale User/Soul backup files into bak and delete stale bak files") {
+		t.Fatalf("missing backup-clean command description: %s", stdout)
 	}
 }
 
@@ -14783,6 +15114,60 @@ func TestRunIntegrationNotifyCLIReportsSupportedFromNotificationPackage(t *testi
 	}
 	if got.Title != " Windows通知 " || got.Message != " 已完成 " {
 		t.Fatalf("notify options = %#v, want original flag values", got)
+	}
+}
+
+func TestRunIntegrationBackupCleanCLIOutputsJSON(t *testing.T) {
+	agentRoot := filepath.Join(t.TempDir(), "agents")
+	workspace := filepath.Join(agentRoot, "agent-a")
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		t.Fatalf("mkdir workspace: %v", err)
+	}
+	target := filepath.Join(workspace, "USER.md.bak")
+	if err := os.WriteFile(target, []byte("backup"), 0o644); err != nil {
+		t.Fatalf("write backup file: %v", err)
+	}
+	oldTime := time.Now().Add(-30 * time.Hour).Truncate(time.Second)
+	if err := os.Chtimes(target, oldTime, oldTime); err != nil {
+		t.Fatalf("chtimes backup file: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := runIntegrationBackupCleanCLI([]string{"--agent-dir", agentRoot}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("code = %d, stderr = %s", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr should be empty, got %q", stderr.String())
+	}
+
+	var payload struct {
+		Status      int                 `json:"status"`
+		AgentDir    string              `json:"agentDir"`
+		AgentCount  int                 `json:"agentCount"`
+		ArchivedCnt int                 `json:"archivedCnt"`
+		DeletedCnt  int                 `json:"deletedCnt"`
+		Archived    []backupCleanupMove `json:"archived"`
+		Deleted     []string            `json:"deleted"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("decode stdout: %v; raw=%s", err, stdout.String())
+	}
+	if payload.Status != 0 {
+		t.Fatalf("status = %d; raw=%s", payload.Status, stdout.String())
+	}
+	if payload.AgentCount != 1 {
+		t.Fatalf("agentCount = %d, want 1", payload.AgentCount)
+	}
+	if payload.ArchivedCnt != 1 || len(payload.Archived) != 1 {
+		t.Fatalf("archived count = %d/%d, want 1/1; raw=%s", payload.ArchivedCnt, len(payload.Archived), stdout.String())
+	}
+	if payload.DeletedCnt != 0 || len(payload.Deleted) != 0 {
+		t.Fatalf("deleted count = %d/%d, want 0/0; raw=%s", payload.DeletedCnt, len(payload.Deleted), stdout.String())
+	}
+	if _, err := os.Stat(filepath.Join(workspace, "bak", "USER.md.bak")); err != nil {
+		t.Fatalf("backup file should be moved into bak: %v", err)
 	}
 }
 

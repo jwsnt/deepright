@@ -2,9 +2,9 @@ package ai.deepright.llm.optimize.rag;
 
 import ai.deepright.cli.CliPrinter;
 import ai.deepright.complex.ComplexityUtils;
+import ai.deepright.feature.FeatureFlag;
 import ai.deepright.lang.XmlResourceLang;
 import ai.deepright.llm.provider.RequestContextUtils;
-import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.llm.Segment;
 import ai.open.right.workflow.flow.llm.rag.RagCondition;
 import ai.open.right.workflow.flow.llm.rag.RagConfig;
@@ -47,21 +47,23 @@ public class RequestModelRag extends RagCondition implements RagService {
         Long bytes = ragData.getQuery().delMetadata(RequestModelRag.LANG_KEY_REQUEST_CAPACITY, Long.class);
         if (!StringUtils.isEmpty(model) && bytes != null) {
             if ((bytes / (double) RequestContextUtils.limit(ragData.getQuery(), ragData.getRequest().getModel()) > this.focusRate)) {
-                this.notify(ragData.getQuery(), XmlResourceLang.get(RequestModelRag.LANG_KEY_REQUEST_CAPACITY).replace("#size", String.valueOf(bytes / 1024)).replace("#model", model));
+                this.notify(ragConfig, ragData, XmlResourceLang.get(RequestModelRag.LANG_KEY_REQUEST_CAPACITY).replace("#size", String.valueOf(bytes / 1024)).replace("#model", model));
                 ComplexityUtils.upgrade(ragData.getQuery());
             }
         }
         return new RagAtOnce(ragConfig);
     }
 
-    public void notify(WorkflowTask workTask, String content) throws Exception {
-        Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
-                .metadata(CliPrinter.process(RequestModelRag.RAG_KEY))
-                .content(new StringBuffer(content))
-                .workflow(workTask.getWorkflow())
-                .notifier(Notifier.SOURCE)
-                .build();
-        this.notifierService.notify(Segment.build(workTask, segmentConfig), workTask, workTask);
+    public void notify(RagConfig ragConfig, RagData ragData, String content) throws Exception {
+        if (!FeatureFlag.isSilent(ragData.getQuery())) {
+            Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
+                    .metadata(CliPrinter.process(RequestModelRag.RAG_KEY))
+                    .content(new StringBuffer(content))
+                    .workflow(ragData.getQuery().getWorkflow())
+                    .notifier(Notifier.SOURCE)
+                    .build();
+            this.notifierService.notify(Segment.build(ragData.getQuery(), segmentConfig), ragData.getQuery(), ragData.getQuery());
+        }
     }
 
     @Order(Ordered.LOWEST_PRECEDENCE - 1)

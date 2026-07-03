@@ -53,7 +53,7 @@ public class TaskExec implements Runnable {
     public TaskExec init(Integer timeout) throws Exception {
         long timestamp = System.currentTimeMillis() + timeout;
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern(TaskExec.FORMAT);
-        this.filename = FeatureUtils.buildWorkspace(this.workTask) + FeatureUtils.buildFileSeparator(this.workTask) + TaskExec.TEMP + FeatureUtils.buildFileSeparator(this.workTask) + TaskExec.PREFIX + (this.deadline = LocalDateTime.ofInstant(Instant.ofEpochMilli(timestamp), ZoneId.of(FeatureUtils.buildTimezone(this.workTask))).format(formatter)) + TaskExec.SUFFIX;
+        this.filename = FeatureUtils.buildWorkspace(this.workTask) + FeatureUtils.buildFileSeparator(this.workTask) + TaskExec.TEMP + FeatureUtils.buildFileSeparator(this.workTask) + TaskExec.PREFIX + (this.deadline = LocalDateTime.ofInstant(Instant.ofEpochMilli(timestamp), this.buildZoneId(this.workTask)).format(formatter)) + TaskExec.SUFFIX;
         return this;
     }
 
@@ -76,5 +76,10 @@ public class TaskExec implements Runnable {
         } catch (Exception e) {
             WorkflowException.dolog(e);
         }
+    }
+
+    protected ZoneId buildZoneId(WorkflowTask workTask) throws Exception {
+        String timezone = FeatureUtils.buildTimezone(workTask);
+        return StringUtils.isBlank(timezone) ? ZoneId.systemDefault() : ZoneId.of(timezone);
     }
 }

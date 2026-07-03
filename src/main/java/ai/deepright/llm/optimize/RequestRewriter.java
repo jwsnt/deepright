@@ -4,6 +4,7 @@ import ai.deepright.cli.CliPrinter;
 import ai.deepright.cli.CliSubFetcher;
 import ai.deepright.complex.ComplexityMode;
 import ai.deepright.complex.ComplexityUtils;
+import ai.deepright.feature.FeatureFlag;
 import ai.deepright.lang.XmlResourceLang;
 import ai.deepright.llm.provider.RequestContextUtils;
 import ai.deepright.llm.provider.RequestFunCallStore;
@@ -309,13 +310,15 @@ public class RequestRewriter implements ProviderRequestRewriter {
     }
 
     public void notify(WorkflowTask workTask) throws Exception {
-        Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
-                .content(new StringBuffer(XmlResourceLang.get(RequestRewriter.LANG_KEY_REWRITE_MESSAGE)))
-                .metadata(CliPrinter.process(RequestRewriter.KEY))
-                .workflow(workTask.getWorkflow())
-                .notifier(Notifier.SOURCE)
-                .build();
-        this.notifierService.notify(Segment.build(workTask, segmentConfig), workTask, workTask);
+        if (!FeatureFlag.isSilent(workTask)) {
+            Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
+                    .content(new StringBuffer(XmlResourceLang.get(RequestRewriter.LANG_KEY_REWRITE_MESSAGE)))
+                    .metadata(CliPrinter.process(RequestRewriter.KEY))
+                    .workflow(workTask.getWorkflow())
+                    .notifier(Notifier.SOURCE)
+                    .build();
+            this.notifierService.notify(Segment.build(workTask, segmentConfig), workTask, workTask);
+        }
     }
 
     @Getter

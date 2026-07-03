@@ -1,8 +1,14 @@
 package ai.deepright.llm.optimize.rag;
 
+import ai.deepright.feature.FeatureFlag;
+import ai.deepright.feature.FeatureUtils;
+import ai.deepright.lang.XmlResourceLang;
+import ai.deepright.llm.notifier.MultiSourceFlag;
 import ai.deepright.llm.provider.RequestContextBuilder;
 import ai.deepright.utils.TemplateChecker;
+import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.resouce.ResourceService;
+import ai.open.right.workflow.flow.llm.Segment;
 import ai.open.right.workflow.flow.llm.rag.RagCondition;
 import ai.open.right.workflow.flow.llm.rag.RagConfig;
 import ai.open.right.workflow.flow.llm.rag.RagData;
@@ -10,12 +16,16 @@ import ai.open.right.workflow.flow.llm.rag.RagService;
 import ai.open.right.workflow.flow.llm.rag.future.RagAtOnce;
 import ai.open.right.workflow.flow.llm.rag.future.RagFuture;
 import ai.open.right.workflow.flow.llm.store.history.History;
+import ai.open.right.workflow.notify.Notifier;
+import com.google.common.collect.ImmutableMap;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +38,8 @@ import org.springframework.util.Assert;
 
 import java.io.BufferedInputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -36,6 +48,8 @@ import java.util.concurrent.TimeUnit;
 @Getter
 public class RequestExpiredRag extends RagCondition implements RagService {
 
+    public static final String LANG_KEY_REQUEST_EXPIRED = "request.expired";
+
     public static final String RAG_KEY = "rag_expired";
 
     protected ResourceService resourceService;
@@ -43,6 +57,10 @@ public class RequestExpiredRag extends RagCondition implements RagService {
     protected String template4expired;
 
     protected Integer expired;
+
+    protected Integer offset;
+
+    protected Integer delay;
 
     @PostConstruct
     public void init() throws Exception {
@@ -55,11 +73,12 @@ public class RequestExpiredRag extends RagCondition implements RagService {
         if (!this.allowed(ragConfig, ragData)) {
             return RagFuture.NOTHING;
         }
-        this.buildExpired(ragConfig, ragData);
+        this.buildConversationExpired(ragConfig, ragData);
+        this.buildHistoryExpired(ragConfig, ragData);
         return new RagAtOnce(ragConfig);
     }
 
-    protected String buildContent(RagConfig ragConfig, RagData ragData, Long expired) throws Exception {
+    protected String buildHistoryExpired(RagConfig ragConfig, RagData ragData, Long expired) throws Exception {
         String template = this.template4expired.replace("#expired", String.valueOf(TimeUnit.MINUTES.convert(expired, TimeUnit.MILLISECONDS)));
         if (log.isWarnEnabled() && !TemplateChecker.check(template)) {
             log.warn("The template contains unexpected characters, please check: {}", template);
@@ -67,7 +86,14 @@ public class RequestExpiredRag extends RagCondition implements RagService {
         return template;
     }
 
-    protected void buildExpired(RagConfig ragConfig, RagData ragData) throws Exception {
+    protected void buildConversationExpired(RagConfig ragConfig, RagData ragData) throws Exception {
+        Long lastResponse = MapUtils.getLong(ragData.getQuery().getMetadata(), "lastResponse");
+        if (lastResponse != null && ragData.getQuery().isEntry() && (System.currentTimeMillis() - ZonedDateTime.now(this.buildZoneId(ragConfig, ragData)).toInstant().toEpochMilli()) > this.offset) {
+            this.notify(ragConfig, ragData);
+        }
+    }
+
+    protected void buildHistoryExpired(RagConfig ragConfig, RagData ragData) throws Exception {
         // History内部不一定有序
         List<History> histories = ragData.getQuery().getHistories();
         if (!CollectionUtils.isEmpty(histories)) {
@@ -88,8 +114,25 @@ public class RequestExpiredRag extends RagCondition implements RagService {
             if (lastIndex != null) {
                 History history = histories.get(lastIndex);
                 Long expired = System.currentTimeMillis() - history.getCreated();
-                histories.add(RequestContextBuilder.buildContext(ragData.getRequest(), this.buildContent(ragConfig, ragData, expired), History.ROLE_ASSISTANT, history.getCreated() + 1));
+                histories.add(RequestContextBuilder.buildContext(ragData.getRequest(), this.buildHistoryExpired(ragConfig, ragData, expired), History.ROLE_ASSISTANT, history.getCreated() + 1));
             }
+        }
+    }
+
+    protected ZoneId buildZoneId(RagConfig ragConfig, RagData ragData) throws Exception {
+        String timezone = FeatureUtils.buildTimezone(ragData.getQuery());
+        return StringUtils.isBlank(timezone) ? ZoneId.systemDefault() : ZoneId.of(timezone);
+    }
+
+    public void notify(RagConfig ragConfig, RagData ragData) throws Exception {
+        if (!FeatureFlag.isSilent(ragData.getQuery())) {
+            Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
+                    .metadata(ImmutableMap.of(MultiSourceFlag.RETRY, ProtocolCode.C404, MultiSourceFlag.DELAY, this.delay))
+                    .content(new StringBuffer(XmlResourceLang.get(RequestExpiredRag.LANG_KEY_REQUEST_EXPIRED)))
+                    .workflow(ragData.getQuery().getWorkflow())
+                    .notifier(Notifier.SOURCE)
+                    .build();
+            this.notifierService.notify(Segment.build(ragData.getQuery(), segmentConfig), ragData.getQuery(), ragData.getQuery());
         }
     }
 
@@ -107,6 +150,12 @@ public class RequestExpiredRag extends RagCondition implements RagService {
 
         @Value("${optimize.expired:600000}")
         protected Integer expired;
+
+        @Value("${llm.recallOffset}")
+        protected Integer offset;
+
+        @Value("${optimize.expired.delay:5000}")
+        protected Integer delay;
 
         @Bean(RequestExpiredRag.RAG_KEY)
         @ConditionalOnMissingBean(name = RequestExpiredRag.RAG_KEY)

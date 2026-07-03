@@ -872,11 +872,20 @@ animation:queuedInsertExplosion .62s ease-out both}
 [data-theme="dark"] .message-task-badge{color:rgba(24,12,8,.84)}
 .message.error{background:linear-gradient(145deg,rgba(255,120,134,.18),rgba(255,255,255,.12));border:1px solid rgba(255,90,107,.38);color:var(--error)}
 .message-actions{position:static;display:flex;align-items:center;justify-content:flex-end;gap:6px;z-index:40;pointer-events:auto;max-width:100%;flex:0 0 auto}
-.message-copy-btn,.message-retry-btn,.message-edit-btn{width:15px;height:15px;padding:0;border:none;border-radius:999px;background:transparent;color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.55;transition:opacity .16s ease,transform .16s ease,color .16s ease,background-color .16s ease,box-shadow .16s ease;pointer-events:auto;appearance:none;-webkit-appearance:none;box-shadow:none}
-.message-copy-btn:hover,.message-copy-btn:focus-visible,.message-retry-btn:hover,.message-retry-btn:focus-visible,.message-edit-btn:hover,.message-edit-btn:focus-visible{opacity:1;transform:translateY(-1px);color:var(--text-primary);background:rgba(77,107,254,.08);box-shadow:0 0 0 1px rgba(77,107,254,.14);outline:none}
-.message-copy-btn svg,.message-retry-btn svg,.message-edit-btn svg{width:15px;height:15px;display:block;fill:currentColor}
-.message-retry-btn:disabled,.message-edit-btn:disabled{opacity:.22;cursor:not-allowed;pointer-events:none;transform:none}
-[data-theme="dark"] .message-copy-btn:hover,[data-theme="dark"] .message-copy-btn:focus-visible,[data-theme="dark"] .message-retry-btn:hover,[data-theme="dark"] .message-retry-btn:focus-visible,[data-theme="dark"] .message-edit-btn:hover,[data-theme="dark"] .message-edit-btn:focus-visible{background:rgba(142,180,255,.14);box-shadow:0 0 0 1px rgba(142,180,255,.18)}
+.message-copy-btn,.message-retry-btn,.message-edit-btn,.message-scroll-top-btn{width:15px;height:15px;padding:0;border:none;border-radius:999px;background:transparent;color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.55;transition:opacity .16s ease,transform .16s ease,color .16s ease,background-color .16s ease,box-shadow .16s ease;pointer-events:auto;appearance:none;-webkit-appearance:none;box-shadow:none}
+.message-scroll-top-btn{display:none}
+.message-scroll-top-btn.show{display:flex}
+.message-copy-btn:hover,.message-copy-btn:focus-visible,.message-retry-btn:hover,.message-retry-btn:focus-visible,.message-edit-btn:hover,.message-edit-btn:focus-visible,.message-scroll-top-btn:hover,.message-scroll-top-btn:focus-visible{opacity:1;transform:translateY(-1px);color:var(--text-primary);background:rgba(77,107,254,.08);box-shadow:0 0 0 1px rgba(77,107,254,.14);outline:none}
+.message-copy-btn svg,.message-retry-btn svg,.message-edit-btn svg,.message-scroll-top-btn svg{width:15px;height:15px;display:block;fill:currentColor}
+.message-scroll-top-btn svg{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.message-retry-btn:disabled,.message-edit-btn:disabled,.message-scroll-top-btn:disabled{opacity:.22;cursor:not-allowed;pointer-events:none;transform:none}
+[data-theme="dark"] .message-copy-btn:hover,[data-theme="dark"] .message-copy-btn:focus-visible,[data-theme="dark"] .message-retry-btn:hover,[data-theme="dark"] .message-retry-btn:focus-visible,[data-theme="dark"] .message-edit-btn:hover,[data-theme="dark"] .message-edit-btn:focus-visible,[data-theme="dark"] .message-scroll-top-btn:hover,[data-theme="dark"] .message-scroll-top-btn:focus-visible{background:rgba(142,180,255,.14);box-shadow:0 0 0 1px rgba(142,180,255,.18)}
+.chat-scroll-bottom-btn{position:fixed;left:0;top:0;width:22px;height:22px;padding:0;border:none;border-radius:8px;background:linear-gradient(180deg,rgba(255,255,255,.94),rgba(228,237,252,.88));color:#4c6494;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 10px 24px rgba(39,65,128,.14),inset 0 1px 0 rgba(255,255,255,.94);transition:opacity .18s ease,transform .18s ease,filter .18s ease,color .18s ease,background-color .18s ease,box-shadow .18s ease;opacity:0;visibility:hidden;pointer-events:none;transform:translateY(8px) scale(.92);z-index:6}
+.chat-scroll-bottom-btn.show{opacity:.5;visibility:visible;pointer-events:auto;transform:translateY(0) scale(1)}
+.chat-scroll-bottom-btn:hover,.chat-scroll-bottom-btn:focus-visible{opacity:.72;color:var(--text-primary);background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(235,243,255,.96));box-shadow:0 14px 28px rgba(39,65,128,.18),inset 0 1px 0 rgba(255,255,255,.98);outline:none}
+.chat-scroll-bottom-btn svg{width:14px;height:14px;display:block;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+[data-theme="dark"] .chat-scroll-bottom-btn{background:linear-gradient(180deg,rgba(21,36,62,.96),rgba(10,20,38,.92));color:#c9dafc;box-shadow:0 10px 24px rgba(0,0,0,.26),inset 0 1px 0 rgba(255,255,255,.08)}
+[data-theme="dark"] .chat-scroll-bottom-btn:hover,[data-theme="dark"] .chat-scroll-bottom-btn:focus-visible{background:linear-gradient(180deg,rgba(24,43,78,.98),rgba(12,24,47,.96));box-shadow:0 14px 28px rgba(0,0,0,.32),inset 0 1px 0 rgba(255,255,255,.1)}
 .greeting{text-align:center;padding:0;color:var(--accent);font-size:18px;max-width:100%;margin:auto;position:relative;width:100%;height:100%;min-height:560px;display:flex;align-items:center;justify-content:center;isolation:isolate}
 .greeting::before,.greeting::after{content:'';position:absolute;pointer-events:none;filter:blur(10px);opacity:.9}
 .greeting::before{width:min(38vw,460px);height:min(38vw,460px);left:10%;top:10%;border-radius:45% 55% 62% 38%/40% 42% 58% 60%;background:radial-gradient(circle at 35% 35%,rgba(255,255,255,.72),rgba(129,187,255,.18) 50%,transparent 74%);animation:liquidBlobFloat 14s ease-in-out infinite}
@@ -3454,6 +3463,12 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
       </svg>
     </button>
     <div class="chat-container" id="chatContainer"></div>
+    <button type="button" class="chat-scroll-bottom-btn" id="chatScrollBottomBtn" onclick="scrollActiveAssistantToBottom(event)" title="沉底到当前响应末尾" aria-label="沉底到当前响应末尾" aria-hidden="true">
+      <svg viewBox="0 0 20 20" aria-hidden="true">
+        <path d="M10 4.5v10"></path>
+        <path d="m5.75 10.75 4.25 4.25 4.25-4.25"></path>
+      </svg>
+    </button>
     <div class="input-area" id="centerInputArea">
       <div class="working-indicator" id="workingIndicator" aria-live="polite">
         <div class="working-indicator-particles" id="workingIndicatorParticles" aria-hidden="true"></div>
@@ -5276,6 +5291,22 @@ function isRemoteReadonlySiteAccess() {
   return !isLocalHostName(String(location.hostname || '').trim().toLowerCase());
 }
 
+function compareConfiguredModelNames(a, b) {
+  const modelA = normalizeModelName(a);
+  const modelB = normalizeModelName(b);
+  if (!modelA && !modelB) return 0;
+  if (!modelA) return 1;
+  if (!modelB) return -1;
+  const deeprightA = modelA === 'deepright';
+  const deeprightB = modelB === 'deepright';
+  if (deeprightA !== deeprightB) return deeprightA ? -1 : 1;
+  return modelA.localeCompare(modelB, 'en', { sensitivity: 'base' });
+}
+
+function getOrderedConfiguredModelNames(modelMap) {
+  return Object.keys(modelMap || {}).sort(compareConfiguredModelNames);
+}
+
 function normalizeModelMap(input) {
   const output = {};
   if (!input || typeof input !== 'object' || Array.isArray(input)) return output;
@@ -5287,7 +5318,11 @@ function normalizeModelMap(input) {
       output[normalizedKey] = value;
     }
   });
-  return output;
+  const ordered = {};
+  getOrderedConfiguredModelNames(output).forEach(key => {
+    ordered[key] = output[key];
+  });
+  return ordered;
 }
 
 function normalizeModelConfig(input) {
@@ -5946,6 +5981,9 @@ const ENERGY_SAVER_PAGE_TASK_INTERVALS = Object.freeze({
 });
 const DOC_TIDY_STALE_THRESHOLD_MS = 8 * 60 * 60 * 1000;
 const CHAT_AUTO_SCROLL_THRESHOLD_PX = 72;
+const CHAT_SCROLL_CONTROL_SYNC_MARGIN_PX = 6;
+const CHAT_MESSAGE_SCROLL_ALIGN_TOP_PX = 10;
+const CHAT_SCROLL_BOTTOM_BTN_CORNER_OVERHANG_PX = 11;
 let docTidyLastUpdateState = {};
 let docTidyDismissedState = {};
 
@@ -10173,6 +10211,7 @@ function syncLayoutVars() {
     root.style.setProperty('--toast-vfs-bottom', '36px');
   }
   syncVfsUploadToastPlacement();
+  scheduleChatScrollControlsSync();
   if (isOnboardingActive()) scheduleOnboardingSync();
 }
 
@@ -10295,12 +10334,44 @@ function isRightSidebarCollapsed() {
   return !!(rightSidebar && rightSidebar.classList.contains('collapsed'));
 }
 
+const URL_PREVIEW_BLOCKED_RESOURCE_EXTENSIONS = new Set([
+  'js', 'mjs', 'cjs', 'css', 'less', 'sass', 'scss', 'map', 'wasm'
+]);
+
+function getRightSidebarUrlPreviewBlockedResourceExtension(href) {
+  const normalizedHref = normalizeRightSidebarUrlPreviewHref(href);
+  if (!normalizedHref) return '';
+  try {
+    const url = new URL(normalizedHref);
+    const pathname = decodeURIComponent(url.pathname || '');
+    const fileName = String(pathname.split('/').pop() || '').trim().toLowerCase();
+    if (!fileName) return '';
+    const dotIndex = fileName.lastIndexOf('.');
+    if (dotIndex <= 0 || dotIndex >= fileName.length - 1) return '';
+    const extension = fileName.slice(dotIndex + 1);
+    return URL_PREVIEW_BLOCKED_RESOURCE_EXTENSIONS.has(extension) ? extension : '';
+  } catch {
+    return '';
+  }
+}
+
+function getRightSidebarUrlPreviewBlockedReason(href) {
+  const extension = getRightSidebarUrlPreviewBlockedResourceExtension(href);
+  if (!extension) return '';
+  return '资源类文件（.' + extension + '）不支持预览，请直接打开原链接';
+}
+
+function isRightSidebarUrlPreviewEligibleHref(href) {
+  return !getRightSidebarUrlPreviewBlockedResourceExtension(href);
+}
+
 function normalizeChatUrlPreviewState(value) {
   const raw = value && typeof value === 'object' ? value : {};
   const href = normalizeRightSidebarUrlPreviewHref(raw.href);
+  const previewHref = isRightSidebarUrlPreviewEligibleHref(href) ? href : '';
   return {
-    active: !!(raw.active && href),
-    href: href || '',
+    active: !!(raw.active && previewHref),
+    href: previewHref || '',
     title: String(raw.title || '').trim(),
     subtitle: String(raw.subtitle || '').trim()
   };
@@ -10349,7 +10420,7 @@ function extractHttpUrlsFromText(text) {
   matches.forEach(token => {
     const resolved = resolveMessageHttpLink(token);
     const href = normalizeRightSidebarUrlPreviewHref(resolved && resolved.href);
-    if (!href || seen.has(href)) return;
+    if (!href || seen.has(href) || !isRightSidebarUrlPreviewEligibleHref(href)) return;
     seen.add(href);
     urls.push(href);
   });
@@ -10457,6 +10528,14 @@ async function fetchRightSidebarUrlPreviewProbeResult(href) {
       ok: false,
       href: '',
       reason: 'URL 无效，无法预览'
+    };
+  }
+  const blockedReason = getRightSidebarUrlPreviewBlockedReason(normalizedHref);
+  if (blockedReason) {
+    return {
+      ok: false,
+      href: normalizedHref,
+      reason: blockedReason
     };
   }
   try {
@@ -10658,6 +10737,7 @@ function syncRightSidebarUrlPreviewForActiveChat() {
 }
 
 function openRightSidebarUrlPreviewForChat(chatId, href) {
+  if (!isRightSidebarUrlPreviewEligibleHref(href)) return false;
   const meta = buildRightSidebarUrlPreviewMeta(href);
   const targetChatId = String(chatId || '').trim();
   if (!meta.href || !targetChatId || !state.chats || !state.chats[targetChatId]) return false;
@@ -19011,11 +19091,13 @@ function warmRenderedMessageImages(root) {
     const cacheCurrent = () => {
       const current = img.getAttribute('data-origin-src') || img.currentSrc || img.getAttribute('src') || '';
       cacheMessageImage(current);
+      scheduleChatScrollControlsSync();
     };
     const restoreCurrent = () => {
       const current = img.getAttribute('data-origin-src') || img.currentSrc || img.getAttribute('src') || '';
       if (!current || img.dataset.cacheRestored === '1') return;
       restoreMessageImageFromCache(img);
+      scheduleChatScrollControlsSync();
     };
     if (img.dataset.cacheHandlersBound !== '1') {
       img.dataset.cacheHandlersBound = '1';
@@ -20344,6 +20426,7 @@ async function init() {
   });
   document.addEventListener('click', handleMessageCodeBlockAction);
   window.addEventListener('resize', scheduleLayoutSync);
+  window.addEventListener('resize', scheduleChatScrollControlsSync);
   window.addEventListener('resize', hideModelConfigOverflowPreview);
   window.addEventListener('resize', syncScreenSaverSceneScale);
   ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'].forEach(evt => {
@@ -25678,6 +25761,7 @@ function switchChat(id) {
     syncChatSessionCopyButton();
     syncQueuedCenterInputUI(id, getChatAgentId(id));
     syncChatTaskBadgeUI({ animateEnter: false });
+    scheduleChatScrollControlsSync();
     return;
   }
   clearChatCompletionStar(id);
@@ -26081,6 +26165,7 @@ function renderMessages(options) {
       bindGreetingInteractions(container);
       syncChatFooterInlineHintUI();
       syncChatTaskBadgeUI({ animateEnter: false });
+      scheduleChatScrollControlsSync();
       return;
     }
     container.innerHTML = greetingHtml(true);
@@ -26088,6 +26173,7 @@ function renderMessages(options) {
     state.displayedCount = 0;
     syncChatFooterInlineHintUI();
     syncChatTaskBadgeUI({ animateEnter: false });
+    scheduleChatScrollControlsSync();
     return;
   }
   const total = msgs.length;
@@ -26108,6 +26194,7 @@ function renderMessages(options) {
   else setInstantScrollTop(container, previousScrollTop);
   syncChatFooterInlineHintUI();
   syncChatTaskBadgeUI({ animateEnter: false });
+  scheduleChatScrollControlsSync();
 }
 
 function greetingHtml(showText) {
@@ -26288,6 +26375,127 @@ function setInstantScrollTop(container, nextTop) {
   requestAnimationFrame(() => {
     container.style.scrollBehavior = prevBehavior;
   });
+}
+
+let chatScrollControlsFrame = 0;
+
+function getRenderedMessageWraps(container) {
+  if (!container) return [];
+  return Array.from(container.children).filter(node => node && node.classList && node.classList.contains('message-wrap'));
+}
+
+function getLastRenderedMessageWrap(container) {
+  const wraps = getRenderedMessageWraps(container);
+  return wraps.length ? wraps[wraps.length - 1] : null;
+}
+
+function getLastRenderedAssistantWrap(container) {
+  const wraps = getRenderedMessageWraps(container);
+  for (let i = wraps.length - 1; i >= 0; i--) {
+    if (wraps[i] && wraps[i].classList.contains('assistant')) return wraps[i];
+  }
+  return null;
+}
+
+function setChatScrollButtonVisibility(btn, visible) {
+  if (!btn) return;
+  const show = !!visible;
+  btn.classList.toggle('show', show);
+  btn.disabled = !show;
+  btn.setAttribute('aria-hidden', show ? 'false' : 'true');
+}
+
+function positionChatScrollBottomButton(btn, container, wrap) {
+  if (!btn || !container) return;
+  const containerRect = container.getBoundingClientRect();
+  const width = Math.round(btn.offsetWidth || btn.getBoundingClientRect().width || 22);
+  const height = Math.round(btn.offsetHeight || btn.getBoundingClientRect().height || 22);
+  const cornerLeft = Math.round(containerRect.right - (width / 2) - CHAT_SCROLL_BOTTOM_BTN_CORNER_OVERHANG_PX);
+  const cornerTop = Math.round(containerRect.bottom - (height / 2) - CHAT_SCROLL_BOTTOM_BTN_CORNER_OVERHANG_PX + 2);
+  const left = Math.max(0, Math.min(window.innerWidth - width, cornerLeft));
+  const top = Math.max(0, Math.min(window.innerHeight - height, cornerTop));
+  btn.style.left = left + 'px';
+  btn.style.top = top + 'px';
+}
+
+function syncAssistantScrollTopButtons(container) {
+  if (!container) return;
+  const containerRect = container.getBoundingClientRect();
+  const tailWrap = getLastRenderedMessageWrap(container);
+  const tailAssistantWrap = tailWrap && tailWrap.classList.contains('assistant') ? tailWrap : null;
+  const buttons = container.querySelectorAll('.message-scroll-top-btn');
+  buttons.forEach(btn => {
+    const wrap = btn.closest('.message-wrap.assistant');
+    if (!wrap || wrap !== tailAssistantWrap) {
+      setChatScrollButtonVisibility(btn, false);
+      return;
+    }
+    const footer = wrap.querySelector('.message-footer');
+    const footerRect = footer ? footer.getBoundingClientRect() : wrap.getBoundingClientRect();
+    const wrapRect = wrap.getBoundingClientRect();
+    const footerVisible = footerRect.bottom > containerRect.top + CHAT_SCROLL_CONTROL_SYNC_MARGIN_PX
+      && footerRect.top < containerRect.bottom - CHAT_SCROLL_CONTROL_SYNC_MARGIN_PX;
+    const hasHiddenTop = wrapRect.top < containerRect.top - CHAT_SCROLL_CONTROL_SYNC_MARGIN_PX;
+    setChatScrollButtonVisibility(btn, footerVisible && hasHiddenTop);
+  });
+}
+
+function syncChatScrollBottomButton() {
+  const btn = document.getElementById('chatScrollBottomBtn');
+  const container = document.getElementById('chatContainer');
+  if (!btn || !container) return;
+  const tailWrap = getLastRenderedMessageWrap(container);
+  const tailAssistantWrap = tailWrap && tailWrap.classList.contains('assistant') ? tailWrap : null;
+  const shouldShow = !!(
+    tailAssistantWrap &&
+    !isChatNearBottom(container, CHAT_SCROLL_CONTROL_SYNC_MARGIN_PX)
+  );
+  if (shouldShow) positionChatScrollBottomButton(btn, container, tailAssistantWrap);
+  setChatScrollButtonVisibility(btn, shouldShow);
+}
+
+function syncChatScrollControls() {
+  const container = document.getElementById('chatContainer');
+  if (!container) return;
+  syncAssistantScrollTopButtons(container);
+  syncChatScrollBottomButton();
+}
+
+function scheduleChatScrollControlsSync() {
+  if (chatScrollControlsFrame) return;
+  chatScrollControlsFrame = requestAnimationFrame(() => {
+    chatScrollControlsFrame = 0;
+    syncChatScrollControls();
+  });
+}
+
+function scrollAssistantMessageToStart(event) {
+  if (event) {
+    if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  const btn = event && event.currentTarget ? event.currentTarget : null;
+  const wrap = btn ? btn.closest('.message-wrap.assistant') : null;
+  const container = document.getElementById('chatContainer');
+  if (!wrap || !container) return;
+  const containerRect = container.getBoundingClientRect();
+  const wrapRect = wrap.getBoundingClientRect();
+  const nextTop = Math.max(0, container.scrollTop + (wrapRect.top - containerRect.top) - CHAT_MESSAGE_SCROLL_ALIGN_TOP_PX);
+  container.scrollTo({ top: nextTop, behavior: 'smooth' });
+  scheduleChatScrollControlsSync();
+}
+
+function scrollActiveAssistantToBottom(event) {
+  if (event) {
+    if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  const container = document.getElementById('chatContainer');
+  if (!container) return;
+  container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+  scheduleChatScrollControlsSync();
 }
 
 function stripAnsiSequences(text) {
@@ -26734,6 +26942,7 @@ function flushStreamingMessage(streamKey) {
   if (copyBtn) copyBtn.dataset.copyText = assistantMsg.content;
   if (!usedPlainFallback && !lowPowerRendering) warmRenderedMessageImages(wrap || msgEl);
   if (keepBottom) setInstantScrollTop(container, container.scrollHeight);
+  scheduleChatScrollControlsSync();
 }
 
 function scheduleStreamingMessageRender(streamKey, chatId, msgEl, assistantMsg) {
@@ -26793,11 +27002,15 @@ function finalizeActiveStreamingMessageNode(chatId) {
   warmRenderedMessageImages(wrap || targetEl);
   syncChatFooterInlineHintUI();
   syncChatTaskBadgeUI({ animateEnter: false });
+  scheduleChatScrollControlsSync();
   return true;
 }
 
 function messageActionsHtml(m) {
   const actions = [];
+  if (m && m.role === 'assistant' && !m.error) {
+    actions.push(messageScrollTopButtonHtml());
+  }
   if (m && m.role === 'user' && !m.error) {
     actions.push(messageRetryButtonHtml(m));
     actions.push(messageEditButtonHtml(m));
@@ -26825,6 +27038,10 @@ function messageRetryButtonHtml(m) {
 function messageCopyButtonHtml(m) {
   const text = esc(String(m && m.content || '')).replace(/"/g, '&quot;');
   return `<button type="button" class="message-copy-btn" data-copy-text="${text}" onclick="copyCenterMessage(event)" title="复制" aria-label="复制"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M6.55 1.2a.7.7 0 0 0-.7.7v.35h-1.2a1.1 1.1 0 0 0-1.1 1.1v3.9c0 .61.49 1.1 1.1 1.1h3.2a1.1 1.1 0 0 0 1.1-1.1v-3.9a1.1 1.1 0 0 0-1.1-1.1h-1.2V1.9a.7.7 0 0 0-.7-.7h-.7Zm0 .7h.7v.7h-.7v-.7Zm-1.9 1.4h3.2a.4.4 0 0 1 .4.4v3.9a.4.4 0 0 1-.4.4h-3.2a.4.4 0 0 1-.4-.4v-3.9a.4.4 0 0 1 .4-.4ZM2.3 4.05a.35.35 0 0 1 .35.35v3.5c0 .08.07.15.15.15h3.5a.35.35 0 1 1 0 .7H2.8c-.47 0-.85-.38-.85-.85V4.4a.35.35 0 0 1 .35-.35Zm5.45-2.65.19.66.66.19-.66.19-.19.66-.19-.66-.66-.19.66-.19.19-.66Z"></path></svg></button>`;
+}
+
+function messageScrollTopButtonHtml() {
+  return `<button type="button" class="message-scroll-top-btn" onclick="scrollAssistantMessageToStart(event)" title="回到该响应开头" aria-label="回到该响应开头" aria-hidden="true"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 15V5"></path><path d="m5.75 9.25 4.25-4.25 4.25 4.25"></path></svg></button>`;
 }
 
 function messageEditButtonHtml(m) {
@@ -27577,18 +27794,27 @@ function syncChatFooterInlineHintUI() {
   container.querySelectorAll('.assistant-process-inline-hint').forEach(node => node.remove());
   restoreAssistantInlineHintRows(container);
   const hint = getActiveChatFooterInlineHint();
-  if (!hint) return;
+  if (!hint) {
+    scheduleChatScrollControlsSync();
+    return;
+  }
   const activeChatId = String(state.activeChat || '').trim();
   const activeChat = activeChatId ? state.chats[activeChatId] : null;
   const placement = normalizeChatFooterInlineHintPlacement(hint.placement);
   const targetWrap = placement === 'inside'
     ? findTargetAssistantWrapForPendingRequestUi(container, activeChat)
     : findTargetAssistantWrapForFooterInlineHint(container, activeChat);
-  if (!targetWrap) return;
+  if (!targetWrap) {
+    scheduleChatScrollControlsSync();
+    return;
+  }
   const hintEl = createAssistantInlineHintElement(hint);
   if (placement === 'inside') {
     const messageEl = targetWrap.querySelector('.message.assistant');
-    if (!messageEl) return;
+    if (!messageEl) {
+      scheduleChatScrollControlsSync();
+      return;
+    }
     const row = document.createElement('div');
     row.className = 'message-inline-hint-row';
     const metaEl = messageEl.querySelector('.message-meta');
@@ -27596,11 +27822,16 @@ function syncChatFooterInlineHintUI() {
     if (metaEl) row.appendChild(metaEl);
     messageEl.classList.add('has-inline-hint-inside');
     messageEl.appendChild(row);
+    scheduleChatScrollControlsSync();
     return;
   }
   const slot = targetWrap.querySelector('.message-footer-process-slot');
-  if (!slot) return;
+  if (!slot) {
+    scheduleChatScrollControlsSync();
+    return;
+  }
   slot.appendChild(hintEl);
+  scheduleChatScrollControlsSync();
 }
 
 function normalizeTaskBadgeKey(value) {
@@ -27679,6 +27910,7 @@ function finalizeTaskBadgeRow(row) {
   const messageEl = wrap ? wrap.querySelector('.message.assistant') : null;
   if (messageEl) messageEl.classList.remove('has-task-badges');
   row.remove();
+  scheduleChatScrollControlsSync();
 }
 
 function startTaskBadgeEnter(badge) {
@@ -27841,6 +28073,7 @@ function syncChatTaskBadgeUI(options) {
   });
   if (!taskState || !messageEl || !actionEl) {
     clearTaskStartTourTargetClass();
+    scheduleChatScrollControlsSync();
     return;
   }
   let row = actionEl.querySelector('.message-task-badge-row');
@@ -27880,6 +28113,7 @@ function syncChatTaskBadgeUI(options) {
   existingBadges.forEach(startTaskBadgeLeave);
   if (!row.querySelector('.message-task-badge')) finalizeTaskBadgeRow(row);
   syncTaskStartTourTargetClass();
+  scheduleChatScrollControlsSync();
 }
 
 function clearChatTaskBadges(chatId) {
@@ -28692,6 +28926,7 @@ function scrollToBottom(options) {
   if (!opts.force && opts.onlyIfNearBottom && !isChatNearBottom(c, opts.threshold)) return;
   requestAnimationFrame(() => {
     setInstantScrollTop(c, c.scrollHeight);
+    scheduleChatScrollControlsSync();
   });
 }
 
@@ -28699,6 +28934,7 @@ function scrollToBottom(options) {
 function setupScrollLazy() {
   const container = document.getElementById('chatContainer');
   container.addEventListener('scroll', async () => {
+    scheduleChatScrollControlsSync();
     if (container.scrollTop < 50 && state.activeChat) {
       const chat = state.chats[state.activeChat];
       if (!chat) return;
@@ -28731,6 +28967,7 @@ function setupScrollLazy() {
           await waitForRichMessageUpgradeFlush();
           await waitForAnimationFrames(2);
         }
+        scheduleChatScrollControlsSync();
       } finally {
         chatLazyLoading = false;
         setChatHistoryLock(false);
@@ -30938,6 +31175,7 @@ async function sendCenterMessage(rawText, options) {
           syncAssistantExplosionBeacon(entry.msgEl, assistantMsg);
           syncChatFooterInlineHintUI();
           syncChatTaskBadgeUI({ animateEnter: false });
+          scheduleChatScrollControlsSync();
         }
         return;
       }
@@ -30955,6 +31193,7 @@ async function sendCenterMessage(rawText, options) {
       if (entry.msgEl) syncAssistantExplosionBeacon(entry.msgEl, assistantMsg);
       syncChatFooterInlineHintUI();
       syncChatTaskBadgeUI({ animateEnter: false });
+      scheduleChatScrollControlsSync();
     }
   }
 
@@ -30979,6 +31218,7 @@ async function sendCenterMessage(rawText, options) {
       }
       appendTerminalErrorMessage(text, assistantMsg.receivedAt || assistantMsg.createdAt || messageTs, targetEntry);
       chat.pendingRequest = false;
+      scheduleChatScrollControlsSync();
       return;
     }
     assistantMsg.error = true;
@@ -30994,6 +31234,7 @@ async function sendCenterMessage(rawText, options) {
       const copyBtn = wrap && wrap.querySelector('.message-copy-btn');
       if (copyBtn) copyBtn.dataset.copyText = assistantMsg.content;
     }
+    scheduleChatScrollControlsSync();
   }
 
   function appendTerminalErrorMessage(content, createdAt, entry) {
@@ -31016,6 +31257,7 @@ async function sendCenterMessage(rawText, options) {
     }
     state.displayedCount++;
     scrollToBottom();
+    scheduleChatScrollControlsSync();
   }
 
   function appendLiveAssistantRawSse(rawLine, entry) {
@@ -31039,6 +31281,7 @@ async function sendCenterMessage(rawText, options) {
       entry.msgEl.closest('.message-wrap')?.remove();
       entry.msgEl = null;
       state.displayedCount = Math.max(0, state.displayedCount - 1);
+      scheduleChatScrollControlsSync();
     }
   }
 
@@ -34463,7 +34706,7 @@ function getSettingsDraftModels() {
       __custom_cleared: cleared
     };
   });
-  return draft;
+  return normalizeModelMap(draft);
 }
 
 function getAvailableModelMapForSwarm() {
@@ -34473,7 +34716,7 @@ function getAvailableModelMapForSwarm() {
 }
 
 function getAvailableModelListForSwarm() {
-  return Object.keys(getAvailableModelMapForSwarm());
+  return getOrderedConfiguredModelNames(getAvailableModelMapForSwarm());
 }
 
 function isSwarmModelMissing(cfg) {
@@ -34925,7 +35168,7 @@ function renderModelEntries() {
     addBtn.disabled = remoteRestricted;
     addBtn.title = remoteRestricted ? '远程访问下不允许新增模型配置' : '';
   }
-  const keys = Object.keys(models);
+  const keys = getOrderedConfiguredModelNames(models);
   hideModelKeyHintPreview();
   hideModelConfigOverflowPreview();
   if (keys.length === 0) {
@@ -34942,6 +35185,22 @@ function renderModelEntries() {
   refreshModelEntryOptions();
   refreshSwarmModelAvailability();
   scheduleOnboardingSync();
+}
+
+function sortModelEntryElements() {
+  const container = document.getElementById('modelEntries');
+  if (!container) return;
+  const entries = Array.from(container.querySelectorAll('.model-entry'));
+  if (!entries.length) return;
+  entries.sort((entryA, entryB) => {
+    const modelA = normalizeModelName(entryA.querySelector('select') && entryA.querySelector('select').value);
+    const modelB = normalizeModelName(entryB.querySelector('select') && entryB.querySelector('select').value);
+    return compareConfiguredModelNames(modelA, modelB);
+  });
+  entries.forEach((entry, idx) => {
+    entry.setAttribute('data-idx', String(idx));
+    container.appendChild(entry);
+  });
 }
 
 function buildAvailableModelOptions(currentModel, currentEntry) {
@@ -35092,6 +35351,7 @@ function addModelEntry() {
   const entry = div.firstElementChild;
   container.appendChild(entry);
   attachModelConfigInputListeners(entry);
+  sortModelEntryElements();
   refreshModelEntryOptions();
   refreshSwarmModelAvailability();
   scheduleOnboardingSync();
@@ -35381,6 +35641,7 @@ function onModelChange(sel) {
   if (entry) {
     replaceModelEntry(entry, dup.length > 0 ? '' : nextModel, { token: draft.token });
   }
+  sortModelEntryElements();
   refreshModelEntryOptions();
   if (dup.length > 0) {
     setSettingsErrorMessage(`模型 ${dup[0]} 已存在，同一模型只能配置一次`);
@@ -37245,6 +37506,11 @@ async function feOpen(absPath) {
 function fePreviewExternalLink(href) {
   const targetHref = String(href || '').trim();
   if (!/^https?:\/\//i.test(targetHref)) return;
+  const blockedReason = getRightSidebarUrlPreviewBlockedReason(targetHref);
+  if (blockedReason) {
+    vfsShowUploadToast(blockedReason, true);
+    return;
+  }
   openRightSidebarUrlPreview(targetHref);
 }
 
@@ -38008,6 +38274,8 @@ function resolveOverlayCancelButton(scope) {
         return findVisibleButton(scope, ['#pluginModalBrowserRestartCancelBtn']) || findVisibleButtonByText(scope, ['取消']);
       }
       return findVisibleButton(scope, ['#pluginModalCancelBtn', '.plugin-modal-close']) || findVisibleButtonByText(scope, ['关闭窗口', '关闭插件', '修改配置', '取消', '关闭']);
+    case 'chatSessionLogOverlay':
+      return findVisibleButton(scope, ['#chatSessionLogCloseBtn']) || findVisibleButtonByText(scope, ['取消', '关闭']);
     case 'sandboxOverlay':
       return findVisibleButton(scope, ['#sandboxCloseBtn']) || findVisibleButtonByText(scope, ['关闭会话沙盒']);
     case 'shutdownConfirmOverlay':
@@ -39660,20 +39928,22 @@ async function showSelectedMessagePathActions(anchor) {
   if (selectionTarget.kind === 'http') {
     const httpHref = String(selectionTarget.href || '').trim();
     if (!isHttpMessageHref(httpHref)) return;
-    showSelectionActionBubble(rect, [
-      {
+    const actions = [];
+    if (isRightSidebarUrlPreviewEligibleHref(httpHref)) {
+      actions.push({
         label: '预览',
         onClick: async () => {
           fePreviewExternalLink(httpHref);
         }
-      },
-      {
-        label: '打开',
-        onClick: async () => {
-          _origOpen(httpHref, '_blank', 'noopener,noreferrer');
-        }
+      });
+    }
+    actions.push({
+      label: '打开',
+      onClick: async () => {
+        _origOpen(httpHref, '_blank', 'noopener,noreferrer');
       }
-    ]);
+    });
+    showSelectionActionBubble(rect, actions);
     return;
   }
   if (!selectionTarget.filePath) return;

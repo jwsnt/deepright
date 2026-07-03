@@ -76,14 +76,16 @@ public class RetryUtils {
 
     // 推送回端
     public static void notify(NotifierService notifierService, WorkflowTask workTask, String content, Integer code, Integer delay) throws Exception {
-        Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
-                // 推送空格保持连接
-                .content(new StringBuffer(!FeatureFlag.isSilent(workTask) ? CliPrinter.format(content, CliPrinter.SIZE_N) : ""))
-                .metadata(ImmutableMap.of(MultiSourceFlag.RETRY, code, MultiSourceFlag.DELAY, delay))
-                .workflow(workTask.getWorkflow())
-                .notifier(Notifier.SOURCE)
-                .build();
-        notifierService.notify(Segment.build(workTask, segmentConfig), workTask, workTask);
+        if (!FeatureFlag.isSilent(workTask)) {
+            Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
+                    // 推送空格保持连接
+                    .metadata(ImmutableMap.of(MultiSourceFlag.RETRY, code, MultiSourceFlag.DELAY, delay))
+                    .content(new StringBuffer(CliPrinter.format(content, CliPrinter.SIZE_N)))
+                    .workflow(workTask.getWorkflow())
+                    .notifier(Notifier.SOURCE)
+                    .build();
+            notifierService.notify(Segment.build(workTask, segmentConfig), workTask, workTask);
+        }
     }
 
     // 重配置

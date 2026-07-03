@@ -38,6 +38,7 @@ cd /path/to/deepright/cli/module/integration
 ./integration notify [--title TEXT] [--message TEXT]
 ./integration skills-warning [--refresh]
 ./integration file-last-update --file 路径 [--agent AgentId]
+./integration backup-clean [--agent-dir 路径] [--archive-after 24h] [--delete-after 72h]
 ```
 
 如果你沿用本次迭代的默认目录约定，也可以显式写成：
@@ -190,6 +191,7 @@ cd /path/to/deepright/cli/module/integration
 - `knowledge last-update` 通过 `integration` 主二进制直接收口了 Knowledge 最后更新时间读取能力，并与 `/knowledge_lastUpdate` 复用同一份 integration 子模块实现
 - `skills-warning` 通过 `integration` 主二进制直接收口了 SKILL 解析告警读取能力
 - `file-last-update` 通过 `integration` 主二进制直接收口了文件最后更新时间查询能力
+- `backup-clean` 通过 `integration` 主二进制直接收口了 Agent `User/Soul` 备份文件归档与清理能力
 - macOS、Windows 与 WSL 下，普通对话与备忘录任务的 SSE 在整体结束后都会触发系统通知；通知标题固定为 `DeepRight通知`
 - 普通对话通知内容会直接显示 `用户最后一条问题摘要`；正常完成与异常结束都会沿用同一摘要，超过 `10` 个字符会自动截断为 `...`
 - macOS 下通过系统原生通知显示，并跟随当前 `integration` 进程所属应用图标；Windows 与 WSL 下通知使用系统信息图标
@@ -292,6 +294,10 @@ module/release/
 - `media` 是 Agent 维度的 JSON 对象；当前 Site 侧会按 `模型服务商名 -> 多组参数` 的结构写入，例如 `"media":{"gemini":{"aspectRatio":"16:9","imageSize":"2K"}}`
 - 如果请求体 `metadata` 中显式传入 `knowledge_commit`，则会按 `metadata.agentId` 维度把最新提交值写回共享 sqlite 的 `knowledge_runtime.knowledge_commit`
 - 如果请求体 `metadata` 中显式传入 `knowledge_commit: true`，则在对应 SSE 响应完整结束后，会把当前时间同时写回该 Agent 的知识库最后更新时间和知识库更新申请锁时间
+- 如果当前会话已经存在 SSE 响应日志，则会额外补充 `metadata.lastResponse`
+- `/v1/chat/completions` 会按当前请求里的 `metadata.chat` 查询该会话最近一次 SSE 响应时间，并写成 Unix 毫秒时间戳
+- `/cli/get` 当前没有显式 `chat` 字段，因此会从本地 `chat_log` 中取最近一次活跃的 `page_session` 会话，作为“当前 Chat”去查询最近一次 SSE 响应时间
+- integration 内部 cron 执行请求也会按自身 `chatId` 补充同样的 `metadata.lastResponse`
 - 发往上游的最终报文会统一收口为：
 - `/v1/chat/completions`：`{ "messages": [...], "stream": ..., "metadata": ..., "model": ... }`
 - `/cli/get`：`{ "messages": [{"role":"user","content":""}], "metadata": ... }`
@@ -417,6 +423,27 @@ curl 'http://127.0.0.1:8080/api/plugins/exec?key=browser&command=instance%20init
 curl 'http://127.0.0.1:8080/file/lastUpdate?agentId=A&file=USER.md'
 ./integration file-last-update --agent A --file USER.md
 ./integration file-last-update --file /abs/path/to/USER.md
+```
+
+## Agent 备份清理收口
+
+- CLI 提供 `./integration backup-clean [--agent-dir ...] [--archive-after 24h] [--delete-after 72h]`
+- 命令会扫描每个 Agent workspace 根目录下与 `USER/SOUL` 相关的备份文件
+- 文件名中带 `bak` 或明显时间戳，且最后更新时间超过 `--archive-after` 时，会移动到对应 workspace 下的 `bak/`
+- `bak/` 不存在时会自动创建
+- `bak/` 中已存在同名文件时，会自动追加递增后缀，避免覆盖旧文件
+- `bak/` 目录中的文件如果最后更新时间超过 `--delete-after`，会被直接删除
+- 当前生效中的 `USER.md`、`SOUL.md` 不会被误处理；`USER_GUIDE.md` 这类普通文档也不会命中
+- 默认阈值分别为 `24h` 和 `72h`
+- Agent 根目录解析继续复用 integration 现有优先级：`--agent-dir` > 主应用 `config/config.json` > `AGENT_DIR` > 默认目录
+- 该命令属于轻量本地 CLI，不依赖插件运行时初始化，可单独执行
+
+例如：
+
+```bash
+./integration backup-clean
+./integration backup-clean --agent-dir ./agent
+./integration backup-clean --archive-after 24h --delete-after 72h
 ```
 
 ## Agent 元数据中的 `skills`
@@ -584,6 +611,7 @@ curl http://127.0.0.1:8080/install_app
   - `log_type`
   - `created_at`
 - 索引为 `agent_id + chat_id + log_type + created_at`
+- 另外还新增了 `chat_id + log_type + created_at` 索引，用于加速按会话查询最近一次 SSE 响应时间，也就是 `metadata.lastResponse` 的查找路径
 - `log_type` 固定取值：
   - `0`：`/v1/chat/completions` 请求
   - `1`：`/v1/chat/completions` SSE 响应分段
@@ -720,6 +748,8 @@ Integration 的 CLI 既可以启动统一 HTTP 服务，也支持通过 `cron` �
 - `plugins` 与 `knowledge` 仍按共享元数据统一输出
 - `agents[].skills` 会在每次请求时实时刷新
 - `/v1/chat/completions`、`/cli/get` 与 integration 内部 cron 请求发送前，会再按每个 Agent 工作目录实时读取 `Knowledge.md`；若不存在则回退到 `knowledge.md`，并补充到对应的 `agents[].knowledge`
+- `/v1/chat/completions`、`/cli/get` 与 integration 内部 cron 请求发送前，还会按当前会话补充 `lastResponse`
+- 该字段表示当前 Chat 最近一次收到 SSE 响应的时间，格式为 Unix 毫秒时间戳
 
 如果当前应用启动目录下已存在 `knowledge` 目录，则上述链路中的 metadata 会额外包含：
 
