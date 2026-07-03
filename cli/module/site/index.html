@@ -886,6 +886,11 @@ animation:queuedInsertExplosion .62s ease-out both}
 .chat-scroll-bottom-btn svg{width:14px;height:14px;display:block;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 [data-theme="dark"] .chat-scroll-bottom-btn{background:linear-gradient(180deg,rgba(21,36,62,.96),rgba(10,20,38,.92));color:#c9dafc;box-shadow:0 10px 24px rgba(0,0,0,.26),inset 0 1px 0 rgba(255,255,255,.08)}
 [data-theme="dark"] .chat-scroll-bottom-btn:hover,[data-theme="dark"] .chat-scroll-bottom-btn:focus-visible{background:linear-gradient(180deg,rgba(24,43,78,.98),rgba(12,24,47,.96));box-shadow:0 14px 28px rgba(0,0,0,.32),inset 0 1px 0 rgba(255,255,255,.1)}
+.cli-sub-scroll-bottom-btn{position:absolute;left:0;top:0;width:13px;height:13px;border-radius:999px;background:linear-gradient(180deg,rgba(212,234,255,.98),rgba(126,173,232,.96));color:#1f4f8c;box-shadow:0 8px 17px rgba(92,148,217,.24),0 0 0 1px rgba(186,220,255,.58),0 0 0 3px rgba(106,168,235,.12),inset 0 1px 0 rgba(255,255,255,.94);z-index:9}
+.cli-sub-scroll-bottom-btn.show{opacity:.96}
+.cli-sub-scroll-bottom-btn:hover,.cli-sub-scroll-bottom-btn:focus-visible{opacity:1;color:#163f75;background:linear-gradient(180deg,rgba(228,242,255,.99),rgba(145,189,241,.98));box-shadow:0 9px 19px rgba(92,148,217,.3),0 0 0 1px rgba(198,229,255,.7),0 0 0 4px rgba(106,168,235,.16),inset 0 1px 0 rgba(255,255,255,.98)}
+[data-theme="dark"] .cli-sub-scroll-bottom-btn{background:linear-gradient(180deg,rgba(198,224,250,.98),rgba(103,149,214,.96));color:#133d73;box-shadow:0 8px 17px rgba(86,137,207,.32),0 0 0 1px rgba(180,217,255,.46),0 0 0 3px rgba(83,142,218,.14),inset 0 1px 0 rgba(255,255,255,.76)}
+[data-theme="dark"] .cli-sub-scroll-bottom-btn:hover,[data-theme="dark"] .cli-sub-scroll-bottom-btn:focus-visible{background:linear-gradient(180deg,rgba(216,234,253,.99),rgba(122,167,228,.98));color:#0f3566;box-shadow:0 9px 20px rgba(86,137,207,.38),0 0 0 1px rgba(198,228,255,.56),0 0 0 4px rgba(83,142,218,.2),inset 0 1px 0 rgba(255,255,255,.84)}
 .greeting{text-align:center;padding:0;color:var(--accent);font-size:18px;max-width:100%;margin:auto;position:relative;width:100%;height:100%;min-height:560px;display:flex;align-items:center;justify-content:center;isolation:isolate}
 .greeting::before,.greeting::after{content:'';position:absolute;pointer-events:none;filter:blur(10px);opacity:.9}
 .greeting::before{width:min(38vw,460px);height:min(38vw,460px);left:10%;top:10%;border-radius:45% 55% 62% 38%/40% 42% 58% 60%;background:radial-gradient(circle at 35% 35%,rgba(255,255,255,.72),rgba(129,187,255,.18) 50%,transparent 74%);animation:liquidBlobFloat 14s ease-in-out infinite}
@@ -1065,7 +1070,7 @@ body.center-overlay-focus .rs-url-preview-floating-switch.onboarding-url-preview
 [data-energy-saver="on"] .rs-url-preview.is-loading .rs-url-preview-frame,
 [data-low-power-rendering="on"] .rs-url-preview.is-loading .rs-url-preview-frame{opacity:.54;filter:none}
 .rs-url-preview-empty{position:absolute;inset:0;width:100%;height:100%;min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px;font-size:12px;line-height:1.7;color:var(--text-muted);text-align:center}
-.right-sidebar .rs-top{flex:0 0 auto;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:220px auto 250px;border-bottom:1px solid var(--border);overflow:hidden;min-height:0;max-height:1000px;opacity:1;transition:max-height .38s cubic-bezier(.22,1,.36,1),opacity .28s ease,border-color .28s ease,padding .28s ease,margin .28s ease,filter .32s ease,transform .32s ease}
+.right-sidebar .rs-top{position:relative;flex:0 0 auto;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:220px auto 250px;border-bottom:1px solid var(--border);overflow:hidden;min-height:0;max-height:1000px;opacity:1;transition:max-height .38s cubic-bezier(.22,1,.36,1),opacity .28s ease,border-color .28s ease,padding .28s ease,margin .28s ease,filter .32s ease,transform .32s ease}
 .right-sidebar .rs-top.memo-tour-controls-locked{pointer-events:none}
 .right-sidebar.wiki-expanded .rs-top{max-height:0;opacity:0;border-bottom-color:transparent;pointer-events:none}
 .right-sidebar .rs-top .rs-cell{border:1px solid var(--border);padding:8px;overflow:auto;display:flex;flex-direction:column;min-height:0}
@@ -3764,7 +3769,12 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
         </div>
         <div class="cli-sub-container" id="cliSubContainer"></div>
       </div>
-      <div class="rs-cell"></div>
+      <button type="button" class="chat-scroll-bottom-btn cli-sub-scroll-bottom-btn" id="cliSubScrollBottomBtn" onclick="scrollCliSubPanelToBottom(event)" title="沉底到系统指令末尾" aria-label="沉底到系统指令末尾" aria-hidden="true">
+        <svg viewBox="0 0 20 20" aria-hidden="true">
+          <path d="M10 4.5v10"></path>
+          <path d="m5.75 10.75 4.25 4.25 4.25-4.25"></path>
+        </svg>
+      </button>
     </div>
     <div class="rs-bottom" id="rsWikiSection">
       <div class="rs-row-divider rs-bottom-header" id="rsWikiHeader">
@@ -5984,6 +5994,8 @@ const CHAT_AUTO_SCROLL_THRESHOLD_PX = 72;
 const CHAT_SCROLL_CONTROL_SYNC_MARGIN_PX = 6;
 const CHAT_MESSAGE_SCROLL_ALIGN_TOP_PX = 10;
 const CHAT_SCROLL_BOTTOM_BTN_CORNER_OVERHANG_PX = 11;
+const CLI_SUB_SCROLL_NEAR_BOTTOM_THRESHOLD_PX = 1;
+const CLI_SUB_SCROLL_BTN_INSET_PX = 1;
 let docTidyLastUpdateState = {};
 let docTidyDismissedState = {};
 
@@ -10212,6 +10224,7 @@ function syncLayoutVars() {
   }
   syncVfsUploadToastPlacement();
   scheduleChatScrollControlsSync();
+  scheduleCliSubScrollBottomButtonSync();
   if (isOnboardingActive()) scheduleOnboardingSync();
 }
 
@@ -10318,6 +10331,8 @@ function applyRightSidebarState(collapsed) {
   updateRightSidebarToggleUI();
   updateLeftSidebarToggleUI();
   scheduleLayoutSync();
+  scheduleCliSubScrollBottomButtonSync();
+  setTimeout(() => scheduleCliSubScrollBottomButtonSync(), 420);
   refreshOverlayStates();
   if (!collapsed && shouldClearTimelineCompletionBadgeOnReveal()) clearTimelineCompletionBadge();
 }
@@ -20373,6 +20388,7 @@ async function init() {
   if (onboardingState.eligible) startFirstRunOnboarding();
   else maybeStartPendingModelSaveVerifyTour();
   setupScrollLazy();
+  setupCliSubScrollControls();
   vfsInit();
   updateModelIndicator();
   syncFullscreenToggleUI();
@@ -20427,6 +20443,7 @@ async function init() {
   document.addEventListener('click', handleMessageCodeBlockAction);
   window.addEventListener('resize', scheduleLayoutSync);
   window.addEventListener('resize', scheduleChatScrollControlsSync);
+  window.addEventListener('resize', scheduleCliSubScrollBottomButtonSync);
   window.addEventListener('resize', hideModelConfigOverflowPreview);
   window.addEventListener('resize', syncScreenSaverSceneScale);
   ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'].forEach(evt => {
@@ -26378,6 +26395,7 @@ function setInstantScrollTop(container, nextTop) {
 }
 
 let chatScrollControlsFrame = 0;
+let cliSubScrollBottomButtonFrame = 0;
 
 function getRenderedMessageWraps(container) {
   if (!container) return [];
@@ -26414,6 +26432,28 @@ function positionChatScrollBottomButton(btn, container, wrap) {
   const cornerTop = Math.round(containerRect.bottom - (height / 2) - CHAT_SCROLL_BOTTOM_BTN_CORNER_OVERHANG_PX + 2);
   const left = Math.max(0, Math.min(window.innerWidth - width, cornerLeft));
   const top = Math.max(0, Math.min(window.innerHeight - height, cornerTop));
+  btn.style.left = left + 'px';
+  btn.style.top = top + 'px';
+}
+
+function isCliSubPanelNearBottom(container, threshold) {
+  if (!container) return true;
+  const limit = Math.max(0, Number(threshold) || CLI_SUB_SCROLL_NEAR_BOTTOM_THRESHOLD_PX);
+  const distance = container.scrollHeight - container.clientHeight - container.scrollTop;
+  return distance <= limit;
+}
+
+function positionCliSubScrollBottomButton(btn, container) {
+  if (!btn || !container) return;
+  const host = document.getElementById('rsTopGrid');
+  const containerRect = container.getBoundingClientRect();
+  const hostRect = host ? host.getBoundingClientRect() : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+  const width = Math.round(btn.offsetWidth || btn.getBoundingClientRect().width || 13);
+  const height = Math.round(btn.offsetHeight || btn.getBoundingClientRect().height || 13);
+  const left = Math.max(0, Math.min(Math.max(Math.round(hostRect.width - width), 0), Math.round(containerRect.right - hostRect.left - width - CLI_SUB_SCROLL_BTN_INSET_PX)));
+  const top = Math.max(0, Math.min(Math.max(Math.round(hostRect.height - height), 0), Math.round(containerRect.bottom - hostRect.top - height - CLI_SUB_SCROLL_BTN_INSET_PX)));
+  btn.style.right = '';
+  btn.style.bottom = '';
   btn.style.left = left + 'px';
   btn.style.top = top + 'px';
 }
@@ -26461,11 +26501,37 @@ function syncChatScrollControls() {
   syncChatScrollBottomButton();
 }
 
+function syncCliSubScrollBottomButton() {
+  const btn = document.getElementById('cliSubScrollBottomBtn');
+  const container = document.getElementById('rsCliSubCell');
+  if (!btn || !container) return;
+  const rect = container.getBoundingClientRect();
+  const hasViewport = rect.width > 0 && rect.height > 0;
+  const hasOverflow = (container.scrollHeight - container.clientHeight) > CLI_SUB_SCROLL_NEAR_BOTTOM_THRESHOLD_PX;
+  const hasContent = !container.classList.contains('cli-sub-cell-empty');
+  const shouldShow = !!(
+    hasViewport &&
+    hasContent &&
+    hasOverflow &&
+    !isCliSubPanelNearBottom(container, CLI_SUB_SCROLL_NEAR_BOTTOM_THRESHOLD_PX)
+  );
+  if (shouldShow) positionCliSubScrollBottomButton(btn, container);
+  setChatScrollButtonVisibility(btn, shouldShow);
+}
+
 function scheduleChatScrollControlsSync() {
   if (chatScrollControlsFrame) return;
   chatScrollControlsFrame = requestAnimationFrame(() => {
     chatScrollControlsFrame = 0;
     syncChatScrollControls();
+  });
+}
+
+function scheduleCliSubScrollBottomButtonSync() {
+  if (cliSubScrollBottomButtonFrame) return;
+  cliSubScrollBottomButtonFrame = requestAnimationFrame(() => {
+    cliSubScrollBottomButtonFrame = 0;
+    syncCliSubScrollBottomButton();
   });
 }
 
@@ -26496,6 +26562,18 @@ function scrollActiveAssistantToBottom(event) {
   if (!container) return;
   container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
   scheduleChatScrollControlsSync();
+}
+
+function scrollCliSubPanelToBottom(event) {
+  if (event) {
+    if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  const container = document.getElementById('rsCliSubCell');
+  if (!container) return;
+  container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+  scheduleCliSubScrollBottomButtonSync();
 }
 
 function stripAnsiSequences(text) {
@@ -28621,11 +28699,14 @@ function updateCliSubEmptyState() {
   const hasContent = Array.from(container.querySelectorAll('.cli-sub-group')).some(group => group.children.length > 0);
   cell.classList.toggle('cli-sub-cell-empty', !hasContent);
   if (empty) empty.setAttribute('aria-hidden', hasContent ? 'true' : 'false');
+  scheduleCliSubScrollBottomButtonSync();
 }
 
 function renderCliSubPanel(content) {
   const container = document.getElementById('cliSubContainer');
   if (!container) return;
+  const cell = document.getElementById('rsCliSubCell');
+  const keepBottom = !cell || isCliSubPanelNearBottom(cell, CLI_SUB_SCROLL_NEAR_BOTTOM_THRESHOLD_PX);
   const options = arguments.length > 1 && arguments[1] ? arguments[1] : {};
   const groupId = String(options.groupId || '').trim();
   let group = groupId
@@ -28645,10 +28726,10 @@ function renderCliSubPanel(content) {
   if (groups.length > MAX_CLI_SUB_SHOW) {
     for (let i = 0; i < groups.length - MAX_CLI_SUB_SHOW; i++) groups[i].remove();
   }
-  const cell = document.getElementById('rsCliSubCell');
-  if (cell) cell.scrollTop = cell.scrollHeight;
+  if (cell && keepBottom) cell.scrollTop = cell.scrollHeight;
   updateCliSubEmptyState();
   triggerCliTaskPanelFlash();
+  scheduleCliSubScrollBottomButtonSync();
 }
 
 function restoreCliSubPanel(chatId) {
@@ -28669,6 +28750,17 @@ function restoreCliSubPanel(chatId) {
   const cell = document.getElementById('rsCliSubCell');
   if (cell) cell.scrollTop = cell.scrollHeight;
   updateCliSubEmptyState();
+  scheduleCliSubScrollBottomButtonSync();
+}
+
+function setupCliSubScrollControls() {
+  const container = document.getElementById('rsCliSubCell');
+  if (!container || container.dataset.scrollControlsBound === '1') return;
+  container.dataset.scrollControlsBound = '1';
+  container.addEventListener('scroll', () => {
+    scheduleCliSubScrollBottomButtonSync();
+  }, { passive: true });
+  scheduleCliSubScrollBottomButtonSync();
 }
 
 function triggerCliTaskPanelFlash() {
