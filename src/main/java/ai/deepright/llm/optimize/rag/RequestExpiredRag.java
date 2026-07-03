@@ -88,7 +88,7 @@ public class RequestExpiredRag extends RagCondition implements RagService {
 
     protected void buildConversationExpired(RagConfig ragConfig, RagData ragData) throws Exception {
         Long lastResponse = MapUtils.getLong(ragData.getQuery().getMetadata(), "lastResponse");
-        if (lastResponse != null && ragData.getQuery().isEntry() && (System.currentTimeMillis() - ZonedDateTime.now(this.buildZoneId(ragConfig, ragData)).toInstant().toEpochMilli()) > this.offset) {
+        if (lastResponse != null && ragData.getQuery().isEntry() && (System.currentTimeMillis() - lastResponse) > this.offset) {
             this.notify(ragConfig, ragData);
         }
     }
@@ -117,11 +117,6 @@ public class RequestExpiredRag extends RagCondition implements RagService {
                 histories.add(RequestContextBuilder.buildContext(ragData.getRequest(), this.buildHistoryExpired(ragConfig, ragData, expired), History.ROLE_ASSISTANT, history.getCreated() + 1));
             }
         }
-    }
-
-    protected ZoneId buildZoneId(RagConfig ragConfig, RagData ragData) throws Exception {
-        String timezone = FeatureUtils.buildTimezone(ragData.getQuery());
-        return StringUtils.isBlank(timezone) ? ZoneId.systemDefault() : ZoneId.of(timezone);
     }
 
     public void notify(RagConfig ragConfig, RagData ragData) throws Exception {
