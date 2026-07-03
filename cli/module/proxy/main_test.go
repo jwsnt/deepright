@@ -8,6 +8,7 @@ import (
 	"connect/pluginlog"
 	"connect/sandboxstate"
 	"connect/sharedutil"
+	"connect/skillstate"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -5157,6 +5158,80 @@ func TestHandleSkills(t *testing.T) {
 	resp4.Body.Close()
 }
 
+func TestHandleSkillsRespectsChatSkillState(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	sharedDataDB = pooledDB{}
+	defer func() {
+		if sharedDataDB.db != nil {
+			_ = sharedDataDB.db.Close()
+		}
+		sharedDataDB = pooledDB{}
+	}()
+
+	agentDir := filepath.Join(tmp, "agent")
+	alphaDir := filepath.Join(agentDir, "a", "skills", "alpha")
+	betaDir := filepath.Join(alphaDir, "beta")
+	for path, name := range map[string]string{
+		filepath.Join(alphaDir, "SKILL.md"): "alpha",
+		filepath.Join(betaDir, "SKILL.md"):  "beta",
+	} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatalf("mkdir skill dir: %v", err)
+		}
+		content := fmt.Sprintf("---\nname: %s\ndescription: %s skill\n---\nbody\n", name, name)
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatalf("write skill: %v", err)
+		}
+	}
+
+	db, err := getDataDB()
+	if err != nil {
+		t.Fatalf("getDataDB: %v", err)
+	}
+	if _, err := skillstate.SetDisabled(db, "chat-1", alphaDir, true); err != nil {
+		t.Fatalf("SetDisabled: %v", err)
+	}
+
+	proxy := &ProxyServer{AgentDir: agentDir, DeviceID: "test-dev", CacheTTL: 0}
+	server := httptest.NewServer(http.HandlerFunc(proxy.HandleSkills))
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/api/skills?agentId=a")
+	if err != nil {
+		t.Fatalf("GET skills: %v", err)
+	}
+	defer resp.Body.Close()
+	var names []string
+	if err := json.NewDecoder(resp.Body).Decode(&names); err != nil {
+		t.Fatalf("decode all skills: %v", err)
+	}
+	if !reflect.DeepEqual(names, []string{"alpha", "beta"}) {
+		t.Fatalf("skills without chat state = %v, want [alpha beta]", names)
+	}
+
+	resp, err = http.Get(server.URL + "/api/skills?agentId=a&chatId=chat-1")
+	if err != nil {
+		t.Fatalf("GET filtered skills: %v", err)
+	}
+	defer resp.Body.Close()
+	names = nil
+	if err := json.NewDecoder(resp.Body).Decode(&names); err != nil {
+		t.Fatalf("decode filtered skills: %v", err)
+	}
+	if len(names) != 0 {
+		t.Fatalf("skills with disabled alpha = %v, want empty", names)
+	}
+}
+
 func TestHandleSkillsIncludesPluginInternalSkillsOnlyWhenStarted(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("plugin shell script test is not supported on windows")
@@ -5608,6 +5683,100 @@ func TestHandleFiles(t *testing.T) {
 	json.NewDecoder(resp5.Body).Decode(&prefixEntries)
 	if len(prefixEntries) != 1 || prefixEntries[0].Name != "SOUL.md" {
 		t.Errorf("prefix match entries = %v, want [{SOUL.md file}]", prefixEntries)
+	}
+}
+
+func TestHandleFilesReportsChatSkillState(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	sharedDataDB = pooledDB{}
+	defer func() {
+		if sharedDataDB.db != nil {
+			_ = sharedDataDB.db.Close()
+		}
+		sharedDataDB = pooledDB{}
+	}()
+
+	agentDir := filepath.Join(tmp, "agent")
+	skillsRoot := filepath.Join(agentDir, "a", "skills")
+	alphaDir := filepath.Join(skillsRoot, "alpha")
+	betaDir := filepath.Join(alphaDir, "beta")
+	for path, name := range map[string]string{
+		filepath.Join(alphaDir, "SKILL.md"): "alpha",
+		filepath.Join(betaDir, "SKILL.md"):  "beta",
+	} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatalf("mkdir skill dir: %v", err)
+		}
+		content := fmt.Sprintf("---\nname: %s\ndescription: %s skill\n---\nbody\n", name, name)
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatalf("write skill: %v", err)
+		}
+	}
+
+	db, err := getDataDB()
+	if err != nil {
+		t.Fatalf("getDataDB: %v", err)
+	}
+	if _, err := skillstate.SetDisabled(db, "chat-1", alphaDir, true); err != nil {
+		t.Fatalf("SetDisabled: %v", err)
+	}
+
+	proxy := &ProxyServer{}
+	server := httptest.NewServer(http.HandlerFunc(proxy.HandleFiles))
+	defer server.Close()
+
+	type fileEntry struct {
+		Name                   string `json:"name"`
+		Type                   string `json:"type"`
+		HasSkill               bool   `json:"hasSkill"`
+		SkillDisabled          bool   `json:"skillDisabled"`
+		SkillDisabledSelf      bool   `json:"skillDisabledSelf"`
+		SkillDisabledInherited bool   `json:"skillDisabledInherited"`
+	}
+
+	resp, err := http.Get(server.URL + "/api/files?path=" + url.QueryEscape(skillsRoot) + "&chatId=chat-1")
+	if err != nil {
+		t.Fatalf("GET root skills: %v", err)
+	}
+	defer resp.Body.Close()
+	var rootEntries []fileEntry
+	if err := json.NewDecoder(resp.Body).Decode(&rootEntries); err != nil {
+		t.Fatalf("decode root entries: %v", err)
+	}
+	if len(rootEntries) != 1 || rootEntries[0].Name != "alpha" || !rootEntries[0].HasSkill || !rootEntries[0].SkillDisabled || !rootEntries[0].SkillDisabledSelf || rootEntries[0].SkillDisabledInherited {
+		t.Fatalf("root entries = %+v, want alpha self-disabled", rootEntries)
+	}
+
+	resp, err = http.Get(server.URL + "/api/files?path=" + url.QueryEscape(alphaDir) + "&chatId=chat-1")
+	if err != nil {
+		t.Fatalf("GET nested skills: %v", err)
+	}
+	defer resp.Body.Close()
+	var nestedEntries []fileEntry
+	if err := json.NewDecoder(resp.Body).Decode(&nestedEntries); err != nil {
+		t.Fatalf("decode nested entries: %v", err)
+	}
+	if len(nestedEntries) != 2 {
+		t.Fatalf("nested entries len = %d, want 2", len(nestedEntries))
+	}
+	var beta fileEntry
+	for _, entry := range nestedEntries {
+		if entry.Name == "beta" {
+			beta = entry
+			break
+		}
+	}
+	if beta.Name != "beta" || !beta.HasSkill || !beta.SkillDisabled || beta.SkillDisabledSelf || !beta.SkillDisabledInherited {
+		t.Fatalf("beta entry = %+v, want inherited-disabled", beta)
 	}
 }
 

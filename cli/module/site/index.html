@@ -3152,6 +3152,16 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
 .vfs-item.warning-path{background:linear-gradient(90deg,rgba(217,48,37,.16),rgba(255,140,0,.08) 48%,transparent);box-shadow:inset 2px 0 0 rgba(217,48,37,.72);animation:vfsWarningPulse .38s steps(2,end) infinite}
 .vfs-item.warning-file .vfs-name{color:var(--error);font-weight:600;text-shadow:0 0 10px rgba(217,48,37,.24)}
 .vfs-item svg{width:14px;height:14px;color:var(--text-muted);flex-shrink:0}
+.vfs-item .vfs-skill-toggle{width:18px;height:18px;border:none;background:transparent;border-radius:6px;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;flex-shrink:0;color:#c56a1d;transition:background-color .16s ease,color .16s ease,transform .16s ease,opacity .16s ease,box-shadow .16s ease}
+.vfs-item .vfs-skill-toggle:hover{background:linear-gradient(180deg,rgba(255,248,239,.92),rgba(255,236,214,.94));color:#a65210;box-shadow:0 8px 18px rgba(255,161,89,.12),inset 0 1px 0 rgba(255,255,255,.9);transform:translateY(-1px)}
+.vfs-item .vfs-skill-toggle svg{width:16px;height:16px;color:currentColor}
+.vfs-item .vfs-skill-toggle.disabled{color:#c53a30}
+.vfs-item .vfs-skill-toggle.disabled:hover{background:rgba(217,48,37,.1);color:#d93025}
+.vfs-item .vfs-skill-toggle.inherited{opacity:.86}
+.vfs-item .vfs-skill-toggle:focus-visible{outline:none;box-shadow:0 0 0 2px rgba(255,161,89,.18)}
+[data-theme="dark"] .vfs-item .vfs-skill-toggle{color:#ffd7af}
+[data-theme="dark"] .vfs-item .vfs-skill-toggle:hover{background:linear-gradient(180deg,rgba(86,48,13,.96),rgba(55,30,8,.94));color:#ffe4c8;box-shadow:0 10px 20px rgba(0,0,0,.26),inset 0 1px 0 rgba(255,255,255,.04)}
+[data-theme="dark"] .vfs-item .vfs-skill-toggle:focus-visible{box-shadow:0 0 0 2px rgba(255,190,132,.16)}
 .vfs-item .vfs-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .vfs-item .vfs-actions{display:flex;align-items:center;justify-content:flex-end;gap:4px;flex:0 0 auto;min-width:78px}
 .vfs-item .vfs-repair-btn{width:16px;height:16px;border:none;background:transparent;color:var(--error);display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;cursor:pointer;animation:vfsWarningPulse .32s steps(2,end) infinite}
@@ -25857,6 +25867,7 @@ function switchChat(id) {
     if (shouldResumeChatPolling(id)) { console.log('[restore] starting polling for', id, state.chats[id]?.pendingRequest, state.chats[id]?.lastRequestAt); ensureChatRestorePolling(id); }
     else { console.log('[restore] no polling for', id, 'pending:', state.chats[id]?.pendingRequest, 'lastReqAt:', state.chats[id]?.lastRequestAt); stopChatRestorePolling(id); }
     updateChatAsyncUI(id);
+    if (vfsCurrentPath) vfsRefresh();
     clearRestoreNoDataTip(id);
     scheduleSwitchedChatAutoReload(id, { delayMs: 120 });
     if (state.chats[id] && state.chats[id].pendingRequest) resetChatSkillIndicator(id, { agentId: getChatAgentId(id) });
@@ -36153,10 +36164,13 @@ async function showAtMenu() {
   const agentItem = document.querySelector('#' + menuId + ' .at-menu-item[data-type="agent"]');
   if (skillItem) {
     let hasSkills = false;
-    const agentId = state.settings.agentId;
+    const chatId = String(state.activeChat || '').trim();
+    const agentId = String(getChatAgentId(chatId) || state.settings.agentId || '').trim();
     if (agentId) {
       try {
-        const resp = await fetch('/api/skills?agentId=' + encodeURIComponent(agentId));
+        let url = '/api/skills?agentId=' + encodeURIComponent(agentId);
+        if (chatId) url += '&chatId=' + encodeURIComponent(chatId);
+        const resp = await fetch(url);
         if (resp.ok) {
           const skills = await resp.json();
           hasSkills = skills && skills.length > 0;
@@ -36406,10 +36420,13 @@ function atFileKey(e) {
 // Skills
 async function loadSkills() {
   if (isOnboardingActive() && (isAtTourOnboardingStep(onboardingState.step) || isBrowserPluginHoverTourOnboardingStep(onboardingState.step))) return;
-  const agentId = state.settings.agentId;
+  const chatId = String(state.activeChat || '').trim();
+  const agentId = String(getChatAgentId(chatId) || state.settings.agentId || '').trim();
   if (!agentId) { alert('请先在设置中选择 Agent'); return; }
   try {
-    const resp = await fetch('/api/skills?agentId=' + encodeURIComponent(agentId));
+    let url = '/api/skills?agentId=' + encodeURIComponent(agentId);
+    if (chatId) url += '&chatId=' + encodeURIComponent(chatId);
+    const resp = await fetch(url);
     if (!resp.ok) return;
     const skills = await resp.json();
     const panel = document.getElementById(getAtSkillId());
@@ -36602,7 +36619,10 @@ async function vfsRefresh() {
   hideVfsWarningPopover();
   hideVfsRepairPopover();
   try {
-    const resp = await fetch('/api/files?path=' + encodeURIComponent(vfsCurrentPath + '/'));
+    let url = '/api/files?path=' + encodeURIComponent(vfsCurrentPath + '/');
+    const chatId = String(state.activeChat || '').trim();
+    if (chatId) url += '&chatId=' + encodeURIComponent(chatId);
+    const resp = await fetch(url);
     if (!resp.ok) return;
     const json = await resp.text();
     const entries = JSON.parse(json);
@@ -36634,8 +36654,10 @@ function vfsRender(entries) {
     return a.name.localeCompare(b.name);
   });
   list.innerHTML = entries.map(e => {
+    const defaultFolderIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>';
+    const disabledFolderIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M8 9l8 8"/><path d="M16 9l-8 8"/></svg>';
     const icon = e.type === 'dir'
-      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>'
+      ? defaultFolderIcon
       : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
     const del = '<button class="vfs-del" onclick="event.stopPropagation();vfsRequestDel(event,\'' + esc(e.name) + '\',\'' + e.type + '\')" title="删除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>';
     const dl = '<button class="vfs-dl" onclick="event.stopPropagation();vfsDownload(event,\'' + esc(e.name) + '\')" title="下载"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>';
@@ -36671,11 +36693,61 @@ function vfsRender(entries) {
     const repairBtn = repairWarning
       ? `<button class="vfs-repair-btn" onclick="showVfsRepairPopover(event,'${esc(absPath)}')" title="修复 SKILL.md"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a3 3 0 0 0 4.24 4.24l-8.7 8.7a2 2 0 0 1-.9.52l-3.03.76.76-3.03a2 2 0 0 1 .52-.9z"/><path d="M13.5 7.5 16.5 10.5"/></svg></button>`
       : '';
+    const hasSkillToggle = e.type === 'dir' && !!e.hasSkill;
+    const skillDisabled = !!e.skillDisabled;
+    const skillDisabledSelf = !!e.skillDisabledSelf;
+    const skillDisabledInherited = !!e.skillDisabledInherited;
+    const skillToggleTitle = hasSkillToggle
+      ? (skillDisabledInherited && !skillDisabledSelf
+        ? '当前目录因父级技能目录被禁用，需先恢复父级'
+        : (skillDisabled ? '启用当前技能目录及其子孙技能' : '禁用当前技能目录及其子孙技能'))
+      : '';
+    const skillIcon = hasSkillToggle
+      ? `<button class="vfs-skill-toggle${skillDisabled ? ' disabled' : ''}${skillDisabledInherited && !skillDisabledSelf ? ' inherited' : ''}" onclick="vfsToggleSkillDir(event,'${esc(absPath)}',${skillDisabled ? 'true' : 'false'},${skillDisabledSelf ? 'true' : 'false'},${skillDisabledInherited ? 'true' : 'false'})" title="${skillToggleTitle}">${skillDisabled ? disabledFolderIcon : defaultFolderIcon}</button>`
+      : icon;
     const vfsEditTourCls = vfsEditTourState.sourcePath && absPath === vfsEditTourState.sourcePath ? ' vfs-edit-tour-source' : '';
     const cls = `${sel}${inChain ? ' warning-path' : ''}${warning ? ' warning-file' : ''}${vfsEditTourCls}`;
-    return `<div class="vfs-item${cls}"${itemId} data-vfs-name="${esc(e.name)}" data-vfs-type="${e.type}" data-vfs-path="${esc(absPath)}" draggable="true" onmouseenter="vfsHover(event,'${esc(e.name)}','${e.type}')" ondragstart="vfsDragStart(event,'${esc(absPath)}')" onclick="vfsClick(event,'${esc(e.name)}','${e.type}')" ondblclick="vfsDoubleClick(event,'${esc(e.name)}','${e.type}')">${icon}<span class="vfs-name">${esc(e.name)}</span><span class="vfs-actions">${repairBtn}${warningBtn}${del}${dl}${soulBtn}</span></div>`;
+    return `<div class="vfs-item${cls}"${itemId} data-vfs-name="${esc(e.name)}" data-vfs-type="${e.type}" data-vfs-path="${esc(absPath)}" draggable="true" onmouseenter="vfsHover(event,'${esc(e.name)}','${e.type}')" ondragstart="vfsDragStart(event,'${esc(absPath)}')" onclick="vfsClick(event,'${esc(e.name)}','${e.type}')" ondblclick="vfsDoubleClick(event,'${esc(e.name)}','${e.type}')">${skillIcon}<span class="vfs-name">${esc(e.name)}</span><span class="vfs-actions">${repairBtn}${warningBtn}${del}${dl}${soulBtn}</span></div>`;
   }).join('');
   if (isOnboardingActive()) scheduleOnboardingSync();
+}
+
+async function vfsToggleSkillDir(event, absPath, currentlyDisabled, disabledSelf, disabledInherited) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  const chatId = String(state.activeChat || '').trim();
+  if (!chatId) {
+    vfsShowUploadToast('请先选择会话', true);
+    return false;
+  }
+  if (disabledInherited && !disabledSelf) {
+    vfsShowUploadToast('当前目录因父级技能目录被禁用，需先恢复父级', true);
+    return false;
+  }
+  try {
+    const resp = await fetch('/api/skill_state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chatId,
+        path: absPath,
+        disabled: !currentlyDisabled
+      })
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok || Number(payload.status || 0) !== 0) {
+      vfsShowUploadToast('技能目录切换失败: ' + String(payload.content || resp.statusText || '未知错误'), true);
+      return false;
+    }
+    await vfsRefresh();
+    vfsShowUploadToast(currentlyDisabled ? '技能目录已恢复' : '技能目录已禁用', false);
+    return true;
+  } catch (err) {
+    vfsShowUploadToast('技能目录切换失败: ' + err.message, true);
+    return false;
+  }
 }
 
 function vfsDragStart(e, absPath) {

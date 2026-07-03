@@ -7,6 +7,7 @@ import (
 	"compress/gzip"
 	"connect/connectsvc"
 	"connect/sandboxstate"
+	"connect/skillstate"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -1178,6 +1179,9 @@ func getAgentOutputForChat(root string, deviceID string, ttl time.Duration, chat
 	}
 	cloned := *output
 	hydrateAgentOutput(&cloned, chatID)
+	if err := applyChatSkillState(&cloned, chatID); err != nil {
+		return nil, err
+	}
 	if err := syncIntegrationKnowledgeOutput(&cloned, root); err != nil {
 		return nil, err
 	}
@@ -1304,6 +1308,50 @@ func hydrateAgentOutput(output *AgentOutput, chatID string) {
 		}
 		output.Agents[i].Sandbox = readIntegrationSandboxMode(output.Agents[i].AgentID, chatID)
 	}
+}
+
+func disabledSkillPathsForChat(chatID string) ([]string, error) {
+	chatID = strings.TrimSpace(chatID)
+	if chatID == "" {
+		return nil, nil
+	}
+	if cronDB != nil {
+		return skillstate.ListDisabledPaths(cronDB, chatID)
+	}
+	db, err := sql.Open("sqlite", resolveIntegrationDBPath())
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+	return skillstate.ListDisabledPaths(db, chatID)
+}
+
+func filterSkillsByDisabledPaths(skills []agentcore.Skill, disabledPaths []string) []agentcore.Skill {
+	if len(skills) == 0 || len(disabledPaths) == 0 {
+		return skills
+	}
+	filtered := make([]agentcore.Skill, 0, len(skills))
+	for _, skill := range skills {
+		if self, inherited := skillstate.DisabledStatus(disabledPaths, skill.Location); self || inherited {
+			continue
+		}
+		filtered = append(filtered, skill)
+	}
+	return filtered
+}
+
+func applyChatSkillState(output *AgentOutput, chatID string) error {
+	if output == nil {
+		return nil
+	}
+	disabledPaths, err := disabledSkillPathsForChat(chatID)
+	if err != nil || len(disabledPaths) == 0 {
+		return err
+	}
+	for i := range output.Agents {
+		output.Agents[i].Skills = filterSkillsByDisabledPaths(output.Agents[i].Skills, disabledPaths)
+	}
+	return nil
 }
 
 func requestChatContext(raw interface{}) (string, string) {
@@ -2253,7 +2301,16 @@ func startCliGet(ctx context.Context, cfg *Config) {
 				return
 			default:
 			}
-			metadata, err := getAgentOutput(cfg.AgentDir, cfg.Device, agentTTL)
+			currentChatID := resolveCurrentPageSessionChatID()
+			var (
+				metadata *AgentOutput
+				err      error
+			)
+			if currentChatID != "" {
+				metadata, err = getAgentOutputForChat(cfg.AgentDir, cfg.Device, agentTTL, currentChatID)
+			} else {
+				metadata, err = getAgentOutput(cfg.AgentDir, cfg.Device, agentTTL)
+			}
 			if err != nil {
 				log.Printf("cli-get: agent scan error: %v", err)
 				if !sleepContext(ctx, sleepDur) {
@@ -3350,7 +3407,16 @@ func handleSkills(cfg *Config) http.HandlerFunc {
 			return
 		}
 		agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
-		metadata, err := getAgentOutput(cfg.AgentDir, cfg.Device, agentTTL)
+		chatID := strings.TrimSpace(r.URL.Query().Get("chatId"))
+		var (
+			metadata *AgentOutput
+			err      error
+		)
+		if chatID != "" {
+			metadata, err = getAgentOutputForChat(cfg.AgentDir, cfg.Device, agentTTL, chatID)
+		} else {
+			metadata, err = getAgentOutput(cfg.AgentDir, cfg.Device, agentTTL)
+		}
 		if err != nil {
 			log.Printf("api/skills: agent scan error: %v", err)
 			http.Error(w, "Failed to get agent metadata", http.StatusInternalServerError)
@@ -3461,8 +3527,12 @@ func buildIntegrationRuntimeSkillNames(base []string) []string {
 // ═══════════════════════════════════════════════════════════════════════════
 
 type FileEntry struct {
-	Name string `json:"name"`
-	Type string `json:"type"`
+	Name                   string `json:"name"`
+	Type                   string `json:"type"`
+	HasSkill               bool   `json:"hasSkill,omitempty"`
+	SkillDisabled          bool   `json:"skillDisabled,omitempty"`
+	SkillDisabledSelf      bool   `json:"skillDisabledSelf,omitempty"`
+	SkillDisabledInherited bool   `json:"skillDisabledInherited,omitempty"`
 }
 
 func normalizeQuotedPathArg(path string) string {
@@ -3518,6 +3588,11 @@ func handleFiles() http.HandlerFunc {
 			http.Error(w, "Failed to read directory: "+err.Error(), http.StatusNotFound)
 			return
 		}
+		disabledPaths, err := disabledSkillPathsForChat(r.URL.Query().Get("chatId"))
+		if err != nil {
+			http.Error(w, "Failed to read skill state: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 		result := make([]FileEntry, 0, len(entries))
 		for _, e := range entries {
 			if prefix != "" && !strings.HasPrefix(strings.ToLower(e.Name()), strings.ToLower(prefix)) {
@@ -3527,10 +3602,99 @@ func handleFiles() http.HandlerFunc {
 			if e.IsDir() {
 				t = "dir"
 			}
-			result = append(result, FileEntry{Name: e.Name(), Type: t})
+			item := FileEntry{Name: e.Name(), Type: t}
+			if e.IsDir() {
+				entryPath := filepath.Join(searchDir, e.Name())
+				item.HasSkill = hasDirectSkillMarkdown(entryPath)
+				if item.HasSkill {
+					item.SkillDisabledSelf, item.SkillDisabledInherited = skillstate.DisabledStatus(disabledPaths, entryPath)
+					item.SkillDisabled = item.SkillDisabledSelf || item.SkillDisabledInherited
+				}
+			}
+			result = append(result, item)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(result)
+	}
+}
+
+type skillStateRequest struct {
+	ChatID   string `json:"chatId"`
+	Path     string `json:"path"`
+	Disabled bool   `json:"disabled"`
+}
+
+func hasDirectSkillMarkdown(dir string) bool {
+	dir = strings.TrimSpace(dir)
+	if dir == "" {
+		return false
+	}
+	info, err := os.Stat(filepath.Join(dir, "SKILL.md"))
+	return err == nil && !info.IsDir()
+}
+
+func handleSkillState() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var req skillStateRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": 1, "content": "invalid request body"})
+			return
+		}
+		req.ChatID = strings.TrimSpace(req.ChatID)
+		req.Path = skillstate.NormalizePath(req.Path)
+		if req.ChatID == "" || req.Path == "" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": 1, "content": "chatId and path are required"})
+			return
+		}
+		info, err := os.Stat(req.Path)
+		if err != nil || !info.IsDir() || !hasDirectSkillMarkdown(req.Path) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": 1, "content": "path must be a skill directory"})
+			return
+		}
+		db := cronDB
+		opened := false
+		if db == nil {
+			db, err = sql.Open("sqlite", resolveIntegrationDBPath())
+			if err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": 1, "content": err.Error()})
+				return
+			}
+			opened = true
+			defer db.Close()
+		}
+		paths, err := skillstate.SetDisabled(db, req.ChatID, req.Path, req.Disabled)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": 1, "content": err.Error()})
+			return
+		}
+		if opened && cronDB == nil {
+			_ = skillstate.EnsureSchema(db)
+		}
+		selfDisabled, inheritedDisabled := skillstate.DisabledStatus(paths, req.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"status":            0,
+			"chatId":            req.ChatID,
+			"path":              req.Path,
+			"disabled":          selfDisabled || inheritedDisabled,
+			"disabledSelf":      selfDisabled,
+			"disabledInherited": inheritedDisabled,
+			"disabledPaths":     paths,
+		})
 	}
 }
 
@@ -13224,6 +13388,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/plugins/log", handlePluginsLog(&cfg))
 	mux.HandleFunc("/api/folder", handleFolder(&cfg))
 	mux.HandleFunc("/api/skills", handleSkills(&cfg))
+	mux.HandleFunc("/api/skill_state", handleSkillState())
 	mux.HandleFunc("/skills_warning", handleSkillsWarning(&cfg))
 	mux.HandleFunc("/api/files", handleFiles())
 	mux.HandleFunc("/api/data", handleData())

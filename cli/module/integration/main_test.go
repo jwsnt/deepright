@@ -8,6 +8,7 @@ import (
 	"connect/connectsvc"
 	"connect/sandboxstate"
 	"connect/sharedutil"
+	"connect/skillstate"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -14421,6 +14422,83 @@ func TestHandleSkillsIncludesInternalSkills(t *testing.T) {
 			t.Fatalf("skills = %v, want %v", names, wantStarted)
 		}
 	})
+}
+
+func TestHandleSkillsRespectsChatSkillState(t *testing.T) {
+	tmp := t.TempDir()
+
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	db, err := sql.Open("sqlite", filepath.Join(tmp, "data"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+	oldCronDB := cronDB
+	cronDB = db
+	defer func() { cronDB = oldCronDB }()
+
+	agentDir := filepath.Join(tmp, "agent")
+	alphaDir := filepath.Join(agentDir, "a", "skills", "alpha")
+	betaDir := filepath.Join(alphaDir, "beta")
+	for path, name := range map[string]string{
+		filepath.Join(alphaDir, "SKILL.md"): "alpha",
+		filepath.Join(betaDir, "SKILL.md"):  "beta",
+	} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatalf("mkdir skill dir: %v", err)
+		}
+		content := fmt.Sprintf("---\nname: %s\ndescription: %s skill\n---\nbody\n", name, name)
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatalf("write skill: %v", err)
+		}
+	}
+
+	if _, err := skillstate.SetDisabled(db, "chat-1", alphaDir, true); err != nil {
+		t.Fatalf("SetDisabled: %v", err)
+	}
+
+	cfg := &Config{
+		AgentDir:     agentDir,
+		Device:       "test-dev",
+		AgentCacheMs: 0,
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(handleSkills(cfg)))
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/api/skills?agentId=a")
+	if err != nil {
+		t.Fatalf("GET skills: %v", err)
+	}
+	defer resp.Body.Close()
+	var names []string
+	if err := json.NewDecoder(resp.Body).Decode(&names); err != nil {
+		t.Fatalf("decode all skills: %v", err)
+	}
+	if !reflect.DeepEqual(names, []string{"alpha", "beta"}) {
+		t.Fatalf("skills without chat state = %v, want [alpha beta]", names)
+	}
+
+	resp, err = http.Get(server.URL + "/api/skills?agentId=a&chatId=chat-1")
+	if err != nil {
+		t.Fatalf("GET filtered skills: %v", err)
+	}
+	defer resp.Body.Close()
+	names = nil
+	if err := json.NewDecoder(resp.Body).Decode(&names); err != nil {
+		t.Fatalf("decode filtered skills: %v", err)
+	}
+	if len(names) != 0 {
+		t.Fatalf("skills with disabled alpha = %v, want empty", names)
+	}
 }
 
 func TestHandleSkillsWarningRefreshScansAgentDirSkillsOnly(t *testing.T) {

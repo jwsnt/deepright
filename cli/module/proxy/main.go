@@ -7,6 +7,7 @@ import (
 
 	"connect/connectsvc"
 	"connect/sandboxstate"
+	"connect/skillstate"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -843,6 +844,9 @@ func getAgentOutputForChat(root string, deviceID string, ttl time.Duration, chat
 	}
 	cloned := *output
 	hydrateAgentOutput(&cloned, chatID)
+	if err := applyChatSkillState(&cloned, chatID); err != nil {
+		return nil, err
+	}
 	if err := syncProxyKnowledgeOutput(&cloned, root); err != nil {
 		return nil, err
 	}
@@ -922,6 +926,46 @@ func hydrateAgentOutput(output *AgentOutput, chatID string) {
 			output.Agents[i].Sandbox = mode
 		}
 	}
+}
+
+func disabledSkillPathsForChat(chatID string) ([]string, error) {
+	chatID = strings.TrimSpace(chatID)
+	if chatID == "" {
+		return nil, nil
+	}
+	db, err := getDataDB()
+	if err != nil {
+		return nil, err
+	}
+	return skillstate.ListDisabledPaths(db, chatID)
+}
+
+func filterSkillsByDisabledPaths(skills []Skill, disabledPaths []string) []Skill {
+	if len(skills) == 0 || len(disabledPaths) == 0 {
+		return skills
+	}
+	filtered := make([]Skill, 0, len(skills))
+	for _, skill := range skills {
+		if self, inherited := skillstate.DisabledStatus(disabledPaths, skill.Location); self || inherited {
+			continue
+		}
+		filtered = append(filtered, skill)
+	}
+	return filtered
+}
+
+func applyChatSkillState(output *AgentOutput, chatID string) error {
+	if output == nil {
+		return nil
+	}
+	disabledPaths, err := disabledSkillPathsForChat(chatID)
+	if err != nil || len(disabledPaths) == 0 {
+		return err
+	}
+	for i := range output.Agents {
+		output.Agents[i].Skills = filterSkillsByDisabledPaths(output.Agents[i].Skills, disabledPaths)
+	}
+	return nil
 }
 
 func cloneStringAnyMap(src map[string]interface{}) map[string]interface{} {
@@ -2407,7 +2451,16 @@ func (p *ProxyServer) HandleSkills(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	metadata, err := getAgentOutput(p.AgentDir, p.DeviceID, p.CacheTTL)
+	chatID := strings.TrimSpace(r.URL.Query().Get("chatId"))
+	var (
+		metadata *AgentOutput
+		err      error
+	)
+	if chatID != "" {
+		metadata, err = getAgentOutputForChat(p.AgentDir, p.DeviceID, p.CacheTTL, chatID)
+	} else {
+		metadata, err = getAgentOutput(p.AgentDir, p.DeviceID, p.CacheTTL)
+	}
 	if err != nil {
 		log.Printf("agent scan error: %v", err)
 		http.Error(w, "Failed to get agent metadata", http.StatusInternalServerError)
@@ -2490,8 +2543,12 @@ func (p *ProxyServer) HandleSkillsWarning(w http.ResponseWriter, r *http.Request
 
 // FileEntry represents a file or directory in a listing.
 type FileEntry struct {
-	Name string `json:"name"`
-	Type string `json:"type"`
+	Name                   string `json:"name"`
+	Type                   string `json:"type"`
+	HasSkill               bool   `json:"hasSkill,omitempty"`
+	SkillDisabled          bool   `json:"skillDisabled,omitempty"`
+	SkillDisabledSelf      bool   `json:"skillDisabledSelf,omitempty"`
+	SkillDisabledInherited bool   `json:"skillDisabledInherited,omitempty"`
 }
 
 type knowledgeTreeNode struct {
@@ -2558,6 +2615,12 @@ func (p *ProxyServer) HandleFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	disabledPaths, err := disabledSkillPathsForChat(r.URL.Query().Get("chatId"))
+	if err != nil {
+		http.Error(w, "Failed to read skill state: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	result := make([]FileEntry, 0, len(entries))
 	for _, e := range entries {
 		if prefix != "" && !strings.HasPrefix(strings.ToLower(e.Name()), strings.ToLower(prefix)) {
@@ -2567,11 +2630,89 @@ func (p *ProxyServer) HandleFiles(w http.ResponseWriter, r *http.Request) {
 		if e.IsDir() {
 			t = "dir"
 		}
-		result = append(result, FileEntry{Name: e.Name(), Type: t})
+		item := FileEntry{Name: e.Name(), Type: t}
+		if e.IsDir() {
+			entryPath := filepath.Join(searchDir, e.Name())
+			item.HasSkill = hasDirectSkillMarkdown(entryPath)
+			if item.HasSkill {
+				item.SkillDisabledSelf, item.SkillDisabledInherited = skillstate.DisabledStatus(disabledPaths, entryPath)
+				item.SkillDisabled = item.SkillDisabledSelf || item.SkillDisabledInherited
+			}
+		}
+		result = append(result, item)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(result)
+}
+
+type skillStateRequest struct {
+	ChatID   string `json:"chatId"`
+	Path     string `json:"path"`
+	Disabled bool   `json:"disabled"`
+}
+
+func hasDirectSkillMarkdown(dir string) bool {
+	dir = strings.TrimSpace(dir)
+	if dir == "" {
+		return false
+	}
+	info, err := os.Stat(filepath.Join(dir, "SKILL.md"))
+	return err == nil && !info.IsDir()
+}
+
+func (p *ProxyServer) HandleSkillState(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req skillStateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]any{"status": 1, "content": "invalid request body"})
+		return
+	}
+	req.ChatID = strings.TrimSpace(req.ChatID)
+	req.Path = skillstate.NormalizePath(req.Path)
+	if req.ChatID == "" || req.Path == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]any{"status": 1, "content": "chatId and path are required"})
+		return
+	}
+	info, err := os.Stat(req.Path)
+	if err != nil || !info.IsDir() || !hasDirectSkillMarkdown(req.Path) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]any{"status": 1, "content": "path must be a skill directory"})
+		return
+	}
+	db, err := getDataDB()
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]any{"status": 1, "content": err.Error()})
+		return
+	}
+	paths, err := skillstate.SetDisabled(db, req.ChatID, req.Path, req.Disabled)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]any{"status": 1, "content": err.Error()})
+		return
+	}
+	selfDisabled, inheritedDisabled := skillstate.DisabledStatus(paths, req.Path)
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"status":            0,
+		"chatId":            req.ChatID,
+		"path":              req.Path,
+		"disabled":          selfDisabled || inheritedDisabled,
+		"disabledSelf":      selfDisabled,
+		"disabledInherited": inheritedDisabled,
+		"disabledPaths":     paths,
+	})
 }
 
 // ResolveCaseInsensitive resolves a path with case-insensitive matching for each segment.
@@ -9205,6 +9346,7 @@ func runServe(opts serveOptions) {
 	mux.HandleFunc("/api/plugins/log", proxy.HandlePluginsLog)
 	mux.HandleFunc("/api/folder", proxy.HandleFolder)
 	mux.HandleFunc("/api/skills", proxy.HandleSkills)
+	mux.HandleFunc("/api/skill_state", proxy.HandleSkillState)
 	mux.HandleFunc("/skills_warning", proxy.HandleSkillsWarning)
 	mux.HandleFunc("/api/files", proxy.HandleFiles)
 	mux.HandleFunc("/api/data", proxy.HandleData)
