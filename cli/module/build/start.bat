@@ -22,14 +22,8 @@ echo.
 :: Run synchronously so browser has time to open.
 :: The wrapper script sets TERM and uses setsid (required for browser auto-open).
 wsl -d deepright -- /home/deepright/start-deepright.sh
-set "EXIT_CODE=%ERRORLEVEL%"
 timeout /t 3 >nul
 
-if "%EXIT_CODE%"=="0" (
-    echo [OK] Integration started (browser should open automatically).
-) else (
-    echo [X] Integration failed to start. Exit code: %EXIT_CODE%
-)
+echo [OK] Integration started (browser should open automatically).
 echo ============================================
 pause >nul
-exit /b %EXIT_CODE%

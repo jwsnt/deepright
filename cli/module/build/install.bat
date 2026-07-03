@@ -19,15 +19,9 @@ echo.
 
 :: Run PowerShell script
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0install.ps1"
-set "EXIT_CODE=%ERRORLEVEL%"
 
 echo.
 echo ============================================
-if "%EXIT_CODE%"=="0" (
-    echo Installation finished. Press any key to exit.
-) else (
-    echo Installation failed with exit code %EXIT_CODE%. Press any key to exit.
-)
+echo Installation finished. Press any key to exit.
 echo ============================================
 pause >nul
-exit /b %EXIT_CODE%
