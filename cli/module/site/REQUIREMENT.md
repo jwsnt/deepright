@@ -3123,26 +3123,26 @@ data: [DONE]
 + __PROCESS__临时提示展示5秒，下一轮收到新的__PROCESS__则立即替换并刷新5秒计时
 + 纯__PROCESS__报文在实时SSE和历史恢复时都不进入居中对话框正文
 + "努力工作中"位置逻辑保持原样，仅跟当前会话busy状态显示/隐藏，不被__PROCESS__替换
-+ __RETRY__红框重试提示只作用于当前这段SSE响应，不影响下一段
-+ biz=cli且workflow=sub或__sub时__RETRY__不进入红框提示
-+ finish_reason=error保持现有错误展示逻辑，不被__PROCESS__和__RETRY__覆盖
++ __WARN__红框重试提示只作用于当前这段SSE响应，不影响下一段
++ biz=cli且workflow=sub或__sub时__WARN__不进入红框提示
++ finish_reason=error保持现有错误展示逻辑，不被__PROCESS__和__WARN__覆盖
 
 ### 迭代 20260619-1
 > 新增自 ./iteration/20260619-1/REQUIREMENT.md
-+ __RETRY__不再插入独立红框，改为展示到footer预留槽位（与__PROCESS__共用展示位）
++ __WARN__不再插入独立红框，改为展示到footer预留槽位（与__PROCESS__共用展示位）
 + 展示内容取choices[0].delta.content，按前端收口规则做文本归一化
-+ __RETRY__提示仅按当前ChatId匹配，不再按AgentId::ChatId隔离
-+ __RETRY__展示时间优先取choices[0].metadata.delay（毫秒），否则默认30秒
-+ __RETRY__与__PROCESS__共用同一footer展示位，后到覆盖，各自按时长重新计时
-+ __RETRY__展示样式改为荧光红色警告风格；__PROCESS__原有样式保持不变
-+ 原本__RETRY__的红框展示逻辑整体删除，不保留兼容代码
-+ __RETRY__不再使用前端兜底文案，仅使用服务端实际下发的delta.content
++ __WARN__提示仅按当前ChatId匹配，不再按AgentId::ChatId隔离
++ __WARN__展示时间优先取choices[0].metadata.__DELAY__（毫秒），否则默认30秒
++ __WARN__与__PROCESS__共用同一footer展示位，后到覆盖，各自按时长重新计时
++ __WARN__展示样式改为荧光红色警告风格；__PROCESS__原有样式保持不变
++ 原本__WARN__的红框展示逻辑整体删除，不保留兼容代码
++ __WARN__不再使用前端兜底文案，仅使用服务端实际下发的delta.content
 + 红框错误展示仅保留错误场景：HTTP非200、code不在200-299范围内、finish_reason=error
-+ 首次收到__RETRY__时引导的高亮目标改为footer中__RETRY__提示
++ 首次收到__WARN__时引导的高亮目标改为footer中__WARN__提示
 
 ### 迭代 20260620-2
 > 新增自 ./iteration/20260620-2/REQUIREMENT.md
-+ SSE响应里choices[0].metadata.__TARGET__为非空标记时，__PROCESS__和__RETRY__改为展示在当前等待响应assistant气泡内侧左下
++ SSE响应里choices[0].metadata.__TARGET__为非空标记时，__PROCESS__和__WARN__改为展示在当前等待响应assistant气泡内侧左下
 + __TARGET__只影响展示位置，不参与提示作用域匹配
 + 无论是否携带__TARGET__，提示匹配和清理都只按当前ChatId处理
 

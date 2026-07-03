@@ -54,7 +54,7 @@ public class RequestModelRag extends RagCondition implements RagService {
         return new RagAtOnce(ragConfig);
     }
 
-    public void notify(RagConfig ragConfig, RagData ragData, String content) throws Exception {
+    protected void notify(RagConfig ragConfig, RagData ragData, String content) throws Exception {
         if (!FeatureFlag.isSilent(ragData.getQuery())) {
             Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
                     .metadata(CliPrinter.process(RequestModelRag.RAG_KEY))

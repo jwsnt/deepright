@@ -79,7 +79,7 @@ public class RetryUtils {
         if (!FeatureFlag.isSilent(workTask)) {
             Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
                     // 推送空格保持连接
-                    .metadata(ImmutableMap.of(MultiSourceFlag.RETRY, code, MultiSourceFlag.DELAY, delay))
+                    .metadata(ImmutableMap.of(MultiSourceFlag.WARN, code, MultiSourceFlag.DELAY, delay))
                     .content(new StringBuffer(CliPrinter.format(content, CliPrinter.SIZE_N)))
                     .workflow(workTask.getWorkflow())
                     .notifier(Notifier.SOURCE)

@@ -329,8 +329,8 @@ public class DefMemoryService extends BaseFunction implements MemoryService {
         @Override
         public void call(Segment segment) throws Exception {
             this.buffer.append(segment.getContent());
-            if (segment.isFinished() && log.isInfoEnabled()) {
-                log.info("The memory refreshed device={}, content={}", segment.getDevice(), this.buffer);
+            if (segment.isFinished() && log.isDebugEnabled()) {
+                log.debug("The memory refreshed device={}, content={}", segment.getDevice(), this.buffer);
             }
         }
     }

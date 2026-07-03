@@ -17,6 +17,8 @@ public interface FeatureField {
 
     public static final String KEY_ROUTER_DESC = "router_desc";
 
+    public static final String KEY_LAST_RESPONSE = "lastResponse";
+
     public static final String KEY_CRON_TYPE = "cron_type";
 
     public static final String KEY_WORKSPACE = "workspace";

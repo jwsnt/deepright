@@ -87,6 +87,10 @@ public class FeatureUtils {
         return MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_PROVIDER, FeatureUtils.buildTargetProvider(workTask));
     }
 
+    public static Long buildLastResponse(WorkflowTask workTask) throws Exception {
+        return MapUtils.getLong(workTask.getMetadata(), FeatureField.KEY_LAST_RESPONSE);
+    }
+
     public static String buildWorkspace(WorkflowTask workTask) throws Exception {
         return MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_WORKSPACE);
     }

@@ -38,9 +38,9 @@ public class MultiSourceNotifier extends SourceNotifier {
             metadata.put(MultiSourceFlag.KEY_CLOSE, MapUtils.getString(withOutMeta.getMetadata(), MultiSourceFlag.KEY_CLOSE));
             metadata.put(MultiSourceFlag.PROCESS, MapUtils.getString(withOutMeta.getMetadata(), MultiSourceFlag.PROCESS));
             metadata.put(MultiSourceFlag.TARGET, MapUtils.getString(withOutMeta.getMetadata(), MultiSourceFlag.TARGET));
-            metadata.put(MultiSourceFlag.RETRY, MapUtils.getInteger(withOutMeta.getMetadata(), MultiSourceFlag.RETRY));
             metadata.put(MultiSourceFlag.RESET, MapUtils.getString(withOutMeta.getMetadata(), MultiSourceFlag.RESET));
             metadata.put(MultiSourceFlag.DELAY, MapUtils.getObject(withOutMeta.getMetadata(), MultiSourceFlag.DELAY));
+            metadata.put(MultiSourceFlag.WARN, MapUtils.getInteger(withOutMeta.getMetadata(), MultiSourceFlag.WARN));
             metadata.values().removeIf(Objects::isNull);
             withOutMeta.putMetadata(metadata);
             return withOutMeta;

@@ -30278,7 +30278,7 @@ function extractRestoreAbnormalErrorText(raw) {
 }
 
 function extractResponseRetryCodeValue(payload) {
-  const value = payload && payload.choices && payload.choices[0] && payload.choices[0].metadata && payload.choices[0].metadata.__RETRY__;
+  const value = payload && payload.choices && payload.choices[0] && payload.choices[0].metadata && payload.choices[0].metadata.__WARN__;
   return String(value == null ? '' : value).trim();
 }
 
@@ -30348,32 +30348,18 @@ function hasResponseRetryKey(payload) {
   return !!extractResponseRetryCodeValue(payload);
 }
 
-function hasResponseRetryDelayMetadata(payload) {
-  const choice = payload && payload.choices && payload.choices[0];
-  const metadata = choice && choice.metadata && typeof choice.metadata === 'object' ? choice.metadata : null;
-  return !!(metadata && Object.prototype.hasOwnProperty.call(metadata, 'delay'));
-}
-
-function isRetryNoticeContent(text) {
-  const value = normalizeWorkingIndicatorPacketText(text);
-  if (!value) return false;
-  return value.includes('重试') || /\bretry\b/i.test(value);
-}
-
 function shouldDisplayResponseRetryInlineHint(payload) {
   if (!hasResponseRetryKey(payload)) return false;
   if (isResponseTerminalErrorPacket(payload)) return false;
-  const choice = payload && payload.choices && payload.choices[0];
-  const content = choice && choice.delta && typeof choice.delta.content === 'string'
-    ? choice.delta.content
-    : '';
-  return hasResponseRetryDelayMetadata(payload) || isRetryNoticeContent(content);
+  return true;
 }
 
 function extractResponseRetryDelayMs(payload) {
   const choice = payload && payload.choices && payload.choices[0];
   const metadata = choice && choice.metadata && typeof choice.metadata === 'object' ? choice.metadata : {};
-  const raw = metadata && metadata.delay;
+  const raw = metadata && Object.prototype.hasOwnProperty.call(metadata, '__DELAY__')
+    ? metadata.__DELAY__
+    : metadata && metadata.delay;
   const value = Number(raw);
   if (!Number.isFinite(value) || value <= 0) return RETRY_INLINE_HINT_FLASH_MS;
   return Math.max(1, Math.round(value));
@@ -32992,7 +32978,7 @@ function appendRestoredRecords(chatId, chat, records) {
       }
       if (activeUserIndex < 0) activeUserIndex = getLatestUserIndex(chat);
       if (activeUserIndex < 0) return;
-      // Restore replays should keep control-only __PROCESS__/__RETRY__/__TASK__
+      // Restore replays should keep control-only __PROCESS__/__WARN__/__TASK__
       // packets out of center正文, but they still need to refresh the
       // transient inline-hint/task-badge UI for an ongoing pending request.
       const inlineHintPacket = extractFooterInlineHintPacketFromRawRecord(rec.content);

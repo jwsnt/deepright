@@ -13,7 +13,7 @@ public interface MultiSourceFlag {
 
     public static final String DELAY = "__DELAY__";
 
-    public static final String RETRY = "__RETRY__";
-
     public static final String RESET = "__RESET__";
+
+    public static final String WARN = "__WARN__";
 }

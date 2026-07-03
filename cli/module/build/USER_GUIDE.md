@@ -12,6 +12,8 @@
   - WSL2 安装、依赖补齐、文件复制、启动主流程
 - `start.bat`
   - 已安装后的快速启动入口
+- `DeepRight.ico`
+  - Windows 快捷方式图标
 - `app/`
   - 可选
   - 如果存在，则脚本优先复制该目录作为 Linux release 载荷
@@ -52,6 +54,7 @@ install.bat
 - 创建默认用户 `deepright`
 - 安装缺失依赖
 - 复制 release 文件到 WSL 中的 `~/deepright`
+- 在桌面和开始菜单创建带 `DeepRight.ico` 的启动快捷方式
 - 启动 `integration start`
 
 ### 3. 后续启动
@@ -61,6 +64,8 @@ install.bat
 ```text
 start.bat
 ```
+
+也可以直接使用安装时自动创建的 `DeepRight` 桌面/开始菜单快捷方式，图标与应用主站点资源保持一致。
 
 该脚本会在 WSL 中执行：
 

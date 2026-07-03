@@ -293,6 +293,53 @@ build_mac_app_icon() {
   iconutil -c icns "$iconset_dir" -o "$out_icns"
 }
 
+build_windows_app_icon() {
+  src_png="$1"
+  out_ico="$2"
+  fallback_ico="$MODULE_DIR/build/DeepRight.ico"
+
+  if [ ! -f "$src_png" ]; then
+    echo "missing windows app icon source: $src_png" >&2
+    exit 1
+  fi
+
+  mkdir -p "$(dirname "$out_ico")"
+
+  if command -v magick >/dev/null 2>&1; then
+    magick "$src_png" -define icon:auto-resize=256,128,64,48,32,16 "$out_ico"
+    return 0
+  fi
+
+  if command -v python3 >/dev/null 2>&1; then
+    if SRC_PNG="$src_png" OUT_ICO="$out_ico" python3 - <<'PY'
+from pathlib import Path
+import os
+import sys
+
+try:
+    from PIL import Image
+except Exception:
+    sys.exit(1)
+
+src = Path(os.environ["SRC_PNG"])
+out = Path(os.environ["OUT_ICO"])
+img = Image.open(src).convert("RGBA")
+img.save(out, format="ICO", sizes=[(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)])
+PY
+    then
+      return 0
+    fi
+  fi
+
+  if [ -f "$fallback_ico" ]; then
+    copy_release_asset "$fallback_ico" "$out_ico"
+    return 0
+  fi
+
+  echo "failed to build windows app icon: install ImageMagick or python3+Pillow, or provide $fallback_ico" >&2
+  exit 1
+}
+
 write_mac_dmg_background_svg() {
   svg_path="$1"
   target_name="$2"
@@ -811,6 +858,7 @@ package_windows_wsl2_launcher() {
   copy_release_asset "$MODULE_DIR/build/install.bat" "$target_release_dir/install.bat"
   copy_release_asset "$MODULE_DIR/build/start.bat" "$target_release_dir/start.bat"
   copy_release_asset "$MODULE_DIR/build/install.ps1" "$target_release_dir/install.ps1"
+  build_windows_app_icon "$SITE_DIR/icon_white_bg.png" "$target_release_dir/DeepRight.ico"
   rm -f "$target_release_dir/install-wsl2.ps1" "$target_release_dir/install-wsl2.cmd"
   sed -i.bak \
     -e 's|^\$APP_DIR       = Join-Path \$PSScriptRoot "app"$|$APP_DIR       = $PSScriptRoot|' \

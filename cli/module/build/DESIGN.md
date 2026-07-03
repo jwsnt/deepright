@@ -37,6 +37,8 @@
 - `start.bat`
   - 安装完成后的二次启动入口
   - 通过 WSL 用户家目录下的 `~/.integration` 启动主程序
+- `DeepRight.ico`
+  - Windows 启动快捷方式图标
 
 ## 运行流程
 
@@ -49,10 +51,11 @@
 7. 安装缺失依赖：`git`、`npm`、`python3`、`bubblewrap`
 8. 复制 release 目录到 `~/<TargetDirName>`
 9. 生成 `~/.integration` 与 `~/start-deepright.sh`
-10. 默认执行 `~/.integration --start`
+10. 生成桌面与开始菜单快捷方式，并统一使用 `DeepRight.ico`
+11. 默认执行 `~/.integration --start`
 
 ## 与主构建的关系
 
 - `../build.sh` 负责生成不同 Linux/WSL 架构的发布目录。
 - `build` 目录中的脚本定义了 Windows 侧安装与启动的期望行为。
-- 图标仍复用主站点图标资源，由 `../build.sh` 在正式发布时负责打包到目标产物。
+- 图标仍复用主站点图标资源，由 `../build.sh` 在正式发布时转换并打包为 Windows `.ico` 到目标产物。

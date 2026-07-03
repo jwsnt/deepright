@@ -152,7 +152,7 @@ public class GitMemoryService extends BaseFunction implements GitPath, MemorySer
 
     @Override
     public String init(WorkflowTask workTask) throws Exception {
-        if(!this.allowedRead(workTask)) {
+        if (!this.allowedRead(workTask)) {
             return "";
         }
         this.notify(workTask, XmlResourceLang.get(GitMemoryService.LANG_KEY_INIT_MESSAGE));
@@ -353,9 +353,8 @@ public class GitMemoryService extends BaseFunction implements GitPath, MemorySer
     }
 
     protected Boolean allowedRead(WorkflowTask workTask) throws Exception {
-        // 无任何附加上下文时补充额外信息
-        // 不为简单任务
-        return CollectionUtils.isEmpty(workTask.getHistories()) && !ComplexityMode.FAST_REPLY.equals(ComplexityUtils.result(workTask));
+        // 前提：当前没有服务端History召回时 客户端带了LastResponse（非新会话）或 非简单问题
+        return CollectionUtils.isEmpty(History.getReferenceHistory(workTask.getHistories(), History.REFERENCE_SERVER)) && (FeatureUtils.buildLastResponse(workTask) != null || !ComplexityMode.FAST_REPLY.equals(ComplexityUtils.result(workTask)));
     }
 
     @Builder

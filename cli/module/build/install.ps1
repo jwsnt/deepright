@@ -5,9 +5,11 @@ $DISTRO_NAME   = "deepright"
 $WSL_VHD_PATH  = "C:\WSL\deepright"
 $APP_DIR       = Join-Path $PSScriptRoot "app"
 $LOG_FILE      = Join-Path $PSScriptRoot "install.log"
+$ICON_FILE     = Join-Path $PSScriptRoot "DeepRight.ico"
 $WSL_SENTINEL  = "/home/deepright/.deepright_initialized"
 $LOCAL_SENTINEL_DIR  = "C:\ProgramData\deepright"
 $LOCAL_SENTINEL_FILE = Join-Path $LOCAL_SENTINEL_DIR ".deepright_installed"
+$SHORTCUT_NAME = "DeepRight"
 
 # ---------- Log ----------
 function L_Step($m) { $l="`n========================================  $m"; Write-Host $l -F Cyan;   Add-Content -Path $LOG_FILE -Value $l -Encoding UTF8 }
@@ -76,6 +78,61 @@ function Fix-WslConfig([string]$Path) {
 function Test-WslTool([string]$cmd) {
     & wsl.exe -d $DISTRO_NAME -- bash -c "command -v $cmd > /dev/null 2>&1" | Out-Null
     return ($LASTEXITCODE -eq 0)
+}
+
+function New-AppShortcut([string]$ShortcutPath, [string]$TargetPath, [string]$WorkingDir, [string]$IconPath, [string]$Description) {
+    try {
+        $parentDir = Split-Path -Parent $ShortcutPath
+        if (-not (Test-Path $parentDir)) {
+            New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
+        }
+
+        $shell = New-Object -ComObject WScript.Shell
+        $shortcut = $shell.CreateShortcut($ShortcutPath)
+        $shortcut.TargetPath = $TargetPath
+        $shortcut.WorkingDirectory = $WorkingDir
+        $shortcut.Description = $Description
+        if ($IconPath) {
+            $shortcut.IconLocation = $IconPath
+        }
+        $shortcut.Save()
+        return $true
+    } catch {
+        Add-Content -Path $LOG_FILE -Value "shortcut $ShortcutPath failed: $_" -Encoding UTF8
+        return $false
+    }
+}
+
+function Install-WindowsShortcuts {
+    $targetPath = Join-Path $PSScriptRoot "start.bat"
+    if (-not (Test-Path $targetPath)) {
+        L_Warn "start.bat not found, skipping shortcut creation"
+        return
+    }
+
+    $iconLocation = $null
+    if (Test-Path $ICON_FILE) {
+        $iconLocation = "$ICON_FILE,0"
+    } else {
+        L_Warn "Icon file not found, shortcuts will use the default script icon: $ICON_FILE"
+    }
+
+    $shortcutTargets = @(
+        @{ Label = "Desktop";    Path = Join-Path ([Environment]::GetFolderPath("DesktopDirectory")) "$SHORTCUT_NAME.lnk" },
+        @{ Label = "Start Menu"; Path = Join-Path ([Environment]::GetFolderPath("Programs")) "$SHORTCUT_NAME.lnk" }
+    )
+
+    foreach ($shortcutTarget in $shortcutTargets) {
+        if ([string]::IsNullOrWhiteSpace($shortcutTarget.Path)) {
+            L_Warn "Unable to resolve $($shortcutTarget.Label) shortcut directory"
+            continue
+        }
+        if (New-AppShortcut -ShortcutPath $shortcutTarget.Path -TargetPath $targetPath -WorkingDir $PSScriptRoot -IconPath $iconLocation -Description "Launch DeepRight") {
+            L_OK "$($shortcutTarget.Label) shortcut ready: $($shortcutTarget.Path)"
+        } else {
+            L_Warn "Failed to create $($shortcutTarget.Label) shortcut: $($shortcutTarget.Path)"
+        }
+    }
 }
 
 # ---------- Main ----------
@@ -469,6 +526,9 @@ try {
 }
 
 }  # end of needsFullInstall
+
+L_Step "Creating Windows shortcuts"
+Install-WindowsShortcuts
 
 # ====================================================================
 #   PHASE 2: Start integration (always, regardless of sentinel path)

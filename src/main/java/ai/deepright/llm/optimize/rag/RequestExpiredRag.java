@@ -23,9 +23,7 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.collections.MapUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,8 +36,6 @@ import org.springframework.util.Assert;
 
 import java.io.BufferedInputStream;
 import java.nio.charset.StandardCharsets;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -48,7 +44,9 @@ import java.util.concurrent.TimeUnit;
 @Getter
 public class RequestExpiredRag extends RagCondition implements RagService {
 
-    public static final String LANG_KEY_REQUEST_EXPIRED = "request.expired";
+    public static final String LANG_KEY_REQUEST_EXPIRED_MESSAGE = "request.expired.message";
+
+    public static final String LANG_KEY_REQUEST_EXPIRED_FOOTER = "request.expired.footer";
 
     public static final String RAG_KEY = "rag_expired";
 
@@ -87,9 +85,9 @@ public class RequestExpiredRag extends RagCondition implements RagService {
     }
 
     protected void buildConversationExpired(RagConfig ragConfig, RagData ragData) throws Exception {
-        Long lastResponse = MapUtils.getLong(ragData.getQuery().getMetadata(), "lastResponse");
+        Long lastResponse = FeatureUtils.buildLastResponse(ragData.getQuery());
         if (lastResponse != null && ragData.getQuery().isEntry() && (System.currentTimeMillis() - lastResponse) > this.offset) {
-            this.notify(ragConfig, ragData);
+            this.notifyExpired(ragConfig, ragData);
         }
     }
 
@@ -119,15 +117,27 @@ public class RequestExpiredRag extends RagCondition implements RagService {
         }
     }
 
-    public void notify(RagConfig ragConfig, RagData ragData) throws Exception {
+    protected void notifyMessage(RagConfig ragConfig, RagData ragData) throws Exception {
+        this.notifierService.notify(Segment.build(ragData.getQuery(), Segment.SegmentConfig.builder()
+                .content(new StringBuffer(XmlResourceLang.get(RequestExpiredRag.LANG_KEY_REQUEST_EXPIRED_MESSAGE)))
+                .workflow(ragData.getQuery().getWorkflow())
+                .notifier(Notifier.SOURCE)
+                .build()), ragData.getQuery(), ragData.getQuery());
+    }
+
+    protected void notifyFooter(RagConfig ragConfig, RagData ragData) throws Exception {
+        this.notifierService.notify(Segment.build(ragData.getQuery(), Segment.SegmentConfig.builder()
+                .metadata(ImmutableMap.of(MultiSourceFlag.WARN, ProtocolCode.C404, MultiSourceFlag.DELAY, this.delay))
+                .content(new StringBuffer(XmlResourceLang.get(RequestExpiredRag.LANG_KEY_REQUEST_EXPIRED_FOOTER)))
+                .workflow(ragData.getQuery().getWorkflow())
+                .notifier(Notifier.SOURCE)
+                .build()), ragData.getQuery(), ragData.getQuery());
+    }
+
+    protected void notifyExpired(RagConfig ragConfig, RagData ragData) throws Exception {
         if (!FeatureFlag.isSilent(ragData.getQuery())) {
-            Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
-                    .metadata(ImmutableMap.of(MultiSourceFlag.RETRY, ProtocolCode.C404, MultiSourceFlag.DELAY, this.delay))
-                    .content(new StringBuffer(XmlResourceLang.get(RequestExpiredRag.LANG_KEY_REQUEST_EXPIRED)))
-                    .workflow(ragData.getQuery().getWorkflow())
-                    .notifier(Notifier.SOURCE)
-                    .build();
-            this.notifierService.notify(Segment.build(ragData.getQuery(), segmentConfig), ragData.getQuery(), ragData.getQuery());
+            this.notifyMessage(ragConfig, ragData);
+            this.notifyFooter(ragConfig, ragData);
         }
     }
 
