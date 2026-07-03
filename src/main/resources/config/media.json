@@ -1,0 +1,187 @@
+{
+  "image": {
+    "assistant": "def-mediaTransfer",
+    "funCall": {
+      "description": "Note: The skill shall invoke this only when explicitly required by the user or when the skill uses it proactively.\nThe images shall be generated from optional reference images, videos, and prompts to match the user's scenario.",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "The prompt for image generation; provide as much detail as possible."
+        },
+        "why_do_this": {
+          "type": "string",
+          "description": "Brief reasoning for executing this command. Must retain granular data and operational logs for process summarization. The more granular, the better."
+        },
+        "mediaContext": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "string",
+                "description": "The optional reference image or video URI, such as an HTTP URL or a local absolute path; provide as much detail as possible."
+              },
+              "type": {
+                "type": "string",
+                "description": "The MIME type of the media."
+              }
+            },
+            "required": [
+              "data",
+              "type"
+            ]
+          }
+        },
+        "metadata": {
+          "type": "object",
+          "description": "The optional metadata, structured as a key-value map (Map)."
+        }
+      },
+      "required": [
+        "mediaContext",
+        "why_do_this",
+        "query"
+      ]
+    },
+    "media": {
+      "base64": true
+    },
+    "chain": "image_gen"
+  },
+  "image_gen": {
+    "llm": {
+      "networkBuffer": "${image_gen.networkBuffer}",
+      "timeout": "${image_gen.timeout}",
+      "additional": {
+        "imageConfig": {
+          "aspectRatio": "${image_gen.aspectRatio}",
+          "imageSize": "${image_gen.imageSize}"
+        }
+      },
+      "rag": [
+        {
+          "key": "rag_media"
+        }
+      ]
+    },
+    "chain": "base@close"
+  },
+  "file": {
+    "assistant": "def-function",
+    "funCall": {
+      "description": "Note: The skill shall invoke this only when explicitly required by the user or when the skill uses it proactively.\nThe tool shall analyze associated code or files whose combined size is greater than ${file_gen.minsize} bytes and less than ${file_gen.maxsize} bytes to create code, reports, or related content.\nThe total size must be confirmed before use (the file can be used in `batches`).",
+      "properties": {
+        "why_do_this": {
+          "type": "string",
+          "description": "Brief reasoning for executing this command. Must retain granular data and operational logs for process summarization. The more granular, the better."
+        },
+        "refer_uris": {
+          "type": "array",
+          "nullable": false,
+          "minItems": 1,
+          "description": "The local absolute path of the reference image or video. If a HTTP URL is provided, the file should be downloaded first. Please be as detailed as possible.",
+          "items": {
+            "type": "string",
+            "description": "The absolute path of the file."
+          }
+        },
+        "file_path": {
+          "type": "string",
+          "description": "The suggested absolute path to save the generated, analyzed, or modified file or code."
+        },
+        "query": {
+          "type": "string",
+          "description": "The detailed scenario description for the file or code after generation, analysis, or modification."
+        }
+      },
+      "required": [
+        "why_do_this",
+        "refer_uris",
+        "file_path",
+        "query"
+      ]
+    },
+    "function": {
+      "environment": {
+        "workflow": "file_gen"
+      },
+      "name": "fun_file_gen"
+    }
+  },
+  "file_gen": {
+    "extended": "base@config",
+    "llm": {
+      "additional": {
+        "response_schema": {
+          "type": "object",
+          "properties": {
+            "why_do_this": {
+              "type": "string",
+              "description": "Brief reasoning for executing this command. Must retain granular data and operational logs for process summarization. The more granular, the better."
+            },
+            "content": {
+              "type": "string",
+              "description": "The content of the file or code after generation, analysis, or modification."
+            }
+          },
+          "required": [
+            "why_do_this",
+            "content"
+          ]
+        }
+      }
+    },
+    "chain": "base@close"
+  },
+  "ocr": {
+    "assistant": "def-mediaTransfer",
+    "funCall": {
+      "description": "Note: The skill shall invoke this only when explicitly required by the user or when the skill uses it proactively.\nThe content of multimedia formats such as images, videos, and PDFs shall be explained according to the user's request.",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "The content to obtain from the multimedia input, such as query parameters or operation instructions."
+        },
+        "why_do_this": {
+          "type": "string",
+          "description": "Brief reasoning for executing this command. Must retain granular data and operational logs for process summarization. The more granular, the better."
+        },
+        "mediaContext": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "string",
+                "description": "The URI to attach, such as an HTTP URL or a local absolute path (provide as much detail as possible)."
+              },
+              "type": {
+                "type": "string",
+                "description": "The MIME type of the media."
+              }
+            },
+            "required": [
+              "data",
+              "type"
+            ]
+          }
+        }
+      },
+      "required": [
+        "mediaContext",
+        "why_do_this",
+        "query"
+      ]
+    },
+    "media": {
+      "base64": true
+    },
+    "chain": "ocr_gen"
+  },
+  "ocr_gen": {
+    "llm": {
+      "timeout": "${ocr_gen.timeout}"
+    },
+    "chain": "base@close"
+  }
+}

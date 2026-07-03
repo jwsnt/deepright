@@ -1,0 +1,95 @@
+{
+  "create": {
+    "assistant": "def-function",
+    "funCall": {
+      "description": "Create or fully replan a task execution plan based on user requirements.",
+      "properties": {
+        "type": {
+          "type": "integer",
+          "description": "Question category: 1 = open-ended, 2 = closed-ended"
+        },
+        "necessary": {
+          "type": "boolean",
+          "description": "Whether planning is needed. False for trivial questions that can be answered directly"
+        },
+        "why_do_this": {
+          "type": "string",
+          "description": "Brief reasoning for executing this command. Must retain granular data and operational logs for process summarization. The more granular, the better."
+        }
+      },
+      "required": [
+        "type",
+        "necessary",
+        "why_do_this"
+      ]
+    },
+    "function": {
+      "name": "fun_plan_create"
+    }
+  },
+  "update": {
+    "assistant": "def-function",
+    "funCall": {
+      "description": "Incrementally update task plan status after completing or skipping items.",
+      "properties": {
+        "pattern": {
+          "type": "array",
+          "description": "List of plan items to update, one item per entry.",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "pattern": {
+                "type": "string",
+                "description": "Exact original text to match (literal, not regex). Half-width characters only."
+              },
+              "replacement": {
+                "type": "string",
+                "description": "Replacement text. Half-width characters only."
+              }
+            },
+            "required": [
+              "pattern",
+              "replacement"
+            ]
+          }
+        },
+        "why_do_this": {
+          "type": "string",
+          "description": "Brief reasoning for executing this command. Must retain granular data and operational logs for process summarization. The more granular, the better."
+        }
+      },
+      "required": [
+        "pattern",
+        "why_do_this"
+      ]
+    },
+    "function": {
+      "name": "fun_plan_update"
+    }
+  },
+  "config": {
+    "llm": {
+      "global": {
+        "#": "递归总结标记，@see RequestRewriter",
+        "__summary__": false
+      },
+      "rag": [
+        {
+          "file": "classpath:config/plan/base.md",
+          "replace": "#base",
+          "key": "rag_file"
+        },
+        {
+          "key": "rag_check"
+        }
+      ]
+    }
+  },
+  "close": {
+    "extended": "plan@config"
+  },
+  "open": {
+    "extended": "plan@config"
+  }
+}

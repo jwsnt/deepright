@@ -1,0 +1,49 @@
+{
+  "compress": {
+    "llm": {
+      "timeout": "${summary.compress.timeout}",
+      "global": {
+        "#": "递归总结标记，@see RequestRewriter",
+        "__summary__": false
+      },
+      "rag": [
+        {
+          "replace": "#schema",
+          "key": "rag_schema"
+        },
+        {
+          "key": "rag_check",
+          "sort": 0
+        }
+      ],
+      "additional": {
+        "response_schema": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "created": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Unix timestamp in milliseconds. Higher value = more recent."
+              },
+              "content": {
+                "type": "string",
+                "description": "Summarized content of this interaction turn."
+              },
+              "type": {
+                "type": "string",
+                "description": "Role of this turn: Query or Answer."
+              }
+            },
+            "required": [
+              "created",
+              "content",
+              "type"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

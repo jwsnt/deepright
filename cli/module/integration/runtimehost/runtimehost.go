@@ -1,0 +1,206 @@
+package runtimehost
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"integration/http11client"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
+	"sync"
+	"time"
+)
+
+const Endpoint = "/api/host"
+
+type Snapshot struct {
+	Host        string `json:"host"`
+	StartupHost string `json:"startupHost"`
+	Overridden  bool   `json:"overridden"`
+	RuntimeOnly bool   `json:"runtimeOnly"`
+}
+
+type State struct {
+	mu           sync.RWMutex
+	startupHost  string
+	overrideHost string
+}
+
+type apiResponse struct {
+	Status  int      `json:"status"`
+	Content string   `json:"content,omitempty"`
+	Data    Snapshot `json:"data"`
+}
+
+type Client struct {
+	BaseURL    string
+	HTTPClient *http.Client
+}
+
+func New(startupHost string) *State {
+	return &State{startupHost: strings.TrimSpace(startupHost)}
+}
+
+func Validate(raw string) (string, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return "", fmt.Errorf("host is required")
+	}
+	parsed, err := url.Parse(value)
+	if err != nil {
+		return "", fmt.Errorf("invalid host: %w", err)
+	}
+	if !parsed.IsAbs() || parsed.Host == "" || strings.TrimSpace(parsed.Hostname()) == "" {
+		return "", fmt.Errorf("host must be absolute http/https URL")
+	}
+	scheme := strings.ToLower(strings.TrimSpace(parsed.Scheme))
+	if scheme != "http" && scheme != "https" {
+		return "", fmt.Errorf("host must use http or https")
+	}
+	if parsed.RawQuery != "" || parsed.Fragment != "" {
+		return "", fmt.Errorf("host must not include query or fragment")
+	}
+	return strings.TrimRight(parsed.String(), "/"), nil
+}
+
+func (s *State) Current() string {
+	if s == nil {
+		return ""
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.overrideHost != "" {
+		return s.overrideHost
+	}
+	return s.startupHost
+}
+
+func (s *State) Snapshot() Snapshot {
+	if s == nil {
+		return Snapshot{RuntimeOnly: true}
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	host := s.startupHost
+	overridden := false
+	if s.overrideHost != "" {
+		host = s.overrideHost
+		overridden = true
+	}
+	return Snapshot{
+		Host:        host,
+		StartupHost: s.startupHost,
+		Overridden:  overridden,
+		RuntimeOnly: true,
+	}
+}
+
+func (s *State) Set(host string) (Snapshot, error) {
+	if s == nil {
+		return Snapshot{}, fmt.Errorf("runtime host state is nil")
+	}
+	normalized, err := Validate(host)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	s.mu.Lock()
+	s.overrideHost = normalized
+	s.mu.Unlock()
+	return s.Snapshot(), nil
+}
+
+func (s *State) Reset() Snapshot {
+	if s == nil {
+		return Snapshot{RuntimeOnly: true}
+	}
+	s.mu.Lock()
+	s.overrideHost = ""
+	s.mu.Unlock()
+	return s.Snapshot()
+}
+
+func NewClient(baseURL string, httpClient *http.Client) *Client {
+	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if httpClient == nil {
+		httpClient = http11client.NewClient(http11client.Options{Timeout: 5 * time.Second})
+	}
+	return &Client{BaseURL: baseURL, HTTPClient: httpClient}
+}
+
+func (c *Client) Get(ctx context.Context) (Snapshot, error) {
+	return c.do(ctx, http.MethodGet, nil)
+}
+
+func (c *Client) Set(ctx context.Context, host string) (Snapshot, error) {
+	return c.do(ctx, http.MethodPost, map[string]any{"host": host})
+}
+
+func (c *Client) Reset(ctx context.Context) (Snapshot, error) {
+	return c.do(ctx, http.MethodDelete, nil)
+}
+
+func (c *Client) do(ctx context.Context, method string, payload map[string]any) (Snapshot, error) {
+	if c == nil {
+		return Snapshot{}, fmt.Errorf("runtime host client is nil")
+	}
+	baseURL := strings.TrimRight(strings.TrimSpace(c.BaseURL), "/")
+	if baseURL == "" {
+		return Snapshot{}, fmt.Errorf("runtime host base URL is empty")
+	}
+
+	var body io.Reader
+	if payload != nil {
+		data, err := json.Marshal(payload)
+		if err != nil {
+			return Snapshot{}, err
+		}
+		body = bytes.NewReader(data)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, baseURL+Endpoint, body)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	if payload != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	httpClient := c.HTTPClient
+	if httpClient == nil {
+		httpClient = http11client.NewClient(http11client.Options{Timeout: 5 * time.Second})
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return Snapshot{}, err
+	}
+
+	var decoded apiResponse
+	if len(bytes.TrimSpace(data)) != 0 {
+		if err := json.Unmarshal(data, &decoded); err != nil {
+			return Snapshot{}, err
+		}
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 || decoded.Status != 0 {
+		message := strings.TrimSpace(decoded.Content)
+		if message == "" {
+			message = strings.TrimSpace(string(data))
+		}
+		if message == "" {
+			message = resp.Status
+		}
+		return Snapshot{}, fmt.Errorf(message)
+	}
+
+	return decoded.Data, nil
+}

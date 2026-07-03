@@ -1,0 +1,100 @@
+### 第一性原则
++ 仅可以新增/更新/删除site（../..）同目录及其子目录下的文件和文件夹
+
+### 技术规范
++ 严格遵守整体设计文档：../../../DESIGN.md
++ 本模块设计文档：../../DESIGN.md
+
+### 迭代要求
++ site介绍：../../REQUIREMENT.md
++ site手册：../../USER_GUIDE.md
++ 不能破坏现有设计和功能
+
+### 同步代码
++ ../../../integration/REQUIREMENT.md
++ 所以设计/编译都需要遵守integration的二进制和CLI收口原则
+
+### 需求介绍
++ 在设置浮层中模型与密钥的配置增加一个客户化配置的小图标，位于删除按钮之后
++ 点击客户化配置的小图标，在模型与密钥栏下展开两栏补充配置菜单：
+    + 第一栏：模型URL（__url）
+    + 第二栏：分3个框，第一个框：基础模型（__model），第二个框：快速响应（__model_fast），第三个框：深度思考（__model_thinking），第四个框：多模态输入（__model_multi）
++ 展开客户化配置时再次点击小图标则收起
++ Integration需求：../../../integration/iteration/20260519-2/REQUIREMENT.md
++ Proxy需求：../../../proxy/iteration/20260519-2/REQUIREMENT.md
++ 不同模型有不同默认值：
+    + deepright：没有客户话配置图标（不支持客户配置）
+    + deepseek：
+        + __url：https://api.deepseek.com/chat/completions
+        + __model：deepseek-v4-flash
+        + __model_fast：deepseek-v4-flash
+        + __model_thinking：deepseek-v4-pro
+        + __model_multi_input、__model_multi_output：没有，不支持配置
+    + bigmodel：
+        + __url：https://open.bigmodel.cn/api/paas/v4/chat/completions
+        + __model：glm-5.1
+        + __model_fast：glm-4.7-flashx
+        + __model_thinking：glm-5.1
+        + __model_multi_input：glm-5v-turbo
+        + __model_multi_output：不支持配置
+    + gemini：
+        + __url：https://generativelanguage.googleapis.com/v1beta/models/#model:streamGenerateContent
+        + __model：gemini-3.5-flash
+        + __model_fast：gemini-3.5-flash
+        + __model_thinking：gemini-3.1-pro-preview
+        + __model_multi_input：gemini-3.5-flash
+        + __model_multi_output：gemini-3.1-flash-image-preview
+    + openai：
+        + __url：https://api.openai.com/v1/chat/completions
+        + __model：gpt-5.4
+        + __model_fast：gpt-5.4
+        + __model_thinking：gpt-5.4
+        + __model_multi_input：gpt-5.4
+        + __model_multi_output：不支持配置
+    + kimi：
+        + __url：https://api.moonshot.cn/v1/chat/completions
+        + __model：kimi-k2.6
+        + __model_fast：kimi-k2-turbo-preview
+        + __model_thinking：kimi-k2.6
+        + __model_multi_input：kimi-k2.6
+        + __model_multi_output：不支持配置
+    + minimax：
+        + __url：https://api.minimaxi.com/anthropic/v1/messages
+        + __model：MiniMax-M2.7
+        + __model_fast：MiniMax-M2.7-highspeed
+        + __model_thinking：MiniMax-M2.7
+        + __model_multi_input、__model_multi_output：不支持配置
+    + qwen：
+        + __url：https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+        + __model：qwen3.5-flash
+        + __model_fast：qwen3.5-flash
+        + __model_thinking：qwen3.6-plus
+        + __model_multi_input：qwen3.5-flash
+        + __model_multi_output：qwen-image-plus
+    + anthropic：
+        + __url：https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+        + __model：claude-opus-4-6
+        + __model_fast：claude-haiku-4-5-20251001
+        + __model_thinking：claude-opus-4-6
+        + __model_multi_input：claude-opus-4-6
+        + __model_multi_output：不支持配置
++ 在不同模型配置（基础模型、快速响应等）配置的最右侧增加重置和清空按钮，点击重置后重置默认模型的配置和URL，点击清空后清除所有配置
+    + 清空模型客户化配置后，保存并重新打开设置时必须保持为空，不能再被默认配置自动回填
++ 客户化配置的小图标每次打开默认都是收起，如果存在客户话配置（__url、__model等）则闪动
++ 模型点击删除按钮后需要通过/api/config进行持久化删除
+
+### 编写代码
++ 所有前端依赖资源必须随站点页面一起可访问并在发布链路中强校验存在性与正确MIME，禁止出现页面已引用但静态服务未实际发布的本地资源
++ 所有固定定位遮罩层、确认框、弹窗必须统一管理层级、显示状态和pointer-events，按左侧Sidebar、居中会话区、右侧Sidebar分域隔离，禁止未激活浮层跨区域遮挡或拦截其他可操作控件点击
++ 涉及弹窗、日志面板、确认框、遮罩层、透明点击层、复制按钮、全局选区逻辑，默认都必须遵守“交互域隔离 + 隐藏视图彻底失活”原则
++ 设计上先统一弹层挂哪、用哪套坐标系，并避免把会溢出的弹层放进overflow:hidden 容器里
++ 所有浮层都需要先关闭当前打开的浮层后再打开自己，不要产生重叠，不要同时存在多个浮层
++ 代码上把定位收口成一个公共函数或portal机制，不要在业务里各自手算left/top
++ 能用开源包的就用开源包
++ 代码简洁，包体积越小越好
+
+### 撰写手册
++ 编写USER_GUIDE.md
+
+### 其他要求
++ REQUIREMENT.md为需求文档，禁止编写

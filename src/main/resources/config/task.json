@@ -1,0 +1,134 @@
+{
+  "extract": {
+    "llm": {
+      "rag": [
+        {
+          "replace": "#schema",
+          "key": "rag_schema"
+        },
+        {
+          "key": "rag_check",
+          "sort": 0
+        }
+      ],
+      "additional": {
+        "response_schema": {
+          "type": "object",
+          "properties": {
+            "content": {
+              "type": "string",
+              "description": "Extract detailed text content with file paths replaced by filenames."
+            },
+            "artifacts": {
+              "type": "array",
+              "description": "All file paths found in the response.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "description": "Absolute file path."
+                  },
+                  "desc": {
+                    "type": "string",
+                    "description": "Purpose of this file."
+                  }
+                },
+                "required": [
+                  "path",
+                  "desc"
+                ]
+              }
+            },
+            "why_do_this": {
+              "type": "string",
+              "description": "Brief reasoning for executing this command. Must retain granular data and operational logs for process summarization. The more granular, the better."
+            }
+          },
+          "required": [
+            "content",
+            "why_do_this"
+          ]
+        }
+      }
+    }
+  },
+  "main": {
+    "assistant": "def-function",
+    "funCall": {
+      "description": "Assign natural language tasks to team members. Batch multiple independent tasks in one call.",
+      "properties": {
+        "task": {
+          "type": "array",
+          "description": "Tasks to assign.",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "target_device": {
+                "type": "string",
+                "description": "Target member's device unique ID from the online list."
+              },
+              "target_agent": {
+                "type": "string",
+                "description": "Target member's agent unique ID from the online list."
+              },
+              "content": {
+                "type": "string",
+                "description": "Task description with full context. Do not assume the member has prior knowledge."
+              },
+              "artifacts": {
+                "type": "array",
+                "description": "Files or resources required for the task. Use absolute paths from your own file system.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "description": "Absolute path to the file or resource."
+                    },
+                    "desc": {
+                      "type": "string",
+                      "description": "Purpose of this artifact."
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "desc"
+                  ]
+                }
+              },
+              "timeout_seconds": {
+                "type": "integer",
+                "description": "Expected execution timeout in seconds. Default: ${task.timeout}."
+              },
+              "async_execute": {
+                "type": "boolean",
+                "description": "Set to `true` for async execution to run other tasks in parallel (default: `false`). The main task must not be terminated until results are obtained or a timeout occurs."
+              },
+              "why_do_this": {
+                "type": "string",
+                "description": "The brief reasoning for choosing this router team member. Must retain granular data and operational logs for process summarization. The more granular, the better."
+              }
+            },
+            "required": [
+              "content",
+              "artifacts",
+              "why_do_this",
+              "target_agent",
+              "async_execute",
+              "target_device",
+              "timeout_seconds"
+            ]
+          }
+        }
+      },
+      "required": [
+        "task"
+      ]
+    },
+    "function": {
+      "name": "fun_task"
+    }
+  }
+}

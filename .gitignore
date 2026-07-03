@@ -1,0 +1,93 @@
+.idea/
+logs/
+target/
+autodump/
+*.DS_Store
+.kiro/
+# CLI 工具
+cli/bin
+cli/module/release
+cli/module/plugins/*
+!cli/module/plugins/.gitkeep
+cli/module/connect/.browser_playwright_demo*
+cli/module/connect/.browser_playwright*
+cli/module/connect/browser/playwright/.browser_playwright*
+cli/module/connect/browser/.browser_playwright/sessions*
+cli/module/connect/browser/playwright/browser_playwright
+cli/module/connect/browser/cookie/browser_cookie
+cli/module/connect/browser/instance/browser_instance.json
+cli/module/connect/browser/instance/browser_instance
+cli/module/connect/browser/browser_instance.json
+cli/module/connect/browser/.browser_playwright*
+cli/module/connect/browser/instance/obscura
+cli/module/connect/browser/release*
+cli/module/connect/plugins/*
+!cli/module/connect/plugins/.gitkeep
+cli/module/connect/remote/release/
+cli/module/cli-get/sandbox/mac/dist/
+cli/module/cli-get/sandbox/mac/data
+cli/module/plugins/feishu_artifacts
+cli/module/connect/feishu/feishu_artifacts
+cli/module/connect/feishu/bin-feishu
+cli/module/connect/feishu/feishu*
+cli/module/connect/playwright
+cli/module/connect/email/email
+cli/module/cron/cron
+cli/module/connect/connect*
+!cli/module/connect/connectsvc/
+cli/module/connect/connectsvc/*
+!cli/module/connect/connectsvc/local_plugins.go
+!cli/module/connect/connectsvc/local_plugins_test.go
+!cli/module/connect/connectsvc/runtime_skills.go
+!cli/module/connect/connectsvc/runtime_skills_test.go
+cli/module/connect/data
+cli/module/cli-get/cli-get*
+cli/module/agent/agent-scanner*
+cli/module/integration.pid
+cli/module/integration/runtime.json
+cli/module/integration/integration*
+cli/module/integration/.browser_playwright
+cli/module/integration/data*
+cli/module/proxy/proxy*
+cli/module/proxy/data*
+cli/module/skills/skill-scanner*
+cli/module/site/tmp/
+cli/module/knowledge/_tmp_app_test
+# IDE
+.vscode/
+.codex_write_check
+
+# ===== 通用规则：所有日志文件 & 二进制文件 =====
+
+# 所有日志文件
+*.log
+*.runtime.log
+
+# 常见的二进制文件类型
+*.exe       # Windows 可执行文件
+*.bin       # 二进制文件
+*.o         # 目标文件
+*.so        # 共享对象
+*.dylib     # macOS 动态库
+*.class     # Java 字节码
+*.jar       # Java 归档
+
+# 无后缀名的编译二进制文件（补漏）
+cli/module/static/static-server
+
+# Logs
+*.log
+*.runtime.log
+tmp-*.log
+
+# 额外添加的忽略规则
+*.bin
+*.log
+
+# 用户指定的项目资源文件（从跟踪中移除）
+cli/module/icon.png
+cli/module/connect/browser/release/obscura/release/linux/obscura-x86_64-linux.tar.gz
+cli/module/connect/browser/release/obscura/release/mac/obscura-aarch64-macos.tar.gz
+
+# 临时系统/搜索数据文件
+sys_*.json

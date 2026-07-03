@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "feishu-raw-request.schema.json",
+  "title": "Feishu Raw Request Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["source", "receivedAt", "message", "groupedBy", "windowSecs", "expireSecs"],
+  "properties": {
+    "source": {
+      "type": "string",
+      "const": "feishu"
+    },
+    "receivedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["messageId"],
+      "properties": {
+        "requestId": { "type": "string" },
+        "eventId": { "type": "string" },
+        "messageId": { "type": "string", "minLength": 1 },
+        "externalId": { "type": "string" },
+        "chatId": { "type": "string" },
+        "messageAtMs": { "type": "integer" },
+        "messageType": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderType": { "type": "string" },
+        "content": { "type": "string" },
+        "rawContent": { "type": "string" },
+        "artifacts": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "raw": { "type": "string" },
+        "parsed": { "type": "boolean" }
+      }
+    },
+    "pending": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["externalId", "type", "messageAt", "receivedAt"],
+        "properties": {
+          "externalId": { "type": "string", "minLength": 1 },
+          "eventId": { "type": "string" },
+          "messageId": { "type": "string" },
+          "chatId": { "type": "string" },
+          "senderId": { "type": "string" },
+          "senderType": { "type": "string" },
+          "raw": { "type": "string" },
+          "rawContent": { "type": "string" },
+          "type": { "type": "string", "minLength": 1 },
+          "content": { "type": "string" },
+          "artifacts": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "messageAt": { "type": "integer" },
+          "receivedAt": { "type": "integer" }
+        }
+      }
+    },
+    "groupedBy": {
+      "type": "string",
+      "const": "chat_id"
+    },
+    "windowSecs": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "expireSecs": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

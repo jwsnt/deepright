@@ -1,0 +1,47 @@
+{
+  "messages": [
+    {
+      "content": "1+1",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "agentId": "A",
+    "agents": [
+      {
+        "description": "",
+        "provider": "bigmodel",
+        "router_disable": false,
+        "thinking": true,
+        "workspace": "/../agent/A",
+        "agentId": "A",
+        "soul": SOUL.md的内容,
+        "user": USER.md的内容,
+        "skills": [
+          {
+            "name": "skill-creator",
+            "location": "/../agent/A/skills/skill-creator/SKILL.md",
+            "description": "Create new skills, modify and improve existing skills, and measure skill performance. Use when users want to create a skill from scratch, edit, or optimize an existing skill, run evals to test a skill, benchmark skill performance with variance analysis, or optimize a skill's description for better triggering accuracy."
+          }
+        ]
+      }
+    ],
+    "app": "/../module/release/integration",
+    "chat": "98@98",
+    "deviceId": "1280F55F-75EC-5F61-8894-D99102DE3E91",
+    "gateway": "c4:c0:63:b5:d4:1",
+    "git": "/usr/bin/git",
+    "html": false,
+    "knowledge": {
+      "path": "/../module/release/knowledge"
+    },
+    "router_disable": true,
+    "sys": "Darwin 23.4.0",
+    "terminal": "/bin/zsh",
+    "thinking": false,
+    "timezone": "Asia/Shanghai",
+    "type": "page_session"
+  },
+  "model": "deepseek",
+  "stream": true
+}

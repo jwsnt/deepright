@@ -1,0 +1,48 @@
+{
+  "main": {
+    "extended": "base@config,base@llm",
+    "llm": {
+      "containHistories": true,
+      "notifier": "feedback",
+      "rag": [
+        {
+          "file": "classpath:config/main/base.md",
+          "replace": "#base",
+          "key": "rag_file",
+          "sort": 25
+        },
+        {
+          "key": "rag_model",
+          "sort": 5
+        },
+        {
+          "key": "rag_plan",
+          "sort": 15
+        },
+        {
+          "replace": "#output",
+          "key": "rag_output",
+          "sort": 5
+        },
+        {
+          "key": "rag_insert"
+        },
+        {
+          "key": "rag_expired",
+          "sort": 5
+        }
+      ],
+      "funCall": [
+        {
+          "prefix": "[plan-create]",
+          "name": "plan@create"
+        },
+        {
+          "prefix": "[plan-update]",
+          "name": "plan@update"
+        }
+      ]
+    },
+    "chain": "logic@main"
+  }
+}

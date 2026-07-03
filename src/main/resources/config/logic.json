@@ -1,0 +1,57 @@
+{
+  "main": {
+    "assistant": "logic",
+    "chain": "base@close"
+  },
+  "logic": {
+    "llm": {
+      "containHistories": false,
+      "notifier": "feedback",
+      "rag": [
+        {
+          "replace": "#schema",
+          "key": "rag_schema"
+        }
+      ],
+      "funCall": [
+        {
+          "prefix": "[cli]",
+          "name": "cli@sub"
+        }
+      ]
+    }
+  },
+  "extract": {
+    "llm": {
+      "rag": [
+        {
+          "replace": "#schema",
+          "key": "rag_schema"
+        },
+        {
+          "key": "rag_check",
+          "sort": 0
+        }
+      ],
+      "additional": {
+        "response_schema": {
+          "type": "object",
+          "properties": {
+            "passed": {
+              "type": "boolean",
+              "description": "Passed / Failed"
+            },
+            "how_to_improve": {
+              "type": "string",
+              "description": "How to improve, the more detailed, the better, such as: 'I need to...' 'It is required that..'"
+            }
+          },
+          "required": [
+            "passed",
+            "how_to_improve"
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">
+<properties>
+    <entry key="assistant.filegen.hint">[资源必须小于 #max bytes, 请重试]</entry>
+    <entry key="assistant.logic.hint">[重新制定目标]</entry>
+    <entry key="assistant.close.hint">[耗时 #time]</entry>
+    <entry key="memory.markdown.important">重要程度</entry>
+    <entry key="memory.markdown.datetime">时间</entry>
+    <entry key="memory.markdown.digest">摘要</entry>
+    <entry key="memory.markdown.needs">需求</entry>
+    <entry key="memory.recall.valid">[加载长期记忆失败，开始时间、结束时间或编号至少需要一个]</entry>
+    <entry key="memory.recall.message">[正在检索长期记忆]</entry>
+    <entry key="memory.init.message">[正在加载长期记忆]</entry>
+    <entry key="memory.init.file">no such file or directory</entry>
+    <entry key="memory.init.git">exit status 1</entry>
+    <entry key="knowledge.recall.message">[正在检索知识库]</entry>
+    <entry key="knowledge.init.message">[正在加载知识库]</entry>
+    <entry key="skills.hint.recall">[正在阅读 #skill 方法]</entry>
+    <entry key="skills.hint.init">[正在加载 #skill]</entry>
+    <entry key="request.capacity">[正在使用 #model 当前上下文约为 #sizek]</entry>
+    <entry key="rewrite.message">[正在压缩上下文，预计等待 1 至 2 分钟]</entry>
+    <entry key="retry.message">[服务将在 #delay 秒后重试，错误码 #code]</entry>
+    <entry key="cli.general.message">[正在回传待执行任务]</entry>
+    <entry key="cli.logic.message">[正在检查任务结果] #content</entry>
+    <entry key="cli.recall">[已加入引导内容]</entry>
+    <entry key="image.remind">[请耐心等待，预计需要 1 至 2 分钟]</entry>
+    <entry key="image.error">[图片操作失败啦] #content</entry>
+    <entry key="task.start">[Agent #agent 开始执行]</entry>
+    <entry key="task.close">[Agent #agent 完成任务]</entry>
+    <entry key="token.knowledge">整理知识库</entry>
+    <entry key="token.profile">整理偏好</entry>
+    <entry key="token.skill">创建技能</entry>
+    <entry key="token.cron">计划任务</entry>
+    <entry key="token.task">合作任务</entry>
+    <entry key="token.chat">对话</entry>
+    <entry key="plan.create">[正在制定规划]</entry>
+    <entry key="plan.update">[正在更新规划]</entry>
+</properties>

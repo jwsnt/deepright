@@ -1,0 +1,18 @@
+{
+  "host": "https://www.deepright.cn",
+  "version": "1.0",
+  "skills": [
+    "__internal_cron",
+    "__internal_token"
+  ],
+  "http": {
+    "debug": true
+  },
+  "install_app": {
+    "mac": [
+      "git",
+      "python3",
+      "npm"
+    ]
+  }
+}

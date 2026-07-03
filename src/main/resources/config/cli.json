@@ -1,0 +1,161 @@
+{
+  "verify": {
+    "assistant": "def-function",
+    "funCall": {
+      "description": "Verify that task deliverables exist at the specified paths.",
+      "properties": {
+        "artifact": {
+          "type": "array",
+          "description": "List of deliverables to verify.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "resource": {
+                "type": "string",
+                "description": "HTTP URL or absolute file path of the deliverable."
+              },
+              "function": {
+                "type": "string",
+                "description": "Purpose of this deliverable and which requirement it fulfills."
+              }
+            },
+            "required": [
+              "resource",
+              "function"
+            ]
+          }
+        },
+        "why_do_this": {
+          "type": "string",
+          "description": "Brief reasoning for executing this command. Must retain granular data and operational logs for process summarization. The more granular, the better."
+        }
+      },
+      "required": [
+        "artifact",
+        "why_do_this"
+      ]
+    },
+    "function": {
+      "name": "fun_cli_verify"
+    }
+  },
+  "sub": {
+    "assistant": "def-function",
+    "funCall": {
+      "description": "Execute a shell command on the target device. Combine commands with && or | when possible. Enclose all paths in double quotes.",
+      "properties": {
+        "cmd": {
+          "type": "string",
+          "description": "Full shell command to execute. For commands that support timeout flags, include a timeout matching timeout_seconds."
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "description": "Expected execution timeout in seconds. Default: ${cli.sub.timeout}."
+        },
+        "target_device": {
+          "type": "string",
+          "description": "Target member's device unique ID from the online list. Leave blank for the current user."
+        },
+        "target_agent": {
+          "type": "string",
+          "description": "Target member's agent unique ID from the online list. Leave blank for the current user."
+        },
+        "sub_ops": {
+          "type": "object",
+          "description": "File paths involved in this command for access control.",
+          "properties": {
+            "app": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Command names only (not full commands), e.g. [\"ls\", \"grep\"]. Always an array."
+            },
+            "r": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Absolute paths of files being read. Empty array if none."
+            },
+            "w": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Absolute paths of files being written. Empty array if none."
+            }
+          },
+          "required": [
+            "app",
+            "r",
+            "w"
+          ]
+        },
+        "suffix": {
+          "type": "string",
+          "description": "Primary file extension involved in the command (e.g. \"jpg\"). Empty string if none."
+        },
+        "why_do_this": {
+          "type": "string",
+          "description": "Brief reasoning for executing this command. Must retain granular data and operational logs for process summarization. The more granular, the better."
+        }
+      },
+      "required": [
+        "cmd",
+        "suffix",
+        "sub_ops",
+        "why_do_this",
+        "timeout_seconds"
+      ]
+    },
+    "function": {
+      "name": "fun_cli_sub"
+    }
+  },
+  "pub": {
+    "assistant": "def-function",
+    "function": {
+      "name": "fun_cli_pub"
+    }
+  },
+  "get": {
+    "assistant": "def-function",
+    "function": {
+      "name": "fun_cli_get"
+    }
+  },
+  "ops": {
+    "llm": {
+      "rag": [
+        {
+          "replace": "#schema",
+          "key": "rag_schema"
+        },
+        {
+          "key": "rag_check",
+          "sort": 0
+        }
+      ],
+      "additional": {
+        "response_schema": {
+          "type": "object",
+          "properties": {
+            "decision": {
+              "type": "boolean",
+              "description": "True = approved, False = rejected."
+            },
+            "why_do_this": {
+              "type": "string",
+              "description": "Brief reasoning for executing this command. Must retain granular data and operational logs for process summarization. The more granular, the better."
+            }
+          },
+          "required": [
+            "decision",
+            "why_do_this"
+          ]
+        }
+      }
+    }
+  }
+}

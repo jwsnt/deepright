@@ -1,0 +1,100 @@
+{
+  "config": {
+    "llm": {
+      "rag": [
+        {
+          "global": {
+            "workspace": "#workspace",
+            "terminal": "#terminal",
+            "provider": "#provider",
+            "agentId": "#agentId",
+            "device": "#device",
+            "chat": "#chat",
+            "user": "#user",
+            "soul": "#soul",
+            "sys": "#sys",
+            "dir": "#dir",
+            "app": "#app"
+          },
+          "key": "rag_env",
+          "sort": 20
+        },
+        {
+          "replace": "#memory",
+          "key": "rag_memory"
+        },
+        {
+          "replace": "#skills",
+          "key": "rag_skills"
+        },
+        {
+          "replace": "#router",
+          "key": "rag_router"
+        },
+        {
+          "replace": "#schema",
+          "key": "rag_schema"
+        },
+        {
+          "replace": "#safety",
+          "key": "rag_safety"
+        },
+        {
+          "key": "rag_placeholder"
+        },
+        {
+          "key": "rag_check",
+          "sort": 0
+        }
+      ],
+      "funCall": [
+        {
+          "prefix": "[recall]",
+          "name": "memory@recall"
+        },
+        {
+          "prefix": "[skills]",
+          "name": "skills@main"
+        },
+        {
+          "prefix": "[image]",
+          "name": "media@image"
+        },
+        {
+          "prefix": "[file]",
+          "name": "media@file"
+        },
+        {
+          "prefix": "[verify]",
+          "name": "cli@verify"
+        },
+        {
+          "prefix": "[task]",
+          "name": "task@main"
+        },
+        {
+          "prefix": "[cli]",
+          "name": "cli@sub"
+        },
+        {
+          "prefix": "[ocr]",
+          "name": "media@ocr"
+        }
+      ]
+    }
+  },
+  "llm": {
+    "llm": {
+      "clientHistories": "${llm.clientHistories}",
+      "storeCompleted": "${llm.storeCompleted}",
+      "recallOffset": "${llm.recallOffset}",
+      "recallNums": "${llm.recallNums}",
+      "histories": "${llm.histories}",
+      "scene": "${llm.scene}"
+    }
+  },
+  "close": {
+    "assistant": "def-passage",
+    "close": true
+  }
+}

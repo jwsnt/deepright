@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Algalon the Observer - Cosmic Order</title>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #020206; }
+        canvas { display: block; }
+        #ui { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: rgba(0, 255, 255, 0.7); font-family: 'Segoe UI', monospace; text-align: center; pointer-events: none; text-shadow: 0 0 10px rgba(0, 255, 255, 0.5); }
+        h1 { font-size: 2.5rem; letter-spacing: 0.8em; margin-bottom: 0.5em; text-transform: uppercase; }
+        p { font-size: 1rem; letter-spacing: 0.3em; }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <h1>Algalon</h1>
+        <p>Analyzing Cosmic Order...</p>
+    </div>
+    <canvas id="canvas"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        const stars = [];
+        for(let i=0; i<200; i++) {
+            stars.push({
+                x: Math.random() * width,
+                y: Math.random() * height,
+                r: Math.random() * 1.5,
+                speed: Math.random() * 0.2 + 0.05
+            });
+        }
+
+        let time = 0;
+
+        function drawGeometry(cx, cy, radius, sides, angle, color, lineWidth) {
+            ctx.beginPath();
+            for (let i = 0; i < sides; i++) {
+                const theta = angle + (i * 2 * Math.PI / sides);
+                const x = cx + radius * Math.cos(theta);
+                const y = cy + radius * Math.sin(theta);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = lineWidth;
+            ctx.stroke();
+        }
+
+        function animate() {
+            ctx.fillStyle = 'rgba(2, 2, 6, 0.15)';
+            ctx.fillRect(0, 0, width, height);
+
+            ctx.fillStyle = '#ffffff';
+            stars.forEach(star => {
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+                ctx.fill();
+                star.y += star.speed;
+                if(star.y > height) star.y = 0;
+            });
+
+            const cx = width / 2;
+            const cy = height / 2;
+            time += 0.005;
+
+            ctx.save();
+            ctx.translate(cx, cy);
+            
+            ctx.rotate(time);
+            drawGeometry(0, 0, 300, 6, 0, 'rgba(0, 255, 255, 0.3)', 1);
+            drawGeometry(0, 0, 300, 6, Math.PI/6, 'rgba(0, 200, 255, 0.2)', 1);
+            
+            ctx.beginPath();
+            ctx.arc(0, 0, 320, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(0, 150, 255, 0.1)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.rotate(-time * 2.5);
+            drawGeometry(0, 0, 150, 3, 0, 'rgba(0, 255, 255, 0.5)', 2);
+            drawGeometry(0, 0, 150, 3, Math.PI, 'rgba(0, 255, 255, 0.5)', 2);
+
+            ctx.beginPath();
+            ctx.arc(0, 0, 40 + Math.sin(time*10)*10, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0, 255, 255, 0.8)';
+            ctx.shadowBlur = 30;
+            ctx.shadowColor = '#00ffff';
+            ctx.fill();
+
+            ctx.restore();
+
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.15)';
+            ctx.lineWidth = 0.5;
+            for(let i=0; i<40; i++) {
+                for(let j=i+1; j<40; j++) {
+                    const dx = stars[i].x - stars[j].x;
+                    const dy = stars[i].y - stars[j].y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    if(dist < 120) {
+                        ctx.beginPath();
+                        ctx.moveTo(stars[i].x, stars[i].y);
+                        ctx.lineTo(stars[j].x, stars[j].y);
+                        ctx.stroke();
+                    }
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+        animate();
+    </script>
+</body>
+</html>

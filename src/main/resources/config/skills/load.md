@@ -1,0 +1,1 @@
+资源已通过工具[#tools_skill]下载到#path, 可通过工具[#tools_cli]查看或使用

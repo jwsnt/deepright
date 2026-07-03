@@ -1,0 +1,70 @@
+package ai.deepright.module;
+
+import ai.open.right.workflow.config.TokenEntry;
+import ai.open.right.workflow.config.TokenMapping;
+import ai.open.right.workflow.flow.WorkflowTask;
+import ai.open.right.workflow.flow.llm.provider.ProviderRequestService;
+import ai.deepright.auth.AuthService;
+import ai.deepright.feature.FeatureUtils;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import org.springframework.util.Assert;
+
+@Slf4j
+@Getter
+@Setter
+public class HttpAuthority implements TokenMapping {
+
+    public static final TokenEntry TOKEN = TokenEntry.builder().build();
+
+    public static final String NAME = "token.http";
+
+    protected AuthService authService;
+
+    @Override
+    public TokenEntry entry(WorkflowTask workTask, String token) throws Exception {
+        // TOKEN为空或cli@pub sub get task时不转写Provider和Token
+        if (StringUtils.isEmpty(token) || StringUtils.equalsIgnoreCase("cli", workTask.getBiz())) {
+            return HttpAuthority.TOKEN;
+        }
+        String provider = FeatureUtils.buildTargetProvider(workTask);
+        Assert.hasText(provider, "The provider can not be empty");
+        if (this.authService.support(provider)) {
+            // 验证
+            this.authService.auth(workTask, provider, token);
+        } else {
+            // 其他服务商检查Token
+            Assert.hasText(token, "The token can not be empty");
+            workTask.putMetadata(ProviderRequestService.KEY_INTERNAL + ProviderRequestService.KEY_TOKEN, StringUtils.trim(token));
+        }
+        return HttpAuthority.TOKEN;
+    }
+
+    @Order(Ordered.LOWEST_PRECEDENCE - 1)
+    @Configuration
+    @Setter
+    @Getter
+    public static class InitConfig {
+
+        @Autowired
+        protected AuthService authService;
+
+        @Bean(name = HttpAuthority.NAME)
+        @ConditionalOnMissingBean(name = HttpAuthority.NAME)
+        public HttpAuthority httpAuthority() throws Exception {
+            HttpAuthority httpAuthority = new HttpAuthority();
+            BeanUtils.copyProperties(this, httpAuthority);
+            log.info("HttpAuthority inited");
+            return httpAuthority;
+        }
+    }
+}

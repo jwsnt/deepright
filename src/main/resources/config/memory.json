@@ -1,0 +1,130 @@
+{
+  "recall": {
+    "assistant": "def-function",
+    "funCall": {
+      "description": "Recall details from long-term memory by keywords and/or time range.",
+      "properties": {
+        "keywords": {
+          "type": "array",
+          "description": "Entity types or keywords to search for in memory.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "before": {
+          "type": "string",
+          "description": "Upper time bound: recall entries before this time. Format: yyyy-MM-dd HH:mm:ss."
+        },
+        "after": {
+          "type": "string",
+          "description": "Lower time bound: recall entries after this time. Format: yyyy-MM-dd HH:mm:ss."
+        }
+      }
+    },
+    "function": {
+      "name": "fun_memory_recall"
+    }
+  },
+  "summary": {
+    "extended": "base@llm",
+    "llm": {
+      "timeout": "${memory.summary.timeout}",
+      "#": "上下文可读不可写",
+      "writeable": false,
+      "rag": [
+        {
+          "file": "classpath:config/main/base.md",
+          "replace": "#main",
+          "key": "rag_file"
+        },
+        {
+          "replace": "#schema",
+          "key": "rag_schema"
+        },
+        {
+          "key": "rag_check",
+          "sort": 0
+        }
+      ],
+      "additional": {
+        "response_schema": {
+          "type": "object",
+          "properties": {
+            "important": {
+              "type": "integer",
+              "description": "1 = new knowledge worth remembering, 0 = already known or not significant."
+            },
+            "digest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "description": "Summary in specific-subject + verb + specific-object format."
+            },
+            "needs": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 10,
+              "description": "Maslow need level this interaction relates to."
+            },
+            "why_do_this": {
+              "type": "string",
+              "description": "Brief reasoning for executing this command. Must retain granular data and operational logs for process summarization. The more granular, the better."
+            }
+          },
+          "required": [
+            "digest",
+            "needs",
+            "important",
+            "why_do_this"
+          ]
+        }
+      }
+    }
+  },
+  "refresh": {
+    "extended": "base@llm",
+    "llm": {
+      "global": {
+        "#": "递归总结标记，@see RequestRewriter",
+        "__summary__": false
+      },
+      "timeout": "${memory.refresh.timeout}",
+      "#": "上下文可读不可写",
+      "writeable": false,
+      "rag": [
+        {
+          "global": {
+            "workspace": "#workspace",
+            "terminal": "#terminal",
+            "identity": "#identity",
+            "provider": "#provider",
+            "agentId": "#agentId",
+            "device": "#device",
+            "chat": "#chat",
+            "user": "#user",
+            "soul": "#soul",
+            "sys": "#sys",
+            "app": "#app"
+          },
+          "key": "rag_env"
+        },
+        {
+          "key": "rag_check",
+          "sort": 0
+        }
+      ],
+      "funCall": [
+        {
+          "prefix": "[cli]",
+          "name": "cli@sub"
+        }
+      ]
+    }
+  },
+  "refresh_merge": {
+    "extended": "memory@refresh"
+  },
+  "refresh_append": {
+    "extended": "memory@refresh"
+  }
+}
