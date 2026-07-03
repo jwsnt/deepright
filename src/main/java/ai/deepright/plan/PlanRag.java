@@ -8,6 +8,7 @@ import ai.open.right.workflow.flow.llm.rag.RagData;
 import ai.open.right.workflow.flow.llm.rag.RagService;
 import ai.open.right.workflow.flow.llm.rag.future.RagAtOnce;
 import ai.open.right.workflow.flow.llm.rag.future.RagFuture;
+import ai.open.right.workflow.flow.llm.store.history.History;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.Setter;
@@ -26,6 +27,7 @@ import org.springframework.util.Assert;
 
 import java.io.BufferedInputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 @Slf4j
 @Getter
@@ -40,12 +42,16 @@ public class PlanRag extends RagCondition implements RagService {
 
     protected String template4update;
 
+    protected String template4append;
+
     @PostConstruct
     public void init() throws Exception {
         this.template4create = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4create).openStream()), StandardCharsets.UTF_8);
         this.template4update = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4update).openStream()), StandardCharsets.UTF_8);
+        this.template4append = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4append).openStream()), StandardCharsets.UTF_8);
         Assert.hasText(this.template4create, "The plan create template can not be empty");
         Assert.hasText(this.template4update, "The plan update template can not be empty");
+        Assert.hasText(this.template4append, "The plan append template can not be empty");
     }
 
     @Override
@@ -58,7 +64,9 @@ public class PlanRag extends RagCondition implements RagService {
             String plan = PlanUtils.fetchPlan(ragData.getQuery());
             if (!StringUtils.isEmpty(plan)) {
                 // 提示更新
-                ragData.getRequest().getMessage().getHistories().add(RequestContextBuilder.buildContext(ragData.getRequest(), this.template4update.replace("#plan", plan), PlanUtils.fetchTime(ragData.getQuery())));
+                History assistant = RequestContextBuilder.buildContext(ragData.getRequest(), this.template4update.replace("#plan", plan), History.ROLE_ASSISTANT, PlanUtils.fetchTime(ragData.getQuery()));
+                History user = RequestContextBuilder.buildContext(ragData.getRequest(), this.template4append, assistant.getCreated() + RequestContextBuilder.NEXT);
+                ragData.getRequest().getMessage().getHistories().addAll(List.of(assistant, user));
             } else {
                 // 提示创建（Gemini特殊处理）
                 ragData.getRequest().getMessage().getHistories().add(RequestContextBuilder.buildContext(ragData.getRequest(), this.template4create, ragData.getRequest().getMessage().getCreated() + RequestContextBuilder.NEXT));
@@ -81,6 +89,9 @@ public class PlanRag extends RagCondition implements RagService {
 
         @Value("${plan.rag.template.update:classpath:config/plan/update.md}")
         protected String template4update;
+
+        @Value("${plan.rag.template.update:classpath:config/plan/append.md}")
+        protected String template4append;
 
         @Bean(PlanRag.RAG_KEY)
         @ConditionalOnMissingBean(name = PlanRag.RAG_KEY)
