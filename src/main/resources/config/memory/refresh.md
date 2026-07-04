@@ -15,6 +15,6 @@
 + 使用工具`[cli]`局部更新（sed/cat >>）禁止覆盖写入（echo >/cat >）
     + USER.md："#workspace/USER.md"
     + SOUL.md："#workspace/SOUL.md"
-+ 注意"更新前"需要在同目录以时间戳备份原文件
++ 更新前需要在"#workspace/bak"下以时间戳备份原文件
 ### 输出规范
 + 交付后说明更新了什么，或为什么未更新

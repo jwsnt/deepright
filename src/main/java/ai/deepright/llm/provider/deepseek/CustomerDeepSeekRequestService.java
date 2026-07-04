@@ -55,7 +55,7 @@ public class CustomerDeepSeekRequestService extends DeepSeekRequestService {
         if (lastResult.is(ComplexityMode.DEEP_THINKING, ComplexityMode.TASK_PLANNING)) {
             Map<String, Object> extra = request.getExtraBody();
             extra = extra != null ? extra : new HashMap<String, Object>();
-            extra.put("reasoning_effort", lastResult.is(ComplexityMode.DEEP_THINKING) ? "high" : "max");
+            extra.put("reasoning_effort", lastResult.is(ComplexityMode.TASK_PLANNING, ComplexityMode.DEEP_THINKING) ? "high" : "max");
             extra.put("thinking", ImmutableMap.of("type", "enabled"));
             request.setExtraBody(extra);
         }

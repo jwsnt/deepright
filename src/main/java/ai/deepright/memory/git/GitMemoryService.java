@@ -327,7 +327,6 @@ public class GitMemoryService extends BaseFunction implements GitPath, MemorySer
     protected Integer buildRecall(WorkflowTask workTask) throws Exception {
         Integer recall = MapUtils.getInteger(workTask.getMetadata(), "__memoryRecall", this.recall);
         return (int) (recall * (ComplexityMode.FAST_REPLY.is(ComplexityUtils.result(workTask)) ? 1 : this.complexRate));
-
     }
 
     protected Integer buildFetch(WorkflowTask workTask) throws Exception {
@@ -354,6 +353,7 @@ public class GitMemoryService extends BaseFunction implements GitPath, MemorySer
         // 前提：当前没有服务端History召回时 客户端带了LastResponse（非新会话）或 非简单问题
         return CollectionUtils.isEmpty(History.getReferenceHistory(workTask.getHistories(), History.REFERENCE_SERVER)) && (FeatureUtils.buildLastResponse(workTask) != null || !ComplexityMode.FAST_REPLY.equals(ComplexityUtils.result(workTask)));
     }
+
 
     @Builder
     public static class MemoryCommitCallable extends BaseCallable {
@@ -382,14 +382,14 @@ public class GitMemoryService extends BaseFunction implements GitPath, MemorySer
                     Map<String, Object> memory = JsonUtils.read(this.buffer.toString(), Map.class);
                     Assert.notEmpty(memory, "The git memory commit can not be empty");
                     Integer important = MapUtils.getInteger(memory, "important", 0);
-                    digest = "[datetime=" + GitMemoryService.DATE_FORMAT.format(this.workTask.getCreated()) + "][important=" + important + "][" + MapUtils.getString(memory, "needs") + "]";
+                    digest = "[datetime=" + GitMemoryService.DATE_FORMAT.format(this.workTask.getCreated()) + "][important=" + important + "][needs=" + MapUtils.getString(memory, "needs") + "][digest=" + MapUtils.getString(memory, "digest", "") + "]";
                     why = MapUtils.getString(memory, "why_do_this");
                     if (log.isInfoEnabled()) {
                         log.info("The long-term memory refreshed, important={}, why={}", important, why);
                     }
                 } else if (log.isWarnEnabled()) {
                     log.warn("The long-term memory refresh failed, the result is not JSON.");
-                    digest = "[datetime=" + GitMemoryService.DATE_FORMAT.format(this.workTask.getCreated()) + "][important=0][" + this.workTask.getOriginal() + "]";
+                    digest = "[datetime=" + GitMemoryService.DATE_FORMAT.format(this.workTask.getCreated()) + "][important=0][digest=" + this.workTask.getOriginal() + "]";
                 }
                 // 使用>覆盖，只保留Git
                 StringBuffer buffer = new StringBuffer().append("cd ").append(this.path).append(" && ");

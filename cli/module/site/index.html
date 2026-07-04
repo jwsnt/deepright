@@ -23239,6 +23239,7 @@ function finalizeAssistantTransientFields(msg) {
   if (!msg || msg.role !== 'assistant') return msg;
   if (msg._cliSubContent && !msg.cliSubContent) msg.cliSubContent = msg._cliSubContent;
   if (msg._cliSubGroupId && !msg.cliSubGroupId) msg.cliSubGroupId = msg._cliSubGroupId;
+  if (msg._cliSubOnly) msg.cliSubOnly = true;
   const explosionSnapshots = normalizeAssistantExplosionSnapshots(
     Array.isArray(msg._explodedSnapshots) ? msg._explodedSnapshots : msg.explodedSnapshots
   );
@@ -23246,6 +23247,7 @@ function finalizeAssistantTransientFields(msg) {
   else delete msg.explodedSnapshots;
   delete msg._cliSubContent;
   delete msg._cliSubGroupId;
+  delete msg._cliSubOnly;
   delete msg._pendingExplosionContent;
   delete msg._pendingExplosionGroupKey;
   delete msg._explosionGroupKey;
@@ -26475,12 +26477,25 @@ function shouldRenderMessageAsStandaloneJsonCodeFence(message) {
   return String(message.streamStatus || '').trim() === '完成';
 }
 
+function hasAssistantCliSubContent(message) {
+  return !!normalizeMessageText(message && (message._cliSubContent || message.cliSubContent));
+}
+
+function isAssistantCliSubOnlyMessage(message) {
+  return !!(message && (message._cliSubOnly || message.cliSubOnly));
+}
+
 function shouldRenderAssistantCenterMessage(message) {
   if (!message || message.role !== 'assistant') return false;
+  const hasCenterContent = !!normalizeMessageText(message.content);
+  const hasCliSubContent = hasAssistantCliSubContent(message);
+  const hasExplosionSnapshots = getAssistantExplosionSnapshots(message).length > 0;
   if (message.error || message.cancelMarker) return true;
+  if (isAssistantCliSubOnlyMessage(message)) return false;
+  if (!hasCenterContent && !hasExplosionSnapshots && hasCliSubContent) return false;
   if (message.pendingUiPlaceholder && !isAssistantTerminalMessage(message)) return true;
-  if (normalizeMessageText(message.content)) return true;
-  return getAssistantExplosionSnapshots(message).length > 0;
+  if (hasCenterContent) return true;
+  return hasExplosionSnapshots;
 }
 
 function shouldRenderMessageInCenter(message) {
@@ -31837,7 +31852,7 @@ async function sendCenterMessage(rawText, options) {
             sse503OnboardingQueued = true;
             queueSse503TourOnboarding({ chatId, model: selectedModel });
           }
-          // Detect cli+sub workflow — render to right sidebar instead of center
+          // Detect cli/sub packets and keep them out of center chat.
           if (isCliSub) {
             const cliChoice = choice;
             if (!isTerminalErrorPacket && !inlineHintPacket.active && !taskBadgePacket.active && cliChoice && cliChoice.delta && cliChoice.delta.content) {
@@ -31845,6 +31860,7 @@ async function sendCenterMessage(rawText, options) {
               if (!cliAssistantMsg) continue;
               ensureAssistantMessageAdded(streamEntry);
               // Store in chat messages with cliSub flag
+              cliAssistantMsg._cliSubOnly = true;
               if (!cliAssistantMsg._cliSubGroupId) cliAssistantMsg._cliSubGroupId = cliAssistantMsg.cliSubGroupId || ('stream-cli:' + uuid());
               if (!cliAssistantMsg._cliSubContent) cliAssistantMsg._cliSubContent = '';
               cliAssistantMsg._cliSubContent += cliChoice.delta.content;
@@ -32833,7 +32849,7 @@ function parseRestoreAssistantRecord(raw) {
         } else if (packetSnapshotGroupKey && !inlineHintPacket.active && !taskBadgePacket.active) {
           assistantState._explosionGroupKey = packetSnapshotGroupKey;
         }
-        if (parsed.biz === 'cli' && parsed.workflow === 'sub' && !shouldSkipCenterAssistantDelta(parsed)) {
+        if (isCliSub && !shouldSkipCenterAssistantDelta(parsed)) {
           cliSubContent += choice.delta.content;
         } else if (!shouldSkipCenterAssistantDelta(parsed)) {
           appendCenterStreamDelta(assistantState, parsed, choice.delta.content);
@@ -33424,6 +33440,13 @@ function appendRestoredRecords(chatId, chat, records) {
       if (!activeAssistant.createdAt) activeAssistant.createdAt = ts;
       const parsed = parseRestoreAssistantRecord(activeAssistant.rawSse);
       applyParsedAssistantSnapshot(activeAssistant, parsed);
+      if (
+        isCliSubOnlyRecord &&
+        !normalizeMessageText(activeAssistant.content) &&
+        !getAssistantExplosionSnapshots(activeAssistant).length
+      ) {
+        activeAssistant._cliSubOnly = true;
+      }
       if (parsed.error) {
         const terminalErrorText = String(parsed.errorText || '').trim() || '服务端返回错误';
         const existingError = findAssistantErrorForRequest(chat, activeUserIndex, terminalErrorText, activeAssistant);

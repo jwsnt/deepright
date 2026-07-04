@@ -1,0 +1,2199 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DeepRight · 视频帧平铺与标注</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    :root {
+      --bg-main: #06101f;
+      --bg-sidebar: rgba(10, 20, 38, 0.44);
+      --bg-input: rgba(9, 18, 34, 0.36);
+      --bg-card: rgba(10, 20, 38, 0.42);
+      --text-primary: #eef4ff;
+      --text-secondary: #afc4ea;
+      --text-muted: rgba(201, 216, 245, 0.58);
+      --border: rgba(149, 181, 255, 0.18);
+      --accent: #6d95ff;
+      --accent-hover: #8cafff;
+      --error: #ff5a6b;
+      --error-bg: rgba(255, 120, 134, 0.14);
+      --shadow: 0 24px 64px rgba(0, 0, 0, 0.42);
+      --radius: 28px;
+      --radius-sm: 18px;
+      --radius-xs: 12px;
+      --transition: all .32s cubic-bezier(.22, 1, .36, 1);
+      
+      --glass-surface: rgba(11, 23, 44, 0.42);
+      --glass-surface-strong: rgba(14, 29, 54, 0.6);
+      --glass-panel: rgba(9, 18, 34, 0.5);
+      --glass-edge: rgba(169, 198, 255, 0.22);
+      --glass-edge-strong: rgba(214, 229, 255, 0.34);
+      --glass-highlight: rgba(218, 231, 255, 0.2);
+      --glass-shadow: 0 32px 82px rgba(0, 0, 0, 0.45);
+      
+      --bg-gradient:
+        radial-gradient(circle at 18% 18%, rgba(27, 92, 189, 0.52), transparent 24%),
+        radial-gradient(circle at 82% 12%, rgba(83, 120, 255, 0.4), transparent 26%),
+        radial-gradient(circle at 50% 82%, rgba(0, 205, 255, 0.24), transparent 28%),
+        radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.05), transparent 40%);
+    }
+
+    html, body {
+      height: 100%;
+      font-family: "SF Pro Display", "PingFang SC", "Segoe UI", sans-serif;
+      background: var(--bg-main);
+      color: var(--text-primary);
+      transition: var(--transition);
+      overflow-x: hidden;
+    }
+
+    body {
+      position: relative;
+      background: var(--bg-gradient), linear-gradient(135deg, #030916 0%, #081a31 44%, #061120 100%);
+    }
+
+    body::before, body::after {
+      content: '';
+      position: fixed;
+      inset: -18%;
+      pointer-events: none;
+      z-index: -2;
+    }
+
+    body::before {
+      background:
+        radial-gradient(circle at 20% 22%, rgba(255, 255, 255, 0.1), transparent 18%),
+        radial-gradient(circle at 76% 16%, rgba(255, 255, 255, 0.05), transparent 16%),
+        radial-gradient(circle at 60% 78%, rgba(255, 255, 255, 0.03), transparent 20%);
+      filter: blur(18px);
+      animation: liquidSkyDrift 18s ease-in-out infinite alternate;
+    }
+
+    @keyframes liquidSkyDrift {
+      0% { transform: translate(0, 0) rotate(0deg); }
+      100% { transform: translate(4%, 3%) rotate(8deg); }
+    }
+
+    body::after {
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+      background-size: 88px 88px;
+      opacity: .32;
+      mask-image: radial-gradient(circle at center, rgba(0,0,0,.95), transparent 78%);
+    }
+
+    .app-container {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 40px 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header */
+    header {
+      margin-bottom: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo-area {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-text {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #ffffff 0%, #afc4ea 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .logo-badge {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: rgba(109, 149, 255, 0.15);
+      border: 1px solid rgba(109, 149, 255, 0.3);
+      color: var(--accent);
+    }
+
+    /* Panel */
+    .panel {
+      background: var(--glass-surface);
+      border: 1px solid var(--glass-edge);
+      border-radius: var(--radius);
+      padding: 28px;
+      margin-bottom: 28px;
+      backdrop-filter: blur(20px) saturate(160%);
+      -webkit-backdrop-filter: blur(20px) saturate(160%);
+      box-shadow: var(--glass-shadow);
+      transition: var(--transition);
+    }
+
+    .panel:hover {
+      border-color: var(--glass-edge-strong);
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      align-items: flex-end;
+    }
+    .row > .form-group {
+      flex: 1 1 240px;
+    }
+    .row > .form-group-half {
+      flex: 1 1 110px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .row > .form-group-btn {
+      flex: 1 1 110px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    @media (max-width: 768px) {
+      .row > .form-group,
+      .row > .form-group-half,
+      .row > .form-group-btn {
+        flex: 1 1 100%;
+      }
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      letter-spacing: 0.5px;
+    }
+
+    /* Custom File Input */
+    .file-input-wrapper {
+      position: relative;
+      width: 100%;
+    }
+
+    .file-input-wrapper input[type="file"] {
+      position: absolute;
+      left: 0;
+      top: 0;
+      opacity: 0;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+    }
+
+    .file-input-trigger {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 16px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 14px;
+      transition: var(--transition);
+      text-align: center;
+    }
+
+    .file-input-wrapper:hover .file-input-trigger {
+      border-color: var(--accent);
+      background: rgba(109, 149, 255, 0.08);
+    }
+
+    input[type="number"] {
+      width: 100%;
+      background: var(--bg-input);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      font-size: 14px;
+      transition: var(--transition);
+      outline: none;
+    }
+
+    input[type="number"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(109, 149, 255, 0.15);
+    }
+
+    /* Buttons */
+    button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: var(--accent);
+      color: #ffffff;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 12px 24px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: var(--transition);
+      outline: none;
+    }
+
+    button:hover {
+      background: var(--accent-hover);
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    button:disabled {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-muted);
+      border-color: transparent;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .secondary-btn {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+    }
+
+    .secondary-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--text-secondary);
+    }
+
+    .meta {
+      margin-top: 8px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      padding: 6px 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: var(--radius-xs);
+      border-left: 3px solid var(--accent);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+    .meta-item {
+      display: inline-flex;
+      align-items: center;
+    }
+    .meta-item:not(:last-child)::after {
+      content: "|";
+      margin-left: 12px;
+      color: rgba(255, 255, 255, 0.15);
+    }
+
+    .status {
+      margin-top: 12px;
+      color: #7dd3fc;
+      font-size: 13px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Toolbar */
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .toolbar-left,
+    .toolbar-right {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    /* Progress */
+    .progress {
+      margin-top: 20px;
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #6d95ff, #00cdff);
+      transition: width 0.15s linear;
+      border-radius: 999px;
+    }
+
+    .tip {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 16px;
+      line-height: 1.6;
+    }
+
+    /* Frames Grid */
+    .frames {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 20px;
+      margin-top: 28px;
+    }
+
+    .frame-card {
+      background: var(--glass-surface);
+      border: 1px solid var(--glass-edge);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      cursor: pointer;
+      transition: var(--transition);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    }
+
+    .frame-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--accent);
+      box-shadow: 0 16px 40px rgba(109, 149, 255, 0.15);
+    }
+
+    .frame-thumb-wrapper {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #000;
+      overflow: hidden;
+    }
+
+    .frame-thumb {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.5s ease;
+    }
+
+    .frame-card:hover .frame-thumb {
+      transform: scale(1.05);
+    }
+
+    .frame-info {
+      padding: 14px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      background: rgba(0, 0, 0, 0.15);
+      border-top: 1px solid var(--border);
+    }
+
+    .frame-index {
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    /* Pager */
+    .pager {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+      margin-top: 40px;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+    .pager.hidden {
+      opacity: 0;
+      visibility: hidden;
+      height: 0;
+      margin-top: 0;
+      overflow: hidden;
+    }
+    /* 优化 toolbar-right 布局，防止按钮在小屏幕或多按钮时重叠 */
+    .toolbar-right {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+    @media (max-width: 600px) {
+      .toolbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 16px;
+      }
+      .toolbar-left, .toolbar-right {
+        justify-content: center;
+        width: 100%;
+      }
+    }
+
+    /* Modal & Editor */
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(3, 8, 22, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      z-index: 999;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .modal.open {
+      display: flex;
+      opacity: 1;
+    }
+
+    .modal-content {
+      width: min(1400px, 100%);
+      max-height: 90vh;
+      background: #0c1524;
+      border: 1px solid var(--glass-edge);
+      border-radius: var(--radius);
+      padding: 28px;
+      box-shadow: var(--glass-shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      overflow: hidden;
+    }
+
+    .modal-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .editor-layout {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 24px;
+      overflow: hidden;
+      flex: 1;
+    }
+
+    .editor-stage {
+      position: relative;
+      background: #040912;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      overflow: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      min-height: 400px;
+    }
+
+    .editor-canvas-wrap {
+      position: relative;
+      margin: 0 auto;
+      width: fit-content;
+      max-width: 100%;
+      overflow: hidden;
+      border-radius: var(--radius-xs);
+      box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+    }
+
+    .editor-base-image {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      z-index: 2;
+    }
+
+    .editor-overlay-canvas {
+      display: block;
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 3;
+      cursor: crosshair;
+    }
+
+    .editor-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .editor-group {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 18px;
+    }
+
+    .editor-group h3 {
+      margin-bottom: 14px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: 0.5px;
+    }
+
+    .editor-tools {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .tool-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #ffffff;
+    }
+
+    .editor-field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .editor-field:last-child {
+      margin-bottom: 0;
+    }
+
+    .editor-field input[type="color"],
+    .editor-field input[type="range"],
+    .editor-field textarea {
+      width: 100%;
+      background: var(--bg-input);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xs);
+      padding: 10px 12px;
+      font: inherit;
+      outline: none;
+      transition: var(--transition);
+    }
+
+    .editor-field input[type="color"] {
+      padding: 4px;
+      height: 40px;
+      cursor: pointer;
+    }
+
+    .editor-field textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
+
+    .editor-field input:focus,
+    .editor-field textarea:focus {
+      border-color: var(--accent);
+    }
+
+    .shape-list {
+      max-height: 180px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .shape-item {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xs);
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.01);
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .shape-item.active {
+      border-color: var(--accent);
+      background: rgba(109, 149, 255, 0.05);
+    }
+
+    .editor-empty {
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .frame-coord-badge {
+      position: absolute;
+      right: 20px;
+      bottom: 20px;
+      z-index: 10;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(109, 149, 255, 0.3);
+      background: rgba(6, 16, 31, 0.85);
+      color: var(--accent);
+      font-size: 11px;
+      font-family: monospace;
+      backdrop-filter: blur(8px);
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    @media (max-width: 1080px) {
+      .editor-layout {
+        grid-template-columns: 1fr;
+      }
+      .modal-content {
+        max-height: 95vh;
+        overflow-y: auto;
+      }
+    }
+
+    /* 配置浮层样式 */
+    .config-popover-wrapper {
+      position: relative;
+      display: inline-block;
+    }
+    .config-popover {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      z-index: 100;
+      width: 320px;
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(6, 16, 31, 0.96);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      transition: all 0.2s ease;
+    }
+    .config-popover.open {
+      display: flex;
+    }
+    .config-popover .form-group-row {
+      display: flex;
+      gap: 12px;
+    }
+    .config-popover .form-group-row > div {
+      flex: 1;
+    }
+    .config-popover label {
+      display: block;
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .config-popover input {
+      width: 100%;
+      height: 36px;
+      padding: 0 10px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--bg-input);
+      color: var(--text-primary);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .config-popover input:focus {
+      border-color: var(--accent);
+    }
+
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <header>
+      <div class="logo-area">
+        <span class="logo-text">DeepRight</span>
+        <span class="logo-badge">Frames</span>
+      </div>
+    </header>
+
+    <div class="panel">
+      <div class="row">
+        <div class="form-group">
+          <label>选择视频</label>
+          <div class="file-input-wrapper">
+            <div class="file-input-trigger">选择视频文件...</div>
+            <input type="file" id="fileInput" accept="video/*" />
+          </div>
+        </div>
+
+        <!-- 隐藏每页数量配置项，固定为 50 -->
+        <input type="hidden" id="pageSizeInput" value="50" />
+
+        <!-- 开始、重置与配置放一行 -->
+        <div style="display: flex; gap: 12px; flex: 1 1 320px; align-items: flex-end;">
+          <div style="flex: 1;">
+            <button id="startBtn" style="width: 100%;">开始</button>
+          </div>
+          <div style="flex: 1;">
+            <button id="clearBtn" class="secondary-btn" style="width: 100%;">重置</button>
+          </div>
+          <div class="config-popover-wrapper" style="flex: 1;">
+            <button id="configToggleBtn" class="secondary-btn" style="width: 100%;">配置</button>
+            
+            <!-- 配置浮层 -->
+            <div class="config-popover" id="configPopover">
+              <div class="form-group-row">
+                <div>
+                  <label>抽帧频率 (秒/帧)</label>
+                  <input type="number" id="fpsInput" min="0.1" max="60" step="0.1" value="1.0" title="每隔多少秒抽取一帧" />
+                </div>
+                <div>
+                  <label>图片质量 (0.1~1)</label>
+                  <input type="number" id="qualityInput" min="0.1" max="1" step="0.1" value="0.5" />
+                </div>
+              </div>
+              <div class="form-group-row">
+                <div>
+                  <label>开始时间 (秒)</label>
+                  <input type="number" id="startTimeInput" min="0" step="0.1" placeholder="默认从头" />
+                </div>
+                <div>
+                  <label>结束时间 (秒)</label>
+                  <input type="number" id="endTimeInput" min="0" step="0.1" placeholder="默认到尾" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="meta" id="meta">未选择视频</div>
+      <div class="status" id="status">等待开始</div>
+
+      <div class="toolbar" id="resultToolbar" hidden>
+        <div class="toolbar-left">
+          <div class="badge" id="summaryBadge">暂无帧数据</div>
+          <div class="badge" id="pageBadge">页码：0 / 0</div>
+        </div>
+        <div class="toolbar-right">
+          <button id="exportBtn" class="secondary-btn" disabled>导出拼图</button>
+          <button id="prevPageBtn" class="secondary-btn" style="display: none;" disabled>上一页</button>
+          <button id="nextPageBtn" class="secondary-btn" style="display: none;" disabled>下一页</button>
+        </div>
+      </div>
+
+      <div class="progress">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+
+      <div class="tip" id="resultTip" style="line-height: 1.8;" hidden>
+        点击任意帧可放大并进行标注。<br>导出拼图会把当前抽出的全部帧合成为一张 contact sheet。
+      </div>
+    </div>
+
+    <div id="frames" class="frames"></div>
+
+    <div class="pager hidden">
+      <button id="prevPageBottomBtn" class="secondary-btn" disabled>上一页</button>
+      <div class="badge" id="pageInfoBottom">当前无内容</div>
+      <button id="nextPageBottomBtn" class="secondary-btn" disabled>下一页</button>
+    </div>
+  </div>
+
+  <div class="modal" id="previewModal">
+    <div class="modal-content">
+      <div class="modal-head">
+        <div class="modal-title" id="modalTitle">帧编辑器</div>
+        <div class="editor-actions">
+          <button id="openOriginalBtn" class="secondary-btn">打开当前帧原图</button>
+          <button id="downloadEditedBtn" class="secondary-btn">导出当前编辑图</button>
+          <button id="closeModalBtn" class="secondary-btn">关闭</button>
+        </div>
+      </div>
+      <div class="editor-layout">
+        <div class="editor-stage">
+          <div class="editor-canvas-wrap" id="editorCanvasWrap">
+            <img id="modalImage" class="editor-base-image" alt="frame-preview" />
+            <canvas id="editorOverlayCanvas" class="editor-overlay-canvas"></canvas>
+          </div>
+          <div id="frameCoordBadge" class="frame-coord-badge" hidden>相对左下角坐标：(-, -)</div>
+        </div>
+        <div class="editor-sidebar">
+          <div class="editor-group">
+            <h3>编辑工具</h3>
+            <div class="editor-tools">
+              <button class="secondary-btn tool-btn active" data-tool="select">选择</button>
+              <button class="secondary-btn tool-btn" data-tool="rect">矩形</button>
+              <button class="secondary-btn tool-btn" data-tool="ellipse">椭圆</button>
+              <button class="secondary-btn tool-btn" data-tool="box">拉框</button>
+              <button class="secondary-btn tool-btn" data-tool="curve">曲线</button>
+              <button class="secondary-btn tool-btn" data-tool="text">文字</button>
+            </div>
+          </div>
+
+          <div class="editor-group">
+            <h3>样式</h3>
+            <div class="editor-field">
+              <label for="strokeColorInput">描边颜色</label>
+              <input type="color" id="strokeColorInput" value="#6d95ff" />
+            </div>
+            <div class="editor-field">
+              <label for="strokeWidthInput">描边粗细</label>
+              <input type="range" id="strokeWidthInput" min="1" max="12" value="3" />
+            </div>
+            <div class="editor-field">
+              <label for="fillColorInput">填充颜色</label>
+              <input type="color" id="fillColorInput" value="#6d95ff" />
+            </div>
+            <div class="editor-field">
+              <label for="fillAlphaInput">填充透明度</label>
+              <input type="range" id="fillAlphaInput" min="0" max="1" step="0.05" value="0.18" />
+            </div>
+            <div class="editor-field">
+              <label for="fontSizeInput">文字大小</label>
+              <input type="range" id="fontSizeInput" min="12" max="72" value="24" />
+            </div>
+            <div class="editor-field">
+              <label for="textInput">文字内容</label>
+              <textarea id="textInput" placeholder="选择文字工具后，点击图片添加文字"></textarea>
+            </div>
+          </div>
+
+          <div class="editor-group">
+            <h3>操作</h3>
+            <div class="editor-actions">
+              <button id="undoShapeBtn" class="secondary-btn">撤销一步</button>
+              <button id="clearShapesBtn" class="secondary-btn">清空标注</button>
+            </div>
+          </div>
+
+          <div class="editor-group">
+            <h3>当前标注</h3>
+            <div id="shapeList" class="shape-list"></div>
+            <div id="shapeEmpty" class="editor-empty">当前帧还没有标注。先选一个工具再到图片上操作。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <video id="video" preload="metadata" muted playsinline hidden aria-hidden="true" style="display:none"></video>
+  <canvas id="canvas" hidden aria-hidden="true" style="display:none"></canvas>
+
+  <script>
+    // 监听文件选择变化，更新自定义触发器的文字
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      const fileName = e.target.files[0] ? e.target.files[0].name : '选择视频文件...';
+      document.querySelector('.file-input-trigger').textContent = fileName;
+    });
+  </script>
+<script>
+    window.addEventListener('error', (event) => {
+      const statusNode = document.getElementById('status');
+      const metaNode = document.getElementById('meta');
+      const message = event && event.message ? event.message : '页面脚本初始化失败';
+      if (statusNode) {
+        statusNode.textContent = `页面脚本异常：${message}`;
+        statusNode.setAttribute('data-state', 'boot-error');
+      }
+      if (metaNode) {
+        metaNode.textContent = '脚本初始化失败';
+        metaNode.setAttribute('data-state', 'boot-error');
+      }
+      window.__videoFramesBootError = message;
+      console.error('video-frames boot error', event && event.error ? event.error : message);
+    });
+  </script>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const fpsInput = document.getElementById('fpsInput');
+    const qualityInput = document.getElementById('qualityInput');
+    const pageSizeInput = document.getElementById('pageSizeInput');
+    const startBtn = document.getElementById('startBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const configToggleBtn = document.getElementById('configToggleBtn');
+    const configPopover = document.getElementById('configPopover');
+    const startTimeInput = document.getElementById('startTimeInput');
+    const endTimeInput = document.getElementById('endTimeInput');
+    const exportBtn = document.getElementById('exportBtn');
+    const resultToolbar = document.getElementById('resultToolbar');
+    const resultTip = document.getElementById('resultTip');
+    const prevPageBtn = document.getElementById('prevPageBtn');
+    const nextPageBtn = document.getElementById('nextPageBtn');
+    const prevPageBottomBtn = document.getElementById('prevPageBottomBtn');
+    const nextPageBottomBtn = document.getElementById('nextPageBottomBtn');
+    const pageInfoBottom = document.getElementById('pageInfoBottom');
+    const summaryBadge = document.getElementById('summaryBadge');
+    const pageBadge = document.getElementById('pageBadge');
+    const meta = document.getElementById('meta');
+    const status = document.getElementById('status');
+    const frames = document.getElementById('frames');
+    const progressBar = document.getElementById('progressBar');
+    window.__videoFramesBooted = true;
+    window.__videoFramesStartClickedAt = null;
+
+    const previewModal = document.getElementById('previewModal');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const modalImage = document.getElementById('modalImage');
+    const modalTitle = document.getElementById('modalTitle');
+    const editorCanvasWrap = document.getElementById('editorCanvasWrap');
+    const editorStage = document.querySelector('.editor-stage');
+    const frameCoordBadge = document.getElementById('frameCoordBadge');
+    const editorOverlayCanvas = document.getElementById('editorOverlayCanvas');
+    const overlayCtx = editorOverlayCanvas.getContext('2d');
+    const toolButtons = Array.from(document.querySelectorAll('.tool-btn'));
+    const strokeColorInput = document.getElementById('strokeColorInput');
+    const strokeWidthInput = document.getElementById('strokeWidthInput');
+    const fillColorInput = document.getElementById('fillColorInput');
+    const fillAlphaInput = document.getElementById('fillAlphaInput');
+    const fontSizeInput = document.getElementById('fontSizeInput');
+    const textInput = document.getElementById('textInput');
+    const undoShapeBtn = document.getElementById('undoShapeBtn');
+    const clearShapesBtn = document.getElementById('clearShapesBtn');
+    const shapeList = document.getElementById('shapeList');
+    const shapeEmpty = document.getElementById('shapeEmpty');
+    const openOriginalBtn = document.getElementById('openOriginalBtn');
+    const downloadEditedBtn = document.getElementById('downloadEditedBtn');
+
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+    let currentFile = null;
+    let currentUrl = null;
+    let extracting = false;
+    let abortController = null;
+    let frameDataList = [];
+    let currentPage = 1;
+    let activeTool = 'select';
+    let activeFrameIndex = null;
+    let drawingShape = null;
+    let isPointerDown = false;
+    let currentFrameDataUrl = '';
+    const frameAnnotations = new Map();
+    const editorRuntimeState = {
+      frameIndex: '',
+      frameTime: '',
+      loadState: 'idle',
+      lastStep: 'idle',
+      srcLength: 0,
+      error: '',
+      naturalWidth: 0,
+      naturalHeight: 0,
+      clientWidth: 0,
+      clientHeight: 0,
+      rectWidth: 0,
+      rectHeight: 0,
+      canvasWidth: 0,
+      canvasHeight: 0,
+      modalOpen: false,
+      imgComplete: false,
+      imgVisibility: '',
+      imgDisplay: '',
+      imgOpacity: '',
+      canvasDisplay: '',
+      canvasOpacity: '',
+      placeholder: '等待选择帧',
+      testBoxVisible: false,
+      lastEvent: ''
+    };
+
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      currentFile = file;
+      resetResults(false);
+
+      if (currentUrl) {
+        URL.revokeObjectURL(currentUrl);
+      }
+      currentUrl = URL.createObjectURL(file);
+      video.src = currentUrl;
+      video.load();
+
+      status.textContent = '视频加载中...';
+
+      try {
+        await waitForVideoReady(video);
+
+        meta.innerHTML = `
+          <div class="meta-item">大小：${formatBytes(file.size)}</div>
+          <div class="meta-item">分辨率：${video.videoWidth} × ${video.videoHeight}</div>
+          <div class="meta-item">时长：${formatTime(video.duration)}</div>
+        `;
+        status.textContent = '视频已加载，可以开始提取';
+      } catch (error) {
+        console.error('video load failed', error);
+        currentFile = null;
+        startBtn.disabled = false;
+        meta.textContent = '视频加载失败';
+        status.textContent = error?.message || '视频加载失败，请重新选择文件';
+        alert(status.textContent);
+      }
+    });
+
+    const handleStartExtract = async () => {
+      // 状态机：如果正在提取中，则此按钮行为变为“终止”
+      if (extracting) {
+        if (abortController) {
+          abortController.abort();
+        }
+        return;
+      }
+
+      if (!currentFile) {
+        const missingMsg = '请先选择视频文件';
+        if (status) {
+          status.textContent = missingMsg;
+          status.innerText = missingMsg;
+          status.setAttribute('data-state', 'missing-file');
+        }
+        if (meta) {
+          meta.textContent = '未选择视频，无法开始提取';
+          meta.innerText = '未选择视频，无法开始提取';
+          meta.setAttribute('data-state', 'missing-file');
+        }
+        console.warn('start blocked: missing file');
+        return;
+      }
+
+      // 抽帧频率（秒/帧），默认1秒1帧
+      const interval = Number(fpsInput.value) || 1.0;
+      const quality = Number(qualityInput.value) || 0.5;
+      const pageSize = getPageSize();
+
+      if (interval <= 0) {
+        status.textContent = '请输入正确的抽帧频率';
+        status.innerText = '请输入正确的抽帧频率';
+        status.setAttribute('data-state', 'invalid-param');
+        meta.textContent = '抽帧频率必须大于 0';
+        meta.innerText = '抽帧频率必须大于 0';
+        meta.setAttribute('data-state', 'invalid-param');
+        return;
+      }
+
+      if (!(quality > 0 && quality <= 1)) {
+        status.textContent = '图片质量应在 0.1 到 1 之间';
+        status.innerText = '图片质量应在 0.1 到 1 之间';
+        status.setAttribute('data-state', 'invalid-param');
+        meta.textContent = '请把图片质量设置在 0.1 到 1 之间';
+        meta.innerText = '请把图片质量设置在 0.1 到 1 之间';
+        meta.setAttribute('data-state', 'invalid-param');
+        return;
+      }
+
+      try {
+        if (status) {
+          status.textContent = '开始提取，正在初始化';
+          status.innerText = '开始提取，正在初始化';
+          status.setAttribute('data-state', 'starting');
+        }
+        if (meta) {
+          meta.setAttribute('data-state', 'extracting');
+        }
+
+        // 状态机切换：开始提取，重置按钮变为“终止”
+        extracting = true;
+        startBtn.textContent = '提取中...';
+        clearBtn.textContent = '终止';
+        clearBtn.classList.remove('secondary-btn');
+        clearBtn.style.background = '#ff4d4f';
+        clearBtn.style.color = '#fff';
+        
+        // 禁用配置按钮和输入框，防止提取中途篡改
+        configToggleBtn.disabled = true;
+        fpsInput.disabled = true;
+        qualityInput.disabled = true;
+        startTimeInput.disabled = true;
+        endTimeInput.disabled = true;
+        configPopover.classList.remove('open'); // 自动收起浮层
+
+        exportBtn.disabled = true;
+        resetResults(false);
+        closeModal();
+        progressBar.style.width = '0%';
+
+        await waitForVideoReady(video);
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        if (!canvas.width || !canvas.height) {
+          throw new Error('视频尺寸无效，无法开始提取');
+        }
+
+        const duration = Number(video.duration);
+        if (!(duration > 0) || !Number.isFinite(duration)) {
+          throw new Error('视频时长无效，无法开始提取');
+        }
+
+        // 解析时间范围
+        let startSec = startTimeInput.value ? Math.max(0, Number(startTimeInput.value)) : 0;
+        let endSec = endTimeInput.value ? Math.min(duration, Number(endTimeInput.value)) : duration;
+        if (startSec >= duration) {
+          startSec = 0;
+        }
+        if (endSec <= startSec) {
+          endSec = duration;
+        }
+
+        // 计算需要抽取的帧的时间点列表
+        const targetTimes = [];
+        for (let t = startSec; t <= endSec; t += interval) {
+          targetTimes.push(Math.min(t, duration - 0.001));
+        }
+        // 确保至少有一帧
+        if (targetTimes.length === 0) {
+          targetTimes.push(startSec);
+        }
+
+        const totalFrames = targetTimes.length;
+        status.textContent = `开始提取，共计划 ${totalFrames} 张`;
+        status.innerText = `开始提取，共计划 ${totalFrames} 张`;
+        status.setAttribute('data-state', 'extracting');
+
+        // 初始化 AbortController 用于中途终止
+        abortController = new AbortController();
+        const { signal } = abortController;
+
+        for (let i = 0; i < totalFrames; i++) {
+          if (signal.aborted) {
+            throw new Error('提取已被用户终止');
+          }
+
+          const frameTime = targetTimes[i];
+
+          status.textContent = `定位视频帧 ${i + 1} / ${totalFrames}`;
+          status.innerText = `定位视频帧 ${i + 1} / ${totalFrames}`;
+          await seekVideo(video, frameTime);
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          frameDataList.push({
+            index: i + 1,
+            time: frameTime,
+            dataUrl,
+            width: canvas.width,
+            height: canvas.height
+          });
+
+          const percent = ((i + 1) / totalFrames) * 100;
+          progressBar.style.width = percent.toFixed(2) + '%';
+          status.textContent = `提取中 ${i + 1} / ${totalFrames}`;
+          status.innerText = `提取中 ${i + 1} / ${totalFrames}`;
+
+          // 流式渲染：每抽出一帧就立即渲染，提供极致的流式体验
+          renderPage();
+
+          await nextFrame();
+        }
+
+        exportBtn.disabled = frameDataList.length === 0;
+        if (frameDataList.length === 0) {
+          status.textContent = '提取完成，但未生成有效帧';
+          status.innerText = '提取完成，但未生成有效帧';
+          status.setAttribute('data-state', 'empty-result');
+          meta.textContent = '请检查视频内容、抽帧频率或浏览器解码状态';
+          meta.innerText = '请检查视频内容、抽帧频率或浏览器解码状态';
+          meta.setAttribute('data-state', 'empty-result');
+        } else {
+          status.textContent = `提取完成，共 ${frameDataList.length} 张`;
+          status.innerText = `提取完成，共 ${frameDataList.length} 张`;
+          status.setAttribute('data-state', 'success');
+          meta.textContent = `可导出，当前每页 ${pageSize} 张`;
+          meta.innerText = `可导出，当前每页 ${pageSize} 张`;
+          meta.setAttribute('data-state', 'success');
+        }
+      } catch (error) {
+        console.error('extract failed', error);
+        const failedMsg = error?.message || '提取失败，请重试';
+        status.textContent = failedMsg;
+        status.innerText = failedMsg;
+        status.setAttribute('data-state', 'error');
+        if (currentFile && video.videoWidth) {
+          meta.innerHTML = `
+            <div class="meta-item">大小：${formatBytes(currentFile.size)}</div>
+            <div class="meta-item">分辨率：${video.videoWidth} × ${video.videoHeight}</div>
+            <div class="meta-item">时长：${formatTime(video.duration)}</div>
+          `;
+          meta.setAttribute('data-state', 'success');
+        } else {
+          meta.textContent = failedMsg === '提取已被用户终止' ? '提取已被手动终止' : '提取流程已终止，可修正问题后重试';
+          meta.innerText = failedMsg === '提取已被用户终止' ? '提取已被手动终止' : '提取流程已终止，可修正问题后重试';
+          meta.setAttribute('data-state', 'error');
+        }
+      } finally {
+        extracting = false;
+        abortController = null;
+        startBtn.disabled = false;
+        startBtn.textContent = '开始';
+        
+        // 恢复重置按钮样式与状态
+        clearBtn.textContent = '重置';
+        clearBtn.classList.add('secondary-btn');
+        clearBtn.style.background = '';
+        clearBtn.style.color = '';
+        
+        // 启用配置按钮和输入框
+        configToggleBtn.disabled = false;
+        fpsInput.disabled = false;
+        qualityInput.disabled = false;
+        startTimeInput.disabled = false;
+        endTimeInput.disabled = false;
+        
+        exportBtn.disabled = frameDataList.length === 0;
+      }
+    };
+
+
+    window.__videoFramesStartHandler = handleStartExtract;
+    startBtn.addEventListener('click', handleStartExtract);
+
+    // 配置浮层展开与收起
+    configToggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      configPopover.classList.toggle('open');
+    });
+
+    configPopover.addEventListener('click', (e) => {
+      e.stopPropagation(); // 阻止冒泡，防止点击浮层内部时关闭
+    });
+
+    document.addEventListener('click', () => {
+      configPopover.classList.remove('open');
+    });
+
+
+    clearBtn.addEventListener('click', () => {
+      if (extracting) {
+        // 如果正在提取中，点击“终止”按钮触发终止
+        if (typeof abortController !== 'undefined' && abortController) {
+          abortController.abort();
+        } else {
+          // 备用方案：直接修改 extracting 状态
+          extracting = false;
+        }
+      } else {
+        // 正常重置逻辑
+        resetResults(true);
+        status.textContent = '已重置结果';
+      }
+    });
+
+    exportBtn.addEventListener('click', async () => {
+      if (!frameDataList.length) {
+        alert('当前没有可导出的帧');
+        return;
+      }
+
+      exportBtn.disabled = true;
+      exportBtn.textContent = '导出中...';
+
+      try {
+        const fileName = (currentFile?.name || 'video').replace(/\.[^.]+$/, '');
+        const url = await buildContactSheet(frameDataList, fileName);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${fileName}_contact_sheet.png`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 3000);
+        status.textContent = `导出完成：${fileName}_contact_sheet.png`;
+      } catch (error) {
+        console.error(error);
+        alert('导出拼图失败，请重试');
+      } finally {
+        exportBtn.disabled = frameDataList.length === 0;
+        exportBtn.textContent = '导出拼图';
+      }
+    });
+
+    prevPageBtn.addEventListener('click', () => changePage(-1));
+    nextPageBtn.addEventListener('click', () => changePage(1));
+    prevPageBottomBtn.addEventListener('click', () => changePage(-1));
+    nextPageBottomBtn.addEventListener('click', () => changePage(1));
+
+    closeModalBtn.addEventListener('click', closeModal);
+    previewModal.addEventListener('click', (e) => {
+      if (e.target === previewModal) closeModal();
+    });
+
+    toolButtons.forEach((btn) => {
+      btn.addEventListener('click', () => setActiveTool(btn.dataset.tool));
+    });
+
+    undoShapeBtn.addEventListener('click', () => {
+      const shapes = getActiveShapes();
+      if (!shapes.length) return;
+      shapes.pop();
+      refreshEditorUI();
+    });
+
+    clearShapesBtn.addEventListener('click', () => {
+      if (activeFrameIndex == null) return;
+      frameAnnotations.set(activeFrameIndex, []);
+      refreshEditorUI();
+    });
+
+    downloadEditedBtn.addEventListener('click', async () => {
+      if (activeFrameIndex == null) return;
+      const item = frameDataList.find(frame => frame.index === activeFrameIndex);
+      if (!item) return;
+      const url = await exportEditedFrame(item);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `frame_${String(item.index).padStart(4, '0')}_edited.png`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 3000);
+      status.textContent = `已导出当前编辑图：${link.download}`;
+    });
+
+    openOriginalBtn.addEventListener('click', () => {
+      if (!currentFrameDataUrl) {
+        status.textContent = '当前帧原图地址不可用';
+        return;
+      }
+      window.open(currentFrameDataUrl, '_blank', 'noopener');
+      status.textContent = '已尝试在新窗口打开当前帧原图';
+    });
+
+    function setDebugPlaceholder(message, type = '') {
+      editorRuntimeState.placeholder = message || '等待选择帧';
+      editorStage.dataset.debugPlaceholder = editorRuntimeState.placeholder;
+      editorStage.classList.add('has-debug-placeholder');
+    }
+
+    function clearDebugPlaceholder() {
+      editorStage.classList.remove('has-debug-placeholder');
+      delete editorStage.dataset.debugPlaceholder;
+    }
+
+    function updateEditorRuntimeState(patch = {}) {
+      Object.assign(editorRuntimeState, patch);
+      const imgStyle = window.getComputedStyle(modalImage);
+      const canvasStyle = window.getComputedStyle(editorOverlayCanvas);
+      const rect = modalImage.getBoundingClientRect();
+      editorRuntimeState.modalOpen = previewModal.classList.contains('open');
+      editorRuntimeState.imgComplete = !!modalImage.complete;
+      editorRuntimeState.imgVisibility = imgStyle.visibility;
+      editorRuntimeState.imgDisplay = imgStyle.display;
+      editorRuntimeState.imgOpacity = imgStyle.opacity;
+      editorRuntimeState.canvasDisplay = canvasStyle.display;
+      editorRuntimeState.canvasOpacity = canvasStyle.opacity;
+      editorRuntimeState.clientWidth = modalImage.clientWidth || 0;
+      editorRuntimeState.clientHeight = modalImage.clientHeight || 0;
+      editorRuntimeState.rectWidth = Math.round(rect.width || 0);
+      editorRuntimeState.rectHeight = Math.round(rect.height || 0);
+      editorRuntimeState.canvasWidth = editorOverlayCanvas.width || 0;
+      editorRuntimeState.canvasHeight = editorOverlayCanvas.height || 0;
+      editorRuntimeState.naturalWidth = modalImage.naturalWidth || 0;
+      editorRuntimeState.naturalHeight = modalImage.naturalHeight || 0;
+      editorRuntimeState.srcLength = (modalImage.currentSrc || modalImage.src || '').length;
+      editorRuntimeState.testBoxVisible = editorRuntimeState.canvasWidth > 0 && editorRuntimeState.canvasHeight > 0;
+    }
+
+    modalImage.addEventListener('load', () => {
+      updateEditorRuntimeState({ loadState: 'loaded', lastStep: 'image-load', lastEvent: 'load', error: '' });
+      syncEditorCanvasSize();
+    });
+    modalImage.addEventListener('error', (event) => {
+      clearOverlayCanvas();
+      modalImage.style.visibility = 'hidden';
+      setDebugPlaceholder('图片加载失败\n可先点“打开当前帧原图”单独验证资源', 'error');
+      updateEditorRuntimeState({
+        loadState: 'error',
+        lastStep: 'image-error',
+        lastEvent: 'error',
+        error: event?.message || 'image load error'
+      });
+      status.textContent = '当前帧图片加载失败，请重新抽帧后再试';
+    });
+    window.addEventListener('resize', () => {
+      if (previewModal.classList.contains('open')) syncEditorCanvasSize();
+    });
+
+    editorOverlayCanvas.addEventListener('pointerleave', () => {
+      resetFrameCoordBadge();
+    });
+    modalImage.addEventListener('pointermove', onEditorPointerMove);
+    modalImage.addEventListener('pointerdown', onEditorPointerMove);
+    editorOverlayCanvas.addEventListener('pointermove', onEditorPointerMove);
+    editorOverlayCanvas.addEventListener('pointerdown', onEditorPointerMove);
+    modalImage.addEventListener('pointerleave', () => resetFrameCoordBadge());
+
+    window.__frameCoordDebug = [];
+    function pushFrameCoordDebug(label, payload = {}) {
+      const entry = {
+        ts: new Date().toISOString(),
+        label,
+        ...payload
+      };
+      window.__frameCoordDebug.push(entry);
+      if (window.__frameCoordDebug.length > 20) window.__frameCoordDebug.shift();
+      console.log('[frame-coord-debug]', entry);
+      return entry;
+    }
+
+    editorOverlayCanvas.addEventListener('pointerdown', (event) => {
+      const rect = modalImage.getBoundingClientRect();
+      pushFrameCoordDebug('overlay-pointerdown', {
+        clientX: Math.round(event.clientX || 0),
+        clientY: Math.round(event.clientY || 0),
+        rectLeft: Math.round(rect.left || 0),
+        rectTop: Math.round(rect.top || 0),
+        rectWidth: Math.round(rect.width || 0),
+        rectHeight: Math.round(rect.height || 0),
+        canvasWidth: editorOverlayCanvas.width || 0,
+        canvasHeight: editorOverlayCanvas.height || 0,
+        badge: frameCoordBadge ? frameCoordBadge.textContent : ''
+      });
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && previewModal.classList.contains('open')) {
+        closeModal();
+      }
+    });
+
+    function syncResultChrome() {
+      const hasFrames = frameDataList.length > 0;
+      if (resultToolbar) {
+        resultToolbar.hidden = !hasFrames;
+        resultToolbar.setAttribute('aria-hidden', hasFrames ? 'false' : 'true');
+      }
+      if (resultTip) {
+        resultTip.hidden = !hasFrames;
+        resultTip.setAttribute('aria-hidden', hasFrames ? 'false' : 'true');
+      }
+    }
+
+    function renderPage() {
+      syncResultChrome();
+      const pageSize = getPageSize() || 60;
+      const total = frameDataList.length;
+      const totalPages = total ? Math.ceil(total / pageSize) : 0;
+
+      if (totalPages === 0) {
+        currentPage = 1;
+      } else if (currentPage > totalPages) {
+        currentPage = totalPages;
+      }
+
+      const start = totalPages ? (currentPage - 1) * pageSize : 0;
+      const end = Math.min(start + pageSize, total);
+      const list = frameDataList.slice(start, end);
+
+      frames.innerHTML = '';
+
+      for (const item of list) {
+        const card = document.createElement('article');
+        card.className = 'frame-card';
+        card.dataset.index = item.index;
+        card.innerHTML = `
+          <img class="frame-thumb" loading="lazy" src="${item.dataUrl}" alt="frame-${item.index}">
+          <div class="frame-info">
+            序号：${item.index}<br>
+            时间：${item.time.toFixed(3)}s
+          </div>
+        `;
+        card.addEventListener('click', () => openPreview(item.index));
+        frames.appendChild(card);
+      }
+
+      summaryBadge.textContent = total
+        ? `总帧数：${total}｜当前页展示：${list.length}｜每页：${pageSize}`
+        : '暂无帧数据';
+
+      pageBadge.textContent = `页码：${totalPages ? currentPage : 0} / ${totalPages}`;
+      pageInfoBottom.textContent = total
+        ? `显示第 ${start + 1} - ${end} 张，共 ${total} 张`
+        : '当前无内容';
+
+      const hasPrev = totalPages > 1 && currentPage > 1;
+      const hasNext = totalPages > 1 && currentPage < totalPages;
+      prevPageBtn.disabled = !hasPrev;
+      prevPageBottomBtn.disabled = !hasPrev;
+      nextPageBtn.disabled = !hasNext;
+      nextPageBottomBtn.disabled = !hasNext;
+      exportBtn.disabled = total === 0 || extracting;
+
+      // 当无内容或总页数小于等于1时，优雅地隐藏底部 pager 控件
+      const pagerElement = document.querySelector('.pager');
+      if (pagerElement) {
+        if (total === 0 || totalPages <= 1) {
+          pagerElement.classList.add('hidden');
+        } else {
+          pagerElement.classList.remove('hidden');
+        }
+      }
+
+      // 如果总页数小于等于1，隐藏 toolbar 中的分页按钮，避免与导出拼图重叠
+      if (totalPages <= 1) {
+        prevPageBtn.style.display = 'none';
+        nextPageBtn.style.display = 'none';
+      } else {
+        prevPageBtn.style.display = 'inline-flex';
+        nextPageBtn.style.display = 'inline-flex';
+      }
+    }
+
+    function openPreview(index) {
+      const item = frameDataList.find(frame => frame.index === index);
+      if (!item || !item.dataUrl) {
+        setDebugPlaceholder('当前帧图片数据不可用', 'error');
+        updateEditorRuntimeState({
+          frameIndex: index,
+          frameTime: '-',
+          loadState: 'error',
+          lastStep: 'openPreview-no-data',
+          lastEvent: 'missing-dataUrl',
+          srcLength: 0,
+          error: 'missing dataUrl'
+        });
+        status.textContent = '当前帧图片数据不可用';
+        return;
+      }
+      activeFrameIndex = index;
+      currentFrameDataUrl = item.dataUrl;
+      if (!frameAnnotations.has(index)) frameAnnotations.set(index, []);
+      modalTitle.innerHTML = `帧编辑器｜序号：${item.index}<br>时间：${item.time.toFixed(3)}s<br>分辨率：${item.width} × ${item.height}`;
+      previewModal.classList.add('open');
+      clearOverlayCanvas();
+      const stageWidth = Math.max(editorStage.clientWidth - 32, 320);
+      const targetWidth = Math.max(1, Math.min(item.width || stageWidth, stageWidth));
+      const targetHeight = Math.max(1, Math.round(targetWidth * Math.max(item.height || 1, 1) / Math.max(item.width || targetWidth, 1)));
+      modalImage.style.visibility = 'hidden';
+      modalImage.style.display = 'block';
+      modalImage.style.width = targetWidth + 'px';
+      modalImage.style.maxWidth = '100%';
+      modalImage.style.height = targetHeight + 'px';
+      modalImage.style.minHeight = targetHeight + 'px';
+      modalImage.style.objectFit = 'contain';
+      modalImage.style.objectPosition = 'center';
+      modalImage.style.objectPosition = 'center';
+      editorCanvasWrap.style.width = targetWidth + 'px';
+      editorCanvasWrap.style.maxWidth = '100%';
+      editorCanvasWrap.style.height = targetHeight + 'px';
+      editorCanvasWrap.style.aspectRatio = `${Math.max(item.width || 1, 1)} / ${Math.max(item.height || 1, 1)}`;
+      editorCanvasWrap.style.minHeight = targetHeight + 'px';
+      editorCanvasWrap.style.background = 'transparent';
+      editorOverlayCanvas.width = targetWidth;
+      editorOverlayCanvas.height = targetHeight;
+      editorOverlayCanvas.style.width = targetWidth + 'px';
+      editorOverlayCanvas.style.height = targetHeight + 'px';
+      editorOverlayCanvas.style.minHeight = targetHeight + 'px';
+      editorOverlayCanvas.style.inset = '0';
+      setDebugPlaceholder('图片加载中...\n如果一直只看到这段提示，请点“打开当前帧原图”继续验证资源', '');
+      updateEditorRuntimeState({
+        frameIndex: item.index,
+        frameTime: item.time.toFixed(3) + 's',
+        loadState: 'loading',
+        lastStep: 'openPreview-start',
+        lastEvent: 'click-frame',
+        srcLength: item.dataUrl.length,
+        error: '',
+        naturalWidth: item.width || 0,
+        naturalHeight: item.height || 0,
+        canvasWidth: targetWidth,
+        canvasHeight: targetHeight
+      });
+      setActiveTool(activeTool);
+      refreshEditorUI();
+      requestAnimationFrame(() => {
+        updateEditorRuntimeState({ lastStep: 'assign-src', lastEvent: 'src-set' });
+        modalImage.src = item.dataUrl;
+      });
+    }
+
+    function closeModal() {
+      previewModal.classList.remove('open');
+      modalImage.style.visibility = 'hidden';
+      modalImage.removeAttribute('src');
+      modalImage.style.display = '';
+      modalImage.style.width = '';
+      modalImage.style.maxWidth = '';
+      modalImage.style.height = '';
+      editorCanvasWrap.style.width = '';
+      editorCanvasWrap.style.maxWidth = '';
+      editorCanvasWrap.style.aspectRatio = '';
+      editorCanvasWrap.style.minHeight = '';
+      editorOverlayCanvas.style.display = '';
+      editorOverlayCanvas.style.width = '';
+      editorOverlayCanvas.style.height = '';
+      editorOverlayCanvas.style.minHeight = '';
+      modalImage.style.minHeight = '';
+      modalImage.style.objectFit = '';
+      modalImage.style.objectPosition = '';
+      editorCanvasWrap.style.height = '';
+      editorCanvasWrap.style.background = 'transparent';
+      editorCanvasWrap.style.boxShadow = '';
+      currentFrameDataUrl = '';
+      activeFrameIndex = null;
+      resetFrameCoordBadge();
+      drawingShape = null;
+      isPointerDown = false;
+      clearOverlayCanvas();
+      setDebugPlaceholder('等待选择帧');
+      updateEditorRuntimeState({ loadState: 'idle', lastStep: 'closeModal', lastEvent: 'close', error: '' });
+      refreshShapeList();
+    }
+
+    function changePage(delta) {
+      const totalPages = Math.ceil(frameDataList.length / (getPageSize() || 60));
+      if (!totalPages) return;
+      const next = currentPage + delta;
+      if (next < 1 || next > totalPages) return;
+      currentPage = next;
+      renderPage();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function setActiveTool(tool) {
+      activeTool = tool;
+      toolButtons.forEach((btn) => btn.classList.toggle('active', btn.dataset.tool === tool));
+      editorOverlayCanvas.style.cursor = tool === 'select' ? 'default' : 'crosshair';
+    }
+
+    function syncEditorCanvasSize() {
+      const naturalWidth = modalImage.naturalWidth || 0;
+      const naturalHeight = modalImage.naturalHeight || 0;
+      const wrapWidth = editorCanvasWrap.clientWidth || 0;
+      const wrapHeight = editorCanvasWrap.clientHeight || 0;
+      const stageWidth = Math.max(editorStage.clientWidth - 32, 320);
+      const stageHeight = Math.max(editorStage.clientHeight - 32, 240);
+      const sourceWidth = naturalWidth || wrapWidth || modalImage.clientWidth || editorOverlayCanvas.width || stageWidth;
+      const sourceHeight = naturalHeight || wrapHeight || modalImage.clientHeight || editorOverlayCanvas.height || stageHeight;
+      if (!sourceWidth || !sourceHeight) {
+        setDebugPlaceholder('图片已触发加载，但渲染尺寸仍为 0\n请先点“打开当前帧原图”确认资源，再观察下方诊断数据', 'error');
+        updateEditorRuntimeState({ loadState: 'loaded', lastStep: 'sync-size-zero', lastEvent: 'sync-size', canvasWidth: 0, canvasHeight: 0 });
+        return;
+      }
+      const widthRatio = stageWidth / Math.max(sourceWidth, 1);
+      const heightRatio = stageHeight / Math.max(sourceHeight, 1);
+      const scale = Math.min(1, widthRatio, heightRatio);
+      const width = Math.max(1, Math.round(sourceWidth * scale));
+      const height = Math.max(1, Math.round(sourceHeight * scale));
+      editorCanvasWrap.style.width = width + 'px';
+      editorCanvasWrap.style.maxWidth = '100%';
+      editorCanvasWrap.style.height = height + 'px';
+      editorCanvasWrap.style.aspectRatio = `${Math.max(sourceWidth, 1)} / ${Math.max(sourceHeight, 1)}`;
+      editorCanvasWrap.style.minHeight = height + 'px';
+      modalImage.style.display = 'block';
+      modalImage.style.width = width + 'px';
+      modalImage.style.maxWidth = '100%';
+      modalImage.style.height = height + 'px';
+      modalImage.style.minHeight = height + 'px';
+      modalImage.style.objectFit = 'contain';
+      modalImage.style.objectPosition = 'center';
+      editorOverlayCanvas.width = width;
+      editorOverlayCanvas.height = height;
+      editorOverlayCanvas.style.display = 'block';
+      editorOverlayCanvas.style.width = width + 'px';
+      editorOverlayCanvas.style.height = height + 'px';
+      editorOverlayCanvas.style.minHeight = height + 'px';
+      editorOverlayCanvas.style.inset = '0';
+      modalImage.style.visibility = 'visible';
+      clearDebugPlaceholder();
+      resetFrameCoordBadge();
+      updateEditorRuntimeState({ loadState: 'loaded', lastStep: 'sync-size-ok', lastEvent: 'sync-size', error: '' });
+      refreshEditorUI();
+    }
+
+    function getActiveShapes() {
+      if (activeFrameIndex == null) return [];
+      if (!frameAnnotations.has(activeFrameIndex)) frameAnnotations.set(activeFrameIndex, []);
+      return frameAnnotations.get(activeFrameIndex);
+    }
+
+    function getEditorStyle() {
+      return {
+        stroke: strokeColorInput.value,
+        strokeWidth: Number(strokeWidthInput.value) || 3,
+        fill: fillColorInput.value,
+        fillAlpha: Number(fillAlphaInput.value) || 0,
+        fontSize: Number(fontSizeInput.value) || 24
+      };
+    }
+
+    function toCanvasPoint(event) {
+      const rect = modalImage.getBoundingClientRect();
+      const width = rect.width > 0 ? rect.width : editorOverlayCanvas.getBoundingClientRect().width;
+      const height = rect.height > 0 ? rect.height : editorOverlayCanvas.getBoundingClientRect().height;
+      const scaleX = width > 0 ? editorOverlayCanvas.width / width : 1;
+      const scaleY = height > 0 ? editorOverlayCanvas.height / height : 1;
+      return {
+        x: Math.max(0, Math.min(editorOverlayCanvas.width, (event.clientX - rect.left) * scaleX)),
+        y: Math.max(0, Math.min(editorOverlayCanvas.height, (event.clientY - rect.top) * scaleY))
+      };
+    }
+
+    function onEditorPointerMove(event) {
+      const point = toCanvasPoint(event);
+      const relativeX = Math.max(0, Math.round(point.x));
+      const relativeY = Math.max(0, Math.round(editorOverlayCanvas.height - point.y));
+      if (frameCoordBadge) frameCoordBadge.hidden = false;
+      pushFrameCoordDebug('coord-sampled', {
+        eventType: event.type,
+        targetId: event.currentTarget?.id || event.currentTarget?.className || event.target?.id || '',
+        clientX: Math.round(event.clientX || 0),
+        clientY: Math.round(event.clientY || 0),
+        pointX: relativeX,
+        pointY: relativeY,
+        canvasWidth: editorOverlayCanvas.width || 0,
+        canvasHeight: editorOverlayCanvas.height || 0
+      });
+      setFrameCoordBadge(relativeX, relativeY);
+    }
+
+    function normalizeShape(shape) {
+      if (shape.type === 'curve') return shape;
+      const x = Math.min(shape.x1, shape.x2);
+      const y = Math.min(shape.y1, shape.y2);
+      const w = Math.abs(shape.x2 - shape.x1);
+      const h = Math.abs(shape.y2 - shape.y1);
+      return { ...shape, x, y, w, h };
+    }
+
+    function refreshEditorUI() {
+      drawAllShapes();
+      refreshShapeList();
+    }
+
+    function clearOverlayCanvas() {
+      overlayCtx.clearRect(0, 0, editorOverlayCanvas.width, editorOverlayCanvas.height);
+    }
+
+    let lastValidFrameCoordText = '';
+
+    function setFrameCoordBadge(x, y, options = {}) {
+      if (!frameCoordBadge) return;
+      const { copyToClipboard = true, hide = false } = options;
+      const coordText = `相对左下角坐标：(${x}, ${y}) · 画布：${editorOverlayCanvas.width}×${editorOverlayCanvas.height}`;
+      frameCoordBadge.textContent = coordText;
+      frameCoordBadge.hidden = !!hide;
+      if (x !== '-' && y !== '-') {
+        lastValidFrameCoordText = coordText;
+      }
+      if (copyToClipboard && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        navigator.clipboard.writeText(x === '-' && y === '-' ? (lastValidFrameCoordText || coordText) : coordText).catch(() => {});
+      }
+    }
+
+    function resetFrameCoordBadge() {
+      setFrameCoordBadge('-', '-', { copyToClipboard: false, hide: true });
+    }
+
+    function drawAllShapes() {
+      clearOverlayCanvas();
+      drawingShape = null;
+      isPointerDown = false;
+      updateEditorRuntimeState({ lastStep: 'draw-skipped' });
+    }
+
+    function drawShape(shape, highlight, preview = false) {
+      overlayCtx.save();
+      overlayCtx.lineWidth = shape.strokeWidth || 3;
+      overlayCtx.strokeStyle = shape.stroke || '#22c55e';
+      overlayCtx.fillStyle = hexToRgba(shape.fill || '#22c55e', shape.fillAlpha ?? 0.18);
+      overlayCtx.lineJoin = 'round';
+      overlayCtx.lineCap = 'round';
+      if (highlight && !preview) overlayCtx.setLineDash([8, 6]);
+
+      if (shape.type === 'rect' || shape.type === 'box') {
+        overlayCtx.fillRect(shape.x, shape.y, shape.w, shape.h);
+        overlayCtx.strokeRect(shape.x, shape.y, shape.w, shape.h);
+      } else if (shape.type === 'ellipse') {
+        overlayCtx.beginPath();
+        overlayCtx.ellipse(shape.x + shape.w / 2, shape.y + shape.h / 2, Math.max(shape.w / 2, 1), Math.max(shape.h / 2, 1), 0, 0, Math.PI * 2);
+        overlayCtx.fill();
+        overlayCtx.stroke();
+      } else if (shape.type === 'curve') {
+        const points = shape.points || [];
+        if (points.length > 1) {
+          overlayCtx.beginPath();
+          overlayCtx.moveTo(points[0].x, points[0].y);
+          for (let i = 1; i < points.length; i++) overlayCtx.lineTo(points[i].x, points[i].y);
+          overlayCtx.stroke();
+        }
+      } else if (shape.type === 'text') {
+        overlayCtx.font = `${shape.fontSize || 24}px Arial`;
+        overlayCtx.fillStyle = shape.stroke || '#22c55e';
+        overlayCtx.fillText(shape.text || '文本', shape.x, shape.y);
+      }
+      overlayCtx.restore();
+    }
+
+    function refreshShapeList() {
+      const shapes = getActiveShapes();
+      shapeList.innerHTML = '';
+      shapeEmpty.classList.remove('hidden');
+      shapeEmpty.textContent = '中间预览区仅显示原帧，不再叠加标注内容';
+      shapes.forEach((shape, index) => {
+        const item = document.createElement('div');
+        item.className = 'shape-item' + (index === shapes.length - 1 ? ' active' : '');
+        item.innerHTML = `
+          <div>类型：${shapeTypeLabel(shape.type)}</div>
+          <div>样式：${shape.stroke} / ${shape.strokeWidth}px</div>
+          <div>${shapeSummary(shape)}</div>
+        `;
+        const btn = document.createElement('button');
+        btn.className = 'secondary-btn';
+        btn.textContent = '删除此标注';
+        btn.addEventListener('click', () => {
+          shapes.splice(index, 1);
+          refreshEditorUI();
+        });
+        item.appendChild(btn);
+        shapeList.appendChild(item);
+      });
+    }
+
+    function shapeTypeLabel(type) {
+      return ({ rect: '矩形', box: '拉框', ellipse: '椭圆', curve: '曲线', text: '文字' })[type] || type;
+    }
+
+    function shapeSummary(shape) {
+      if (shape.type === 'curve') return `点数：${(shape.points || []).length}`;
+      if (shape.type === 'text') return `文本：${shape.text || '文本'}`;
+      return `位置：(${Math.round(shape.x)}, ${Math.round(shape.y)}) 尺寸：${Math.round(shape.w)} × ${Math.round(shape.h)}`;
+    }
+
+    function hexToRgba(hex, alpha) {
+      const safe = (hex || '#22c55e').replace('#', '');
+      const full = safe.length === 3 ? safe.split('').map((ch) => ch + ch).join('') : safe;
+      const num = parseInt(full, 16);
+      const r = (num >> 16) & 255;
+      const g = (num >> 8) & 255;
+      const b = num & 255;
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    async function exportEditedFrame(item) {
+      const img = await loadImage(item.dataUrl);
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = item.width;
+      tempCanvas.height = item.height;
+      const tempCtx = tempCanvas.getContext('2d');
+      tempCtx.drawImage(img, 0, 0, item.width, item.height);
+      const shapes = frameAnnotations.get(item.index) || [];
+      const scaleX = item.width / Math.max(editorOverlayCanvas.width, 1);
+      const scaleY = item.height / Math.max(editorOverlayCanvas.height, 1);
+      shapes.forEach((shape) => drawShapeToContext(tempCtx, shape, scaleX, scaleY));
+      return await new Promise((resolve) => {
+        tempCanvas.toBlob((blob) => resolve(URL.createObjectURL(blob)), 'image/png');
+      });
+    }
+
+    function drawShapeToContext(targetCtx, shape, scaleX, scaleY) {
+      targetCtx.save();
+      targetCtx.lineWidth = (shape.strokeWidth || 3) * scaleX;
+      targetCtx.strokeStyle = shape.stroke || '#22c55e';
+      targetCtx.fillStyle = hexToRgba(shape.fill || '#22c55e', shape.fillAlpha ?? 0.18);
+      targetCtx.lineJoin = 'round';
+      targetCtx.lineCap = 'round';
+      if (shape.type === 'rect' || shape.type === 'box') {
+        targetCtx.fillRect(shape.x * scaleX, shape.y * scaleY, shape.w * scaleX, shape.h * scaleY);
+        targetCtx.strokeRect(shape.x * scaleX, shape.y * scaleY, shape.w * scaleX, shape.h * scaleY);
+      } else if (shape.type === 'ellipse') {
+        targetCtx.beginPath();
+        targetCtx.ellipse((shape.x + shape.w / 2) * scaleX, (shape.y + shape.h / 2) * scaleY, Math.max(shape.w * scaleX / 2, 1), Math.max(shape.h * scaleY / 2, 1), 0, 0, Math.PI * 2);
+        targetCtx.fill();
+        targetCtx.stroke();
+      } else if (shape.type === 'curve') {
+        const points = shape.points || [];
+        if (points.length > 1) {
+          targetCtx.beginPath();
+          targetCtx.moveTo(points[0].x * scaleX, points[0].y * scaleY);
+          for (let i = 1; i < points.length; i++) targetCtx.lineTo(points[i].x * scaleX, points[i].y * scaleY);
+          targetCtx.stroke();
+        }
+      } else if (shape.type === 'text') {
+        targetCtx.font = `${(shape.fontSize || 24) * scaleX}px Arial`;
+        targetCtx.fillStyle = shape.stroke || '#22c55e';
+        targetCtx.fillText(shape.text || '文本', shape.x * scaleX, shape.y * scaleY);
+      }
+      targetCtx.restore();
+    }
+
+    setDebugPlaceholder('等待选择帧');
+    resetFrameCoordBadge();
+    updateEditorRuntimeState({ lastStep: 'init', lastEvent: 'init' });
+
+    function resetResults(resetMeta) {
+      frameDataList = [];
+      currentPage = 1;
+      frames.innerHTML = '';
+      progressBar.style.width = '0%';
+      summaryBadge.textContent = '暂无帧数据';
+      pageBadge.textContent = '页码：0 / 0';
+      pageInfoBottom.textContent = '当前无内容';
+      prevPageBtn.disabled = true;
+      prevPageBottomBtn.disabled = true;
+      nextPageBtn.disabled = true;
+      nextPageBottomBtn.disabled = true;
+      exportBtn.disabled = true;
+      
+      // 重置时隐藏 toolbar 中的分页按钮
+      prevPageBtn.style.display = 'none';
+      nextPageBtn.style.display = 'none';
+      const pagerElement = document.querySelector('.pager');
+      if (pagerElement) {
+        pagerElement.classList.add('hidden');
+      }
+      syncResultChrome();
+      if (resetMeta) {
+        meta.innerHTML = '未选择视频';
+        fileInput.value = '';
+        currentFile = null;
+        if (currentUrl) {
+          URL.revokeObjectURL(currentUrl);
+          currentUrl = null;
+          video.removeAttribute('src');
+          video.load();
+        }
+      }
+    }
+
+    function getPageSize() {
+      const pageSize = Number(pageSizeInput.value);
+      if (!pageSize || pageSize < 12 || pageSize > 240) return 0;
+      return pageSize;
+    }
+
+    function waitEvent(target, event, timeout = 10000) {
+      return new Promise((resolve, reject) => {
+        let timer = null;
+
+        const cleanup = () => {
+          target.removeEventListener(event, onSuccess);
+          target.removeEventListener('error', onError);
+          if (timer) window.clearTimeout(timer);
+        };
+
+        const onSuccess = () => {
+          cleanup();
+          resolve();
+        };
+
+        const onError = () => {
+          cleanup();
+          reject(new Error(`等待事件失败: ${event}`));
+        };
+
+        target.addEventListener(event, onSuccess, { once: true });
+        target.addEventListener('error', onError, { once: true });
+
+        if (timeout > 0) {
+          timer = window.setTimeout(() => {
+            cleanup();
+            reject(new Error(`等待事件超时: ${event}`));
+          }, timeout);
+        }
+      });
+    }
+
+    async function waitForVideoReady(video) {
+      if (video.readyState >= 1 && video.videoWidth > 0 && video.videoHeight > 0 && Number.isFinite(video.duration) && video.duration > 0) {
+        return;
+      }
+
+      video.load();
+      await waitEvent(video, 'loadedmetadata', 15000);
+
+      if (!(video.videoWidth > 0 && video.videoHeight > 0)) {
+        throw new Error('视频元数据已加载，但尺寸无效');
+      }
+
+      if (!(Number.isFinite(video.duration) && video.duration > 0)) {
+        throw new Error('视频元数据已加载，但时长无效');
+      }
+    }
+
+    function seekVideo(video, time) {
+      return new Promise((resolve, reject) => {
+        const targetTime = Math.max(0, Number(time) || 0);
+        const currentTime = Number(video.currentTime) || 0;
+        if (Math.abs(currentTime - targetTime) < 0.001) {
+          resolve();
+          return;
+        }
+
+        let timer = null;
+
+        const cleanup = () => {
+          video.removeEventListener('seeked', onSeeked);
+          video.removeEventListener('error', onError);
+          if (timer) window.clearTimeout(timer);
+        };
+
+        const onSeeked = () => {
+          cleanup();
+          resolve();
+        };
+
+        const onError = () => {
+          cleanup();
+          reject(new Error('视频定位失败'));
+        };
+
+        video.addEventListener('seeked', onSeeked, { once: true });
+        video.addEventListener('error', onError, { once: true });
+
+        timer = window.setTimeout(() => {
+          cleanup();
+          reject(new Error(`视频定位超时: ${targetTime.toFixed(3)}s`));
+        }, 15000);
+
+        try {
+          video.currentTime = targetTime;
+        } catch (error) {
+          cleanup();
+          reject(error);
+        }
+      });
+    }
+
+    function nextFrame() {
+      return new Promise(resolve => {
+        requestAnimationFrame(() => resolve());
+      });
+    }
+
+    async function buildContactSheet(items, fileName) {
+      const columns = Math.max(1, Math.min(5, Math.ceil(Math.sqrt(items.length))));
+      const thumbWidth = 320;
+      const aspect = items[0].height / items[0].width;
+      const thumbHeight = Math.round(thumbWidth * aspect);
+      const labelHeight = 42;
+      const gap = 12;
+      const rows = Math.ceil(items.length / columns);
+      const sheetCanvas = document.createElement('canvas');
+      const sheetCtx = sheetCanvas.getContext('2d');
+      sheetCanvas.width = columns * thumbWidth + (columns + 1) * gap;
+      sheetCanvas.height = rows * (thumbHeight + labelHeight) + (rows + 1) * gap;
+
+      sheetCtx.fillStyle = '#0b1118';
+      sheetCtx.fillRect(0, 0, sheetCanvas.width, sheetCanvas.height);
+      sheetCtx.font = '16px Arial';
+      sheetCtx.textBaseline = 'middle';
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const img = await loadImage(item.dataUrl);
+        const col = i % columns;
+        const row = Math.floor(i / columns);
+        const x = gap + col * (thumbWidth + gap);
+        const y = gap + row * (thumbHeight + labelHeight + gap);
+
+        sheetCtx.fillStyle = '#111927';
+        sheetCtx.fillRect(x, y, thumbWidth, thumbHeight + labelHeight);
+        sheetCtx.drawImage(img, x, y, thumbWidth, thumbHeight);
+
+        sheetCtx.fillStyle = '#dce4ef';
+        sheetCtx.fillText(`#${item.index}  ${item.time.toFixed(3)}s`, x + 10, y + thumbHeight + 21);
+      }
+
+      return await new Promise((resolve) => {
+        sheetCanvas.toBlob((blob) => {
+          resolve(URL.createObjectURL(blob));
+        }, 'image/png');
+      });
+    }
+
+    function loadImage(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+      });
+    }
+
+    function formatBytes(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+      if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+      return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+    }
+
+    function formatTime(sec) {
+      if (!isFinite(sec)) return '未知';
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = Math.floor(sec % 60);
+
+      if (h > 0) {
+        return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      }
+      return `${m}:${String(s).padStart(2, '0')}`;
+    }
+  </script>

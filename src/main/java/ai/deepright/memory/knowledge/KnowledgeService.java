@@ -34,7 +34,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.time.FastDateFormat;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -45,16 +44,18 @@ import org.springframework.util.Assert;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Getter
 @Setter
 public class KnowledgeService implements MemoryService {
-
-    public static final FastDateFormat DATE_FORMAT = FastDateFormat.getInstance("yyyy-MM-dd HH:mm:ss");
 
     public static final String LANG_KEY_RECALL_MESSAGE = "knowledge.recall.message";
 
@@ -63,6 +64,8 @@ public class KnowledgeService implements MemoryService {
     public static final String KEY_KNOWLEDGE_COMMIT = "knowledge_commit";
 
     public static final String KEY_KNOWLEDGE = "knowledge";
+
+    public static final String DATE_FORMAT = "yyyy-MM-dd HH:mm:ss";
 
     public static final String NAME = "knowledge";
 
@@ -89,6 +92,8 @@ public class KnowledgeService implements MemoryService {
     protected Long interval;
 
     protected String index;
+
+    protected Integer days;
 
     @PostConstruct
     public void init() throws Exception {
@@ -182,7 +187,6 @@ public class KnowledgeService implements MemoryService {
         return knowledge.getPath();
     }
 
-
     protected Map<String, Object> buildMetadata(WorkflowTask workTask) throws Exception {
         Map<String, Object> metadata = new HashMap<String, Object>(workTask.getMetadata());
         // 标记知识库清洗
@@ -201,15 +205,20 @@ public class KnowledgeService implements MemoryService {
 
     protected String buildQuery(WorkflowTask workTask) throws Exception {
         Knowledge knowledge = this.buildKnowledge(workTask);
-        String commit = this.template4prefix + System.lineSeparator() + StringUtils.defaultIfEmpty(FeatureUtils.buildKnowledge(workTask), this.template4commit);
-        String query = commit.replace("#lastUpdate", knowledge.getLastUpdate() != null ? KnowledgeService.DATE_FORMAT.format(knowledge.getLastUpdate()) : "1970-01-01 00:00:00");
+        String prefix = this.template4prefix;
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(KnowledgeService.DATE_FORMAT);
+        ZoneId zoneId = this.buildZoneId(workTask);
+        // lastUpdate使用客户端时间，如果不存在则使用请求创建时间-days
+        // limitUpdate使用请求创建时间
+        String query = prefix.replace("#lastUpdate", Instant.ofEpochMilli(knowledge.getLastUpdate() != null ? knowledge.getLastUpdate() : (workTask.getCreated() - TimeUnit.MILLISECONDS.convert(this.days, TimeUnit.DAYS))).atZone(zoneId).format(formatter));
+        query = query.replace("#limitUpdate", Instant.ofEpochMilli(workTask.getCreated()).atZone(zoneId).format(formatter));
         query = query.replace("#knowledge", this.buildPath(workTask, knowledge));
         query = query.replace("#git", this.gitPath.buildGitPath(workTask));
         query = query.replace("#index", this.index);
         if (log.isWarnEnabled() && !TemplateChecker.check(query)) {
             log.warn("The query template contains unexpected characters, please check: {}", query);
         }
-        return query;
+        return query + System.lineSeparator() + StringUtils.defaultIfEmpty(FeatureUtils.buildKnowledge(workTask), this.template4commit);
     }
 
     protected void notify(WorkflowTask workTask, String scene) throws Exception {
@@ -227,12 +236,13 @@ public class KnowledgeService implements MemoryService {
         if (this.isCommit(workTask)) {
             return false;
         }
-        // knowledge为空时允许初始化更新；knowledge存在时仅在未显式关闭且达到更新时间间隔后允许更新
-        return knowledge == null || (!knowledge.getDisable() && knowledge.shouldUpdate(this.interval));
+        // 不传knowledge不更新，knowledge存在时仅在未显式关闭且达到更新时间间隔后允许更新
+        return !knowledge.getDisable() && knowledge.shouldUpdate(this.interval);
     }
 
     protected Boolean allowedUpdate(WorkflowTask workTask) throws Exception {
-        return this.allowedUpdate(workTask, this.buildKnowledge(workTask));
+        Knowledge knowledge = this.buildKnowledge(workTask);
+        return knowledge != null && this.allowedUpdate(workTask, knowledge);
     }
 
     protected Boolean updateTime(WorkflowTask workTask) throws Exception {
@@ -246,6 +256,11 @@ public class KnowledgeService implements MemoryService {
             log.warn("The knowledge timestamp update failed={}", pubData.getCmd());
         }
         return pubData.isOk();
+    }
+
+    protected ZoneId buildZoneId(WorkflowTask workTask) throws Exception {
+        String timezone = FeatureUtils.buildTimezone(workTask);
+        return StringUtils.isBlank(timezone) ? ZoneId.systemDefault() : ZoneId.of(timezone);
     }
 
     // 是否为主动更新
@@ -298,7 +313,7 @@ public class KnowledgeService implements MemoryService {
         @Value("${memory.knowledge.template.recall:classpath:config/memory/knowledge_recall.md}")
         protected String template4recall;
 
-        @Value("${memory.knowledge.template.recall:classpath:config/memory/knowledge_prefix.md}")
+        @Value("${memory.knowledge.template.prefix:classpath:config/memory/knowledge_prefix.md}")
         protected String template4prefix;
 
         @Value("${memory.knowledge.truncate:20480}")
@@ -312,6 +327,9 @@ public class KnowledgeService implements MemoryService {
 
         @Value("${memory.knowledge.index:index.md}")
         protected String index;
+
+        @Value("${memory.knowledge.days:3}")
+        protected Integer days;
 
         @Bean(KnowledgeService.NAME)
         @ConditionalOnMissingBean(name = KnowledgeService.NAME)

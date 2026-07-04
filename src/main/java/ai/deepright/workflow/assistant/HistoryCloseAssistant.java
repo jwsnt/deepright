@@ -55,11 +55,6 @@ public class HistoryCloseAssistant extends PassageAssistant {
         }
     }
 
-    protected ZoneId buildZoneId(WorkflowConfig workflowConfig, WorkflowTask workTask) throws Exception {
-        String timezone = FeatureUtils.buildTimezone(workTask);
-        return StringUtils.isBlank(timezone) ? ZoneId.systemDefault() : ZoneId.of(timezone);
-    }
-
     // 关闭前提交记忆
     protected void commit(WorkflowConfig workflowConfig, WorkflowTask workTask) throws Exception {
         this.memoryService.commit(workTask);

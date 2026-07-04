@@ -2,7 +2,7 @@
 + #knowledge
 ### 设计准则
 + 初始加载：读取系统当前时间与index.md最后更新时间，以此作为基准一次性扫描知识库目录所有文件的修改时间
-+ 逐次读取git：#git 在`#lastUpdate`前、72小时内每个COMMIT。单次小于5个COMMIT，仅取摘要（≤80字）
++ 逐次读取git：#git 在`#lastUpdate`至`#limitUpdate`内每个COMMIT。单次小于5个COMMIT，仅取摘要
 + 每页WIKI记录上下文摘要、关联Commit；实体词间交叉引用，高频关联实体词抽象公共概念作为新实体词聚合
 + 参考www.wikipedia.org的交叉引用与层级组织方式，以Markdown为载体编写高频实体词WIKI
 + 忽略绝对路径、临时文件路径和URL，核心页面/组件的相对文件名可作为实体词标识保留
