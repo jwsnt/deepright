@@ -4,6 +4,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,6 +21,10 @@ import java.time.Duration;
 @EnableConfigurationProperties(PubsubRedisEventProperties.class)
 public class PubsubRedisEventConfig {
 
+    public static final String NAME_FACTORY = "redis4eventConnectionFactory";
+
+    public static final String NAME = "redis4event";
+
     @Value("${pubsub.redis.event.lettuce.pool.max-active:200}")
     protected Integer maxActive;
 
@@ -32,7 +37,8 @@ public class PubsubRedisEventConfig {
     @Value("${pubsub.redis.event.lettuce.pool.min-idle:8}")
     protected Integer minIdle;
 
-    @Bean("redis4eventConnectionFactory")
+    @Bean(PubsubRedisEventConfig.NAME_FACTORY)
+    @ConditionalOnMissingBean(name = PubsubRedisEventConfig.NAME_FACTORY)
     public LettuceConnectionFactory redis4eventConnectionFactory(PubsubRedisEventProperties pubsubEventProperties) {
         RedisStandaloneConfiguration redis = new RedisStandaloneConfiguration();
         redis.setHostName(!StringUtils.isEmpty(pubsubEventProperties.getHost()) ? pubsubEventProperties.getHost() : "localhost");
@@ -65,7 +71,8 @@ public class PubsubRedisEventConfig {
         return new LettuceConnectionFactory(redis, clientBuilder.build());
     }
 
-    @Bean("redis4event")
+    @Bean(PubsubRedisEventConfig.NAME)
+    @ConditionalOnMissingBean(name = PubsubRedisEventConfig.NAME)
     public RedisTemplate<String, Object> redis4event(@Qualifier("redis4eventConnectionFactory") LettuceConnectionFactory connectionFactory) {
         RedisTemplate<String, Object> redisTemplate = new RedisTemplate<>();
         redisTemplate.setHashValueSerializer(RedisSerializer.byteArray());

@@ -19,6 +19,7 @@ import org.apache.http.entity.StringEntity;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
@@ -92,6 +93,7 @@ public class CustomerOpenAiRouter extends OpenAiRouter {
 
         @Override
         @Bean(OpenAiRouter.NAME)
+        @ConditionalOnMissingBean(name = OpenAiRouter.NAME)
         public OpenAiRouter openAiRouter() {
             CustomerOpenAiRouter openAiRouter = new CustomerOpenAiRouter();
             BeanUtils.copyProperties(this, openAiRouter);

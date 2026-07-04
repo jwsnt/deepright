@@ -11,8 +11,11 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -51,6 +54,7 @@ public class HintSkillAssistant extends SkillsAssistant {
         }
     }
 
+    @Order(Ordered.LOWEST_PRECEDENCE - 1)
     @Configuration
     @Setter
     @Getter
@@ -61,6 +65,7 @@ public class HintSkillAssistant extends SkillsAssistant {
 
         @Override
         @Bean(SkillsAssistant.WORKFLOW_NAME)
+        @ConditionalOnMissingBean(name = SkillsAssistant.WORKFLOW_NAME)
         public SkillsAssistant skillsAssistant() throws Exception {
             HintSkillAssistant skillsAssistant = new HintSkillAssistant();
             BeanUtils.copyProperties(this, skillsAssistant);

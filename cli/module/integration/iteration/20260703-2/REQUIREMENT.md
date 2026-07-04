@@ -16,7 +16,7 @@
 
 ### 需求介绍
 + 新增 `integration backup-clean` CLI 子命令，用于定期清理每个 Agent 工作目录下 `User.md` / `Soul.md` 的备份文件
-+ 备份文件通常文件名中带 `bak` 或时间戳；如果仍停留在 Agent 工作目录根部，且最后更新时间距离当前时间已超过 `24h`，则自动 `mv` 到该工作目录下的 `bak/`
++ 备份文件通常文件名中带 `bak` 或时间戳；如果仍停留在 Agent 工作目录根部，且最后更新时间距离当前时间已超过 `30分钟`，则自动 `mv` 到该工作目录下的 `bak/`
 + 如果工作目录下不存在 `bak/`，则在归档时自动创建
 + 清理 `bak/` 目录中的历史备份；当文件最后更新时间距离当前时间已超过 `72h` 时，自动删除
 + 仅处理当前 Agent 自己 workspace 下的文件，不影响其他目录和其他模块
@@ -25,7 +25,7 @@
 + CLI 收口：
     + 通过 `integration` 主二进制新增 `backup-clean` 子命令，保持 integration 的二进制与 CLI 收口原则
     + 命令支持 `--agent-dir`、`--archive-after`、`--delete-after`
-    + 默认阈值分别为 `24h` 和 `72h`
+    + 默认阈值分别为 `30分钟` 和 `72h`
 + Agent 根目录解析：
     + 复用 integration 现有的 Agent 根目录解析逻辑
     + `--agent-dir` 未传时，继续按主应用 `config/config.json`、环境变量 `AGENT_DIR`、默认目录的既有优先级回退

@@ -20,6 +20,7 @@ import org.apache.http.entity.StringEntity;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
@@ -93,6 +94,7 @@ public class CustomerVolcengineRouter extends VolcengineRouter {
 
         @Override
         @Bean(VolcengineRouter.NAME)
+        @ConditionalOnMissingBean(name = VolcengineRouter.NAME)
         public VolcengineRouter volcengineRouter() {
             CustomerVolcengineRouter volcengineRouter = new CustomerVolcengineRouter();
             BeanUtils.copyProperties(this, volcengineRouter);

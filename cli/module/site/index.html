@@ -3152,6 +3152,7 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
 .vfs-item.warning-path{background:linear-gradient(90deg,rgba(217,48,37,.16),rgba(255,140,0,.08) 48%,transparent);box-shadow:inset 2px 0 0 rgba(217,48,37,.72);animation:vfsWarningPulse .38s steps(2,end) infinite}
 .vfs-item.warning-file .vfs-name{color:var(--error);font-weight:600;text-shadow:0 0 10px rgba(217,48,37,.24)}
 .vfs-item svg{width:14px;height:14px;color:var(--text-muted);flex-shrink:0}
+#vfsList.onboarding-skill-disable-locked,#vfsList.onboarding-skill-disable-locked *{pointer-events:none !important}
 .vfs-item .vfs-skill-toggle{width:18px;height:18px;border:none;background:transparent;border-radius:6px;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;flex-shrink:0;color:#c56a1d;transition:background-color .16s ease,color .16s ease,transform .16s ease,opacity .16s ease,box-shadow .16s ease}
 .vfs-item .vfs-skill-toggle:hover{background:linear-gradient(180deg,rgba(255,248,239,.92),rgba(255,236,214,.94));color:#a65210;box-shadow:0 8px 18px rgba(255,161,89,.12),inset 0 1px 0 rgba(255,255,255,.9);transform:translateY(-1px)}
 .vfs-item .vfs-skill-toggle svg{width:16px;height:16px;color:currentColor}
@@ -5171,6 +5172,7 @@ const MEMO_TASK_TOUR_CLICK_KEY = 'deepright_memo_task_tour_clicked';
 const MEMO_COMPLETION_TOUR_CLICK_KEY = 'deepright_memo_completion_tour_clicked';
 const MEMO_RECURRING_TOUR_CLICK_KEY = 'deepright_memo_recurring_tour_clicked';
 const SKILL_TOUR_CLICK_KEY = 'deepright_skill_tour_clicked';
+const SKILL_DISABLE_TOUR_CLICK_KEY = 'deepright_skill_disable_tour_clicked';
 const CLI_TOUR_CLICK_KEY = 'deepright_cli_tour_clicked';
 const WIKI_TOUR_CLICK_KEY = 'deepright_wiki_tour_clicked';
 const WIKI_AUTO_TOUR_CLICK_KEY = 'deepright_wiki_auto_tour_clicked';
@@ -5693,6 +5695,10 @@ let memoTourState = {
 let skillTourState = {
   starting: false,
   snapshot: null
+};
+let skillDisableTourState = {
+  pendingStart: false,
+  path: ''
 };
 let skillTourGoalInputDemoState = {
   running: false,
@@ -7397,6 +7403,20 @@ function hasSkillTourClickRecord() {
 function markSkillTourClickRecord() {
   try {
     localStorage.setItem(SKILL_TOUR_CLICK_KEY, '1');
+  } catch {}
+}
+
+function hasSkillDisableTourClickRecord() {
+  try {
+    return localStorage.getItem(SKILL_DISABLE_TOUR_CLICK_KEY) === '1';
+  } catch {
+    return true;
+  }
+}
+
+function markSkillDisableTourClickRecord() {
+  try {
+    localStorage.setItem(SKILL_DISABLE_TOUR_CLICK_KEY, '1');
   } catch {}
 }
 
@@ -10006,6 +10026,20 @@ function getOnboardingStepConfig(step) {
         cardOffsetX: 0,
         cardOffsetY: 18
       };
+    case 'skill-disable-tour-item':
+      return {
+        domain: 'left',
+        selector: '#vfsSkillDisableTourItem',
+        message: '禁用技能为会话级别，再次点击可开启。',
+        actionLabel: '完成',
+        padding: 8,
+        highlightPadding: 12,
+        cardPlacement: 'below-left',
+        cardWidth: 340,
+        cardMinHeight: 118,
+        cardOffsetX: 0,
+        cardOffsetY: 18
+      };
     case 'skill-tour-skills-dir':
       return {
         domain: 'left',
@@ -11717,6 +11751,10 @@ function isKnowledgeFileTourOnboardingStep(step) {
 
 function isSkillTourOnboardingStep(step) {
   return ['skill-tour-skills-dir', 'skill-tour-create-btn', 'skill-tour-modal', 'skill-tour-round', 'skill-tour-time', 'skill-tour-goal', 'skill-tour-goal-input'].includes(String(step || '').trim());
+}
+
+function isSkillDisableTourOnboardingStep(step) {
+  return ['skill-disable-tour-item'].includes(String(step || '').trim());
 }
 
 function isQueuedCenterTourOnboardingStep(step) {
@@ -14106,6 +14144,26 @@ function getSkillTourAvailability() {
   };
 }
 
+function getSkillDisableTourTargetPath() {
+  return normalizeFsPath(skillDisableTourState.path);
+}
+
+function setSkillDisableTourTargetPath(path) {
+  skillDisableTourState.path = normalizeFsPath(path);
+}
+
+function isSkillDisableTourTargetPath(path) {
+  const targetPath = getSkillDisableTourTargetPath();
+  const candidatePath = normalizeFsPath(path);
+  return !!(targetPath && candidatePath && targetPath === candidatePath);
+}
+
+function setSkillDisableTourListLock(locked) {
+  const list = document.getElementById('vfsList');
+  if (!list) return;
+  list.classList.toggle('onboarding-skill-disable-locked', !!locked);
+}
+
 function prepareSkillTourGoalPreview() {
   const fallbackPath = vfsWorkspace
     ? joinFsPath(vfsWorkspace, 'tmp/skill_extract_demo.log')
@@ -14157,6 +14215,43 @@ async function syncSkillTourStep(step) {
     if (normalizedStep === 'skill-tour-goal-input') startSkillTourGoalInputDemoPlayback();
   }
   return true;
+}
+
+async function ensureSkillDisableTourTargetVisible() {
+  applyLeftSidebarState(false);
+  applyRightSidebarState(true);
+  closeQuickFanMenu();
+  closePluginModal(true);
+  closeSettings(true);
+  closeSoulTidyPopover();
+  closeAllSkillExtractPopovers(true);
+  closeInstallAppPopover();
+  cmdClosePanel(true);
+  hideAgentSelectOverlay();
+  hideInputReloadConfirm();
+  const targetPath = getSkillDisableTourTargetPath();
+  if (!targetPath) return false;
+  const vfsEl = document.getElementById('vfs');
+  if (vfsEl) vfsEl.classList.remove('hidden');
+  const parentPath = getFsDirname(targetPath) || vfsWorkspace || '/';
+  if (vfsCurrentPath !== parentPath || !vfsLastJson || !document.getElementById('vfsSkillDisableTourItem')) {
+    vfsCurrentPath = parentPath;
+    vfsLastJson = '';
+    await vfsRefresh();
+  }
+  scheduleOnboardingStepResync('skill-disable-tour-item', [60, 180, 320]);
+  return !!document.getElementById('vfsSkillDisableTourItem');
+}
+
+async function syncSkillDisableTourStep(step) {
+  const normalizedStep = String(step || '').trim();
+  if (!isSkillDisableTourOnboardingStep(normalizedStep)) {
+    setSkillDisableTourListLock(false);
+    return true;
+  }
+  const visible = await ensureSkillDisableTourTargetVisible();
+  setSkillDisableTourListLock(visible);
+  return visible;
 }
 
 function setCliTourDemoVisible(visible) {
@@ -17088,6 +17183,20 @@ function setOnboardingStep(step) {
       scheduleOnboardingSync();
     });
   }
+  if (isSkillDisableTourOnboardingStep(next)) {
+    Promise.resolve().then(async () => {
+      const ok = await syncSkillDisableTourStep(next).catch(() => false);
+      if (!isOnboardingActive() || String(onboardingState.step || '').trim() !== next) return;
+      if (!ok) {
+        if (!isSkillDisableTourOnboardingStep(onboardingState.step)) return;
+        stopOnboarding(false);
+        return;
+      }
+      scheduleOnboardingSync();
+    });
+  } else {
+    setSkillDisableTourListLock(false);
+  }
   if (isQueuedCenterTourOnboardingStep(next)) {
     const ok = syncQueuedCenterTourStep(next);
     if (!ok) {
@@ -17233,6 +17342,7 @@ function stopOnboarding(markComplete) {
   resetVfsEditTourDemoState();
   resetAtTourDemoState();
   resetBrowserPluginHoverTourDemoState();
+  setSkillDisableTourListLock(false);
   resetBrowserInstanceInitTourState();
   setBrowserInstanceInitGuidePreviewVisible(false);
   clearStandaloneModeTourPreview();
@@ -17301,6 +17411,9 @@ function stopOnboarding(markComplete) {
     closeAllSkillExtractPopovers(true);
     restoreSkillExtractDraftState(skillTourState.snapshot);
     skillTourState.snapshot = null;
+  }
+  if (!skillDisableTourState.pendingStart) {
+    setSkillDisableTourTargetPath('');
   }
   if (isMemoTaskTourOnboardingStep(lastStep)) {
     clearMemoTaskTourDemoVisualState();
@@ -17416,6 +17529,12 @@ function stopOnboarding(markComplete) {
     window.setTimeout(() => {
       if (!pluginSuccessTourState.pendingStart || hasPluginSuccessTourClickRecord() || isOnboardingActive()) return;
       startPluginSuccessTourOnboarding().catch(() => {});
+    }, 160);
+  }
+  if (skillDisableTourState.pendingStart && !hasSkillDisableTourClickRecord()) {
+    window.setTimeout(() => {
+      if (!skillDisableTourState.pendingStart || hasSkillDisableTourClickRecord() || isOnboardingActive()) return;
+      startSkillDisableTourOnboarding().catch(() => {});
     }, 160);
   }
   if (queuedCenterTourState.pendingStart && !hasQueuedCenterTourClickRecord()) {
@@ -17833,6 +17952,42 @@ async function startSkillTourOnboarding() {
   } finally {
     skillTourState.starting = false;
   }
+}
+
+async function startSkillDisableTourOnboarding() {
+  return withOnboardingStartLockAsync(async () => {
+    if (hasSkillDisableTourClickRecord()) {
+      skillDisableTourState.pendingStart = false;
+      setSkillDisableTourTargetPath('');
+      return false;
+    }
+    if (!getSkillDisableTourTargetPath()) {
+      skillDisableTourState.pendingStart = false;
+      return false;
+    }
+    const visible = await ensureSkillDisableTourTargetVisible();
+    if (!visible) {
+      skillDisableTourState.pendingStart = false;
+      setSkillDisableTourTargetPath('');
+      return false;
+    }
+    markSkillDisableTourClickRecord();
+    skillDisableTourState.pendingStart = false;
+    onboardingState.active = true;
+    setOnboardingStep('skill-disable-tour-item');
+    return true;
+  });
+}
+
+function queueSkillDisableTourOnboarding(path) {
+  if (hasSkillDisableTourClickRecord()) return false;
+  const normalizedPath = normalizeFsPath(path);
+  if (!normalizedPath) return false;
+  setSkillDisableTourTargetPath(normalizedPath);
+  skillDisableTourState.pendingStart = true;
+  if (isOnboardingStartLocked()) return false;
+  Promise.resolve(startSkillDisableTourOnboarding()).catch(() => {});
+  return true;
 }
 
 async function startChatCompletionTourOnboarding() {
@@ -18790,6 +18945,9 @@ function handleOnboardingAction(event) {
       stopOnboarding(false);
       return;
     case 'knowledge-file-tour-item':
+      stopOnboarding(false);
+      return;
+    case 'skill-disable-tour-item':
       stopOnboarding(false);
       return;
     case 'skill-tour-skills-dir':
@@ -36705,9 +36863,10 @@ function vfsRender(entries) {
     const skillIcon = hasSkillToggle
       ? `<button class="vfs-skill-toggle${skillDisabled ? ' disabled' : ''}${skillDisabledInherited && !skillDisabledSelf ? ' inherited' : ''}" onclick="vfsToggleSkillDir(event,'${esc(absPath)}',${skillDisabled ? 'true' : 'false'},${skillDisabledSelf ? 'true' : 'false'},${skillDisabledInherited ? 'true' : 'false'})" title="${skillToggleTitle}">${skillDisabled ? disabledFolderIcon : defaultFolderIcon}</button>`
       : icon;
+    const skillDisableTourItemId = skillDisabled && isSkillDisableTourTargetPath(absPath) ? ' id="vfsSkillDisableTourItem"' : '';
     const vfsEditTourCls = vfsEditTourState.sourcePath && absPath === vfsEditTourState.sourcePath ? ' vfs-edit-tour-source' : '';
     const cls = `${sel}${inChain ? ' warning-path' : ''}${warning ? ' warning-file' : ''}${vfsEditTourCls}`;
-    return `<div class="vfs-item${cls}"${itemId} data-vfs-name="${esc(e.name)}" data-vfs-type="${e.type}" data-vfs-path="${esc(absPath)}" draggable="true" onmouseenter="vfsHover(event,'${esc(e.name)}','${e.type}')" ondragstart="vfsDragStart(event,'${esc(absPath)}')" onclick="vfsClick(event,'${esc(e.name)}','${e.type}')" ondblclick="vfsDoubleClick(event,'${esc(e.name)}','${e.type}')">${skillIcon}<span class="vfs-name">${esc(e.name)}</span><span class="vfs-actions">${repairBtn}${warningBtn}${del}${dl}${soulBtn}</span></div>`;
+    return `<div class="vfs-item${cls}"${skillDisableTourItemId || itemId} data-vfs-name="${esc(e.name)}" data-vfs-type="${e.type}" data-vfs-path="${esc(absPath)}" draggable="true" onmouseenter="vfsHover(event,'${esc(e.name)}','${e.type}')" ondragstart="vfsDragStart(event,'${esc(absPath)}')" onclick="vfsClick(event,'${esc(e.name)}','${e.type}')" ondblclick="vfsDoubleClick(event,'${esc(e.name)}','${e.type}')">${skillIcon}<span class="vfs-name">${esc(e.name)}</span><span class="vfs-actions">${repairBtn}${warningBtn}${del}${dl}${soulBtn}</span></div>`;
   }).join('');
   if (isOnboardingActive()) scheduleOnboardingSync();
 }
@@ -36717,6 +36876,7 @@ async function vfsToggleSkillDir(event, absPath, currentlyDisabled, disabledSelf
     event.preventDefault();
     event.stopPropagation();
   }
+  if (isOnboardingActive() && isSkillDisableTourOnboardingStep(onboardingState.step)) return false;
   const chatId = String(state.activeChat || '').trim();
   if (!chatId) {
     vfsShowUploadToast('请先选择会话', true);
@@ -36741,8 +36901,15 @@ async function vfsToggleSkillDir(event, absPath, currentlyDisabled, disabledSelf
       vfsShowUploadToast('技能目录切换失败: ' + String(payload.content || resp.statusText || '未知错误'), true);
       return false;
     }
+    const shouldQueueSkillDisableTour = !currentlyDisabled && !hasSkillDisableTourClickRecord();
+    if (shouldQueueSkillDisableTour) setSkillDisableTourTargetPath(absPath);
     await vfsRefresh();
-    vfsShowUploadToast(currentlyDisabled ? '技能目录已恢复' : '技能目录已禁用', false);
+    if (currentlyDisabled) {
+      vfsShowUploadToast('技能目录已恢复', false);
+    } else if (!shouldQueueSkillDisableTour) {
+      vfsShowUploadToast('技能目录已禁用', false);
+    }
+    if (shouldQueueSkillDisableTour) queueSkillDisableTourOnboarding(absPath);
     return true;
   } catch (err) {
     vfsShowUploadToast('技能目录切换失败: ' + err.message, true);

@@ -256,11 +256,18 @@ public class LogicVerifyAssistant extends DefaultAssistant {
         public LogicVerifyAssistant logicVerifyAssistant() throws Exception {
             LogicVerifyAssistant logicVerifyAssistant = new LogicVerifyAssistant();
             BeanUtils.copyProperties(this, logicVerifyAssistant);
-            if (!StringUtils.isEmpty(this.excluded)) {
-                logicVerifyAssistant.getExcludedProvider().addAll(Arrays.asList(this.excluded.split(",")));
-            }
+            this.excluded(logicVerifyAssistant);
             log.info("LogicVerifyAssistant inited");
             return logicVerifyAssistant;
+        }
+
+        protected void excluded(LogicVerifyAssistant logicVerifyAssistant) {
+            if (!StringUtils.isEmpty(this.excluded)) {
+                Arrays.stream(this.excluded.split(","))
+                        .map(StringUtils::trim)
+                        .filter(StringUtils::isNotEmpty)
+                        .forEach(logicVerifyAssistant.getExcludedProvider()::add);
+            }
         }
     }
 }

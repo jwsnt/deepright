@@ -1260,6 +1260,7 @@ curl -X POST 'http://127.0.0.1:8080/api/cron/create?agentId=demo-agent' \
 | GET | `/api/folder` | 打开 Agent 工作目录 |
 | GET | `/api/skills` | 获取 Agent 技能列表 |
 | GET | `/api/files` | 浏览文件列表 |
+| POST | `/api/skill_state` | 按会话切换技能目录禁用状态 |
 | GET | `/api/data` | 读取文本文件 |
 | GET | `/api/workspace` | 获取 Agent 工作目录路径 |
 | POST | `/api/edit` | 写入文本或二进制文件 |
@@ -2656,3 +2657,86 @@ integration plugins sync-bundled
 - `integration/main.go` 已支持双平台 helper 路径解析
 - `cli/module/build.sh` 会在 linux 发布物里打包 WSL helper
 - `integration/main_test.go` 已补充 linux `helpers/<mode>/CLI_SANDBOX` 解析测试
+
+---
+
+## 迭代 20260704-1：会话级技能目录禁用
+
+## 本次更新
+
+- `integration` 新增了虚拟文件系统技能目录的会话级禁用能力
+- 技能目录以“直属包含 `SKILL.md` 的目录”为单位；禁用后，该目录及其全部子孙技能都会在当前 `chatId` 下失效
+- 这组状态会持久化到共享 sqlite；刷新页面或重新进入同一会话后仍然生效，但不会影响其他会话
+- `GET /api/skills?agentId=xxx&chatId=yyy` 现在会按当前会话的禁用状态过滤返回结果；不传 `chatId` 时保持原有行为
+- `GET /api/files?path=xxx&chatId=yyy` 现在会额外返回技能目录状态字段，供前端渲染禁用、继承禁用和普通态
+- `POST /api/skill_state` 用于切换某个技能目录在当前会话中的禁用/恢复状态
+
+## `/api/files`
+
+请求示例：
+
+```text
+GET /api/files?path=/Users/demo/agent/A/skills&chatId=chat-1
+```
+
+目录项会新增以下字段：
+
+- `hasSkill`：当前目录直属是否存在 `SKILL.md`
+- `skillDisabled`：当前目录是否处于禁用态
+- `skillDisabledSelf`：当前目录是否由自身路径直接禁用
+- `skillDisabledInherited`：当前目录是否因父级技能目录被禁用而继承禁用
+
+返回示例：
+
+```json
+[
+  {
+    "name": "alpha",
+    "type": "dir",
+    "hasSkill": true,
+    "skillDisabled": true,
+    "skillDisabledSelf": true,
+    "skillDisabledInherited": false
+  }
+]
+```
+
+## `/api/skill_state`
+
+请求示例：
+
+```json
+{
+  "chatId": "chat-1",
+  "path": "/Users/demo/agent/A/skills/alpha",
+  "disabled": true
+}
+```
+
+返回示例：
+
+```json
+{
+  "status": 0,
+  "chatId": "chat-1",
+  "path": "/Users/demo/agent/A/skills/alpha",
+  "disabled": true,
+  "disabledSelf": true,
+  "disabledInherited": false,
+  "disabledPaths": [
+    "/Users/demo/agent/A/skills/alpha"
+  ]
+}
+```
+
+说明：
+
+- `path` 必须是一个真实存在、且直属包含 `SKILL.md` 的目录
+- 如果父级目录已经禁用，子级目录不会重复写入 `disabledPaths`
+- 如果恢复父级目录，原本只是继承禁用的子级目录会自动恢复为普通态
+
+## `/api/skills`
+
+- `GET /api/skills?agentId=xxx&chatId=yyy` 会先取当前 Agent 原本可见的技能，再按 `chatId` 绑定的禁用目录过滤
+- 被命中的技能目录以及其子孙技能都不会继续出现在返回数组中
+- 不传 `chatId` 时，接口仍返回完整技能列表，兼容旧调用

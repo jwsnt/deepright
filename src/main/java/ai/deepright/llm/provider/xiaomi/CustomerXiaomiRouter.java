@@ -20,6 +20,7 @@ import org.apache.http.entity.StringEntity;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
@@ -93,6 +94,7 @@ public class CustomerXiaomiRouter extends XiaomiRouter {
 
         @Override
         @Bean(XiaomiRouter.NAME)
+        @ConditionalOnMissingBean(name = XiaomiRouter.NAME)
         public XiaomiRouter xiaomiRouter() {
             CustomerXiaomiRouter xiaomiRouter = new CustomerXiaomiRouter();
             BeanUtils.copyProperties(this, xiaomiRouter);

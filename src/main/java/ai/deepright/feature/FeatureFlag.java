@@ -132,10 +132,10 @@ public class FeatureFlag {
         return MapUtils.getObject(workTask.getMetadata(), FeatureField.KEY_TASK) != null;
     }
 
-    // 是否来自定时任务
+    // 是否来自周期任务
     public static Boolean isCron(WorkflowTask workTask) throws Exception {
         String cron = MapUtils.getString(workTask.getMetadata(), FeatureFlag.KEY_CRON_TYPE);
-        // 存在cron_type标记，但类型不是Cron（来自插件的消息类型为插件名，如feishu）
-        return !StringUtils.isEmpty(cron) && !StringUtils.equalsIgnoreCase(cron, "cron");
+        // 存在cron_type标记，类型不是Cron则来自插件的消息类型为插件名，如feishu
+        return !StringUtils.isEmpty(cron);
     }
 }
