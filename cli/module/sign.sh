@@ -865,11 +865,30 @@ staple_artifact() {
 
 notarize_app() {
   local app_path="$1"
+  local temp_root
+  temp_root="$(mktemp -d "${TMPDIR:-/tmp}/deepright-notary-app.XXXXXX")"
+  local stage_root="${temp_root}/stage"
+  local stage_app="${stage_root}/$(basename "${app_path}")"
   local archive_path
   archive_path="$(mktemp_file_path "$(basename "${app_path}" .app).notary" ".zip")"
-  ditto -c -k --keepParent "${app_path}" "${archive_path}"
+
+  cleanup_notarize_app() {
+    rm -rf "${temp_root}"
+    rm -f "${archive_path}"
+  }
+  trap cleanup_notarize_app RETURN
+
+  mkdir -p "${stage_root}"
+  echo "  staging app for notarization: ${app_path}"
+  ditto "${app_path}" "${stage_app}"
+  clean_mutable_bundle_runtime_files "${stage_app}"
+  verify_app "${stage_app}"
+
+  ditto -c -k --keepParent "${stage_app}" "${archive_path}"
   submit_notarization "${archive_path}" "${app_path}"
-  rm -f "${archive_path}"
+
+  rm -rf "${app_path}"
+  ditto "${stage_app}" "${app_path}"
   staple_artifact "${app_path}"
   verify_app "${app_path}" "post-notarization"
 }
@@ -1100,6 +1119,32 @@ verify_dmg() {
   fi
 }
 
+sign_app_bundle() {
+  local app_path="$1"
+  local temp_root
+  temp_root="$(mktemp -d "${TMPDIR:-/tmp}/deepright-sign-app.XXXXXX")"
+
+  local stage_root="${temp_root}/stage"
+  local stage_app="${stage_root}/$(basename "${app_path}")"
+  local sign_temp_dir="${temp_root}/sign"
+
+  cleanup_sign_app_bundle() {
+    rm -rf "${temp_root}"
+  }
+  trap cleanup_sign_app_bundle RETURN
+
+  mkdir -p "${stage_root}" "${sign_temp_dir}"
+  echo "  staging app for signing: ${app_path}"
+  ditto "${app_path}" "${stage_app}"
+
+  sign_bundle_tree "${stage_app}" "${sign_temp_dir}"
+  verify_app "${stage_app}"
+
+  rm -rf "${app_path}"
+  ditto "${stage_app}" "${app_path}"
+  verify_app "${app_path}"
+}
+
 sign_dmg() {
   local dmg_path="$1"
   local dmg_name
@@ -1176,11 +1221,7 @@ main() {
     [[ -n "${app_path}" ]] || continue
     found_any=1
     echo "-> signing ${app_path}"
-    local temp_dir
-    temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/deepright-sign-app.XXXXXX")"
-    sign_bundle_tree "${app_path}" "${temp_dir}"
-    verify_app "${app_path}"
-    rm -rf "${temp_dir}"
+    sign_app_bundle "${app_path}"
   done < <(resolve_app_targets)
 
   local pkg_path

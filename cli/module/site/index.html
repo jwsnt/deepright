@@ -3275,10 +3275,17 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
 [data-theme="dark"] .sel-file-bubble.onboarding-message-url-bubble{box-shadow:0 22px 46px rgba(0,0,0,.42),0 0 0 1px rgba(142,180,255,.16)}
 [data-theme="dark"] .sel-file-bubble-btn.secondary{background:rgba(255,255,255,.08);color:#d7e5ff;box-shadow:none}
 [data-theme="dark"] .sel-file-bubble-btn.secondary:hover{background:rgba(255,255,255,.14)}
-.message-wrap .md-content a.message-path-link{color:#1d4ed8;text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:2px;font-weight:600;word-break:break-all}
-.message-wrap .md-content a.message-path-link.onboarding-message-url-target{display:inline-block;padding:2px 6px;margin:-2px -6px;border-radius:10px;background:rgba(77,107,254,.14);box-shadow:0 0 0 1px rgba(77,107,254,.2)}
-[data-theme="dark"] .message-wrap .md-content a.message-path-link{color:#8cb8ff}
-[data-theme="dark"] .message-wrap .md-content a.message-path-link.onboarding-message-url-target{background:rgba(95,132,241,.18);box-shadow:0 0 0 1px rgba(142,180,255,.22)}
+.message-wrap .md-content a.message-path-link{display:inline-flex;align-items:center;max-width:min(100%,420px);margin:2px 4px 2px 0;padding:2px 10px;border-radius:12px;border:1px solid color-mix(in srgb,var(--accent) 24%,var(--border) 76%);background:linear-gradient(180deg,color-mix(in srgb,var(--bg-card) 86%,var(--accent) 14%),color-mix(in srgb,var(--bg-card) 94%,rgba(255,255,255,.22) 6%));color:var(--accent);text-decoration:none;font-weight:700;line-height:1.6;vertical-align:middle;overflow:hidden;box-shadow:0 10px 24px rgba(16,24,40,.12),inset 0 1px 0 rgba(255,255,255,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease,filter .16s ease}
+.message-wrap .md-content a.message-path-link:hover,.message-wrap .md-content a.message-path-link:focus-visible{transform:translateY(-1px);border-color:color-mix(in srgb,var(--accent) 42%,var(--border) 58%);box-shadow:0 14px 28px rgba(16,24,40,.16),inset 0 1px 0 rgba(255,255,255,.72);outline:none}
+.message-wrap .md-content a.message-path-link .message-path-link-label{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.message-wrap .md-content a.message-http-link{background:linear-gradient(180deg,rgba(77,107,254,.16),rgba(77,107,254,.08));border-color:rgba(77,107,254,.22);color:#244fbf}
+.message-wrap .md-content a.message-file-link{background:linear-gradient(180deg,rgba(53,124,255,.14),rgba(53,124,255,.06));border-color:rgba(53,124,255,.2);color:#1d4ed8}
+.message-wrap .md-content a.message-path-link.onboarding-message-url-target{box-shadow:0 0 0 1px rgba(77,107,254,.26),0 16px 30px rgba(77,107,254,.18)}
+[data-theme="dark"] .message-wrap .md-content a.message-path-link{background:linear-gradient(180deg,rgba(16,28,49,.94),rgba(10,20,37,.88));border-color:rgba(169,190,227,.22);color:#d9e8ff;box-shadow:0 14px 32px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.06)}
+[data-theme="dark"] .message-wrap .md-content a.message-path-link:hover,[data-theme="dark"] .message-wrap .md-content a.message-path-link:focus-visible{border-color:rgba(142,180,255,.34);box-shadow:0 18px 36px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.08)}
+[data-theme="dark"] .message-wrap .md-content a.message-http-link{background:linear-gradient(180deg,rgba(62,92,201,.34),rgba(29,58,144,.24));border-color:rgba(128,166,255,.26);color:#aecdff}
+[data-theme="dark"] .message-wrap .md-content a.message-file-link{background:linear-gradient(180deg,rgba(39,87,189,.34),rgba(20,56,133,.22));border-color:rgba(123,165,255,.24);color:#b8d4ff}
+[data-theme="dark"] .message-wrap .md-content a.message-path-link.onboarding-message-url-target{box-shadow:0 0 0 1px rgba(142,180,255,.24),0 18px 34px rgba(0,0,0,.34)}
 .file-editor-header-actions{display:flex;align-items:center;gap:8px;min-width:0}
 .file-editor-close{width:30px;height:30px;flex:0 0 30px;border-radius:999px;border:1px solid color-mix(in srgb,var(--border) 80%,rgba(255,255,255,.24));background:transparent;color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition)}
 .file-editor-close:hover,.file-editor-close:focus-visible{color:var(--text-primary);border-color:var(--accent);outline:none}
@@ -30017,6 +30024,31 @@ function resolveCmdExecResponseText(data, rawText) {
   return fallback;
 }
 
+function resolveCmdStandaloneHttpUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw || /\s/.test(raw)) return null;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    if (!url.hostname || !/[a-z0-9]/i.test(url.hostname)) return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
+function openCmdStandaloneHttpUrl(url) {
+  const href = resolveCmdStandaloneHttpUrl(url);
+  if (!href) return false;
+  try {
+    if (typeof _origOpen === 'function') {
+      _origOpen(href, '_blank', 'noopener,noreferrer');
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
 function cmdOpenPanel() {
   if (isCliTourOnboardingStep(onboardingState.step)) return;
   if (cmdExecuting) return;
@@ -30130,6 +30162,19 @@ async function cmdExecuteConfirmed() {
   const historyEntry = startManualCmdCliHistory(chatId, cmd);
   cmdClosePanel(true);
   try {
+    const standaloneUrl = resolveCmdStandaloneHttpUrl(cmd);
+    if (standaloneUrl) {
+      const opened = openCmdStandaloneHttpUrl(standaloneUrl);
+      finishManualCmdCliHistory(chatId, historyEntry && historyEntry.id, {
+        command: cmd,
+        output: opened
+          ? ('已在新页面打开 URL: ' + standaloneUrl)
+          : ('URL 打开失败: ' + standaloneUrl),
+        ok: opened
+      });
+      if (!opened) cmdShowToast('URL 打开失败，请检查浏览器拦截设置', true);
+      return;
+    }
     const resp = await fetchExecApi('/api/cmd', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -39693,6 +39738,72 @@ function shouldDecorateMessagePathNode(node) {
   return !parent.closest(MESSAGE_PATH_SKIP_SELECTOR);
 }
 
+function buildMessageFileBubbleLabel(rawValue, filePath) {
+  const raw = cleanSelectedMessageToken(rawValue);
+  const resolvedPath = extractMessageFilePath(filePath || raw);
+  const normalized = normalizeFsPath(resolvedPath || raw);
+  if (!normalized) return raw || '文件';
+  const parts = normalized.split('/').filter(Boolean);
+  if (!parts.length) return raw || normalized || '文件';
+  if (parts.length === 1) return parts[0];
+  return parts.slice(-2).join('/');
+}
+
+function buildMessageHttpBubbleLabel(href, fallbackText) {
+  const customText = String(fallbackText || '').trim();
+  if (customText && !resolveMessageHttpLink(customText)) return customText;
+  const normalizedHref = normalizeRightSidebarUrlPreviewHref(href || customText);
+  if (!normalizedHref) return customText || 'URL';
+  try {
+    const url = new URL(normalizedHref);
+    const host = String(url.host || url.hostname || normalizedHref).trim();
+    const pathParts = decodeURIComponent(url.pathname || '/').split('/').filter(Boolean);
+    if (pathParts.length >= 2) return host + '/' + pathParts.slice(-2).join('/');
+    if (pathParts.length === 1) return host + '/' + pathParts[0];
+    return host || normalizedHref;
+  } catch {
+    return customText || normalizedHref;
+  }
+}
+
+function getMessagePathLinkDisplayText(kind, rawValue, fallbackText, filePath) {
+  if (kind === 'file') return buildMessageFileBubbleLabel(rawValue || fallbackText, filePath);
+  return buildMessageHttpBubbleLabel(rawValue, fallbackText);
+}
+
+function decorateMessagePathAnchor(anchor, options) {
+  if (!(anchor instanceof Element)) return;
+  const opts = options || {};
+  const kind = opts.kind === 'file' ? 'file' : 'http';
+  const rawValue = String(opts.rawValue || opts.href || opts.filePath || anchor.getAttribute('data-raw-value') || anchor.getAttribute('href') || anchor.textContent || '').trim();
+  const fallbackText = String(opts.fallbackText || anchor.textContent || '').trim();
+  const filePath = kind === 'file'
+    ? String(opts.filePath || anchor.getAttribute('data-file-path') || '').trim()
+    : '';
+  const href = kind === 'http'
+    ? normalizeRightSidebarUrlPreviewHref(opts.href || anchor.getAttribute('href') || rawValue || fallbackText)
+    : String(opts.href || anchor.getAttribute('href') || rawValue || fallbackText).trim();
+  const displayText = getMessagePathLinkDisplayText(kind, kind === 'http' ? (href || rawValue) : (rawValue || href), fallbackText, filePath);
+  anchor.classList.remove('message-path-link', 'message-file-link', 'message-http-link');
+  anchor.classList.add('message-path-link', kind === 'file' ? 'message-file-link' : 'message-http-link');
+  anchor.setAttribute('data-raw-value', rawValue || (kind === 'file' ? filePath : href));
+  anchor.setAttribute('title', rawValue || (kind === 'file' ? filePath : href));
+  if (kind === 'file') {
+    anchor.setAttribute('data-file-path', filePath);
+    anchor.setAttribute('data-path-link', '1');
+    anchor.setAttribute('href', href || rawValue || filePath);
+  } else {
+    anchor.removeAttribute('data-file-path');
+    anchor.removeAttribute('data-path-link');
+    anchor.setAttribute('href', href);
+  }
+  anchor.textContent = '';
+  const label = anchor.ownerDocument.createElement('span');
+  label.className = 'message-path-link-label';
+  label.textContent = displayText || (kind === 'file' ? '文件' : 'URL');
+  anchor.appendChild(label);
+}
+
 function decorateMessagePathTextNode(node) {
   if (!shouldDecorateMessagePathNode(node) || !node.parentNode) return;
   const ownerDoc = node.ownerDocument || document;
@@ -39706,15 +39817,12 @@ function decorateMessagePathTextNode(node) {
       fragment.appendChild(ownerDoc.createTextNode(source.slice(cursor, match.start)));
     }
     const anchor = ownerDoc.createElement('a');
-    anchor.className = match.kind === 'http'
-      ? 'message-path-link message-http-link'
-      : 'message-path-link message-file-link';
-    anchor.setAttribute('href', match.href);
-    if (match.kind === 'file') {
-      anchor.setAttribute('data-file-path', match.filePath);
-      anchor.setAttribute('data-path-link', '1');
-    }
-    anchor.textContent = match.text;
+    decorateMessagePathAnchor(anchor, {
+      kind: match.kind,
+      rawValue: match.text,
+      href: match.href,
+      filePath: match.filePath
+    });
     fragment.appendChild(anchor);
     cursor = match.end;
   });
@@ -39729,22 +39837,25 @@ function decorateExistingMessageAnchors(root) {
   root.querySelectorAll('a[href]').forEach(anchor => {
     const rawHref = String(anchor.getAttribute('href') || '').trim();
     const rawText = String(anchor.textContent || '').trim();
-    anchor.classList.remove('message-path-link', 'message-file-link', 'message-http-link');
-    anchor.removeAttribute('data-file-path');
-    anchor.removeAttribute('data-path-link');
     const httpLink = resolveMessageHttpLink(rawHref);
     if (httpLink) {
-      const textHttpLink = resolveMessageHttpLink(rawText);
-      anchor.setAttribute('href', httpLink.href);
-      if (textHttpLink) anchor.textContent = textHttpLink.text;
-      anchor.classList.add('message-path-link', 'message-http-link');
+      decorateMessagePathAnchor(anchor, {
+        kind: 'http',
+        rawValue: httpLink.href,
+        href: httpLink.href,
+        fallbackText: rawText
+      });
       return;
     }
     const filePath = extractMessageFilePath(rawHref);
     if (filePath) {
-      anchor.classList.add('message-path-link', 'message-file-link');
-      anchor.setAttribute('data-file-path', filePath);
-      anchor.setAttribute('data-path-link', '1');
+      decorateMessagePathAnchor(anchor, {
+        kind: 'file',
+        rawValue: rawHref,
+        href: rawHref,
+        fallbackText: rawText,
+        filePath
+      });
       return;
     }
     if (!anchor.parentNode) return;
@@ -40013,10 +40124,36 @@ function resolveMessageUrlTourTargetAnchor(preferredAnchor) {
   return fallback;
 }
 
+function getMessagePathAnchorRawValue(anchor) {
+  if (!(anchor instanceof Element)) return '';
+  return String(anchor.getAttribute('data-raw-value') || anchor.getAttribute('data-file-path') || anchor.getAttribute('href') || '').trim();
+}
+
+function getMessagePathHttpCopyValue(value) {
+  const normalized = normalizeRightSidebarUrlPreviewHref(value);
+  return normalized || String(value || '').trim();
+}
+
+async function copyMessagePathValueToClipboard(value) {
+  const text = String(value || '').trim();
+  if (!text) throw new Error('没有可复制的内容');
+  await copyTextToClipboard(text);
+  vfsShowUploadToast('已复制到粘贴板', false, { placement: 'vfs' });
+}
+
 function buildMessageFileActionItems(actionState) {
   const actions = [];
   if (!actionState) return actions;
   const canOpenDirectory = actionState.dirExists && localAdminControlIsAvailable();
+  const copyValue = String(actionState.rawPath || actionState.filePath || '').trim();
+  if (copyValue) {
+    actions.push({
+      label: '复制',
+      onClick: async () => {
+        await copyMessagePathValueToClipboard(copyValue);
+      }
+    });
+  }
   if (actionState.previewable) {
     actions.push({
       label: '预览',
@@ -40041,6 +40178,32 @@ function buildMessageFileActionItems(actionState) {
       }
     });
   }
+  return actions;
+}
+
+function buildMessageHttpActionItems(href, rawValue) {
+  const normalizedHref = normalizeRightSidebarUrlPreviewHref(href);
+  if (!normalizedHref) return [];
+  const actions = [{
+    label: '复制',
+    onClick: async () => {
+      await copyMessagePathValueToClipboard(getMessagePathHttpCopyValue(rawValue || normalizedHref));
+    }
+  }];
+  if (isRightSidebarUrlPreviewEligibleHref(normalizedHref)) {
+    actions.push({
+      label: '预览',
+      onClick: async () => {
+        fePreviewExternalLink(normalizedHref);
+      }
+    });
+  }
+  actions.push({
+    label: '打开',
+    onClick: async () => {
+      _origOpen(normalizedHref, '_blank', 'noopener,noreferrer');
+    }
+  });
   return actions;
 }
 
@@ -40198,6 +40361,23 @@ function getSelectionActionRect(anchor) {
   return selection.getRangeAt(0).getBoundingClientRect();
 }
 
+async function showMessagePathActionsForAnchor(anchor) {
+  if (!(anchor instanceof Element)) return;
+  const rect = getSelectionActionRect(anchor);
+  if (!rect || (!rect.width && !rect.height)) return;
+  if (anchor.classList.contains('message-http-link')) {
+    const actions = buildMessageHttpActionItems(anchor.getAttribute('href') || '', getMessagePathAnchorRawValue(anchor));
+    if (actions.length) showSelectionActionBubble(rect, actions);
+    return;
+  }
+  const actionState = await resolveMessageFileActionState(anchor.getAttribute('data-file-path') || anchor.getAttribute('href') || '');
+  if (!actionState) return;
+  const rawValue = getMessagePathAnchorRawValue(anchor);
+  if (rawValue) actionState.rawPath = rawValue;
+  const actions = buildMessageFileActionItems(actionState);
+  if (actions.length) showSelectionActionBubble(rect, actions);
+}
+
 async function showSelectedMessagePathActions(anchor) {
   const container = document.getElementById('chatContainer');
   const selection = window.getSelection ? window.getSelection() : null;
@@ -40245,27 +40425,17 @@ async function showSelectedMessagePathActions(anchor) {
   if (selectionTarget.kind === 'http') {
     const httpHref = String(selectionTarget.href || '').trim();
     if (!isHttpMessageHref(httpHref)) return;
-    const actions = [];
-    if (isRightSidebarUrlPreviewEligibleHref(httpHref)) {
-      actions.push({
-        label: '预览',
-        onClick: async () => {
-          fePreviewExternalLink(httpHref);
-        }
-      });
-    }
-    actions.push({
-      label: '打开',
-      onClick: async () => {
-        _origOpen(httpHref, '_blank', 'noopener,noreferrer');
-      }
-    });
+    const actions = buildMessageHttpActionItems(httpHref, targetAnchor ? getMessagePathAnchorRawValue(targetAnchor) : httpHref);
     showSelectionActionBubble(rect, actions);
     return;
   }
   if (!selectionTarget.filePath) return;
   const actionState = await resolveMessageFileActionState(selectionTarget.filePath, workspaceContext);
   if (!actionState) return;
+  if (targetAnchor) {
+    const rawValue = getMessagePathAnchorRawValue(targetAnchor);
+    if (rawValue) actionState.rawPath = rawValue;
+  }
   const actions = buildMessageFileActionItems(actionState);
   if (actions.length) showSelectionActionBubble(rect, actions);
 }
@@ -40288,6 +40458,13 @@ document.addEventListener('dblclick', e => {
   }, 50);
 });
 document.addEventListener('click', e => {
+  const pathBubble = closestFromEventTarget(e.target, 'a.message-path-link');
+  if (pathBubble) {
+    e.preventDefault();
+    e.stopPropagation();
+    Promise.resolve().then(() => showMessagePathActionsForAnchor(pathBubble)).catch(() => {});
+    return;
+  }
   const anchor = closestFromEventTarget(e.target, 'a.message-file-link');
   if (!anchor) return;
   e.preventDefault();
