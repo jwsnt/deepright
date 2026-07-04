@@ -8,6 +8,7 @@ import ai.deepright.feature.FeatureField;
 import ai.deepright.feature.FeatureFlag;
 import ai.deepright.lang.XmlResourceLang;
 import ai.deepright.llm.notifier.MultiSourceFlag;
+import ai.deepright.skills.SkillsChecker;
 import ai.deepright.utils.TemplateChecker;
 import ai.deepright.workflow.worktask.ResetStateWorkTask;
 import ai.open.right.WorkflowException;
@@ -226,6 +227,9 @@ public class LogicVerifyAssistant extends DefaultAssistant {
 
         @Autowired
         protected WorkflowQueue workflowQueue;
+
+        @Autowired
+        protected SkillsChecker skillsChecker;
 
         @Autowired
         protected CliRecall cliRecall;

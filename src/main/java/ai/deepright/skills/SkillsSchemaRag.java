@@ -4,6 +4,7 @@ import ai.deepright.feature.FeatureFlag;
 import ai.deepright.feature.FeatureUtils;
 import ai.deepright.utils.TemplateChecker;
 import ai.open.right.resouce.ResourceService;
+import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.llm.rag.RagConfig;
 import ai.open.right.workflow.flow.llm.rag.RagData;
 import ai.open.right.workflow.flow.llm.rag.RagService;
@@ -35,7 +36,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Getter
 @Setter
-public class SkillsSchemaRag extends RagSkills {
+public class SkillsSchemaRag extends RagSkills implements SkillsChecker {
 
     protected Map<String, String> activePlugins = new HashMap<String, String>();
 
@@ -56,8 +57,14 @@ public class SkillsSchemaRag extends RagSkills {
         // 覆盖（rewrite），不需要重入，启动检测，必要资源
         Assert.hasText(this.template4extract, "The template template4extract must not be empty");
         Assert.hasText(this.template4init, "The template init must not be empty");
-        this.activePlugins.put("__internal_browser", "browser");
-        this.activePlugins.put("__internal_remote", "remote");
+        this.activePlugins.put(SkillsChecker.PLUGIN_BROWSER, "browser");
+        this.activePlugins.put(SkillsChecker.PLUGIN_REMOTE, "remote");
+    }
+
+    @Override
+    public Boolean allowedSkill(WorkflowTask workTask, String skill) throws Exception {
+        // 插件Skills需要判断激活, 如果插件没激活则不加载技能
+        return this.activePlugins.containsKey(skill) && FeatureFlag.isActivePlugin(workTask, this.activePlugins.get(skill));
     }
 
     @Override
@@ -73,9 +80,9 @@ public class SkillsSchemaRag extends RagSkills {
     }
 
     @Override
-    protected Boolean allowedSkill(RagConfig ragConfig, RagData ragData, SkillMetadata skill) throws Exception {
+    protected Boolean allowedSkill(RagConfig ragConfig, RagData ragData, String skill) throws Exception {
         // 插件Skills需要判断激活, 如果插件没激活则不加载技能
-        return this.activePlugins.containsKey(skill.getName()) ? FeatureFlag.isActivePlugin(ragData.getQuery(), this.activePlugins.get(skill.getName())) : super.allowedSkill(ragConfig, ragData, skill);
+        return this.activePlugins.containsKey(skill) ? this.allowedSkill(ragData.getQuery(), skill) : super.allowedSkill(ragConfig, ragData, skill);
     }
 
     @Override
