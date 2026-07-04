@@ -2,7 +2,6 @@ package ai.deepright.workflow.assistant;
 
 import ai.deepright.cli.CliPrinter;
 import ai.deepright.cli.insert.CliRecall;
-import ai.deepright.complex.ComplexityMode;
 import ai.deepright.complex.ComplexityUtils;
 import ai.deepright.feature.FeatureField;
 import ai.deepright.feature.FeatureFlag;
@@ -126,8 +125,8 @@ public class LogicVerifyAssistant extends DefaultAssistant {
     }
 
     protected Boolean skipLogic(WorkflowConfig workflowConfig, WorkflowTask workTask) throws Exception {
-        // 客户端任务 或 Task 或  后台任务 或 简单问答 或 供应商不支持 或 超过最大次数 则跳过
-        return FeatureFlag.isCron(workTask) || FeatureFlag.isTask(workTask) || FeatureFlag.isDaemon(workTask) || ComplexityMode.FAST_REPLY.equals(ComplexityUtils.result(workTask)) || this.excludedProvider.contains(workTask.getMetadata(ProviderRequestService.KEY_PROVIDER, String.class)) || this.isMaxTime(workflowConfig, workTask);
+        // 客户端任务 或 Task 或  后台任务 或 没有主动开启思考 或 供应商不支持 或 超过最大次数 则跳过
+        return FeatureFlag.isCron(workTask) || FeatureFlag.isTask(workTask) || FeatureFlag.isDaemon(workTask) || !ComplexityUtils.isThinking(workTask) || this.excludedProvider.contains(workTask.getMetadata(ProviderRequestService.KEY_PROVIDER, String.class)) || this.isMaxTime(workflowConfig, workTask);
     }
 
     protected Boolean isMaxTime(WorkflowConfig workflowConfig, WorkflowTask workTask) throws Exception {
