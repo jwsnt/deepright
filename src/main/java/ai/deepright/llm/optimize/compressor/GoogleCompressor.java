@@ -12,8 +12,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 
 @Slf4j
 public class GoogleCompressor extends StoreCompressor {
@@ -30,7 +28,6 @@ public class GoogleCompressor extends StoreCompressor {
     }
 
     @Conditional(GoogleCondition.class)
-    @Order(Ordered.LOWEST_PRECEDENCE - 1)
     @Configuration
     public static class CompressInitConfig extends InitConfig {
 

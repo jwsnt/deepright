@@ -10,7 +10,6 @@ import org.apache.commons.collections.MapUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.annotation.Order;
 
 import java.util.HashMap;
 import java.util.List;
@@ -58,7 +57,6 @@ public class MultiSourceNotifier extends SourceNotifier {
         }
     }
 
-    @Order(Integer.MAX_VALUE - 1)
     @Configuration
     public static class InitConfig {
         @Bean(SourceNotifier.SOURCE)

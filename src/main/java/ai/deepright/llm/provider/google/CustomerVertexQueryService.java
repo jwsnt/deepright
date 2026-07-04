@@ -14,8 +14,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 
 @Slf4j
 public class CustomerVertexQueryService extends VertexQueryService {
@@ -37,7 +35,6 @@ public class CustomerVertexQueryService extends VertexQueryService {
     }
 
     @ConditionalOnProperty(name = "vertex.enable", havingValue = "true", matchIfMissing = false)
-    @Order(Ordered.LOWEST_PRECEDENCE - 1)
     @Configuration
     @Setter
     @Getter

@@ -28,8 +28,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 import org.springframework.util.Assert;
 
 import java.io.RandomAccessFile;
@@ -176,7 +174,6 @@ public class HttpService extends NettyHttpHandler {
     }
 
     @ConditionalOnProperty(name = "chat.http.enable", havingValue = "true", matchIfMissing = true)
-    @Order(Ordered.LOWEST_PRECEDENCE - 1)
     @Configuration
     @Setter
     @Getter

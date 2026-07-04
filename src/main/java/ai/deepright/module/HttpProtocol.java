@@ -12,8 +12,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -50,7 +48,6 @@ public class HttpProtocol {
     }
 
     @ConditionalOnProperty(name = "chat.http.enable", havingValue = "true", matchIfMissing = true)
-    @Order(Ordered.LOWEST_PRECEDENCE - 1)
     @Configuration
     @Setter
     @Getter

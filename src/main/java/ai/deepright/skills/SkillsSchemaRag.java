@@ -23,8 +23,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 import org.springframework.util.Assert;
 
 import java.io.BufferedInputStream;
@@ -104,7 +102,6 @@ public class SkillsSchemaRag extends RagSkills {
         return FeatureFlag.isSkillExtract(ragData.getQuery()) && MapUtils.getObject(skills.getSkills(), this.skillCreator) != null;
     }
 
-    @Order(Ordered.LOWEST_PRECEDENCE - 1)
     @Configuration
     @Setter
     @Getter

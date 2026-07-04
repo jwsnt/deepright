@@ -22,8 +22,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -68,7 +66,6 @@ public class CustomerDeepseekRouter extends DeepSeekRouter {
         return entity;
     }
 
-    @Order(Ordered.LOWEST_PRECEDENCE - 1)
     @Configuration
     @Getter
     @Setter

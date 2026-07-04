@@ -12,8 +12,6 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 
 @Slf4j
 public class CustomerCozeRequestService extends CozeRequestService {
@@ -23,7 +21,6 @@ public class CustomerCozeRequestService extends CozeRequestService {
         RetryUtils.storeQuery(request, llmConfig, this.historyStore, this.buildHistoryQuery(request, llmConfig));
     }
 
-    @Order(Ordered.LOWEST_PRECEDENCE - 1)
     @Configuration
     @Setter
     @Getter

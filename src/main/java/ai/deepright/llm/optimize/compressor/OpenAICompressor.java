@@ -14,8 +14,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 import org.springframework.util.Assert;
 
 import java.nio.charset.StandardCharsets;
@@ -43,7 +41,6 @@ public class OpenAICompressor extends StoreCompressor {
     }
 
     @Conditional(CompressCondition.class)
-    @Order(Ordered.LOWEST_PRECEDENCE - 1)
     @Configuration
     public static class CompressInitConfig extends InitConfig {
 

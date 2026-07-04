@@ -10,8 +10,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 
 @Slf4j
 public class AnthropicCompressor extends StoreCompressor {
@@ -19,7 +17,6 @@ public class AnthropicCompressor extends StoreCompressor {
     public static final String NAME = FunCallCompressor.FLAG + ProviderRequest.REQUEST_ANTHROPIC;
 
     @Conditional(CompressCondition.class)
-    @Order(Ordered.LOWEST_PRECEDENCE - 1)
     @Configuration
     public static class CompressInitConfig extends InitConfig {
 

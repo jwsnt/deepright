@@ -13,10 +13,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.util.Assert;
 
 import java.io.File;
 import java.util.Date;
@@ -34,29 +31,31 @@ public class AutoDumpCleaner {
 
     @PostConstruct
     public void init() throws Exception {
-        Assert.hasText(this.path, "The path can not be empty");
-        this.dir = new File(this.path);
-        if (!this.dir.exists() && this.dir.mkdirs()) {
-            if (log.isInfoEnabled()) {
-                log.info("The autodump cleaner dir={}", this.dir);
+        if (!StringUtils.isEmpty(this.path)) {
+            this.dir = new File(this.path);
+            if (!this.dir.exists() && this.dir.mkdirs()) {
+                if (log.isInfoEnabled()) {
+                    log.info("The autodump cleaner dir={}", this.dir);
+                }
             }
         }
     }
 
     @Scheduled(initialDelayString = "${autodump.llm.initialDelay:30000}", fixedRateString = "${autodump.llm.fixedRate:30000}")
     public void deletePeriod() throws Exception {
-        Date cutoff = new Date(System.currentTimeMillis() - this.expired);
-        for (File file : FileUtils.listFiles(this.dir, FileFilterUtils.fileFileFilter(), null)) {
-            if (FileUtils.isFileOlder(file, cutoff) && StringUtils.startsWithIgnoreCase(file.getName(), DumpUtils.DUMP_PREFIX)) {
-                FileUtils.forceDelete(file);
-                if (log.isInfoEnabled()) {
-                    log.info("The expired file deleted, path={}", file.getAbsolutePath());
+        if (this.dir != null) {
+            Date cutoff = new Date(System.currentTimeMillis() - this.expired);
+            for (File file : FileUtils.listFiles(this.dir, FileFilterUtils.fileFileFilter(), null)) {
+                if (FileUtils.isFileOlder(file, cutoff) && StringUtils.startsWithIgnoreCase(file.getName(), DumpUtils.DUMP_PREFIX)) {
+                    FileUtils.forceDelete(file);
+                    if (log.isInfoEnabled()) {
+                        log.info("The expired file deleted, path={}", file.getAbsolutePath());
+                    }
                 }
             }
         }
     }
 
-    @Order(Ordered.LOWEST_PRECEDENCE - 1)
     @Getter
     @Setter
     @Configuration

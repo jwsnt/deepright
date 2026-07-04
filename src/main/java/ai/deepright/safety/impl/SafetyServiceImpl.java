@@ -6,8 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 
 @Slf4j
 public class SafetyServiceImpl implements SafetyService {
@@ -20,7 +18,6 @@ public class SafetyServiceImpl implements SafetyService {
         return "";
     }
 
-    @Order(Ordered.LOWEST_PRECEDENCE - 1)
     @Configuration
     public static class InitConfig {
 

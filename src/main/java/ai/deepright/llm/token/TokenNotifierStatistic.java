@@ -14,8 +14,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 
 import java.util.List;
 
@@ -47,7 +45,6 @@ public class TokenNotifierStatistic extends RedisTokenStatistic {
     }
 
     @Configuration
-    @Order(Ordered.LOWEST_PRECEDENCE - 1)
     @Setter
     @Getter
     public static class CustomerInitConfig extends InitConfig {

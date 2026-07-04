@@ -14,8 +14,6 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 
 @Slf4j
 // 用于提醒资源生成时等待
@@ -35,7 +33,6 @@ public class ImageRemindAssistant extends MediaTransferAssistant {
         }
     }
 
-    @Order(Ordered.LOWEST_PRECEDENCE - 1)
     @Configuration
     @Setter
     @Getter

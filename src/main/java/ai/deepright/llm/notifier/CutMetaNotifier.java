@@ -12,8 +12,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 
 import java.util.List;
 
@@ -35,7 +33,6 @@ public class CutMetaNotifier extends EndpointNotifier {
         return segment;
     }
 
-    @Order(Ordered.LOWEST_PRECEDENCE - 1)
     @Configuration
     public static class InitConfig {
 

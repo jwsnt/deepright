@@ -46,8 +46,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 import org.springframework.util.Assert;
 import org.unix4j.Unix4j;
 import org.unix4j.line.Line;
@@ -432,7 +430,6 @@ public class GitMemoryService extends BaseFunction implements GitPath, MemorySer
         }
     }
 
-    @Order(Ordered.LOWEST_PRECEDENCE - 1)
     @Configuration
     @Getter
     @Setter

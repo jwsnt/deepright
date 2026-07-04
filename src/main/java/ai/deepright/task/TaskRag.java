@@ -27,8 +27,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 import org.springframework.util.Assert;
 
 import java.io.BufferedInputStream;
@@ -121,7 +119,6 @@ public class TaskRag extends RagCondition implements RagService {
         return MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_CRON_TYPE);
     }
 
-    @Order(Ordered.LOWEST_PRECEDENCE - 1)
     @Configuration
     @Setter
     @Getter
