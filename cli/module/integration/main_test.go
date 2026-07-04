@@ -5646,11 +5646,11 @@ func TestAppStaticFiles(t *testing.T) {
 		path string
 		want string
 	}{
-		{"/app/demo-agent/", "APP HOME"},
-		{"/app/demo-agent/index.html", "APP HOME"},
-		{"/app/demo-agent/demos/nested/", "NESTED HOME"},
-		{"/app/demo-agent/demos/nested/index.html", "NESTED HOME"},
-		{"/app/demo-agent/assets/hello.js", "console.log('hello app')"},
+		{"/mapping/demo-agent/", "APP HOME"},
+		{"/mapping/demo-agent/index.html", "APP HOME"},
+		{"/mapping/demo-agent/demos/nested/", "NESTED HOME"},
+		{"/mapping/demo-agent/demos/nested/index.html", "NESTED HOME"},
+		{"/mapping/demo-agent/assets/hello.js", "console.log('hello app')"},
 	}
 	for _, tt := range tests {
 		resp, err := http.Get(server.URL + tt.path)
@@ -5691,7 +5691,7 @@ func TestAppStaticExplicitIndexDoesNotRedirect(t *testing.T) {
 		},
 	}
 
-	resp, err := client.Get(server.URL + "/app/demo-agent/index.html")
+	resp, err := client.Get(server.URL + "/mapping/demo-agent/index.html")
 	if err != nil {
 		t.Fatalf("GET explicit index: %v", err)
 	}
@@ -5716,7 +5716,7 @@ func TestHandleAppStaticRejectsPathEscape(t *testing.T) {
 		t.Fatalf("mkdir agent dir: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/app/demo-agent/%2e%2e/secret.txt", nil)
+	req := httptest.NewRequest(http.MethodGet, "/mapping/demo-agent/%2e%2e/secret.txt", nil)
 	rec := httptest.NewRecorder()
 
 	handleAppStatic(&Config{AgentDir: agentRoot}).ServeHTTP(rec, req)
@@ -5736,16 +5736,16 @@ func TestHandleAppStaticRequiresAgentID(t *testing.T) {
 		t.Fatalf("mkdir agent dir: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/app/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/mapping/", nil)
 	rec := httptest.NewRecorder()
 
 	handleAppStatic(&Config{AgentDir: agentRoot}).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("GET /app/ status = %d, body = %s", rec.Code, rec.Body.String())
+		t.Fatalf("GET /mapping/ status = %d, body = %s", rec.Code, rec.Body.String())
 	}
 	if !strings.Contains(rec.Body.String(), "agentId is required") {
-		t.Fatalf("GET /app/ body = %q", rec.Body.String())
+		t.Fatalf("GET /mapping/ body = %q", rec.Body.String())
 	}
 }
 

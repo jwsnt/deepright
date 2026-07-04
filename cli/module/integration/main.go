@@ -3912,13 +3912,13 @@ func appStaticRequestTarget(requestPath string) (string, string, error) {
 	if err != nil {
 		return "", "", fmt.Errorf("invalid path: %w", err)
 	}
-	if decoded == "/app" || decoded == "/app/" {
+	if decoded == "/mapping" || decoded == "/mapping/" {
 		return "", "", fmt.Errorf("agentId is required")
 	}
-	if !strings.HasPrefix(decoded, "/app/") {
-		return "", "", fmt.Errorf("path does not match /app")
+	if !strings.HasPrefix(decoded, "/mapping/") {
+		return "", "", fmt.Errorf("path does not match /mapping")
 	}
-	trimmed := strings.TrimPrefix(decoded, "/app/")
+	trimmed := strings.TrimPrefix(decoded, "/mapping/")
 	parts := strings.SplitN(trimmed, "/", 2)
 	agentID := strings.TrimSpace(parts[0])
 	if agentID == "" || agentID == "." || agentID == ".." {
@@ -4060,7 +4060,7 @@ func handleAppStatic(cfg *Config) http.HandlerFunc {
 			served.URL.Path = "/" + filepath.ToSlash(relPath)
 			// Preserve a caller-provided trailing slash for directories so
 			// FileServer does not emit a relative redirect against the outer
-			// /app/{agentId}/ URL and accidentally duplicate the subdirectory.
+			// /mapping/{agentId}/ URL and accidentally duplicate the subdirectory.
 			if strings.HasSuffix(r.URL.Path, "/") {
 				if info, statErr := os.Stat(target); statErr == nil && info.IsDir() {
 					served.URL.Path += "/"
@@ -10824,8 +10824,8 @@ func registerAppStatic(mux *http.ServeMux, cfg *Config) {
 	if mux == nil {
 		return
 	}
-	mux.HandleFunc("/app", handleAppStatic(cfg))
-	mux.HandleFunc("/app/", handleAppStatic(cfg))
+	mux.HandleFunc("/mapping", handleAppStatic(cfg))
+	mux.HandleFunc("/mapping/", handleAppStatic(cfg))
 	agentDir := ""
 	if cfg != nil {
 		agentDir = cfg.AgentDir
@@ -10835,7 +10835,7 @@ func registerAppStatic(mux *http.ServeMux, cfg *Config) {
 		log.Printf("app static register failed: %v", err)
 		return
 	}
-	log.Printf("static: serving /app/{agentId}/ from %s/*/app", root)
+	log.Printf("static: serving /mapping/{agentId}/ from %s/*/app", root)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

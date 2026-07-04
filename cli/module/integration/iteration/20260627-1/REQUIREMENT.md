@@ -15,11 +15,11 @@
 + 所以设计/编译都需要遵守integration的二进制和CLI收口原则
 
 ### 需求介绍
-+ 新增静态资源映射路径：/app/$agentId/*，映射--agent-dir目录下每个Agent下的app目录资源
++ 新增静态资源映射路径：/mapping/$agentId/*，映射--agent-dir目录下每个Agent下的app目录资源
     + 与nginx静态映射效果相同
 + 用于对静态生成html内容的映射
 ``` 例如AgentId=x下app目录下的y文件
-/app/x/y
+/mapping/x/y
 ```
 
 ### 编写代码

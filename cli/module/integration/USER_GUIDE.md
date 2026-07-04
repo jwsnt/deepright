@@ -768,9 +768,9 @@ Integration 的 CLI 既可以启动统一 HTTP 服务，也支持通过 `cron` �
 - `lastUpdate` 来自 `<app-dir>/data` 中的 `knowledge_runtime.last_update`
 - 若知识库尚未初始化，则 metadata 中不会出现 `knowledge`
 
-## `/app` 静态映射
+## `/mapping` 静态映射
 
-`integration` 新增了 `GET /app/$agentId/*` 静态资源映射，用来直接暴露每个 Agent 目录下的 `app/` 内容。
+`integration` 新增了 `GET /mapping/$agentId/*` 静态资源映射，用来直接暴露每个 Agent 目录下的 `app/` 内容。
 
 目录关系示例：
 
@@ -786,9 +786,9 @@ runtime/
 
 访问规则：
 
-- `GET /app/<agentId>/`
+- `GET /mapping/<agentId>/`
   - 直接映射到 `<agent-dir>/<agentId>/app/`
-- `GET /app/<agentId>/<相对路径>`
+- `GET /mapping/<agentId>/<相对路径>`
   - 直接返回对应静态文件内容
 - 与 nginx 静态目录映射一致，适合托管静态生成的 HTML、JS、CSS 与图片资源
 
@@ -803,9 +803,9 @@ runtime/
 示例：
 
 ```bash
-curl http://127.0.0.1:8080/app/agent-a/
-curl http://127.0.0.1:8080/app/agent-a/index.html
-curl http://127.0.0.1:8080/app/agent-a/assets/main.js
+curl http://127.0.0.1:8080/mapping/agent-a/
+curl http://127.0.0.1:8080/mapping/agent-a/index.html
+curl http://127.0.0.1:8080/mapping/agent-a/assets/main.js
 ```
 
 ## `/knowledge` 静态映射
