@@ -2,6 +2,7 @@ package messageinsert
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -11,6 +12,11 @@ const (
 	StatusPending   = 0
 	StatusUploaded  = 1
 	StatusCancelled = 2
+)
+
+var (
+	ErrAlreadyReported = errors.New("message insert already reported")
+	ErrImmutable       = errors.New("message insert is immutable")
 )
 
 type Item struct {
@@ -75,16 +81,37 @@ func UpsertPending(db *sql.DB, agentID, chatID, tid, message string, now time.Ti
 		return Item{}, err
 	}
 	ts := nowOrUTC(now)
-	if _, err := db.Exec(`INSERT INTO message_insert (chat_id, mid, agent_id, message, status, reported_at, created_at, updated_at)
+	res, err := db.Exec(`INSERT INTO message_insert (chat_id, mid, agent_id, message, status, reported_at, created_at, updated_at)
 		VALUES (?,?,?,?,?,?,?,?)
 		ON CONFLICT(chat_id, mid) DO UPDATE SET
 			agent_id = excluded.agent_id,
 			message = excluded.message,
 			status = excluded.status,
 			reported_at = excluded.reported_at,
-			updated_at = excluded.updated_at`,
-		chatID, tid, agentID, message, StatusPending, "", ts, ts); err != nil {
+			updated_at = excluded.updated_at
+		WHERE message_insert.status = `+fmt.Sprintf("%d", StatusPending)+` AND message_insert.reported_at = ''`,
+		chatID, tid, agentID, message, StatusPending, "", ts, ts)
+	if err != nil {
 		return Item{}, err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return Item{}, err
+	}
+	if rows == 0 {
+		existing, getErr := Get(db, chatID, tid)
+		if getErr == nil {
+			if strings.TrimSpace(existing.ReportedAt) != "" {
+				return Item{}, ErrAlreadyReported
+			}
+			if existing.Status != StatusPending {
+				return Item{}, ErrImmutable
+			}
+		}
+		if getErr != nil && !errors.Is(getErr, sql.ErrNoRows) {
+			return Item{}, getErr
+		}
+		return Item{}, ErrImmutable
 	}
 	return Get(db, chatID, tid)
 }
@@ -103,14 +130,30 @@ func Cancel(db *sql.DB, chatID, tid string, now time.Time) (bool, error) {
 	}
 	res, err := db.Exec(`UPDATE message_insert
 		SET status = ?, updated_at = ?
-		WHERE chat_id = ? AND mid = ?`,
-		StatusCancelled, nowOrUTC(now), chatID, tid)
+		WHERE chat_id = ? AND mid = ? AND status = ? AND reported_at = ''`,
+		StatusCancelled, nowOrUTC(now), chatID, tid, StatusPending)
 	if err != nil {
 		return false, err
 	}
 	rows, err := res.RowsAffected()
 	if err != nil {
 		return false, err
+	}
+	if rows == 0 {
+		existing, getErr := Get(db, chatID, tid)
+		if getErr == nil {
+			if strings.TrimSpace(existing.ReportedAt) != "" {
+				return false, ErrAlreadyReported
+			}
+			if existing.Status != StatusPending {
+				return false, ErrImmutable
+			}
+			return false, nil
+		}
+		if errors.Is(getErr, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, getErr
 	}
 	return rows > 0, nil
 }

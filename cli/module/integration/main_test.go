@@ -7400,6 +7400,45 @@ func TestMessageInsertListHandlerIncludesPublishedPendingItems(t *testing.T) {
 	}
 }
 
+func TestMessageInsertHandlersRejectMutationsAfterReported(t *testing.T) {
+	oldCronDB := cronDB
+	defer func() {
+		if cronDB != nil && cronDB != oldCronDB {
+			_ = cronDB.Close()
+		}
+		cronDB = oldCronDB
+	}()
+
+	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "data"))
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	cronDB = db
+	if err := integrationmessageinsert.EnsureSchema(cronDB); err != nil {
+		t.Fatalf("ensure schema: %v", err)
+	}
+	if _, err := integrationmessageinsert.UpsertPending(cronDB, "agent-a", "chat-1", "1710000000000", "hello", time.Unix(1710000000, 0)); err != nil {
+		t.Fatalf("UpsertPending: %v", err)
+	}
+	if _, err := integrationmessageinsert.MarkPublished(cronDB, "chat-1", []string{"1710000000000"}, time.Unix(1710000010, 0)); err != nil {
+		t.Fatalf("MarkPublished: %v", err)
+	}
+
+	addReq := httptest.NewRequest(http.MethodPost, "/api/message_insert/add", strings.NewReader(`{"agentId":"agent-a","chatId":"chat-1","tid":"1710000000000","message":"updated"}`))
+	addRec := httptest.NewRecorder()
+	handleMessageInsertAdd().ServeHTTP(addRec, addReq)
+	if addRec.Code != http.StatusConflict {
+		t.Fatalf("add after publish status = %d body=%s", addRec.Code, addRec.Body.String())
+	}
+
+	delReq := httptest.NewRequest(http.MethodPost, "/api/message_insert/del", strings.NewReader(`{"chatId":"chat-1","tid":"1710000000000"}`))
+	delRec := httptest.NewRecorder()
+	handleMessageInsertDel().ServeHTTP(delRec, delReq)
+	if delRec.Code != http.StatusConflict {
+		t.Fatalf("del after publish status = %d body=%s", delRec.Code, delRec.Body.String())
+	}
+}
+
 func TestHeartbeatDebugLogsTimeoutAndTaskPayload(t *testing.T) {
 	var logBuf bytes.Buffer
 	originalWriter := log.Writer()

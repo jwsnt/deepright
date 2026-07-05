@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -145,6 +146,14 @@ func handleMessageInsertAdd() http.HandlerFunc {
 			time.Now(),
 		)
 		if err != nil {
+			if errors.Is(err, messageinsert.ErrAlreadyReported) {
+				writeMessageInsertError(w, http.StatusConflict, fmt.Errorf("插入待处理消息已上报，等待结果中"))
+				return
+			}
+			if errors.Is(err, messageinsert.ErrImmutable) {
+				writeMessageInsertError(w, http.StatusConflict, fmt.Errorf("插入待处理消息已结束，无法修改"))
+				return
+			}
 			writeMessageInsertError(w, http.StatusBadRequest, err)
 			return
 		}
@@ -182,6 +191,14 @@ func handleMessageInsertDel() http.HandlerFunc {
 
 		affected, err := messageinsert.Cancel(db, chatID, tid, time.Now())
 		if err != nil {
+			if errors.Is(err, messageinsert.ErrAlreadyReported) {
+				writeMessageInsertError(w, http.StatusConflict, fmt.Errorf("插入待处理消息已上报，等待结果中"))
+				return
+			}
+			if errors.Is(err, messageinsert.ErrImmutable) {
+				writeMessageInsertError(w, http.StatusConflict, fmt.Errorf("插入待处理消息已结束，无法修改"))
+				return
+			}
 			writeMessageInsertError(w, http.StatusBadRequest, err)
 			return
 		}

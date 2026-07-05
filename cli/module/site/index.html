@@ -24259,6 +24259,12 @@ function isQueuedCenterInsertError(item) {
   return !!(state && !state.removing && state.error);
 }
 
+function isQueuedCenterInsertReadOnly(item) {
+  const state = getQueuedCenterInsertState(item);
+  if (!state || state.removing || state.error) return false;
+  return !!String(state.reportedAt || '').trim();
+}
+
 function getQueuedCenterRequestItem(chatId, itemId, agentId) {
   const resolvedItemId = String(itemId || '').trim();
   if (!resolvedItemId) return null;
@@ -24288,6 +24294,11 @@ function normalizeMessageInsertErrorMessage(err, fallback) {
   const message = String(err && err.message || err || '').trim();
   if (!message) return defaultMessage;
   return message;
+}
+
+function isMessageInsertReportedError(err) {
+  const message = normalizeMessageInsertErrorMessage(err, '');
+  return message.includes('已上报');
 }
 
 function isSyntheticInsertedUserMessage(msg) {
@@ -24557,6 +24568,12 @@ async function invalidateQueuedCenterInsertedMessage(chatId, agentId, item, opti
     if (opts.successMessage) vfsShowUploadToast(String(opts.successMessage || '').trim(), false);
     return true;
   } catch (err) {
+    if (isMessageInsertReportedError(err)) {
+      void syncQueuedCenterInsertedMessagesFromServer(resolvedChatId, resolvedAgentId, {
+        silent: true,
+        autoDrainWhenIdle: false
+      });
+    }
     syncQueuedCenterInputUI(resolvedChatId, resolvedAgentId);
     if (opts.toastOnError !== false) {
       vfsShowUploadToast(normalizeMessageInsertErrorMessage(err, '取消插入待处理消息失败'), true);
@@ -24841,9 +24858,14 @@ function renderQueuedCenterPanel(chatId) {
     const insertClass = isQueuedCenterInsertActive(item) ? ' insert-active' : '';
     const insertErrorClass = isQueuedCenterInsertError(item) ? ' insert-error' : '';
     const insertRemovingClass = isQueuedCenterInsertRemoving(item) ? ' insert-removing' : '';
+    const insertReadOnly = isQueuedCenterInsertReadOnly(item);
     const insertBusy = !!(insertState && (insertState.phase === 'creating' || insertState.phase === 'tracking' || insertState.removing));
     const insertTitle = insertBusy
-      ? (insertState && insertState.error ? '插入状态同步异常，等待自动重试' : '插入待处理消息进行中')
+      ? (insertState && insertState.error
+        ? '插入状态同步异常，等待自动重试'
+        : (insertState && String(insertState.reportedAt || '').trim()
+          ? '插入待处理消息已上报，等待结果'
+          : '插入待处理消息进行中'))
       : '插入待处理消息';
     const deleteTitle = hasQueuedCenterInsertState(item) ? '取消加入插入消息' : '删除待发送消息';
     const insertButton = insertBusy
@@ -24851,6 +24873,9 @@ function renderQueuedCenterPanel(chatId) {
       : `<button type="button" class="chat-queue-panel-action insert add" onclick="insertQueuedCenterRequest(event,'${safeChatId}','${safeAgentId}','${safeItemId}')" title="${insertTitle}" aria-label="${insertTitle}"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M13.4 2.1a.9.9 0 0 1 .98.72l.38 2.12 1.83 1.13a.9.9 0 0 1 .16 1.43l-1.48 1.48.38 2.11a.9.9 0 0 1-1.25.98l-2.08-.88-1.98 1.98 1.32 4.06a.55.55 0 0 1-1.01.43L8.72 13.6 6.64 15.7a.75.75 0 1 1-1.06-1.06l2.1-2.08-4.07-1.33a.55.55 0 0 1 .43-1.01l4.06 1.32 1.98-1.98-.88-2.08a.9.9 0 0 1 .98-1.25l2.11.38 1.48-1.48a.9.9 0 0 1 1.43.16l1.13 1.83.38-2.12a.9.9 0 0 1 .72-.98Z"></path></svg></button>`;
     const actionLocked = !!(insertState && (insertState.phase === 'creating' || insertState.removing));
     const actionDisabledAttr = actionLocked ? ' disabled aria-disabled="true"' : '';
+    const editDeleteButtons = insertReadOnly ? '' : `
+          <button type="button" class="chat-queue-panel-action edit" onclick="editQueuedCenterRequest(event,'${safeChatId}','${safeAgentId}','${safeItemId}')" title="编辑待发送消息" aria-label="编辑待发送消息"${actionDisabledAttr}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M14.69 2.86a2.1 2.1 0 0 1 2.97 2.97l-8.3 8.3a2.3 2.3 0 0 1-1.03.6l-3.06.78a.75.75 0 0 1-.91-.91l.78-3.06a2.3 2.3 0 0 1 .6-1.03Zm1.91 1.06a.6.6 0 0 0-.85 0l-1.06 1.06 1.91 1.9 1.06-1.05a.6.6 0 0 0 0-.85Zm-2.97 2.12-7.43 7.43a.8.8 0 0 0-.2.35l-.5 1.96 1.96-.5a.8.8 0 0 0 .35-.2l7.43-7.43Z"></path></svg></button>
+          <button type="button" class="chat-queue-panel-action delete" onclick="deleteQueuedCenterRequest(event,'${safeChatId}','${safeAgentId}','${safeItemId}')" title="${deleteTitle}" aria-label="${deleteTitle}"${actionDisabledAttr}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"></path><path d="M6 6l12 12"></path></svg></button>`;
     return `<div class="chat-queue-panel-item${flashClass}${insertClass}${insertErrorClass}${insertRemovingClass}" data-queued-chat="${safeChatId}" data-queued-agent="${safeAgentId}" data-queued-id="${safeItemId}">
       <span class="chat-queue-panel-handle" aria-hidden="true" onpointerdown="handleQueuedCenterItemPointerDown(event,'${safeChatId}','${safeAgentId}','${safeItemId}')"><svg viewBox="0 0 12 18" fill="currentColor"><circle cx="3" cy="3" r="1.1"/><circle cx="9" cy="3" r="1.1"/><circle cx="3" cy="9" r="1.1"/><circle cx="9" cy="9" r="1.1"/><circle cx="3" cy="15" r="1.1"/><circle cx="9" cy="15" r="1.1"/></svg></span>
       <span class="chat-queue-panel-index">${index + 1}.</span>
@@ -24858,8 +24883,7 @@ function renderQueuedCenterPanel(chatId) {
         <span class="chat-queue-panel-text" title="${title}">${esc(preview)}</span>
         <div class="chat-queue-panel-actions">
           ${insertButton}
-          <button type="button" class="chat-queue-panel-action edit" onclick="editQueuedCenterRequest(event,'${safeChatId}','${safeAgentId}','${safeItemId}')" title="编辑待发送消息" aria-label="编辑待发送消息"${actionDisabledAttr}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M14.69 2.86a2.1 2.1 0 0 1 2.97 2.97l-8.3 8.3a2.3 2.3 0 0 1-1.03.6l-3.06.78a.75.75 0 0 1-.91-.91l.78-3.06a2.3 2.3 0 0 1 .6-1.03Zm1.91 1.06a.6.6 0 0 0-.85 0l-1.06 1.06 1.91 1.9 1.06-1.05a.6.6 0 0 0 0-.85Zm-2.97 2.12-7.43 7.43a.8.8 0 0 0-.2.35l-.5 1.96 1.96-.5a.8.8 0 0 0 .35-.2l7.43-7.43Z"></path></svg></button>
-          <button type="button" class="chat-queue-panel-action delete" onclick="deleteQueuedCenterRequest(event,'${safeChatId}','${safeAgentId}','${safeItemId}')" title="${deleteTitle}" aria-label="${deleteTitle}"${actionDisabledAttr}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"></path><path d="M6 6l12 12"></path></svg></button>
+          ${editDeleteButtons}
         </div>
       </div>
     </div>`;
@@ -25120,8 +25144,15 @@ async function editQueuedCenterRequest(event, chatId, agentId, itemId) {
   }
   const item = getQueuedCenterRequests(chatId, agentId).find(entry => String(entry && entry.id || '').trim() === String(itemId || '').trim());
   if (!item) return false;
+  if (isQueuedCenterInsertReadOnly(item)) {
+    vfsShowUploadToast('插入待处理消息等待结果中，暂不支持编辑', true);
+    return false;
+  }
   closeQueuedCenterPanel(true);
-  if (hasQueuedCenterInsertState(item)) await invalidateQueuedCenterInsertedMessage(chatId, agentId, item);
+  if (hasQueuedCenterInsertState(item)) {
+    const invalidated = await invalidateQueuedCenterInsertedMessage(chatId, agentId, item);
+    if (!invalidated) return false;
+  }
   return openQueuedCenterMessageEdit(chatId, itemId, event && event.currentTarget ? event.currentTarget : null, agentId);
 }
 
@@ -25132,6 +25163,10 @@ async function deleteQueuedCenterRequest(event, chatId, agentId, itemId) {
   }
   const item = getQueuedCenterRequests(chatId, agentId).find(entry => String(entry && entry.id || '').trim() === String(itemId || '').trim());
   if (!item) return false;
+  if (isQueuedCenterInsertReadOnly(item)) {
+    vfsShowUploadToast('插入待处理消息等待结果中，暂不支持删除', true);
+    return false;
+  }
   if (hasQueuedCenterInsertState(item)) {
     return invalidateQueuedCenterInsertedMessage(chatId, agentId, item, {
       successMessage: '已取消加入插入消息'

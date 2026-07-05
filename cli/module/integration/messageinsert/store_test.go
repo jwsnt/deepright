@@ -2,6 +2,7 @@ package messageinsert
 
 import (
 	"database/sql"
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -120,5 +121,38 @@ func TestMessageInsertLifecycle(t *testing.T) {
 	}
 	if len(activeItems) != 0 {
 		t.Fatalf("active items after transitions = %d, want 0", len(activeItems))
+	}
+}
+
+func TestMessageInsertRejectsMutationsAfterReported(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	if _, err := UpsertPending(db, "agent-a", "chat-1", "101", "hello", time.Unix(1710000000, 0)); err != nil {
+		t.Fatalf("UpsertPending first: %v", err)
+	}
+	if _, err := MarkPublished(db, "chat-1", []string{"101"}, time.Unix(1710000010, 0)); err != nil {
+		t.Fatalf("MarkPublished: %v", err)
+	}
+
+	if _, err := UpsertPending(db, "agent-a", "chat-1", "101", "changed", time.Unix(1710000020, 0)); !errors.Is(err, ErrAlreadyReported) {
+		t.Fatalf("UpsertPending after publish error = %v, want %v", err, ErrAlreadyReported)
+	}
+	if _, err := Cancel(db, "chat-1", "101", time.Unix(1710000030, 0)); !errors.Is(err, ErrAlreadyReported) {
+		t.Fatalf("Cancel after publish error = %v, want %v", err, ErrAlreadyReported)
+	}
+
+	item, err := Get(db, "chat-1", "101")
+	if err != nil {
+		t.Fatalf("Get after rejected mutations: %v", err)
+	}
+	if item.Message != "hello" {
+		t.Fatalf("message changed unexpectedly: %q", item.Message)
+	}
+	if item.Status != StatusPending {
+		t.Fatalf("status changed unexpectedly: %d", item.Status)
+	}
+	if item.ReportedAt == "" {
+		t.Fatalf("reportedAt unexpectedly empty: %#v", item)
 	}
 }
