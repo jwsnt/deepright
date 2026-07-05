@@ -10,5 +10,5 @@ public class CliInsert {
     private String message;
 
     // Insert id
-    private String mid;
+    private String tid;
 }

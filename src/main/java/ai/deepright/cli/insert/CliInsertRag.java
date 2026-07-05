@@ -3,6 +3,7 @@ package ai.deepright.cli.insert;
 import ai.deepright.cli.CliPrinter;
 import ai.deepright.feature.FeatureFlag;
 import ai.deepright.lang.XmlResourceLang;
+import ai.deepright.llm.notifier.MultiSourceFlag;
 import ai.deepright.llm.provider.RequestContextBuilder;
 import ai.open.right.resouce.ResourceService;
 import ai.open.right.workflow.flow.WorkflowTask;
@@ -155,15 +156,17 @@ public class CliInsertRag extends RagCondition implements CliInsertService, RagS
         return super.allowed(ragConfig, ragData) && !FeatureFlag.isTask(ragData.getQuery()) && !FeatureFlag.isDaemon(ragData.getQuery());
     }
 
-    protected void notify(RagConfig ragConfig, RagData ragData) throws Exception {
+    protected void notify(RagConfig ragConfig, RagData ragData, List<CliInsert> inserts) throws Exception {
         if (!FeatureFlag.isSilent(ragData.getQuery())) {
-            Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
-                    .content(new StringBuffer(XmlResourceLang.get(CliInsertRag.KEY_RECALL)))
-                    .metadata(CliPrinter.process(CliInsertRag.RAG_KEY))
-                    .workflow(ragData.getQuery().getWorkflow())
-                    .notifier(Notifier.SOURCE)
-                    .build();
-            this.notifierService.notify(Segment.build(ragData.getQuery(), segmentConfig), ragData.getQuery(), ragData.getQuery());
+            for (CliInsert insert : inserts) {
+                Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
+                        .metadata(CliPrinter.process(CliInsertRag.RAG_KEY, MultiSourceFlag.TID, insert.getTid()))
+                        .content(new StringBuffer(XmlResourceLang.get(CliInsertRag.KEY_RECALL)))
+                        .workflow(ragData.getQuery().getWorkflow())
+                        .notifier(Notifier.SOURCE)
+                        .build();
+                this.notifierService.notify(Segment.build(ragData.getQuery(), segmentConfig), ragData.getQuery(), ragData.getQuery());
+            }
         }
     }
 

@@ -16,4 +16,6 @@ public interface MultiSourceFlag {
     public static final String RESET = "__RESET__";
 
     public static final String WARN = "__WARN__";
+
+    public static final String TID = "__TID__";
 }
