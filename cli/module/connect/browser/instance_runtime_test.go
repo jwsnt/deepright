@@ -302,6 +302,133 @@ func TestBrowserInitInstanceDestroysExistingInstanceBeforeCreate(t *testing.T) {
 	}
 }
 
+func TestBrowserCreateInstanceReusesChatScopedRecordAcrossAgentChanges(t *testing.T) {
+	restore := stubBrowserRuntime()
+	defer restore()
+
+	statePath := filepath.Join(t.TempDir(), "browser_instance.json")
+	browserProcessExistsFn = func(pid int) bool {
+		return pid == 9011
+	}
+	browserCDPVersionFn = func(port int) (browserCDPVersion, error) {
+		if port != 22001 {
+			t.Fatalf("unexpected port: %d", port)
+		}
+		return browserCDPVersion{WebSocketDebuggerURL: instanceCDPEndpoint(port)}, nil
+	}
+	if err := browserSaveInstances(statePath, []browserInstanceStateRecord{{
+		AgentID:      "agent-a",
+		ChatID:       "chat-001",
+		Port:         22001,
+		PID:          9011,
+		CDP:          instanceCDPEndpoint(22001),
+		LastActiveAt: time.Now().Add(-time.Minute).Format(time.RFC3339),
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	item, err := browserCreateInstance(map[string]string{
+		"state":   statePath,
+		"agentId": "Agent-B",
+		"chatId":  "Chat-001",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item.AgentID != "agent-a" || item.ChatID != "chat-001" {
+		t.Fatalf("unexpected item: %+v", item)
+	}
+	if item.Port != 22001 || item.PID != 9011 {
+		t.Fatalf("unexpected item: %+v", item)
+	}
+}
+
+func TestBrowserGetInstanceFallsBackToChatScopedRecord(t *testing.T) {
+	restore := stubBrowserRuntime()
+	defer restore()
+
+	statePath := filepath.Join(t.TempDir(), "browser_instance.json")
+	browserProcessExistsFn = func(pid int) bool {
+		return pid == 9011
+	}
+	browserCDPVersionFn = func(port int) (browserCDPVersion, error) {
+		if port != 22001 {
+			t.Fatalf("unexpected port: %d", port)
+		}
+		return browserCDPVersion{WebSocketDebuggerURL: instanceCDPEndpoint(port)}, nil
+	}
+	if err := browserSaveInstances(statePath, []browserInstanceStateRecord{{
+		AgentID:      "agent-a",
+		ChatID:       "chat-001",
+		Port:         22001,
+		PID:          9011,
+		CDP:          instanceCDPEndpoint(22001),
+		LastActiveAt: time.Now().Add(-time.Minute).Format(time.RFC3339),
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	item, err := browserGetInstance(map[string]string{
+		"state":   statePath,
+		"agentId": "Agent-B",
+		"chatId":  "Chat-001",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item.AgentID != "agent-a" || item.ChatID != "chat-001" {
+		t.Fatalf("unexpected item: %+v", item)
+	}
+}
+
+func TestBrowserDestroyInstanceSupportsChatScopedShutdownWithoutAgent(t *testing.T) {
+	restore := stubBrowserRuntime()
+	defer restore()
+
+	statePath := filepath.Join(t.TempDir(), "browser_instance.json")
+	browserProcessExistsFn = func(pid int) bool {
+		return pid == 9011
+	}
+	browserCDPVersionFn = func(port int) (browserCDPVersion, error) {
+		if port != 22001 {
+			t.Fatalf("unexpected port: %d", port)
+		}
+		return browserCDPVersion{WebSocketDebuggerURL: instanceCDPEndpoint(port)}, nil
+	}
+	if err := browserSaveInstances(statePath, []browserInstanceStateRecord{{
+		AgentID:      "agent-a",
+		ChatID:       "chat-001",
+		Port:         22001,
+		PID:          9011,
+		CDP:          instanceCDPEndpoint(22001),
+		LastActiveAt: time.Now().Add(-time.Minute).Format(time.RFC3339),
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	terminated := []browserInstanceRecord{}
+	browserTerminateManagedInstanceFn = func(item browserInstanceRecord) error {
+		terminated = append(terminated, item)
+		return nil
+	}
+
+	if err := browserDestroyInstance(map[string]string{
+		"state":  statePath,
+		"chatId": "Chat-001",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(terminated) != 1 {
+		t.Fatalf("terminated = %v, want one record", terminated)
+	}
+	if terminated[0].AgentID != "agent-a" || terminated[0].ChatID != "chat-001" {
+		t.Fatalf("unexpected terminated record: %+v", terminated[0])
+	}
+	if _, err := os.Stat(statePath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("state file should be removed, err = %v", err)
+	}
+}
+
 func TestBrowserResolveChromeHeadlessModeFromPluginMetaTrue(t *testing.T) {
 	restore := stubBrowserRuntime()
 	defer restore()

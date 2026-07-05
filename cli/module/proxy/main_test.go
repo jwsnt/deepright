@@ -923,6 +923,103 @@ func TestProxyChatCompletionsLogsAbnormalWhenUpstreamStreamBreaksMidResponse(t *
 	}
 }
 
+func TestProxyChatCompletionsLogsAbnormalWhenUpstreamEndsWithoutDoneMarker(t *testing.T) {
+	flushAgentCache()
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tmp, "knowledge"), 0o755); err != nil {
+		t.Fatalf("mkdir knowledge: %v", err)
+	}
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	oldSharedDataDB := sharedDataDB
+	oldSharedEventLogger := sharedEventLogger
+	sharedDataDB = pooledDB{}
+	sharedEventLogger = struct {
+		mu     sync.Mutex
+		path   string
+		logger *eventlog.Logger
+	}{}
+	defer func() {
+		if sharedEventLogger.logger != nil {
+			_ = sharedEventLogger.logger.Close()
+		}
+		if sharedDataDB.db != nil {
+			_ = sharedDataDB.db.Close()
+		}
+		sharedDataDB = oldSharedDataDB
+		sharedEventLogger = oldSharedEventLogger
+	}()
+
+	agentRoot := filepath.Join(tmp, "agents")
+	agentDir := filepath.Join(agentRoot, "A")
+	if err := os.MkdirAll(agentDir, 0o755); err != nil {
+		t.Fatalf("mkdir agent: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(agentDir, "SOUL.md"), []byte("soul"), 0o644); err != nil {
+		t.Fatalf("write soul: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(agentDir, "USER.md"), []byte("user"), 0o644); err != nil {
+		t.Fatalf("write user: %v", err)
+	}
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n\n")
+	}))
+	defer upstream.Close()
+
+	proxy := &ProxyServer{
+		Host:     upstream.URL,
+		AgentDir: agentRoot,
+		DeviceID: "test-eof-device",
+		CacheTTL: 120 * time.Second,
+		Client:   &http.Client{Timeout: 3 * time.Second},
+	}
+	server := httptest.NewServer(http.HandlerFunc(proxy.HandleChatCompletions))
+	defer server.Close()
+
+	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"HELLO EOF"}],"stream":true,"metadata":{"agentId":"A","chat":"chat-eof"}}`
+	req, err := http.NewRequest(http.MethodPost, server.URL+"/v1/chat/completions", strings.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer sk-test")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err == nil && resp != nil {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}
+
+	db, err := getDataDB()
+	if err != nil {
+		t.Fatalf("getDataDB: %v", err)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	var abnormalCount int
+	for time.Now().Before(deadline) {
+		if err := db.QueryRow(`SELECT COUNT(*) FROM chat_log WHERE agent_id = ? AND chat_id = ? AND role = 'A' AND response_type = 'abnormal' AND content LIKE ?`,
+			"A", "chat-eof", "SSE stream interrupted:%").Scan(&abnormalCount); err != nil {
+			t.Fatalf("count abnormal chat_log: %v", err)
+		}
+		if abnormalCount > 0 {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if abnormalCount == 0 {
+		t.Fatalf("expected abnormal restore log after EOF without done marker")
+	}
+}
+
 func TestProxyChatCompletionsInjectsSelectedAgentVersionAndSandbox(t *testing.T) {
 	flushAgentCache()
 	oldwd, err := os.Getwd()
@@ -4845,7 +4942,7 @@ func TestHandleLogSkillExportsMarkdownToAgentTmp(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	proxy := &ProxyServer{AgentDir: agentRoot, DeviceID: "dev-1", CacheTTL: time.Second}
-	req := httptest.NewRequest(http.MethodGet, "/log_skill?agentId=A&chatId=chat-1&round=1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/log_skill?agentId=stale-agent&chatId=chat-1&round=1", nil)
 	rec := httptest.NewRecorder()
 	proxy.HandleLogSkill(rec, req)
 
@@ -5017,6 +5114,74 @@ func TestHandleLogSkillStatusReturnsTrueForCLIGetWithoutCLIPub(t *testing.T) {
 	}
 }
 
+func TestHandleLogSkillStatusAcceptsChatIDWithoutAgentID(t *testing.T) {
+	flushAgentCache()
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	sharedDataDB = pooledDB{}
+	sharedEventLogger = struct {
+		mu     sync.Mutex
+		path   string
+		logger *eventlog.Logger
+	}{}
+
+	logger, err := getEventLogger()
+	if err != nil {
+		t.Fatalf("getEventLogger: %v", err)
+	}
+	logger.Append(eventlog.Entry{AgentID: "A", ChatID: "chat-only", Type: eventlog.TypeChatCompletionRequest, Content: "req", CreatedAt: "2026-05-13T10:00:00.000"})
+	logger.Append(eventlog.Entry{AgentID: "A", ChatID: "chat-only", Type: eventlog.TypeChatCompletionResponse, Content: "resp", CreatedAt: "2026-05-13T10:00:01.000"})
+	for i := 0; i < 10; i++ {
+		logger.Append(eventlog.Entry{
+			AgentID:   "A",
+			ChatID:    "chat-only",
+			Type:      eventlog.TypeCLIGet,
+			Content:   fmt.Sprintf("cli-get-%d", i+1),
+			CreatedAt: fmt.Sprintf("2026-05-13T10:00:%02d.000", i+2),
+		})
+	}
+	time.Sleep(100 * time.Millisecond)
+
+	proxy := &ProxyServer{}
+	req := httptest.NewRequest(http.MethodGet, "/log_skill_status?chatId=chat-only", nil)
+	rec := httptest.NewRecorder()
+	proxy.HandleLogSkillStatus(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+
+	var resp struct {
+		Status   int    `json:"status"`
+		AgentID  string `json:"agentId"`
+		ChatID   string `json:"chatId"`
+		HasSkill bool   `json:"hasSkill"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Status != 0 {
+		t.Fatalf("status body = %d, want 0", resp.Status)
+	}
+	if resp.AgentID != "" {
+		t.Fatalf("agentId = %q, want empty", resp.AgentID)
+	}
+	if resp.ChatID != "chat-only" {
+		t.Fatalf("chatId = %q, want chat-only", resp.ChatID)
+	}
+	if !resp.HasSkill {
+		t.Fatalf("hasSkill = false, want true when chatId-only lookup reaches threshold")
+	}
+}
+
 func TestHandleLogSkillStatusUsesConfiguredSkillExtractThresholdWhenRoundMissing(t *testing.T) {
 	flushAgentCache()
 	oldwd, err := os.Getwd()
@@ -5105,8 +5270,8 @@ func TestHandleLogSkillStatusUsesConfiguredSkillExtractThresholdWhenRoundMissing
 		}
 	}
 
-	assertHasSkill("configured threshold", "/log_skill_status?agentId=A&chatId=chat-threshold", false, 11)
-	assertHasSkill("explicit threshold override", "/log_skill_status?agentId=A&chatId=chat-threshold&round=1", true, 1)
+	assertHasSkill("configured threshold", "/log_skill_status?chatId=chat-threshold", false, 11)
+	assertHasSkill("explicit threshold override", "/log_skill_status?chatId=chat-threshold&round=1", true, 1)
 }
 
 func TestExportRoundLogUsesRecentNthRequestAsBoundary(t *testing.T) {
@@ -5153,7 +5318,7 @@ func TestExportRoundLogUsesRecentNthRequestAsBoundary(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	proxy := &ProxyServer{AgentDir: agentRoot, DeviceID: "dev-1", CacheTTL: time.Second}
-	path, err := exportRoundLog(proxy, "A", "chat-2", roundLogOptions{Round: 2})
+	path, err := exportRoundLog(proxy, "chat-2", roundLogOptions{Round: 2})
 	if err != nil {
 		t.Fatalf("exportRoundLog: %v", err)
 	}
@@ -5214,7 +5379,7 @@ func TestExportRoundLogAppliesStartAndCloseAsAndConditions(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	proxy := &ProxyServer{AgentDir: agentRoot, DeviceID: "dev-1", CacheTTL: time.Second}
-	path, err := exportRoundLog(proxy, "A", "chat-3", roundLogOptions{
+	path, err := exportRoundLog(proxy, "chat-3", roundLogOptions{
 		Round: 3,
 		Start: "2026-05-13 10:00:00",
 		Close: "2026-05-13 10:59:59",
@@ -5278,7 +5443,7 @@ func TestExportRoundLogSupportsStartAndCloseWithoutRound(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	proxy := &ProxyServer{AgentDir: agentRoot, DeviceID: "dev-1", CacheTTL: time.Second}
-	path, err := exportRoundLog(proxy, "A", "B", roundLogOptions{
+	path, err := exportRoundLog(proxy, "B", roundLogOptions{
 		Start: "2026-05-13 21:25:00",
 		Close: "2026-05-13 22:25:00",
 	})
@@ -7850,7 +8015,7 @@ func TestProxyHandleChatSessionLogReturnsDescendingRawRows(t *testing.T) {
 	}
 
 	proxy := &ProxyServer{}
-	req := httptest.NewRequest(http.MethodGet, "/api/chat_session_log?agentId=agent-a&chatId=chat-1&start=2026-05-27T08:01:00&close=2026-05-27T08:02:00&limit=5", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/chat_session_log?chatId=chat-1&start=2026-05-27T08:01:00&close=2026-05-27T08:02:00&limit=5", nil)
 	rec := httptest.NewRecorder()
 	proxy.HandleChatSessionLog(rec, req)
 

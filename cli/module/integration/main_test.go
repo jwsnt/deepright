@@ -484,6 +484,93 @@ func TestProxyChatCompletionsLogsAbnormalWhenUpstreamStreamBreaksMidResponse(t *
 	}
 }
 
+func TestProxyChatCompletionsLogsAbnormalWhenUpstreamEndsWithoutDoneMarker(t *testing.T) {
+	disableIntegrationNotificationsForTest(t)
+	fixtureAgentDir, err := filepath.Abs("../agent/test-case")
+	if err != nil {
+		t.Fatalf("resolve agent dir: %v", err)
+	}
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	agentDir := filepath.Join(tmp, "agent")
+	if err := copyTestDir(fixtureAgentDir, agentDir); err != nil {
+		t.Fatalf("copy agent fixture: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(tmp, "knowledge"), 0o755); err != nil {
+		t.Fatalf("mkdir knowledge: %v", err)
+	}
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	initCronDB()
+	if cronDB == nil {
+		t.Fatalf("cronDB not initialized")
+	}
+	defer func() {
+		if cronDB != nil {
+			_ = cronDB.Close()
+			cronDB = nil
+		}
+	}()
+	if err := ensureTokenStore(cronDB); err != nil {
+		t.Fatalf("ensureTokenStore: %v", err)
+	}
+	if err := writeTokenStore(cronDB, map[string]string{"gpt-4": "Bearer stored-token"}); err != nil {
+		t.Fatalf("writeTokenStore: %v", err)
+	}
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n\n")
+	}))
+	defer upstream.Close()
+
+	cfg := &Config{
+		Host:         upstream.URL,
+		AgentDir:     agentDir,
+		Device:       "test-dev",
+		AgentCacheMs: 120000,
+	}
+	proxyClient := &http.Client{Timeout: 3 * time.Second}
+	server := httptest.NewServer(http.HandlerFunc(handleChatCompletions(cfg, proxyClient)))
+	defer server.Close()
+
+	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"HELLO EOF"}],"stream":true,"metadata":{"agentId":"a","chat":"chat-eof"}}`
+	req, err := http.NewRequest(http.MethodPost, server.URL, strings.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer sk-test")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err == nil && resp != nil {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	var abnormalCount int
+	for time.Now().Before(deadline) {
+		if err := cronDB.QueryRow(`SELECT COUNT(*) FROM chat_log WHERE agent_id = ? AND chat_id = ? AND role = 'A' AND response_type = 'abnormal' AND content LIKE ?`,
+			"a", "chat-eof", "SSE stream interrupted:%").Scan(&abnormalCount); err != nil {
+			t.Fatalf("count abnormal chat_log: %v", err)
+		}
+		if abnormalCount > 0 {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if abnormalCount == 0 {
+		t.Fatalf("expected abnormal restore log after EOF without done marker")
+	}
+}
+
 func TestProxyChatCompletionsInjectsLastResponseMetadata(t *testing.T) {
 	disableIntegrationNotificationsForTest(t)
 	agentDir, err := filepath.Abs("../agent/test-case")
@@ -8101,6 +8188,7 @@ func TestHandleLogSkillExportsMarkdownToAgentTmp(t *testing.T) {
 			cronDB = nil
 		}
 	}()
+	chatID := "chat-skill-" + filepath.Base(tmp)
 
 	agentRoot := filepath.Join(tmp, "agent")
 	workspace := filepath.Join(agentRoot, "A")
@@ -8115,17 +8203,21 @@ func TestHandleLogSkillExportsMarkdownToAgentTmp(t *testing.T) {
 	}
 
 	if _, err := cronDB.Exec(`INSERT INTO agent_message_log (agent_id, chat_id, content, log_type, created_at) VALUES
-		('A','chat-skill','{"model":"deepseek","messages":[{"role":"user","content":"看下我的桌面"}],"stream":true,"metadata":{"agentId":"A","chat":"chat-skill","type":"page_session"}}',?, '2026-05-13T10:00:00.000'),
-		('A','chat-skill','data: {"choices":[{"delta":{"content":"正在加载长期记忆\n"}}]}\n\n',?, '2026-05-13T10:00:01.000'),
-		('A','chat-skill','data: {"choices":[{"delta":{"content":"查看桌面文件列表\n"}}]}\n\n',?, '2026-05-13T10:00:02.000'),
-		('A','chat-skill','{"cmd":"ls -la /Users/demo/Desktop","tid":"task_1"}',?, '2026-05-13T10:00:03.000'),
-		('A','chat-skill','{"messages":[{"role":"user","content":"桌面列表已返回"}]}',?, '2026-05-13T10:00:04.000')`,
-		logTypeChatCompletionRequest, logTypeChatCompletionResponse, logTypeChatCompletionResponse, logTypeCLIGet, logTypeCLIPub); err != nil {
+		(?,?,'{"model":"deepseek","messages":[{"role":"user","content":"看下我的桌面"}],"stream":true,"metadata":{"agentId":"A","chat":"`+chatID+`","type":"page_session"}}',?, '2026-05-13T10:00:00.000'),
+		(?,?,'data: {"choices":[{"delta":{"content":"正在加载长期记忆\n"}}]}\n\n',?, '2026-05-13T10:00:01.000'),
+		(?,?,'data: {"choices":[{"delta":{"content":"查看桌面文件列表\n"}}]}\n\n',?, '2026-05-13T10:00:02.000'),
+		(?,?,'{"cmd":"ls -la /Users/demo/Desktop","tid":"task_1"}',?, '2026-05-13T10:00:03.000'),
+		(?,?,'{"messages":[{"role":"user","content":"桌面列表已返回"}]}',?, '2026-05-13T10:00:04.000')`,
+		"A", chatID, logTypeChatCompletionRequest,
+		"A", chatID, logTypeChatCompletionResponse,
+		"A", chatID, logTypeChatCompletionResponse,
+		"A", chatID, logTypeCLIGet,
+		"A", chatID, logTypeCLIPub); err != nil {
 		t.Fatalf("seed event logs: %v", err)
 	}
 
 	cfg := &Config{AgentDir: agentRoot, Device: "dev-1", AgentCacheMs: 1000}
-	req := httptest.NewRequest(http.MethodGet, "/log_skill?agentId=A&chatId=chat-skill&round=1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/log_skill?agentId=stale-agent&chatId="+url.QueryEscape(chatID)+"&round=1", nil)
 	rec := httptest.NewRecorder()
 	handleLogSkill(cfg)(rec, req)
 
@@ -8146,8 +8238,8 @@ func TestHandleLogSkillExportsMarkdownToAgentTmp(t *testing.T) {
 	if !strings.HasPrefix(resp.Path, filepath.Join(workspace, "tmp")) {
 		t.Fatalf("path = %q, want under %q", resp.Path, filepath.Join(workspace, "tmp"))
 	}
-	if matched, _ := regexp.MatchString(`/A_chat-skill_\d{14}\.log$`, filepath.ToSlash(resp.Path)); !matched {
-		t.Fatalf("path = %q, want suffix /A_chat-skill_YYYYMMDDHHMMSS.log", resp.Path)
+	if matched, _ := regexp.MatchString(`/A_`+regexp.QuoteMeta(chatID)+`_\d{14}\.log$`, filepath.ToSlash(resp.Path)); !matched {
+		t.Fatalf("path = %q, want suffix /A_%s_YYYYMMDDHHMMSS.log", resp.Path, chatID)
 	}
 	data, err := os.ReadFile(resp.Path)
 	if err != nil {
@@ -8332,6 +8424,74 @@ func TestHandleLogSkillStatusReturnsTrueForCLIGetWithoutCLIPub(t *testing.T) {
 	}
 }
 
+func TestHandleLogSkillStatusAcceptsChatIDWithoutAgentID(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+	chatID := "chat-only-" + filepath.Base(tmp)
+
+	initCronDB()
+	defer func() {
+		if cronDB != nil {
+			_ = cronDB.Close()
+			cronDB = nil
+		}
+	}()
+
+	if _, err := cronDB.Exec(`INSERT INTO agent_message_log (agent_id, chat_id, content, log_type, created_at) VALUES
+		(?, ?, 'req', ?, '2026-05-13T10:00:00.000'),
+		(?, ?, 'resp', ?, '2026-05-13T10:00:01.000')`,
+		"A", chatID, logTypeChatCompletionRequest,
+		"A", chatID, logTypeChatCompletionResponse); err != nil {
+		t.Fatalf("seed request/response logs: %v", err)
+	}
+	for i := 0; i < 10; i++ {
+		cliAt := fmt.Sprintf("2026-05-13T10:00:%02d.000", i+2)
+		if _, err := cronDB.Exec(
+			`INSERT INTO agent_message_log (agent_id, chat_id, content, log_type, created_at) VALUES (?, ?, ?, ?, ?)`,
+			"A", chatID, fmt.Sprintf("cli-get-%d", i+1), logTypeCLIGet, cliAt,
+		); err != nil {
+			t.Fatalf("insert cli/get %d: %v", i+1, err)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/log_skill_status?chatId="+url.QueryEscape(chatID), nil)
+	rec := httptest.NewRecorder()
+	handleLogSkillStatus(nil)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+
+	var resp struct {
+		Status   int    `json:"status"`
+		AgentID  string `json:"agentId"`
+		ChatID   string `json:"chatId"`
+		HasSkill bool   `json:"hasSkill"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Status != 0 {
+		t.Fatalf("status body = %d, want 0", resp.Status)
+	}
+	if resp.AgentID != "" {
+		t.Fatalf("agentId = %q, want empty", resp.AgentID)
+	}
+	if resp.ChatID != chatID {
+		t.Fatalf("chatId = %q, want %q", resp.ChatID, chatID)
+	}
+	if !resp.HasSkill {
+		t.Fatalf("hasSkill = false, want true when chatId-only lookup reaches threshold")
+	}
+}
+
 func TestHandleLogSkillStatusUsesConfiguredSkillExtractRoundWhenRoundMissing(t *testing.T) {
 	oldwd, err := os.Getwd()
 	if err != nil {
@@ -8415,9 +8575,9 @@ func TestHandleLogSkillStatusUsesConfiguredSkillExtractRoundWhenRoundMissing(t *
 		}
 	}
 
-	assertHasSkill("default threshold", "/log_skill_status?agentId=A&chatId="+url.QueryEscape(chatID), nil, true, 10)
-	assertHasSkill("configured threshold", "/log_skill_status?agentId=A&chatId="+url.QueryEscape(chatID), &Config{SkillExtractRound: 11}, false, 11)
-	assertHasSkill("explicit threshold override", "/log_skill_status?agentId=A&chatId="+url.QueryEscape(chatID)+"&round=9", &Config{SkillExtractRound: 11}, true, 9)
+	assertHasSkill("default threshold", "/log_skill_status?chatId="+url.QueryEscape(chatID), nil, true, 10)
+	assertHasSkill("configured threshold", "/log_skill_status?chatId="+url.QueryEscape(chatID), &Config{SkillExtractRound: 11}, false, 11)
+	assertHasSkill("explicit threshold override", "/log_skill_status?chatId="+url.QueryEscape(chatID)+"&round=9", &Config{SkillExtractRound: 11}, true, 9)
 }
 
 // ── Proxy iteration: /api/agentId ──
@@ -14169,7 +14329,7 @@ func TestIntegrationHandleChatSessionLogReturnsDescendingRawRows(t *testing.T) {
 		}
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/api/chat_session_log?agentId=agent-a&chatId=chat-1&start=2026-05-27T08:01:00&close=2026-05-27T08:02:00&limit=5", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/chat_session_log?chatId=chat-1&start=2026-05-27T08:01:00&close=2026-05-27T08:02:00&limit=5", nil)
 	rec := httptest.NewRecorder()
 	handleChatSessionLog()(rec, req)
 

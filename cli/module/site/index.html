@@ -7025,7 +7025,7 @@ function openChatSessionLogOverlay(event) {
     event.stopPropagation();
   }
   const binding = resolveChatSessionLogBinding();
-  if (!binding.chatId || !binding.agentId) {
+  if (!binding.chatId) {
     vfsShowUploadToast('请先选择当前会话', true);
     return;
   }
@@ -7062,8 +7062,8 @@ function readChatSessionLogQueryDraft() {
 
 async function submitChatSessionLogQuery() {
   if (!chatSessionLogState.visible || chatSessionLogState.loading) return;
-  if (!chatSessionLogState.agentId || !chatSessionLogState.chatId) {
-    setChatSessionLogError('当前会话缺少 agent_id 或 chat_id');
+  if (!chatSessionLogState.chatId) {
+    setChatSessionLogError('当前会话缺少 chat_id');
     renderChatSessionLogRecords([]);
     return;
   }
@@ -7080,7 +7080,6 @@ async function submitChatSessionLogQuery() {
   setChatSessionLogLoading(true);
   const requestSeq = ++chatSessionLogState.requestSeq;
   const params = new URLSearchParams();
-  params.set('agentId', chatSessionLogState.agentId);
   params.set('chatId', chatSessionLogState.chatId);
   params.set('limit', String(chatSessionLogState.limit));
   if (query.start) params.set('start', query.start);
@@ -19901,9 +19900,8 @@ async function submitInstallAppPrompt() {
 
 function getChatSkillIndicatorKey(chatId, agentId) {
   const resolvedChatId = String(chatId || '').trim();
-  const resolvedAgentId = String(agentId || (resolvedChatId ? getChatAgentId(resolvedChatId) : '') || '').trim();
-  if (!resolvedChatId || !resolvedAgentId) return '';
-  return resolvedAgentId + '::' + resolvedChatId;
+  if (!resolvedChatId) return '';
+  return resolvedChatId;
 }
 
 function ensureChatSkillIndicatorState(chatId, agentId) {
@@ -20094,7 +20092,7 @@ function openSkillExtractRangePopover(options = {}) {
   if (!opts.force && isOnboardingActive() && isSkillTourOnboardingStep(onboardingState.step)) return;
   if (skillExtractState.exporting) return;
   const binding = getActiveSkillExtractBinding();
-  if (!opts.allowMissingBinding && (!binding.chatId || !binding.agentId)) {
+  if (!opts.allowMissingBinding && !binding.chatId) {
     vfsShowUploadToast('目前没有可以提炼的会话', true);
     return;
   }
@@ -20229,12 +20227,12 @@ async function submitSkillExtractRange() {
   if (isOnboardingActive() && isSkillTourOnboardingStep(onboardingState.step)) return;
   if (skillExtractState.exporting) return;
   const binding = getActiveSkillExtractBinding();
-  if (!binding.chatId || !binding.agentId) {
+  if (!binding.chatId) {
     closeAllSkillExtractPopovers();
-    vfsShowUploadToast('当前没有可用的 Agent 或会话', true);
+    vfsShowUploadToast('当前没有可用的会话', true);
     return;
   }
-  if (binding.chatId !== skillExtractState.anchorChatId || binding.agentId !== skillExtractState.anchorAgentId) {
+  if (binding.chatId !== skillExtractState.anchorChatId) {
     closeAllSkillExtractPopovers();
     vfsShowUploadToast('会话已切换，请重新选择日志范围', true);
     return;
@@ -20264,7 +20262,6 @@ async function submitSkillExtractRange() {
   setSkillExtractExporting(true);
   const requestSeq = ++skillExtractState.requestSeq;
   const query = new URLSearchParams();
-  query.set('agentId', binding.agentId);
   query.set('chatId', binding.chatId);
   if (hasRound) query.set('round', String(roundNum));
   if (hasStart) query.set('start', formatSkillExtractDatetime(startRaw));
@@ -20302,7 +20299,7 @@ async function submitSkillExtractGoal() {
     return;
   }
   const binding = getActiveSkillExtractBinding();
-  if (!binding.chatId || !binding.agentId || binding.chatId !== skillExtractState.anchorChatId || binding.agentId !== skillExtractState.anchorAgentId) {
+  if (!binding.chatId || binding.chatId !== skillExtractState.anchorChatId) {
     closeSkillExtractGoalPopover();
     vfsShowUploadToast('会话已切换，请重新导出日志', true);
     return;
@@ -20489,9 +20486,8 @@ function shouldSuppressChatSkillIndicator(chat) {
 function removeChatSkillIndicatorState(chatId) {
   const resolvedChatId = String(chatId || '').trim();
   if (!resolvedChatId) return;
-  const suffix = '::' + resolvedChatId;
   Object.keys(chatSkillIndicators).forEach(key => {
-    if (!key.endsWith(suffix)) return;
+    if (key !== resolvedChatId) return;
     clearChatSkillIndicatorTimer(key);
     clearChatSkillIndicatorReplayTimer(key);
     delete chatSkillIndicators[key];
@@ -20503,7 +20499,7 @@ async function refreshChatSkillIndicator(chatId, options) {
   const opts = options || {};
   const chat = state.chats[chatId];
   const agentId = String((Object.prototype.hasOwnProperty.call(opts, 'agentId') ? opts.agentId : getChatAgentId(chatId)) || '').trim();
-  if (!chatId || !agentId) {
+  if (!chatId) {
     resetChatSkillIndicator(chatId, { agentId, animate: !!opts.animate });
     return false;
   }
@@ -20525,7 +20521,7 @@ async function refreshChatSkillIndicator(chatId, options) {
   info.state.checking = true;
   if (getChatSkillIndicatorKey(state.activeChat) === info.key) renderVfsSkillIndicator();
   try {
-    const resp = await fetchExecApi('/log_skill_status?agentId=' + encodeURIComponent(agentId) + '&chatId=' + encodeURIComponent(chatId) + '&_=' + Date.now(), { cache: 'no-store' });
+    const resp = await fetchExecApi('/log_skill_status?chatId=' + encodeURIComponent(chatId) + '&_=' + Date.now(), { cache: 'no-store' });
     let data = null;
     try { data = await resp.json(); } catch {}
     if (!chatSkillIndicators[info.key] || chatSkillIndicators[info.key].requestSeq !== requestSeq) return false;
@@ -21451,7 +21447,7 @@ function renderBrowserInstanceInitLock() {
   if (desc) {
     if (phase === 'destroy') desc.textContent = '正在执行 browser instance shutdown，请稍候。';
     else if (pluginStart) desc.textContent = '需要等待 1 至 2 分钟';
-    else if (ready) desc.textContent = '登录浏览器已经打开并完成实例注册。登录所有账号后点击下方完成按钮，页面会调用 browser instance shutdown 关闭该实例。';
+    else if (ready) desc.textContent = '浏览器插件登录已就绪，登录所有账号后点击下方完成按钮。';
     else desc.textContent = '稍后会为您单独打开用于登录账号的浏览器，这个过程可能需要等待若干分钟。在登录所有账号后点击下方完成按钮，解锁界面。';
   }
   if (doneBtn) {
@@ -21482,9 +21478,10 @@ async function execBrowserInstanceCommand(command, binding) {
   const params = new URLSearchParams({
     key: 'browser',
     command,
-    agentId: String(binding && binding.agentId || '').trim(),
     chatId: String(binding && binding.chatId || '').trim()
   });
+  const agentId = String(binding && binding.agentId || '').trim();
+  if (agentId) params.set('agentId', agentId);
   const resp = await fetchExecApi('/api/plugins/exec?' + params.toString(), {
     cache: 'no-store'
   });
@@ -21518,7 +21515,7 @@ async function handleBrowserInstanceInitBadgeClick(event) {
   const requestSeq = ++browserInstanceInitState.requestSeq;
   browserInstanceInitState.loading = true;
   browserInstanceInitState.phase = 'init';
-  browserInstanceInitState.binding = { agentId: binding.agentId, chatId: binding.chatId };
+  browserInstanceInitState.binding = { chatId: binding.chatId };
   scheduleBrowserInstanceDoneReveal();
   renderBrowserInstanceInitBadge();
   closeQuickFanMenu();
@@ -21548,8 +21545,7 @@ async function handleBrowserInstanceInitDoneClick(event) {
   if (browserInstanceInitState.phase === 'idle' || browserInstanceInitState.phase === 'destroy' || browserInstanceInitState.phase === 'plugin-start') return;
   const binding = browserInstanceInitState.binding || { agentId: '', chatId: '' };
   const chatId = String(binding.chatId || '').trim();
-  const agentId = String(binding.agentId || '').trim();
-  if (!chatId || !agentId) {
+  if (!chatId) {
     resetBrowserInstanceInitState();
     renderBrowserInstanceInitLock();
     renderBrowserInstanceInitBadge();
@@ -21561,7 +21557,7 @@ async function handleBrowserInstanceInitDoneClick(event) {
   renderBrowserInstanceInitLock();
   renderBrowserInstanceInitBadge();
   try {
-    await execBrowserInstanceCommand('instance shutdown', { agentId, chatId });
+    await execBrowserInstanceCommand('instance shutdown', { chatId });
     if (browserInstanceInitState.requestSeq !== requestSeq) return;
     vfsShowUploadToast('浏览器 CDP 已销毁，界面已解锁', false);
   } catch (err) {

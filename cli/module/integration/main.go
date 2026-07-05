@@ -9482,17 +9482,25 @@ func sanitizeLogRoundFilePart(value string) string {
 	return replacer.Replace(value)
 }
 
-func exportRoundLog(cfg *Config, agentID, chatID string, opts roundLogOptions) (string, error) {
-	agentID = strings.TrimSpace(agentID)
+func resolveRoundLogAgentID(entries []eventLogEntry) string {
+	for idx := len(entries) - 1; idx >= 0; idx-- {
+		if agentID := strings.TrimSpace(entries[idx].AgentID); agentID != "" {
+			return agentID
+		}
+	}
+	return ""
+}
+
+func exportRoundLog(cfg *Config, chatID string, opts roundLogOptions) (string, error) {
 	chatID = strings.TrimSpace(chatID)
-	if agentID == "" || chatID == "" {
-		return "", fmt.Errorf("agentId and chatId are required")
+	if chatID == "" {
+		return "", fmt.Errorf("chatId is required")
 	}
 	normalizedOpts, err := normalizeRoundLogOptions(opts)
 	if err != nil {
 		return "", err
 	}
-	entries, err := queryEventLogs(agentID, chatID)
+	entries, err := queryEventLogs("", chatID)
 	if err != nil {
 		return "", err
 	}
@@ -9523,7 +9531,14 @@ func exportRoundLog(cfg *Config, agentID, chatID string, opts roundLogOptions) (
 	}
 	records = mergeSSEContent(records)
 
-	workspace, err := getWorkspaceByAgentID(cfg, agentID)
+	exportAgentID := resolveRoundLogAgentID(filteredEntries)
+	if exportAgentID == "" {
+		exportAgentID = resolveRoundLogAgentID(entries)
+	}
+	if exportAgentID == "" {
+		return "", fmt.Errorf("agent not found for chatId: %s", chatID)
+	}
+	workspace, err := getWorkspaceByAgentID(cfg, exportAgentID)
 	if err != nil {
 		return "", err
 	}
@@ -9532,7 +9547,7 @@ func exportRoundLog(cfg *Config, agentID, chatID string, opts roundLogOptions) (
 		return "", err
 	}
 	filename := fmt.Sprintf("%s_%s_%s.log",
-		sanitizeLogRoundFilePart(agentID),
+		sanitizeLogRoundFilePart(exportAgentID),
 		sanitizeLogRoundFilePart(chatID),
 		roundLogTimestamp(),
 	)
@@ -9597,16 +9612,15 @@ func countCLIGetInEntries(entries []eventLogEntry) int {
 	return count
 }
 
-func querySkillStatus(agentID, chatID string, threshold int) (bool, error) {
-	agentID = strings.TrimSpace(agentID)
+func querySkillStatus(chatID string, threshold int) (bool, error) {
 	chatID = strings.TrimSpace(chatID)
-	if agentID == "" || chatID == "" {
-		return false, fmt.Errorf("agentId and chatId are required")
+	if chatID == "" {
+		return false, fmt.Errorf("chatId is required")
 	}
 	if threshold <= 0 {
 		threshold = 10
 	}
-	entries, err := queryEventLogs(agentID, chatID)
+	entries, err := queryEventLogs("", chatID)
 	if err != nil {
 		return false, err
 	}
@@ -9633,7 +9647,6 @@ func handleLogSkill(cfg *Config) http.HandlerFunc {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		agentID := strings.TrimSpace(r.URL.Query().Get("agentId"))
 		chatID := strings.TrimSpace(firstNonEmpty(r.URL.Query().Get("chatId"), r.URL.Query().Get("chat")))
 		roundStr := strings.TrimSpace(r.URL.Query().Get("round"))
 		round := 0
@@ -9657,7 +9670,7 @@ func handleLogSkill(cfg *Config) http.HandlerFunc {
 			return
 		}
 
-		path, err := exportRoundLog(cfg, agentID, chatID, opts)
+		path, err := exportRoundLog(cfg, chatID, opts)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]any{"status": 1, "content": err.Error()})
@@ -9692,7 +9705,7 @@ func handleLogSkillStatus(cfg *Config) http.HandlerFunc {
 			}
 			round = value
 		}
-		hasSkill, err := querySkillStatus(agentID, chatID, round)
+		hasSkill, err := querySkillStatus(chatID, round)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]any{"status": 1, "content": err.Error()})
@@ -9719,9 +9732,9 @@ func handleChatSessionLog() http.HandlerFunc {
 		}
 		agentID := strings.TrimSpace(r.URL.Query().Get("agentId"))
 		chatID := strings.TrimSpace(firstNonEmpty(r.URL.Query().Get("chatId"), r.URL.Query().Get("chat")))
-		if agentID == "" || chatID == "" {
+		if chatID == "" {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]any{"status": 1, "content": "agentId and chatId are required"})
+			json.NewEncoder(w).Encode(map[string]any{"status": 1, "content": "chatId is required"})
 			return
 		}
 		limit, err := normalizeChatSessionLogLimit(r.URL.Query().Get("limit"))
@@ -9736,7 +9749,7 @@ func handleChatSessionLog() http.HandlerFunc {
 			json.NewEncoder(w).Encode(map[string]any{"status": 1, "content": err.Error()})
 			return
 		}
-		entries, err := queryEventLogs(agentID, chatID)
+		entries, err := queryEventLogs("", chatID)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]any{"status": 1, "content": err.Error()})
@@ -9761,7 +9774,6 @@ func handleLogRound(cfg *Config) http.HandlerFunc {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		agentID := strings.TrimSpace(r.URL.Query().Get("agentId"))
 		chatID := strings.TrimSpace(firstNonEmpty(r.URL.Query().Get("chatId"), r.URL.Query().Get("chat")))
 		round, err := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("round")))
 		if err != nil || round <= 0 {
@@ -9769,7 +9781,7 @@ func handleLogRound(cfg *Config) http.HandlerFunc {
 			json.NewEncoder(w).Encode(map[string]any{"status": 1, "content": "round must be a positive integer"})
 			return
 		}
-		path, err := exportRoundLog(cfg, agentID, chatID, roundLogOptions{Round: round})
+		path, err := exportRoundLog(cfg, chatID, roundLogOptions{Round: round})
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]any{"status": 1, "content": err.Error()})
@@ -10105,6 +10117,19 @@ func queueSSEStreamInterruptedLog(ch chan chatMsg, err error) bool {
 		content:      buildSSEStreamInterruptedContent(err),
 	}
 	return true
+}
+
+func sseEventHasDoneMarker(event string) bool {
+	for _, line := range strings.Split(event, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "data:") {
+			continue
+		}
+		if strings.TrimSpace(strings.TrimPrefix(trimmed, "data:")) == "[DONE]" {
+			return true
+		}
+	}
+	return false
 }
 
 func compactNotificationPrompt(input string) string {
@@ -10752,6 +10777,7 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 		w.WriteHeader(resp.StatusCode)
 		abnormalStream := resp.StatusCode < 200 || resp.StatusCode >= 300
 		sawAbnormalPacket := false
+		sawDoneMarker := false
 
 		flusher, ok := w.(http.Flusher)
 		if !ok {
@@ -10764,6 +10790,9 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 				if ch != nil {
 					payloadBuf := append([]byte(nil), payload...)
 					for _, event := range splitCompleteSSEEvents(&payloadBuf) {
+						if sseEventHasDoneMarker(event) {
+							sawDoneMarker = true
+						}
 						responseType := detectResponseType(event)
 						if responseType == "abnormal" {
 							sawAbnormalPacket = true
@@ -10773,6 +10802,9 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 						ch <- chatMsg{role: "A", content: event, responseType: responseType}
 					}
 					for _, event := range flushTrailingSSEBytes(&payloadBuf) {
+						if sseEventHasDoneMarker(event) {
+							sawDoneMarker = true
+						}
 						responseType := detectResponseType(event)
 						if responseType == "abnormal" {
 							sawAbnormalPacket = true
@@ -10785,9 +10817,12 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 			}
 			if copyErr != nil && !errors.Is(copyErr, io.EOF) && !errors.Is(ctx.Err(), context.Canceled) {
 				abnormalStream = true
-				if !sawAbnormalPacket {
+				if !sawDoneMarker && !sawAbnormalPacket {
 					sawAbnormalPacket = queueSSEStreamInterruptedLog(ch, copyErr) || sawAbnormalPacket
 				}
+			} else if !errors.Is(ctx.Err(), context.Canceled) && !sawDoneMarker && !sawAbnormalPacket {
+				abnormalStream = true
+				sawAbnormalPacket = queueSSEStreamInterruptedLog(ch, io.EOF) || sawAbnormalPacket
 			}
 			if ch != nil {
 				connMu.Lock()
@@ -10825,6 +10860,9 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 				flusher.Flush()
 				logBuf = append(logBuf, buf[:n]...)
 				for _, event := range splitCompleteSSEEvents(&logBuf) {
+					if sseEventHasDoneMarker(event) {
+						sawDoneMarker = true
+					}
 					responseType := detectResponseType(event)
 					if responseType == "abnormal" {
 						sawAbnormalPacket = true
@@ -10843,6 +10881,9 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 		}
 		if len(logBuf) > 0 {
 			for _, event := range flushTrailingSSEBytes(&logBuf) {
+				if sseEventHasDoneMarker(event) {
+					sawDoneMarker = true
+				}
 				responseType := detectResponseType(event)
 				if responseType == "abnormal" {
 					sawAbnormalPacket = true
@@ -10854,9 +10895,11 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 				}
 			}
 		}
-		if streamErr != nil && !errors.Is(streamErr, io.EOF) && !errors.Is(ctx.Err(), context.Canceled) {
-			abnormalStream = true
-			if !sawAbnormalPacket {
+		if streamErr != nil && !errors.Is(ctx.Err(), context.Canceled) {
+			if !errors.Is(streamErr, io.EOF) || !sawDoneMarker {
+				abnormalStream = true
+			}
+			if !sawDoneMarker && !sawAbnormalPacket {
 				sawAbnormalPacket = queueSSEStreamInterruptedLog(ch, streamErr) || sawAbnormalPacket
 			}
 		}
@@ -14481,11 +14524,12 @@ func runIntegrationLogRoundCLI(args []string, cfg *Config) {
 	if targetAgentID == "" {
 		targetAgentID = strings.TrimSpace(*agent)
 	}
+	_ = targetAgentID
 	targetChatID := strings.TrimSpace(*chatID)
 	if targetChatID == "" {
 		targetChatID = strings.TrimSpace(*chat)
 	}
-	path, err := exportRoundLog(cfg, targetAgentID, targetChatID, roundLogOptions{Round: *round})
+	path, err := exportRoundLog(cfg, targetChatID, roundLogOptions{Round: *round})
 	if err != nil {
 		log.Fatal(err)
 	}

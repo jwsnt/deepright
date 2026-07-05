@@ -150,6 +150,9 @@ func browserCreateInstance(flags map[string]string) (browserInstanceRecord, erro
 	if err != nil {
 		return browserInstanceRecord{}, err
 	}
+	if agentID == "" {
+		return browserInstanceRecord{}, errors.New("agentId is required")
+	}
 	browserCreateTrace("instance.create.begin", map[string]any{
 		"agentId": agentID,
 		"chatId":  chatID,
@@ -349,6 +352,9 @@ func browserInitInstance(flags map[string]string) (browserInstanceRecord, error)
 	agentID, chatID, err := browserRequiredIdentity(next)
 	if err != nil {
 		return browserInstanceRecord{}, err
+	}
+	if agentID == "" {
+		return browserInstanceRecord{}, errors.New("agentId is required")
 	}
 	next["agentId"] = agentID
 	next["chatId"] = chatID
@@ -1199,9 +1205,6 @@ func browserRequiredIdentity(flags map[string]string) (string, string, error) {
 	flags = browserNormalizeIdentityFlags(flags)
 	agentID := connectsvc.FirstValue(flags, "agent", "agentId")
 	chatID := connectsvc.FirstValue(flags, "chat", "chatId")
-	if strings.TrimSpace(agentID) == "" {
-		return "", "", errors.New("agentId is required")
-	}
 	if strings.TrimSpace(chatID) == "" {
 		return "", "", errors.New("chatId is required")
 	}
@@ -2334,16 +2337,14 @@ func browserSaveInstances(statePath string, items []browserInstanceStateRecord) 
 	return os.Rename(tmpPath, statePath)
 }
 
-func browserRemoveInstance(statePath, agentID, chatID string, pid int) error {
-	agentID = browserNormalizeIdentityPart(agentID)
+func browserRemoveInstance(statePath, _ string, chatID string, pid int) error {
 	chatID = browserNormalizeIdentityPart(chatID)
 	items, err := browserLoadInstances(statePath)
 	if err != nil {
 		return err
 	}
 	filtered := browserFilterInstances(items, func(item browserInstanceStateRecord) bool {
-		return !(browserNormalizeIdentityPart(item.AgentID) == agentID &&
-			browserNormalizeIdentityPart(item.ChatID) == chatID &&
+		return !(browserNormalizeIdentityPart(item.ChatID) == chatID &&
 			(pid == 0 || item.PID == pid))
 	})
 	return browserPersistInstancesOrRemoveStateFile(statePath, filtered)
@@ -2373,8 +2374,18 @@ func browserPersistInstancesOrRemoveStateFile(statePath string, items []browserI
 func browserFindInstanceIndex(items []browserInstanceStateRecord, agentID, chatID string) int {
 	agentID = browserNormalizeIdentityPart(agentID)
 	chatID = browserNormalizeIdentityPart(chatID)
+	if chatID == "" {
+		return -1
+	}
+	if agentID != "" {
+		for idx, item := range items {
+			if browserNormalizeIdentityPart(item.AgentID) == agentID && browserNormalizeIdentityPart(item.ChatID) == chatID {
+				return idx
+			}
+		}
+	}
 	for idx, item := range items {
-		if browserNormalizeIdentityPart(item.AgentID) == agentID && browserNormalizeIdentityPart(item.ChatID) == chatID {
+		if browserNormalizeIdentityPart(item.ChatID) == chatID {
 			return idx
 		}
 	}
@@ -2910,7 +2921,7 @@ func browserUpsertInstanceState(items []browserInstanceStateRecord, next browser
 	next.AgentID = browserNormalizeIdentityPart(next.AgentID)
 	next.ChatID = browserNormalizeIdentityPart(next.ChatID)
 	for idx := range items {
-		if browserNormalizeIdentityPart(items[idx].AgentID) == next.AgentID && browserNormalizeIdentityPart(items[idx].ChatID) == next.ChatID {
+		if browserNormalizeIdentityPart(items[idx].ChatID) == next.ChatID {
 			items[idx] = next
 			browserSortInstances(items)
 			return items
@@ -2986,8 +2997,8 @@ func browserTerminateManagedInstanceByPort(port int) error {
 	return nil
 }
 
-func browserInstanceKey(agentID, chatID string) string {
-	return browserNormalizeIdentityPart(agentID) + "\x00" + browserNormalizeIdentityPart(chatID)
+func browserInstanceKey(_ string, chatID string) string {
+	return browserNormalizeIdentityPart(chatID)
 }
 
 func browserInstanceExpiredMinutes(flags map[string]string) (int, error) {
