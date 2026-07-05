@@ -5873,6 +5873,7 @@ const QUEUED_CENTER_REQUEST_LIMIT = 10;
 const MESSAGE_INSERT_ACTIVE_LIMIT = 5;
 // Per-chat queued next sends captured from the center composer while the current request is still running.
 let queuedCenterRequests = {};
+let queuedCenterInsertRestoreTasks = {};
 let chatSendDispatching = {};
 let queuedCenterTourState = {
   pendingStart: false,
@@ -24154,6 +24155,26 @@ function getQueuedCenterQueue(chatId, agentId) {
   return scopeKey ? queuedCenterRequests[scopeKey] || null : null;
 }
 
+function buildQueuedCenterInsertedServerItemId(tid) {
+  const resolvedTid = String(tid || '').trim();
+  return resolvedTid ? `message-insert:${resolvedTid}` : '';
+}
+
+function buildQueuedCenterInsertedRestoreSendOptions(chatId) {
+  const resolvedChatId = String(chatId || '').trim();
+  const model = normalizeModelName(chatModels[resolvedChatId] || state.selectedModel);
+  if (resolvedChatId && state.activeChat === resolvedChatId) {
+    return captureQueuedCenterSendOptions(resolvedChatId);
+  }
+  return {
+    chatId: resolvedChatId,
+    clearInputAfterSend: true,
+    toastOnSuccess: '',
+    preserveToggleMetadata: true,
+    model
+  };
+}
+
 function ensureQueuedCenterQueue(chatId, agentId) {
   const resolvedChatId = String(chatId || '').trim();
   const resolvedAgentId = String(agentId != null ? agentId : getChatAgentId(resolvedChatId)).trim();
@@ -24242,6 +24263,15 @@ function getQueuedCenterRequestItem(chatId, itemId, agentId) {
   const resolvedItemId = String(itemId || '').trim();
   if (!resolvedItemId) return null;
   return getQueuedCenterRequests(chatId, agentId).find(item => String(item && item.id || '').trim() === resolvedItemId) || null;
+}
+
+function getQueuedCenterRequestItemByInsertTid(chatId, tid, agentId) {
+  const resolvedTid = String(tid || '').trim();
+  if (!resolvedTid) return null;
+  return getQueuedCenterRequests(chatId, agentId).find(item => {
+    const insertState = getQueuedCenterInsertState(item);
+    return !!insertState && String(insertState.tid || '').trim() === resolvedTid;
+  }) || null;
 }
 
 function getQueuedCenterInsertActiveItems(chatId, agentId) {
@@ -24373,6 +24403,125 @@ async function postQueuedCenterMessageInsertDel(chatId, tid) {
   return data;
 }
 
+async function fetchQueuedCenterMessageInsertList(chatId, limit) {
+  const resolvedChatId = String(chatId || '').trim();
+  if (!resolvedChatId) return [];
+  const params = new URLSearchParams({ chatId: resolvedChatId });
+  if (Number(limit) > 0) params.set('limit', String(Math.floor(Number(limit))));
+  const resp = await fetchExecApi('/api/message_insert/list?' + params.toString(), {
+    method: 'GET'
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok || !data || data.status !== 0) {
+    throw new Error((data && data.content) || `HTTP ${resp.status}`);
+  }
+  return Array.isArray(data.data) ? data.data : [];
+}
+
+function mergeQueuedCenterInsertedItemsFromServer(chatId, agentId, items) {
+  const resolvedChatId = String(chatId || '').trim();
+  const resolvedAgentId = String(agentId != null ? agentId : getChatAgentId(resolvedChatId)).trim();
+  const normalizedItems = Array.isArray(items) ? items : [];
+  if (!resolvedChatId || !resolvedAgentId || !normalizedItems.length) return false;
+  const queue = ensureQueuedCenterQueue(resolvedChatId, resolvedAgentId);
+  if (!queue) return false;
+  let changed = false;
+  normalizedItems.forEach(rawItem => {
+    const tid = String(rawItem && rawItem.tid || '').trim();
+    const text = String(rawItem && rawItem.message || '').trim();
+    if (!tid || !text) return;
+    const serviceAgentId = String(rawItem && rawItem.agentId || resolvedAgentId).trim() || resolvedAgentId;
+    const serviceCreatedAt = toChatTimestamp(rawItem && rawItem.createdAt) || toChatTimestamp(new Date());
+    const serviceReportedAt = String(rawItem && rawItem.reportedAt || '').trim();
+    let item = getQueuedCenterRequestItemByInsertTid(resolvedChatId, tid, resolvedAgentId);
+    if (!item) item = getQueuedCenterRequestItem(resolvedChatId, buildQueuedCenterInsertedServerItemId(tid), resolvedAgentId);
+    if (!item) {
+      queue.items.push({
+        id: buildQueuedCenterInsertedServerItemId(tid) || uuid(),
+        text,
+        draftHtml: text,
+        options: buildQueuedCenterInsertedRestoreSendOptions(resolvedChatId),
+        queuedAt: Date.parse(serviceCreatedAt) || Date.now(),
+        insertSync: {
+          tid,
+          agentId: serviceAgentId,
+          status: 0,
+          phase: 'tracking',
+          httpErrorCount: 0,
+          error: false,
+          removing: false,
+          removalTimer: 0,
+          serverBound: true,
+          reportedAt: serviceReportedAt
+        }
+      });
+      changed = true;
+      return;
+    }
+    const insertState = getQueuedCenterInsertState(item);
+    if (insertState && insertState.removing) return;
+    if (String(item.text || '') !== text) {
+      item.text = text;
+      item.draftHtml = text;
+      changed = true;
+    } else if (!String(item.draftHtml || '').trim()) {
+      item.draftHtml = text;
+      changed = true;
+    }
+    if (!item.options || typeof item.options !== 'object') {
+      item.options = buildQueuedCenterInsertedRestoreSendOptions(resolvedChatId);
+      changed = true;
+    }
+    item.insertSync = {
+      ...(insertState && typeof insertState === 'object' ? insertState : {}),
+      tid,
+      agentId: serviceAgentId,
+      status: 0,
+      phase: 'tracking',
+      error: false,
+      removing: false,
+      serverBound: true,
+      reportedAt: serviceReportedAt,
+      removalTimer: insertState && insertState.removalTimer ? insertState.removalTimer : 0,
+      httpErrorCount: 0
+    };
+    if (!item.queuedAt) {
+      item.queuedAt = Date.parse(serviceCreatedAt) || Date.now();
+      changed = true;
+    }
+  });
+  if (changed) syncQueuedCenterInputUI(resolvedChatId, resolvedAgentId);
+  return changed;
+}
+
+function syncQueuedCenterInsertedMessagesFromServer(chatId, agentId, options) {
+  const resolvedChatId = String(chatId || '').trim();
+  const resolvedAgentId = String(agentId != null ? agentId : getChatAgentId(resolvedChatId)).trim();
+  const scopeKey = getQueuedCenterScopeKey(resolvedChatId, resolvedAgentId);
+  const opts = options || {};
+  if (!scopeKey) return Promise.resolve([]);
+  const previous = queuedCenterInsertRestoreTasks[scopeKey] || Promise.resolve([]);
+  const task = previous
+    .catch(() => [])
+    .then(async () => {
+      try {
+        const items = await fetchQueuedCenterMessageInsertList(resolvedChatId, opts.limit || QUEUED_CENTER_REQUEST_LIMIT);
+        mergeQueuedCenterInsertedItemsFromServer(resolvedChatId, resolvedAgentId, items);
+        if (items.length > 0 && opts.autoDrainWhenIdle !== false && !isChatBusy(resolvedChatId) && !isChatSendDispatching(resolvedChatId)) {
+          scheduleQueuedCenterRequestDrain(resolvedChatId, resolvedAgentId);
+        }
+        return items;
+      } catch (err) {
+        if (!opts.silent) vfsShowUploadToast(normalizeMessageInsertErrorMessage(err, '恢复插入待处理消息失败'), true);
+        return [];
+      }
+    });
+  queuedCenterInsertRestoreTasks[scopeKey] = task.finally(() => {
+    if (queuedCenterInsertRestoreTasks[scopeKey] === task) delete queuedCenterInsertRestoreTasks[scopeKey];
+  });
+  return task;
+}
+
 async function cancelQueuedCenterInsertedMessage(chatId, agentId, item, options) {
   const opts = options || {};
   const state = getQueuedCenterInsertState(item);
@@ -24469,6 +24618,7 @@ async function insertQueuedCenterRequest(event, chatId, agentId, itemId) {
     state.status = 0;
     state.error = false;
     state.httpErrorCount = 0;
+    state.serverBound = true;
     syncQueuedCenterInputUI(resolvedChatId, resolvedAgentId);
     return true;
   } catch (err) {
@@ -24488,6 +24638,7 @@ async function syncQueuedCenterInsertedMessage(chatId, agentId, item) {
     state.status = 0;
     state.error = false;
     state.httpErrorCount = 0;
+    state.serverBound = true;
     syncQueuedCenterInputUI(chatId, agentId);
     return true;
   } catch (err) {
@@ -25941,6 +26092,7 @@ function switchChat(id) {
     thinkingEnabled = !!chatThinking[id];
     updateModelIndicator();
     updateThinkingUI();
+    void syncQueuedCenterInsertedMessagesFromServer(id, getChatAgentId(id), { silent: true });
     refreshChatSandboxStatus(id, { agentId: getChatAgentId(id), toastOnError: false }).catch(() => {});
     rsInitNote();
     refreshCronViews();
@@ -30763,6 +30915,26 @@ function extractTaskBadgePacketsFromRawRecord(raw) {
   return packets;
 }
 
+function extractMessageInsertTidsFromRawRecord(raw) {
+  const tids = [];
+  const seen = new Set();
+  const lines = String(raw || '').split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || !trimmed.startsWith('data:')) continue;
+    const data = trimmed.slice(5).trim();
+    if (!data || data === '[DONE]') continue;
+    try {
+      const parsed = JSON.parse(data);
+      const tid = extractResponseMessageInsertTid(parsed);
+      if (!tid || seen.has(tid)) continue;
+      seen.add(tid);
+      tids.push(tid);
+    } catch {}
+  }
+  return tids;
+}
+
 function truncateWorkingIndicatorText(rawText) {
   const chars = Array.from(String(rawText || '').trim());
   if (!chars.length) return WORKING_INDICATOR_DEFAULT_TEXT;
@@ -33176,10 +33348,14 @@ function appendRestoredRecords(chatId, chat, records) {
       const logicalPacketId = extractRestoreLogicalPacketId(rec.content);
       const closePacket = isRestoreClosePacket(rec.content);
       const parsedRecord = parseRestoreAssistantRecord(rec.content);
+      const confirmedInsertTids = extractMessageInsertTidsFromRawRecord(rec.content);
       const normalizedLogicalPacketId = normalizeStreamLogicalId(logicalPacketId);
       const hasCenterRenderablePayload = !!normalizeMessageText(parsedRecord.content);
       const hasCliSubPayload = !!normalizeMessageText(parsedRecord.cliSubContent);
       const isCliSubOnlyRecord = !hasCenterRenderablePayload && hasCliSubPayload && !closePacket && !parsedRecord.error;
+      if (confirmedInsertTids.length) {
+        confirmedInsertTids.forEach(tid => confirmQueuedCenterInsertedMessage(chatId, restoreAgentId, tid));
+      }
       if (rec.responseType === 'abnormal') {
         setChatRestoreSkippedAfterAbnormal(chatId, true, restoreAgentId);
         const abnormalRawText = String(rec.content || '').trim();
@@ -33585,6 +33761,7 @@ async function performReloadChatRecords(chatId, opts) {
       }
       renderChatList();
     }
+    void syncQueuedCenterInsertedMessagesFromServer(chatId, agentId, { silent: true });
     if (terminal || (!chat.pendingRequest && added > 0)) {
       refreshChatSkillIndicator(chatId, { agentId, force: true }).catch(() => {});
     }

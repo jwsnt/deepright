@@ -8,13 +8,17 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"integration/messageinsert"
 )
 
-const messageInsertPublishLimit = 5
+const (
+	messageInsertPublishLimit = 5
+	messageInsertListLimit    = 20
+)
 
 type messageInsertPublishItem struct {
 	Tid     string `json:"tid"`
@@ -193,18 +197,61 @@ func handleMessageInsertDel() http.HandlerFunc {
 	}
 }
 
+func handleMessageInsertList() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		chatID := strings.TrimSpace(r.URL.Query().Get("chatId"))
+		if chatID == "" {
+			writeMessageInsertError(w, http.StatusBadRequest, fmt.Errorf("chatId is required"))
+			return
+		}
+		limit := messageInsertListLimit
+		if rawLimit := strings.TrimSpace(r.URL.Query().Get("limit")); rawLimit != "" {
+			parsed, err := strconv.Atoi(rawLimit)
+			if err != nil || parsed <= 0 {
+				writeMessageInsertError(w, http.StatusBadRequest, fmt.Errorf("limit is invalid"))
+				return
+			}
+			limit = parsed
+		}
+
+		db, closeFn, err := openIntegrationMessageInsertDB()
+		if err != nil {
+			writeMessageInsertError(w, http.StatusInternalServerError, err)
+			return
+		}
+		defer closeFn()
+
+		items, err := messageinsert.ListActive(db, chatID, limit)
+		if err != nil {
+			writeMessageInsertError(w, http.StatusBadRequest, err)
+			return
+		}
+		writeMessageInsertJSON(w, http.StatusOK, map[string]interface{}{
+			"status": 0,
+			"data":   items,
+		})
+	}
+}
+
 func printIntegrationMessageInsertHelp() {
 	fmt.Println("Usage:")
 	fmt.Println("  integration message-insert add --agentId ID --chatId ID --tid TID --message TEXT")
 	fmt.Println("  integration message-insert del --chatId ID --tid TID")
+	fmt.Println("  integration message-insert list --chatId ID [--limit N]")
 	fmt.Println("")
 	fmt.Println("Subcommands:")
 	fmt.Println("  add               Save one pending inserted message")
 	fmt.Println("  del               Mark one inserted message as cancelled")
+	fmt.Println("  list              List pending inserted messages for one chat")
 	fmt.Println("")
 	fmt.Println("Examples:")
 	fmt.Println("  integration message-insert add --agentId demo --chatId chat-001 --tid 1718966400000 --message 'HELLO'")
 	fmt.Println("  integration message-insert del --chatId chat-001 --tid 1718966400000")
+	fmt.Println("  integration message-insert list --chatId chat-001 --limit 20")
 }
 
 func runIntegrationMessageInsertCLI(args []string) {
@@ -221,6 +268,7 @@ func runIntegrationMessageInsertCLI(args []string) {
 	chatAlias := fs.String("chat", "", "chat id")
 	tid := fs.String("tid", "", "message insert id")
 	midAlias := fs.String("mid", "", "legacy message insert id")
+	limit := fs.Int("limit", messageInsertListLimit, "list limit")
 	message := fs.String("message", "", "message content")
 	fs.Usage = func() { printIntegrationMessageInsertHelp() }
 	if err := fs.Parse(args[1:]); err != nil {
@@ -267,6 +315,14 @@ func runIntegrationMessageInsertCLI(args []string) {
 				"status":   messageinsert.StatusCancelled,
 			},
 		}); err != nil {
+			log.Fatal(err)
+		}
+	case "list":
+		items, err := messageinsert.ListActive(db, targetChatID, *limit)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := encoder.Encode(map[string]interface{}{"status": 0, "data": items}); err != nil {
 			log.Fatal(err)
 		}
 	default:

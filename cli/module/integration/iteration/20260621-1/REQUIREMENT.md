@@ -33,8 +33,9 @@
     "tid": ttt
 }
 ```
-+ 插入消息仍然通过cli/get -> cli/pub链路上报，但单个tid只允许cli/get上报一次：
-    + 只要cli/pub没有报错，就记为“已上报一次”，后续cli/get不再重复上报同一个tid
++ 插入消息仍然通过cli/get -> cli/pub链路上报，但单个tid仅在成功收到一次cli/pub正确返回后不再重复上报：
+    + 若cli/pub网络异常，则视为本次提交失败；下次cli/get仍可继续提交同一个tid
+    + 若cli/pub正确返回，则记为“已上报一次”，后续cli/get不再重复上报同一个tid
     + 此时不立即改为已上传，仅从待上报集合中移除
 + 当integration收到响应报文中 `metadata.__PROCESS__ = rag_insert` 且 `metadata.__TID__` 与插入消息tid相同，才视为该tid真正上报成功：
     + 命中后把数据库状态更新为已上传

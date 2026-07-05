@@ -14,13 +14,14 @@ const (
 )
 
 type Item struct {
-	AgentID   string `json:"agentId"`
-	ChatID    string `json:"chatId"`
-	Tid       string `json:"tid"`
-	Message   string `json:"message"`
-	Status    int    `json:"status"`
-	CreatedAt string `json:"createdAt"`
-	UpdatedAt string `json:"updatedAt"`
+	AgentID    string `json:"agentId"`
+	ChatID     string `json:"chatId"`
+	Tid        string `json:"tid"`
+	Message    string `json:"message"`
+	Status     int    `json:"status"`
+	ReportedAt string `json:"reportedAt,omitempty"`
+	CreatedAt  string `json:"createdAt"`
+	UpdatedAt  string `json:"updatedAt"`
 }
 
 func EnsureSchema(db *sql.DB) error {
@@ -119,10 +120,10 @@ func Get(db *sql.DB, chatID, tid string) (Item, error) {
 		return Item{}, err
 	}
 	var item Item
-	err := db.QueryRow(`SELECT agent_id, chat_id, mid, message, status, created_at, updated_at
+	err := db.QueryRow(`SELECT agent_id, chat_id, mid, message, status, reported_at, created_at, updated_at
 		FROM message_insert WHERE chat_id = ? AND mid = ?`,
 		strings.TrimSpace(chatID), strings.TrimSpace(tid),
-	).Scan(&item.AgentID, &item.ChatID, &item.Tid, &item.Message, &item.Status, &item.CreatedAt, &item.UpdatedAt)
+	).Scan(&item.AgentID, &item.ChatID, &item.Tid, &item.Message, &item.Status, &item.ReportedAt, &item.CreatedAt, &item.UpdatedAt)
 	return item, err
 }
 
@@ -137,7 +138,7 @@ func ListPending(db *sql.DB, chatID string, limit int) ([]Item, error) {
 	if err := EnsureSchema(db); err != nil {
 		return nil, err
 	}
-	rows, err := db.Query(`SELECT agent_id, chat_id, mid, message, status, created_at, updated_at
+	rows, err := db.Query(`SELECT agent_id, chat_id, mid, message, status, reported_at, created_at, updated_at
 		FROM message_insert
 		WHERE chat_id = ? AND status = ? AND reported_at = ''
 		ORDER BY created_at, mid
@@ -151,7 +152,40 @@ func ListPending(db *sql.DB, chatID string, limit int) ([]Item, error) {
 	items := make([]Item, 0, limit)
 	for rows.Next() {
 		var item Item
-		if err := rows.Scan(&item.AgentID, &item.ChatID, &item.Tid, &item.Message, &item.Status, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		if err := rows.Scan(&item.AgentID, &item.ChatID, &item.Tid, &item.Message, &item.Status, &item.ReportedAt, &item.CreatedAt, &item.UpdatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func ListActive(db *sql.DB, chatID string, limit int) ([]Item, error) {
+	chatID = strings.TrimSpace(chatID)
+	if chatID == "" {
+		return nil, fmt.Errorf("chatId is required")
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if err := EnsureSchema(db); err != nil {
+		return nil, err
+	}
+	rows, err := db.Query(`SELECT agent_id, chat_id, mid, message, status, reported_at, created_at, updated_at
+		FROM message_insert
+		WHERE chat_id = ? AND status = ?
+		ORDER BY created_at, mid
+		LIMIT ?`,
+		chatID, StatusPending, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]Item, 0, limit)
+	for rows.Next() {
+		var item Item
+		if err := rows.Scan(&item.AgentID, &item.ChatID, &item.Tid, &item.Message, &item.Status, &item.ReportedAt, &item.CreatedAt, &item.UpdatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, item)

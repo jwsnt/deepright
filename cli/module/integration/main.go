@@ -13475,6 +13475,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/consume", handleConsume())
 	mux.HandleFunc("/api/message_insert/add", handleMessageInsertAdd())
 	mux.HandleFunc("/api/message_insert/del", handleMessageInsertDel())
+	mux.HandleFunc("/api/message_insert/list", handleMessageInsertList())
 	mux.HandleFunc("/api/sandbox", handleSandbox())
 	mux.HandleFunc("/api/sandbox=off", handleSandbox())
 	mux.HandleFunc("/api/sandbox=filepick", handleSandbox())

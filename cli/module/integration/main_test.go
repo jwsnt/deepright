@@ -7342,6 +7342,64 @@ func TestMessageInsertHandlersLifecycle(t *testing.T) {
 	}
 }
 
+func TestMessageInsertListHandlerIncludesPublishedPendingItems(t *testing.T) {
+	oldCronDB := cronDB
+	defer func() {
+		if cronDB != nil && cronDB != oldCronDB {
+			_ = cronDB.Close()
+		}
+		cronDB = oldCronDB
+	}()
+
+	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "data"))
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	cronDB = db
+	if err := integrationmessageinsert.EnsureSchema(cronDB); err != nil {
+		t.Fatalf("ensure schema: %v", err)
+	}
+	if _, err := integrationmessageinsert.UpsertPending(cronDB, "agent-a", "chat-1", "1710000000000", "first", time.Unix(1710000000, 0)); err != nil {
+		t.Fatalf("UpsertPending first: %v", err)
+	}
+	if _, err := integrationmessageinsert.UpsertPending(cronDB, "agent-a", "chat-1", "1710000005000", "second", time.Unix(1710000010, 0)); err != nil {
+		t.Fatalf("UpsertPending second: %v", err)
+	}
+	if _, err := integrationmessageinsert.MarkPublished(cronDB, "chat-1", []string{"1710000000000"}, time.Unix(1710000020, 0)); err != nil {
+		t.Fatalf("MarkPublished: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/message_insert/list?chatId=chat-1&limit=5", nil)
+	rec := httptest.NewRecorder()
+	handleMessageInsertList().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list status = %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var resp struct {
+		Status int `json:"status"`
+		Data   []struct {
+			Tid        string `json:"tid"`
+			ReportedAt string `json:"reportedAt"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode list response: %v", err)
+	}
+	if resp.Status != 0 {
+		t.Fatalf("list response status = %d", resp.Status)
+	}
+	if len(resp.Data) != 2 {
+		t.Fatalf("list items = %d, want 2", len(resp.Data))
+	}
+	if resp.Data[0].Tid != "1710000000000" || resp.Data[1].Tid != "1710000005000" {
+		t.Fatalf("list tids = %#v", resp.Data)
+	}
+	if strings.TrimSpace(resp.Data[0].ReportedAt) == "" {
+		t.Fatalf("published item reportedAt is empty: %#v", resp.Data[0])
+	}
+}
+
 func TestHeartbeatDebugLogsTimeoutAndTaskPayload(t *testing.T) {
 	var logBuf bytes.Buffer
 	originalWriter := log.Writer()

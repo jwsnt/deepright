@@ -63,6 +63,19 @@ func TestMessageInsertLifecycle(t *testing.T) {
 	if _, err := MarkPublished(db, "chat-1", []string{"101"}, time.Unix(1710000015, 0)); err != nil {
 		t.Fatalf("MarkPublished: %v", err)
 	}
+	activeItems, err := ListActive(db, "chat-1", 5)
+	if err != nil {
+		t.Fatalf("ListActive after publish: %v", err)
+	}
+	if len(activeItems) != 2 {
+		t.Fatalf("active items after publish = %d, want 2", len(activeItems))
+	}
+	if activeItems[0].Tid != "101" || activeItems[1].Tid != "102" {
+		t.Fatalf("active order after publish = %#v", activeItems)
+	}
+	if activeItems[0].ReportedAt == "" {
+		t.Fatalf("reported_at for published item is empty: %#v", activeItems[0])
+	}
 	items, err = ListPending(db, "chat-1", 5)
 	if err != nil {
 		t.Fatalf("ListPending after publish: %v", err)
@@ -99,5 +112,13 @@ func TestMessageInsertLifecycle(t *testing.T) {
 	}
 	if len(items) != 0 {
 		t.Fatalf("pending items after transitions = %d, want 0", len(items))
+	}
+
+	activeItems, err = ListActive(db, "chat-1", 5)
+	if err != nil {
+		t.Fatalf("ListActive after transitions: %v", err)
+	}
+	if len(activeItems) != 0 {
+		t.Fatalf("active items after transitions = %d, want 0", len(activeItems))
 	}
 }
