@@ -813,6 +813,116 @@ func TestProxyChatCompletionsKeepsBoolMetadataOnlyUnderMetadata(t *testing.T) {
 	}
 }
 
+func TestProxyChatCompletionsLogsAbnormalWhenUpstreamStreamBreaksMidResponse(t *testing.T) {
+	flushAgentCache()
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tmp, "knowledge"), 0o755); err != nil {
+		t.Fatalf("mkdir knowledge: %v", err)
+	}
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	oldSharedDataDB := sharedDataDB
+	oldSharedEventLogger := sharedEventLogger
+	sharedDataDB = pooledDB{}
+	sharedEventLogger = struct {
+		mu     sync.Mutex
+		path   string
+		logger *eventlog.Logger
+	}{}
+	defer func() {
+		if sharedEventLogger.logger != nil {
+			_ = sharedEventLogger.logger.Close()
+		}
+		if sharedDataDB.db != nil {
+			_ = sharedDataDB.db.Close()
+		}
+		sharedDataDB = oldSharedDataDB
+		sharedEventLogger = oldSharedEventLogger
+	}()
+
+	agentRoot := filepath.Join(tmp, "agents")
+	agentDir := filepath.Join(agentRoot, "A")
+	if err := os.MkdirAll(agentDir, 0o755); err != nil {
+		t.Fatalf("mkdir agent: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(agentDir, "SOUL.md"), []byte("soul"), 0o644); err != nil {
+		t.Fatalf("write soul: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(agentDir, "USER.md"), []byte("user"), 0o644); err != nil {
+		t.Fatalf("write user: %v", err)
+	}
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hj, ok := w.(http.Hijacker)
+		if !ok {
+			t.Errorf("hijacker unavailable")
+			return
+		}
+		conn, bufrw, err := hj.Hijack()
+		if err != nil {
+			t.Errorf("hijack failed: %v", err)
+			return
+		}
+		payload := "data: " + `{"choices":[{"delta":{"content":"partial"}}]}` + "\n\n"
+		fmt.Fprintf(bufrw, "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\n\r\n")
+		fmt.Fprintf(bufrw, "%x\r\n%s\r\n", len(payload), payload)
+		_ = bufrw.Flush()
+		_ = conn.Close()
+	}))
+	defer upstream.Close()
+
+	proxy := &ProxyServer{
+		Host:     upstream.URL,
+		AgentDir: agentRoot,
+		DeviceID: "test-midstream-device",
+		CacheTTL: 120 * time.Second,
+		Client:   &http.Client{Timeout: 3 * time.Second},
+	}
+	server := httptest.NewServer(http.HandlerFunc(proxy.HandleChatCompletions))
+	defer server.Close()
+
+	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"HELLO MIDSTREAM"}],"stream":true,"metadata":{"agentId":"A","chat":"chat-midstream"}}`
+	req, err := http.NewRequest(http.MethodPost, server.URL+"/v1/chat/completions", strings.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer sk-test")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err == nil && resp != nil {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}
+
+	db, err := getDataDB()
+	if err != nil {
+		t.Fatalf("getDataDB: %v", err)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	var abnormalCount int
+	for time.Now().Before(deadline) {
+		if err := db.QueryRow(`SELECT COUNT(*) FROM chat_log WHERE agent_id = ? AND chat_id = ? AND role = 'A' AND response_type = 'abnormal' AND content LIKE ?`,
+			"A", "chat-midstream", "SSE stream interrupted:%").Scan(&abnormalCount); err != nil {
+			t.Fatalf("count abnormal chat_log: %v", err)
+		}
+		if abnormalCount > 0 {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if abnormalCount == 0 {
+		t.Fatalf("expected abnormal restore log after midstream disconnect")
+	}
+}
+
 func TestProxyChatCompletionsInjectsSelectedAgentVersionAndSandbox(t *testing.T) {
 	flushAgentCache()
 	oldwd, err := os.Getwd()

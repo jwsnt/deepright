@@ -10084,6 +10084,29 @@ func normalizeResponseType(responseType string) string {
 	}
 }
 
+func buildSSEStreamInterruptedContent(err error) string {
+	if err == nil {
+		return "SSE stream interrupted"
+	}
+	detail := strings.TrimSpace(err.Error())
+	if detail == "" {
+		return "SSE stream interrupted"
+	}
+	return "SSE stream interrupted: " + detail
+}
+
+func queueSSEStreamInterruptedLog(ch chan chatMsg, err error) bool {
+	if ch == nil || err == nil {
+		return false
+	}
+	ch <- chatMsg{
+		role:         "A",
+		responseType: "abnormal",
+		content:      buildSSEStreamInterruptedContent(err),
+	}
+	return true
+}
+
 func compactNotificationPrompt(input string) string {
 	return strings.Join(strings.Fields(strings.TrimSpace(input)), " ")
 }
@@ -10728,6 +10751,7 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 
 		w.WriteHeader(resp.StatusCode)
 		abnormalStream := resp.StatusCode < 200 || resp.StatusCode >= 300
+		sawAbnormalPacket := false
 
 		flusher, ok := w.(http.Flusher)
 		if !ok {
@@ -10740,17 +10764,30 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 				if ch != nil {
 					payloadBuf := append([]byte(nil), payload...)
 					for _, event := range splitCompleteSSEEvents(&payloadBuf) {
+						responseType := detectResponseType(event)
+						if responseType == "abnormal" {
+							sawAbnormalPacket = true
+							abnormalStream = true
+						}
 						markConfirmedMessageInsertUploads(chatID, event)
-						ch <- chatMsg{role: "A", content: event, responseType: detectResponseType(event)}
+						ch <- chatMsg{role: "A", content: event, responseType: responseType}
 					}
 					for _, event := range flushTrailingSSEBytes(&payloadBuf) {
+						responseType := detectResponseType(event)
+						if responseType == "abnormal" {
+							sawAbnormalPacket = true
+							abnormalStream = true
+						}
 						markConfirmedMessageInsertUploads(chatID, event)
-						ch <- chatMsg{role: "A", content: event, responseType: detectResponseType(event)}
+						ch <- chatMsg{role: "A", content: event, responseType: responseType}
 					}
 				}
 			}
 			if copyErr != nil && !errors.Is(copyErr, io.EOF) && !errors.Is(ctx.Err(), context.Canceled) {
 				abnormalStream = true
+				if !sawAbnormalPacket {
+					sawAbnormalPacket = queueSSEStreamInterruptedLog(ch, copyErr) || sawAbnormalPacket
+				}
 			}
 			if ch != nil {
 				connMu.Lock()
@@ -10788,12 +10825,14 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 				flusher.Flush()
 				logBuf = append(logBuf, buf[:n]...)
 				for _, event := range splitCompleteSSEEvents(&logBuf) {
-					if detectResponseType(event) == "abnormal" {
+					responseType := detectResponseType(event)
+					if responseType == "abnormal" {
+						sawAbnormalPacket = true
 						abnormalStream = true
 					}
 					markConfirmedMessageInsertUploads(chatID, event)
 					if ch != nil {
-						ch <- chatMsg{role: "A", content: event, responseType: detectResponseType(event)}
+						ch <- chatMsg{role: "A", content: event, responseType: responseType}
 					}
 				}
 			}
@@ -10804,17 +10843,22 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 		}
 		if len(logBuf) > 0 {
 			for _, event := range flushTrailingSSEBytes(&logBuf) {
-				if detectResponseType(event) == "abnormal" {
+				responseType := detectResponseType(event)
+				if responseType == "abnormal" {
+					sawAbnormalPacket = true
 					abnormalStream = true
 				}
 				markConfirmedMessageInsertUploads(chatID, event)
 				if ch != nil {
-					ch <- chatMsg{role: "A", content: event, responseType: detectResponseType(event)}
+					ch <- chatMsg{role: "A", content: event, responseType: responseType}
 				}
 			}
 		}
 		if streamErr != nil && !errors.Is(streamErr, io.EOF) && !errors.Is(ctx.Err(), context.Canceled) {
 			abnormalStream = true
+			if !sawAbnormalPacket {
+				sawAbnormalPacket = queueSSEStreamInterruptedLog(ch, streamErr) || sawAbnormalPacket
+			}
 		}
 		if ch != nil {
 			connMu.Lock()

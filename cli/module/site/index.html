@@ -33137,7 +33137,10 @@ function resetLatestRequestForRestoreReplay(chat, startIndex) {
   let changed = false;
   for (let i = chat.messages.length - 1; i > startIndex; i--) {
     const msg = chat.messages[i];
-    if (msg && msg.role === 'user' && !isTransparentInsertedRequestBoundaryMessage(msg)) break;
+    if (msg && msg.role === 'user') {
+      if (isTransparentInsertedRequestBoundaryMessage(msg)) continue;
+      break;
+    }
     chat.messages.splice(i, 1);
     changed = true;
   }
