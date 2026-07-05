@@ -16,7 +16,7 @@ const (
 type Item struct {
 	AgentID   string `json:"agentId"`
 	ChatID    string `json:"chatId"`
-	Mid       string `json:"mid"`
+	Tid       string `json:"tid"`
 	Message   string `json:"message"`
 	Status    int    `json:"status"`
 	CreatedAt string `json:"createdAt"`
@@ -27,35 +27,45 @@ func EnsureSchema(db *sql.DB) error {
 	if db == nil {
 		return nil
 	}
-	_, err := db.Exec(`
+	if _, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS message_insert (
 			chat_id TEXT NOT NULL,
 			mid TEXT NOT NULL,
 			agent_id TEXT NOT NULL DEFAULT '',
 			message TEXT NOT NULL DEFAULT '',
 			status INTEGER NOT NULL DEFAULT 0,
+			reported_at TEXT NOT NULL DEFAULT '',
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL,
 			PRIMARY KEY (chat_id, mid)
-		);
+		)
+	`); err != nil {
+		return err
+	}
+	if err := ensureMessageInsertColumn(db, "reported_at", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
+	_, err := db.Exec(`
 		CREATE INDEX IF NOT EXISTS idx_message_insert_chat_status_time
 			ON message_insert(chat_id, status, created_at);
 		CREATE INDEX IF NOT EXISTS idx_message_insert_chat_updated_time
 			ON message_insert(chat_id, updated_at);
+		CREATE INDEX IF NOT EXISTS idx_message_insert_chat_reported_time
+			ON message_insert(chat_id, status, reported_at, created_at);
 	`)
 	return err
 }
 
-func UpsertPending(db *sql.DB, agentID, chatID, mid, message string, now time.Time) (Item, error) {
+func UpsertPending(db *sql.DB, agentID, chatID, tid, message string, now time.Time) (Item, error) {
 	agentID = strings.TrimSpace(agentID)
 	chatID = strings.TrimSpace(chatID)
-	mid = strings.TrimSpace(mid)
+	tid = strings.TrimSpace(tid)
 	message = strings.TrimSpace(message)
 	if chatID == "" {
 		return Item{}, fmt.Errorf("chatId is required")
 	}
-	if mid == "" {
-		return Item{}, fmt.Errorf("mid is required")
+	if tid == "" {
+		return Item{}, fmt.Errorf("tid is required")
 	}
 	if message == "" {
 		return Item{}, fmt.Errorf("message is required")
@@ -64,21 +74,22 @@ func UpsertPending(db *sql.DB, agentID, chatID, mid, message string, now time.Ti
 		return Item{}, err
 	}
 	ts := nowOrUTC(now)
-	if _, err := db.Exec(`INSERT INTO message_insert (chat_id, mid, agent_id, message, status, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?)
+	if _, err := db.Exec(`INSERT INTO message_insert (chat_id, mid, agent_id, message, status, reported_at, created_at, updated_at)
+		VALUES (?,?,?,?,?,?,?,?)
 		ON CONFLICT(chat_id, mid) DO UPDATE SET
 			agent_id = excluded.agent_id,
 			message = excluded.message,
 			status = excluded.status,
+			reported_at = excluded.reported_at,
 			updated_at = excluded.updated_at`,
-		chatID, mid, agentID, message, StatusPending, ts, ts); err != nil {
+		chatID, tid, agentID, message, StatusPending, "", ts, ts); err != nil {
 		return Item{}, err
 	}
 	var item Item
 	err := db.QueryRow(`SELECT agent_id, chat_id, mid, message, status, created_at, updated_at
 		FROM message_insert WHERE chat_id = ? AND mid = ?`,
-		chatID, mid,
-	).Scan(&item.AgentID, &item.ChatID, &item.Mid, &item.Message, &item.Status, &item.CreatedAt, &item.UpdatedAt)
+		chatID, tid,
+	).Scan(&item.AgentID, &item.ChatID, &item.Tid, &item.Message, &item.Status, &item.CreatedAt, &item.UpdatedAt)
 	return item, err
 }
 
@@ -95,7 +106,7 @@ func ListPending(db *sql.DB, chatID string, limit int) ([]Item, error) {
 	}
 	rows, err := db.Query(`SELECT agent_id, chat_id, mid, message, status, created_at, updated_at
 		FROM message_insert
-		WHERE chat_id = ? AND status = ?
+		WHERE chat_id = ? AND status = ? AND reported_at = ''
 		ORDER BY created_at, mid
 		LIMIT ?`,
 		chatID, StatusPending, limit)
@@ -107,7 +118,7 @@ func ListPending(db *sql.DB, chatID string, limit int) ([]Item, error) {
 	items := make([]Item, 0, limit)
 	for rows.Next() {
 		var item Item
-		if err := rows.Scan(&item.AgentID, &item.ChatID, &item.Mid, &item.Message, &item.Status, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		if err := rows.Scan(&item.AgentID, &item.ChatID, &item.Tid, &item.Message, &item.Status, &item.CreatedAt, &item.UpdatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, item)
@@ -115,47 +126,99 @@ func ListPending(db *sql.DB, chatID string, limit int) ([]Item, error) {
 	return items, rows.Err()
 }
 
-func MarkUploaded(db *sql.DB, chatID string, mids []string, now time.Time) (int64, error) {
+func MarkPublished(db *sql.DB, chatID string, tids []string, now time.Time) (int64, error) {
 	chatID = strings.TrimSpace(chatID)
-	mids = uniqueMIDs(mids)
-	if chatID == "" || len(mids) == 0 {
+	tids = uniqueTIDs(tids)
+	if chatID == "" || len(tids) == 0 {
 		return 0, nil
 	}
 	if err := EnsureSchema(db); err != nil {
 		return 0, err
 	}
-	args := make([]interface{}, 0, len(mids)+3)
-	args = append(args, StatusUploaded, nowOrUTC(now), chatID)
-	for _, mid := range mids {
-		args = append(args, mid)
+	ts := nowOrUTC(now)
+	args := make([]interface{}, 0, len(tids)+3)
+	args = append(args, ts, ts, chatID)
+	for _, tid := range tids {
+		args = append(args, tid)
 	}
 	res, err := db.Exec(`UPDATE message_insert
-		SET status = ?, updated_at = ?
-		WHERE chat_id = ? AND status = `+fmt.Sprintf("%d", StatusPending)+` AND mid IN (`+placeholders(len(mids))+`)`, args...)
+		SET reported_at = ?, updated_at = ?
+		WHERE chat_id = ? AND status = `+fmt.Sprintf("%d", StatusPending)+` AND reported_at = '' AND mid IN (`+placeholders(len(tids))+`)`, args...)
 	if err != nil {
 		return 0, err
 	}
 	return res.RowsAffected()
 }
 
-func uniqueMIDs(mids []string) []string {
-	if len(mids) == 0 {
+func MarkUploaded(db *sql.DB, chatID string, tids []string, now time.Time) (int64, error) {
+	chatID = strings.TrimSpace(chatID)
+	tids = uniqueTIDs(tids)
+	if chatID == "" || len(tids) == 0 {
+		return 0, nil
+	}
+	if err := EnsureSchema(db); err != nil {
+		return 0, err
+	}
+	args := make([]interface{}, 0, len(tids)+3)
+	args = append(args, StatusUploaded, nowOrUTC(now), chatID)
+	for _, tid := range tids {
+		args = append(args, tid)
+	}
+	res, err := db.Exec(`UPDATE message_insert
+		SET status = ?, updated_at = ?
+		WHERE chat_id = ? AND status = `+fmt.Sprintf("%d", StatusPending)+` AND mid IN (`+placeholders(len(tids))+`)`, args...)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+func uniqueTIDs(tids []string) []string {
+	if len(tids) == 0 {
 		return nil
 	}
-	seen := make(map[string]struct{}, len(mids))
-	result := make([]string, 0, len(mids))
-	for _, mid := range mids {
-		mid = strings.TrimSpace(mid)
-		if mid == "" {
+	seen := make(map[string]struct{}, len(tids))
+	result := make([]string, 0, len(tids))
+	for _, tid := range tids {
+		tid = strings.TrimSpace(tid)
+		if tid == "" {
 			continue
 		}
-		if _, ok := seen[mid]; ok {
+		if _, ok := seen[tid]; ok {
 			continue
 		}
-		seen[mid] = struct{}{}
-		result = append(result, mid)
+		seen[tid] = struct{}{}
+		result = append(result, tid)
 	}
 	return result
+}
+
+func ensureMessageInsertColumn(db *sql.DB, name, definition string) error {
+	rows, err := db.Query(`PRAGMA table_info(message_insert)`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid int
+		var columnName, columnType string
+		var notNull int
+		var defaultValue interface{}
+		var pk int
+		if err := rows.Scan(&cid, &columnName, &columnType, &notNull, &defaultValue, &pk); err != nil {
+			return err
+		}
+		if strings.EqualFold(strings.TrimSpace(columnName), strings.TrimSpace(name)) {
+			return nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`ALTER TABLE message_insert ADD COLUMN ` + name + ` ` + definition)
+	return err
 }
 
 func placeholders(count int) string {

@@ -7159,7 +7159,7 @@ func TestCliGetWritesUnifiedEventLogs(t *testing.T) {
 	}
 }
 
-func TestPublishResultIncludesPendingMessageInsertAndMarksUploaded(t *testing.T) {
+func TestPublishResultIncludesPendingMessageInsertAndMarksPublished(t *testing.T) {
 	oldCronDB := cronDB
 	defer func() {
 		if cronDB != nil && cronDB != oldCronDB {
@@ -7216,19 +7216,69 @@ func TestPublishResultIncludesPendingMessageInsertAndMarksUploaded(t *testing.T)
 	if len(payload.Insert) != 2 {
 		t.Fatalf("insert payload count = %d, want 2", len(payload.Insert))
 	}
-	if payload.Insert[0].Mid != "1710000000000" || payload.Insert[0].Message != "first insert" {
+	if payload.Insert[0].Tid != "1710000000000" || payload.Insert[0].Message != "first insert" {
 		t.Fatalf("first insert payload = %#v", payload.Insert[0])
 	}
-	if payload.Insert[1].Mid != "1710000005000" || payload.Insert[1].Message != "second insert" {
+	if payload.Insert[1].Tid != "1710000005000" || payload.Insert[1].Message != "second insert" {
 		t.Fatalf("second insert payload = %#v", payload.Insert[1])
 	}
 
-	statuses, err := integrationmessageinsert.StatusByMIDs(cronDB, "chat-1", []string{"1710000000000", "1710000005000"})
+	statuses, err := integrationmessageinsert.StatusByTIDs(cronDB, "chat-1", []string{"1710000000000", "1710000005000"})
 	if err != nil {
 		t.Fatalf("status query: %v", err)
 	}
-	if statuses["1710000000000"] != integrationmessageinsert.StatusUploaded {
-		t.Fatalf("status first = %d, want %d", statuses["1710000000000"], integrationmessageinsert.StatusUploaded)
+	if statuses["1710000000000"] != integrationmessageinsert.StatusPending {
+		t.Fatalf("status first = %d, want %d", statuses["1710000000000"], integrationmessageinsert.StatusPending)
+	}
+	if statuses["1710000005000"] != integrationmessageinsert.StatusPending {
+		t.Fatalf("status second = %d, want %d", statuses["1710000005000"], integrationmessageinsert.StatusPending)
+	}
+
+	pending, err := integrationmessageinsert.ListPending(cronDB, "chat-1", 5)
+	if err != nil {
+		t.Fatalf("ListPending after publish: %v", err)
+	}
+	if len(pending) != 0 {
+		t.Fatalf("pending after publish = %#v, want none", pending)
+	}
+}
+
+func TestMarkConfirmedMessageInsertUploadsFromSSE(t *testing.T) {
+	oldCronDB := cronDB
+	defer func() {
+		if cronDB != nil && cronDB != oldCronDB {
+			_ = cronDB.Close()
+		}
+		cronDB = oldCronDB
+	}()
+
+	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "data"))
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	cronDB = db
+	if err := integrationmessageinsert.EnsureSchema(cronDB); err != nil {
+		t.Fatalf("ensure schema: %v", err)
+	}
+	if _, err := integrationmessageinsert.UpsertPending(cronDB, "agent-a", "chat-1", "1710000000000", "first insert", time.Now()); err != nil {
+		t.Fatalf("insert first pending: %v", err)
+	}
+	if _, err := integrationmessageinsert.UpsertPending(cronDB, "agent-a", "chat-1", "1710000005000", "second insert", time.Now().Add(time.Millisecond)); err != nil {
+		t.Fatalf("insert second pending: %v", err)
+	}
+	if _, err := integrationmessageinsert.MarkPublished(cronDB, "chat-1", []string{"1710000000000", "1710000005000"}, time.Now().Add(2*time.Millisecond)); err != nil {
+		t.Fatalf("MarkPublished: %v", err)
+	}
+
+	event := "data: {\"choices\":[{\"index\":0,\"metadata\":{\"__TID__\":\"1710000005000\",\"__PROCESS__\":\"rag_insert\"},\"delta\":{\"content\":\"[已加入引导内容] hello\",\"role\":\"assistant\"}}],\"workflow\":\"main\",\"object\":\"chat.completion\",\"model\":\"right\",\"created\":1783184455608,\"code\":200,\"biz\":\"main\",\"id\":\"15c859bd-8f0e-4e93-85b9-cecb1b3362d2\"}\n\n"
+	markConfirmedMessageInsertUploads("chat-1", event)
+
+	statuses, err := integrationmessageinsert.StatusByTIDs(cronDB, "chat-1", []string{"1710000000000", "1710000005000"})
+	if err != nil {
+		t.Fatalf("status query: %v", err)
+	}
+	if statuses["1710000000000"] != integrationmessageinsert.StatusPending {
+		t.Fatalf("status first = %d, want %d", statuses["1710000000000"], integrationmessageinsert.StatusPending)
 	}
 	if statuses["1710000005000"] != integrationmessageinsert.StatusUploaded {
 		t.Fatalf("status second = %d, want %d", statuses["1710000005000"], integrationmessageinsert.StatusUploaded)
@@ -7253,50 +7303,37 @@ func TestMessageInsertHandlersLifecycle(t *testing.T) {
 		t.Fatalf("ensure schema: %v", err)
 	}
 
-	addReq := httptest.NewRequest(http.MethodPost, "/api/message_insert/add", strings.NewReader(`{"agentId":"agent-a","chatId":"chat-1","mid":1710000000000,"message":"hello"}`))
+	addReq := httptest.NewRequest(http.MethodPost, "/api/message_insert/add", strings.NewReader(`{"agentId":"agent-a","chatId":"chat-1","tid":1710000000000,"message":"hello"}`))
 	addRec := httptest.NewRecorder()
 	handleMessageInsertAdd().ServeHTTP(addRec, addReq)
 	if addRec.Code != http.StatusOK {
 		t.Fatalf("add status = %d body=%s", addRec.Code, addRec.Body.String())
 	}
 
-	statusReq := httptest.NewRequest(http.MethodPost, "/api/message_insert/status", strings.NewReader(`{"chatId":"chat-1","mid":[1710000000000,1710000000001]}`))
-	statusRec := httptest.NewRecorder()
-	handleMessageInsertStatus().ServeHTTP(statusRec, statusReq)
-	if statusRec.Code != http.StatusOK {
-		t.Fatalf("status code = %d body=%s", statusRec.Code, statusRec.Body.String())
-	}
-	var statusResp struct {
+	var addResp struct {
 		Status int `json:"status"`
 		Data   struct {
-			Items []struct {
-				Mid    string `json:"mid"`
-				Status int    `json:"status"`
-			} `json:"items"`
-			Missing []string `json:"missing"`
+			Tid string `json:"tid"`
 		} `json:"data"`
 	}
-	if err := json.Unmarshal(statusRec.Body.Bytes(), &statusResp); err != nil {
-		t.Fatalf("decode status response: %v", err)
+	if err := json.Unmarshal(addRec.Body.Bytes(), &addResp); err != nil {
+		t.Fatalf("decode add response: %v", err)
 	}
-	if statusResp.Status != 0 {
-		t.Fatalf("status response status = %d", statusResp.Status)
+	if addResp.Status != 0 {
+		t.Fatalf("add response status = %d", addResp.Status)
 	}
-	if len(statusResp.Data.Items) != 1 || statusResp.Data.Items[0].Mid != "1710000000000" || statusResp.Data.Items[0].Status != integrationmessageinsert.StatusPending {
-		t.Fatalf("status items = %#v", statusResp.Data.Items)
-	}
-	if len(statusResp.Data.Missing) != 1 || statusResp.Data.Missing[0] != "1710000000001" {
-		t.Fatalf("missing = %#v", statusResp.Data.Missing)
+	if addResp.Data.Tid != "1710000000000" {
+		t.Fatalf("add tid = %q", addResp.Data.Tid)
 	}
 
-	delReq := httptest.NewRequest(http.MethodPost, "/api/message_insert/del", strings.NewReader(`{"chatId":"chat-1","mid":"1710000000000"}`))
+	delReq := httptest.NewRequest(http.MethodPost, "/api/message_insert/del", strings.NewReader(`{"chatId":"chat-1","tid":"1710000000000"}`))
 	delRec := httptest.NewRecorder()
 	handleMessageInsertDel().ServeHTTP(delRec, delReq)
 	if delRec.Code != http.StatusOK {
 		t.Fatalf("del status = %d body=%s", delRec.Code, delRec.Body.String())
 	}
 
-	statuses, err := integrationmessageinsert.StatusByMIDs(cronDB, "chat-1", []string{"1710000000000"})
+	statuses, err := integrationmessageinsert.StatusByTIDs(cronDB, "chat-1", []string{"1710000000000"})
 	if err != nil {
 		t.Fatalf("status query after del: %v", err)
 	}

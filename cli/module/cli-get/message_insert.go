@@ -10,7 +10,7 @@ import (
 const messageInsertPublishLimit = 5
 
 type messageInsertPublishItem struct {
-	Mid     string `json:"mid"`
+	Tid     string `json:"tid"`
 	Message string `json:"message"`
 }
 
@@ -29,14 +29,14 @@ func loadPendingMessageInsertPublishItems(chatID string, limit int) ([]messageIn
 	result := make([]messageInsertPublishItem, 0, len(items))
 	for _, item := range items {
 		result = append(result, messageInsertPublishItem{
-			Mid:     strings.TrimSpace(item.Mid),
+			Tid:     strings.TrimSpace(item.Tid),
 			Message: strings.TrimSpace(item.Message),
 		})
 	}
 	return result, nil
 }
 
-func markUploadedMessageInsertPublishItems(chatID string, items []messageInsertPublishItem) error {
+func markPublishedMessageInsertPublishItems(chatID string, items []messageInsertPublishItem) error {
 	if strings.TrimSpace(chatID) == "" || len(items) == 0 {
 		return nil
 	}
@@ -44,15 +44,15 @@ func markUploadedMessageInsertPublishItems(chatID string, items []messageInsertP
 	if err != nil {
 		return err
 	}
-	mids := make([]string, 0, len(items))
+	tids := make([]string, 0, len(items))
 	for _, item := range items {
-		if mid := strings.TrimSpace(item.Mid); mid != "" {
-			mids = append(mids, mid)
+		if tid := strings.TrimSpace(item.Tid); tid != "" {
+			tids = append(tids, tid)
 		}
 	}
-	if len(mids) == 0 {
+	if len(tids) == 0 {
 		return nil
 	}
-	_, err = messageinsert.MarkUploaded(db, chatID, mids, time.Now())
+	_, err = messageinsert.MarkPublished(db, chatID, tids, time.Now())
 	return err
 }

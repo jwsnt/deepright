@@ -2262,10 +2262,11 @@ func publishResult(client *http.Client, host string, result *ResultPayload, meta
 		return fmt.Errorf("publish code %d", rp.Code)
 	}
 	if len(pendingInsertItems) > 0 {
-		if err := markUploadedMessageInsertPublishItems(strings.TrimSpace(result.Chat), pendingInsertItems); err != nil {
-			log.Printf("message_insert mark uploaded failed chatId=%s mids=%d: %v", strings.TrimSpace(result.Chat), len(pendingInsertItems), err)
+		if err := markPublishedMessageInsertPublishItems(strings.TrimSpace(result.Chat), pendingInsertItems); err != nil {
+			log.Printf("message_insert mark published failed chatId=%s tids=%d: %v", strings.TrimSpace(result.Chat), len(pendingInsertItems), err)
 		}
 	}
+	markConfirmedMessageInsertUploads(strings.TrimSpace(result.Chat), string(body))
 	return nil
 }
 
@@ -10263,6 +10264,60 @@ func parseResponseStatusCode(raw interface{}) (int, bool) {
 	}
 }
 
+func markConfirmedMessageInsertUploads(chatID, content string) {
+	chatID = strings.TrimSpace(chatID)
+	if chatID == "" {
+		return
+	}
+	tids := extractConfirmedMessageInsertTIDs(content)
+	if len(tids) == 0 {
+		return
+	}
+	if err := markUploadedMessageInsertTIDs(chatID, tids); err != nil {
+		log.Printf("message_insert mark uploaded failed chatId=%s tids=%d: %v", chatID, len(tids), err)
+	}
+}
+
+func extractConfirmedMessageInsertTIDs(content string) []string {
+	payloads := extractResponsePayloads(content)
+	if len(payloads) == 0 {
+		return nil
+	}
+	seen := map[string]struct{}{}
+	result := make([]string, 0, len(payloads))
+	for _, payload := range payloads {
+		var raw interface{}
+		if err := json.Unmarshal([]byte(payload), &raw); err != nil {
+			continue
+		}
+		collectConfirmedMessageInsertTIDs(raw, seen, &result)
+	}
+	return result
+}
+
+func collectConfirmedMessageInsertTIDs(raw interface{}, seen map[string]struct{}, result *[]string) {
+	switch value := raw.(type) {
+	case map[string]interface{}:
+		if metadata, ok := value["metadata"].(map[string]interface{}); ok {
+			processKey := strings.TrimSpace(normalizeMessageInsertValue(metadata["__PROCESS__"]))
+			tid := strings.TrimSpace(normalizeMessageInsertValue(metadata["__TID__"]))
+			if strings.EqualFold(processKey, "rag_insert") && tid != "" {
+				if _, exists := seen[tid]; !exists {
+					seen[tid] = struct{}{}
+					*result = append(*result, tid)
+				}
+			}
+		}
+		for _, nested := range value {
+			collectConfirmedMessageInsertTIDs(nested, seen, result)
+		}
+	case []interface{}:
+		for _, nested := range value {
+			collectConfirmedMessageInsertTIDs(nested, seen, result)
+		}
+	}
+}
+
 func splitCompleteSSEEvents(buf *[]byte) []string {
 	data := *buf
 	var events []string
@@ -10672,9 +10727,11 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 				if ch != nil {
 					payloadBuf := append([]byte(nil), payload...)
 					for _, event := range splitCompleteSSEEvents(&payloadBuf) {
+						markConfirmedMessageInsertUploads(chatID, event)
 						ch <- chatMsg{role: "A", content: event, responseType: detectResponseType(event)}
 					}
 					for _, event := range flushTrailingSSEBytes(&payloadBuf) {
+						markConfirmedMessageInsertUploads(chatID, event)
 						ch <- chatMsg{role: "A", content: event, responseType: detectResponseType(event)}
 					}
 				}
@@ -10721,6 +10778,7 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 					if detectResponseType(event) == "abnormal" {
 						abnormalStream = true
 					}
+					markConfirmedMessageInsertUploads(chatID, event)
 					if ch != nil {
 						ch <- chatMsg{role: "A", content: event, responseType: detectResponseType(event)}
 					}
@@ -10736,6 +10794,7 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 				if detectResponseType(event) == "abnormal" {
 					abnormalStream = true
 				}
+				markConfirmedMessageInsertUploads(chatID, event)
 				if ch != nil {
 					ch <- chatMsg{role: "A", content: event, responseType: detectResponseType(event)}
 				}
@@ -12151,7 +12210,7 @@ func printCLIHelp() {
 	fmt.Println("  integration standalone get")
 	fmt.Println("  integration standalone set --value true")
 	fmt.Println("  integration standalone reset")
-	fmt.Println("  integration message-insert add --agentId demo --chatId chat-001 --mid 1718966400000 --message 'HELLO'")
+	fmt.Println("  integration message-insert add --agentId demo --chatId chat-001 --tid 1718966400000 --message 'HELLO'")
 	fmt.Println("  integration agent export --agent DEF_AGENT --output ./DEF_AGENT.zip")
 	fmt.Println("  integration agent import --input ./DEF_AGENT.zip")
 	fmt.Println("  integration connect meta-create --key feishu --meta '{\"token\":\"abc\"}' --callback ignored --agent A --model OpenAI")
@@ -13416,7 +13475,6 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/consume", handleConsume())
 	mux.HandleFunc("/api/message_insert/add", handleMessageInsertAdd())
 	mux.HandleFunc("/api/message_insert/del", handleMessageInsertDel())
-	mux.HandleFunc("/api/message_insert/status", handleMessageInsertStatus())
 	mux.HandleFunc("/api/sandbox", handleSandbox())
 	mux.HandleFunc("/api/sandbox=off", handleSandbox())
 	mux.HandleFunc("/api/sandbox=filepick", handleSandbox())

@@ -15,31 +15,30 @@
 + 所以设计/编译都需要遵守integration的二进制和CLI收口原则
 
 ### 需求介绍
-+ 增加Post接口/api/message_insert/add，保存指定ChatId的插入消息，mid为插入消息id，由上游传递（通常为时间戳）
-    + 需要保存到数据库，数据库中增加状态（status=0,待上传、1已上传，2取消）
++ 增加Post接口/api/message_insert/add，保存指定ChatId的插入消息，tid为插入消息id，由上游传递（通常为时间戳）
+    + 需要保存到数据库，数据库中增加状态（status=0,待上传、1已上传、2取消）
     + AgentId仅做记录用由哪个Agent发起
 ```
 {
     "agentId": xxx,
     "chatId": yyy,
-    "mid": mmm,
+    "tid": ttt,
     "message": zzz,
 }
 ```
-+ 增加Post接口/api/message_insert/del，删除指定ChatId的插入消息，mid为插入消息id，由上游传递（通常为时间戳）
++ 增加Post接口/api/message_insert/del，取消指定ChatId的插入消息，tid为插入消息id，由上游传递（通常为时间戳）
 ```
 {
     "chatId": yyy,
-    "mid": mmm
+    "tid": ttt
 }
 ```
-+ 增加Post接口/api/message_insert/status，获取指定ChatId的消息状态，mid为插入消息id（可以多条），由上游传递（通常为时间戳）
-```
-{
-    "chatId": yyy,
-    "mid": [aaa,bbb,ccc]
-}
-```
++ 插入消息仍然通过cli/get -> cli/pub链路上报，但单个tid只允许cli/get上报一次：
+    + 只要cli/pub没有报错，就记为“已上报一次”，后续cli/get不再重复上报同一个tid
+    + 此时不立即改为已上传，仅从待上报集合中移除
++ 当integration收到响应报文中 `metadata.__PROCESS__ = rag_insert` 且 `metadata.__TID__` 与插入消息tid相同，才视为该tid真正上报成功：
+    + 命中后把数据库状态更新为已上传
+    + 不再保留旧的 `/api/message_insert/status` 轮询接口
 
 ### 编写代码
 + 以Golang编写以上代码，要求：

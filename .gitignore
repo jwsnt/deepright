@@ -26,6 +26,7 @@ cli/module/connect/plugins/*
 cli/module/connect/remote/release/
 cli/module/cli-get/sandbox/mac/dist/
 cli/module/cli-get/sandbox/mac/data
+cli/module/cli-get/data
 cli/module/plugins/feishu_artifacts
 cli/module/connect/feishu/feishu_artifacts
 cli/module/connect/feishu/bin-feishu

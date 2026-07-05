@@ -128,16 +128,16 @@ public class CliInsertRag extends RagCondition implements CliInsertService, RagS
             }
             this.storeHistory(ragConfig, ragData, histories);
             this.storeRecall(ragConfig, ragData, recall);
-            this.notify(ragConfig, ragData);
+            this.notify(ragConfig, ragData, inserts);
         }
     }
 
     protected void recallQuery(RagConfig ragConfig, RagData ragData) throws Exception {
         List<History> recall = this.recall(ragData.getQuery());
         if (!CollectionUtils.isEmpty(recall)) {
-            // 过滤时间早于Query.created的
+            // 保留时间晚于Query.created的
             recall = recall.stream()
-                    .filter(h -> h.getCreated() <= ragData.getQuery().getCreated())
+                    .filter(h -> h.getCreated() > ragData.getQuery().getCreated())
                     .collect(Collectors.toList());
             if (!CollectionUtils.isEmpty(recall)) {
                 // 最后一条强化Query（会破坏最后一轮的KV缓存）
@@ -153,20 +153,18 @@ public class CliInsertRag extends RagCondition implements CliInsertService, RagS
     @Override
     protected Boolean allowed(RagConfig ragConfig, RagData ragData) throws Exception {
         // 不为Task和后台任务
-        return super.allowed(ragConfig, ragData) && !FeatureFlag.isTask(ragData.getQuery()) && !FeatureFlag.isDaemon(ragData.getQuery());
+        return super.allowed(ragConfig, ragData) && !FeatureFlag.isTask(ragData.getQuery()) && !FeatureFlag.isDaemon(ragData.getQuery()) && !FeatureFlag.isSilent(ragData.getQuery());
     }
 
     protected void notify(RagConfig ragConfig, RagData ragData, List<CliInsert> inserts) throws Exception {
-        if (!FeatureFlag.isSilent(ragData.getQuery())) {
-            for (CliInsert insert : inserts) {
-                Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
-                        .metadata(CliPrinter.process(CliInsertRag.RAG_KEY, MultiSourceFlag.TID, insert.getTid()))
-                        .content(new StringBuffer(XmlResourceLang.get(CliInsertRag.KEY_RECALL)))
-                        .workflow(ragData.getQuery().getWorkflow())
-                        .notifier(Notifier.SOURCE)
-                        .build();
-                this.notifierService.notify(Segment.build(ragData.getQuery(), segmentConfig), ragData.getQuery(), ragData.getQuery());
-            }
+        for (CliInsert insert : inserts) {
+            Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
+                    .metadata(CliPrinter.process(CliInsertRag.RAG_KEY, MultiSourceFlag.TID, insert.getTid()))
+                    .content(new StringBuffer(XmlResourceLang.get(CliInsertRag.KEY_RECALL)))
+                    .workflow(ragData.getQuery().getWorkflow())
+                    .notifier(Notifier.SOURCE)
+                    .build();
+            this.notifierService.notify(Segment.build(ragData.getQuery(), segmentConfig), ragData.getQuery(), ragData.getQuery());
         }
     }
 
@@ -185,7 +183,7 @@ public class CliInsertRag extends RagCondition implements CliInsertService, RagS
         @Value("${cli.insert.query:classpath:config/cli/insert.md}")
         protected String template4insert;
 
-        @Value("${cli.insert.maxSize:10}")
+        @Value("${cli.insert.maxSize:15}")
         protected Integer maxSize;
 
         @Bean(CliInsertRag.RAG_KEY)

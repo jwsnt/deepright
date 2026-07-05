@@ -583,32 +583,46 @@ func TestPublishResultIncludesPendingMessageInsertAndMarksUploaded(t *testing.T)
 	if len(payload.Insert) != 2 {
 		t.Fatalf("insert payload count = %d, want 2", len(payload.Insert))
 	}
-	if payload.Insert[0].Mid != "1710000000000" || payload.Insert[0].Message != "first insert" {
+	if payload.Insert[0].Tid != "1710000000000" || payload.Insert[0].Message != "first insert" {
 		t.Fatalf("first insert payload = %#v", payload.Insert[0])
 	}
-	if payload.Insert[1].Mid != "1710000005000" || payload.Insert[1].Message != "second insert" {
+	if payload.Insert[1].Tid != "1710000005000" || payload.Insert[1].Message != "second insert" {
 		t.Fatalf("second insert payload = %#v", payload.Insert[1])
 	}
 
-	rows, err := db.Query(`SELECT mid, status FROM message_insert WHERE chat_id = ? ORDER BY mid`, "chat-1")
+	rows, err := db.Query(`SELECT mid, status, reported_at FROM message_insert WHERE chat_id = ? ORDER BY mid`, "chat-1")
 	if err != nil {
 		t.Fatalf("query statuses: %v", err)
 	}
 	defer rows.Close()
 	statuses := map[string]int{}
+	reported := map[string]string{}
 	for rows.Next() {
 		var mid string
 		var status int
-		if err := rows.Scan(&mid, &status); err != nil {
+		var reportedAt string
+		if err := rows.Scan(&mid, &status, &reportedAt); err != nil {
 			t.Fatalf("scan status: %v", err)
 		}
 		statuses[mid] = status
+		reported[mid] = reportedAt
 	}
-	if statuses["1710000000000"] != messageinsert.StatusUploaded {
-		t.Fatalf("status first = %d, want %d", statuses["1710000000000"], messageinsert.StatusUploaded)
+	if statuses["1710000000000"] != messageinsert.StatusPending {
+		t.Fatalf("status first = %d, want %d", statuses["1710000000000"], messageinsert.StatusPending)
 	}
-	if statuses["1710000005000"] != messageinsert.StatusUploaded {
-		t.Fatalf("status second = %d, want %d", statuses["1710000005000"], messageinsert.StatusUploaded)
+	if statuses["1710000005000"] != messageinsert.StatusPending {
+		t.Fatalf("status second = %d, want %d", statuses["1710000005000"], messageinsert.StatusPending)
+	}
+	if reported["1710000000000"] == "" || reported["1710000005000"] == "" {
+		t.Fatalf("reported_at not updated: %#v", reported)
+	}
+
+	pending, err := messageinsert.ListPending(db, "chat-1", 5)
+	if err != nil {
+		t.Fatalf("ListPending after publish: %v", err)
+	}
+	if len(pending) != 0 {
+		t.Fatalf("pending after publish = %#v, want none", pending)
 	}
 }
 

@@ -10,12 +10,13 @@
 ```json
 {
   "insert": [
-    { "mid": "1718966400000", "message": "..." }
+    { "tid": "1718966400000", "message": "..." }
   ]
 }
 ```
 
-- `/cli/pub` 成功后，这批 `mid` 会自动更新为 `status=1`
+- `/cli/pub` 成功后，这批 `tid` 只会记为“已上报一次”，后续不再重复通过 `cli/get` 上报
+- 只有当 integration 后续收到响应报文中 `metadata.__PROCESS__ = rag_insert` 且 `metadata.__TID__` 相同，才会最终更新为 `status=1`
 - 读取或回写失败不会中断原有 `cli/pub`，只会输出错误日志
 
 ## 状态存储

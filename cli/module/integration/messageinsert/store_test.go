@@ -37,8 +37,8 @@ func TestMessageInsertLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UpsertPending second: %v", err)
 	}
-	if second.Mid != "102" {
-		t.Fatalf("second mid = %q", second.Mid)
+	if second.Tid != "102" {
+		t.Fatalf("second tid = %q", second.Tid)
 	}
 
 	items, err := ListPending(db, "chat-1", 5)
@@ -48,16 +48,27 @@ func TestMessageInsertLifecycle(t *testing.T) {
 	if len(items) != 2 {
 		t.Fatalf("pending items = %d, want 2", len(items))
 	}
-	if items[0].Mid != "101" || items[1].Mid != "102" {
+	if items[0].Tid != "101" || items[1].Tid != "102" {
 		t.Fatalf("pending order = %#v", items)
 	}
 
-	statuses, err := StatusByMIDs(db, "chat-1", []string{"101", "102"})
+	statuses, err := StatusByTIDs(db, "chat-1", []string{"101", "102"})
 	if err != nil {
-		t.Fatalf("StatusByMIDs before: %v", err)
+		t.Fatalf("StatusByTIDs before: %v", err)
 	}
 	if statuses["101"] != StatusPending || statuses["102"] != StatusPending {
 		t.Fatalf("pending statuses = %#v", statuses)
+	}
+
+	if _, err := MarkPublished(db, "chat-1", []string{"101"}, time.Unix(1710000015, 0)); err != nil {
+		t.Fatalf("MarkPublished: %v", err)
+	}
+	items, err = ListPending(db, "chat-1", 5)
+	if err != nil {
+		t.Fatalf("ListPending after publish: %v", err)
+	}
+	if len(items) != 1 || items[0].Tid != "102" {
+		t.Fatalf("pending after publish = %#v", items)
 	}
 
 	if _, err := MarkUploaded(db, "chat-1", []string{"101"}, time.Unix(1710000020, 0)); err != nil {
@@ -71,9 +82,9 @@ func TestMessageInsertLifecycle(t *testing.T) {
 		t.Fatal("Cancel affected = false, want true")
 	}
 
-	statuses, err = StatusByMIDs(db, "chat-1", []string{"101", "102"})
+	statuses, err = StatusByTIDs(db, "chat-1", []string{"101", "102"})
 	if err != nil {
-		t.Fatalf("StatusByMIDs after: %v", err)
+		t.Fatalf("StatusByTIDs after: %v", err)
 	}
 	if statuses["101"] != StatusUploaded {
 		t.Fatalf("status 101 = %d, want %d", statuses["101"], StatusUploaded)

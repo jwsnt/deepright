@@ -740,8 +740,8 @@ func PublishResult(client *http.Client, host string, result *ResultPayload, meta
 		return fmt.Errorf("publish code %d", rp.Code)
 	}
 	if len(pendingInsertItems) > 0 {
-		if err := markUploadedMessageInsertPublishItems(strings.TrimSpace(result.Chat), pendingInsertItems); err != nil {
-			fmt.Fprintf(os.Stderr, "message_insert mark uploaded error chat=%s mids=%d: %v\n", strings.TrimSpace(result.Chat), len(pendingInsertItems), err)
+		if err := markPublishedMessageInsertPublishItems(strings.TrimSpace(result.Chat), pendingInsertItems); err != nil {
+			fmt.Fprintf(os.Stderr, "message_insert mark published error chat=%s tids=%d: %v\n", strings.TrimSpace(result.Chat), len(pendingInsertItems), err)
 		}
 	}
 	return nil

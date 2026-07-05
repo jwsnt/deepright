@@ -92,13 +92,14 @@ go build -o cli-get .
 ```json
 {
   "insert": [
-    { "mid": "1718966400000", "message": "..." }
+    { "tid": "1718966400000", "message": "..." }
   ]
 }
 ```
 
 - 单次最多附带 `5` 条，按 `created_at` 顺序读取
-- `/cli/pub` 成功后，这批 `mid` 会自动更新为 `status=1`
+- `/cli/pub` 成功后，这批 `tid` 只会标记为“已上报一次”，后续 `cli/get` 不会再次重复上报
+- 只有当 integration 后续收到响应报文中 `metadata.__PROCESS__ = rag_insert` 且 `metadata.__TID__` 相同，这条消息才会最终更新为 `status=1`
 - 如果读取或状态更新失败，会输出错误日志，但不会中断原有 `cli/pub` 主链路
 
 ## Sandbox 模式

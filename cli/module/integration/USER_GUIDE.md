@@ -1294,7 +1294,6 @@ curl -X POST 'http://127.0.0.1:8080/api/cron/create?agentId=demo-agent' \
 | GET/POST | `/api/token` | 保存或读取模型密钥 |
 | POST | `/api/message_insert/add` | 新增或覆盖一条待上传插入消息 |
 | POST | `/api/message_insert/del` | 将指定插入消息标记为取消 |
-| POST | `/api/message_insert/status` | 查询指定 ChatId 下多条插入消息状态 |
 | POST | `/api/cron/create` | 创建定时任务 |
 | POST | `/api/cron/detail/metadata` | 查询定时任务元数据 |
 | POST | `/api/cron/delete` | 删除定时任务 |
@@ -1565,14 +1564,14 @@ Integration 与 proxy 保持一致，统一提供模型密钥读写接口。
 {
   "agentId": "agent-a",
   "chatId": "chat-001",
-  "mid": 1718966400000,
+  "tid": 1718966400000,
   "message": "这是一条待插入的排队消息"
 }
 ```
 
 行为说明：
 
-- 按 `chatId + mid` 作为唯一键写入共享 SQLite `data`
+- 按 `chatId + tid` 作为唯一键写入共享 SQLite `data`
 - 已存在同一条记录时，会直接覆盖 `agentId`、`message` 并把状态重置为 `0`
 - 状态枚举固定为：
   - `0`：待上传
@@ -1588,7 +1587,7 @@ Integration 与 proxy 保持一致，统一提供模型密钥读写接口。
 ```json
 {
   "chatId": "chat-001",
-  "mid": 1718966400000
+  "tid": 1718966400000
 }
 ```
 
@@ -1597,35 +1596,21 @@ Integration 与 proxy 保持一致，统一提供模型密钥读写接口。
 - 不物理删除记录，而是把该条消息状态更新为 `2`
 - 如果对应记录不存在，接口仍返回成功，但 `affected=false`
 
-### `/api/message_insert/status`
-
-`POST /api/message_insert/status`
-
-请求体示例：
-
-```json
-{
-  "chatId": "chat-001",
-  "mid": [1718966400000, 1718966405000]
-}
-```
-
-响应中的 `data.items` 会返回命中的 `mid + status` 列表；未命中的 `mid` 会出现在 `data.missing` 中。
-
 ### `cli/pub` 插入消息上报
 
-- `integration` 内部 `cli/get -> exec -> cli/pub` 链路在真正提交 `/cli/pub` 前，会先从本地 `message_insert` 表读取当前 `chatId` 下状态为 `0` 的记录
+- `integration` 内部 `cli/get -> exec -> cli/pub` 链路在真正提交 `/cli/pub` 前，会先从本地 `message_insert` 表读取当前 `chatId` 下状态为 `0` 且尚未上报过的记录
 - 单次最多附带 `5` 条，写入 `cli/pub` 请求体中的：
 
 ```json
 {
   "insert": [
-    { "mid": "1718966400000", "message": "..." }
+    { "tid": "1718966400000", "message": "..." }
   ]
 }
 ```
 
-- `/cli/pub` 返回成功后，这批 `mid` 会自动更新为 `1`
+- `/cli/pub` 返回成功后，这批 `tid` 只会标记为“已上报一次”，后续不再重复通过 `cli/get` 上报
+- 只有当 integration 收到响应报文中 `metadata.__PROCESS__ = rag_insert` 且 `metadata.__TID__` 相同，这条消息才会自动更新为 `1`
 - 如果读取或回写状态失败，不会中断原有 `cli/pub` 主链路，但会在标准日志里记录错误
 
 ### `/api/plugins/meta`

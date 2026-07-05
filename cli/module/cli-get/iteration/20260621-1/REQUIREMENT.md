@@ -28,11 +28,12 @@
 {
     ... 其他属性
     "insert": [
-        {"mid":xxx, "message":yyy}, .. 1到多条
+        {"tid":xxx, "message":yyy}, .. 1到多条
     ]
 }
 ```
-+ 上报成功后，message_insert状态改为已上传
++ cli/pub成功后，只将这批tid标记为“已上报一次”，后续cli/get不再重复上报同一个tid
++ 是否真正上报成功不再以cli/pub返回成功为准，而是等待integration后续收到响应报文中 `metadata.__PROCESS__ = rag_insert` 且 `metadata.__TID__` 相同后，再更新为已上传
 
 ### 编写代码
 + 以Golang编写以上代码，要求：
@@ -47,7 +48,4 @@
 
 ### 其他要求
 + REQUIREMENT.md为需求文档，禁止编写
-
-
-
 
