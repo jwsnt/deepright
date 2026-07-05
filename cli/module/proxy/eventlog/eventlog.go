@@ -153,20 +153,31 @@ func (s *Store) Query(agentID, chatID, timeline string, types ...int) ([]Entry, 
 		return []Entry{}, nil
 	}
 	args := make([]any, 0, 3+len(types))
-	args = append(args, strings.TrimSpace(agentID), strings.TrimSpace(chatID), strings.TrimSpace(timeline))
+	trimmedAgentID := strings.TrimSpace(agentID)
+	trimmedChatID := strings.TrimSpace(chatID)
+	args = append(args, trimmedChatID, strings.TrimSpace(timeline))
 	holders := make([]string, 0, len(types))
 	for _, item := range types {
 		holders = append(holders, "?")
 		args = append(args, item)
 	}
-	rows, err := s.db.Query(
-		`SELECT id, agent_id, chat_id, content, log_type, created_at
+	query := `SELECT id, agent_id, chat_id, content, log_type, created_at
+		 FROM agent_message_log
+		 WHERE chat_id = ? AND created_at > ?
+		   AND log_type IN (` + strings.Join(holders, ",") + `)
+		 ORDER BY id`
+	if trimmedAgentID != "" {
+		args = append(args[:0], trimmedAgentID, trimmedChatID, strings.TrimSpace(timeline))
+		for _, item := range types {
+			args = append(args, item)
+		}
+		query = `SELECT id, agent_id, chat_id, content, log_type, created_at
 		 FROM agent_message_log
 		 WHERE agent_id = ? AND chat_id = ? AND created_at > ?
-		   AND log_type IN (`+strings.Join(holders, ",")+`)
-		 ORDER BY id`,
-		args...,
-	)
+		   AND log_type IN (` + strings.Join(holders, ",") + `)
+		 ORDER BY id`
+	}
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -187,13 +198,21 @@ func (s *Store) QueryAll(agentID, chatID string) ([]Entry, error) {
 	if s == nil || s.db == nil {
 		return nil, nil
 	}
-	rows, err := s.db.Query(
-		`SELECT id, agent_id, chat_id, content, log_type, created_at
+	trimmedAgentID := strings.TrimSpace(agentID)
+	trimmedChatID := strings.TrimSpace(chatID)
+	query := `SELECT id, agent_id, chat_id, content, log_type, created_at
+		 FROM agent_message_log
+		 WHERE chat_id = ?
+		 ORDER BY created_at, id`
+	args := []any{trimmedChatID}
+	if trimmedAgentID != "" {
+		query = `SELECT id, agent_id, chat_id, content, log_type, created_at
 		 FROM agent_message_log
 		 WHERE agent_id = ? AND chat_id = ?
-		 ORDER BY created_at, id`,
-		strings.TrimSpace(agentID), strings.TrimSpace(chatID),
-	)
+		 ORDER BY created_at, id`
+		args = []any{trimmedAgentID, trimmedChatID}
+	}
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}

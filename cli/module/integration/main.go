@@ -8832,9 +8832,9 @@ func handleRestore() http.HandlerFunc {
 		chatID := r.URL.Query().Get("chat")
 		timeline := r.URL.Query().Get("timeline")
 		lastIDStr := r.URL.Query().Get("lastId")
-		if agentID == "" || chatID == "" || timeline == "" {
+		if chatID == "" || timeline == "" {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "agentId, chat and timeline are required"})
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "chat and timeline are required"})
 			return
 		}
 		lastID := 0
@@ -8848,11 +8848,19 @@ func handleRestore() http.HandlerFunc {
 			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "db not ready"})
 			return
 		}
-		query := `SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at FROM chat_log WHERE agent_id = ? AND chat_id = ? AND created_at > ? ORDER BY id`
-		args := []interface{}{agentID, chatID, timeline}
+		query := `SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at FROM chat_log WHERE chat_id = ? AND created_at > ? ORDER BY id`
+		args := []interface{}{chatID, timeline}
+		if strings.TrimSpace(agentID) != "" {
+			query = `SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at FROM chat_log WHERE agent_id = ? AND chat_id = ? AND created_at > ? ORDER BY id`
+			args = []interface{}{agentID, chatID, timeline}
+		}
 		if lastID > 0 {
-			query = `SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at FROM chat_log WHERE agent_id = ? AND chat_id = ? AND (created_at > ? OR (created_at = ? AND id > ?)) ORDER BY id`
-			args = []interface{}{agentID, chatID, timeline, timeline, lastID}
+			query = `SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at FROM chat_log WHERE chat_id = ? AND (created_at > ? OR (created_at = ? AND id > ?)) ORDER BY id`
+			args = []interface{}{chatID, timeline, timeline, lastID}
+			if strings.TrimSpace(agentID) != "" {
+				query = `SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at FROM chat_log WHERE agent_id = ? AND chat_id = ? AND (created_at > ? OR (created_at = ? AND id > ?)) ORDER BY id`
+				args = []interface{}{agentID, chatID, timeline, timeline, lastID}
+			}
 		}
 		rows, err := cronDB.Query(query, args...)
 		if err != nil {
@@ -10025,7 +10033,7 @@ func validateIntegrationRegisteredModel(model string) error {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Active connection manager (AgentId+Chat dimension)
+// Active connection manager (Chat dimension)
 // ═══════════════════════════════════════════════════════════════════════════
 
 type chatMsg struct {
@@ -10047,7 +10055,7 @@ var (
 	connMap = make(map[string]*activeConn)
 )
 
-func connKey(agentID, chatID string) string { return agentID + "|" + chatID }
+func connKey(chatID string) string { return strings.TrimSpace(chatID) }
 
 const (
 	chatTypePageSession   = "page_session"
@@ -10383,9 +10391,15 @@ func queryEventLogs(agentID, chatID string, types ...int) ([]eventLogEntry, erro
 	if cronDB == nil {
 		return nil, fmt.Errorf("db not ready")
 	}
+	trimmedAgentID := strings.TrimSpace(agentID)
+	trimmedChatID := strings.TrimSpace(chatID)
 	args := make([]any, 0, 2+len(types))
-	args = append(args, strings.TrimSpace(agentID), strings.TrimSpace(chatID))
-	query := `SELECT id, agent_id, chat_id, content, log_type, created_at FROM agent_message_log WHERE agent_id = ? AND chat_id = ?`
+	args = append(args, trimmedChatID)
+	query := `SELECT id, agent_id, chat_id, content, log_type, created_at FROM agent_message_log WHERE chat_id = ?`
+	if trimmedAgentID != "" {
+		args = append(args[:0], trimmedAgentID, trimmedChatID)
+		query = `SELECT id, agent_id, chat_id, content, log_type, created_at FROM agent_message_log WHERE agent_id = ? AND chat_id = ?`
+	}
 	if len(types) > 0 {
 		holders := make([]string, 0, len(types))
 		for _, item := range types {
@@ -10418,14 +10432,13 @@ func handleCancel(cfg *Config) http.HandlerFunc {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		agentID := r.URL.Query().Get("agentId")
 		chatID := r.URL.Query().Get("chat")
-		if agentID == "" || chatID == "" {
+		if chatID == "" {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "agentId and chat are required"})
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "chat is required"})
 			return
 		}
-		key := connKey(agentID, chatID)
+		key := connKey(chatID)
 		connMu.Lock()
 		ac, exists := connMap[key]
 		if exists {
@@ -10616,9 +10629,9 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 			return
 		}
 
-		// Cancel any existing connection for this agent+chat
-		key := connKey(chatAgentID, chatID)
-		if chatAgentID != "" && chatID != "" {
+		// Cancel any existing connection for this chat, even if the bound agent changed.
+		key := connKey(chatID)
+		if chatID != "" {
 			connMu.Lock()
 			if old, exists := connMap[key]; exists {
 				old.cancel()
@@ -10647,7 +10660,7 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 		// Start async writer goroutine and register active connection early so
 		// /api/cancel can hit even before the first SSE chunk arrives.
 		var ch chan chatMsg
-		if chatAgentID != "" && chatID != "" {
+		if chatID != "" {
 			ch = make(chan chatMsg, 64)
 			go func() {
 				for msg := range ch {
@@ -10680,7 +10693,7 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 
 		resp, err := proxyClient.Do(proxyReq)
 		if err != nil {
-			if chatAgentID != "" && chatID != "" {
+			if chatID != "" {
 				connMu.Lock()
 				if ac, exists := connMap[key]; exists {
 					delete(connMap, key)
@@ -10689,7 +10702,7 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 				connMu.Unlock()
 			}
 			cancel()
-			if chatAgentID != "" && chatID != "" {
+			if chatID != "" {
 				appendChatLogDB(chatAgentID, chatID, chatType, "A", "abnormal", "Failed to forward: "+err.Error())
 			}
 			http.Error(w, "Failed to forward", http.StatusBadGateway)
@@ -10709,7 +10722,7 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 		w.Header().Set("X-Accel-Buffering", "no")
 		// Save the normalized forwarded request body so request logs match the
 		// metadata that actually reached the upstream integration boundary.
-		if chatAgentID != "" && chatID != "" {
+		if chatID != "" {
 			go appendChatLogDB(chatAgentID, chatID, chatType, "Q", "normal", string(newBody))
 		}
 
@@ -10756,7 +10769,7 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 			if !errors.Is(ctx.Err(), context.Canceled) {
 				sendSSECompletionNotification(chatType, "", extractCompletionNotificationPrompt(reqData), abnormalStream)
 			}
-			if chatAgentID != "" && chatID != "" {
+			if chatID != "" {
 				connMu.Lock()
 				delete(connMap, key)
 				connMu.Unlock()
@@ -10822,7 +10835,7 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 		}
 
 		// Clean up connection
-		if chatAgentID != "" && chatID != "" {
+		if chatID != "" {
 			connMu.Lock()
 			delete(connMap, key)
 			connMu.Unlock()
@@ -13475,6 +13488,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/consume", handleConsume())
 	mux.HandleFunc("/api/message_insert/add", handleMessageInsertAdd())
 	mux.HandleFunc("/api/message_insert/del", handleMessageInsertDel())
+	mux.HandleFunc("/api/message_insert/delete", handleMessageInsertDelete())
 	mux.HandleFunc("/api/message_insert/list", handleMessageInsertList())
 	mux.HandleFunc("/api/sandbox", handleSandbox())
 	mux.HandleFunc("/api/sandbox=off", handleSandbox())

@@ -1489,6 +1489,9 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 
 /* Model selector */
 .model-selector{position:relative}
+.model-selector.missing > .icon-btn{color:var(--error);box-shadow:0 0 0 1px rgba(255,90,107,.34),0 0 0 4px rgba(255,90,107,.08),inset 0 1px 0 rgba(255,255,255,.26)}
+.model-selector.missing > .icon-btn:hover{color:var(--error);background:rgba(255,90,107,.12)}
+#rsModelLabel.missing{color:var(--error) !important;font-weight:600}
 .model-dropdown{position:absolute;bottom:44px;left:0;background:linear-gradient(180deg,rgba(255,255,255,.86),rgba(255,255,255,.72));border:1px solid rgba(72,99,143,.22);border-radius:var(--radius-xs);box-shadow:0 18px 38px rgba(33,58,118,.16),inset 0 1px 0 rgba(255,255,255,.9);min-width:160px;z-index:20;opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity .2s,transform .2s;backdrop-filter:blur(16px) saturate(140%);-webkit-backdrop-filter:blur(16px) saturate(140%)}
 .model-dropdown.show{opacity:1;transform:translateY(0);pointer-events:auto}
 .model-dropdown-item{padding:8px 14px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:var(--transition);color:#1b315c}
@@ -3629,22 +3632,6 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
         <div class="rs-cell-divider"></div>
         <div class="rs-cell-lower" id="rsTimeline" onmouseenter="tlCollapseCalendar(true)" onmouseleave="tlCollapseCalendar(false)"></div>
         <div class="tl-popup" id="tlPopup" data-overlay-base data-overlay-domain="right" data-overlay-order="18" data-overlay-passive="1"></div>
-        <div class="rs-confirm" id="tlIgnoreConfirm" data-overlay-base data-overlay-domain="right" data-overlay-order="19">
-          <div class="rs-confirm-row"><span>确定忽略此任务？</span></div>
-          <div id="tlIgnoreInfo"></div>
-          <div class="rs-confirm-actions">
-            <button class="rs-confirm-cancel" onclick="tlIgnoreCancel()">取消</button>
-            <button class="rs-confirm-save" style="background:var(--error);border-color:var(--error)" onclick="tlIgnoreDo()">忽略</button>
-          </div>
-        </div>
-        <div class="rs-confirm" id="tlViewConfirm" data-overlay-base data-overlay-domain="right" data-overlay-order="19">
-          <div class="rs-confirm-row"><span>查看备忘录会话？</span></div>
-          <div id="tlViewInfo"></div>
-          <div class="rs-confirm-actions">
-            <button class="rs-confirm-cancel" onclick="tlViewCancel()">取消</button>
-            <button class="rs-confirm-save" onclick="tlViewDo()">查看</button>
-          </div>
-        </div>
       </div>
       <div class="rs-cell" id="rsMemoCell">
         <div class="rs-note-upper" id="rsNoteUpper">
@@ -3846,6 +3833,22 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
         <div class="rs-url-preview-empty" id="rsUrlPreviewEmpty" style="display:none">当前 URL 无法预览</div>
       </div>
     </div>
+    </div>
+    <div class="rs-confirm" id="tlIgnoreConfirm" data-overlay-base data-overlay-domain="right" data-overlay-order="19">
+      <div class="rs-confirm-row"><span>确定忽略此任务？</span></div>
+      <div id="tlIgnoreInfo"></div>
+      <div class="rs-confirm-actions">
+        <button class="rs-confirm-cancel" onclick="tlIgnoreCancel()">取消</button>
+        <button class="rs-confirm-save" style="background:var(--error);border-color:var(--error)" onclick="tlIgnoreDo()">忽略</button>
+      </div>
+    </div>
+    <div class="rs-confirm" id="tlViewConfirm" data-overlay-base data-overlay-domain="right" data-overlay-order="19">
+      <div class="rs-confirm-row"><span>查看备忘录会话？</span></div>
+      <div id="tlViewInfo"></div>
+      <div class="rs-confirm-actions">
+        <button class="rs-confirm-cancel" onclick="tlViewCancel()">取消</button>
+        <button class="rs-confirm-save" onclick="tlViewDo()">查看</button>
+      </div>
     </div>
     <div class="rs-confirm" id="rsConfirm" data-overlay-base data-overlay-domain="right" data-overlay-order="19">
       <div class="rs-confirm-row"><span>模型</span><span id="rsConfirmModel">-</span></div>
@@ -12730,7 +12733,8 @@ function rsSetModelDropdownOpen(open) {
     return false;
   }
   const models = state.settings.models || {};
-  dd.innerHTML = Object.keys(models).map(m => '<div class="model-option' + (m === rsSelectedModel ? ' active' : '') + '" onclick="rsSelectModel(\'' + m + '\')">' + m + '</div>').join('');
+  const selectedModel = rsGetSelectedModel();
+  dd.innerHTML = Object.keys(models).map(m => '<div class="model-option' + (m === selectedModel ? ' active' : '') + '" onclick="rsSelectModel(\'' + m + '\')">' + m + '</div>').join('');
   dd.classList.add('show');
   return true;
 }
@@ -13036,7 +13040,9 @@ function restoreMemoTaskTourDraftState(snapshot) {
   if (noteInput) noteInput.innerHTML = String(draft.noteHtml || '');
   if (reuseChat) reuseChat.checked = !!draft.reuseChecked;
   rsSelectedModel = String(draft.selectedModel || '');
+  rsSetModelMissingState(false);
   if (modelLabel) modelLabel.textContent = String(draft.modelLabelText || '');
+  rsGetSelectedModel();
   if (timeH) timeH.value = String(draft.timeH || '').padStart(2, '0');
   if (timeM) timeM.value = String(draft.timeM || '').padStart(2, '0');
   rsRepeatMode = String(draft.repeatMode || 'once') || 'once';
@@ -13128,6 +13134,7 @@ function startMemoTaskTourDemoPlayback() {
   if (noteInput) noteInput.innerHTML = '';
   if (reuseChat) reuseChat.checked = false;
   rsSelectedModel = '';
+  rsSetModelMissingState(false);
   if (modelLabel) modelLabel.textContent = '';
   if (swarmToggle) swarmToggle.classList.remove('on');
   if (swarmLabel) swarmLabel.classList.remove('on');
@@ -13167,6 +13174,7 @@ function startMemoTaskTourDemoPlayback() {
     runIfActive(() => {
       memoTaskTourState.phase = 'model-option';
       rsSelectedModel = firstModel;
+      rsSetModelMissingState(false);
       if (modelLabel) modelLabel.textContent = firstModel;
       rsSetModelDropdownOpen(false);
     });
@@ -24101,6 +24109,7 @@ function setChatPendingRequest(chatId, pending, requestTs) {
     chat.lastRestoreAt = requestTs;
     chat.lastRestoreId = 0;
   }
+  if (pending) releaseQueuedCenterRecoveredInsertHold(chatId, getChatAgentId(chatId), { syncUi: false });
   saveChats();
 }
 
@@ -24175,6 +24184,41 @@ function buildQueuedCenterInsertedRestoreSendOptions(chatId) {
   };
 }
 
+function hasQueuedCenterRecoveredInsertItem(queue) {
+  return !!(queue && Array.isArray(queue.items) && queue.items.some(item => !!(item && item.recoveredFromInsert)));
+}
+
+function syncQueuedCenterRecoveredInsertHold(chatId, agentId) {
+  const queue = getQueuedCenterQueue(chatId, agentId);
+  if (!queue) return false;
+  if (!hasQueuedCenterRecoveredInsertItem(queue)) {
+    queue.holdRecoveredInsertUntilNextBusy = false;
+    return false;
+  }
+  return !!queue.holdRecoveredInsertUntilNextBusy;
+}
+
+function releaseQueuedCenterRecoveredInsertHold(chatId, agentId, options) {
+  const queue = getQueuedCenterQueue(chatId, agentId);
+  if (!queue) return false;
+  const opts = options || {};
+  let changed = false;
+  if (queue.holdRecoveredInsertUntilNextBusy) {
+    queue.holdRecoveredInsertUntilNextBusy = false;
+    changed = true;
+  }
+  if (opts.clearItemFlags !== false && Array.isArray(queue.items)) {
+    queue.items.forEach(item => {
+      if (item && item.recoveredFromInsert) {
+        delete item.recoveredFromInsert;
+        changed = true;
+      }
+    });
+  }
+  if (changed && opts.syncUi !== false) syncQueuedCenterInputUI(chatId, agentId);
+  return changed;
+}
+
 function ensureQueuedCenterQueue(chatId, agentId) {
   const resolvedChatId = String(chatId || '').trim();
   const resolvedAgentId = String(agentId != null ? agentId : getChatAgentId(resolvedChatId)).trim();
@@ -24186,7 +24230,8 @@ function ensureQueuedCenterQueue(chatId, agentId) {
       chatId: resolvedChatId,
       agentId: resolvedAgentId,
       items: [],
-      draining: false
+      draining: false,
+      holdRecoveredInsertUntilNextBusy: false
     };
   }
   return queuedCenterRequests[scopeKey];
@@ -24414,6 +24459,29 @@ async function postQueuedCenterMessageInsertDel(chatId, tid) {
   return data;
 }
 
+async function postQueuedCenterMessageInsertDelete(chatId, tids) {
+  const resolvedChatId = String(chatId || '').trim();
+  const resolvedTids = Array.isArray(tids)
+    ? tids.map(tid => String(tid || '').trim()).filter(Boolean)
+    : [];
+  if (!resolvedChatId || !resolvedTids.length) {
+    return { status: 0, data: { affected: 0, tids: [] } };
+  }
+  const resp = await fetchExecApi('/api/message_insert/delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chatId: resolvedChatId,
+      tids: resolvedTids
+    })
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok || !data || data.status !== 0) {
+    throw new Error((data && data.content) || `HTTP ${resp.status}`);
+  }
+  return data;
+}
+
 async function fetchQueuedCenterMessageInsertList(chatId, limit) {
   const resolvedChatId = String(chatId || '').trim();
   if (!resolvedChatId) return [];
@@ -24505,6 +24573,84 @@ function mergeQueuedCenterInsertedItemsFromServer(chatId, agentId, items) {
   return changed;
 }
 
+function shouldConvertQueuedCenterInsertedMessagesToPending(chatId) {
+  const resolvedChatId = String(chatId || '').trim();
+  if (!resolvedChatId || isChatBusy(resolvedChatId) || isChatSendDispatching(resolvedChatId)) return false;
+  const chat = state.chats[resolvedChatId];
+  if (!chat) return true;
+  if (chat.pendingRequest) return false;
+  const pending = getPendingRequestState(chat);
+  if (pending.assistant && !isAssistantTerminalMessage(pending.assistant)) return false;
+  return true;
+}
+
+function convertQueuedCenterInsertedItemsToPending(chatId, agentId, items) {
+  const resolvedChatId = String(chatId || '').trim();
+  const resolvedAgentId = String(agentId != null ? agentId : getChatAgentId(resolvedChatId)).trim();
+  const normalizedItems = Array.isArray(items) ? items : [];
+  if (!resolvedChatId || !resolvedAgentId || !normalizedItems.length) {
+    return { changed: false, tids: [] };
+  }
+  const queue = ensureQueuedCenterQueue(resolvedChatId, resolvedAgentId);
+  if (!queue) return { changed: false, tids: [] };
+  let changed = false;
+  const tids = [];
+  normalizedItems.forEach(rawItem => {
+    const tid = String(rawItem && rawItem.tid || '').trim();
+    const text = String(rawItem && rawItem.message || '').trim();
+    if (!tid || !text) return;
+    tids.push(tid);
+    const serviceCreatedAt = toChatTimestamp(rawItem && rawItem.createdAt) || toChatTimestamp(new Date());
+    let item = getQueuedCenterRequestItemByInsertTid(resolvedChatId, tid, resolvedAgentId);
+    if (!item) item = getQueuedCenterRequestItem(resolvedChatId, buildQueuedCenterInsertedServerItemId(tid), resolvedAgentId);
+    if (!item) {
+      queue.items.push({
+        id: buildQueuedCenterInsertedServerItemId(tid) || uuid(),
+        text,
+        draftHtml: text,
+        options: buildQueuedCenterInsertedRestoreSendOptions(resolvedChatId),
+        queuedAt: Date.parse(serviceCreatedAt) || Date.now(),
+        recoveredFromInsert: true
+      });
+      changed = true;
+      return;
+    }
+    const insertState = getQueuedCenterInsertState(item);
+    if (insertState && insertState.removalTimer) {
+      clearTimeout(insertState.removalTimer);
+      insertState.removalTimer = 0;
+    }
+    if (String(item.text || '') !== text) {
+      item.text = text;
+      changed = true;
+    }
+    if (String(item.draftHtml || '') !== text) {
+      item.draftHtml = text;
+      changed = true;
+    }
+    if (!item.options || typeof item.options !== 'object') {
+      item.options = buildQueuedCenterInsertedRestoreSendOptions(resolvedChatId);
+      changed = true;
+    }
+    if (!item.queuedAt) {
+      item.queuedAt = Date.parse(serviceCreatedAt) || Date.now();
+      changed = true;
+    }
+    if (!item.recoveredFromInsert) {
+      item.recoveredFromInsert = true;
+      changed = true;
+    }
+    if (item.insertSync) {
+      delete item.insertSync;
+      changed = true;
+    }
+  });
+  if (!tids.length) return { changed: false, tids: [] };
+  queue.holdRecoveredInsertUntilNextBusy = true;
+  if (changed) syncQueuedCenterInputUI(resolvedChatId, resolvedAgentId);
+  return { changed, tids };
+}
+
 function syncQueuedCenterInsertedMessagesFromServer(chatId, agentId, options) {
   const resolvedChatId = String(chatId || '').trim();
   const resolvedAgentId = String(agentId != null ? agentId : getChatAgentId(resolvedChatId)).trim();
@@ -24517,6 +24663,17 @@ function syncQueuedCenterInsertedMessagesFromServer(chatId, agentId, options) {
     .then(async () => {
       try {
         const items = await fetchQueuedCenterMessageInsertList(resolvedChatId, opts.limit || QUEUED_CENTER_REQUEST_LIMIT);
+        if (items.length > 0 && shouldConvertQueuedCenterInsertedMessagesToPending(resolvedChatId)) {
+          const converted = convertQueuedCenterInsertedItemsToPending(resolvedChatId, resolvedAgentId, items);
+          if (converted.tids.length > 0) {
+            try {
+              await postQueuedCenterMessageInsertDelete(resolvedChatId, converted.tids);
+            } catch (err) {
+              if (!opts.silent) vfsShowUploadToast(normalizeMessageInsertErrorMessage(err, '清理插入待处理消息失败'), true);
+            }
+          }
+          return items;
+        }
         mergeQueuedCenterInsertedItemsFromServer(resolvedChatId, resolvedAgentId, items);
         if (items.length > 0 && opts.autoDrainWhenIdle !== false && !isChatBusy(resolvedChatId) && !isChatSendDispatching(resolvedChatId)) {
           scheduleQueuedCenterRequestDrain(resolvedChatId, resolvedAgentId);
@@ -25077,6 +25234,7 @@ function removeQueuedCenterRequestById(chatId, itemId, agentId, options) {
     void cancelQueuedCenterInsertedMessage(chatId, agentId, item, { ignoreErrors: true });
   }
   queue.items.splice(index, 1);
+  syncQueuedCenterRecoveredInsertHold(chatId, agentId);
   cleanupQueuedCenterQueue(chatId, agentId);
   syncQueuedCenterInputUI(chatId, agentId);
   return true;
@@ -25640,7 +25798,8 @@ function collapseRequestAssistantsToSingleCancelled(chat, userIndex, ts) {
 function scheduleQueuedCenterRequestDrain(chatId, agentId) {
   const resolvedAgentId = String(agentId != null ? agentId : getChatAgentId(chatId)).trim();
   const queue = getQueuedCenterQueue(chatId, resolvedAgentId);
-  if (!queue || queue.draining || isChatBusy(chatId) || isChatSendDispatching(chatId) || !queue.items.length || isQueuedCenterTourDrainLocked(chatId, resolvedAgentId)) {
+  syncQueuedCenterRecoveredInsertHold(chatId, resolvedAgentId);
+  if (!queue || queue.draining || queue.holdRecoveredInsertUntilNextBusy || isChatBusy(chatId) || isChatSendDispatching(chatId) || !queue.items.length || isQueuedCenterTourDrainLocked(chatId, resolvedAgentId)) {
     syncQueuedCenterInputUI(chatId, resolvedAgentId);
     return;
   }
@@ -26917,6 +27076,8 @@ function appendCenterStreamDelta(target, parsed, chunkText, options) {
   target.content = shouldSwitch
     ? text
     : (String(target.content || '') + text);
+  delete target._cliSubOnly;
+  delete target.cliSubOnly;
   return {
     switched: shouldSwitch,
     packetType: String(target.streamPacketType || packetType || previousType || '')
@@ -31706,7 +31867,11 @@ async function sendCenterMessage(rawText, options) {
   function removeEmptyStreamingEntry(entry) {
     if (!entry || !entry.msgPushed) return;
     const assistantMsg = entry.assistantMsg;
-    if (normalizeMessageText(assistantMsg.content) || normalizeMessageText(assistantMsg._cliSubContent || assistantMsg.cliSubContent)) return;
+    if (
+      normalizeMessageText(assistantMsg.content) ||
+      normalizeMessageText(assistantMsg._cliSubContent || assistantMsg.cliSubContent) ||
+      getAssistantExplosionSnapshots(assistantMsg).length
+    ) return;
     const index = chat.messages.indexOf(assistantMsg);
     if (index >= 0) {
       chat.messages.splice(index, 1);
@@ -32116,7 +32281,6 @@ async function stopStreaming() {
   if (cs && cs.streaming) cs.cancelling = true;
   if (poll && poll.active) poll.cancelling = true;
   const preflight = preflightTimers[chatId];
-  const agentId = getChatAgentId(chatId);
   const nowTs = toChatTimestamp(new Date());
   markChatRequestCancelled(chatId, nowTs);
   if (state.activeChat === chatId) {
@@ -32139,7 +32303,7 @@ async function stopStreaming() {
   indicator.classList.add('burst');
   setTimeout(() => { indicator.classList.remove('burst'); }, 500);
   await new Promise(resolve => setTimeout(resolve, 3000));
-  if (agentId && chatId) await requestChatCancel(agentId, chatId);
+  if (chatId) await requestChatCancel(chatId);
   stopChatRestorePolling(chatId);
   delete preflightTimers[chatId];
   showPreflight(false);
@@ -32147,10 +32311,10 @@ async function stopStreaming() {
   vfsShowUploadToast('取消成功', false);
 }
 
-async function requestChatCancel(agentId, chatId) {
+async function requestChatCancel(chatId) {
   for (let i = 0; i < 8; i++) {
     try {
-      const resp = await fetchExecApi('/api/cancel?agentId=' + encodeURIComponent(agentId) + '&chat=' + encodeURIComponent(chatId), { method: 'POST' });
+      const resp = await fetchExecApi('/api/cancel?chat=' + encodeURIComponent(chatId), { method: 'POST' });
       let data = {};
       try { data = await resp.json(); } catch {}
       if (resp.ok && data && data.status === 0) return true;
@@ -32850,6 +33014,87 @@ function getChatRestoreLastId(chat) {
   return Number.isFinite(raw) && raw > 0 ? raw : 0;
 }
 
+function extractStructuredAssistantCenterContentFromRaw(raw, options) {
+  const opts = options || {};
+  const includeClosePackets = opts.includeClosePackets !== false;
+  const assistantState = { content: '', streamPacketType: '' };
+  String(raw || '').split(/\r?\n/).forEach(line => {
+    const trimmed = line.trim();
+    if (!trimmed || !trimmed.startsWith('data:')) return;
+    const data = trimmed.slice(5).trim();
+    if (!data || data === '[DONE]') return;
+    try {
+      const parsed = JSON.parse(data);
+      if (isResponseTerminalErrorPacket(parsed)) return;
+      if (isResponseCliSub(parsed)) return;
+      if (!includeClosePackets && isResponseClosePacket(parsed)) return;
+      if (shouldSkipCenterAssistantDelta(parsed)) return;
+      const choice = parsed && parsed.choices && parsed.choices[0];
+      if (!choice || !choice.delta || typeof choice.delta.content !== 'string') return;
+      appendCenterStreamDelta(assistantState, parsed, choice.delta.content);
+    } catch {}
+  });
+  return String(assistantState.content || '');
+}
+
+function hasMeaningfulRestoreAssistantContent(msg) {
+  if (!msg || msg.role !== 'assistant' || msg.error) return false;
+  if (isAssistantCancelledMessage(msg)) return true;
+  const centerBody = msg.rawSse
+    ? normalizeMessageText(extractStructuredAssistantCenterContentFromRaw(msg.rawSse, { includeClosePackets: false }))
+    : normalizeMessageText(String(msg.content || ''));
+  if (normalizeMessageText(centerBody)) return true;
+  return getAssistantExplosionSnapshots(msg).length > 0;
+}
+
+function getLatestRequestRestoreReplayPlan(chat) {
+  if (!chat || !Array.isArray(chat.messages) || !chat.lastRequestAt) return null;
+  const pending = getPendingRequestState(chat);
+  if (pending.start < 0 || !pending.user) return null;
+  const requestTimeline = toChatTimestamp(chat.lastRequestAt);
+  const restoreTimeline = toChatTimestamp(chat.lastRestoreAt);
+  if (!requestTimeline || !restoreTimeline) return null;
+  const assistants = getAssistantsForRequest(chat, pending.start).filter(msg => msg && msg.role === 'assistant' && !msg.error);
+  const meaningfulAssistants = assistants.filter(msg => hasMeaningfulRestoreAssistantContent(msg));
+  if (!meaningfulAssistants.length) {
+    return restoreTimeline > requestTimeline
+      ? { start: pending.start, timeline: requestTimeline, reason: 'missing_assistant' }
+      : null;
+  }
+  let latestAssistantTimeline = '';
+  let hasIncompleteAssistant = false;
+  assistants.forEach(msg => {
+    if (!isAssistantTerminalMessage(msg)) hasIncompleteAssistant = true;
+  });
+  meaningfulAssistants.forEach(msg => {
+    const msgTimeline = toChatTimestamp(msg.receivedAt || msg.createdAt || '');
+    if (msgTimeline && (!latestAssistantTimeline || msgTimeline > latestAssistantTimeline)) {
+      latestAssistantTimeline = msgTimeline;
+    }
+  });
+  if (!hasIncompleteAssistant) return null;
+  const latestLocalTimeline = latestAssistantTimeline || requestTimeline;
+  if (restoreTimeline <= latestLocalTimeline) return null;
+  return { start: pending.start, timeline: requestTimeline, reason: 'partial_assistant' };
+}
+
+function resetLatestRequestForRestoreReplay(chat, startIndex) {
+  if (!chat || !Array.isArray(chat.messages) || startIndex < 0 || startIndex >= chat.messages.length) return false;
+  let changed = false;
+  for (let i = chat.messages.length - 1; i > startIndex; i--) {
+    const msg = chat.messages[i];
+    if (msg && msg.role === 'user' && !isSyntheticInsertedUserMessage(msg)) break;
+    chat.messages.splice(i, 1);
+    changed = true;
+  }
+  chat.pendingRequest = true;
+  chat.lastRestoreAt = toChatTimestamp(chat.lastRequestAt) || chat.lastRequestAt;
+  chat.lastRestoreId = 0;
+  const pendingUser = chat.messages[startIndex];
+  if (pendingUser && pendingUser.role === 'user') chat.lastMsg = pendingUser.content;
+  return changed;
+}
+
 function resetChatRestoreCursorForTimeline(chat, timeline) {
   if (!chat) return;
   const normalized = toChatTimestamp(timeline);
@@ -32857,7 +33102,7 @@ function resetChatRestoreCursorForTimeline(chat, timeline) {
   const current = toChatTimestamp(chat.lastRestoreAt);
   // Re-opening an already restored timeline should keep the latest cursor,
   // otherwise repeated "查看" would pull the same records again and duplicate messages.
-  if (!current) {
+  if (!current || !chatHasRenderableCenterMessages(chat)) {
     chat.lastRestoreAt = normalized;
     chat.lastRestoreId = 0;
   }
@@ -32870,6 +33115,11 @@ function isChatRestoreExpired(chat, timeline) {
   const current = toChatTimestamp(chat.lastRestoreAt);
   if (!current) return false;
   return normalized < current;
+}
+
+function chatHasRenderableCenterMessages(chat) {
+  if (!chat || !Array.isArray(chat.messages)) return false;
+  return chat.messages.some(msg => shouldRenderMessageInCenter(msg));
 }
 
 function normalizeRestoredUserContent(content) {
@@ -33162,6 +33412,10 @@ function applyParsedAssistantSnapshot(msg, parsed) {
     getAssistantExplosionSnapshots(msg).length
   ) {
     delete msg.pendingUiPlaceholder;
+  }
+  if (normalizeMessageText(msg.content) || getAssistantExplosionSnapshots(msg).length) {
+    delete msg._cliSubOnly;
+    delete msg.cliSubOnly;
   }
 }
 
@@ -33903,12 +34157,16 @@ async function performReloadChatRecords(chatId, opts) {
     return { ok: false, terminal: false, added: 0, skipped: true };
   }
   const agentId = getChatAgentId(chatId);
-  if (!agentId) {
-    if (!silent) vfsShowUploadToast('请先选择 Agent', true, toastOptions);
-    return { ok: false, terminal: false, added: 0 };
-  }
   let timeline = getChatRestoreTimeline(chat);
-  const lastId = getChatRestoreLastId(chat);
+  let lastId = getChatRestoreLastId(chat);
+  const replayPlan = getLatestRequestRestoreReplayPlan(chat);
+  if (replayPlan) {
+    resetLatestRequestForRestoreReplay(chat, replayPlan.start);
+    clearChatTaskBadges(chatId);
+    clearChatFooterInlineHint(chatId);
+    timeline = replayPlan.timeline;
+    lastId = 0;
+  }
   const memoRecovery = options.memoRecovery || getMemoViewRecovery(chatId);
   const memoViewTimeline = toChatTimestamp(options.memoViewTimeline || (memoRecovery && memoRecovery.timeline) || '');
   if (!timeline) {
@@ -33921,7 +34179,7 @@ async function performReloadChatRecords(chatId, opts) {
   const requestedTimeline = toChatTimestamp(timeline);
   const noDataTipKey = buildRestoreNoDataTipKey(requestedTimeline || timeline, lastId, memoViewTimeline);
   try {
-    const resp = await fetchExecApi('/api/restore?agentId=' + encodeURIComponent(agentId) + '&chat=' + encodeURIComponent(chatId) + '&timeline=' + encodeURIComponent(timeline) + '&lastId=' + encodeURIComponent(String(lastId)), { method: 'POST' });
+    const resp = await fetchExecApi('/api/restore?chat=' + encodeURIComponent(chatId) + '&timeline=' + encodeURIComponent(timeline) + '&lastId=' + encodeURIComponent(String(lastId)), { method: 'POST' });
     const data = await resp.json();
     if (data.status !== 0) {
       if (!silent) vfsShowUploadToast('加载失败: ' + (data.content || ''), true, toastOptions);
@@ -33948,7 +34206,7 @@ async function performReloadChatRecords(chatId, opts) {
       }
     }
     let fallbackApplied = false;
-    if (!terminal && chat.pendingRequest && memoRecovery) {
+    if (!terminal && memoRecovery && (chat.pendingRequest || !chatHasRenderableCenterMessages(chat))) {
       const fallbackAdded = applyMemoViewRecoveryFallback(chat, memoRecovery);
       if (fallbackAdded > 0 || !chat.pendingRequest) {
         added += fallbackAdded;
@@ -41923,6 +42181,12 @@ function tlViewDo() {
   // Check if chat already exists
   if (state.chats[id]) {
     resetChatRestoreCursorForTimeline(state.chats[id], execTs);
+    if (!chatHasRenderableCenterMessages(state.chats[id])) {
+      state.chats[id].pendingRequest = true;
+      if (!state.chats[id].lastRequestAt || toChatTimestamp(state.chats[id].lastRequestAt) > execTs) {
+        state.chats[id].lastRequestAt = execTs;
+      }
+    }
     switchChat(id);
     renderChatList();
     setTimeout(() => {
@@ -41990,6 +42254,42 @@ function rsToggleReuseChat(event) {
 
 function rsSwarmEnabled() {
   return !!document.getElementById('rsSwarmToggle')?.classList.contains('on');
+}
+
+function rsSetModelMissingState(missing) {
+  const selector = document.getElementById('rsModelSelector');
+  const label = document.getElementById('rsModelLabel');
+  const btn = document.getElementById('rsModelBtn');
+  if (selector) selector.classList.toggle('missing', !!missing);
+  if (label) label.classList.toggle('missing', !!missing);
+  if (btn) btn.setAttribute('aria-invalid', missing ? 'true' : 'false');
+}
+
+function rsGetSelectedModel() {
+  const model = normalizeModelName(rsSelectedModel);
+  if (model && state.settings.models && state.settings.models[model]) {
+    rsSelectedModel = model;
+    rsSetModelMissingState(false);
+    return model;
+  }
+  if (model) {
+    rsSelectedModel = '';
+    const label = document.getElementById('rsModelLabel');
+    if (label) label.textContent = '';
+  }
+  return '';
+}
+
+function rsRequireSelectedModel(options = {}) {
+  const model = rsGetSelectedModel();
+  if (model) return model;
+  rsSetModelMissingState(true);
+  const btn = document.getElementById('rsModelBtn');
+  if (btn && typeof btn.focus === 'function') {
+    try { btn.focus({ preventScroll: true }); } catch { btn.focus(); }
+  }
+  if (options.showToast !== false) vfsShowUploadToast('请先选择模型', true);
+  return '';
 }
 
 function rsInitNote() {
@@ -42080,6 +42380,7 @@ function rsSelectModel(m) {
   if (isMemoTourInteractionLocked()) return;
   rsHideConfirm();
   rsSelectedModel = normalizeModelName(m);
+  rsSetModelMissingState(false);
   const label = document.getElementById('rsModelLabel');
   label.style.opacity = '0';
   setTimeout(() => { label.textContent = m; label.style.opacity = '1'; }, 150);
@@ -42098,14 +42399,14 @@ function rsSaveNote(options = {}) {
     focusEditableInput(noteEl);
     return false;
   }
-  if (!rsSelectedModel && !state.selectedModel) {
-    vfsShowUploadToast('请先选择模型', true);
+  const selectedModel = rsRequireSelectedModel();
+  if (!selectedModel) {
     return false;
   }
   const schedule = rsBuildSaveSchedule();
   const cycleLabels = { once: '仅一次', workday: '工作日', daily: '自然日', hourly: '每小时', every15: '每15分钟', every30: '每30分钟' };
   // Populate confirm panel
-  document.getElementById('rsConfirmModel').textContent = rsSelectedModel || state.selectedModel || '未选择';
+  document.getElementById('rsConfirmModel').textContent = selectedModel;
   document.getElementById('rsConfirmSwarm').textContent = rsSwarmEnabled() ? '开启' : '关闭';
   document.getElementById('rsConfirmThinking').textContent = document.getElementById('rsThinkingToggle').classList.contains('on') ? 'Thinking' : 'Auto';
   document.getElementById('rsConfirmTime').textContent = schedule.rawTime;
@@ -42142,8 +42443,8 @@ async function rsSubmitNote(options = {}) {
     if (noteEl) focusEditableInput(noteEl);
     return { ok: false, reason: 'too-long' };
   }
-  if (!rsSelectedModel && !state.selectedModel) {
-    if (options.showToast !== false) vfsShowUploadToast('请先选择模型', true);
+  const selectedModel = rsRequireSelectedModel({ showToast: options.showToast !== false });
+  if (!selectedModel) {
     return { ok: false, reason: 'missing-model' };
   }
   const schedule = rsBuildSaveSchedule();
@@ -42160,7 +42461,7 @@ async function rsSubmitNote(options = {}) {
     const routerRemote = await getAgentRouterRemoteConfig(agentId);
     const payload = {
       content: content,
-      model: rsSelectedModel || state.selectedModel,
+      model: selectedModel,
       thinking: document.getElementById('rsThinkingToggle').classList.contains('on'),
       router_disable: !rsSwarmEnabled(),
       rawTime: schedule.rawTime,
@@ -42203,6 +42504,7 @@ function rsResetNote() {
   const reuseChat = document.getElementById('rsReuseChat');
   if (reuseChat) reuseChat.checked = false;
   rsSelectedModel = '';
+  rsSetModelMissingState(false);
   rsRepeatMode = 'once';
   const label = document.getElementById('rsModelLabel');
   label.style.opacity = '0';

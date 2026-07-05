@@ -320,6 +320,28 @@ func MarkUploaded(db *sql.DB, chatID string, tids []string, now time.Time) (int6
 	return res.RowsAffected()
 }
 
+func DeleteActive(db *sql.DB, chatID string, tids []string) (int64, error) {
+	chatID = strings.TrimSpace(chatID)
+	tids = uniqueTIDs(tids)
+	if chatID == "" || len(tids) == 0 {
+		return 0, nil
+	}
+	if err := EnsureSchema(db); err != nil {
+		return 0, err
+	}
+	args := make([]interface{}, 0, len(tids)+2)
+	args = append(args, chatID, StatusPending)
+	for _, tid := range tids {
+		args = append(args, tid)
+	}
+	res, err := db.Exec(`DELETE FROM message_insert
+		WHERE chat_id = ? AND status = ? AND mid IN (`+placeholders(len(tids))+`)`, args...)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 func uniqueTIDs(tids []string) []string {
 	if len(tids) == 0 {
 		return nil

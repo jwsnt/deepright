@@ -4418,6 +4418,161 @@ func TestHandleRestoreIncludesCLIGetAndCLIPubLogs(t *testing.T) {
 	}
 }
 
+func TestHandleRestoreUsesChatAcrossAgentSwitches(t *testing.T) {
+	flushAgentCache()
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	sharedDataDB = pooledDB{}
+	sharedEventLogger = struct {
+		mu     sync.Mutex
+		path   string
+		logger *eventlog.Logger
+	}{}
+
+	db, err := sql.Open("sqlite", "data")
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+	initChatTable(db)
+
+	if _, err := db.Exec(`INSERT INTO chat_log (agent_id, chat_id, chat_type, role, response_type, content, created_at) VALUES
+		('agent-a','chat-switch','page_session','A','normal','from-agent-a','2026-05-13T12:00:00.100'),
+		('agent-b','chat-switch','page_session','A','normal','from-agent-b','2026-05-13T12:00:00.300'),
+		('agent-z','chat-other','page_session','A','normal','other-chat','2026-05-13T12:00:00.400')`); err != nil {
+		t.Fatalf("seed chat_log: %v", err)
+	}
+
+	logger, err := getEventLogger()
+	if err != nil {
+		t.Fatalf("getEventLogger: %v", err)
+	}
+	logger.Append(eventlog.Entry{
+		AgentID:   "agent-a",
+		ChatID:    "chat-switch",
+		Content:   `{"task":"run-a"}`,
+		Type:      eventlog.TypeCLIGet,
+		CreatedAt: "2026-05-13T12:00:00.200",
+	})
+	logger.Append(eventlog.Entry{
+		AgentID:   "agent-b",
+		ChatID:    "chat-switch",
+		Content:   `{"status":0,"cmd":"run-b"}`,
+		Type:      eventlog.TypeCLIPub,
+		CreatedAt: "2026-05-13T12:00:00.400",
+	})
+	time.Sleep(100 * time.Millisecond)
+
+	proxy := &ProxyServer{}
+	req := httptest.NewRequest(http.MethodPost, "/api/restore?chat=chat-switch&timeline=2026-05-13T12:00:00", nil)
+	rec := httptest.NewRecorder()
+	proxy.HandleRestore(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+
+	var resp struct {
+		Status int `json:"status"`
+		Data   []struct {
+			AgentID string `json:"agentId"`
+			Role    string `json:"role"`
+			Content string `json:"content"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Status != 0 {
+		t.Fatalf("status body = %d, want 0", resp.Status)
+	}
+	if len(resp.Data) != 4 {
+		t.Fatalf("len(data) = %d, want 4", len(resp.Data))
+	}
+
+	var hasAgentAAssistant, hasAgentBAssistant, hasCLIGet, hasCLIPub bool
+	for _, item := range resp.Data {
+		switch {
+		case item.Role == "A" && item.AgentID == "agent-a" && item.Content == "from-agent-a":
+			hasAgentAAssistant = true
+		case item.Role == "A" && item.AgentID == "agent-b" && item.Content == "from-agent-b":
+			hasAgentBAssistant = true
+		case item.Role == "cli/get" && item.AgentID == "agent-a":
+			hasCLIGet = true
+		case item.Role == "cli/pub" && item.AgentID == "agent-b":
+			hasCLIPub = true
+		}
+	}
+	if !hasAgentAAssistant || !hasAgentBAssistant || !hasCLIGet || !hasCLIPub {
+		t.Fatalf("restored records missing cross-agent entries: %#v", resp.Data)
+	}
+}
+
+func TestHandleCancelUsesChatAcrossAgentSwitches(t *testing.T) {
+	connMu.Lock()
+	connMap = make(map[string]*activeConn)
+	cancelled := false
+	ch := make(chan chatMsg, 1)
+	connMap[connKey("chat-switch")] = &activeConn{
+		cancel:  func() { cancelled = true },
+		ch:      ch,
+		agentID: "agent-old",
+		chatID:  "chat-switch",
+	}
+	connMu.Unlock()
+	defer func() {
+		connMu.Lock()
+		connMap = make(map[string]*activeConn)
+		connMu.Unlock()
+	}()
+
+	proxy := &ProxyServer{}
+	req := httptest.NewRequest(http.MethodPost, "/api/cancel?chat=chat-switch", nil)
+	rec := httptest.NewRecorder()
+	proxy.HandleCancel(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var resp struct {
+		Status    int  `json:"status"`
+		Cancelled bool `json:"cancelled"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Status != 0 || !resp.Cancelled {
+		t.Fatalf("resp = %#v, want status=0 cancelled=true", resp)
+	}
+	if !cancelled {
+		t.Fatalf("cancel func was not called")
+	}
+	msg, ok := <-ch
+	if !ok {
+		t.Fatalf("cancel marker channel closed before delivering marker")
+	}
+	if msg.role != "X" {
+		t.Fatalf("cancel marker = %#v, want role X", msg)
+	}
+	if _, ok := <-ch; ok {
+		t.Fatalf("channel should be closed after cancel")
+	}
+	connMu.Lock()
+	_, exists := connMap[connKey("chat-switch")]
+	connMu.Unlock()
+	if exists {
+		t.Fatalf("connection should be removed after cancel")
+	}
+}
+
 func TestUnifiedEventLogNormalizesCLIPubRawOutput(t *testing.T) {
 	flushAgentCache()
 	oldwd, err := os.Getwd()

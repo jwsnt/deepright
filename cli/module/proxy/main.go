@@ -6579,7 +6579,7 @@ func (p *ProxyServer) HandleCronDetailStatus(w http.ResponseWriter, r *http.Requ
 	json.NewEncoder(w).Encode(map[string]interface{}{"status": 0, "affected": n})
 }
 
-// HandleRestore serves POST /api/restore?agentId=xxx&chat=yyy&timeline=zzz
+// HandleRestore serves POST /api/restore?chat=yyy&timeline=zzz
 func (p *ProxyServer) HandleRestore(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -6589,9 +6589,9 @@ func (p *ProxyServer) HandleRestore(w http.ResponseWriter, r *http.Request) {
 	chatID := r.URL.Query().Get("chat")
 	timeline := r.URL.Query().Get("timeline")
 	lastIDStr := r.URL.Query().Get("lastId")
-	if agentID == "" || chatID == "" || timeline == "" {
+	if chatID == "" || timeline == "" {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "agentId, chat and timeline are required"})
+		json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "chat and timeline are required"})
 		return
 	}
 	lastID := 0
@@ -6607,11 +6607,19 @@ func (p *ProxyServer) HandleRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	initChatTable(db)
-	query := `SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at FROM chat_log WHERE agent_id = ? AND chat_id = ? AND created_at > ? ORDER BY id`
-	args := []interface{}{agentID, chatID, timeline}
+	query := `SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at FROM chat_log WHERE chat_id = ? AND created_at > ? ORDER BY id`
+	args := []interface{}{chatID, timeline}
+	if strings.TrimSpace(agentID) != "" {
+		query = `SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at FROM chat_log WHERE agent_id = ? AND chat_id = ? AND created_at > ? ORDER BY id`
+		args = []interface{}{agentID, chatID, timeline}
+	}
 	if lastID > 0 {
-		query = `SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at FROM chat_log WHERE agent_id = ? AND chat_id = ? AND (created_at > ? OR (created_at = ? AND id > ?)) ORDER BY id`
-		args = []interface{}{agentID, chatID, timeline, timeline, lastID}
+		query = `SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at FROM chat_log WHERE chat_id = ? AND (created_at > ? OR (created_at = ? AND id > ?)) ORDER BY id`
+		args = []interface{}{chatID, timeline, timeline, lastID}
+		if strings.TrimSpace(agentID) != "" {
+			query = `SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at FROM chat_log WHERE agent_id = ? AND chat_id = ? AND (created_at > ? OR (created_at = ? AND id > ?)) ORDER BY id`
+			args = []interface{}{agentID, chatID, timeline, timeline, lastID}
+		}
 	}
 	rows, err := db.Query(query, args...)
 	if err != nil {
@@ -7742,10 +7750,10 @@ type activeConn struct {
 
 var (
 	connMu  sync.Mutex
-	connMap = make(map[string]*activeConn) // key: agentId+"|"+chatId
+	connMap = make(map[string]*activeConn) // key: chatId
 )
 
-func connKey(agentID, chatID string) string { return agentID + "|" + chatID }
+func connKey(chatID string) string { return strings.TrimSpace(chatID) }
 
 const (
 	chatTypePageSession   = "page_session"
@@ -8532,20 +8540,19 @@ func startCronExecutor(p *ProxyServer) {
 	log.Println("[cron] task executor started (every 1 minute)")
 }
 
-// HandleCancel serves POST /api/cancel?agentId=xxx&chat=yyy
+// HandleCancel serves POST /api/cancel?chat=yyy
 func (p *ProxyServer) HandleCancel(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	agentID := r.URL.Query().Get("agentId")
 	chatID := r.URL.Query().Get("chat")
-	if agentID == "" || chatID == "" {
+	if chatID == "" {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "agentId and chat are required"})
+		json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "chat is required"})
 		return
 	}
-	key := connKey(agentID, chatID)
+	key := connKey(chatID)
 	connMu.Lock()
 	ac, exists := connMap[key]
 	if exists {
@@ -8841,9 +8848,9 @@ func (p *ProxyServer) HandleChatCompletions(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Cancel any existing connection for this agent+chat
-	key := connKey(chatAgentID, chatID)
-	if chatAgentID != "" && chatID != "" {
+	// Cancel any existing connection for this chat, even if the bound agent changed.
+	key := connKey(chatID)
+	if chatID != "" {
 		connMu.Lock()
 		if old, exists := connMap[key]; exists {
 			old.cancel()
@@ -8874,7 +8881,7 @@ func (p *ProxyServer) HandleChatCompletions(w http.ResponseWriter, r *http.Reque
 	// Start async writer goroutine and register active connection early so
 	// /api/cancel can hit even before the first SSE chunk arrives.
 	var ch chan chatMsg
-	if chatAgentID != "" && chatID != "" {
+	if chatID != "" {
 		ch = make(chan chatMsg, 64)
 		go func() {
 			for msg := range ch {
@@ -8904,7 +8911,7 @@ func (p *ProxyServer) HandleChatCompletions(w http.ResponseWriter, r *http.Reque
 
 	resp, err := p.Client.Do(proxyReq)
 	if err != nil {
-		if chatAgentID != "" && chatID != "" {
+		if chatID != "" {
 			connMu.Lock()
 			if ac, exists := connMap[key]; exists {
 				delete(connMap, key)
@@ -8916,7 +8923,7 @@ func (p *ProxyServer) HandleChatCompletions(w http.ResponseWriter, r *http.Reque
 			connMu.Unlock()
 		}
 		cancel()
-		if chatAgentID != "" && chatID != "" {
+		if chatID != "" {
 			appendChatLog(chatAgentID, chatID, chatType, "A", "abnormal", "Failed to forward request: "+err.Error())
 		}
 		http.Error(w, "Failed to forward request", http.StatusBadGateway)
@@ -8942,7 +8949,7 @@ func (p *ProxyServer) HandleChatCompletions(w http.ResponseWriter, r *http.Reque
 
 	// Save the normalized forwarded request body so request logs match the
 	// metadata that actually reached the upstream proxy boundary.
-	if chatAgentID != "" && chatID != "" {
+	if chatID != "" {
 		go appendChatLog(chatAgentID, chatID, chatType, "Q", "normal", string(newBody))
 	}
 
@@ -8987,7 +8994,7 @@ func (p *ProxyServer) HandleChatCompletions(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Clean up connection
-	if chatAgentID != "" && chatID != "" {
+	if chatID != "" {
 		connMu.Lock()
 		delete(connMap, key)
 		connMu.Unlock()

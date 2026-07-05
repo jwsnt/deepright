@@ -7342,6 +7342,77 @@ func TestMessageInsertHandlersLifecycle(t *testing.T) {
 	}
 }
 
+func TestMessageInsertDeleteHandlerRemovesActiveRows(t *testing.T) {
+	oldCronDB := cronDB
+	defer func() {
+		if cronDB != nil && cronDB != oldCronDB {
+			_ = cronDB.Close()
+		}
+		cronDB = oldCronDB
+	}()
+
+	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "data"))
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	cronDB = db
+	if err := integrationmessageinsert.EnsureSchema(cronDB); err != nil {
+		t.Fatalf("ensure schema: %v", err)
+	}
+	if _, err := integrationmessageinsert.UpsertPending(cronDB, "agent-a", "chat-1", "1710000000000", "first", time.Unix(1710000000, 0)); err != nil {
+		t.Fatalf("UpsertPending first: %v", err)
+	}
+	if _, err := integrationmessageinsert.UpsertPending(cronDB, "agent-a", "chat-1", "1710000005000", "second", time.Unix(1710000010, 0)); err != nil {
+		t.Fatalf("UpsertPending second: %v", err)
+	}
+	if _, err := integrationmessageinsert.MarkPublished(cronDB, "chat-1", []string{"1710000005000"}, time.Unix(1710000020, 0)); err != nil {
+		t.Fatalf("MarkPublished: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/message_insert/delete", strings.NewReader(`{"chatId":"chat-1","tids":["1710000000000","1710000005000"]}`))
+	rec := httptest.NewRecorder()
+	handleMessageInsertDelete().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("delete status = %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var resp struct {
+		Status int `json:"status"`
+		Data   struct {
+			Affected int64    `json:"affected"`
+			Tids     []string `json:"tids"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode delete response: %v", err)
+	}
+	if resp.Status != 0 {
+		t.Fatalf("delete response status = %d", resp.Status)
+	}
+	if resp.Data.Affected != 2 {
+		t.Fatalf("delete affected = %d, want 2", resp.Data.Affected)
+	}
+	if len(resp.Data.Tids) != 2 {
+		t.Fatalf("delete tids = %#v", resp.Data.Tids)
+	}
+
+	statuses, err := integrationmessageinsert.StatusByTIDs(cronDB, "chat-1", []string{"1710000000000", "1710000005000"})
+	if err != nil {
+		t.Fatalf("status query after delete: %v", err)
+	}
+	if len(statuses) != 0 {
+		t.Fatalf("statuses after delete = %#v, want empty", statuses)
+	}
+
+	items, err := integrationmessageinsert.ListActive(cronDB, "chat-1", 5)
+	if err != nil {
+		t.Fatalf("ListActive after delete: %v", err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("active items after delete = %#v, want empty", items)
+	}
+}
+
 func TestMessageInsertListHandlerIncludesPublishedPendingItems(t *testing.T) {
 	oldCronDB := cronDB
 	defer func() {
@@ -7581,6 +7652,9 @@ func TestHandleRestoreIncludesCLIGetAndCLIPubLogs(t *testing.T) {
 		t.Fatalf("open sqlite: %v", err)
 	}
 	cronDB = db
+	if _, err := cronDB.Exec(`CREATE TABLE IF NOT EXISTS chat_log (id INTEGER PRIMARY KEY AUTOINCREMENT, agent_id TEXT NOT NULL, chat_id TEXT NOT NULL, chat_type TEXT NOT NULL DEFAULT 'page_session', role TEXT NOT NULL, response_type TEXT NOT NULL DEFAULT 'normal', content TEXT NOT NULL, created_at TEXT NOT NULL)`); err != nil {
+		t.Fatalf("create chat_log: %v", err)
+	}
 	if _, err := cronDB.Exec(`CREATE TABLE IF NOT EXISTS agent_message_log (id INTEGER PRIMARY KEY AUTOINCREMENT, agent_id TEXT NOT NULL DEFAULT '', chat_id TEXT NOT NULL DEFAULT '', content TEXT NOT NULL, log_type INTEGER NOT NULL, created_at TEXT NOT NULL)`); err != nil {
 		t.Fatalf("create agent_message_log: %v", err)
 	}
@@ -7627,6 +7701,147 @@ func TestHandleRestoreIncludesCLIGetAndCLIPubLogs(t *testing.T) {
 	}
 	if resp.Data[1].Role != "cli/pub" || resp.Data[1].LogType != logTypeCLIPub {
 		t.Fatalf("second = %#v", resp.Data[1])
+	}
+}
+
+func TestHandleRestoreUsesChatAcrossAgentSwitches(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	db, err := sql.Open("sqlite", "data")
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	cronDB = db
+	if _, err := cronDB.Exec(`CREATE TABLE IF NOT EXISTS chat_log (id INTEGER PRIMARY KEY AUTOINCREMENT, agent_id TEXT NOT NULL, chat_id TEXT NOT NULL, chat_type TEXT NOT NULL DEFAULT 'page_session', role TEXT NOT NULL, response_type TEXT NOT NULL DEFAULT 'normal', content TEXT NOT NULL, created_at TEXT NOT NULL)`); err != nil {
+		t.Fatalf("create chat_log: %v", err)
+	}
+	if _, err := cronDB.Exec(`CREATE TABLE IF NOT EXISTS agent_message_log (id INTEGER PRIMARY KEY AUTOINCREMENT, agent_id TEXT NOT NULL DEFAULT '', chat_id TEXT NOT NULL DEFAULT '', content TEXT NOT NULL, log_type INTEGER NOT NULL, created_at TEXT NOT NULL)`); err != nil {
+		t.Fatalf("create agent_message_log: %v", err)
+	}
+	defer func() {
+		if cronDB != nil {
+			_ = cronDB.Close()
+			cronDB = nil
+		}
+	}()
+
+	if _, err := cronDB.Exec(`INSERT INTO chat_log (agent_id, chat_id, chat_type, role, response_type, content, created_at) VALUES
+		('agent-a','chat-switch','page_session','A','normal','from-agent-a','2026-05-13T12:00:00.100'),
+		('agent-b','chat-switch','page_session','A','normal','from-agent-b','2026-05-13T12:00:00.300'),
+		('agent-z','chat-other','page_session','A','normal','other-chat','2026-05-13T12:00:00.400')`); err != nil {
+		t.Fatalf("seed chat_log: %v", err)
+	}
+	if _, err := cronDB.Exec(`INSERT INTO agent_message_log (agent_id, chat_id, content, log_type, created_at) VALUES
+		('agent-a','chat-switch','{"task":"run-a"}',?, '2026-05-13T12:00:00.200'),
+		('agent-b','chat-switch','{"status":0,"cmd":"run-b"}',?, '2026-05-13T12:00:00.400'),
+		('agent-z','chat-other','{"task":"other"}',?, '2026-05-13T12:00:00.500')`,
+		logTypeCLIGet, logTypeCLIPub, logTypeCLIGet); err != nil {
+		t.Fatalf("seed event logs: %v", err)
+	}
+
+	handler := handleRestore()
+	req := httptest.NewRequest(http.MethodPost, "/api/restore?chat=chat-switch&timeline=2026-05-13T12:00:00", nil)
+	rec := httptest.NewRecorder()
+	handler(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var resp struct {
+		Status int `json:"status"`
+		Data   []struct {
+			AgentID string `json:"agentId"`
+			Role    string `json:"role"`
+			Content string `json:"content"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Status != 0 {
+		t.Fatalf("status body = %d, want 0", resp.Status)
+	}
+	if len(resp.Data) != 4 {
+		t.Fatalf("len(data) = %d, want 4", len(resp.Data))
+	}
+
+	var hasAgentAAssistant, hasAgentBAssistant, hasCLIGet, hasCLIPub bool
+	for _, item := range resp.Data {
+		switch {
+		case item.Role == "A" && item.AgentID == "agent-a" && item.Content == "from-agent-a":
+			hasAgentAAssistant = true
+		case item.Role == "A" && item.AgentID == "agent-b" && item.Content == "from-agent-b":
+			hasAgentBAssistant = true
+		case item.Role == "cli/get" && item.AgentID == "agent-a":
+			hasCLIGet = true
+		case item.Role == "cli/pub" && item.AgentID == "agent-b":
+			hasCLIPub = true
+		}
+	}
+	if !hasAgentAAssistant || !hasAgentBAssistant || !hasCLIGet || !hasCLIPub {
+		t.Fatalf("restored records missing cross-agent entries: %#v", resp.Data)
+	}
+}
+
+func TestHandleCancelUsesChatAcrossAgentSwitches(t *testing.T) {
+	connMu.Lock()
+	connMap = make(map[string]*activeConn)
+	cancelled := false
+	ch := make(chan chatMsg, 1)
+	connMap[connKey("chat-switch")] = &activeConn{
+		cancel:  func() { cancelled = true },
+		ch:      ch,
+		agentID: "agent-old",
+		chatID:  "chat-switch",
+	}
+	connMu.Unlock()
+	defer func() {
+		connMu.Lock()
+		connMap = make(map[string]*activeConn)
+		connMu.Unlock()
+	}()
+
+	handler := handleCancel(&Config{})
+	req := httptest.NewRequest(http.MethodPost, "/api/cancel?chat=chat-switch", nil)
+	rec := httptest.NewRecorder()
+	handler(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var resp struct {
+		Status    int  `json:"status"`
+		Cancelled bool `json:"cancelled"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Status != 0 || !resp.Cancelled {
+		t.Fatalf("resp = %#v, want status=0 cancelled=true", resp)
+	}
+	if !cancelled {
+		t.Fatalf("cancel func was not called")
+	}
+	msg, ok := <-ch
+	if !ok {
+		t.Fatalf("cancel marker channel closed before delivering marker")
+	}
+	if msg.role != "X" {
+		t.Fatalf("cancel marker = %#v, want role X", msg)
+	}
+	connMu.Lock()
+	_, exists := connMap[connKey("chat-switch")]
+	connMu.Unlock()
+	if exists {
+		t.Fatalf("connection should be removed after cancel")
 	}
 }
 

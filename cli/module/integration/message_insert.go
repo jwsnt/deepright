@@ -214,6 +214,56 @@ func handleMessageInsertDel() http.HandlerFunc {
 	}
 }
 
+func handleMessageInsertDelete() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var payload struct {
+			ChatID interface{}   `json:"chatId"`
+			Tid    interface{}   `json:"tid"`
+			Mid    interface{}   `json:"mid"`
+			Tids   []interface{} `json:"tids"`
+		}
+		if err := decodeMessageInsertPayload(r, &payload); err != nil {
+			writeMessageInsertError(w, http.StatusBadRequest, err)
+			return
+		}
+		chatID := normalizeMessageInsertValue(payload.ChatID)
+		tids := collectMessageInsertTIDs(payload.Tids, payload.Tid, payload.Mid)
+		if chatID == "" {
+			writeMessageInsertError(w, http.StatusBadRequest, fmt.Errorf("chatId is required"))
+			return
+		}
+		if len(tids) == 0 {
+			writeMessageInsertError(w, http.StatusBadRequest, fmt.Errorf("tid is required"))
+			return
+		}
+
+		db, closeFn, err := openIntegrationMessageInsertDB()
+		if err != nil {
+			writeMessageInsertError(w, http.StatusInternalServerError, err)
+			return
+		}
+		defer closeFn()
+
+		affected, err := messageinsert.DeleteActive(db, chatID, tids)
+		if err != nil {
+			writeMessageInsertError(w, http.StatusBadRequest, err)
+			return
+		}
+		writeMessageInsertJSON(w, http.StatusOK, map[string]interface{}{
+			"status": 0,
+			"data": map[string]interface{}{
+				"chatId":   chatID,
+				"tids":     tids,
+				"affected": affected,
+			},
+		})
+	}
+}
+
 func handleMessageInsertList() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -378,6 +428,44 @@ func resolveMessageInsertTID(values ...interface{}) string {
 		}
 	}
 	return ""
+}
+
+func collectMessageInsertTIDs(values ...interface{}) []string {
+	seen := make(map[string]struct{})
+	result := make([]string, 0, len(values))
+	var appendTid func(string)
+	appendTid = func(value string) {
+		tid := strings.TrimSpace(value)
+		if tid == "" {
+			return
+		}
+		if _, ok := seen[tid]; ok {
+			return
+		}
+		seen[tid] = struct{}{}
+		result = append(result, tid)
+	}
+	var walk func(interface{})
+	walk = func(value interface{}) {
+		switch current := value.(type) {
+		case nil:
+			return
+		case []interface{}:
+			for _, item := range current {
+				walk(item)
+			}
+		case []string:
+			for _, item := range current {
+				appendTid(item)
+			}
+		default:
+			appendTid(normalizeMessageInsertValue(current))
+		}
+	}
+	for _, value := range values {
+		walk(value)
+	}
+	return result
 }
 
 func writeMessageInsertJSON(w http.ResponseWriter, statusCode int, payload interface{}) {

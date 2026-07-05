@@ -4,6 +4,7 @@
 
 - 新增 `POST /api/message_insert/add`
 - 新增 `POST /api/message_insert/del`
+- 新增 `POST /api/message_insert/delete`
 - 新增共享 SQLite `data` 中的 `message_insert` 表，状态固定为：
   - `0`：待上传
   - `1`：已上传
@@ -33,6 +34,18 @@
   "tid": 1718966400000
 }
 ```
+
+### `/api/message_insert/delete`
+
+```json
+{
+  "chatId": "chat-001",
+  "tids": [1718966400000, 1718966400001]
+}
+```
+
+- 这个接口会直接物理删除指定 `chatId` 下仍处于未终态的插入记录
+- 主要给上层在“会话已结束，但还残留旧插入记录”时做恢复清理，避免再次切换会话时重复拉回
 
 ## CLI
 

@@ -1294,6 +1294,7 @@ curl -X POST 'http://127.0.0.1:8080/api/cron/create?agentId=demo-agent' \
 | GET/POST | `/api/token` | 保存或读取模型密钥 |
 | POST | `/api/message_insert/add` | 新增或覆盖一条待上传插入消息 |
 | POST | `/api/message_insert/del` | 将指定插入消息标记为取消 |
+| POST | `/api/message_insert/delete` | 物理删除指定插入消息的未终态记录 |
 | POST | `/api/cron/create` | 创建定时任务 |
 | POST | `/api/cron/detail/metadata` | 查询定时任务元数据 |
 | POST | `/api/cron/delete` | 删除定时任务 |
@@ -1596,6 +1597,26 @@ Integration 与 proxy 保持一致，统一提供模型密钥读写接口。
 - 不物理删除记录，而是把该条消息状态更新为 `2`
 - 如果对应记录不存在，接口仍返回成功，但 `affected=false`
 
+### `/api/message_insert/delete`
+
+`POST /api/message_insert/delete`
+
+请求体示例：
+
+```json
+{
+  "chatId": "chat-001",
+  "tids": [1718966400000, 1718966400001]
+}
+```
+
+行为说明：
+
+- 物理删除指定 `chatId` 下、状态仍为未终态的插入消息记录
+- 这类删除不会把状态改成 `2`，而是直接从 `message_insert` 表移除
+- 主要用于前端在“会话已结束，但仍残留旧的插入跟踪记录”时做恢复清理，防止后续再次切换会话时重复恢复
+- 如果目标记录不存在，接口仍返回成功，只是 `affected=0`
+
 ### `cli/pub` 插入消息上报
 
 - `integration` 内部 `cli/get -> exec -> cli/pub` 链路在真正提交 `/cli/pub` 前，会先从本地 `message_insert` 表读取当前 `chatId` 下状态为 `0` 且尚未上报过的记录
@@ -1611,6 +1632,7 @@ Integration 与 proxy 保持一致，统一提供模型密钥读写接口。
 
 - `/cli/pub` 返回成功后，这批 `tid` 只会标记为“已上报一次”，后续不再重复通过 `cli/get` 上报
 - 只有当 integration 收到响应报文中 `metadata.__PROCESS__ = rag_insert` 且 `metadata.__TID__` 相同，这条消息才会自动更新为 `1`
+- 如果上层在会话结束后决定不再把残留插入消息按“插入态”恢复，而是降级回普通待发送消息，应调用 `/api/message_insert/delete` 清掉这些旧记录，避免重复恢复
 - 如果读取或回写状态失败，不会中断原有 `cli/pub` 主链路，但会在标准日志里记录错误
 
 ### `/api/plugins/meta`
