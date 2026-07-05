@@ -33339,6 +33339,156 @@ function findMatchingUserIndex(chat, text) {
   return -1;
 }
 
+function parseRestoreCliRecordJson(content) {
+  const trimmed = String(content || '').trim();
+  if (!trimmed) return null;
+  try {
+    const parsed = JSON.parse(trimmed);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function collectRestoreCliTextParts(value) {
+  if (typeof value === 'string') return [value];
+  if (Array.isArray(value)) {
+    let out = [];
+    value.forEach(item => {
+      out = out.concat(collectRestoreCliTextParts(item));
+    });
+    return out;
+  }
+  if (value && typeof value === 'object') {
+    if (Object.prototype.hasOwnProperty.call(value, 'text')) {
+      return collectRestoreCliTextParts(value.text);
+    }
+    if (Object.prototype.hasOwnProperty.call(value, 'content')) {
+      return collectRestoreCliTextParts(value.content);
+    }
+  }
+  return [];
+}
+
+function extractRestoreCliMessageContents(content) {
+  const payload = parseRestoreCliRecordJson(content);
+  if (!payload) return [];
+  if (Array.isArray(payload.messages)) {
+    let out = [];
+    payload.messages.forEach(item => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return;
+      out = out.concat(collectRestoreCliTextParts(item.content));
+    });
+    return out;
+  }
+  if (Object.prototype.hasOwnProperty.call(payload, 'message')) {
+    return collectRestoreCliTextParts(payload.message);
+  }
+  return [];
+}
+
+function extractRestoreCliNestedCmdValue(value) {
+  if (typeof value === 'string') return extractRestoreCliGetCommand(value);
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const nested = extractRestoreCliNestedCmdValue(item);
+      if (nested) return nested;
+    }
+    return '';
+  }
+  if (!value || typeof value !== 'object') return '';
+  if (typeof value.cmd === 'string' && value.cmd.trim()) return value.cmd.trim();
+  if (Object.prototype.hasOwnProperty.call(value, 'content')) {
+    const nested = extractRestoreCliNestedCmdValue(value.content);
+    if (nested) return nested;
+  }
+  if (Array.isArray(value.choices)) {
+    for (const item of value.choices) {
+      const nested = extractRestoreCliNestedCmdValue(item);
+      if (nested) return nested;
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'message')) {
+    const nested = extractRestoreCliNestedCmdValue(value.message);
+    if (nested) return nested;
+  }
+  return '';
+}
+
+function extractRestoreCliGetCommand(content) {
+  const trimmed = String(content || '').trim();
+  if (!trimmed) return '';
+  const payload = parseRestoreCliRecordJson(trimmed);
+  if (payload) {
+    if (typeof payload.cmd === 'string' && payload.cmd.trim()) return payload.cmd.trim();
+    const nested = extractRestoreCliNestedCmdValue(payload);
+    if (nested) return nested;
+    for (const item of extractRestoreCliMessageContents(trimmed)) {
+      const messageNested = extractRestoreCliGetCommand(item);
+      if (messageNested) return messageNested;
+    }
+    return '';
+  }
+  return trimmed;
+}
+
+function extractRestoreCliPubOutput(content) {
+  const trimmed = String(content || '').trim();
+  if (!trimmed) return '';
+  const items = extractRestoreCliMessageContents(trimmed);
+  if (items.length > 0) return items.join('\n');
+  const payload = parseRestoreCliRecordJson(trimmed);
+  if (payload && Object.prototype.hasOwnProperty.call(payload, 'content')) {
+    const parts = collectRestoreCliTextParts(payload.content);
+    if (parts.length > 0) return parts.join('\n');
+  }
+  return trimmed;
+}
+
+function buildRestoreCliHistoryId(rec, command, ts) {
+  const recId = rec && rec.id != null ? String(rec.id).trim() : '';
+  if (recId) return 'restore-cli:get:' + recId;
+  const stamp = toChatTimestamp(ts || new Date()) || '';
+  return 'restore-cli:get:' + stamp + ':' + String(command || '').trim();
+}
+
+function upsertRestoreCliHistoryEntry(chat, entry) {
+  if (!chat || !entry || typeof entry !== 'object') return null;
+  const history = ensureChatCliCommandHistory(chat);
+  const entryId = String(entry.id || '').trim();
+  if (!entryId) return null;
+  const idx = history.findIndex(item => item && String(item.id || '').trim() === entryId);
+  const previous = idx >= 0 && history[idx] && typeof history[idx] === 'object' ? history[idx] : null;
+  const next = normalizeCliCommandHistoryEntry({
+    ...(previous || {}),
+    ...entry
+  });
+  if (!next) return null;
+  const prevNormalized = normalizeCliCommandHistoryEntry(previous);
+  const changed = !prevNormalized
+    || prevNormalized.command !== next.command
+    || prevNormalized.output !== next.output
+    || prevNormalized.ok !== next.ok
+    || prevNormalized.done !== next.done
+    || prevNormalized.createdAt !== next.createdAt
+    || prevNormalized.updatedAt !== next.updatedAt;
+  if (idx >= 0) history[idx] = next;
+  else history.push(next);
+  if (history.length > MAX_STORE) chat.cliCommandHistory = history.slice(-MAX_STORE);
+  return { entry: next, changed };
+}
+
+function findLatestPendingRestoreCliHistoryEntry(chat) {
+  const history = ensureChatCliCommandHistory(chat);
+  for (let i = history.length - 1; i >= 0; i--) {
+    const entry = normalizeCliCommandHistoryEntry(history[i]);
+    if (!entry) continue;
+    if (!String(entry.id || '').startsWith('restore-cli:get:')) continue;
+    if (entry.done === false) return entry;
+  }
+  return null;
+}
+
 function appendRestoredRecords(chatId, chat, records) {
   if (!chat || !Array.isArray(records) || records.length === 0) return 0;
   const restoreAgentId = getChatAgentId(chatId);
@@ -33353,6 +33503,43 @@ function appendRestoredRecords(chatId, chat, records) {
     if (rec.id != null) {
       const recId = Number(rec.id);
       if (Number.isFinite(recId) && recId > 0) chat.lastRestoreId = recId;
+    }
+    if (rec.role === 'cli/get') {
+      const command = extractRestoreCliGetCommand(rec.content);
+      if (!command) return;
+      const entryId = buildRestoreCliHistoryId(rec, command, ts);
+      const existingEntry = normalizeCliCommandHistoryEntry(
+        ensureChatCliCommandHistory(chat).find(item => item && String(item.id || '').trim() === entryId)
+      );
+      const result = upsertRestoreCliHistoryEntry(chat, {
+        id: entryId,
+        type: 'manual-cmd',
+        command,
+        output: existingEntry ? existingEntry.output : '',
+        ok: existingEntry ? existingEntry.ok : null,
+        done: existingEntry ? existingEntry.done : false,
+        createdAt: (existingEntry && existingEntry.createdAt) || ts,
+        updatedAt: (existingEntry && existingEntry.done ? existingEntry.updatedAt : ts) || ts
+      });
+      if (result && result.changed) added++;
+      return;
+    }
+    if (rec.role === 'cli/pub') {
+      const pendingEntry = findLatestPendingRestoreCliHistoryEntry(chat);
+      if (!pendingEntry) return;
+      const output = extractRestoreCliPubOutput(rec.content);
+      const result = upsertRestoreCliHistoryEntry(chat, {
+        ...pendingEntry,
+        id: pendingEntry.id,
+        type: 'manual-cmd',
+        output,
+        ok: pendingEntry.ok === false ? false : true,
+        done: true,
+        createdAt: pendingEntry.createdAt || ts,
+        updatedAt: ts
+      });
+      if (result && result.changed) added++;
+      return;
     }
     if (rec.role === 'Q') {
       const text = parseRestoreUserRecord(rec.content);
