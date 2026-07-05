@@ -126,6 +126,7 @@ public class CliInsertRag extends RagCondition implements CliInsertService, RagS
                 recall.add(history.buildHistories()[0]);
                 histories.add(history);
             }
+            ragData.getRequest().getMessage().getUserContext().putMetadata(CliInsertRag.KEY_RECALL, recall);
             this.storeHistory(ragConfig, ragData, histories);
             this.storeRecall(ragConfig, ragData, recall);
             this.notify(ragConfig, ragData, inserts);

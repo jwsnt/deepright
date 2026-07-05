@@ -225,16 +225,16 @@ a{color:var(--accent);text-decoration:none}
 .cli-sub-tour-demo{position:absolute;left:10px;right:10px;top:10px;display:none;z-index:4}
 .cli-sub-tour-demo.show{display:block}
 .cli-sub-tour-demo .cli-sub-group{width:100%}
-.cli-sub-tour-demo .runtime-log-entry{display:block;flex:0 0 auto;align-self:stretch;min-width:0;box-sizing:border-box;margin:0;padding:6px 8px;border-radius:var(--radius-xs);background:rgba(8,26,12,.88);border:1px solid rgba(77,107,254,.28);box-shadow:0 0 0 1px rgba(77,107,254,.08),0 0 16px rgba(77,107,254,.10);position:relative;overflow:hidden}
+.cli-sub-tour-demo .runtime-log-entry{display:block;flex:0 0 auto;align-self:stretch;min-width:0;box-sizing:border-box;margin:0;padding:4px 6px;border-radius:var(--radius-xs);background:rgba(8,26,12,.88);border:1px solid rgba(77,107,254,.28);box-shadow:0 0 0 1px rgba(77,107,254,.08),0 0 16px rgba(77,107,254,.10);position:relative;overflow:hidden}
 .cli-sub-tour-demo .runtime-log-entry-content{font-size:12px;line-height:1.45;color:#E0E8FF;min-width:0;word-break:break-word;overflow-wrap:anywhere;white-space:normal}
 .cli-sub-tour-demo .runtime-log-entry-content > :first-child{margin-top:0 !important}
 .cli-sub-tour-demo .runtime-log-entry-content > :last-child{margin-bottom:0 !important}
 .cli-sub-tour-demo .runtime-log-entry-content pre,.cli-sub-tour-demo .runtime-log-entry-content code{font-size:inherit !important}
-.cli-sub-tour-demo .runtime-log-entry-content pre{padding:2px 4px !important;margin:8px 0 !important;overflow-x:auto !important;white-space:pre !important;background:rgba(4,14,7,.98);border:1px solid rgba(77,107,254,.34);color:#8BA4FE;box-shadow:0 0 12px rgba(77,107,254,.10);position:relative;z-index:0}
+.cli-sub-tour-demo .runtime-log-entry-content pre{padding:1px 4px !important;margin:4px 0 !important;overflow-x:auto !important;white-space:pre !important;background:rgba(4,14,7,.98);border:1px solid rgba(77,107,254,.34);color:#8BA4FE;box-shadow:0 0 12px rgba(77,107,254,.10);position:relative;z-index:0}
 .cli-sub-tour-demo .runtime-log-entry-content code{color:#8BA4FE;background:rgba(77,107,254,.14)}
-.cli-sub-tour-demo .runtime-log-entry.cli-sub-bubble{min-height:44px;padding-left:38px;z-index:0}
+.cli-sub-tour-demo .runtime-log-entry.cli-sub-bubble{min-height:0;padding-left:38px;z-index:0}
 .cli-sub-tour-demo .cli-copy-btn,.cli-sub-tour-demo .cli-kill-btn{opacity:1;transform:translateY(0) scale(1)}
-.cli-sub-tour-demo .runtime-log-entry-content{padding-top:8px}
+.cli-sub-tour-demo .runtime-log-entry-content{padding-top:4px}
 .cli-sub-bubble .runtime-log-entry-content pre.onboarding-cli-tour-command-target{box-shadow:0 0 0 1px rgba(77,107,254,.38),0 0 0 3px rgba(77,107,254,.14),0 18px 36px rgba(11,24,54,.22)}
 .cli-sub-bubble .cli-kill-btn.onboarding-cli-tour-kill-target,.cli-sub-bubble .cli-copy-btn.onboarding-cli-tour-copy-target{opacity:1 !important;transform:translateY(0) scale(1) !important;box-shadow:0 0 0 1px rgba(77,107,254,.5),0 0 12px rgba(77,107,254,.18)}
 .rs-cmd-toggle.onboarding-cli-tour-exec-target{background:rgba(77,107,254,.14);color:var(--text-primary);box-shadow:0 0 0 1px rgba(77,107,254,.32),0 0 12px rgba(77,107,254,.14)}
@@ -788,6 +788,7 @@ animation:queuedInsertExplosion .62s ease-out both}
 [data-theme="dark"] .message .md-content .message-code-block-action{box-shadow:0 0 0 1px var(--code-block-action-ring),0 10px 24px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.08)}
 [data-theme="dark"] .message .md-content .message-code-block-action:hover,[data-theme="dark"] .message .md-content .message-code-block-action:focus-visible{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 22%,var(--code-block-action-ring) 78%),0 14px 28px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.12)}
 .message.assistant .message-meta,.message.user .message-meta{margin-top:6px;text-align:right;font-size:10px;line-height:1.2;font-weight:300}
+.message.assistant .message-meta{display:flex;align-items:flex-end;justify-content:flex-end;min-height:18px}
 .message.assistant .message-meta{color:var(--text-muted)}
 .message.user .message-meta{color:rgba(255,255,255,.82)}
 .message.assistant.has-explosion-beacon{overflow:visible}
@@ -973,7 +974,7 @@ animation:queuedInsertExplosion .62s ease-out both}
 .right-sidebar.collapsed .right-sidebar-body{display:none}
 .right-sidebar.collapsed .right-sidebar-header{top:12px;left:auto;right:10px}
 .right-sidebar.collapsed .right-sidebar-toggle{margin-left:0}
-.right-sidebar.previewing-url,.right-sidebar.previewing-url-closing{overflow-x:visible;overflow-y:hidden}
+.right-sidebar.previewing-url,.right-sidebar.previewing-url-closing{overflow:hidden}
 .right-sidebar.previewing-url .right-sidebar-body,.right-sidebar.previewing-url-closing .right-sidebar-body{padding-top:0;overflow:visible;position:static}
 .right-sidebar.previewing-url .right-sidebar-header,.right-sidebar.previewing-url-closing .right-sidebar-header{top:10px;left:auto;right:10px}
 .right-sidebar.previewing-url .rs-top,.right-sidebar.previewing-url .rs-bottom{display:none}
@@ -982,7 +983,7 @@ animation:queuedInsertExplosion .62s ease-out both}
 .right-sidebar.collapsed .right-sidebar-toggle.has-memo-completion-beacon svg{filter:drop-shadow(0 0 6px var(--completion-beacon-glow-strong))}
 .rs-row-divider .rs-row-actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0}
 @keyframes rightSidebarBeacon{0%,100%{box-shadow:0 0 0 1px var(--completion-beacon-bg),0 0 0 rgba(0,0,0,0);filter:brightness(.96)}50%{box-shadow:0 0 0 1px var(--completion-beacon-ring),0 0 22px var(--completion-beacon-glow-strong),0 0 34px var(--completion-beacon-glow);filter:brightness(1.22)}}
-.rs-url-preview{position:absolute;inset:0;display:flex;flex-direction:column;width:100%;height:100%;min-height:100%;overflow-x:visible;overflow-y:hidden;isolation:isolate;background:transparent;opacity:0;visibility:hidden;pointer-events:none;transform:translateY(14px) scale(.982);filter:blur(10px);transition:opacity .36s ease,transform .4s cubic-bezier(.22,1,.36,1),filter .4s ease,visibility 0s linear .4s}
+.rs-url-preview{position:absolute;inset:0;display:flex;flex-direction:column;width:100%;height:100%;min-height:100%;overflow:hidden;isolation:isolate;background:transparent;opacity:0;visibility:hidden;pointer-events:none;transform:translateY(14px) scale(.982);filter:blur(10px);transition:opacity .36s ease,transform .4s cubic-bezier(.22,1,.36,1),filter .4s ease,visibility 0s linear .4s}
 .rs-url-preview::before,.rs-url-preview::after{content:'';position:absolute;inset:0;pointer-events:none}
 .rs-url-preview::before{background:linear-gradient(180deg,rgba(255,255,255,.28),rgba(255,255,255,.16) 22%,rgba(255,255,255,.08) 52%,rgba(255,255,255,.1));opacity:0;transition:opacity .36s ease}
 .rs-url-preview::after{background:linear-gradient(180deg,color-mix(in srgb,var(--bg-sidebar) 86%,rgba(255,255,255,.28) 14%),color-mix(in srgb,var(--bg-sidebar) 72%,rgba(255,255,255,.1) 28%));backdrop-filter:blur(0px) saturate(105%);-webkit-backdrop-filter:blur(0px) saturate(105%);box-shadow:inset 0 1px 0 rgba(255,255,255,.26);opacity:0;transition:opacity .36s ease,backdrop-filter .4s ease,-webkit-backdrop-filter .4s ease}
@@ -1013,10 +1014,10 @@ body.center-overlay-focus .rs-url-preview-floating-switch.onboarding-url-preview
 .rs-url-preview-meta{display:none}
 .rs-url-preview-title{font-size:11px;line-height:1.3;color:var(--text-primary);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rs-url-preview-subtitle{font-size:10px;line-height:1.35;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rs-url-preview-frame-shell{position:absolute;inset:0;width:100%;height:100%;min-height:100%;padding:0;box-sizing:border-box;display:block;overflow:hidden;background:#f7fbff;z-index:1;opacity:0;transform:translateY(18px) scale(.988);filter:blur(8px);transition:opacity .34s ease,transform .42s cubic-bezier(.22,1,.36,1),filter .42s ease}
+.rs-url-preview-frame-shell{position:absolute;inset:0;width:100%;height:100%;min-height:100%;padding:0;box-sizing:border-box;display:block;overflow:auto;background:#f7fbff;z-index:1;opacity:0;transform:translateY(18px) scale(.988);filter:blur(8px);transition:opacity .34s ease,transform .42s cubic-bezier(.22,1,.36,1),filter .42s ease;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y}
 .rs-url-preview.is-active .rs-url-preview-frame-shell{opacity:1;transform:translateY(0) scale(1);filter:blur(0);transition-delay:.08s}
 .rs-url-preview.is-closing .rs-url-preview-frame-shell{opacity:0;transform:translateY(16px) scale(.986);filter:blur(10px);transition-delay:0s}
-.rs-url-preview-frame{position:absolute;inset:0;z-index:1;width:100%;height:100%;min-height:100%;border:none;border-radius:0;background:#fff;box-shadow:none;opacity:.88;filter:blur(6px);transition:opacity .34s ease,filter .42s ease}
+.rs-url-preview-frame{position:absolute;inset:0;z-index:1;display:block;width:100%;height:100%;min-height:100%;border:none;border-radius:0;background:#fff;box-shadow:none;opacity:.88;filter:blur(6px);transition:opacity .34s ease,filter .42s ease;pointer-events:auto;touch-action:auto;overscroll-behavior:contain}
 .rs-url-preview.is-active .rs-url-preview-frame{opacity:1;filter:none;transition-delay:.08s}
 .rs-url-preview.is-closing .rs-url-preview-frame{opacity:.62;filter:blur(6px);transition-delay:0s}
 .rs-url-preview-loading{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;padding:24px;pointer-events:none;opacity:0;visibility:hidden;transition:opacity .26s ease,filter .34s ease,visibility 0s linear .26s}
@@ -1293,14 +1294,14 @@ body.center-overlay-focus .rs-url-preview-floating-switch.onboarding-url-preview
 }
 .cli-sub-group{display:flex;flex-direction:column;gap:2px;margin:0}
 .cli-sub-container .runtime-log-entry,.plugin-log-stream .runtime-log-entry{display:block;flex:0 0 auto;align-self:stretch;min-width:0;box-sizing:border-box;margin:0;border-radius:var(--radius-xs);background:rgba(8,26,12,.88);border:1px solid rgba(77,107,254,.28);box-shadow:0 0 0 1px rgba(77,107,254,.08),0 0 16px rgba(77,107,254,.10);position:relative;overflow:hidden}
-.cli-sub-container .runtime-log-entry{padding:4px 6px}
+.cli-sub-container .runtime-log-entry{padding:3px 5px}
 .plugin-log-stream .runtime-log-entry{padding:6px 8px}
 .cli-sub-container .runtime-log-entry-content,.plugin-log-stream .runtime-log-entry-content{font-size:12px;line-height:1.45;color:#E0E8FF;min-width:0;word-break:break-word;overflow-wrap:anywhere;white-space:normal}
 .cli-sub-container .runtime-log-entry-content > :first-child,.plugin-log-stream .runtime-log-entry-content > :first-child{margin-top:0 !important}
 .cli-sub-container .runtime-log-entry-content > :last-child,.plugin-log-stream .runtime-log-entry-content > :last-child{margin-bottom:0 !important}
 .cli-sub-container .runtime-log-entry-content pre,.cli-sub-container .runtime-log-entry-content code,.plugin-log-stream .runtime-log-entry-content pre,.plugin-log-stream .runtime-log-entry-content code{font-size:inherit !important}
 .cli-sub-container .runtime-log-entry-content pre,.plugin-log-stream .runtime-log-entry-content pre{overflow-x:auto !important;white-space:pre !important;background:rgba(4,14,7,.98);border:1px solid rgba(77,107,254,.34);color:#8BA4FE;box-shadow:0 0 12px rgba(77,107,254,.10);position:relative;z-index:0}
-.cli-sub-container .runtime-log-entry-content pre{padding:1px 4px !important;margin:4px 0 !important}
+.cli-sub-container .runtime-log-entry-content pre{padding:1px 4px !important;margin:2px 0 !important}
 .plugin-log-stream .runtime-log-entry-content pre{padding:2px 4px !important;margin:8px 0 !important}
 .cli-sub-container .runtime-log-entry-content pre::-webkit-scrollbar,.plugin-log-stream .runtime-log-entry-content pre::-webkit-scrollbar{height:0;background:transparent}
 .cli-sub-container .runtime-log-entry-content pre:hover::-webkit-scrollbar,.plugin-log-stream .runtime-log-entry-content pre:hover::-webkit-scrollbar{height:6px}
@@ -3818,7 +3819,7 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
         </div>
       </div>
       <div class="rs-url-preview-frame-shell">
-        <iframe class="rs-url-preview-frame" id="rsUrlPreviewFrame" sandbox="allow-same-origin allow-scripts allow-forms allow-popups" referrerpolicy="no-referrer" loading="eager" title="URL 预览"></iframe>
+        <iframe class="rs-url-preview-frame" id="rsUrlPreviewFrame" sandbox="allow-same-origin allow-scripts allow-forms allow-popups" referrerpolicy="no-referrer" loading="eager" scrolling="auto" tabindex="0" title="URL 预览"></iframe>
         <div class="rs-url-preview-loading" id="rsUrlPreviewLoading" aria-hidden="true">
           <div class="rs-url-preview-loading-card">
             <div class="rs-url-preview-loading-badge" aria-hidden="true">
@@ -5839,6 +5840,7 @@ let workingIndicatorState = {
 };
 let preflightTimers = {};
 let restorePolling = {};
+let liveCliEventPolling = {};
 let restoreReloadQueue = {};
 let restoreNoDataTipKeys = {};
 let switchedChatAutoReloadTimer = 0;
@@ -10564,6 +10566,16 @@ function bindRightSidebarUrlPreviewFrameEvents() {
   const frame = document.getElementById('rsUrlPreviewFrame');
   if (!frame || frame.dataset.urlPreviewBound === '1') return;
   frame.dataset.urlPreviewBound = '1';
+  const focusPreviewFrame = () => {
+    if (!rightSidebarUrlPreviewState.active) return;
+    try {
+      if (frame.contentWindow && typeof frame.contentWindow.focus === 'function') {
+        frame.contentWindow.focus();
+        return;
+      }
+    } catch {}
+    if (typeof frame.focus === 'function') frame.focus();
+  };
   frame.addEventListener('load', () => {
     if (!rightSidebarUrlPreviewState.active) return;
     const activeHref = normalizeRightSidebarUrlPreviewHref(rightSidebarUrlPreviewState.href);
@@ -10571,8 +10583,11 @@ function bindRightSidebarUrlPreviewFrameEvents() {
     setRightSidebarUrlPreviewLoading(false, activeHref);
     clearRightSidebarUrlPreviewLoadTimer();
     renderRightSidebarUrlPreview();
+    focusPreviewFrame();
     queueRightSidebarUrlPreviewTourOnSuccessfulLoad(activeChatId, activeHref);
   });
+  frame.addEventListener('pointerdown', focusPreviewFrame);
+  frame.addEventListener('mouseenter', focusPreviewFrame);
   frame.addEventListener('error', () => {
     setRightSidebarUrlPreviewLoading(false, rightSidebarUrlPreviewState.href);
     const chatId = String(rightSidebarUrlPreviewState.chatId || state.activeChat || '').trim();
@@ -20461,7 +20476,7 @@ function getLatestChatRequestSource(chat) {
   if (pending && pending.user) return String(pending.user.requestSource || '').trim();
   for (let i = chat.messages.length - 1; i >= 0; i--) {
     const msg = chat.messages[i];
-    if (!msg || msg.role !== 'user' || isSyntheticInsertedUserMessage(msg)) continue;
+    if (!msg || msg.role !== 'user' || isTransparentInsertedRequestBoundaryMessage(msg)) continue;
     return String(msg.requestSource || '').trim();
   }
   return '';
@@ -23975,7 +23990,7 @@ function getAssistantsForRequest(chat, userIndex) {
     const msg = chat.messages[i];
     if (!msg) continue;
     if (msg.role === 'user') {
-      if (isSyntheticInsertedUserMessage(msg)) continue;
+      if (isTransparentInsertedRequestBoundaryMessage(msg)) continue;
       break;
     }
     if (msg.role === 'assistant') assistants.push(msg);
@@ -24045,7 +24060,7 @@ function collapseMultiAssistantRequests(messages) {
       const next = messages[j];
       if (!next) continue;
       if (next.role === 'user') {
-        if (isSyntheticInsertedUserMessage(next)) continue;
+        if (isTransparentInsertedRequestBoundaryMessage(next)) continue;
         break;
       }
       if (next.role === 'assistant' && !next.error && !isAssistantCancelledMessage(next)) assistantIndexes.push(j);
@@ -24350,11 +24365,22 @@ function isSyntheticInsertedUserMessage(msg) {
   return !!(msg && msg.role === 'user' && msg.messageInsertSynthetic);
 }
 
+function isMaterializedInsertedUserMessage(msg) {
+  if (!msg || msg.role !== 'user') return false;
+  if (isSyntheticInsertedUserMessage(msg)) return true;
+  if (String(msg.insertTid || '').trim()) return true;
+  return String(msg.requestSource || '').trim() === 'message_insert';
+}
+
+function isTransparentInsertedRequestBoundaryMessage(msg) {
+  return isMaterializedInsertedUserMessage(msg);
+}
+
 function getLatestRealUserIndex(chat) {
   if (!chat || !Array.isArray(chat.messages)) return -1;
   for (let i = chat.messages.length - 1; i >= 0; i--) {
     const msg = chat.messages[i];
-    if (!msg || msg.role !== 'user' || isSyntheticInsertedUserMessage(msg)) continue;
+    if (!msg || msg.role !== 'user' || isTransparentInsertedRequestBoundaryMessage(msg)) continue;
     return i;
   }
   return -1;
@@ -24367,7 +24393,7 @@ function findSyntheticInsertAnchorIndex(chat, userIndex) {
     const msg = chat.messages[i];
     if (!msg) continue;
     if (msg.role === 'user') {
-      if (isSyntheticInsertedUserMessage(msg)) {
+      if (isTransparentInsertedRequestBoundaryMessage(msg)) {
         insertIndex = i + 1;
         continue;
       }
@@ -24402,7 +24428,7 @@ function materializeQueuedCenterInsertedRequestMessage(chatId, agentId, item, op
   const opts = options || {};
   const tid = String(opts.tid || (insertState && insertState.tid) || '').trim();
   if (!resolvedChatId || !chat || !Array.isArray(chat.messages) || !text || !tid) return false;
-  const exists = chat.messages.some(msg => isSyntheticInsertedUserMessage(msg) && String(msg.insertTid || '').trim() === tid);
+  const exists = chat.messages.some(msg => msg && msg.role === 'user' && String(msg.insertTid || '').trim() === tid);
   if (exists) return false;
   const createdAt = toChatTimestamp(opts.createdAt || new Date()) || toChatTimestamp(new Date());
   const requestMsg = {
@@ -24410,7 +24436,6 @@ function materializeQueuedCenterInsertedRequestMessage(chatId, agentId, item, op
     content: text,
     createdAt,
     requestSource: 'message_insert',
-    messageInsertSynthetic: true,
     insertTid: tid,
     insertAgentId: resolvedAgentId
   };
@@ -25728,7 +25753,7 @@ function markChatRequestCancelled(chatId, nowTs) {
       const msg = chat.messages[i];
       if (!msg) continue;
       if (msg.role === 'user') {
-        if (isSyntheticInsertedUserMessage(msg)) continue;
+        if (isTransparentInsertedRequestBoundaryMessage(msg)) continue;
         break;
       }
       if (msg.role === 'assistant' && !msg.error) removeIndexes.push(i);
@@ -25930,6 +25955,11 @@ function normalizeLoadedChat(chat) {
   let changed = false;
   chat.rightSidebarUrlPreview = normalizeChatUrlPreviewState(chat.rightSidebarUrlPreview);
   chat.messages.forEach(msg => {
+    if (msg && msg.role === 'user' && msg.messageInsertSynthetic && String(msg.insertTid || '').trim()) {
+      if (String(msg.requestSource || '').trim() !== 'message_insert') msg.requestSource = 'message_insert';
+      delete msg.messageInsertSynthetic;
+      changed = true;
+    }
     const snapshotsBefore = JSON.stringify(msg && msg.explodedSnapshots || []);
     const logicalIdsBefore = JSON.stringify(msg && msg.explodedLogicalIds || []);
     const contentBefore = collapseTrailingAssistantTimingMarkers(msg && msg.content || '');
@@ -26637,8 +26667,8 @@ function renderMessages(options) {
   state.displayedCount = showCount;
   container.innerHTML = renderedMessages.map(m => msgHtml(m)).join('');
   restoreRenderedAssistantExplosionBeacons(container, renderedMessages);
-  const markedSyntheticInserted = markRenderedSyntheticInsertedMessagesAnimated(renderedMessages);
-  if (markedSyntheticInserted) saveChats();
+  const markedInserted = markRenderedInsertedMessagesAnimated(renderedMessages);
+  if (markedInserted) saveChats();
   syncChatCompletionTourResponseMarker();
   enhanceMessageMath(container, { limit: lowPowerRendering ? LOW_POWER_RENDER_MESSAGE_MATH_LIMIT : 0 });
   enhanceCenterMessageCodeBlocks(container);
@@ -26672,11 +26702,11 @@ function greetingHtml(showText) {
   </div>`;
 }
 
-function markRenderedSyntheticInsertedMessagesAnimated(messages) {
+function markRenderedInsertedMessagesAnimated(messages) {
   if (!Array.isArray(messages)) return false;
   let changed = false;
   messages.forEach(msg => {
-    if (!isSyntheticInsertedUserMessage(msg) || msg.messageInsertAnimated) return;
+    if (!isMaterializedInsertedUserMessage(msg) || msg.messageInsertAnimated) return;
     msg.messageInsertAnimated = true;
     changed = true;
   });
@@ -26784,7 +26814,7 @@ function findRenderedAssistantWrapByBinding(container, message) {
 function msgHtml(m, options) {
   const opts = options || {};
   const shouldDecoratePaths = shouldDecoratePathsForMessage(m);
-  const needsInsertedMaterialized = isSyntheticInsertedUserMessage(m) && !m.messageInsertAnimated;
+  const needsInsertedMaterialized = isMaterializedInsertedUserMessage(m) && !m.messageInsertAnimated;
   const insertedMaterializedClass = needsInsertedMaterialized ? ' inserted-materialized' : '';
   const insertedMaterializedWrapClass = needsInsertedMaterialized ? ' inserted-materialized-wrap' : '';
   const contentHtml = m.error
@@ -28331,15 +28361,20 @@ function syncChatFooterInlineHintUI() {
   const activeChatId = String(state.activeChat || '').trim();
   const activeChat = activeChatId ? state.chats[activeChatId] : null;
   const placement = normalizeChatFooterInlineHintPlacement(hint.placement);
-  const targetWrap = placement === 'inside'
+  let effectivePlacement = placement;
+  let targetWrap = placement === 'inside'
     ? findTargetAssistantWrapForPendingRequestUi(container, activeChat)
     : findTargetAssistantWrapForFooterInlineHint(container, activeChat);
+  if (!targetWrap && placement === 'inside') {
+    targetWrap = findTargetAssistantWrapForFooterInlineHint(container, activeChat);
+    if (targetWrap) effectivePlacement = 'outside';
+  }
   if (!targetWrap) {
     scheduleChatScrollControlsSync();
     return;
   }
   const hintEl = createAssistantInlineHintElement(hint);
-  if (placement === 'inside') {
+  if (effectivePlacement === 'inside') {
     const messageEl = targetWrap.querySelector('.message.assistant');
     if (!messageEl) {
       scheduleChatScrollControlsSync();
@@ -28845,6 +28880,12 @@ function setChatFooterInlineHint(chatId, rawText, options) {
       activateChatFooterInlineHint(resolvedChatId, stateItem, hintItem);
       return;
     }
+    const currentPlacement = normalizeChatFooterInlineHintPlacement(stateItem.placement);
+    if (stateItem.kind === 'process' && currentPlacement !== placement) {
+      stateItem.queue = [];
+      activateChatFooterInlineHint(resolvedChatId, stateItem, hintItem);
+      return;
+    }
     stateItem.queue.push(hintItem);
     if (stateItem.kind === 'process' && Date.now() >= Number(stateItem.minVisibleUntil || 0)) {
       advanceChatFooterInlineHintQueue(resolvedChatId, stateItem.scopeKey || targetScopeKey);
@@ -29038,17 +29079,12 @@ function createMarkdownFence(language, text) {
 }
 
 function renderManualCmdEntryMarkdown(entry) {
-  const statusText = entry && entry.done
-    ? (entry.ok === false ? '失败' : '成功')
-    : '执行中';
   const outputText = String(entry && entry.output || '').trim()
     || (entry && entry.done
-      ? (entry.ok === false ? 'CMD 执行失败，但没有返回更多输出。' : 'CMD 执行成功，无额外输出。')
-      : '命令已提交，等待执行结果。');
+      ? (entry.ok === false ? '执行失败' : '执行成功')
+      : '执行中');
   return [
-    '**CMD**',
     createMarkdownFence('bash', entry && entry.command || ''),
-    `**状态** ${statusText}`,
     createMarkdownFence('text', outputText)
   ].join('\n');
 }
@@ -31745,6 +31781,14 @@ async function sendCenterMessage(rawText, options) {
     if (!assistantMsg.receivedAt) assistantMsg.receivedAt = nowTs;
     if (!assistantMsg.createdAt) assistantMsg.createdAt = assistantMsg.receivedAt || nowTs;
     assistantMsg.streamStatus = '等待';
+    if (
+      !assistantMsg.error &&
+      !normalizeMessageText(assistantMsg.content) &&
+      !normalizeMessageText(assistantMsg._cliSubContent || assistantMsg.cliSubContent) &&
+      !getAssistantExplosionSnapshots(assistantMsg).length
+    ) {
+      assistantMsg.pendingUiPlaceholder = true;
+    }
   }
 
   function ensureAssistantMessageAdded(entry) {
@@ -31985,6 +32029,7 @@ async function sendCenterMessage(rawText, options) {
     }
     chat.lastRequestAt = requestTs;
     setChatPendingRequest(chatId, true, requestTs);
+    ensureLiveCliEventPolling(chatId, { startTimeline: requestTs, restart: true });
     if (isActiveChat()) showWorking(true);
     if (chatStreaming[chatId]) chatStreaming[chatId].phase = 'stream';
 
@@ -32059,8 +32104,9 @@ async function sendCenterMessage(rawText, options) {
           const inlineHintPacket = extractResponseFooterInlineHintPacket(parsed);
           const taskBadgePacket = extractResponseTaskBadgePacket(parsed);
           const hasResetKey = hasResponseResetKey(parsed);
-          const pendingUiEntry = (inlineHintPacket.active || taskBadgePacket.active)
-            ? getCenterStreamingAssistantEntry(true)
+          const controlOnlyPacket = !!(inlineHintPacket.active || taskBadgePacket.active);
+          const pendingUiEntry = controlOnlyPacket
+            ? (findLatestStreamingCenterEntry() || getCenterStreamingAssistantEntry(true))
             : null;
           const hasLogicalPacketId = !!packetLogicalId;
           const shouldTrackLiveExplosionSnapshot = !!(
@@ -32070,7 +32116,9 @@ async function sendCenterMessage(rawText, options) {
             !taskBadgePacket.active &&
             shouldTrackAssistantExplosionLivePacket(parsed)
           );
-          const shouldCreateStreamEntry = hasLogicalPacketId || inlineHintPacket.active || taskBadgePacket.active || hasDeltaContent;
+          const shouldCreateStreamEntry = isCliSub
+            ? (hasLogicalPacketId || hasDeltaContent)
+            : (!isClosePacket && !controlOnlyPacket && (hasLogicalPacketId || hasDeltaContent));
           const streamEntry = resolveStreamingAssistantEntry(parsed, shouldCreateStreamEntry);
           const assistantMsg = streamEntry && streamEntry.assistantMsg;
           if (hasResetKey && assistantMsg && !isCliSub && !isClosePacket) {
@@ -32126,10 +32174,14 @@ async function sendCenterMessage(rawText, options) {
           if (extractResponseTargetKey(parsed) && chatStreaming[chatId]) {
             chatStreaming[chatId].sawTarget = true;
           }
-          if (inlineHintPacket.active || taskBadgePacket.active) {
+          if (controlOnlyPacket) {
             const targetEntry = pendingUiEntry || streamEntry;
-            ensureAssistantPendingMeta(targetEntry);
-            if (targetEntry && isActiveChat()) ensureMsgEl(targetEntry, 'message assistant');
+            if (targetEntry) {
+              ensureAssistantPendingMeta(targetEntry);
+              if (isActiveChat() && shouldRenderAssistantCenterMessage(targetEntry.assistantMsg)) {
+                ensureMsgEl(targetEntry, 'message assistant');
+              }
+            }
           }
           if (inlineHintPacket.active) {
             setChatFooterInlineHint(chatId, inlineHintPacket.text, {
@@ -32325,6 +32377,8 @@ async function requestChatCancel(chatId) {
 }
 
 function finishStreamingFor(chatId) {
+  void performLiveCliEventPoll(chatId).catch(() => {});
+  stopLiveCliEventPolling(chatId);
   const streamState = chatStreaming[chatId];
   const streamSessionToken = String(streamState && streamState.sessionToken || '').trim();
   getStreamingRenderQueueEntriesForChat(chatId).forEach(item => {
@@ -33083,7 +33137,7 @@ function resetLatestRequestForRestoreReplay(chat, startIndex) {
   let changed = false;
   for (let i = chat.messages.length - 1; i > startIndex; i--) {
     const msg = chat.messages[i];
-    if (msg && msg.role === 'user' && !isSyntheticInsertedUserMessage(msg)) break;
+    if (msg && msg.role === 'user' && !isTransparentInsertedRequestBoundaryMessage(msg)) break;
     chat.messages.splice(i, 1);
     changed = true;
   }
@@ -33440,7 +33494,7 @@ function findAssistantForRequest(chat, userIndex) {
     const msg = chat.messages[i];
     if (!msg) continue;
     if (msg.role === 'user') {
-      if (isSyntheticInsertedUserMessage(msg)) continue;
+      if (isTransparentInsertedRequestBoundaryMessage(msg)) continue;
       break;
     }
     if (msg.role === 'assistant') return msg;
@@ -33456,7 +33510,7 @@ function findAssistantForRequestByLogicalId(chat, userIndex, logicalId) {
     const msg = chat.messages[i];
     if (!msg) continue;
     if (msg.role === 'user') {
-      if (isSyntheticInsertedUserMessage(msg)) continue;
+      if (isTransparentInsertedRequestBoundaryMessage(msg)) continue;
       break;
     }
     if (msg.role !== 'assistant') continue;
@@ -33521,7 +33575,7 @@ function findAssistantErrorForRequest(chat, userIndex, errorText, excludeMsg) {
     const msg = chat.messages[i];
     if (!msg || msg === excludeMsg) continue;
     if (msg.role === 'user') {
-      if (isSyntheticInsertedUserMessage(msg)) continue;
+      if (isTransparentInsertedRequestBoundaryMessage(msg)) continue;
       break;
     }
     if (msg.role !== 'assistant' || !msg.error) continue;
@@ -33563,7 +33617,7 @@ function removeChatMessage(chat, targetMsg) {
 function isSameRestoreUserMessage(msg, text, ts) {
   if (!msg || msg.role !== 'user') return false;
   if (normalizeRestoreMessageText(msg.content) !== normalizeRestoreMessageText(text)) return false;
-  if (isSyntheticInsertedUserMessage(msg)) return true;
+  if (isMaterializedInsertedUserMessage(msg)) return true;
   const msgTs = toChatTimestamp(msg.createdAt);
   const recTs = toChatTimestamp(ts);
   if (!msgTs || !recTs) return true;
@@ -34122,6 +34176,180 @@ function applyMemoViewRecoveryFallback(chat, recovery) {
 
 function buildRestoreNoDataTipKey(timeline, lastId, memoViewTimeline) {
   return [String(timeline || '').trim(), String(lastId || 0), String(memoViewTimeline || '').trim()].join('|');
+}
+
+function buildLiveCliHistoryId(rec, command, ts) {
+  const recId = rec && rec.id != null ? String(rec.id).trim() : '';
+  if (recId) return 'live-cli:get:' + recId;
+  const stamp = toChatTimestamp(ts || new Date()) || '';
+  return 'live-cli:get:' + stamp + ':' + String(command || '').trim();
+}
+
+function findLatestPendingLiveCliHistoryEntry(chat) {
+  const history = ensureChatCliCommandHistory(chat);
+  for (let i = history.length - 1; i >= 0; i--) {
+    const entry = normalizeCliCommandHistoryEntry(history[i]);
+    if (!entry) continue;
+    if (!String(entry.id || '').startsWith('live-cli:get:')) continue;
+    if (entry.done === false) return entry;
+  }
+  return null;
+}
+
+function appendLiveCliHistoryRecords(chatId, chat, records) {
+  if (!chat || !Array.isArray(records) || records.length === 0) return 0;
+  let changed = 0;
+  records.forEach(rec => {
+    if (!rec || !rec.role) return;
+    const ts = rec.createdAt || toChatTimestamp(new Date());
+    if (rec.role === 'cli/get') {
+      const command = extractRestoreCliGetCommand(rec.content);
+      if (!command) return;
+      const entryId = buildLiveCliHistoryId(rec, command, ts);
+      const existingEntry = normalizeCliCommandHistoryEntry(
+        ensureChatCliCommandHistory(chat).find(item => item && String(item.id || '').trim() === entryId)
+      );
+      const result = upsertRestoreCliHistoryEntry(chat, {
+        id: entryId,
+        type: 'manual-cmd',
+        command,
+        output: existingEntry ? existingEntry.output : '',
+        ok: existingEntry ? existingEntry.ok : null,
+        done: existingEntry ? existingEntry.done : false,
+        createdAt: (existingEntry && existingEntry.createdAt) || ts,
+        updatedAt: (existingEntry && existingEntry.done ? existingEntry.updatedAt : ts) || ts
+      });
+      if (result && result.changed) changed++;
+      return;
+    }
+    if (rec.role === 'cli/pub') {
+      const pendingEntry = findLatestPendingLiveCliHistoryEntry(chat);
+      if (!pendingEntry) return;
+      const output = extractRestoreCliPubOutput(rec.content);
+      const result = upsertRestoreCliHistoryEntry(chat, {
+        ...pendingEntry,
+        id: pendingEntry.id,
+        type: 'manual-cmd',
+        output,
+        ok: pendingEntry.ok === false ? false : true,
+        done: true,
+        createdAt: pendingEntry.createdAt || ts,
+        updatedAt: ts
+      });
+      if (result && result.changed) changed++;
+    }
+  });
+  if (changed > 0 && state.activeChat === chatId) {
+    restoreCliSubPanel(chatId);
+    triggerCliTaskPanelFlash();
+  }
+  return changed;
+}
+
+function normalizeLiveCliEventPollTimeline(value) {
+  const normalized = toChatTimestamp(value);
+  if (normalized) return normalized;
+  return '1970-01-01T00:00:00';
+}
+
+function stopLiveCliEventPolling(chatId) {
+  const resolvedChatId = String(chatId || '').trim();
+  if (!resolvedChatId) return;
+  const poll = liveCliEventPolling[resolvedChatId];
+  if (!poll) return;
+  poll.active = false;
+  poll.running = false;
+  if (poll.timer) clearTimeout(poll.timer);
+  delete liveCliEventPolling[resolvedChatId];
+}
+
+async function performLiveCliEventPoll(chatId) {
+  const resolvedChatId = String(chatId || '').trim();
+  const poll = liveCliEventPolling[resolvedChatId];
+  const chat = state.chats[resolvedChatId];
+  const streamState = chatStreaming[resolvedChatId];
+  if (!poll || !poll.active || !chat || !streamState || !streamState.streaming || !chat.pendingRequest) {
+    return { ok: false, stopped: true, added: 0 };
+  }
+  const timeline = normalizeLiveCliEventPollTimeline(poll.timeline || chat.lastRequestAt || getChatRestoreTimeline(chat));
+  const lastId = Number.isFinite(Number(poll.lastId)) && Number(poll.lastId) > 0 ? Number(poll.lastId) : 0;
+  const resp = await fetchExecApi('/api/restore?chat=' + encodeURIComponent(resolvedChatId) + '&timeline=' + encodeURIComponent(timeline) + '&lastId=' + encodeURIComponent(String(lastId)), { method: 'POST' });
+  let data = null;
+  try {
+    data = await resp.json();
+  } catch {}
+  if (!resp.ok || !data || data.status !== 0) {
+    const message = (data && (data.content || data.message)) || ('加载 CLI 子任务失败: HTTP ' + resp.status);
+    throw new Error(message);
+  }
+  const records = Array.isArray(data.data) ? data.data : [];
+  if (records.length > 0) {
+    const latestRecord = records[records.length - 1] || {};
+    poll.timeline = normalizeLiveCliEventPollTimeline(latestRecord.createdAt || poll.timeline || timeline);
+    const latestId = Number(latestRecord.id || 0);
+    poll.lastId = Number.isFinite(latestId) && latestId > 0 ? latestId : 0;
+  } else if (!poll.timeline) {
+    poll.timeline = timeline;
+  }
+  const added = appendLiveCliHistoryRecords(resolvedChatId, chat, records);
+  if (added > 0) saveChats();
+  return { ok: true, stopped: false, added };
+}
+
+function ensureLiveCliEventPolling(chatId, options) {
+  const resolvedChatId = String(chatId || '').trim();
+  if (!resolvedChatId) return;
+  const chat = state.chats[resolvedChatId];
+  if (!chat) return;
+  const opts = options || {};
+  const startTimeline = normalizeLiveCliEventPollTimeline(opts.startTimeline || chat.lastRequestAt || getChatRestoreTimeline(chat));
+  let poll = liveCliEventPolling[resolvedChatId];
+  if (!poll || opts.restart === true) {
+    stopLiveCliEventPolling(resolvedChatId);
+    poll = {
+      active: true,
+      running: false,
+      timer: null,
+      timeline: startTimeline,
+      lastId: 0
+    };
+    liveCliEventPolling[resolvedChatId] = poll;
+  } else {
+    poll.active = true;
+    if (!poll.timeline) poll.timeline = startTimeline;
+  }
+  if (poll.running || poll.timer) return;
+  const run = async () => {
+    const current = liveCliEventPolling[resolvedChatId];
+    const currentChat = state.chats[resolvedChatId];
+    const currentStream = chatStreaming[resolvedChatId];
+    if (!current || !current.active || current.running) return;
+    if (!currentChat || !currentChat.pendingRequest || !currentStream || !currentStream.streaming) {
+      stopLiveCliEventPolling(resolvedChatId);
+      return;
+    }
+    current.running = true;
+    try {
+      await performLiveCliEventPoll(resolvedChatId);
+    } catch {}
+    finally {
+      const latest = liveCliEventPolling[resolvedChatId];
+      const latestChat = state.chats[resolvedChatId];
+      const latestStream = chatStreaming[resolvedChatId];
+      if (!latest || latest !== current) return;
+      latest.running = false;
+      if (!latest.active || !latestChat || !latestChat.pendingRequest || !latestStream || !latestStream.streaming) {
+        stopLiveCliEventPolling(resolvedChatId);
+        return;
+      }
+      const nextDelay = isLowPowerRenderingEnabled() ? 3000 : 1200;
+      latest.timer = setTimeout(() => {
+        if (liveCliEventPolling[resolvedChatId] === latest) latest.timer = null;
+        run();
+      }, nextDelay);
+    }
+  };
+  run();
 }
 
 function shouldShowRestoreNoDataTip(chatId, key) {

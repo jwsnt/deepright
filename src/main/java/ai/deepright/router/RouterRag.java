@@ -1,6 +1,7 @@
 package ai.deepright.router;
 
 import ai.deepright.feature.FeatureField;
+import ai.deepright.feature.FeatureUtils;
 import ai.open.right.resouce.ResourceService;
 import ai.open.right.workflow.flow.llm.rag.RagCondition;
 import ai.open.right.workflow.flow.llm.rag.RagConfig;
@@ -75,7 +76,7 @@ public class RouterRag extends RagCondition implements RagService {
         String router = "";
         if (!CollectionUtils.isEmpty(routerDevice)) {
             // 启动Router
-            router = this.buildOnlineHint(ragConfig, ragData) + this.template4main.replace(ragConfig.getReplace(), RouterDevice.buildMarkdown(routerDevice));
+            router = this.buildOnlineHint(ragConfig, ragData) + this.template4main.replace(ragConfig.getReplace(), RouterDevice.buildMarkdown(routerDevice)).replace("#device", ragData.getQuery().getDevice()).replace("#agentId", FeatureUtils.buildAgentId(ragData.getQuery()));
             ragData.getQuery().putMetadata(FeatureField.KEY_ROUTER_STARTUP, true);
         } else {
             router = this.buildOfflineHint(ragConfig, ragData);
