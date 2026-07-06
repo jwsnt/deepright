@@ -516,9 +516,19 @@
     }
 
     .modal-title {
-      font-size: 18px;
+      font-size: 12px;
       font-weight: 700;
       color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .modal-head .editor-actions .secondary-btn {
+      font-size: 10px;
+      padding: 6px 12px;
     }
 
     .editor-layout {
@@ -869,8 +879,8 @@
       <div class="modal-head">
         <div class="modal-title" id="modalTitle">帧编辑器</div>
         <div class="editor-actions">
-          <button id="openOriginalBtn" class="secondary-btn">打开当前帧原图</button>
-          <button id="downloadEditedBtn" class="secondary-btn">导出当前编辑图</button>
+          <button id="openOriginalBtn" class="secondary-btn">帧原图</button>
+          <button id="downloadEditedBtn" class="secondary-btn">编辑图</button>
           <button id="closeModalBtn" class="secondary-btn">关闭</button>
         </div>
       </div>
@@ -1402,28 +1412,78 @@
       refreshEditorUI();
     });
 
+    async function saveBase64ToTmp(base64Data, filename) {
+      try {
+        const base64Content = base64Data.split(",")[1] || base64Data;
+        const response = await fetch("/api/edit?agentId=ICON&path=" + encodeURIComponent("tmp/" + filename), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            base64: base64Content
+          })
+        });
+        if (!response.ok) {
+          throw new Error("HTTP error! status: " + response.status);
+        }
+        const resData = await response.json();
+        return true;
+      } catch (err) {
+        console.error("保存到 tmp 失败:", err);
+        throw err;
+      }
+    }
+
+    async function blobUrlToBase64(blobUrl) {
+      const response = await fetch(blobUrl);
+      const blob = await response.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+
     downloadEditedBtn.addEventListener('click', async () => {
       if (activeFrameIndex == null) return;
       const item = frameDataList.find(frame => frame.index === activeFrameIndex);
       if (!item) return;
-      const url = await exportEditedFrame(item);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `frame_${String(item.index).padStart(4, '0')}_edited.png`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 3000);
-      status.textContent = `已导出当前编辑图：${link.download}`;
+      try {
+        status.textContent = "正在生成并保存编辑图到 tmp...";
+        downloadEditedBtn.disabled = true;
+        const url = await exportEditedFrame(item);
+        const base64Data = await blobUrlToBase64(url);
+        const filename = `frame_${String(item.index).padStart(4, '0')}_edited.png`;
+        await saveBase64ToTmp(base64Data, filename);
+        setTimeout(() => URL.revokeObjectURL(url), 3000);
+        status.textContent = `编辑图已成功保存至工作空间 tmp/${filename}`;
+      } catch (err) {
+        console.error("保存编辑图失败:", err);
+        status.textContent = "保存编辑图失败: " + err.message;
+      } finally {
+        downloadEditedBtn.disabled = false;
+      }
     });
 
-    openOriginalBtn.addEventListener('click', () => {
+    openOriginalBtn.addEventListener('click', async () => {
       if (!currentFrameDataUrl) {
-        status.textContent = '当前帧原图地址不可用';
+        status.textContent = "当前帧原图地址不可用";
         return;
       }
-      window.open(currentFrameDataUrl, '_blank', 'noopener');
-      status.textContent = '已尝试在新窗口打开当前帧原图';
+      try {
+        status.textContent = "正在保存原图到 tmp...";
+        openOriginalBtn.disabled = true;
+        const filename = `frame_${String(activeFrameIndex).padStart(4, '0')}_original.png`;
+        await saveBase64ToTmp(currentFrameDataUrl, filename);
+        status.textContent = `原图已成功保存至工作空间 tmp/${filename}`;
+      } catch (err) {
+        console.error("保存原图失败:", err);
+        status.textContent = "保存原图失败: " + err.message;
+      } finally {
+        openOriginalBtn.disabled = false;
+      }
     });
 
     function setDebugPlaceholder(message, type = '') {
@@ -1505,6 +1565,11 @@
 
     editorOverlayCanvas.addEventListener('pointerdown', (event) => {
       const rect = modalImage.getBoundingClientRect();
+      
+      const point = toCanvasPoint(event);
+      const relX = Math.max(0, Math.round(point.x));
+      const relY = Math.max(0, Math.round(editorOverlayCanvas.height - point.y));
+      setFrameCoordBadge(relX, relY);
       pushFrameCoordDebug('overlay-pointerdown', {
         clientX: Math.round(event.clientX || 0),
         clientY: Math.round(event.clientY || 0),
@@ -1517,7 +1582,6 @@
         badge: frameCoordBadge ? frameCoordBadge.textContent : ''
       });
     });
-
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && previewModal.classList.contains('open')) {
         closeModal();
@@ -1625,7 +1689,7 @@
       activeFrameIndex = index;
       currentFrameDataUrl = item.dataUrl;
       if (!frameAnnotations.has(index)) frameAnnotations.set(index, []);
-      modalTitle.innerHTML = `帧编辑器｜序号：${item.index}<br>时间：${item.time.toFixed(3)}s<br>分辨率：${item.width} × ${item.height}`;
+      modalTitle.innerHTML = `帧编辑器｜第${item.index}帧 第${item.time.toFixed(3)}秒`;
       previewModal.classList.add('open');
       clearOverlayCanvas();
       const stageWidth = Math.max(editorStage.clientWidth - 32, 320);
@@ -1811,7 +1875,7 @@
         canvasWidth: editorOverlayCanvas.width || 0,
         canvasHeight: editorOverlayCanvas.height || 0
       });
-      setFrameCoordBadge(relativeX, relativeY);
+      setFrameCoordBadge(relativeX, relativeY, { copyToClipboard: false });
     }
 
     function normalizeShape(shape) {
@@ -1841,14 +1905,13 @@
       frameCoordBadge.textContent = coordText;
       frameCoordBadge.hidden = !!hide;
       if (x !== '-' && y !== '-') {
-        lastValidFrameCoordText = coordText;
+        lastValidFrameCoordText = `相对左下角的坐标(${x},${y})，画布大小[${editorOverlayCanvas.width}x${editorOverlayCanvas.height}]`;
       }
       if (copyToClipboard && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-        navigator.clipboard.writeText(x === '-' && y === '-' ? (lastValidFrameCoordText || coordText) : coordText).catch(() => {});
+        const textToCopy = x === '-' && y === '-' ? (lastValidFrameCoordText || `相对左下角的坐标(${x},${y})，画布大小[${editorOverlayCanvas.width}x${editorOverlayCanvas.height}]`) : `相对左下角的坐标(${x},${y})，画布大小[${editorOverlayCanvas.width}x${editorOverlayCanvas.height}]`;
+        navigator.clipboard.writeText(textToCopy).catch(() => {});
       }
-    }
-
-    function resetFrameCoordBadge() {
+    } function resetFrameCoordBadge() {
       setFrameCoordBadge('-', '-', { copyToClipboard: false, hide: true });
     }
 

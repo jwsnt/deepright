@@ -1567,8 +1567,13 @@ func prepareIntegrationRuntimeLayout() error {
 	}
 	bundledPluginDir := strings.TrimSpace(integrationBundledPluginDir())
 	if bundledPluginDir != "" {
-		if err := syncBundledPluginsToRuntime(bundledPluginDir, pluginDir); err != nil {
-			return fmt.Errorf("sync bundled plugins: %w", err)
+		info, statErr := os.Stat(bundledPluginDir)
+		if statErr == nil && info != nil && info.IsDir() {
+			if err := syncBundledPluginsToRuntime(bundledPluginDir, pluginDir); err != nil {
+				return fmt.Errorf("sync bundled plugins: %w", err)
+			}
+		} else if statErr != nil && !os.IsNotExist(statErr) {
+			return fmt.Errorf("stat bundled plugins: %w", statErr)
 		}
 	}
 	if err := os.Setenv(integrationPluginDirEnv, pluginDir); err != nil {
@@ -12205,6 +12210,8 @@ func printCLIHelp() {
 	fmt.Println("  integration token get --help")
 	fmt.Println("  integration plugins --help")
 	fmt.Println("  integration connect --help")
+	fmt.Println("  integration api --help")
+	fmt.Println("  integration service --help")
 	fmt.Println("  integration notify --help")
 	fmt.Println("  integration skills-warning --refresh")
 	fmt.Println("  integration file-last-update --agent A --file USER.md")
@@ -15662,6 +15669,8 @@ func main() {
 		case "connect":
 			runIntegrationConnectCLI(args[1:])
 			return
+		case "api", "service":
+			os.Exit(runIntegrationAPICLI(args[1:], os.Stdout, os.Stderr))
 		case "plugins":
 			runIntegrationPluginCLI(args[1:])
 			return

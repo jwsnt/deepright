@@ -550,6 +550,7 @@ http://127.0.0.1:9876/site/
 - `http/https` 超链接双击后会显示 `预览` 与 `打开` 两个小气泡：`预览` 会把右侧 Sidebar 切换为独立 iframe 预览区，`打开` 会新开浏览器窗口访问对应网页
 - assistant 消息里的文件类小气泡会继续沿用相同的 `预览`、`下载文件`、`打开目录` 出现条件；如果目标本身是目录，则不会显示 `下载文件`，也不会展示无效 `预览`
 - assistant 消息里的 `http/https` 小气泡会继续沿用现有 URL 浮层的 `预览` / `打开` 规则；资源类 URL 仍不会进入右侧 iframe 预览链路，只保留允许的动作
+- 如果 assistant `http/https` 小气泡对应的目标 host 是 `localhost` 或 `127.0.0.1`，点击 `预览` 或 `打开` 时，页面会自动在实际访问 URL 上补齐当前 `agentId`、`chatId`、`themeLabel`；其中 `themeLabel` 会按当前主题传 `深色模式` 或 `浅色模式`
 - 右侧 iframe 预览区会整体替换原右侧内容，并让 iframe 尽量吃满右侧可用高度；打开与切回时会带毛玻璃淡入淡出效果，但不会抬高整体布局
 - 右侧 iframe 预览状态与当前 `Agent + Chat` 会话绑定；切换会话后会按目标会话自己的状态决定是否继续展示 iframe
 - 预览区边界处会悬浮一个切换按钮，用于恢复原右侧布局；按钮与居中会话框左上角 `复制会话` 按钮保持同一水平线
@@ -665,6 +666,10 @@ http://127.0.0.1:9876/site/
 - 右侧第二排仅 CLI 子任务列表容器底部新增固定 `5px` 占位留白，确保最后一个气泡不再紧贴面板底边
 - 右侧第二排仅 CLI 子任务气泡使用霓虹荧光绿色，气泡外层区域保持整体原有色调；当 CLI 子任务面板收到新的 SSE 响应刷新时，会高频闪动 `3秒`
 - 当右侧 `CLI` 子面板当前会话还没有任何系统指令记录时，会在面板内展示一个循环跑步的 Chrome 小恐龙待机动画；一旦收到首条 CLI 子任务响应，动画会立即隐藏并切回正常气泡列表
+- 页面调用 `/api/restore` 拉取历史时，除了用户消息和 assistant 消息，也会同步消费返回里的 `cli/get`、`cli/pub` 记录，并在右侧 `CLI` 子面板重建对应的 `CMD` 历史
+- `cli/get` 会恢复成一条 CLI 子任务记录，前端会尽量从原始 `content` 中提取真实命令文本；兼容直接 `{"cmd":"..."}`、嵌套 `message` 以及 `messages[].content` 等现有日志结构
+- 已恢复但暂时还没匹配到结果的 CLI 记录会继续保持 `执行中`；后续 restore 再命中对应 `cli/pub` 时，会直接把结果补到原记录上，不会新增重复气泡；没有可配对命令的孤立 `cli/pub` 会被忽略
+- CLI 历史恢复会沿用现有右侧子面板的展示样式、状态文案和复制回 `CMD` 输入框逻辑，并继续按 `createdAt/id` 时间线与消息恢复保持一致；同一条 `cli/get` 也不会因重复 restore 被重复插入
 - 右侧分割带标题“正在执行的系统指令”后新增一个 CMD 风格的小图标，点击后会在中间会话区水平垂直居中弹出一个 `500x110` 的命令浮层，并复用与扇形菜单插件浮层一致的背景模糊处理，不会遮挡左右 Sidebar 的可操作控件
 - 右侧最下方新增 `知识库WIKI` 标题栏，风格与 CLI 子面板标题栏保持一致，标题右侧带有刷新图标与 `最近刷新 HH:mm:ss` 时间
 - `知识库WIKI` 内容区会读取 `site/wiki_md` 下的静态 Markdown，并直接在右侧面板内渲染
@@ -824,6 +829,7 @@ Header 中 `Authorization` 为对应模型的密钥。
 
 ### CLI子面板
 - 当前会话没有任何 CLI 执行记录时，面板会展示 Chrome 小恐龙循环跑步动画作为空态（20260526-6）
+- `/api/restore` 会同步重建右侧 CLI 子任务历史，未完成命令保持 `执行中`，命中后续结果时会就地补全，避免重复插入（20260705-1）
 - 首次点击右侧 `CLI` 子面板时会进入独立新手引导，并在前三步使用一条模拟 `ls` 命令讲解展示、终止与复制入口，最后一步高亮 `CMD` 执行按钮（20260526-7）
 - 首次点击输入框引导在“等待响应结果”后会新增一步高亮左侧 `logoSvg`，提示可以查看 Token 消耗明细，再继续切到右侧 `CLI` 子面板（20260527-2）
 - CMD执行浮层居中展示（20260504-4）
@@ -857,6 +863,7 @@ Header 中 `Authorization` 为对应模型的密钥。
 - 首次禁用技能目录引导：`/path/to/deepright/cli/module/site/iteration/20260704-1/REQUIREMENT.md`
 - 虚拟文件系统技能目录禁用展示与切换：`/path/to/deepright/cli/module/site/iteration/20260704-2/REQUIREMENT.md`
 - assistant 响应 URL / 路径行内气泡与点击动作浮层：`/path/to/deepright/cli/module/site/iteration/20260704-4/REQUIREMENT.md`
+- assistant URL / 路径气泡与 restore 恢复 CLI 子任务历史：`/path/to/deepright/cli/module/site/iteration/20260705-1/REQUIREMENT.md`
 - 首次点击右侧备忘录区域引导：`/path/to/deepright/cli/module/site/iteration/20260526-3/REQUIREMENT.md`
 - 备忘录元数据 / 任务明细 hover 居中预览：`/path/to/deepright/cli/module/site/iteration/20260526-4/REQUIREMENT.md`
 - 备忘录已完成任务整区闪烁提示：`/path/to/deepright/cli/module/site/iteration/20260604-3/REQUIREMENT.md`
@@ -1230,8 +1237,27 @@ Header 中 `Authorization` 为对应模型的密钥。
 - `复制` 会把完整原始路径或 URL 写入系统剪贴板，而不是复制摘要文本；成功后在左侧虚拟文件系统 Tips 位置提示 `已复制到粘贴板`，失败时也会提示错误
 - 文件类小气泡的 `预览`、`下载文件`、`打开目录` 行为和出现条件与旧消息路径浮层保持一致；目录类目标不展示 `下载文件`，也不展示无效 `预览`
 - `http/https` 小气泡的 `预览`、`打开` 行为和出现条件与现有消息 URL 浮层保持一致；可预览 URL 仍复用右侧 Sidebar 的独立 iframe 预览区，资源类 URL 仍不会进入预览链路
+- 当 `http/https` 小气泡目标为 `localhost` 或 `127.0.0.1` 时，真正执行 `预览` 或 `打开` 的 URL 会自动补上当前 `agentId`、`chatId`、`themeLabel`；如果原 URL 已有 query，会继续兼容并按当前会话值覆盖同名参数
 - SSE 增量分片如果把 URL 或路径拆开，前端会等完整提取结果稳定后再气泡化，避免半截路径误渲染，也避免 SSE 前后展示形态来回闪烁
 - 如果仍有少量未被气泡化覆盖的普通文字路径兜底场景，原有双击/选中后弹浮层的交互仍然保留，但不会影响新的 assistant 小气泡点击链路
+
+## 迭代 20260705-1：restore 恢复 CLI 子任务历史
+
+- 页面调用 `/api/restore` 拉取历史时，除了现有用户消息和 assistant 消息，也会同步消费返回结果中的 `cli/get` 与 `cli/pub`，把右侧 `CLI` 子面板中的历史 `CMD` 一并补齐
+- `cli/get` 会恢复为一条待完成的 CLI 子任务，前端会尽量从原始 `content` 中提取真实命令文本，兼容直接 `{"cmd":"..."}`、嵌套 `message` 和 `messages[].content` 等现有日志结构
+- `cli/pub` 会作为上一条尚未完成命令的执行结果恢复，兼容原始纯文本输出以及 JSON 包裹的 `message`、`content`、`messages` 结构；命中后会直接把原记录补全为成功/失败与输出结果，不会新增重复气泡
+- 重复 restore 或轮询续拉时，同一条 `cli/get` 不会被重复插入；已经恢复但尚未等到结果的记录会继续保持 `执行中`
+- 恢复出来的 CLI 历史与手动 `CMD` 继续共用同一套展示模型、状态样式和复制回 `CMD` 输入框逻辑，并按 `createdAt/id` 时间线与消息恢复保持一致
+- 如果本轮只收到孤立的 `cli/pub` 而没有可配对的待完成命令，前端会忽略这条结果，不会影响其他消息恢复
+
+## 迭代 20260706-1：本地 assistant URL 自动补会话参数
+
+- 本次改动仅补充 assistant `http/https` URL 小气泡在本地目标上的访问参数透传，不改变小气泡识别、摘要展示、动作排序与资源类 URL 过滤规则
+- 当 assistant URL 小气泡对应的目标 host 为 `localhost` 或 `127.0.0.1` 时，点击 `预览` 或 `打开`，页面会自动在实际访问 URL 上补齐当前 `agentId`、`chatId`、`themeLabel`
+- `agentId` 使用当前激活会话实际绑定的 Agent，`chatId` 使用当前激活会话 ID，`themeLabel` 会按当前主题传 `深色模式` 或 `浅色模式`
+- 如果原始本地 URL 已经带有 query 参数，页面会继续按标准 query 形式追加；如果已存在 `agentId`、`chatId`、`themeLabel`，则会自动覆盖为当前会话对应值
+- 这次补参只影响真正用于 `预览` iframe 和 `打开` 新窗口的目标 URL；小气泡摘要展示与 `复制` 出去的原始 URL 文本保持不变
+- 非 `localhost` / `127.0.0.1` 的普通远程 URL 保持现有行为；右侧 iframe 预览的自动打开、失败回退、加载超时与会话绑定逻辑也继续沿用现有规则
 
 ## 迭代 20260613-3：非本机访问限制
 
