@@ -26,13 +26,16 @@ SIGN_KEYCHAIN_PASSWORD="${DEEPRIGHT_KEYCHAIN_PASSWORD:-}"
 SIGN_USE_KEYCHAIN=0
 SIGN_ENABLED=0
 MAC_APP_NAME="${DEEPRIGHT_MAC_APP_NAME:-DeepRight}"
+WINDOWS_BUILDER_RELEASE_LINK=""
+WINDOWS_BUILDER_BUILD_LINK=""
 
 # Normalize cwd immediately so later subshells do not inherit a deleted caller cwd.
 cd "$SCRIPT_DIR"
 
 print_usage() {
-  echo "Usage: $0 [linux|mac|all]" >&2
-  echo "  linux  Build Linux release artifacts, including the Windows WSL2 launcher." >&2
+  echo "Usage: $0 [linux|windows|mac|all]" >&2
+  echo "  linux    Build Linux release artifacts, including the Windows WSL2 launcher." >&2
+  echo "  windows  Build only Windows single-file installers." >&2
   echo "  mac    Build macOS release artifacts." >&2
   echo "  all    Build all release artifacts." >&2
   echo "  omit   Build all release artifacts." >&2
@@ -44,14 +47,19 @@ if [ "$#" -gt 1 ]; then
 fi
 
 BUILD_LINUX=0
+BUILD_WINDOWS=0
 BUILD_MAC=0
 case "$BUILD_SCOPE" in
   ""|all)
     BUILD_LINUX=1
+    BUILD_WINDOWS=1
     BUILD_MAC=1
     ;;
   linux)
     BUILD_LINUX=1
+    ;;
+  windows)
+    BUILD_WINDOWS=1
     ;;
   mac)
     BUILD_MAC=1
@@ -65,6 +73,12 @@ esac
 cleanup_build_tmp() {
   if [ -n "$SIGN_KEYCHAIN_PATH" ]; then
     security delete-keychain "$SIGN_KEYCHAIN_PATH" >/dev/null 2>&1 || true
+  fi
+  if [ -n "$WINDOWS_BUILDER_RELEASE_LINK" ]; then
+    rm -f "$WINDOWS_BUILDER_RELEASE_LINK"
+  fi
+  if [ -n "$WINDOWS_BUILDER_BUILD_LINK" ]; then
+    rm -f "$WINDOWS_BUILDER_BUILD_LINK"
   fi
   rm -rf "$BUILD_TMP_DIR"
 }
@@ -858,6 +872,7 @@ package_windows_wsl2_launcher() {
   copy_release_asset "$MODULE_DIR/build/install.bat" "$target_release_dir/install.bat"
   copy_release_asset "$MODULE_DIR/build/start.bat" "$target_release_dir/start.bat"
   copy_release_asset "$MODULE_DIR/build/install.ps1" "$target_release_dir/install.ps1"
+  copy_release_asset "$MODULE_DIR/build/USER_GUIDE.txt" "$target_release_dir/USER_GUIDE.txt"
   build_windows_app_icon "$SITE_DIR/icon_white_bg.png" "$target_release_dir/DeepRight.ico"
   rm -f "$target_release_dir/install-wsl2.ps1" "$target_release_dir/install-wsl2.cmd"
   sed -i.bak \
@@ -865,6 +880,43 @@ package_windows_wsl2_launcher() {
     -e "s|https://cloud-images.ubuntu.com/wsl/releases/noble/current/ubuntu-noble-wsl-amd64-wsl.rootfs.tar.gz|$rootfs_url|g" \
     "$target_release_dir/install.ps1"
   rm -f "$target_release_dir/install.ps1.bak"
+}
+
+build_windows_single_file_installers() {
+  windows_builder="$MODULE_DIR/build/build-windows-exe.sh"
+  windows_builder_dir="$MODULE_DIR/build"
+  compat_release_path="$windows_builder_dir/release"
+  compat_build_path="$windows_builder_dir/build"
+
+  if [ ! -x "$windows_builder" ]; then
+    echo "missing Windows installer builder: $windows_builder" >&2
+    exit 1
+  fi
+
+  if [ -e "$compat_release_path" ] && [ ! -L "$compat_release_path" ]; then
+    if [ -d "$compat_release_path" ] && [ -z "$(find "$compat_release_path" ! -type d -print -quit)" ]; then
+      rm -rf "$compat_release_path"
+    else
+      echo "Windows installer compatibility path already exists and is not a symlink: $compat_release_path" >&2
+      exit 1
+    fi
+  fi
+  if [ ! -e "$compat_release_path" ]; then
+    ln -s ../release "$compat_release_path"
+    WINDOWS_BUILDER_RELEASE_LINK="$compat_release_path"
+  fi
+
+  if [ -e "$compat_build_path" ] && [ ! -L "$compat_build_path" ]; then
+    echo "Windows installer compatibility path already exists and is not a symlink: $compat_build_path" >&2
+    exit 1
+  fi
+  if [ ! -e "$compat_build_path" ]; then
+    ln -s . "$compat_build_path"
+    WINDOWS_BUILDER_BUILD_LINK="$compat_build_path"
+  fi
+
+  echo "-> building Windows single-file installers"
+  DEEPRIGHT_SKIP_LINUX_BUILD=1 sh "$windows_builder"
 }
 
 write_integration_info_plist() {
@@ -972,6 +1024,16 @@ build_mac_release_artifacts() {
   create_mac_dmg "arm"
 }
 
+prepare_windows_only_release_dir() {
+  echo "-> pruning non-Windows release artifacts"
+  rm -rf "$RELEASE_DIR/linux" "$RELEASE_DIR/mac" "$RELEASE_DIR/windows"
+}
+
+cleanup_windows_only_intermediates() {
+  echo "-> removing Windows build intermediates"
+  rm -rf "$RELEASE_DIR/linux"
+}
+
 echo "Building integration release artifacts..."
 
 if [ "$BUILD_MAC" -eq 1 ]; then
@@ -983,6 +1045,17 @@ reset_release_dir
 
 if [ "$BUILD_LINUX" -eq 1 ]; then
   build_linux_release_artifacts
+fi
+
+if [ "$BUILD_WINDOWS" -eq 1 ] && [ "$BUILD_LINUX" -eq 0 ] && [ "$BUILD_MAC" -eq 0 ]; then
+  prepare_windows_only_release_dir
+  build_linux_release_artifacts
+  build_windows_single_file_installers
+  cleanup_windows_only_intermediates
+fi
+
+if [ "$BUILD_WINDOWS" -eq 1 ] && [ "$BUILD_LINUX" -eq 1 ]; then
+  build_windows_single_file_installers
 fi
 
 if [ "$BUILD_MAC" -eq 1 ]; then
