@@ -207,13 +207,14 @@ public class LogicVerifyAssistant extends DefaultAssistant {
 
     // 重置时间
     protected WorkflowTask reConfig(WorkflowConfig workflowConfig, WorkflowTask workTask, String query) throws Exception {
-        ResetStateWorkTask workflowTaskWrap = new ResetStateWorkTask(workTask, this.buildQuery(workflowConfig, workTask, query));
-        workflowTaskWrap.getUserContext().getMetadata().clear();
+        ResetStateWorkTask workWrap = new ResetStateWorkTask(workTask, this.buildQuery(workflowConfig, workTask, query));
+        // CliInsertRag.KEY_RECALL不需要保留，会从缓存召回
+        workWrap.getUserContext().getMetadata().clear();
         // 不存储Query
-        workflowTaskWrap.getMetadata().put("__storeQuery", false);
-        workflowTaskWrap.setWorkflow("main");
-        workflowTaskWrap.setBiz("main");
-        return workflowTaskWrap;
+        workWrap.getMetadata().put("__storeQuery", false);
+        workWrap.setWorkflow("main");
+        workWrap.setBiz("main");
+        return workWrap;
     }
 
     @Configuration

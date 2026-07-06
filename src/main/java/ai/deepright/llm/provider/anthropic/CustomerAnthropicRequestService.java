@@ -47,6 +47,7 @@ public class CustomerAnthropicRequestService extends AnthropicRequestService {
                 .fast(this.fast)
                 .base(this.base)
                 .build()));
+        // 取最小值
         request.setMaxTokens(Math.min(this.maxTokens, (int) (RequestContextUtils.limit(llmQuery, request.getModel()) * this.rate)));
         return request;
     }

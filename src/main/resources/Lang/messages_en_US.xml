@@ -24,6 +24,7 @@
     <entry key="retry.message">[服务将在 #delay 秒后重试，错误码 #code]</entry>
     <entry key="cli.general.message">[正在回传待执行任务]</entry>
     <entry key="cli.logic.message">[正在检查任务结果] #content</entry>
+    <entry key="cli.insert">[已收到引导内容]</entry>
     <entry key="cli.recall">[已加入引导内容]</entry>
     <entry key="image.remind">[请耐心等待，预计需要 1 至 2 分钟]</entry>
     <entry key="image.error">[图片操作失败啦] #content</entry>

@@ -1176,6 +1176,7 @@ body.center-overlay-focus .rs-url-preview-floating-switch.onboarding-url-preview
 .rs-note-input:empty{text-align:center !important}
 .rs-note-input:not(:empty){text-align:left !important}
 .rs-note-input:focus{border-color:var(--accent)}
+.rs-note-input.validation-flash{border-color:rgba(255,90,107,.72);box-shadow:0 0 0 1px rgba(255,90,107,.24),0 0 0 6px rgba(255,90,107,.08);animation:rsValidationFlash .72s ease-in-out 2}
 .rs-note-input:empty::before{content:attr(data-placeholder);color:var(--text-muted);pointer-events:none}
 .rs-note-input.drag-over{outline:2px solid var(--accent);outline-offset:1px;animation:inputGlow 1s ease-in-out infinite}
 .rs-note-input.drag-over.drag-denied{outline-color:var(--error);animation:inputGlowDeny 1s ease-in-out infinite}
@@ -1547,12 +1548,15 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .icon-btn.stop:hover{background:rgba(217,48,37,.25)}
 .icon-btn.send.flash{animation:btnFlash .5s ease}
 @keyframes btnFlash{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes rsValidationFlash{0%,100%{filter:none;opacity:1}50%{filter:brightness(1.06);opacity:.9}}
 
 /* Model selector */
 .model-selector{position:relative}
 .model-selector.missing > .icon-btn{color:var(--error);box-shadow:0 0 0 1px rgba(255,90,107,.34),0 0 0 4px rgba(255,90,107,.08),inset 0 1px 0 rgba(255,255,255,.26)}
 .model-selector.missing > .icon-btn:hover{color:var(--error);background:rgba(255,90,107,.12)}
+.model-selector.validation-flash > .icon-btn{color:var(--error);animation:rsValidationFlash .72s ease-in-out 2;box-shadow:0 0 0 1px rgba(255,90,107,.4),0 0 0 6px rgba(255,90,107,.12),0 10px 22px rgba(255,90,107,.12),inset 0 1px 0 rgba(255,255,255,.26)}
 #rsModelLabel.missing{color:var(--error) !important;font-weight:600}
+#rsModelLabel.validation-flash{color:var(--error) !important;animation:rsValidationFlash .72s ease-in-out 2;text-shadow:0 0 10px rgba(255,90,107,.2)}
 .model-dropdown{position:absolute;bottom:44px;left:0;background:linear-gradient(180deg,rgba(255,255,255,.86),rgba(255,255,255,.72));border:1px solid rgba(72,99,143,.22);border-radius:var(--radius-xs);box-shadow:0 18px 38px rgba(33,58,118,.16),inset 0 1px 0 rgba(255,255,255,.9);min-width:160px;z-index:20;opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity .2s,transform .2s;backdrop-filter:blur(16px) saturate(140%);-webkit-backdrop-filter:blur(16px) saturate(140%)}
 .model-dropdown.show{opacity:1;transform:translateY(0);pointer-events:auto}
 .model-dropdown-item{padding:8px 14px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:var(--transition);color:#1b315c}
@@ -1586,8 +1590,8 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 @keyframes preflightFade{0%,100%{opacity:.35}50%{opacity:1}}
 
 /* Model indicator */
-.model-indicator{--model-indicator-leading-space:92px;--model-indicator-trailing-space:194px;height:28px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text-muted);line-height:28px;overflow:hidden;white-space:nowrap;margin-bottom:6px;position:relative;top:5px;letter-spacing:.06em;text-transform:uppercase;min-width:0}
-.model-indicator-main{display:flex;align-items:center;justify-content:center;gap:6px;min-width:0;max-width:calc(100% - var(--model-indicator-leading-space) - var(--model-indicator-trailing-space));margin:0 auto;padding:0 12px}
+.model-indicator{--model-indicator-leading-space:92px;--model-indicator-trailing-space:194px;height:28px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text-muted);line-height:28px;overflow:visible;white-space:nowrap;margin-bottom:6px;position:relative;top:5px;letter-spacing:.06em;text-transform:uppercase;min-width:0}
+.model-indicator-main{display:flex;align-items:center;justify-content:center;gap:6px;min-width:0;max-width:calc(100% - var(--model-indicator-leading-space) - var(--model-indicator-trailing-space));margin:0 auto;padding:0 12px;overflow:hidden}
 .model-indicator-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .model-indicator-btn{border:none;background:none;cursor:pointer;padding:0;display:flex;align-items:center;animation:sunFlash .8s ease-in-out infinite}
 .model-indicator-btn svg{width:16px;height:16px}
@@ -2348,10 +2352,12 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .input-thinking{display:none;align-items:center;justify-content:flex-end;gap:6px;position:absolute;right:14px;top:50%;transform:translateY(-50%);width:calc(var(--model-indicator-trailing-space) - 8px);max-width:calc(100% - var(--model-indicator-leading-space) - 16px);white-space:nowrap}
 .remote .input-thinking{right:0}
 .input-thinking.show{display:flex}
-.input-toggle-group{display:flex;align-items:center;gap:3px}
-.input-thinking-toggle{width:28px;height:14px;border-radius:7px;border:1px solid #7f96d8;background:linear-gradient(180deg,#eef4ff,#d7e4ff);box-shadow:inset 0 1px 0 rgba(255,255,255,.98),inset 0 -1px 2px rgba(77,107,254,.18),0 0 0 1px rgba(127,150,216,.28),0 4px 10px rgba(34,58,109,.14);cursor:pointer;position:relative;overflow:hidden;transition:var(--transition)}
-.input-thinking-toggle.on{background:var(--accent);border-color:var(--accent)}
+.input-toggle-group{display:flex;align-items:center;gap:3px;position:relative}
+.input-thinking-toggle{width:28px;height:14px;border-radius:7px;border:1px solid #7f96d8;background:linear-gradient(180deg,#eef4ff,#d7e4ff);box-shadow:inset 0 1px 0 rgba(255,255,255,.98),0 1px 3px rgba(34,58,109,.10);cursor:pointer;position:relative;overflow:hidden;transition:var(--transition)}
+.input-thinking-toggle.on{background:var(--accent);border-color:var(--accent);box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 2px 6px rgba(77,107,254,.16)}
+.input-thinking-toggle.verify-on{background:linear-gradient(180deg,#ffd693,#f7a73d);border-color:#d88615;box-shadow:inset 0 1px 0 rgba(255,255,255,.36),0 2px 6px rgba(216,134,21,.16)}
 .input-thinking-toggle::after{content:'';position:absolute;top:1.5px;left:1.5px;width:9px;height:9px;border-radius:50%;border:1px solid #8ea2d8;background:linear-gradient(180deg,#fff,#edf3ff);box-shadow:0 1px 4px rgba(36,59,110,.24);transition:var(--transition)}
+.input-thinking-toggle.verify-on::after{border-color:#f5ddb2;background:linear-gradient(180deg,#fff8ec,#fff1d4)}
 .input-thinking-toggle.on::after{left:15.5px}
 .input-thinking-toggle.onboarding-swarm-save-success-demo,.input-thinking-label.onboarding-swarm-save-success-demo{transition-duration:2s !important;transition-timing-function:cubic-bezier(.16,1,.3,1) !important}
 .input-thinking-toggle.onboarding-swarm-save-success-demo{background:linear-gradient(180deg,#eef4ff,#d7e4ff) !important;border-color:#7f96d8 !important;box-shadow:inset 0 1px 0 rgba(255,255,255,.98),inset 0 -1px 2px rgba(77,107,254,.18),0 0 0 1px rgba(127,150,216,.28),0 4px 10px rgba(34,58,109,.14) !important}
@@ -2365,16 +2371,33 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 [data-theme="dark"] .input-thinking-toggle.onboarding-swarm-save-success-demo.on::after{border-color:rgba(255,255,255,.76) !important;background:linear-gradient(180deg,#ffffff,#eef6ff) !important;box-shadow:0 0 0 1px rgba(255,255,255,.16),0 3px 10px rgba(7,18,44,.42) !important}
 [data-theme="dark"] .input-thinking-label.onboarding-swarm-save-success-demo{color:#eef4ff;text-shadow:0 0 16px rgba(98,190,255,.28)}
 .swarm-toggle:hover,.thinking-toggle:hover,.input-thinking-toggle:hover{border-color:#6f88d4;box-shadow:inset 0 1px 0 rgba(255,255,255,.98),inset 0 -1px 2px rgba(77,107,254,.22),0 0 0 1px rgba(111,136,212,.34),0 8px 16px rgba(34,58,109,.18)}
+.input-toggle-group .input-thinking-toggle:hover{border-color:#6f88d4;box-shadow:inset 0 1px 0 rgba(255,255,255,.98),0 2px 6px rgba(34,58,109,.14)}
+.input-toggle-group .input-thinking-toggle.on:hover{box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 3px 8px rgba(77,107,254,.18)}
+.input-toggle-group .input-thinking-toggle.verify-on:hover{box-shadow:inset 0 1px 0 rgba(255,255,255,.36),0 3px 8px rgba(216,134,21,.18)}
 [data-theme="dark"] .swarm-toggle,[data-theme="dark"] .thinking-toggle,[data-theme="dark"] .input-thinking-toggle{border-color:rgba(154,181,235,.44);background:linear-gradient(180deg,rgba(22,37,67,.98),rgba(8,18,38,.98));box-shadow:inset 0 1px 0 rgba(255,255,255,.1),inset 0 -2px 5px rgba(0,0,0,.24),0 0 0 1px rgba(117,149,218,.12),0 8px 18px rgba(0,0,0,.34)}
 [data-theme="dark"] .swarm-toggle.on,[data-theme="dark"] .thinking-toggle.on,[data-theme="dark"] .input-thinking-toggle.on{border-color:rgba(136,222,255,.96);background:linear-gradient(180deg,rgba(95,191,255,.98),rgba(70,125,255,.96));box-shadow:inset 0 1px 0 rgba(255,255,255,.3),inset 0 -2px 6px rgba(21,43,109,.28),0 0 0 1px rgba(133,215,255,.34),0 0 18px rgba(98,190,255,.42),0 10px 24px rgba(31,63,146,.44)}
+[data-theme="dark"] .input-thinking-toggle.verify-on{border-color:rgba(255,194,92,.94);background:linear-gradient(180deg,rgba(255,193,72,.98),rgba(242,135,36,.96));box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 -2px 6px rgba(122,65,10,.24),0 0 0 1px rgba(255,195,102,.28),0 0 20px rgba(255,167,58,.28),0 10px 24px rgba(126,59,7,.34)}
 [data-theme="dark"] .swarm-toggle::after,[data-theme="dark"] .thinking-toggle::after,[data-theme="dark"] .input-thinking-toggle::after{border-color:rgba(169,190,227,.18);background:linear-gradient(180deg,#fdfefe,#d9e6ff);box-shadow:0 2px 6px rgba(0,0,0,.32)}
+[data-theme="dark"] .input-thinking-toggle.verify-on::after{border-color:rgba(255,247,229,.74);background:linear-gradient(180deg,#fffef8,#fff0cb);box-shadow:0 0 0 1px rgba(255,255,255,.12),0 3px 10px rgba(68,32,5,.34)}
 [data-theme="dark"] .swarm-toggle.on::after,[data-theme="dark"] .thinking-toggle.on::after,[data-theme="dark"] .input-thinking-toggle.on::after{border-color:rgba(255,255,255,.76);background:linear-gradient(180deg,#ffffff,#eef6ff);box-shadow:0 0 0 1px rgba(255,255,255,.16),0 3px 10px rgba(7,18,44,.42)}
 [data-theme="dark"] .swarm-toggle:hover,[data-theme="dark"] .thinking-toggle:hover,[data-theme="dark"] .input-thinking-toggle:hover{border-color:rgba(167,214,255,.72);box-shadow:inset 0 1px 0 rgba(255,255,255,.12),inset 0 -2px 5px rgba(0,0,0,.26),0 0 0 1px rgba(133,174,255,.18),0 10px 22px rgba(0,0,0,.38)}
 [data-theme="dark"] .swarm-toggle.on:hover,[data-theme="dark"] .thinking-toggle.on:hover,[data-theme="dark"] .input-thinking-toggle.on:hover{border-color:rgba(169,234,255,.98);box-shadow:inset 0 1px 0 rgba(255,255,255,.34),inset 0 -2px 6px rgba(21,43,109,.3),0 0 0 1px rgba(149,226,255,.4),0 0 22px rgba(111,207,255,.5),0 12px 28px rgba(31,63,146,.5)}
+[data-theme="dark"] .input-toggle-group .input-thinking-toggle{box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 2px 6px rgba(0,0,0,.24)}
+[data-theme="dark"] .input-toggle-group .input-thinking-toggle.on{box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 3px 8px rgba(31,63,146,.28)}
+[data-theme="dark"] .input-toggle-group .input-thinking-toggle.verify-on{box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 3px 8px rgba(126,59,7,.24)}
+[data-theme="dark"] .input-toggle-group .input-thinking-toggle:hover{box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 3px 8px rgba(0,0,0,.28)}
+[data-theme="dark"] .input-toggle-group .input-thinking-toggle.on:hover{box-shadow:inset 0 1px 0 rgba(255,255,255,.26),0 4px 10px rgba(31,63,146,.3)}
+[data-theme="dark"] .input-toggle-group .input-thinking-toggle.verify-on:hover{box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 4px 10px rgba(126,59,7,.28)}
 .input-thinking-label{font-size:8px;color:var(--text-muted);white-space:nowrap;transition:color .3s;letter-spacing:.04em}
 .input-thinking-label.on{color:var(--accent);font-weight:600}
+.input-thinking-label.verify-on{color:#c27304;font-weight:700;text-shadow:0 0 12px rgba(232,162,43,.18)}
 [data-theme="dark"] .thinking-label,[data-theme="dark"] .input-thinking-label{color:rgba(210,225,248,.84)}
 [data-theme="dark"] .thinking-wrap .thinking-label.on,[data-theme="dark"] .input-thinking-label.on{color:#c9efff;font-weight:700;text-shadow:0 0 10px rgba(111,207,255,.34)}
+[data-theme="dark"] .input-thinking-label.verify-on{color:#ffe2ab;text-shadow:0 0 14px rgba(255,188,87,.28)}
+.thinking-verify-confirm{width:164px;right:-10px;bottom:calc(100% + 8px);z-index:110}
+#rsThinkingGroup{position:relative}
+#rsThinkingGroup .thinking-verify-confirm{right:-18px;bottom:calc(100% + 10px)}
+.plugin-modal-thinking .thinking-verify-confirm{left:auto;right:0;top:calc(100% + 10px);bottom:auto;z-index:140;transform-origin:100% 0}
 
 /* Center notice overlay */
 .center-notice-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;background:rgba(19,24,36,.14);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);opacity:0;visibility:hidden;transition:opacity .24s ease,visibility 0s linear .24s}
@@ -2505,7 +2528,7 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
 .plugin-modal-config-section{padding-top:3px;padding-bottom:15px}
 .plugin-modal-section + .plugin-modal-section{border-top:1px solid color-mix(in srgb,var(--border) 88%,transparent)}
 .plugin-modal-section-title{font-size:12px;font-weight:600;color:var(--text-secondary);letter-spacing:.04em;text-transform:uppercase}
-.plugin-modal-config{display:flex;align-items:center;gap:12px;margin-top:3px;flex-wrap:wrap}
+.plugin-modal-config{display:flex;align-items:center;gap:12px;margin-top:3px;flex-wrap:wrap;overflow:visible}
 .plugin-modal-config-item.hidden{display:none !important}
 .plugin-modal-config-empty{display:none;padding:12px 14px;border:1px dashed var(--border);border-radius:14px;background:color-mix(in srgb,var(--bg-sidebar) 68%,transparent);font-size:12px;line-height:1.6;color:var(--text-secondary)}
 .plugin-modal-config-empty.show{display:block}
@@ -2519,7 +2542,7 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
 .plugin-modal-model.disabled{opacity:.55;cursor:default;pointer-events:none}
 .plugin-modal-model button{border:none;background:none;padding:0;color:var(--text-secondary);display:flex;align-items:center;cursor:pointer}
 .plugin-modal-model-label{max-width:180px;font-size:12px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.plugin-modal-thinking{display:flex;align-items:center;gap:6px;margin-left:auto}
+.plugin-modal-thinking{display:flex;align-items:center;gap:6px;margin-left:auto;position:relative;z-index:2}
 .plugin-modal-thinking.disabled{opacity:.55;pointer-events:none}
 .plugin-modal-thinking .input-thinking-label{font-size:9px}
 .plugin-modal-view{display:flex;flex-direction:column;grid-area:1 / 1;min-height:0}
@@ -3339,16 +3362,21 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
 [data-theme="dark"] .sel-file-bubble.onboarding-message-url-bubble{box-shadow:0 22px 46px rgba(0,0,0,.42),0 0 0 1px rgba(142,180,255,.16)}
 [data-theme="dark"] .sel-file-bubble-btn.secondary{background:rgba(255,255,255,.08);color:#d7e5ff;box-shadow:none}
 [data-theme="dark"] .sel-file-bubble-btn.secondary:hover{background:rgba(255,255,255,.14)}
-.message-wrap .md-content a.message-path-link{display:inline-flex;align-items:center;max-width:min(100%,420px);margin:2px 4px 2px 0;padding:2px 10px;border-radius:12px;border:1px solid color-mix(in srgb,var(--accent) 24%,var(--border) 76%);background:linear-gradient(180deg,color-mix(in srgb,var(--bg-card) 86%,var(--accent) 14%),color-mix(in srgb,var(--bg-card) 94%,rgba(255,255,255,.22) 6%));color:var(--accent);text-decoration:none;font-weight:700;line-height:1.6;vertical-align:middle;overflow:hidden;box-shadow:0 10px 24px rgba(16,24,40,.12),inset 0 1px 0 rgba(255,255,255,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease,filter .16s ease}
+.message-wrap .md-content a.message-path-link,.message-wrap .md-content .message-inline-token-bubble{display:inline-flex;align-items:center;max-width:min(100%,420px);margin:2px 4px 2px 0;padding:2px 10px;border-radius:12px;border:1px solid color-mix(in srgb,var(--accent) 24%,var(--border) 76%);background:linear-gradient(180deg,color-mix(in srgb,var(--bg-card) 86%,var(--accent) 14%),color-mix(in srgb,var(--bg-card) 94%,rgba(255,255,255,.22) 6%));color:var(--accent);text-decoration:none;font-weight:700;line-height:1.6;vertical-align:middle;overflow:hidden;box-shadow:0 10px 24px rgba(16,24,40,.12),inset 0 1px 0 rgba(255,255,255,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease,filter .16s ease}
 .message-wrap .md-content a.message-path-link:hover,.message-wrap .md-content a.message-path-link:focus-visible{transform:translateY(-1px);border-color:color-mix(in srgb,var(--accent) 42%,var(--border) 58%);box-shadow:0 14px 28px rgba(16,24,40,.16),inset 0 1px 0 rgba(255,255,255,.72);outline:none}
-.message-wrap .md-content a.message-path-link .message-path-link-label{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.message-wrap .md-content .message-inline-token-bubble{cursor:default;user-select:all}
+.message-wrap .md-content a.message-path-link .message-path-link-label,.message-wrap .md-content .message-inline-token-bubble .message-inline-token-label{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .message-wrap .md-content a.message-http-link{background:linear-gradient(180deg,rgba(77,107,254,.16),rgba(77,107,254,.08));border-color:rgba(77,107,254,.22);color:#244fbf}
-.message-wrap .md-content a.message-file-link{background:linear-gradient(180deg,rgba(53,124,255,.14),rgba(53,124,255,.06));border-color:rgba(53,124,255,.2);color:#1d4ed8}
+.message-wrap .md-content a.message-file-link,.message-wrap .md-content .message-inline-token-bubble.token-file{background:linear-gradient(180deg,rgba(53,124,255,.14),rgba(53,124,255,.06));border-color:rgba(53,124,255,.2);color:#1d4ed8}
+.message-wrap .md-content .message-inline-token-bubble.token-skill{background:linear-gradient(180deg,rgba(15,118,110,.14),rgba(15,118,110,.06));border-color:rgba(15,118,110,.22);color:#0f766e}
+.message-wrap .md-content .message-inline-token-bubble.token-team{background:linear-gradient(180deg,rgba(234,88,12,.14),rgba(234,88,12,.06));border-color:rgba(234,88,12,.22);color:#c2410c}
 .message-wrap .md-content a.message-path-link.onboarding-message-url-target{box-shadow:0 0 0 1px rgba(77,107,254,.26),0 16px 30px rgba(77,107,254,.18)}
-[data-theme="dark"] .message-wrap .md-content a.message-path-link{background:linear-gradient(180deg,rgba(16,28,49,.94),rgba(10,20,37,.88));border-color:rgba(169,190,227,.22);color:#d9e8ff;box-shadow:0 14px 32px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.06)}
+[data-theme="dark"] .message-wrap .md-content a.message-path-link,[data-theme="dark"] .message-wrap .md-content .message-inline-token-bubble{background:linear-gradient(180deg,rgba(16,28,49,.94),rgba(10,20,37,.88));border-color:rgba(169,190,227,.22);color:#d9e8ff;box-shadow:0 14px 32px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.06)}
 [data-theme="dark"] .message-wrap .md-content a.message-path-link:hover,[data-theme="dark"] .message-wrap .md-content a.message-path-link:focus-visible{border-color:rgba(142,180,255,.34);box-shadow:0 18px 36px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.08)}
 [data-theme="dark"] .message-wrap .md-content a.message-http-link{background:linear-gradient(180deg,rgba(62,92,201,.34),rgba(29,58,144,.24));border-color:rgba(128,166,255,.26);color:#aecdff}
-[data-theme="dark"] .message-wrap .md-content a.message-file-link{background:linear-gradient(180deg,rgba(39,87,189,.34),rgba(20,56,133,.22));border-color:rgba(123,165,255,.24);color:#b8d4ff}
+[data-theme="dark"] .message-wrap .md-content a.message-file-link,[data-theme="dark"] .message-wrap .md-content .message-inline-token-bubble.token-file{background:linear-gradient(180deg,rgba(39,87,189,.34),rgba(20,56,133,.22));border-color:rgba(123,165,255,.24);color:#b8d4ff}
+[data-theme="dark"] .message-wrap .md-content .message-inline-token-bubble.token-skill{background:linear-gradient(180deg,rgba(17,94,89,.42),rgba(11,68,64,.26));border-color:rgba(94,234,212,.22);color:#99f6e4}
+[data-theme="dark"] .message-wrap .md-content .message-inline-token-bubble.token-team{background:linear-gradient(180deg,rgba(154,52,18,.4),rgba(124,45,18,.24));border-color:rgba(253,186,116,.22);color:#fdba74}
 [data-theme="dark"] .message-wrap .md-content a.message-path-link.onboarding-message-url-target{box-shadow:0 0 0 1px rgba(142,180,255,.24),0 18px 34px rgba(0,0,0,.34)}
 .file-editor-header-actions{display:flex;align-items:center;gap:8px;min-width:0}
 .file-editor-close{width:30px;height:30px;flex:0 0 30px;border-radius:999px;border:1px solid color-mix(in srgb,var(--border) 80%,rgba(255,255,255,.24));background:transparent;color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition)}
@@ -3581,7 +3609,7 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
           <span class="working-indicator-text" id="workingIndicatorText">努力工作中</span>
         </div>
       </div>
-      <div class="model-indicator"><div class="input-leading-controls"><div class="input-sandbox-group" id="inputSandboxGroup"><button type="button" class="input-sandbox-btn" id="inputSandboxToggle" aria-pressed="false" aria-label="当前会话沙盒" onclick="toggleSandboxOverlay(event)" title="当前会话沙盒"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7.5 12 4l8 3.5v9L12 20l-8-3.5z"/><path d="M12 4v16"/><path d="m4 7.5 8 3.5 8-3.5"/></svg></button></div><div class="input-fullscreen-group" id="inputFullscreenGroup"><button type="button" class="input-fullscreen-btn" id="inputFullscreenToggle" aria-pressed="false" aria-label="进入浏览器全屏" onclick="toggleBrowserFullscreen(event)" title="进入浏览器全屏"><svg viewBox="0 0 24 24" fill="none"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button></div></div><div class="model-indicator-main" id="centerAgentIndicator"><span class="model-indicator-text" id="modelIndicator"></span><button class="model-indicator-btn" onclick="openSettings()" title="切换 Agent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></button><button class="bee-input-btn" id="inputBeeBtn" style="display:none" onclick="handleInputBeeClick(event)" title="蜂群已开启"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="6"/><path d="M12 16v4M8 20h8M6 10c-2-1-3-3-3-5M18 10c2-1 3-3 3-5M9 7h6"/></svg></button></div><div class="input-thinking" id="inputThinkingWrap"><div class="input-toggle-group" id="inputSwarmGroup"><div class="input-thinking-toggle" id="inputSwarmToggle" onclick="toggleInputSwarm()" title="SWARM 蜂群模式"></div><span class="input-thinking-label" id="inputSwarmLabel">SWARM</span></div><div class="input-toggle-group" id="inputHtmlGroup"><div class="input-thinking-toggle" id="inputHtmlToggle" onclick="toggleInputHtml()" title="HTML 输出"></div><span class="input-thinking-label" id="inputHtmlLabel">HTML</span></div><div class="input-toggle-group" id="inputThinkingGroup"><div class="input-thinking-toggle" id="inputThinkingToggle" onclick="toggleInputThinking()" title="Thinking 模式"></div><span class="input-thinking-label" id="inputThinkingLabel">Auto</span></div></div></div>
+      <div class="model-indicator"><div class="input-leading-controls"><div class="input-sandbox-group" id="inputSandboxGroup"><button type="button" class="input-sandbox-btn" id="inputSandboxToggle" aria-pressed="false" aria-label="当前会话沙盒" onclick="toggleSandboxOverlay(event)" title="当前会话沙盒"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7.5 12 4l8 3.5v9L12 20l-8-3.5z"/><path d="M12 4v16"/><path d="m4 7.5 8 3.5 8-3.5"/></svg></button></div><div class="input-fullscreen-group" id="inputFullscreenGroup"><button type="button" class="input-fullscreen-btn" id="inputFullscreenToggle" aria-pressed="false" aria-label="进入浏览器全屏" onclick="toggleBrowserFullscreen(event)" title="进入浏览器全屏"><svg viewBox="0 0 24 24" fill="none"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button></div></div><div class="model-indicator-main" id="centerAgentIndicator"><span class="model-indicator-text" id="modelIndicator"></span><button class="model-indicator-btn" onclick="openSettings()" title="切换 Agent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></button><button class="bee-input-btn" id="inputBeeBtn" style="display:none" onclick="handleInputBeeClick(event)" title="蜂群已开启"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="6"/><path d="M12 16v4M8 20h8M6 10c-2-1-3-3-3-5M18 10c2-1 3-3 3-5M9 7h6"/></svg></button></div><div class="input-thinking" id="inputThinkingWrap"><div class="input-toggle-group" id="inputSwarmGroup"><div class="input-thinking-toggle" id="inputSwarmToggle" onclick="toggleInputSwarm()" title="SWARM 蜂群模式"></div><span class="input-thinking-label" id="inputSwarmLabel">SWARM</span></div><div class="input-toggle-group" id="inputHtmlGroup"><div class="input-thinking-toggle" id="inputHtmlToggle" onclick="toggleInputHtml()" title="HTML 输出"></div><span class="input-thinking-label" id="inputHtmlLabel">HTML</span></div><div class="input-toggle-group" id="inputThinkingGroup"><div class="input-thinking-toggle" id="inputThinkingToggle" onclick="toggleInputThinking()" title="Thinking 模式"></div><span class="input-thinking-label" id="inputThinkingLabel">Auto</span><div class="input-reload-confirm thinking-verify-confirm" id="inputThinkingVerifyConfirm" role="dialog" aria-hidden="true" onclick="event.stopPropagation()"><div class="reload-title">是否开启目标校验</div><div class="reload-actions"><button class="reload-cancel-btn" onclick="cancelThinkingVerifyPrompt()">取消</button><button class="reload-confirm-btn" onclick="confirmThinkingVerifyPrompt()">确认</button></div></div></div></div></div>
       <div class="input-row">
       <div class="input-wrapper" id="inputComposeWrap">
         <div class="model-selector">
@@ -3747,6 +3775,13 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
             <div style="display:flex;align-items:center;gap:2px" id="rsThinkingGroup">
               <div class="input-thinking-toggle" id="rsThinkingToggle" onclick="rsToggleThinking()" title="Thinking"></div>
               <span class="input-thinking-label" id="rsThinkingLabel" style="font-size:7px">Auto</span>
+              <div class="input-reload-confirm thinking-verify-confirm" id="rsThinkingVerifyConfirm" role="dialog" aria-hidden="true" onclick="event.stopPropagation()">
+                <div class="reload-title">是否开启目标校验</div>
+                <div class="reload-actions">
+                  <button class="reload-cancel-btn" onclick="cancelThinkingVerifyPrompt()">取消</button>
+                  <button class="reload-confirm-btn" onclick="confirmThinkingVerifyPrompt()">确认</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -4005,7 +4040,7 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
       <div class="rs-meta-center-row"><span class="rs-meta-center-label">模型</span><span class="rs-meta-center-value" id="rsMetaCenterPreviewModel">-</span></div>
       <div class="rs-meta-center-row"><span class="rs-meta-center-label">思考</span><span class="rs-meta-center-value" id="rsMetaCenterPreviewThinking">-</span></div>
       <div class="rs-meta-center-row"><span class="rs-meta-center-label">SWARM</span><span class="rs-meta-center-value" id="rsMetaCenterPreviewSwarm">-</span></div>
-      <div class="rs-meta-center-row"><span class="rs-meta-center-label">类型</span><span class="rs-meta-center-value" id="rsMetaCenterPreviewType">-</span></div>
+      <div class="rs-meta-center-row"><span class="rs-meta-center-label">校验</span><span class="rs-meta-center-value" id="rsMetaCenterPreviewType">-</span></div>
       <div class="rs-meta-center-row"><span class="rs-meta-center-label">Agent</span><span class="rs-meta-center-value" id="rsMetaCenterPreviewAgent">-</span></div>
       <div class="rs-meta-center-row"><span class="rs-meta-center-label">状态</span><span class="rs-meta-center-value" id="rsMetaCenterPreviewStatus">-</span></div>
     </div>
@@ -4149,6 +4184,13 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
             <div class="plugin-modal-thinking plugin-modal-config-item" id="pluginModalThinkingItem">
               <div class="input-thinking-toggle" id="pluginModalThinkingToggle" onclick="pluginModalToggleThinking(event)" title="Thinking"></div>
               <span class="input-thinking-label" id="pluginModalThinkingLabel">Auto</span>
+              <div class="input-reload-confirm thinking-verify-confirm" id="pluginModalThinkingVerifyConfirm" role="dialog" aria-hidden="true" onclick="event.stopPropagation()">
+                <div class="reload-title">是否开启目标校验</div>
+                <div class="reload-actions">
+                  <button class="reload-cancel-btn" onclick="cancelThinkingVerifyPrompt()">取消</button>
+                  <button class="reload-confirm-btn" onclick="confirmThinkingVerifyPrompt()">确认</button>
+                </div>
+              </div>
             </div>
           </div>
           <div class="plugin-modal-config-empty" id="pluginModalConfigEmpty">当前插件未开放容器配置项</div>
@@ -6002,6 +6044,8 @@ let chatModels = {};
 let chatAgents = {};
 // Per-chat thinking selection
 let chatThinking = {};
+// Per-chat verify selection
+let chatVerify = {};
 // Per-chat HTML output selection
 let chatHtmlOutput = {};
 // Per-chat SWARM selection
@@ -7250,6 +7294,7 @@ let pluginModalState = {
   selectedModel: '',
   swarm: false,
   thinking: false,
+  verify: false,
   reuseChat: false,
   started: false,
   statusLoading: false,
@@ -7266,6 +7311,10 @@ let pluginModalState = {
   browserRestartConfirmVisible: false,
   emailIntervalWarningVisible: false,
   pendingStartAfterEmailIntervalWarning: false
+};
+let thinkingVerifyPromptState = {
+  scope: '',
+  resolve: null
 };
 let pluginMetaPlaceholderPreviewState = {
   input: null,
@@ -13093,7 +13142,7 @@ function renderMemoTourMetadataList() {
   if (!list) return;
   const model = normalizeModelName(rsSelectedModel || state.selectedModel || Object.keys(state.settings.models || {})[0] || '') || '未选择';
   list.innerHTML =
-    '<div class="rs-meta-item" id="rsTourMetaItem" data-content="测试任务" data-agent="' + esc(state.settings.agentId || 'DEF_AGENT').replace(/"/g, '&quot;') + '" data-type="cron" data-cycle="工作日" data-time="05-26 09:30" data-model="' + esc(model).replace(/"/g, '&quot;') + '" data-thinking="Auto" data-swarm="关闭">' +
+    '<div class="rs-meta-item" id="rsTourMetaItem" data-content="测试任务" data-agent="' + esc(state.settings.agentId || 'DEF_AGENT').replace(/"/g, '&quot;') + '" data-verify="否" data-type="cron" data-cycle="工作日" data-time="05-26 09:30" data-model="' + esc(model).replace(/"/g, '&quot;') + '" data-thinking="Auto" data-swarm="关闭">' +
       '<div class="rs-meta-info">' +
         '<span>工作日</span>' +
         '<span>05-26 09:30</span>' +
@@ -13319,6 +13368,7 @@ function snapshotMemoTaskTourDraftState() {
     repeatLabelText: repeatLabel ? repeatLabel.textContent : '',
     swarmOn: !!(swarmToggle && swarmToggle.classList.contains('on')),
     thinkingOn: !!(thinkingToggle && thinkingToggle.classList.contains('on')),
+    verifyOn: rsVerifyEnabled(),
     thinkingLabelText: thinkingLabel ? thinkingLabel.textContent : 'Auto',
     swarmLabelOn: !!(swarmLabel && swarmLabel.classList.contains('on')),
     thinkingLabelOn: !!(thinkingLabel && thinkingLabel.classList.contains('on')),
@@ -13352,10 +13402,10 @@ function restoreMemoTaskTourDraftState(snapshot) {
   if (swarmToggle) swarmToggle.classList.toggle('on', !!draft.swarmOn);
   if (swarmLabel) swarmLabel.classList.toggle('on', !!draft.swarmLabelOn);
   if (thinkingToggle) thinkingToggle.classList.toggle('on', !!draft.thinkingOn);
-  if (thinkingLabel) {
-    thinkingLabel.textContent = String(draft.thinkingLabelText || (draft.thinkingOn ? 'Thinking' : 'Auto') || 'Auto');
-    thinkingLabel.classList.toggle('on', !!draft.thinkingLabelOn);
-  }
+  rsVerifyEnabledState = !!draft.verifyOn && !!draft.thinkingOn;
+  if (thinkingLabel) thinkingLabel.textContent = String(draft.thinkingLabelText || (draft.thinkingOn ? 'Thinking' : 'Auto') || 'Auto');
+  rsUpdateThinkingUI();
+  if (thinkingLabel) thinkingLabel.classList.toggle('on', !!draft.thinkingLabelOn);
   document.querySelectorAll('#rsRepeatDd .rs-repeat-opt').forEach(el => el.classList.toggle('active', el.getAttribute('data-mode') === rsRepeatMode));
   rsSetModelDropdownOpen(!!draft.modelDropdownOpen);
   rsSetMetaViewOpen(!!draft.metaViewActive, { immediate: true, load: false });
@@ -13441,10 +13491,9 @@ function startMemoTaskTourDemoPlayback() {
   if (swarmToggle) swarmToggle.classList.remove('on');
   if (swarmLabel) swarmLabel.classList.remove('on');
   if (thinkingToggle) thinkingToggle.classList.remove('on');
-  if (thinkingLabel) {
-    thinkingLabel.textContent = 'Auto';
-    thinkingLabel.classList.remove('on');
-  }
+  rsVerifyEnabledState = false;
+  if (thinkingLabel) thinkingLabel.classList.remove('on');
+  rsUpdateThinkingUI();
   const nextMinute = new Date(Date.now() + 60000);
   if (timeH) timeH.value = String(nextMinute.getHours()).padStart(2, '0');
   if (timeM) timeM.value = String(nextMinute.getMinutes()).padStart(2, '0');
@@ -13705,7 +13754,7 @@ function getMemoRecurringTourPreviewMeta() {
     model: item.getAttribute('data-model') || '',
     thinking: item.getAttribute('data-thinking') || '',
     swarm: item.getAttribute('data-swarm') || '',
-    type: item.getAttribute('data-type') || 'cron',
+    verify: item.getAttribute('data-verify') || '否',
     agent: item.getAttribute('data-agent') || '',
     status: '周期任务',
     content: item.getAttribute('data-content') || ''
@@ -13889,7 +13938,7 @@ function getMemoCompletionTourPreviewMeta() {
       model: normalizeModelName(meta.model),
       thinking: meta.thinking ? 'Thinking' : 'Auto',
       swarm: formatSwarmStatus(meta.router_disable),
-      type: meta.type || 'cron',
+      verify: formatVerifyStatus(!!meta.verify && !!meta.thinking),
       agent: meta.agentId || '',
       status: meta.started || '',
       content: meta.content || ''
@@ -21607,6 +21656,7 @@ function normalizeQuickPluginEntries(items) {
     const chatId = String(item && item.chatId != null ? item.chatId : '').trim();
     const model = normalizeModelName(item && item.model != null ? item.model : '');
     const thinking = !!(item && item.thinking);
+    const verify = !!(item && item.verify) && thinking;
     const stream = !!(item && item.stream);
     const routerDisableValue = readMetadataBoolean(item && item.router_disable);
     const legacySwarmValue = readMetadataBoolean(item && item.swarm);
@@ -21623,7 +21673,7 @@ function normalizeQuickPluginEntries(items) {
     });
     if (!name || seen.has(name)) return null;
     seen.add(name);
-    return { name, key: key || name, param, scope, scopeDefined, meta, agentId, chatId, model, thinking, stream, routerDisable, routerDisableConfigured, callback, createdAt, updatedAt, started: false, statusKnown: false };
+    return { name, key: key || name, param, scope, scopeDefined, meta, agentId, chatId, model, thinking, verify, stream, routerDisable, routerDisableConfigured, callback, createdAt, updatedAt, started: false, statusKnown: false };
   }).filter(Boolean);
 }
 
@@ -22292,11 +22342,13 @@ function pluginModalUpdateThinkingUI() {
   const toggle = document.getElementById('pluginModalThinkingToggle');
   const label = document.getElementById('pluginModalThinkingLabel');
   const on = !!pluginModalState.thinking;
+  if (!on) pluginModalState.verify = false;
   if (toggle) toggle.classList.toggle('on', on);
   if (label) {
     label.textContent = on ? 'Thinking' : 'Auto';
     label.classList.toggle('on', on);
   }
+  applyThinkingVerifyAppearance(toggle, label, !!pluginModalState.verify && on);
 }
 
 function pluginModalUpdateSwarmUI() {
@@ -22356,11 +22408,18 @@ function pluginModalSelectModel(model) {
   pluginModalCloseModelDropdown();
 }
 
-function pluginModalToggleThinking(event) {
+async function pluginModalToggleThinking(event) {
   if (event) event.stopPropagation();
   if (!pluginSupportsScope(pluginModalState.plugin, 'thinking')) return;
-  pluginModalState.thinking = !pluginModalState.thinking;
+  if (isThinkingVerifyPromptPending('plugin')) return;
+  const next = !pluginModalState.thinking;
+  pluginModalState.thinking = next;
+  if (!next) pluginModalState.verify = false;
   pluginModalUpdateThinkingUI();
+  if (next) {
+    pluginModalState.verify = await promptThinkingVerify('plugin');
+    pluginModalUpdateThinkingUI();
+  }
 }
 
 function pluginModalToggleSwarm(event) {
@@ -22459,6 +22518,7 @@ function pluginModalSyncControls() {
   if (!supportsReuse) pluginModalState.reuseChat = false;
   if (!supportsSwarm) pluginModalState.swarm = false;
   if (!supportsThinking) pluginModalState.thinking = false;
+  if (!supportsThinking || !pluginModalState.thinking) pluginModalState.verify = false;
   pluginModalRenderAgentOptions();
   pluginModalState.selectedAgentId = pluginModalResolveEffectiveAgentId();
   pluginModalState.selectedModel = pluginModalResolveEffectiveModel();
@@ -23042,6 +23102,7 @@ function pluginModalApplyRuntimeConfig(plugin, payload) {
   plugin.chatId = String(payload.chatId || '').trim();
   plugin.model = normalizeModelName(payload.model || '');
   plugin.thinking = !!payload.thinking;
+  plugin.verify = !!payload.verify && !!payload.thinking;
   plugin.routerDisable = !!payload.routerDisable;
   plugin.routerDisableConfigured = true;
 }
@@ -23074,6 +23135,7 @@ function pluginModalBuildActionPayload() {
   const supportsProvider = pluginSupportsScope(plugin, 'provider');
   const reuseChat = pluginSupportsScope(plugin, 'reuse') ? !!pluginModalState.reuseChat : false;
   const thinking = pluginSupportsScope(plugin, 'thinking') ? !!pluginModalState.thinking : false;
+  const verify = thinking && pluginSupportsScope(plugin, 'thinking') ? !!pluginModalState.verify : false;
   const routerDisable = pluginSupportsScope(plugin, 'swarm')
     ? resolveRouterDisableFromSwarm(!!pluginModalState.swarm)
     : !!(plugin && plugin.routerDisable);
@@ -23096,6 +23158,7 @@ function pluginModalBuildActionPayload() {
     chatId: configuredChatId,
     model: payloadModel,
     thinking: thinking ? 'true' : 'false',
+    verify: verify ? 'true' : 'false',
     router_disable: routerDisable ? 'true' : 'false'
   });
   return {
@@ -23106,6 +23169,7 @@ function pluginModalBuildActionPayload() {
     chatId: configuredChatId,
     model: payloadModel,
     thinking,
+    verify,
     routerDisable,
     configQuery: params
   };
@@ -23351,6 +23415,9 @@ async function openPluginModal(plugin) {
   pluginModalState.thinking = shouldUseContainerDefaults
     ? false
     : (pluginSupportsScope(plugin, 'thinking') ? !!plugin.thinking : !!thinkingEnabled);
+  pluginModalState.verify = shouldUseContainerDefaults
+    ? false
+    : (pluginSupportsScope(plugin, 'thinking') ? !!plugin.verify && !!plugin.thinking : false);
   pluginModalState.reuseChat = !!(!shouldUseContainerDefaults && hasSavedReuseChat);
   pluginModalState.started = !!(plugin && plugin.started);
   pluginModalState.statusLoading = false;
@@ -23396,6 +23463,7 @@ function closePluginModal(force) {
   pluginModalStopLogStream();
   pluginModalSetBrowserRestartConfirmVisible(false);
   pluginModalSetEmailIntervalWarningVisible(false);
+  cancelThinkingVerifyPrompt();
   hidePluginMetaPlaceholderPreview();
   closeAllSkillExtractPopovers();
   const overlay = document.getElementById('pluginModalOverlay');
@@ -23408,6 +23476,7 @@ function closePluginModal(force) {
   pluginModalState.selectedModel = '';
   pluginModalState.swarm = false;
   pluginModalState.thinking = false;
+  pluginModalState.verify = false;
   pluginModalState.reuseChat = false;
   pluginModalState.started = false;
   pluginModalState.statusLoading = false;
@@ -23546,6 +23615,7 @@ function loadChats() {
       chatAgents = d.agents || {};
       chatModels = normalizeChatModelMap(d.models || {});
       chatThinking = d.thinking && typeof d.thinking === 'object' ? d.thinking : {};
+      chatVerify = d.verify && typeof d.verify === 'object' ? d.verify : {};
       chatHtmlOutput = d.htmlOutput && typeof d.htmlOutput === 'object' ? d.htmlOutput : {};
       chatSwarm = d.swarm && typeof d.swarm === 'object' ? d.swarm : {};
       let normalizedChanged = false;
@@ -23615,6 +23685,7 @@ function buildChatsStoragePayload(sourceChats, sourceOrder) {
     agents: { ...chatAgents },
     models: normalizeChatModelMap(chatModels),
     thinking: { ...chatThinking },
+    verify: { ...chatVerify },
     htmlOutput: { ...chatHtmlOutput },
     swarm: { ...chatSwarm }
   };
@@ -26464,6 +26535,7 @@ function createNewChat(preferredId) {
   if (state.settings.agentId) chatAgents[id] = state.settings.agentId;
   if (state.selectedModel) chatModels[id] = normalizeModelName(state.selectedModel);
   chatThinking[id] = false;
+  chatVerify[id] = false;
   chatHtmlOutput[id] = false;
   chatSwarm[id] = false;
   clearChatSandbox(id);
@@ -26507,6 +26579,7 @@ function confirmDelete() {
   delete chatModels[id];
   delete chatAgents[id];
   delete chatThinking[id];
+  delete chatVerify[id];
   delete chatHtmlOutput[id];
   delete chatSwarm[id];
   clearChatSandbox(id);
@@ -26565,6 +26638,7 @@ function switchChat(id) {
   cancelDelete();
   hideInputClearConfirm();
   hideInputReloadConfirm();
+  cancelThinkingVerifyPrompt();
   closeQueuedCenterPanel(true);
   cmdClosePanel(true);
   // Close agent select overlay if open (will re-check for new chat)
@@ -26809,6 +26883,9 @@ async function checkAgentValidity(chatId) {
     if (!Object.prototype.hasOwnProperty.call(chatThinking, resolvedChatId)) {
       chatThinking[resolvedChatId] = false;
     }
+    if (!Object.prototype.hasOwnProperty.call(chatVerify, resolvedChatId)) {
+      chatVerify[resolvedChatId] = false;
+    }
     if (!Object.prototype.hasOwnProperty.call(chatHtmlOutput, resolvedChatId)) {
       chatHtmlOutput[resolvedChatId] = false;
     }
@@ -26889,6 +26966,9 @@ function bindAgentToChat(chatId, agentId) {
   chatAgents[chatId] = resolvedAgentId;
   if (!Object.prototype.hasOwnProperty.call(chatThinking, chatId)) {
     chatThinking[chatId] = false;
+  }
+  if (!Object.prototype.hasOwnProperty.call(chatVerify, chatId)) {
+    chatVerify[chatId] = false;
   }
   if (!Object.prototype.hasOwnProperty.call(chatHtmlOutput, chatId)) {
     chatHtmlOutput[chatId] = false;
@@ -27065,6 +27145,10 @@ function shouldDecoratePathsForMessage(message) {
   return true;
 }
 
+function shouldDecorateBubbleTokensForMessage(message) {
+  return !!(message && message.role === 'user' && !message.error);
+}
+
 function shouldRenderMessageAsStandaloneJsonCodeFence(message) {
   if (!message || message.error) return false;
   if (message.role === 'user') return true;
@@ -27121,6 +27205,7 @@ function findRenderedAssistantWrapByBinding(container, message) {
 function msgHtml(m, options) {
   const opts = options || {};
   const shouldDecoratePaths = shouldDecoratePathsForMessage(m);
+  const shouldDecorateBubbleTokens = shouldDecorateBubbleTokensForMessage(m);
   const needsInsertedMaterialized = isMaterializedInsertedUserMessage(m) && !m.messageInsertAnimated;
   const insertedMaterializedClass = needsInsertedMaterialized ? ' inserted-materialized' : '';
   const insertedMaterializedWrapClass = needsInsertedMaterialized ? ' inserted-materialized-wrap' : '';
@@ -27129,6 +27214,7 @@ function msgHtml(m, options) {
     : renderMessageContent(m.content, {
         plain: !!opts.deferRich,
         decoratePaths: shouldDecoratePaths,
+        decorateBubbleTokens: shouldDecorateBubbleTokens,
         standaloneJsonCodeFence: shouldRenderMessageAsStandaloneJsonCodeFence(m)
       });
   const mdClass = opts.deferRich ? 'md-content render-plain' : 'md-content';
@@ -27427,10 +27513,12 @@ function renderPlainMessageContent(text) {
 
 function renderMessageContent(text, options) {
   const opts = options || {};
-  const html = opts.plain
+  let html = opts.plain
     ? renderPlainMessageContent(text)
     : renderMd(text, { standaloneJsonCodeFence: !!opts.standaloneJsonCodeFence });
-  return opts.decoratePaths ? decorateMessagePathHtml(html) : html;
+  if (opts.decoratePaths) html = decorateMessagePathHtml(html);
+  if (opts.decorateBubbleTokens) html = decorateMessageInlineTokenHtml(html);
+  return html;
 }
 
 function upgradeMessageNodeRichContent(node) {
@@ -27440,12 +27528,14 @@ function upgradeMessageNodeRichContent(node) {
   const wrap = node.querySelector('.message-wrap');
   const message = node._messageData || null;
   const shouldDecoratePaths = shouldDecoratePathsForMessage(message);
+  const shouldDecorateBubbleTokens = shouldDecorateBubbleTokensForMessage(message);
   const content = wrap && wrap.classList.contains('error')
     ? ''
     : String((message && message.content) || '');
   md.innerHTML = renderMessageContent(content, {
     plain: false,
     decoratePaths: shouldDecoratePaths,
+    decorateBubbleTokens: shouldDecorateBubbleTokens,
     standaloneJsonCodeFence: shouldRenderMessageAsStandaloneJsonCodeFence(message)
   });
   md.classList.remove('render-plain');
@@ -31100,6 +31190,7 @@ function readToggleDomState(toggleId, fallback) {
 function getActiveInputToggleSnapshot() {
   return {
     thinking: readToggleDomState('inputThinkingToggle', getActiveChatThinking()),
+    verify: getActiveChatVerify(),
     html: readToggleDomState('inputHtmlToggle', getActiveChatHtmlOutput()),
     swarm: readToggleDomState('inputSwarmToggle', getActiveChatSwarm())
   };
@@ -31109,6 +31200,7 @@ function syncActiveChatToggleStateFromUI() {
   if (!state.activeChat) return getActiveInputToggleSnapshot();
   const next = getActiveInputToggleSnapshot();
   chatThinking[state.activeChat] = !!next.thinking;
+  chatVerify[state.activeChat] = next.thinking ? !!next.verify : false;
   chatHtmlOutput[state.activeChat] = !!next.html;
   chatSwarm[state.activeChat] = !!next.swarm;
   thinkingEnabled = !!next.thinking;
@@ -31125,6 +31217,10 @@ function readMetadataBoolean(value) {
 function formatSwarmStatus(routerDisableValue) {
   const routerDisable = readMetadataBoolean(routerDisableValue);
   return routerDisable === false ? '开启' : '关闭';
+}
+
+function formatVerifyStatus(verifyEnabled) {
+  return verifyEnabled ? '是' : '否';
 }
 
 function resolveRouterDisableFromSwarm(swarmEnabled) {
@@ -31938,6 +32034,7 @@ async function sendCenterMessage(rawText, options) {
     ? { ...opts.metadata }
     : extraMetadata;
   const thinkingOverride = readMetadataBoolean(mergedMetadata && mergedMetadata.thinking);
+  const verifyOverride = readMetadataBoolean(mergedMetadata && mergedMetadata.verify);
   const htmlOverride = readMetadataBoolean(mergedMetadata && mergedMetadata.html);
   const routerDisableOverride = readMetadataBoolean(mergedMetadata && mergedMetadata.router_disable);
   const swarmOverride = readMetadataBoolean(mergedMetadata && mergedMetadata.swarm);
@@ -31945,11 +32042,15 @@ async function sendCenterMessage(rawText, options) {
   // Active-chat requests follow the live input toggles; background queued sends reuse the chat snapshot.
   const uiToggleSnapshot = wasTargetActiveChat ? syncActiveChatToggleStateFromUI() : null;
   const fallbackThinkingRequested = uiToggleSnapshot ? uiToggleSnapshot.thinking : !!chatThinking[chatId];
+  const fallbackVerifyRequested = uiToggleSnapshot ? uiToggleSnapshot.verify : !!chatVerify[chatId];
   const fallbackHtmlRequested = uiToggleSnapshot ? uiToggleSnapshot.html : !!chatHtmlOutput[chatId];
   const fallbackSwarmRequested = uiToggleSnapshot ? uiToggleSnapshot.swarm : !!chatSwarm[chatId];
   const thinkingRequested = preserveToggleMetadata && thinkingOverride != null
     ? thinkingOverride
     : fallbackThinkingRequested;
+  const verifyRequested = !!thinkingRequested && (preserveToggleMetadata && verifyOverride != null
+    ? verifyOverride
+    : fallbackVerifyRequested);
   const htmlRequested = preserveToggleMetadata && htmlOverride != null
     ? htmlOverride
     : fallbackHtmlRequested;
@@ -31960,6 +32061,8 @@ async function sendCenterMessage(rawText, options) {
     : fallbackSwarmRequested;
   const requestMetadata = mergedMetadata ? { ...mergedMetadata } : {};
   requestMetadata.thinking = !!thinkingRequested;
+  if (verifyRequested) requestMetadata.verify = true;
+  else delete requestMetadata.verify;
   requestMetadata.html = !!htmlRequested;
   requestMetadata.router_disable = !swarmRequested;
   delete requestMetadata.swarm;
@@ -33437,6 +33540,63 @@ function toggleInputReloadConfirm(event) {
 function hideInputReloadConfirm() {
   const panel = document.getElementById('inputReloadConfirm');
   if (panel) setOverlayVisible(panel, false);
+}
+
+function getThinkingVerifyPromptPanel(scope) {
+  switch (String(scope || '').trim()) {
+    case 'center':
+      return document.getElementById('inputThinkingVerifyConfirm');
+    case 'memo':
+      return document.getElementById('rsThinkingVerifyConfirm');
+    case 'plugin':
+      return document.getElementById('pluginModalThinkingVerifyConfirm');
+    default:
+      return null;
+  }
+}
+
+function isThinkingVerifyPromptPending(scope) {
+  return typeof thinkingVerifyPromptState.resolve === 'function'
+    && String(thinkingVerifyPromptState.scope || '').trim() === String(scope || '').trim();
+}
+
+function hideAllThinkingVerifyPrompts() {
+  ['center', 'memo', 'plugin'].forEach(scope => {
+    const panel = getThinkingVerifyPromptPanel(scope);
+    if (panel) setOverlayVisible(panel, false);
+  });
+}
+
+function resolveThinkingVerifyPrompt(enableVerify) {
+  const resolver = thinkingVerifyPromptState.resolve;
+  thinkingVerifyPromptState.scope = '';
+  thinkingVerifyPromptState.resolve = null;
+  hideAllThinkingVerifyPrompts();
+  if (typeof resolver === 'function') resolver(!!enableVerify);
+}
+
+function cancelThinkingVerifyPrompt() {
+  resolveThinkingVerifyPrompt(false);
+}
+
+function confirmThinkingVerifyPrompt() {
+  resolveThinkingVerifyPrompt(true);
+}
+
+function promptThinkingVerify(scope) {
+  const panel = getThinkingVerifyPromptPanel(scope);
+  if (!panel) return Promise.resolve(false);
+  if (typeof thinkingVerifyPromptState.resolve === 'function') {
+    thinkingVerifyPromptState.resolve(false);
+  }
+  thinkingVerifyPromptState.scope = String(scope || '').trim();
+  thinkingVerifyPromptState.resolve = null;
+  hideAllThinkingVerifyPrompts();
+  setOverlayVisible(panel, true);
+  return new Promise(resolve => {
+    thinkingVerifyPromptState.scope = String(scope || '').trim();
+    thinkingVerifyPromptState.resolve = resolve;
+  });
 }
 
 function toggleInputClearConfirm(event) {
@@ -36480,7 +36640,19 @@ function getActiveChatThinking() {
 function setActiveChatThinking(value) {
   if (!state.activeChat) return;
   chatThinking[state.activeChat] = !!value;
+  if (!chatThinking[state.activeChat]) chatVerify[state.activeChat] = false;
   thinkingEnabled = !!value;
+  saveChats();
+}
+
+function getActiveChatVerify() {
+  if (!state.activeChat) return false;
+  return !!chatThinking[state.activeChat] && !!chatVerify[state.activeChat];
+}
+
+function setActiveChatVerify(value) {
+  if (!state.activeChat) return;
+  chatVerify[state.activeChat] = !!value && !!chatThinking[state.activeChat];
   saveChats();
 }
 
@@ -36502,6 +36674,12 @@ function setActiveChatSwarm(value) {
   if (!state.activeChat) return;
   chatSwarm[state.activeChat] = !!value;
   saveChats();
+}
+
+function applyThinkingVerifyAppearance(toggle, label, enabled) {
+  const verifyEnabled = !!enabled;
+  if (toggle) toggle.classList.toggle('verify-on', verifyEnabled);
+  if (label) label.classList.toggle('verify-on', verifyEnabled);
 }
 
 function onAgentSelectChange() {
@@ -36712,6 +36890,7 @@ function updateBeeIcons() {
 
 function updateThinkingUI() {
   const chatThinkingEnabled = getActiveChatThinking();
+  const chatVerifyEnabled = getActiveChatVerify();
   const chatHtmlEnabled = getActiveChatHtmlOutput();
   const chatSwarmEnabled = getActiveChatSwarm();
   // Settings panel thinking toggle
@@ -36737,6 +36916,7 @@ function updateThinkingUI() {
     inputLabel.textContent = chatThinkingEnabled ? 'Thinking' : 'Auto';
     inputLabel.classList.toggle('on', chatThinkingEnabled);
   }
+  applyThinkingVerifyAppearance(inputToggle, inputLabel, chatVerifyEnabled);
 }
 
 async function toggleInputHtml() {
@@ -36762,11 +36942,19 @@ async function toggleInputSwarm() {
 }
 
 async function toggleInputThinking() {
+  if (!state.activeChat) return;
+  if (isThinkingVerifyPromptPending('center')) return;
   const inputToggle = document.getElementById('inputThinkingToggle');
-  inputToggle.classList.toggle('on');
-  const newVal = inputToggle.classList.contains('on');
+  if (!inputToggle) return;
+  const newVal = !inputToggle.classList.contains('on');
+  inputToggle.classList.toggle('on', newVal);
   setActiveChatThinking(newVal);
+  if (!newVal) setActiveChatVerify(false);
   updateThinkingUI();
+  if (newVal) {
+    setActiveChatVerify(await promptThinkingVerify('center'));
+    updateThinkingUI();
+  }
 }
 
 async function toggleThinking() {
@@ -37455,6 +37643,9 @@ async function saveSettingsAsync() {
   if (state.activeChat) chatAgents[state.activeChat] = agentId;
   if (state.activeChat && !Object.prototype.hasOwnProperty.call(chatThinking, state.activeChat)) {
     chatThinking[state.activeChat] = false;
+  }
+  if (state.activeChat && !Object.prototype.hasOwnProperty.call(chatVerify, state.activeChat)) {
+    chatVerify[state.activeChat] = false;
   }
   if (state.activeChat && !Object.prototype.hasOwnProperty.call(chatHtmlOutput, state.activeChat)) {
     chatHtmlOutput[state.activeChat] = false;
@@ -39966,6 +40157,10 @@ function resolveOverlayCancelButton(scope) {
       return findVisibleButton(scope, ['.reload-cancel-btn']) || findVisibleButtonByText(scope, ['取消']);
     case 'inputClearConfirm':
       return findVisibleButton(scope, ['.reload-cancel-btn']) || findVisibleButtonByText(scope, ['取消']);
+    case 'inputThinkingVerifyConfirm':
+    case 'rsThinkingVerifyConfirm':
+    case 'pluginModalThinkingVerifyConfirm':
+      return findVisibleButton(scope, ['.reload-cancel-btn']) || findVisibleButtonByText(scope, ['取消']);
     case 'tlIgnoreConfirm':
     case 'tlViewConfirm':
     case 'rsConfirm':
@@ -40009,6 +40204,10 @@ function resolveOverlayConfirmButton(scope, target) {
     case 'inputReloadConfirm':
       return findVisibleButton(scope, ['.reload-confirm-btn']) || findVisibleButtonByText(scope, ['确认']);
     case 'inputClearConfirm':
+      return findVisibleButton(scope, ['.reload-confirm-btn']) || findVisibleButtonByText(scope, ['确认']);
+    case 'inputThinkingVerifyConfirm':
+    case 'rsThinkingVerifyConfirm':
+    case 'pluginModalThinkingVerifyConfirm':
       return findVisibleButton(scope, ['.reload-confirm-btn']) || findVisibleButtonByText(scope, ['确认']);
     case 'tlIgnoreConfirm':
     case 'tlViewConfirm':
@@ -40544,12 +40743,13 @@ function closestFromEventTarget(target, selector) {
   return element && element.closest ? element.closest(selector) : null;
 }
 
-const MESSAGE_PATH_SKIP_SELECTOR = 'a, pre, script, style, textarea, .katex';
+const MESSAGE_PATH_SKIP_SELECTOR = 'a, pre, script, style, textarea, .katex, .message-inline-token-bubble';
 const MESSAGE_PATH_BOUNDARY_BEFORE = /[\s`"'([{<（【《“‘]/;
 const MESSAGE_PATH_BOUNDARY_AFTER = /[\s`"')\]}>,.:;!?，。；：！？、）】》”’]/;
 const MESSAGE_HTTP_BASECASE = /^(?:https?:\/\/|www\.)[^\s`"'()[\]{}<>|,;!，。；：！？、（）【】《》“”‘’]+/i;
 const MESSAGE_LINK_MATCHER = /https?:\/\/[^\s`"'()[\]{}<>|,;!，。；：！？、（）【】《》“”‘’]+|www\.[^\s`"'()[\]{}<>|,;!，。；：！？、（）【】《》“”‘’]+|file:\/\/\/[^\s`"'()[\]{}<>|,:;!?，。；：！？、（）【】《》“”‘’]+|~\/[^\s`"'()[\]{}<>|,:;!?，。；：！？、（）【】《》“”‘’]*|\/[^\s`"'()[\]{}<>|,:;!?，。；：！？、（）【】《》“”‘’]+|(?:skills|tmp)(?:\/[^\s`"'()[\]{}<>|,:;!?，。；：！？、（）【】《》“”‘’]+)*|(?:SOUL|USER)\.md/g;
 const MESSAGE_FILE_TOKEN_MATCHER = /\[FILE:[^\]\n\r]+\]/gi;
+const MESSAGE_INLINE_TOKEN_MATCHER = /\[(FILE|SKILL|TEAM):\s*([^\]\n\r]+?)\s*\]/gi;
 const MESSAGE_QUOTED_FILE_TOKEN_MATCHER = /"(?:file:\/\/\/|\/|~\/)[^"\n\r]+?"|'(?:file:\/\/\/|\/|~\/)[^'\n\r]+?'/g;
 const MESSAGE_RELATIVE_FILE_NAMES = new Set(['SOUL.md', 'USER.md']);
 const MESSAGE_MAC_SPACE_SEGMENTS = [
@@ -41112,6 +41312,92 @@ function buildMessageHttpBubbleLabel(href, fallbackText) {
 function getMessagePathLinkDisplayText(kind, rawValue, fallbackText, filePath) {
   if (kind === 'file') return buildMessageFileBubbleLabel(rawValue || fallbackText, filePath);
   return buildMessageHttpBubbleLabel(rawValue, fallbackText);
+}
+
+function shouldDecorateMessageInlineTokenNode(node) {
+  if (!node || node.nodeType !== Node.TEXT_NODE) return false;
+  const value = String(node.textContent || '');
+  if (!value.trim()) return false;
+  const parent = node.parentElement;
+  if (!parent) return false;
+  return !parent.closest('a, pre, code, script, style, textarea, .katex, .message-inline-token-bubble');
+}
+
+function buildMessageInlineTokenDisplayText(kind, rawValue) {
+  const normalizedKind = String(kind || '').trim().toUpperCase();
+  const value = String(rawValue || '').trim();
+  if (!normalizedKind || !value) return '';
+  if (normalizedKind === 'FILE') {
+    const filePath = extractMessageFilePath('[FILE:' + value + ']') || extractMessageFilePath(value);
+    const label = filePath ? buildMessageFileBubbleLabel(value, filePath) : value;
+    return '[FILE:' + String(label || value).trim() + ']';
+  }
+  return '[' + normalizedKind + ':' + value + ']';
+}
+
+function buildMessageInlineTokenElement(ownerDoc, kind, rawValue) {
+  const normalizedKind = String(kind || '').trim().toUpperCase();
+  const value = String(rawValue || '').trim();
+  const displayText = buildMessageInlineTokenDisplayText(normalizedKind, value);
+  if (!displayText) return null;
+  const bubble = ownerDoc.createElement('span');
+  bubble.className = 'message-inline-token-bubble token-' + normalizedKind.toLowerCase();
+  bubble.setAttribute('data-token-kind', normalizedKind.toLowerCase());
+  bubble.setAttribute('data-token-value', value);
+  bubble.setAttribute('title', '[' + normalizedKind + ':' + value + ']');
+  const label = ownerDoc.createElement('span');
+  label.className = 'message-inline-token-label';
+  label.textContent = displayText;
+  bubble.appendChild(label);
+  return bubble;
+}
+
+function decorateMessageInlineTokenTextNode(node) {
+  if (!shouldDecorateMessageInlineTokenNode(node) || !node.parentNode) return;
+  const ownerDoc = node.ownerDocument || document;
+  const source = String(node.textContent || '');
+  MESSAGE_INLINE_TOKEN_MATCHER.lastIndex = 0;
+  const fragment = ownerDoc.createDocumentFragment();
+  let cursor = 0;
+  let hasMatch = false;
+  let match;
+  while ((match = MESSAGE_INLINE_TOKEN_MATCHER.exec(source)) !== null) {
+    const rawToken = String(match[0] || '');
+    const tokenKind = String(match[1] || '').trim().toUpperCase();
+    const tokenValue = String(match[2] || '').trim();
+    if (!rawToken || !tokenKind || !tokenValue) continue;
+    hasMatch = true;
+    const start = match.index;
+    const end = start + rawToken.length;
+    if (start > cursor) {
+      fragment.appendChild(ownerDoc.createTextNode(source.slice(cursor, start)));
+    }
+    const bubble = buildMessageInlineTokenElement(ownerDoc, tokenKind, tokenValue);
+    if (bubble) fragment.appendChild(bubble);
+    else fragment.appendChild(ownerDoc.createTextNode(rawToken));
+    cursor = end;
+  }
+  if (!hasMatch) return;
+  if (cursor < source.length) {
+    fragment.appendChild(ownerDoc.createTextNode(source.slice(cursor)));
+  }
+  node.parentNode.replaceChild(fragment, node);
+}
+
+function decorateMessageInlineTokenHtml(inputHtml) {
+  const html = String(inputHtml || '');
+  if (!html.trim() || typeof DOMParser === 'undefined' || typeof document === 'undefined') return html;
+  const parser = new DOMParser();
+  const doc = parser.parseFromString('<body>' + html + '</body>', 'text/html');
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      return shouldDecorateMessageInlineTokenNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+    }
+  });
+  const pending = [];
+  while (walker.nextNode()) pending.push(walker.currentNode);
+  pending.forEach(decorateMessageInlineTokenTextNode);
+  return doc.body.innerHTML;
 }
 
 function decorateMessagePathAnchor(anchor, options) {
@@ -42759,7 +43045,7 @@ async function _doRenderTimeline() {
       const idAttr = isNearest ? ' id="tlNearestPending"' : (isMemoCompletionTarget ? ' id="memoCompletionTourDoneItem"' : '');
       const startedLabel = startedLabels[d.started] || '未知';
       const startedClass = startedClassMap[d.started] || 'unknown';
-      const meta = esc(JSON.stringify({ agentId: d.agentId, type: d.type || 'cron', model: d.model, thinking: d.thinking, router_disable: d.router_disable, started: startedLabel, time: timeStr, content: d.content }));
+      const meta = esc(JSON.stringify({ agentId: d.agentId, type: d.type || 'cron', model: d.model, thinking: d.thinking, verify: d.verify, router_disable: d.router_disable, started: startedLabel, time: timeStr, content: d.content }));
       let actionBtn = '';
       if (d.started === 0) {
         actionBtn = '<button class="tl-del" onclick="event.stopPropagation();tlIgnoreShow(' + d.id + ',this)" title="忽略"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>';
@@ -42799,7 +43085,7 @@ function tlHover(e, el) {
       model: normalizeModelName(m.model),
       thinking: m.thinking ? 'Thinking' : 'Auto',
       swarm: formatSwarmStatus(m.router_disable),
-      type: m.type || 'cron',
+      verify: formatVerifyStatus(!!m.verify && !!m.thinking),
       agent: m.agentId || '',
       status: m.started || '',
       content: m.content || ''
@@ -42889,6 +43175,7 @@ function tlViewShow(detailId, metaId, btn) {
       const m = JSON.parse(meta);
       tlViewPending.model = normalizeModelName(m.model) || '';
       tlViewPending.thinking = !!m.thinking;
+      tlViewPending.verify = !!m.verify && !!m.thinking;
       tlViewPending.routerDisable = readMetadataBoolean(m.router_disable);
       const swarm = formatSwarmStatus(m.router_disable);
       info.innerHTML = '<div class="rs-confirm-row"><span>模型</span><span>' + esc(normalizeModelName(m.model)) + '</span></div>' +
@@ -42956,6 +43243,7 @@ function tlViewDo() {
   chatAgents[id] = p.agentId;
   if (p.model) chatModels[id] = normalizeModelName(p.model);
   chatThinking[id] = !!p.thinking;
+  chatVerify[id] = !!p.verify && !!p.thinking;
   chatHtmlOutput[id] = false;
   chatSwarm[id] = false;
   saveChats();
@@ -42977,7 +43265,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ===== Right Sidebar Note =====
 let rsSelectedModel = '';
+let rsVerifyEnabledState = false;
 let rsTimeFocused = false;
+let rsValidationFlashTimers = {
+  note: 0,
+  model: 0
+};
 function rsReuseChatEnabled() {
   return !!document.getElementById('rsReuseChat')?.checked;
 }
@@ -42997,6 +43290,70 @@ function rsSwarmEnabled() {
   return !!document.getElementById('rsSwarmToggle')?.classList.contains('on');
 }
 
+function rsVerifyEnabled() {
+  return !!rsVerifyEnabledState && !!document.getElementById('rsThinkingToggle')?.classList.contains('on');
+}
+
+function rsUpdateThinkingUI() {
+  const t = document.getElementById('rsThinkingToggle');
+  const l = document.getElementById('rsThinkingLabel');
+  if (!t || !l) return;
+  const on = t.classList.contains('on');
+  if (!on) rsVerifyEnabledState = false;
+  l.textContent = on ? 'Thinking' : 'Auto';
+  l.classList.toggle('on', on);
+  applyThinkingVerifyAppearance(t, l, rsVerifyEnabled());
+}
+
+function rsFlashValidationTarget(nodes, timerKey) {
+  const elements = (Array.isArray(nodes) ? nodes : [nodes]).filter(Boolean);
+  if (!elements.length) return;
+  elements.forEach(node => {
+    node.classList.remove('validation-flash');
+    void node.offsetWidth;
+    node.classList.add('validation-flash');
+  });
+  if (rsValidationFlashTimers[timerKey]) clearTimeout(rsValidationFlashTimers[timerKey]);
+  rsValidationFlashTimers[timerKey] = window.setTimeout(() => {
+    rsValidationFlashTimers[timerKey] = 0;
+    elements.forEach(node => node.classList.remove('validation-flash'));
+  }, 1500);
+}
+
+function rsClearNoteValidationState() {
+  const noteEl = document.getElementById('rsNoteInput');
+  if (rsValidationFlashTimers.note) {
+    clearTimeout(rsValidationFlashTimers.note);
+    rsValidationFlashTimers.note = 0;
+  }
+  if (noteEl) noteEl.classList.remove('validation-flash');
+}
+
+function rsClearModelValidationState() {
+  const selector = document.getElementById('rsModelSelector');
+  const label = document.getElementById('rsModelLabel');
+  if (rsValidationFlashTimers.model) {
+    clearTimeout(rsValidationFlashTimers.model);
+    rsValidationFlashTimers.model = 0;
+  }
+  if (selector) selector.classList.remove('validation-flash');
+  if (label) label.classList.remove('validation-flash');
+}
+
+function rsFlashMissingNote() {
+  const noteEl = document.getElementById('rsNoteInput');
+  if (!noteEl) return;
+  rsFlashValidationTarget(noteEl, 'note');
+  if (typeof focusEditableInput === 'function') focusEditableInput(noteEl);
+  else if (typeof noteEl.focus === 'function') noteEl.focus();
+}
+
+function rsFlashMissingModel() {
+  const selector = document.getElementById('rsModelSelector');
+  const label = document.getElementById('rsModelLabel');
+  rsFlashValidationTarget([selector, label], 'model');
+}
+
 function rsSetModelMissingState(missing) {
   const selector = document.getElementById('rsModelSelector');
   const label = document.getElementById('rsModelLabel');
@@ -43004,6 +43361,7 @@ function rsSetModelMissingState(missing) {
   if (selector) selector.classList.toggle('missing', !!missing);
   if (label) label.classList.toggle('missing', !!missing);
   if (btn) btn.setAttribute('aria-invalid', missing ? 'true' : 'false');
+  if (!missing) rsClearModelValidationState();
 }
 
 function rsGetSelectedModel() {
@@ -43025,6 +43383,7 @@ function rsRequireSelectedModel(options = {}) {
   const model = rsGetSelectedModel();
   if (model) return model;
   rsSetModelMissingState(true);
+  rsFlashMissingModel();
   const btn = document.getElementById('rsModelBtn');
   if (btn && typeof btn.focus === 'function') {
     try { btn.focus({ preventScroll: true }); } catch { btn.focus(); }
@@ -43042,12 +43401,17 @@ function rsInitNote() {
     if (!noteInput.textContent.trim()) {
       noteInput.innerHTML = '';
     }
+    if (noteInput.dataset.validationBound !== '1') {
+      noteInput.addEventListener('input', rsClearNoteValidationState);
+      noteInput.dataset.validationBound = '1';
+    }
   }
   const hSel = document.getElementById('rsTimeH');
   if (hSel) {
     hSel.innerHTML = Array.from({length:24}, (_,i) => '<option value="' + String(i).padStart(2,'0') + '">' + String(i).padStart(2,'0') + '</option>').join('');
   }
   rsUpdateTime();
+  rsUpdateThinkingUI();
   ['rsTimeH','rsTimeM'].forEach(id => {
     const el = document.getElementById(id);
     if (el) {
@@ -43087,15 +43451,20 @@ function rsBuildSaveSchedule() {
     rawTime: date + ' ' + hour + ':' + minute
   };
 }
-function rsToggleThinking() {
+async function rsToggleThinking() {
   if (isMemoTourInteractionLocked()) return;
   rsHideConfirm();
+  if (isThinkingVerifyPromptPending('memo')) return;
   const t = document.getElementById('rsThinkingToggle');
-  const l = document.getElementById('rsThinkingLabel');
-  t.classList.toggle('on');
-  const on = t.classList.contains('on');
-  l.textContent = on ? 'Thinking' : 'Auto';
-  l.classList.toggle('on', on);
+  if (!t) return;
+  const on = !t.classList.contains('on');
+  t.classList.toggle('on', on);
+  if (!on) rsVerifyEnabledState = false;
+  rsUpdateThinkingUI();
+  if (on) {
+    rsVerifyEnabledState = await promptThinkingVerify('memo');
+    rsUpdateThinkingUI();
+  }
 }
 function rsToggleSwarm() {
   if (isMemoTourInteractionLocked()) return;
@@ -43132,6 +43501,7 @@ function rsSaveNote(options = {}) {
   const noteEl = document.getElementById('rsNoteInput');
   const content = getMemoInputText();
   if (!content) {
+    rsFlashMissingNote();
     vfsShowUploadToast('请输入备忘录内容', true);
     return false;
   }
@@ -43176,6 +43546,7 @@ async function rsSubmitNote(options = {}) {
   const noteEl = document.getElementById('rsNoteInput');
   const content = getMemoInputText();
   if (!content) {
+    rsFlashMissingNote();
     if (options.showToast !== false) vfsShowUploadToast('请输入备忘录内容', true);
     return { ok: false, reason: 'empty' };
   }
@@ -43204,6 +43575,7 @@ async function rsSubmitNote(options = {}) {
       content: content,
       model: selectedModel,
       thinking: document.getElementById('rsThinkingToggle').classList.contains('on'),
+      verify: rsVerifyEnabled(),
       router_disable: !rsSwarmEnabled(),
       rawTime: schedule.rawTime,
       cycle: cycleMap[rsRepeatMode] || 0,
@@ -43240,7 +43612,9 @@ function hasMemoInput() {
   return !!getMemoInputText();
 }
 function rsResetNote() {
+  cancelThinkingVerifyPrompt();
   const noteEl = document.getElementById('rsNoteInput');
+  rsClearNoteValidationState();
   noteEl.innerHTML = '';
   const reuseChat = document.getElementById('rsReuseChat');
   if (reuseChat) reuseChat.checked = false;
@@ -43255,10 +43629,9 @@ function rsResetNote() {
   if (swarmToggle) swarmToggle.classList.remove('on');
   if (swarmLabel) swarmLabel.classList.remove('on');
   const t = document.getElementById('rsThinkingToggle');
-  const l = document.getElementById('rsThinkingLabel');
   t.classList.remove('on');
-  l.textContent = 'Auto';
-  l.classList.remove('on');
+  rsVerifyEnabledState = false;
+  rsUpdateThinkingUI();
   rsUpdateTime();
   // Reset repeat
   rsRepeatMode = 'once';
@@ -43290,6 +43663,12 @@ document.addEventListener('click', e => {
   if (!e.target.closest('.rs-repeat-wrap') && !['memo-tour-repeat-once', 'memo-tour-repeat-cycle'].includes(String(onboardingState.step || '').trim())) {
     const dd = document.getElementById('rsRepeatDd');
     if (dd) dd.classList.remove('show');
+  }
+  if (typeof thinkingVerifyPromptState.resolve === 'function'
+      && !e.target.closest('#inputThinkingGroup')
+      && !e.target.closest('#rsThinkingGroup')
+      && !e.target.closest('#pluginModalThinkingItem')) {
+    cancelThinkingVerifyPrompt();
   }
   if (!e.target.closest('.chat-session-clear-wrap')) {
     hideInputClearConfirm();
@@ -43336,7 +43715,7 @@ const RS_META_PREVIEW_FIELD_IDS = {
   model: 'rsMetaCenterPreviewModel',
   thinking: 'rsMetaCenterPreviewThinking',
   swarm: 'rsMetaCenterPreviewSwarm',
-  type: 'rsMetaCenterPreviewType',
+  verify: 'rsMetaCenterPreviewType',
   agent: 'rsMetaCenterPreviewAgent',
   status: 'rsMetaCenterPreviewStatus'
 };
@@ -43377,7 +43756,7 @@ function rsMetaHover(e, el) {
     model: el.getAttribute('data-model') || '',
     thinking: el.getAttribute('data-thinking') || '',
     swarm: el.getAttribute('data-swarm') || '',
-    type: el.getAttribute('data-type') || '',
+    verify: el.getAttribute('data-verify') || '否',
     agent: el.getAttribute('data-agent') || ''
   });
 }
@@ -43447,13 +43826,13 @@ async function rsLoadMetadata() {
       const model = normalizeModelName(m.model);
       const think = m.thinking ? 'Thinking' : 'Auto';
       const swarm = formatSwarmStatus(m.router_disable);
-      const type = m.type || 'cron';
+      const verify = formatVerifyStatus(!!m.verify && !!m.thinking);
       const isMemoRecurringTarget = String(memoRecurringTourState.metaId || '') === String(m.id || '');
       const recurringTourActive = isMemoRecurringTourOnboardingStep(onboardingState.step);
       const targetItemId = isMemoRecurringTarget && recurringTourActive ? ' id="memoRecurringTourMetaItem"' : '';
       const targetItemClass = isMemoRecurringTarget && recurringTourActive ? ' onboarding-memo-meta-item-target' : '';
       const targetDeleteId = isMemoRecurringTarget && recurringTourActive ? ' id="memoRecurringTourDeleteBtn"' : '';
-      return '<div class="rs-meta-item' + targetItemClass + '"' + targetItemId + ' data-content="' + esc(m.content).replace(/"/g, '&quot;') + '" data-agent="' + esc(m.agentId || '').replace(/"/g, '&quot;') + '" data-type="' + esc(type).replace(/"/g, '&quot;') + '" data-cycle="' + esc(cycle).replace(/"/g, '&quot;') + '" data-time="' + esc(time).replace(/"/g, '&quot;') + '" data-model="' + esc(model).replace(/"/g, '&quot;') + '" data-thinking="' + esc(think).replace(/"/g, '&quot;') + '" data-swarm="' + esc(swarm).replace(/"/g, '&quot;') + '" onmouseenter="rsMetaHover(event,this)" onmouseleave="rsMetaLeave()"><div class="rs-meta-info"><span>' + esc(cycle) + '</span><span>' + esc(time) + '</span><span>' + esc(model) + '</span><span>' + esc(swarm) + '</span><span>' + esc(think) + '</span></div><button class="rs-meta-del"' + targetDeleteId + ' onclick="rsDeleteMeta(' + m.id + ',this.parentElement.getAttribute(\'data-content\'))" title="删除"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
+      return '<div class="rs-meta-item' + targetItemClass + '"' + targetItemId + ' data-content="' + esc(m.content).replace(/"/g, '&quot;') + '" data-agent="' + esc(m.agentId || '').replace(/"/g, '&quot;') + '" data-verify="' + esc(verify).replace(/"/g, '&quot;') + '" data-type="' + esc(m.type || 'cron').replace(/"/g, '&quot;') + '" data-cycle="' + esc(cycle).replace(/"/g, '&quot;') + '" data-time="' + esc(time).replace(/"/g, '&quot;') + '" data-model="' + esc(model).replace(/"/g, '&quot;') + '" data-thinking="' + esc(think).replace(/"/g, '&quot;') + '" data-swarm="' + esc(swarm).replace(/"/g, '&quot;') + '" onmouseenter="rsMetaHover(event,this)" onmouseleave="rsMetaLeave()"><div class="rs-meta-info"><span>' + esc(cycle) + '</span><span>' + esc(time) + '</span><span>' + esc(model) + '</span><span>' + esc(swarm) + '</span><span>' + esc(think) + '</span></div><button class="rs-meta-del"' + targetDeleteId + ' onclick="rsDeleteMeta(' + m.id + ',this.parentElement.getAttribute(\'data-content\'))" title="删除"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
     }).join('');
     list.scrollTop = 0;
   } catch (e) {

@@ -75,8 +75,9 @@ public class CliInsertRag extends RagCondition implements CliInsertService, RagS
         List<CliInsert> current = List.class.cast(MapUtils.getObject(workTask.getUserContext().getMetadata(), CliInsertRag.KEY_INSERT));
         (current = current != null ? current : new ArrayList<CliInsert>()).addAll(inserts);
         workTask.getUserContext().putMetadata(CliInsertRag.KEY_INSERT, current);
+        this.notify(workTask);
         if (log.isInfoEnabled()) {
-            log.info("The inserted message={}", current.size());
+            log.info("The message was inserted={}", current.size());
         }
     }
 
@@ -126,10 +127,12 @@ public class CliInsertRag extends RagCondition implements CliInsertService, RagS
                 recall.add(history.buildHistories()[0]);
                 histories.add(history);
             }
-            ragData.getRequest().getMessage().getUserContext().putMetadata(CliInsertRag.KEY_RECALL, recall);
             this.storeHistory(ragConfig, ragData, histories);
             this.storeRecall(ragConfig, ragData, recall);
-            this.notify(ragConfig, ragData, inserts);
+            this.notify(ragData.getQuery(), inserts);
+            if (log.isInfoEnabled()) {
+                log.info("The message was recalled={}", recall.size());
+            }
         }
     }
 
@@ -157,15 +160,26 @@ public class CliInsertRag extends RagCondition implements CliInsertService, RagS
         return super.allowed(ragConfig, ragData) && !FeatureFlag.isTask(ragData.getQuery()) && !FeatureFlag.isDaemon(ragData.getQuery()) && !FeatureFlag.isSilent(ragData.getQuery());
     }
 
-    protected void notify(RagConfig ragConfig, RagData ragData, List<CliInsert> inserts) throws Exception {
+    protected void notify(WorkflowTask workTask, List<CliInsert> inserts) throws Exception {
         for (CliInsert insert : inserts) {
             Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
                     .metadata(CliPrinter.process(CliInsertRag.RAG_KEY, MultiSourceFlag.TID, insert.getTid()))
                     .content(new StringBuffer(XmlResourceLang.get(CliInsertRag.KEY_RECALL)))
-                    .workflow(ragData.getQuery().getWorkflow())
+                    .workflow(workTask.getWorkflow())
                     .notifier(Notifier.SOURCE)
                     .build();
-            this.notifierService.notify(Segment.build(ragData.getQuery(), segmentConfig), ragData.getQuery(), ragData.getQuery());
+            this.notifierService.notify(Segment.build(workTask, segmentConfig), workTask, workTask);
+        }
+    }
+
+    protected void notify(WorkflowTask workTask) throws Exception {
+        if (!FeatureFlag.isSilent(workTask)) {
+            Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
+                    .content(new StringBuffer(XmlResourceLang.get(CliInsertRag.KEY_INSERT)))
+                    .workflow(workTask.getWorkflow())
+                    .notifier(Notifier.SOURCE)
+                    .build();
+            this.notifierService.notify(Segment.build(workTask, segmentConfig), workTask, workTask);
         }
     }
 

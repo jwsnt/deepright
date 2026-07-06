@@ -53,6 +53,65 @@ integration service cancel --chat chat-001
 - 真正消费这些参数的是目标本地页面。
 - 原 URL 已有 query 时继续追加；若已存在同名键，建议按当前上下文覆盖。
 
+## `cli/module/site/index.html` 主题设计说明
+
+`themeLabel` 主要用于把当前站点主题透传给外部本地页面；DeepRight 自身首页 `cli/module/site/index.html` 的主题切换，当前由页面内状态驱动，而不是直接读取该 query。
+
+当前实现约定：
+
+- 主题状态保存在 `localStorage["theme"]`
+- 页面根节点通过 `<html data-theme="light|dark">` 控制整套 CSS 变量
+- 手动切换入口为页面主题按钮，对应 `toggleTheme()`
+- 未手动覆盖时会自动切换主题：`07:00-18:59` 默认浅色，`19:00-06:59` 默认深色
+- 若自动主题被禁用（例如特定低性能画像），则保持当前主题，不按时间自动切换
+
+### 深浅模式的配色与设计风格
+
+| 维度 | 浅色模式 (`light`) | 深色模式 (`dark`) |
+|---|---|---|
+| 整体风格 | 偏「液态玻璃 + 晴空卡片」风格，画面轻、透、亮 | 偏「深海 / 深空玻璃面板」风格，画面更沉、更聚焦、更有霓虹感 |
+| 主背景 | `--bg-main: #dfe8f7`，页面底色叠加浅蓝到白色渐变 | `--bg-main: #06101f`，页面底色叠加深蓝到近黑渐变 |
+| 主文字 | `--text-primary: #10203f`，次级文字 `#465b84` | `--text-primary: #eef4ff`，次级文字 `#afc4ea` |
+| 卡片/侧栏 | 半透明白色玻璃层：`--bg-sidebar: rgba(255,255,255,.24)`、`--bg-card: rgba(255,255,255,.2)` | 深色半透明玻璃层：`--bg-sidebar: rgba(10,20,38,.44)`、`--bg-card: rgba(10,20,38,.42)` |
+| 边框/阴影 | 白边框 + 轻阴影，`--border: rgba(255,255,255,.32)`，`--shadow: 0 20px 60px rgba(40,72,140,.16)` | 冷蓝边框 + 更重阴影，`--border: rgba(149,181,255,.18)`，`--shadow: 0 24px 64px rgba(0,0,0,.42)` |
+| 氛围层 | 大面积亮色径向光斑与网格，强调通透感 | 暗色径向辉光与低亮网格，强调沉浸感与层次对比 |
+| 强调色 | 主强调色沿用 `--accent: #6d95ff`，hover 为 `#8cafff` | 主强调色保持一致，但结合深背景后会更偏冷蓝发光效果 |
+| 状态提示 | 完成提示偏高饱和蓝：`#0037d6`；暖色胶囊偏浅橙奶油色 | 完成提示偏青蓝荧光：`#9ff3ff`；暖色胶囊改为深琥珀底 + 浅橙字 |
+
+### 关键主题参数
+
+以下参数是 `index.html` 当前最关键、最稳定的一组主题设计令牌，适合在联调或后续页面扩展时对齐：
+
+| 参数组 | 关键变量 | 浅色代表值 | 深色代表值 |
+|---|---|---|---|
+| 基础色板 | `--bg-main` / `--text-primary` / `--text-secondary` | `#dfe8f7` / `#10203f` / `#465b84` | `#06101f` / `#eef4ff` / `#afc4ea` |
+| 玻璃材质 | `--glass-surface` / `--glass-surface-strong` / `--glass-panel` | `rgba(255,255,255,.18)` / `rgba(255,255,255,.28)` / `rgba(255,255,255,.12)` | `rgba(11,23,44,.42)` / `rgba(14,29,54,.6)` / `rgba(9,18,34,.5)` |
+| 玻璃边缘 | `--glass-edge` / `--glass-edge-strong` / `--glass-highlight` | `rgba(255,255,255,.42)` / `rgba(255,255,255,.68)` / `rgba(255,255,255,.86)` | `rgba(169,198,255,.22)` / `rgba(214,229,255,.34)` / `rgba(218,231,255,.2)` |
+| 背景氛围 | `--bg-gradient` / `--liquid-grid` | 浅蓝、白色、青色流体光斑；`rgba(255,255,255,.16)` 网格 | 深蓝、青蓝辉光；`rgba(255,255,255,.08)` 网格 |
+| 弹层面板 | `--modal-panel-bg` / `--modal-panel-border` / `--modal-field-bg` | `#eef4ff` / `rgba(72,99,143,.24)` / `#ffffff` | `#101d33` / `rgba(169,190,227,.24)` / `#14233c` |
+| 操作反馈 | `--completion-beacon-*` | 以深蓝完成态为主 | 以青蓝荧光完成态为主 |
+| 协作暖色提示 | `--warm-pill-*` | 浅橙描边、奶油底、棕橙文字 | 深琥珀底、浅橙描边、米橙文字 |
+| 代码块操作 | `--code-block-action-*` | 浅底深字，hover 更亮 | 深底浅字，hover 更蓝更亮 |
+
+### 与视觉稳定性强相关的非颜色参数
+
+这些参数不区分深浅模式，但直接决定当前页面的设计风格和观感密度：
+
+- 圆角：`--radius: 28px`、`--radius-sm: 18px`、`--radius-xs: 12px`
+- 动效：`--transition: all .32s cubic-bezier(.22,1,.36,1)`
+- 侧边栏收起宽度：`--sidebar-width-current: 48px`、`--right-sidebar-width-current: 48px`
+- 聊天区间距：`--chat-frame-side-gap: 72px`
+- 内容宽度：`--chat-content-max-width: 780px`、`--chat-shell-max-width: 1040px`
+- 欢迎卡片宽度：`--chat-greeting-card-max-width: 780px`、`--chat-greeting-text-max-width: 560px`
+- 模态遮罩：`--modal-overlay-bg: rgba(19,24,36,.18)`、`--modal-overlay-blur: 5px`
+- 插件日志动效延迟：`--plugin-log-delay-ms: 2000ms`
+
+说明：
+
+- 上述参数是当前 `index.html` 的实现快照，适合作为视觉对齐基线。
+- 若外部本地页面只需要感知“当前是深色还是浅色”，继续使用 `themeLabel` 即可。
+- 若需要与 DeepRight 首页做高保真视觉对齐，建议直接对齐这套 `data-theme` + CSS 变量体系。
+
 ## 路由总览
 
 ### 核心接口

@@ -672,6 +672,7 @@ func ensureCronSchema(db *sql.DB) {
 			task_type TEXT NOT NULL DEFAULT 'cron',
 			model TEXT NOT NULL,
 			thinking INTEGER NOT NULL DEFAULT 0,
+			verify INTEGER NOT NULL DEFAULT 0,
 			router_disable INTEGER NOT NULL DEFAULT 1,
 			cron TEXT NOT NULL,
 			content TEXT NOT NULL,
@@ -687,6 +688,7 @@ func ensureCronSchema(db *sql.DB) {
 			task_type TEXT NOT NULL DEFAULT 'cron',
 			model TEXT NOT NULL,
 			thinking INTEGER NOT NULL DEFAULT 0,
+			verify INTEGER NOT NULL DEFAULT 0,
 			router_disable INTEGER NOT NULL DEFAULT 1,
 			content TEXT NOT NULL,
 			response_schema TEXT NOT NULL DEFAULT '',
@@ -706,6 +708,7 @@ func ensureCronSchema(db *sql.DB) {
 			raw_time TEXT NOT NULL DEFAULT '',
 			model TEXT NOT NULL,
 			thinking INTEGER NOT NULL DEFAULT 0,
+			verify INTEGER NOT NULL DEFAULT 0,
 			router_disable INTEGER NOT NULL DEFAULT 1,
 			cron TEXT NOT NULL DEFAULT '',
 			content TEXT NOT NULL,
@@ -723,6 +726,7 @@ func ensureCronSchema(db *sql.DB) {
 			exec_time INTEGER NOT NULL,
 			model TEXT NOT NULL,
 			thinking INTEGER NOT NULL DEFAULT 0,
+			verify INTEGER NOT NULL DEFAULT 0,
 			router_disable INTEGER NOT NULL DEFAULT 1,
 			content TEXT NOT NULL,
 			response_schema TEXT NOT NULL DEFAULT '',
@@ -773,8 +777,16 @@ func ensureCronSchema(db *sql.DB) {
 		}
 	}
 	for _, tableName := range []string{"task_meta", "task_detail", "cron_meta_log", "cron_detail_log"} {
+		ensureCronVerifyColumn(db, tableName)
 		ensureCronRouterDisableColumn(db, tableName)
 	}
+}
+
+func ensureCronVerifyColumn(db *sql.DB, tableName string) {
+	if db == nil || hasTableColumn(db, tableName, "verify") {
+		return
+	}
+	_, _ = db.Exec(fmt.Sprintf(`ALTER TABLE %s ADD COLUMN verify INTEGER NOT NULL DEFAULT 0`, tableName))
 }
 
 func ensureCronRouterDisableColumn(db *sql.DB, tableName string) {
@@ -782,6 +794,17 @@ func ensureCronRouterDisableColumn(db *sql.DB, tableName string) {
 		return
 	}
 	_, _ = db.Exec(fmt.Sprintf(`ALTER TABLE %s ADD COLUMN router_disable INTEGER NOT NULL DEFAULT 1`, tableName))
+}
+
+func cronVerifySelect(db *sql.DB, tableName string) string {
+	return cronVerifySelectExpr(db, tableName, "verify")
+}
+
+func cronVerifySelectExpr(db *sql.DB, tableName, expr string) string {
+	if hasTableColumn(db, tableName, "verify") {
+		return expr
+	}
+	return "0 AS verify"
 }
 
 func cronRouterDisableSelect(db *sql.DB, tableName string) string {
@@ -5303,6 +5326,7 @@ type cronMetaResult struct {
 	Type           string `json:"type"`
 	Model          string `json:"model"`
 	Thinking       bool   `json:"thinking"`
+	Verify         bool   `json:"verify"`
 	RouterDisable  bool   `json:"router_disable"`
 	Cron           string `json:"cron"`
 	Content        string `json:"content"`
@@ -5320,6 +5344,7 @@ type cronDetailResult struct {
 	Type           string `json:"type"`
 	Model          string `json:"model"`
 	Thinking       bool   `json:"thinking"`
+	Verify         bool   `json:"verify"`
 	RouterDisable  bool   `json:"router_disable"`
 	Content        string `json:"content"`
 	ResponseSchema string `json:"responseSchema"`
@@ -5341,6 +5366,7 @@ type cronMetaLogEntry struct {
 	RawTime        string
 	Model          string
 	Thinking       bool
+	Verify         bool
 	RouterDisable  bool
 	Cron           string
 	Content        string
@@ -5358,6 +5384,7 @@ type cronDetailLogEntry struct {
 	ExecTime       int64
 	Model          string
 	Thinking       bool
+	Verify         bool
 	RouterDisable  bool
 	Content        string
 	ResponseSchema string
@@ -5768,19 +5795,24 @@ func loadCronMetaLogMap(queryer interface {
 	if db, ok := queryer.(*sql.DB); ok {
 		selectRouterDisable = cronRouterDisableSelect(db, "task_meta")
 	}
-	rows, err := queryer.Query(fmt.Sprintf(`SELECT id, cycle, raw_time, agent_id, model, thinking, %s, cron, content, response_schema, chat_id, task_type FROM task_meta WHERE id IN (%s)`, selectRouterDisable, placeholders(len(metaIDs))), intsToInterfaces(metaIDs)...)
+	selectVerify := `0 AS verify`
+	if db, ok := queryer.(*sql.DB); ok {
+		selectVerify = cronVerifySelect(db, "task_meta")
+	}
+	rows, err := queryer.Query(fmt.Sprintf(`SELECT id, cycle, raw_time, agent_id, model, thinking, %s, %s, cron, content, response_schema, chat_id, task_type FROM task_meta WHERE id IN (%s)`, selectVerify, selectRouterDisable, placeholders(len(metaIDs))), intsToInterfaces(metaIDs)...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var item cronMetaResult
-		var th, routerDisable int
-		if err := rows.Scan(&item.ID, &item.Cycle, &item.RawTime, &item.AgentID, &item.Model, &th, &routerDisable, &item.Cron, &item.Content, &item.ResponseSchema, &item.ChatID, &item.Type); err != nil {
+		var th, verify, routerDisable int
+		if err := rows.Scan(&item.ID, &item.Cycle, &item.RawTime, &item.AgentID, &item.Model, &th, &verify, &routerDisable, &item.Cron, &item.Content, &item.ResponseSchema, &item.ChatID, &item.Type); err != nil {
 			return nil, err
 		}
 		item.Type = sharedutil.NormalizeTaskType(item.Type)
 		item.Thinking = th != 0
+		item.Verify = verify != 0
 		item.RouterDisable = routerDisable != 0
 		result[item.ID] = item
 	}
@@ -5797,10 +5829,14 @@ func loadCronDetailsByMetaIDs(queryer interface {
 	if db, ok := queryer.(*sql.DB); ok {
 		selectRouterDisable = cronRouterDisableSelectExpr(db, "task_detail", "d.router_disable")
 	}
-	query := fmt.Sprintf(`SELECT d.id, d.meta_id, d.exec_time, d.agent_id, d.chat_id, d.task_type, d.model, d.thinking, %s, d.content, d.response_schema, d.started, m.cycle, m.raw_time, m.cron
+	selectVerify := `0 AS verify`
+	if db, ok := queryer.(*sql.DB); ok {
+		selectVerify = cronVerifySelectExpr(db, "task_detail", "d.verify")
+	}
+	query := fmt.Sprintf(`SELECT d.id, d.meta_id, d.exec_time, d.agent_id, d.chat_id, d.task_type, d.model, d.thinking, %s, %s, d.content, d.response_schema, d.started, m.cycle, m.raw_time, m.cron
 		FROM task_detail d
 		LEFT JOIN task_meta m ON m.id = d.meta_id
-		WHERE d.meta_id IN (%s)`, selectRouterDisable, placeholders(len(metaIDs)))
+		WHERE d.meta_id IN (%s)`, selectVerify, selectRouterDisable, placeholders(len(metaIDs)))
 	if unfinishedOnly {
 		query += ` AND d.started != 3`
 	}
@@ -5813,12 +5849,13 @@ func loadCronDetailsByMetaIDs(queryer interface {
 	var items []cronDetailResult
 	for rows.Next() {
 		var item cronDetailResult
-		var th, routerDisable int
-		if err := rows.Scan(&item.ID, &item.MetaID, &item.ExecTime, &item.AgentID, &item.ChatID, &item.Type, &item.Model, &th, &routerDisable, &item.Content, &item.ResponseSchema, &item.Started, &item.Cycle, &item.RawTime, &item.Cron); err != nil {
+		var th, verify, routerDisable int
+		if err := rows.Scan(&item.ID, &item.MetaID, &item.ExecTime, &item.AgentID, &item.ChatID, &item.Type, &item.Model, &th, &verify, &routerDisable, &item.Content, &item.ResponseSchema, &item.Started, &item.Cycle, &item.RawTime, &item.Cron); err != nil {
 			return nil, err
 		}
 		item.Type = sharedutil.NormalizeTaskType(item.Type)
 		item.Thinking = th != 0
+		item.Verify = verify != 0
 		item.RouterDisable = routerDisable != 0
 		items = append(items, item)
 	}
@@ -5833,22 +5870,23 @@ func loadCronDetailLogMap(db *sql.DB, detailIDs []int) (map[int]cronDetailResult
 	if len(detailIDs) == 0 {
 		return result, nil
 	}
-	rows, err := db.Query(fmt.Sprintf(`SELECT d.id, d.meta_id, d.exec_time, d.agent_id, d.chat_id, d.task_type, d.model, d.thinking, %s, d.content, d.response_schema, d.started, m.cycle, m.raw_time, m.cron
+	rows, err := db.Query(fmt.Sprintf(`SELECT d.id, d.meta_id, d.exec_time, d.agent_id, d.chat_id, d.task_type, d.model, d.thinking, %s, %s, d.content, d.response_schema, d.started, m.cycle, m.raw_time, m.cron
 		FROM task_detail d
 		LEFT JOIN task_meta m ON m.id = d.meta_id
-		WHERE d.id IN (%s)`, cronRouterDisableSelectExpr(db, "task_detail", "d.router_disable"), placeholders(len(detailIDs))), intsToInterfaces(detailIDs)...)
+		WHERE d.id IN (%s)`, cronVerifySelectExpr(db, "task_detail", "d.verify"), cronRouterDisableSelectExpr(db, "task_detail", "d.router_disable"), placeholders(len(detailIDs))), intsToInterfaces(detailIDs)...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var item cronDetailResult
-		var th, routerDisable int
-		if err := rows.Scan(&item.ID, &item.MetaID, &item.ExecTime, &item.AgentID, &item.ChatID, &item.Type, &item.Model, &th, &routerDisable, &item.Content, &item.ResponseSchema, &item.Started, &item.Cycle, &item.RawTime, &item.Cron); err != nil {
+		var th, verify, routerDisable int
+		if err := rows.Scan(&item.ID, &item.MetaID, &item.ExecTime, &item.AgentID, &item.ChatID, &item.Type, &item.Model, &th, &verify, &routerDisable, &item.Content, &item.ResponseSchema, &item.Started, &item.Cycle, &item.RawTime, &item.Cron); err != nil {
 			return nil, err
 		}
 		item.Type = sharedutil.NormalizeTaskType(item.Type)
 		item.Thinking = th != 0
+		item.Verify = verify != 0
 		item.RouterDisable = routerDisable != 0
 		result[item.ID] = item
 	}
@@ -6072,7 +6110,7 @@ func parseCronDetailDeleteFilterFromRequest(r *http.Request) (cronDetailFilter, 
 }
 
 func queryCronMetas(db *sql.DB, filter cronMetaFilter) ([]cronMetaResult, error) {
-	query := fmt.Sprintf(`SELECT id, cycle, raw_time, agent_id, model, thinking, %s, cron, content, response_schema, chat_id, task_type FROM task_meta WHERE 1=1`, cronRouterDisableSelect(db, "task_meta"))
+	query := fmt.Sprintf(`SELECT id, cycle, raw_time, agent_id, model, thinking, %s, %s, cron, content, response_schema, chat_id, task_type FROM task_meta WHERE 1=1`, cronVerifySelect(db, "task_meta"), cronRouterDisableSelect(db, "task_meta"))
 	args := make([]interface{}, 0, 10)
 	if filter.AgentID != "" {
 		query += ` AND agent_id = ?`
@@ -6121,13 +6159,15 @@ func queryCronMetas(db *sql.DB, filter cronMetaFilter) ([]cronMetaResult, error)
 		var (
 			item          cronMetaResult
 			th            int
+			verify        int
 			routerDisable int
 		)
-		if err := rows.Scan(&item.ID, &item.Cycle, &item.RawTime, &item.AgentID, &item.Model, &th, &routerDisable, &item.Cron, &item.Content, &item.ResponseSchema, &item.ChatID, &item.Type); err != nil {
+		if err := rows.Scan(&item.ID, &item.Cycle, &item.RawTime, &item.AgentID, &item.Model, &th, &verify, &routerDisable, &item.Cron, &item.Content, &item.ResponseSchema, &item.ChatID, &item.Type); err != nil {
 			return nil, err
 		}
 		item.Type = sharedutil.NormalizeTaskType(item.Type)
 		item.Thinking = th != 0
+		item.Verify = verify != 0
 		item.RouterDisable = routerDisable != 0
 		metas = append(metas, item)
 	}
@@ -6150,6 +6190,7 @@ func queryCronMetas(db *sql.DB, filter cronMetaFilter) ([]cronMetaResult, error)
 			RawTime:        item.RawTime,
 			Model:          item.Model,
 			Thinking:       item.Thinking,
+			Verify:         item.Verify,
 			Cron:           item.Cron,
 			Content:        item.Content,
 			ResponseSchema: item.ResponseSchema,
@@ -6172,10 +6213,10 @@ func queryCronDetails(db *sql.DB, filter cronDetailFilter) ([]cronDetailResult, 
 	if !hasTableColumn(db, "task_detail", "replied_at") {
 		selectRepliedAt = `'' AS replied_at`
 	}
-	query := fmt.Sprintf(`SELECT d.id, d.meta_id, d.exec_time, d.agent_id, d.chat_id, d.meta_ref, d.task_type, d.model, d.thinking, %s, d.content, %s, %s, %s, d.started, m.cycle, m.raw_time, m.cron
+	query := fmt.Sprintf(`SELECT d.id, d.meta_id, d.exec_time, d.agent_id, d.chat_id, d.meta_ref, d.task_type, d.model, d.thinking, %s, %s, d.content, %s, %s, %s, d.started, m.cycle, m.raw_time, m.cron
 		FROM task_detail d
 		INNER JOIN task_meta m ON m.id = d.meta_id
-		WHERE 1=1`, cronRouterDisableSelectExpr(db, "task_detail", "d.router_disable"), selectResponseSchema, selectResultContent, selectRepliedAt)
+		WHERE 1=1`, cronVerifySelectExpr(db, "task_detail", "d.verify"), cronRouterDisableSelectExpr(db, "task_detail", "d.router_disable"), selectResponseSchema, selectResultContent, selectRepliedAt)
 	args := make([]interface{}, 0, 12)
 	if filter.MetaID != nil {
 		query += ` AND d.meta_id = ?`
@@ -6225,13 +6266,15 @@ func queryCronDetails(db *sql.DB, filter cronDetailFilter) ([]cronDetailResult, 
 		var (
 			item          cronDetailResult
 			th            int
+			verify        int
 			routerDisable int
 		)
-		if err := rows.Scan(&item.ID, &item.MetaID, &item.ExecTime, &item.AgentID, &item.ChatID, &item.MetaRef, &item.Type, &item.Model, &th, &routerDisable, &item.Content, &item.ResponseSchema, &item.ResultContent, &item.RepliedAt, &item.Started, &item.Cycle, &item.RawTime, &item.Cron); err != nil {
+		if err := rows.Scan(&item.ID, &item.MetaID, &item.ExecTime, &item.AgentID, &item.ChatID, &item.MetaRef, &item.Type, &item.Model, &th, &verify, &routerDisable, &item.Content, &item.ResponseSchema, &item.ResultContent, &item.RepliedAt, &item.Started, &item.Cycle, &item.RawTime, &item.Cron); err != nil {
 			return nil, err
 		}
 		item.Type = sharedutil.NormalizeTaskType(item.Type)
 		item.Thinking = th != 0
+		item.Verify = verify != 0
 		item.RouterDisable = routerDisable != 0
 		details = append(details, item)
 	}
@@ -6254,6 +6297,7 @@ func queryCronDetails(db *sql.DB, filter cronDetailFilter) ([]cronDetailResult, 
 			ExecTime:       item.ExecTime,
 			Model:          item.Model,
 			Thinking:       item.Thinking,
+			Verify:         item.Verify,
 			RouterDisable:  item.RouterDisable,
 			Content:        item.Content,
 			ResponseSchema: item.ResponseSchema,
@@ -6314,12 +6358,24 @@ func appendCronMetaLog(db *sql.DB, entry cronMetaLogEntry) {
 	if db == nil {
 		return
 	}
+	ensureCronVerifyColumn(db, "cron_meta_log")
 	ensureCronRouterDisableColumn(db, "cron_meta_log")
+	hasVerify := hasTableColumn(db, "cron_meta_log", "verify")
 	hasRouterDisable := hasTableColumn(db, "cron_meta_log", "router_disable")
 	hasResponseSchema := hasTableColumn(db, "cron_meta_log", "response_schema")
-	query := `INSERT INTO cron_meta_log (meta_id, agent_id, chat_id, action, cycle, raw_time, model, thinking, router_disable, cron, content, response_schema, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
-	args := []any{entry.MetaID, entry.AgentID, entry.ChatID, entry.Action, entry.Cycle, entry.RawTime, entry.Model, boolToInt(entry.Thinking), boolToInt(entry.RouterDisable), entry.Cron, entry.Content, entry.ResponseSchema, entry.CreatedAt}
+	query := `INSERT INTO cron_meta_log (meta_id, agent_id, chat_id, action, cycle, raw_time, model, thinking, verify, router_disable, cron, content, response_schema, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+	args := []any{entry.MetaID, entry.AgentID, entry.ChatID, entry.Action, entry.Cycle, entry.RawTime, entry.Model, boolToInt(entry.Thinking), boolToInt(entry.Verify), boolToInt(entry.RouterDisable), entry.Cron, entry.Content, entry.ResponseSchema, entry.CreatedAt}
 	switch {
+	case hasVerify && hasRouterDisable && hasResponseSchema:
+	case hasVerify && hasRouterDisable:
+		query = `INSERT INTO cron_meta_log (meta_id, agent_id, chat_id, action, cycle, raw_time, model, thinking, verify, router_disable, cron, content, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
+		args = []any{entry.MetaID, entry.AgentID, entry.ChatID, entry.Action, entry.Cycle, entry.RawTime, entry.Model, boolToInt(entry.Thinking), boolToInt(entry.Verify), boolToInt(entry.RouterDisable), entry.Cron, entry.Content, entry.CreatedAt}
+	case hasVerify && hasResponseSchema:
+		query = `INSERT INTO cron_meta_log (meta_id, agent_id, chat_id, action, cycle, raw_time, model, thinking, verify, cron, content, response_schema, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
+		args = []any{entry.MetaID, entry.AgentID, entry.ChatID, entry.Action, entry.Cycle, entry.RawTime, entry.Model, boolToInt(entry.Thinking), boolToInt(entry.Verify), entry.Cron, entry.Content, entry.ResponseSchema, entry.CreatedAt}
+	case hasVerify:
+		query = `INSERT INTO cron_meta_log (meta_id, agent_id, chat_id, action, cycle, raw_time, model, thinking, verify, cron, content, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
+		args = []any{entry.MetaID, entry.AgentID, entry.ChatID, entry.Action, entry.Cycle, entry.RawTime, entry.Model, boolToInt(entry.Thinking), boolToInt(entry.Verify), entry.Cron, entry.Content, entry.CreatedAt}
 	case hasRouterDisable && hasResponseSchema:
 	case hasRouterDisable:
 		query = `INSERT INTO cron_meta_log (meta_id, agent_id, chat_id, action, cycle, raw_time, model, thinking, router_disable, cron, content, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
@@ -6341,12 +6397,24 @@ func appendCronDetailLog(db *sql.DB, entry cronDetailLogEntry) {
 	if db == nil {
 		return
 	}
+	ensureCronVerifyColumn(db, "cron_detail_log")
 	ensureCronRouterDisableColumn(db, "cron_detail_log")
+	hasVerify := hasTableColumn(db, "cron_detail_log", "verify")
 	hasRouterDisable := hasTableColumn(db, "cron_detail_log", "router_disable")
 	hasResponseSchema := hasTableColumn(db, "cron_detail_log", "response_schema")
-	query := `INSERT INTO cron_detail_log (detail_id, meta_id, agent_id, chat_id, action, exec_time, model, thinking, router_disable, content, response_schema, started, occurred_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
-	args := []any{entry.DetailID, entry.MetaID, entry.AgentID, entry.ChatID, entry.Action, entry.ExecTime, entry.Model, boolToInt(entry.Thinking), boolToInt(entry.RouterDisable), entry.Content, entry.ResponseSchema, entry.Started, entry.OccurredAt}
+	query := `INSERT INTO cron_detail_log (detail_id, meta_id, agent_id, chat_id, action, exec_time, model, thinking, verify, router_disable, content, response_schema, started, occurred_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+	args := []any{entry.DetailID, entry.MetaID, entry.AgentID, entry.ChatID, entry.Action, entry.ExecTime, entry.Model, boolToInt(entry.Thinking), boolToInt(entry.Verify), boolToInt(entry.RouterDisable), entry.Content, entry.ResponseSchema, entry.Started, entry.OccurredAt}
 	switch {
+	case hasVerify && hasRouterDisable && hasResponseSchema:
+	case hasVerify && hasRouterDisable:
+		query = `INSERT INTO cron_detail_log (detail_id, meta_id, agent_id, chat_id, action, exec_time, model, thinking, verify, router_disable, content, started, occurred_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
+		args = []any{entry.DetailID, entry.MetaID, entry.AgentID, entry.ChatID, entry.Action, entry.ExecTime, entry.Model, boolToInt(entry.Thinking), boolToInt(entry.Verify), boolToInt(entry.RouterDisable), entry.Content, entry.Started, entry.OccurredAt}
+	case hasVerify && hasResponseSchema:
+		query = `INSERT INTO cron_detail_log (detail_id, meta_id, agent_id, chat_id, action, exec_time, model, thinking, verify, content, response_schema, started, occurred_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
+		args = []any{entry.DetailID, entry.MetaID, entry.AgentID, entry.ChatID, entry.Action, entry.ExecTime, entry.Model, boolToInt(entry.Thinking), boolToInt(entry.Verify), entry.Content, entry.ResponseSchema, entry.Started, entry.OccurredAt}
+	case hasVerify:
+		query = `INSERT INTO cron_detail_log (detail_id, meta_id, agent_id, chat_id, action, exec_time, model, thinking, verify, content, started, occurred_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
+		args = []any{entry.DetailID, entry.MetaID, entry.AgentID, entry.ChatID, entry.Action, entry.ExecTime, entry.Model, boolToInt(entry.Thinking), boolToInt(entry.Verify), entry.Content, entry.Started, entry.OccurredAt}
 	case hasRouterDisable && hasResponseSchema:
 	case hasRouterDisable:
 		query = `INSERT INTO cron_detail_log (detail_id, meta_id, agent_id, chat_id, action, exec_time, model, thinking, router_disable, content, started, occurred_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
@@ -6376,14 +6444,15 @@ func logCronDetailStatusByID(db *sql.DB, detailID int, action string) {
 	if hasTableColumn(db, "task_detail", "response_schema") {
 		selectResponseSchema = `response_schema`
 	}
-	row := db.QueryRow(fmt.Sprintf(`SELECT id, meta_id, exec_time, agent_id, chat_id, %s, model, thinking, %s, content, %s, started FROM task_detail WHERE id = ?`,
-		selectMetaRef, cronRouterDisableSelect(db, "task_detail"), selectResponseSchema), detailID)
+	row := db.QueryRow(fmt.Sprintf(`SELECT id, meta_id, exec_time, agent_id, chat_id, %s, model, thinking, %s, %s, content, %s, started FROM task_detail WHERE id = ?`,
+		selectMetaRef, cronVerifySelect(db, "task_detail"), cronRouterDisableSelect(db, "task_detail"), selectResponseSchema), detailID)
 	var d cronDetailResult
-	var th, routerDisable int
-	if err := row.Scan(&d.ID, &d.MetaID, &d.ExecTime, &d.AgentID, &d.ChatID, &d.MetaRef, &d.Model, &th, &routerDisable, &d.Content, &d.ResponseSchema, &d.Started); err != nil {
+	var th, verify, routerDisable int
+	if err := row.Scan(&d.ID, &d.MetaID, &d.ExecTime, &d.AgentID, &d.ChatID, &d.MetaRef, &d.Model, &th, &verify, &routerDisable, &d.Content, &d.ResponseSchema, &d.Started); err != nil {
 		return
 	}
 	d.Thinking = th != 0
+	d.Verify = verify != 0
 	d.RouterDisable = routerDisable != 0
 	appendCronDetailLog(db, cronDetailLogEntry{
 		DetailID:       d.ID,
@@ -6394,6 +6463,7 @@ func logCronDetailStatusByID(db *sql.DB, detailID int, action string) {
 		ExecTime:       d.ExecTime,
 		Model:          d.Model,
 		Thinking:       d.Thinking,
+		Verify:         d.Verify,
 		RouterDisable:  d.RouterDisable,
 		Content:        d.Content,
 		ResponseSchema: d.ResponseSchema,
@@ -7565,6 +7635,7 @@ type cronCreateRequest struct {
 	Content        string `json:"content"`
 	Model          string `json:"model"`
 	Thinking       bool   `json:"thinking"`
+	Verify         bool   `json:"verify"`
 	RouterDisable  bool   `json:"router_disable"`
 	RawTime        string `json:"rawTime"`
 	Cycle          int    `json:"cycle"`
@@ -7579,6 +7650,7 @@ func (r *cronCreateRequest) UnmarshalJSON(data []byte) error {
 		Content        string `json:"content"`
 		Model          string `json:"model"`
 		Thinking       bool   `json:"thinking"`
+		Verify         bool   `json:"verify"`
 		RouterDisable  *bool  `json:"router_disable"`
 		RawTime        string `json:"rawTime"`
 		Cycle          int    `json:"cycle"`
@@ -7596,6 +7668,7 @@ func (r *cronCreateRequest) UnmarshalJSON(data []byte) error {
 	r.Content = raw.Content
 	r.Model = raw.Model
 	r.Thinking = raw.Thinking
+	r.Verify = raw.Verify
 	r.RawTime = raw.RawTime
 	r.Cycle = raw.Cycle
 	r.Cron = raw.Cron
@@ -7639,9 +7712,13 @@ func createCronTask(agentID string, req cronCreateRequest) (map[string]interface
 	var cronExpr string
 	var rawTime string
 	thinkInt := 0
+	verifyInt := 0
 	routerDisableInt := 0
 	if req.Thinking {
 		thinkInt = 1
+	}
+	if req.Verify {
+		verifyInt = 1
 	}
 	if req.RouterDisable {
 		routerDisableInt = 1
@@ -7668,8 +7745,8 @@ func createCronTask(agentID string, req cronCreateRequest) (map[string]interface
 		}
 	}
 
-	res, err := db.Exec(`INSERT INTO task_meta (cycle, raw_time, agent_id, model, thinking, router_disable, cron, content, response_schema, chat_id, task_type) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-		req.Cycle, rawTime, agentID, req.Model, thinkInt, routerDisableInt, cronExpr, req.Content, req.ResponseSchema, req.ChatID, req.Type)
+	res, err := db.Exec(`INSERT INTO task_meta (cycle, raw_time, agent_id, model, thinking, verify, router_disable, cron, content, response_schema, chat_id, task_type) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+		req.Cycle, rawTime, agentID, req.Model, thinkInt, verifyInt, routerDisableInt, cronExpr, req.Content, req.ResponseSchema, req.ChatID, req.Type)
 	if err != nil {
 		return nil, fmt.Errorf("insert error: %w", err)
 	}
@@ -7684,6 +7761,7 @@ func createCronTask(agentID string, req cronCreateRequest) (map[string]interface
 		RawTime:        rawTime,
 		Model:          req.Model,
 		Thinking:       req.Thinking,
+		Verify:         req.Verify,
 		RouterDisable:  req.RouterDisable,
 		Cron:           cronExpr,
 		Content:        req.Content,
@@ -7693,12 +7771,12 @@ func createCronTask(agentID string, req cronCreateRequest) (map[string]interface
 
 	if req.Cycle >= 0 && req.Cycle <= 2 && rawTime != "" {
 		t, _ := time.ParseInLocation("2006-01-02 15:04", rawTime, time.Local)
-		detailRes, _ := db.Exec(`INSERT OR IGNORE INTO task_detail (meta_id, exec_time, agent_id, chat_id, task_type, model, thinking, router_disable, content, response_schema, started) VALUES (?,?,?,?,?,?,?,?,?,?,0)`,
-			metaID, t.Unix(), agentID, req.ChatID, req.Type, req.Model, thinkInt, routerDisableInt, req.Content, req.ResponseSchema)
+		detailRes, _ := db.Exec(`INSERT OR IGNORE INTO task_detail (meta_id, exec_time, agent_id, chat_id, task_type, model, thinking, verify, router_disable, content, response_schema, started) VALUES (?,?,?,?,?,?,?,?,?,?,?,0)`,
+			metaID, t.Unix(), agentID, req.ChatID, req.Type, req.Model, thinkInt, verifyInt, routerDisableInt, req.Content, req.ResponseSchema)
 		if detailRes != nil {
 			if n, _ := detailRes.RowsAffected(); n > 0 {
 				if detailID, err := detailRes.LastInsertId(); err == nil {
-					appendCronDetailLog(db, cronDetailLogEntry{DetailID: int(detailID), MetaID: int(metaID), AgentID: agentID, ChatID: req.ChatID, TaskType: req.Type, Action: "insert", ExecTime: t.Unix(), Model: req.Model, Thinking: req.Thinking, RouterDisable: req.RouterDisable, Content: req.Content, ResponseSchema: req.ResponseSchema, Started: 0, OccurredAt: cronLogTimestamp()})
+					appendCronDetailLog(db, cronDetailLogEntry{DetailID: int(detailID), MetaID: int(metaID), AgentID: agentID, ChatID: req.ChatID, TaskType: req.Type, Action: "insert", ExecTime: t.Unix(), Model: req.Model, Thinking: req.Thinking, Verify: req.Verify, RouterDisable: req.RouterDisable, Content: req.Content, ResponseSchema: req.ResponseSchema, Started: 0, OccurredAt: cronLogTimestamp()})
 				}
 			}
 		}
@@ -7707,12 +7785,12 @@ func createCronTask(agentID string, req cronCreateRequest) (map[string]interface
 			day := t.AddDate(0, 0, 1)
 			for !day.After(end) {
 				if req.Cycle == 2 || (day.Weekday() >= time.Monday && day.Weekday() <= time.Friday) {
-					detailRes, _ := db.Exec(`INSERT OR IGNORE INTO task_detail (meta_id, exec_time, agent_id, chat_id, task_type, model, thinking, router_disable, content, response_schema, started) VALUES (?,?,?,?,?,?,?,?,?,?,0)`,
-						metaID, day.Unix(), agentID, req.ChatID, req.Type, req.Model, thinkInt, routerDisableInt, req.Content, req.ResponseSchema)
+					detailRes, _ := db.Exec(`INSERT OR IGNORE INTO task_detail (meta_id, exec_time, agent_id, chat_id, task_type, model, thinking, verify, router_disable, content, response_schema, started) VALUES (?,?,?,?,?,?,?,?,?,?,?,0)`,
+						metaID, day.Unix(), agentID, req.ChatID, req.Type, req.Model, thinkInt, verifyInt, routerDisableInt, req.Content, req.ResponseSchema)
 					if detailRes != nil {
 						if n, _ := detailRes.RowsAffected(); n > 0 {
 							if detailID, err := detailRes.LastInsertId(); err == nil {
-								appendCronDetailLog(db, cronDetailLogEntry{DetailID: int(detailID), MetaID: int(metaID), AgentID: agentID, ChatID: req.ChatID, TaskType: req.Type, Action: "insert", ExecTime: day.Unix(), Model: req.Model, Thinking: req.Thinking, RouterDisable: req.RouterDisable, Content: req.Content, ResponseSchema: req.ResponseSchema, Started: 0, OccurredAt: cronLogTimestamp()})
+								appendCronDetailLog(db, cronDetailLogEntry{DetailID: int(detailID), MetaID: int(metaID), AgentID: agentID, ChatID: req.ChatID, TaskType: req.Type, Action: "insert", ExecTime: day.Unix(), Model: req.Model, Thinking: req.Thinking, Verify: req.Verify, RouterDisable: req.RouterDisable, Content: req.Content, ResponseSchema: req.ResponseSchema, Started: 0, OccurredAt: cronLogTimestamp()})
 							}
 						}
 					}
@@ -7728,12 +7806,12 @@ func createCronTask(agentID string, req cronCreateRequest) (map[string]interface
 		end := now.Add(5 * 24 * time.Hour)
 		tick := now
 		for !tick.After(end) {
-			detailRes, _ := db.Exec(`INSERT OR IGNORE INTO task_detail (meta_id, exec_time, agent_id, chat_id, task_type, model, thinking, router_disable, content, response_schema, started) VALUES (?,?,?,?,?,?,?,?,?,?,0)`,
-				metaID, tick.Unix(), agentID, req.ChatID, req.Type, req.Model, thinkInt, routerDisableInt, req.Content, req.ResponseSchema)
+			detailRes, _ := db.Exec(`INSERT OR IGNORE INTO task_detail (meta_id, exec_time, agent_id, chat_id, task_type, model, thinking, verify, router_disable, content, response_schema, started) VALUES (?,?,?,?,?,?,?,?,?,?,?,0)`,
+				metaID, tick.Unix(), agentID, req.ChatID, req.Type, req.Model, thinkInt, verifyInt, routerDisableInt, req.Content, req.ResponseSchema)
 			if detailRes != nil {
 				if n, _ := detailRes.RowsAffected(); n > 0 {
 					if detailID, err := detailRes.LastInsertId(); err == nil {
-						appendCronDetailLog(db, cronDetailLogEntry{DetailID: int(detailID), MetaID: int(metaID), AgentID: agentID, ChatID: req.ChatID, TaskType: req.Type, Action: "insert", ExecTime: tick.Unix(), Model: req.Model, Thinking: req.Thinking, RouterDisable: req.RouterDisable, Content: req.Content, ResponseSchema: req.ResponseSchema, Started: 0, OccurredAt: cronLogTimestamp()})
+						appendCronDetailLog(db, cronDetailLogEntry{DetailID: int(detailID), MetaID: int(metaID), AgentID: agentID, ChatID: req.ChatID, TaskType: req.Type, Action: "insert", ExecTime: tick.Unix(), Model: req.Model, Thinking: req.Thinking, Verify: req.Verify, RouterDisable: req.RouterDisable, Content: req.Content, ResponseSchema: req.ResponseSchema, Started: 0, OccurredAt: cronLogTimestamp()})
 					}
 				}
 			}
@@ -8081,8 +8159,8 @@ func createImmediateCronTaskFromConnect(db *sql.DB, meta *connectsvc.Meta, reqs 
 	}, connectsvc.ImmediateCronTaskPersistence{
 		InsertMeta: func(seed *connectsvc.ImmediateCronTaskSeed) (int, error) {
 			taskType := sharedutil.NormalizeTaskType(seed.TaskType)
-			res, err := db.Exec(`INSERT INTO task_meta (cycle, raw_time, agent_id, chat_id, task_type, model, thinking, router_disable, cron, content, response_schema) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-				0, seed.RawTime, seed.AgentID, seed.ChatID, taskType, seed.Model, boolToInt(seed.Thinking), boolToInt(seed.RouterDisable), "", seed.Content, seed.ResponseSchema)
+			res, err := db.Exec(`INSERT INTO task_meta (cycle, raw_time, agent_id, chat_id, task_type, model, thinking, verify, router_disable, cron, content, response_schema) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+				0, seed.RawTime, seed.AgentID, seed.ChatID, taskType, seed.Model, boolToInt(seed.Thinking), boolToInt(seed.Verify), boolToInt(seed.RouterDisable), "", seed.Content, seed.ResponseSchema)
 			if err != nil {
 				return 0, err
 			}
@@ -8100,6 +8178,7 @@ func createImmediateCronTaskFromConnect(db *sql.DB, meta *connectsvc.Meta, reqs 
 				RawTime:        seed.RawTime,
 				Model:          seed.Model,
 				Thinking:       seed.Thinking,
+				Verify:         seed.Verify,
 				RouterDisable:  seed.RouterDisable,
 				Cron:           "",
 				Content:        seed.Content,
@@ -8109,8 +8188,8 @@ func createImmediateCronTaskFromConnect(db *sql.DB, meta *connectsvc.Meta, reqs 
 		},
 		InsertDetail: func(metaID int, chatID string, seed *connectsvc.ImmediateCronTaskSeed) (int, error) {
 			taskType := sharedutil.NormalizeTaskType(seed.TaskType)
-			res, err := db.Exec(`INSERT OR IGNORE INTO task_detail (meta_id, exec_time, agent_id, chat_id, meta_ref, task_type, model, thinking, router_disable, content, response_schema, started) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-				metaID, seed.ExecTime, seed.AgentID, chatID, seed.MetaRef, taskType, seed.Model, boolToInt(seed.Thinking), boolToInt(seed.RouterDisable), seed.Content, seed.ResponseSchema, seed.Started)
+			res, err := db.Exec(`INSERT OR IGNORE INTO task_detail (meta_id, exec_time, agent_id, chat_id, meta_ref, task_type, model, thinking, verify, router_disable, content, response_schema, started) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+				metaID, seed.ExecTime, seed.AgentID, chatID, seed.MetaRef, taskType, seed.Model, boolToInt(seed.Thinking), boolToInt(seed.Verify), boolToInt(seed.RouterDisable), seed.Content, seed.ResponseSchema, seed.Started)
 			if err != nil {
 				return 0, err
 			}
@@ -8128,6 +8207,7 @@ func createImmediateCronTaskFromConnect(db *sql.DB, meta *connectsvc.Meta, reqs 
 				ExecTime:       seed.ExecTime,
 				Model:          seed.Model,
 				Thinking:       seed.Thinking,
+				Verify:         seed.Verify,
 				RouterDisable:  seed.RouterDisable,
 				Content:        seed.Content,
 				ResponseSchema: seed.ResponseSchema,
@@ -8149,6 +8229,7 @@ func createImmediateCronTaskFromConnect(db *sql.DB, meta *connectsvc.Meta, reqs 
 		TaskType:       sharedutil.NormalizeTaskType(result.Task.TaskType),
 		Model:          result.Task.Model,
 		Thinking:       result.Task.Thinking,
+		Verify:         result.Task.Verify,
 		RouterDisable:  result.Task.RouterDisable,
 		Content:        result.Task.Content,
 		ResponseSchema: result.Task.ResponseSchema,
@@ -8353,6 +8434,7 @@ type dueTask struct {
 	TaskType       string
 	Model          string
 	Thinking       bool
+	Verify         bool
 	RouterDisable  bool
 	Content        string
 	ResponseSchema string
@@ -8378,6 +8460,7 @@ func runDueTask(p *ProxyServer, db *sql.DB, task dueTask, alreadyStarted bool) b
 			ExecTime:   task.ExecTime,
 			Model:      task.Model,
 			Thinking:   task.Thinking,
+			Verify:     task.Verify,
 			Content:    task.Content,
 			Started:    boolToInt(alreadyStarted),
 			OccurredAt: cronLogTimestamp(),
@@ -8395,6 +8478,7 @@ func runDueTask(p *ProxyServer, db *sql.DB, task dueTask, alreadyStarted bool) b
 			ExecTime:   task.ExecTime,
 			Model:      task.Model,
 			Thinking:   task.Thinking,
+			Verify:     task.Verify,
 			Content:    task.Content,
 			Started:    boolToInt(alreadyStarted),
 			OccurredAt: cronLogTimestamp(),
@@ -8436,6 +8520,7 @@ func runDueTask(p *ProxyServer, db *sql.DB, task dueTask, alreadyStarted bool) b
 	metaMap["type"] = chatTypeScheduledTask
 	metaMap["cron_type"] = task.TaskType
 	metaMap["thinking"] = task.Thinking
+	metaMap["verify"] = task.Verify
 	metaMap["router_disable"] = task.RouterDisable
 	mediaByAgentID := injectLiveAgentMediaIntoAgentList(metaMap)
 	selectedAgent := selectedAgentMetadata(metadata, task.AgentID)
@@ -8533,8 +8618,8 @@ func cronExecuteOnce(p *ProxyServer) {
 
 	now := time.Now()
 	oneHourAgo := now.Add(-1 * time.Hour)
-	rows, err := db.Query(fmt.Sprintf(`SELECT id, meta_id, exec_time, agent_id, chat_id, meta_ref, task_type, model, thinking, %s, content, response_schema FROM task_detail WHERE started = 0 AND exec_time <= ? AND exec_time >= ? ORDER BY exec_time, id`,
-		cronRouterDisableSelect(db, "task_detail")),
+	rows, err := db.Query(fmt.Sprintf(`SELECT id, meta_id, exec_time, agent_id, chat_id, meta_ref, task_type, model, thinking, %s, %s, content, response_schema FROM task_detail WHERE started = 0 AND exec_time <= ? AND exec_time >= ? ORDER BY exec_time, id`,
+		cronVerifySelect(db, "task_detail"), cronRouterDisableSelect(db, "task_detail")),
 		now.Unix(), oneHourAgo.Unix())
 	if err != nil {
 		return
@@ -8544,12 +8629,13 @@ func cronExecuteOnce(p *ProxyServer) {
 	var tasks []dueTask
 	for rows.Next() {
 		var item dueTask
-		var thinking, routerDisable int
-		if err := rows.Scan(&item.ID, &item.MetaID, &item.ExecTime, &item.AgentID, &item.ChatID, &item.MetaRef, &item.TaskType, &item.Model, &thinking, &routerDisable, &item.Content, &item.ResponseSchema); err != nil {
+		var thinking, verify, routerDisable int
+		if err := rows.Scan(&item.ID, &item.MetaID, &item.ExecTime, &item.AgentID, &item.ChatID, &item.MetaRef, &item.TaskType, &item.Model, &thinking, &verify, &routerDisable, &item.Content, &item.ResponseSchema); err != nil {
 			continue
 		}
 		item.TaskType = sharedutil.NormalizeTaskType(item.TaskType)
 		item.Thinking = thinking != 0
+		item.Verify = verify != 0
 		item.RouterDisable = routerDisable != 0
 		tasks = append(tasks, item)
 	}
@@ -8769,6 +8855,7 @@ func syncForwardedBoolField(reqData map[string]interface{}, metaMap map[string]i
 
 func syncForwardedChatRequestFlags(reqData map[string]interface{}, metaMap map[string]interface{}) {
 	syncForwardedBoolField(reqData, metaMap, "thinking")
+	syncForwardedBoolField(reqData, metaMap, "verify")
 	syncForwardedBoolField(reqData, metaMap, "html")
 	syncForwardedBoolField(reqData, metaMap, "router_disable")
 }
