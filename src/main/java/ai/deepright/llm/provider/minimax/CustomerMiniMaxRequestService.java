@@ -21,6 +21,8 @@ import org.springframework.context.annotation.Configuration;
 @Setter
 public class CustomerMiniMaxRequestService extends MiniMaxRequestService {
 
+    protected Integer maxTokens;
+
     protected String thinking;
 
     protected String fast;
@@ -52,7 +54,7 @@ public class CustomerMiniMaxRequestService extends MiniMaxRequestService {
                 .fast(this.fast)
                 .base(this.base)
                 .build()));
-        request.setMaxTokens((int) (RequestContextUtils.limit(llmQuery, request.getModel()) * this.rate));
+        request.setMaxTokens(Math.min(this.maxTokens, (int) (RequestContextUtils.limit(llmQuery, request.getModel()) * this.rate)));
         return request;
     }
 
@@ -60,6 +62,9 @@ public class CustomerMiniMaxRequestService extends MiniMaxRequestService {
     @Setter
     @Getter
     public static class CustomerInitConfig extends InitConfig {
+
+        @Value("${minimax.model.max_tokens:128000}")
+        protected Integer maxTokens;
 
         @Value("${minimax.model.thinking:MiniMax-M3}")
         protected String thinking;

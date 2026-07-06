@@ -396,7 +396,6 @@
     }
 
     .frame-card:hover {
-      transform: translateY(-4px);
       border-color: var(--accent);
       box-shadow: 0 16px 40px rgba(109, 149, 255, 0.15);
     }
@@ -1523,6 +1522,7 @@
 
     modalImage.addEventListener('load', () => {
       updateEditorRuntimeState({ loadState: 'loaded', lastStep: 'image-load', lastEvent: 'load', error: '' });
+      modalImage.style.visibility = 'visible';
       syncEditorCanvasSize();
     });
     modalImage.addEventListener('error', (event) => {
@@ -1956,6 +1956,7 @@
     }
 
     function refreshShapeList() {
+      if (!shapeList || !shapeEmpty) return;
       const shapes = getActiveShapes();
       shapeList.innerHTML = '';
       shapeEmpty.classList.remove('hidden');

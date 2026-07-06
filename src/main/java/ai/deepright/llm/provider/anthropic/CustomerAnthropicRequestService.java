@@ -21,6 +21,8 @@ import org.springframework.context.annotation.Configuration;
 @Setter
 public class CustomerAnthropicRequestService extends AnthropicRequestService {
 
+    protected Integer maxTokens;
+
     protected String multiInput;
 
     protected String thinking;
@@ -45,7 +47,7 @@ public class CustomerAnthropicRequestService extends AnthropicRequestService {
                 .fast(this.fast)
                 .base(this.base)
                 .build()));
-        request.setMaxTokens((int) (RequestContextUtils.limit(llmQuery, request.getModel()) * this.rate));
+        request.setMaxTokens(Math.min(this.maxTokens, (int) (RequestContextUtils.limit(llmQuery, request.getModel()) * this.rate)));
         return request;
     }
 
@@ -53,6 +55,9 @@ public class CustomerAnthropicRequestService extends AnthropicRequestService {
     @Setter
     @Getter
     public static class CustomerInitConfig extends InitConfig {
+
+        @Value("${anthropic.model.max_tokens:128000}")
+        protected Integer maxTokens;
 
         @Value("${anthropic.model.multiInput:claude-opus-4-6}")
         protected String multiInput;
