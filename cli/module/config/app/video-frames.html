@@ -391,13 +391,14 @@
       border-radius: var(--radius-sm);
       overflow: hidden;
       cursor: pointer;
-      transition: var(--transition);
+      transition: border-color 0.6s ease, border-width 0.6s ease, box-shadow 0.6s ease;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
     }
 
     .frame-card:hover {
-      border-color: var(--accent);
-      box-shadow: 0 16px 40px rgba(109, 149, 255, 0.15);
+      border-color: #00ffcc;
+      border-width: 2px;
+      box-shadow: 0 0 0 1px #00ffcc, 0 0 24px 8px rgba(0,255,204,0.5), 0 0 48px 16px rgba(0,255,204,0.2);
     }
 
     .frame-thumb-wrapper {
@@ -413,11 +414,6 @@
       height: 100%;
       object-fit: cover;
       display: block;
-      transition: transform 0.5s ease;
-    }
-
-    .frame-card:hover .frame-thumb {
-      transform: scale(1.05);
     }
 
     .frame-info {
@@ -532,7 +528,7 @@
 
     .editor-layout {
       display: grid;
-      grid-template-columns: 1fr 340px;
+      grid-template-columns: 1fr;
       gap: 24px;
       overflow: hidden;
       flex: 1;
@@ -578,28 +574,7 @@
       cursor: crosshair;
     }
 
-    .editor-sidebar {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      overflow-y: auto;
-      padding-right: 4px;
-    }
 
-    .editor-group {
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 18px;
-    }
-
-    .editor-group h3 {
-      margin-bottom: 14px;
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text-primary);
-      letter-spacing: 0.5px;
-    }
 
     .editor-tools {
       display: grid;
@@ -878,8 +853,6 @@
       <div class="modal-head">
         <div class="modal-title" id="modalTitle">帧编辑器</div>
         <div class="editor-actions">
-          <button id="openOriginalBtn" class="secondary-btn">帧原图</button>
-          <button id="downloadEditedBtn" class="secondary-btn">编辑图</button>
           <button id="closeModalBtn" class="secondary-btn">关闭</button>
         </div>
       </div>
@@ -891,61 +864,7 @@
           </div>
           <div id="frameCoordBadge" class="frame-coord-badge" hidden>相对左下角坐标：(-, -)</div>
         </div>
-        <div class="editor-sidebar">
-          <div class="editor-group">
-            <h3>编辑工具</h3>
-            <div class="editor-tools">
-              <button class="secondary-btn tool-btn active" data-tool="select">选择</button>
-              <button class="secondary-btn tool-btn" data-tool="rect">矩形</button>
-              <button class="secondary-btn tool-btn" data-tool="ellipse">椭圆</button>
-              <button class="secondary-btn tool-btn" data-tool="box">拉框</button>
-              <button class="secondary-btn tool-btn" data-tool="curve">曲线</button>
-              <button class="secondary-btn tool-btn" data-tool="text">文字</button>
-            </div>
-          </div>
 
-          <div class="editor-group">
-            <h3>样式</h3>
-            <div class="editor-field">
-              <label for="strokeColorInput">描边颜色</label>
-              <input type="color" id="strokeColorInput" value="#6d95ff" />
-            </div>
-            <div class="editor-field">
-              <label for="strokeWidthInput">描边粗细</label>
-              <input type="range" id="strokeWidthInput" min="1" max="12" value="3" />
-            </div>
-            <div class="editor-field">
-              <label for="fillColorInput">填充颜色</label>
-              <input type="color" id="fillColorInput" value="#6d95ff" />
-            </div>
-            <div class="editor-field">
-              <label for="fillAlphaInput">填充透明度</label>
-              <input type="range" id="fillAlphaInput" min="0" max="1" step="0.05" value="0.18" />
-            </div>
-            <div class="editor-field">
-              <label for="fontSizeInput">文字大小</label>
-              <input type="range" id="fontSizeInput" min="12" max="72" value="24" />
-            </div>
-            <div class="editor-field">
-              <label for="textInput">文字内容</label>
-              <textarea id="textInput" placeholder="选择文字工具后，点击图片添加文字"></textarea>
-            </div>
-          </div>
-
-          <div class="editor-group">
-            <h3>操作</h3>
-            <div class="editor-actions">
-              <button id="undoShapeBtn" class="secondary-btn">撤销一步</button>
-              <button id="clearShapesBtn" class="secondary-btn">清空标注</button>
-            </div>
-          </div>
-
-          <div class="editor-group">
-            <h3>当前标注</h3>
-            <div id="shapeList" class="shape-list"></div>
-            <div id="shapeEmpty" class="editor-empty">当前帧还没有标注。先选一个工具再到图片上操作。</div>
-          </div>
-        </div>
       </div>
     </div>
   </div>
@@ -1026,9 +945,6 @@
     const clearShapesBtn = document.getElementById('clearShapesBtn');
     const shapeList = document.getElementById('shapeList');
     const shapeEmpty = document.getElementById('shapeEmpty');
-    const openOriginalBtn = document.getElementById('openOriginalBtn');
-    const downloadEditedBtn = document.getElementById('downloadEditedBtn');
-
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -1398,92 +1314,19 @@
       btn.addEventListener('click', () => setActiveTool(btn.dataset.tool));
     });
 
-    undoShapeBtn.addEventListener('click', () => {
+    undoShapeBtn && undoShapeBtn.addEventListener('click', () => {
       const shapes = getActiveShapes();
       if (!shapes.length) return;
       shapes.pop();
       refreshEditorUI();
     });
 
-    clearShapesBtn.addEventListener('click', () => {
+    clearShapesBtn && clearShapesBtn.addEventListener('click', () => {
       if (activeFrameIndex == null) return;
       frameAnnotations.set(activeFrameIndex, []);
       refreshEditorUI();
     });
 
-    async function saveBase64ToTmp(base64Data, filename) {
-      try {
-        const base64Content = base64Data.split(",")[1] || base64Data;
-        const response = await fetch("/api/edit?agentId=ICON&path=" + encodeURIComponent("tmp/" + filename), {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            base64: base64Content
-          })
-        });
-        if (!response.ok) {
-          throw new Error("HTTP error! status: " + response.status);
-        }
-        const resData = await response.json();
-        return true;
-      } catch (err) {
-        console.error("保存到 tmp 失败:", err);
-        throw err;
-      }
-    }
-
-    async function blobUrlToBase64(blobUrl) {
-      const response = await fetch(blobUrl);
-      const blob = await response.blob();
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-    }
-
-    downloadEditedBtn.addEventListener('click', async () => {
-      if (activeFrameIndex == null) return;
-      const item = frameDataList.find(frame => frame.index === activeFrameIndex);
-      if (!item) return;
-      try {
-        status.textContent = "正在生成并保存编辑图到 tmp...";
-        downloadEditedBtn.disabled = true;
-        const url = await exportEditedFrame(item);
-        const base64Data = await blobUrlToBase64(url);
-        const filename = `frame_${String(item.index).padStart(4, '0')}_edited.png`;
-        await saveBase64ToTmp(base64Data, filename);
-        setTimeout(() => URL.revokeObjectURL(url), 3000);
-        status.textContent = `编辑图已成功保存至工作空间 tmp/${filename}`;
-      } catch (err) {
-        console.error("保存编辑图失败:", err);
-        status.textContent = "保存编辑图失败: " + err.message;
-      } finally {
-        downloadEditedBtn.disabled = false;
-      }
-    });
-
-    openOriginalBtn.addEventListener('click', async () => {
-      if (!currentFrameDataUrl) {
-        status.textContent = "当前帧原图地址不可用";
-        return;
-      }
-      try {
-        status.textContent = "正在保存原图到 tmp...";
-        openOriginalBtn.disabled = true;
-        const filename = `frame_${String(activeFrameIndex).padStart(4, '0')}_original.png`;
-        await saveBase64ToTmp(currentFrameDataUrl, filename);
-        status.textContent = `原图已成功保存至工作空间 tmp/${filename}`;
-      } catch (err) {
-        console.error("保存原图失败:", err);
-        status.textContent = "保存原图失败: " + err.message;
-      } finally {
-        openOriginalBtn.disabled = false;
-      }
-    });
 
     function setDebugPlaceholder(message, type = '') {
       editorRuntimeState.placeholder = message || '等待选择帧';
@@ -1840,11 +1683,11 @@
 
     function getEditorStyle() {
       return {
-        stroke: strokeColorInput.value,
-        strokeWidth: Number(strokeWidthInput.value) || 3,
-        fill: fillColorInput.value,
-        fillAlpha: Number(fillAlphaInput.value) || 0,
-        fontSize: Number(fontSizeInput.value) || 24
+        stroke: (strokeColorInput ? strokeColorInput.value : '#ff0000'),
+        strokeWidth: Number((strokeWidthInput ? strokeWidthInput.value : '3')) || 3,
+        fill: (fillColorInput ? fillColorInput.value : '#ffffff'),
+        fillAlpha: Number((fillAlphaInput ? fillAlphaInput.value : '0')) || 0,
+        fontSize: Number((fontSizeInput ? fontSizeInput.value : '24')) || 24
       };
     }
 
@@ -1999,53 +1842,6 @@
       const g = (num >> 8) & 255;
       const b = num & 255;
       return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    }
-
-    async function exportEditedFrame(item) {
-      const img = await loadImage(item.dataUrl);
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = item.width;
-      tempCanvas.height = item.height;
-      const tempCtx = tempCanvas.getContext('2d');
-      tempCtx.drawImage(img, 0, 0, item.width, item.height);
-      const shapes = frameAnnotations.get(item.index) || [];
-      const scaleX = item.width / Math.max(editorOverlayCanvas.width, 1);
-      const scaleY = item.height / Math.max(editorOverlayCanvas.height, 1);
-      shapes.forEach((shape) => drawShapeToContext(tempCtx, shape, scaleX, scaleY));
-      return await new Promise((resolve) => {
-        tempCanvas.toBlob((blob) => resolve(URL.createObjectURL(blob)), 'image/png');
-      });
-    }
-
-    function drawShapeToContext(targetCtx, shape, scaleX, scaleY) {
-      targetCtx.save();
-      targetCtx.lineWidth = (shape.strokeWidth || 3) * scaleX;
-      targetCtx.strokeStyle = shape.stroke || '#22c55e';
-      targetCtx.fillStyle = hexToRgba(shape.fill || '#22c55e', shape.fillAlpha ?? 0.18);
-      targetCtx.lineJoin = 'round';
-      targetCtx.lineCap = 'round';
-      if (shape.type === 'rect' || shape.type === 'box') {
-        targetCtx.fillRect(shape.x * scaleX, shape.y * scaleY, shape.w * scaleX, shape.h * scaleY);
-        targetCtx.strokeRect(shape.x * scaleX, shape.y * scaleY, shape.w * scaleX, shape.h * scaleY);
-      } else if (shape.type === 'ellipse') {
-        targetCtx.beginPath();
-        targetCtx.ellipse((shape.x + shape.w / 2) * scaleX, (shape.y + shape.h / 2) * scaleY, Math.max(shape.w * scaleX / 2, 1), Math.max(shape.h * scaleY / 2, 1), 0, 0, Math.PI * 2);
-        targetCtx.fill();
-        targetCtx.stroke();
-      } else if (shape.type === 'curve') {
-        const points = shape.points || [];
-        if (points.length > 1) {
-          targetCtx.beginPath();
-          targetCtx.moveTo(points[0].x * scaleX, points[0].y * scaleY);
-          for (let i = 1; i < points.length; i++) targetCtx.lineTo(points[i].x * scaleX, points[i].y * scaleY);
-          targetCtx.stroke();
-        }
-      } else if (shape.type === 'text') {
-        targetCtx.font = `${(shape.fontSize || 24) * scaleX}px Arial`;
-        targetCtx.fillStyle = shape.stroke || '#22c55e';
-        targetCtx.fillText(shape.text || '文本', shape.x * scaleX, shape.y * scaleY);
-      }
-      targetCtx.restore();
     }
 
     setDebugPlaceholder('等待选择帧');
