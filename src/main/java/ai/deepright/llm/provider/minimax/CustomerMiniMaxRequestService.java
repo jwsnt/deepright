@@ -3,6 +3,7 @@ package ai.deepright.llm.provider.minimax;
 import ai.deepright.llm.RetryUtils;
 import ai.deepright.llm.provider.RequestContextUtils;
 import ai.deepright.llm.provider.RequestModelSelect;
+import ai.deepright.llm.provider.anthropic.CustomerAnthropicRequestService;
 import ai.open.right.workflow.flow.llm.LLMQuery;
 import ai.open.right.workflow.flow.llm.config.LLMConfig;
 import ai.open.right.workflow.flow.llm.provider.anthropic.AnthropicRequest;
@@ -10,6 +11,7 @@ import ai.open.right.workflow.flow.llm.provider.minimax.MiniMaxRequestService;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections.MapUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -20,6 +22,8 @@ import org.springframework.context.annotation.Configuration;
 @Getter
 @Setter
 public class CustomerMiniMaxRequestService extends MiniMaxRequestService {
+
+    public static final String MAX_TOKENS = "__max_tokens";
 
     protected Integer maxTokens;
 
@@ -54,8 +58,8 @@ public class CustomerMiniMaxRequestService extends MiniMaxRequestService {
                 .fast(this.fast)
                 .base(this.base)
                 .build()));
-        // 取最小值
-        request.setMaxTokens(Math.min(this.maxTokens, (int) (RequestContextUtils.limit(llmQuery, request.getModel()) * this.rate)));
+        // 优先客户端配置，如果没配置则取推算值和Max_tokens的最小值
+        request.setMaxTokens(MapUtils.getInteger(llmQuery.getMetadata(), CustomerAnthropicRequestService.MAX_TOKENS, Math.min(this.maxTokens, (int) (RequestContextUtils.limit(llmQuery, request.getModel()) * this.rate))));
         return request;
     }
 

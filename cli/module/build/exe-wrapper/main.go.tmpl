@@ -1,0 +1,263 @@
+package main
+
+import (
+	"archive/zip"
+	"bytes"
+	"crypto/sha256"
+	_ "embed"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+)
+
+const (
+	appName         = "DeepRight"
+	payloadFileName = "payload.zip"
+	payloadMarker   = ".deepright_payload_sha256"
+	distroName      = "deepright"
+)
+
+//go:embed payload.zip
+var payloadZip []byte
+
+func main() {
+	mode, err := parseMode(os.Args[1:])
+	if err != nil {
+		exitWithError(err)
+	}
+
+	bundleDir, err := ensureBundleReady()
+	if err != nil {
+		exitWithError(err)
+	}
+
+	switch mode {
+	case "extract":
+		fmt.Println(bundleDir)
+	case "start":
+		if err := runBatch(bundleDir, "start.bat"); err != nil {
+			exitWithError(err)
+		}
+	case "auto":
+		if err := runBatch(bundleDir, defaultBatchName()); err != nil {
+			exitWithError(err)
+		}
+	default:
+		if err := runBatch(bundleDir, "install.bat"); err != nil {
+			exitWithError(err)
+		}
+	}
+}
+
+func parseMode(args []string) (string, error) {
+	mode := "auto"
+	for _, arg := range args {
+		switch arg {
+		case "--auto":
+			mode = "auto"
+		case "--install":
+			mode = "install"
+		case "--start":
+			mode = "start"
+		case "--extract-only":
+			mode = "extract"
+		case "--help", "-h", "/?":
+			printUsage()
+			os.Exit(0)
+		default:
+			return "", fmt.Errorf("unsupported flag: %s", arg)
+		}
+	}
+	return mode, nil
+}
+
+func printUsage() {
+	fmt.Println("DeepRight Windows installer launcher")
+	fmt.Println("  --auto         Extract payload, start directly when healthy, otherwise install (default)")
+	fmt.Println("  --install      Extract payload and run install.bat")
+	fmt.Println("  --start        Extract payload and run start.bat")
+	fmt.Println("  --extract-only Extract payload and print the extracted directory")
+}
+
+func ensureBundleReady() (string, error) {
+	if len(payloadZip) == 0 {
+		return "", errors.New("embedded payload.zip is empty")
+	}
+
+	payloadHash := sha256.Sum256(payloadZip)
+	payloadHashHex := hex.EncodeToString(payloadHash[:])
+
+	cacheRoot, err := os.UserCacheDir()
+	if err != nil || strings.TrimSpace(cacheRoot) == "" {
+		cacheRoot = os.TempDir()
+	}
+	bundleDir := filepath.Join(cacheRoot, appName, "windows-exe", payloadHashHex[:16])
+	markerPath := filepath.Join(bundleDir, payloadMarker)
+
+	if payloadAlreadyExtracted(bundleDir, markerPath, payloadHashHex) {
+		return bundleDir, nil
+	}
+
+	if err := os.RemoveAll(bundleDir); err != nil {
+		return "", fmt.Errorf("remove stale bundle: %w", err)
+	}
+	if err := os.MkdirAll(bundleDir, 0o755); err != nil {
+		return "", fmt.Errorf("create bundle dir: %w", err)
+	}
+	if err := extractPayloadZip(bundleDir); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(markerPath, []byte(payloadHashHex), 0o644); err != nil {
+		return "", fmt.Errorf("write bundle marker: %w", err)
+	}
+	return bundleDir, nil
+}
+
+func payloadAlreadyExtracted(bundleDir, markerPath, payloadHash string) bool {
+	markerBytes, err := os.ReadFile(markerPath)
+	if err != nil {
+		return false
+	}
+	if strings.TrimSpace(string(markerBytes)) != payloadHash {
+		return false
+	}
+
+	requiredPaths := []string{
+		filepath.Join(bundleDir, "install.bat"),
+		filepath.Join(bundleDir, "install.ps1"),
+		filepath.Join(bundleDir, "start.bat"),
+		filepath.Join(bundleDir, "integration"),
+		filepath.Join(bundleDir, "config"),
+		filepath.Join(bundleDir, "site"),
+	}
+	for _, requiredPath := range requiredPaths {
+		if _, err := os.Stat(requiredPath); err != nil {
+			return false
+		}
+	}
+	return true
+}
+
+func extractPayloadZip(bundleDir string) error {
+	reader, err := zip.NewReader(bytes.NewReader(payloadZip), int64(len(payloadZip)))
+	if err != nil {
+		return fmt.Errorf("open embedded %s: %w", payloadFileName, err)
+	}
+
+	for _, file := range reader.File {
+		if err := extractZipEntry(bundleDir, file); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func extractZipEntry(bundleDir string, file *zip.File) error {
+	cleanName := filepath.Clean(file.Name)
+	if cleanName == "." || cleanName == "" {
+		return nil
+	}
+	if filepath.IsAbs(cleanName) {
+		return fmt.Errorf("payload contains absolute path: %s", file.Name)
+	}
+
+	targetPath := filepath.Join(bundleDir, cleanName)
+	relativeTarget, err := filepath.Rel(bundleDir, targetPath)
+	if err != nil {
+		return fmt.Errorf("resolve payload path %s: %w", file.Name, err)
+	}
+	if relativeTarget == ".." || strings.HasPrefix(relativeTarget, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("payload contains path traversal: %s", file.Name)
+	}
+
+	if file.FileInfo().IsDir() {
+		if err := os.MkdirAll(targetPath, 0o755); err != nil {
+			return fmt.Errorf("create payload dir %s: %w", targetPath, err)
+		}
+		return nil
+	}
+
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+		return fmt.Errorf("create parent dir for %s: %w", targetPath, err)
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		return fmt.Errorf("open payload file %s: %w", file.Name, err)
+	}
+	defer src.Close()
+
+	fileMode := file.Mode()
+	if fileMode == 0 {
+		fileMode = 0o644
+	}
+
+	dst, err := os.OpenFile(targetPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, fileMode)
+	if err != nil {
+		return fmt.Errorf("create payload file %s: %w", targetPath, err)
+	}
+
+	if _, err := io.Copy(dst, src); err != nil {
+		dst.Close()
+		return fmt.Errorf("write payload file %s: %w", targetPath, err)
+	}
+	if err := dst.Close(); err != nil {
+		return fmt.Errorf("close payload file %s: %w", targetPath, err)
+	}
+	return nil
+}
+
+func runBatch(bundleDir, batchName string) error {
+	batchPath := filepath.Join(bundleDir, batchName)
+	if _, err := os.Stat(batchPath); err != nil {
+		return fmt.Errorf("missing launcher %s: %w", batchPath, err)
+	}
+
+	cmd := exec.Command("cmd.exe", "/c", batchPath)
+	cmd.Dir = bundleDir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("run %s: %w", batchName, err)
+	}
+	return nil
+}
+
+func defaultBatchName() string {
+	if installLooksHealthy() {
+		return "start.bat"
+	}
+	return "install.bat"
+}
+
+func installLooksHealthy() bool {
+	if _, err := os.Stat(localSentinelPath()); err != nil {
+		return false
+	}
+
+	cmd := exec.Command("wsl.exe", "-d", distroName, "--", "echo", "ok")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(output), "ok")
+}
+
+func localSentinelPath() string {
+	programData := os.Getenv("ProgramData")
+	if strings.TrimSpace(programData) == "" {
+		programData = `C:\ProgramData`
+	}
+	return filepath.Join(programData, "deepright", ".deepright_installed")
+}
+
+func exitWithError(err error) {
+	fmt.Fprintf(os.Stderr, "DeepRight installer failed: %v\n", err)
+	os.Exit(1)
+}

@@ -1,0 +1,92 @@
+DeepRight Windows 安装与卸载说明
+
+1. 安装后文件在哪里
+
+双击 installer.exe 后，安装包会先解压到当前 Windows 登录用户的缓存目录下。
+
+解压目录规则：
+%LocalAppData%\DeepRight\windows-exe\<payload-hash>\
+
+其中通常会包含：
+- install.bat
+- install.ps1
+- start.bat
+- DeepRight.ico
+- integration
+- config\
+- site\
+
+桌面和开始菜单会创建 DeepRight 快捷方式。
+快捷方式实际启动的是上面解压目录中的 start.bat。
+
+WSL 内部还会生成并使用以下路径：
+- WSL 发行版名称：deepright
+- WSL 虚拟磁盘目录：C:\WSL\deepright
+- 应用运行目录：/app
+- 启动脚本：/home/deepright/start-deepright.sh
+
+安装完成标记文件：
+- Windows：C:\ProgramData\deepright\.deepright_installed
+
+
+2. 如何启动
+
+推荐方式：
+- 双击桌面上的 DeepRight 快捷方式
+- 或从开始菜单启动 DeepRight
+
+也可以再次双击原 installer.exe：
+- 如果本地安装状态正常，会直接启动
+- 如果环境缺失或损坏，会重新进入安装流程
+
+
+3. 重复执行 installer 会不会重复安装
+
+正常情况下不会。
+
+installer 会先检查：
+- C:\ProgramData\deepright\.deepright_installed 是否存在
+- WSL 中的 deepright 发行版是否可正常启动
+
+如果两者都正常，就不会重新完整安装，而是直接启动。
+
+以下情况会重新安装：
+- 你删除了 C:\ProgramData\deepright
+- 你删除了 WSL 的 deepright 发行版
+- WSL 环境已经损坏，无法正常启动
+
+
+4. 如何卸载
+
+如果要完整卸载，请按下面顺序操作。
+
+第一步：删除快捷方式
+- 删除桌面上的 DeepRight 快捷方式
+- 删除开始菜单中的 DeepRight 快捷方式
+
+第二步：删除 Windows 安装标记和解压目录
+- 删除 C:\ProgramData\deepright
+- 删除 %LocalAppData%\DeepRight
+
+第三步：删除 WSL 中的 DeepRight 发行版
+以管理员身份打开 PowerShell，执行：
+
+wsl --shutdown
+wsl --unregister deepright
+
+第四步：删除 WSL 虚拟磁盘目录
+- 删除 C:\WSL\deepright
+
+
+5. 卸载后的影响
+
+执行完整卸载后：
+- DeepRight 的 Windows 快捷方式会消失
+- installer 解压出来的本地目录会被删除
+- WSL 中的 deepright 环境会被删除
+- /app 下的应用文件也会一并消失
+
+
+6. 重新安装
+
+卸载完成后，再次双击 installer.exe 即可重新安装。
