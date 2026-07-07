@@ -6,7 +6,7 @@
     "__internal_token"
   ],
   "http": {
-    "debug": true
+    "debug": false
   },
   "install_app": {
     "mac": [

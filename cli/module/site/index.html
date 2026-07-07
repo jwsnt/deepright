@@ -2538,6 +2538,7 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
 .plugin-modal-agent-label{font-size:11px;color:var(--text-muted);white-space:nowrap}
 .plugin-modal-agent .form-select{width:auto;min-width:160px;max-width:220px;padding:8px 32px 8px 12px;border-radius:14px;font-size:12px}
 .plugin-modal-model{position:relative;display:flex;align-items:center;gap:8px;padding:0 12px 0 10px;min-height:34px;border:1px solid var(--border);border-radius:14px;background:var(--bg-input);cursor:pointer;transition:var(--transition)}
+.plugin-modal-model.dropdown-open{z-index:8}
 .plugin-modal-model:hover{border-color:color-mix(in srgb,var(--border) 40%,var(--accent) 60%)}
 .plugin-modal-model.disabled{opacity:.55;cursor:default;pointer-events:none}
 .plugin-modal-model button{border:none;background:none;padding:0;color:var(--text-secondary);display:flex;align-items:center;cursor:pointer}
@@ -22365,32 +22366,48 @@ function pluginModalUpdateSwarmUI() {
 
 function pluginModalCloseModelDropdown() {
   const dd = document.getElementById('pluginModalModelDropdown');
+  const trigger = document.getElementById('pluginModalModelItem');
   if (!dd) return;
   dd.classList.remove('show');
   dd.style.top = '';
   dd.style.bottom = '';
   dd.style.maxHeight = '';
   dd.removeAttribute('data-side-y');
+  if (trigger) trigger.classList.remove('dropdown-open');
 }
 
 function pluginModalPositionModelDropdown() {
   const dd = document.getElementById('pluginModalModelDropdown');
   const trigger = document.getElementById('pluginModalModelItem');
   const panel = document.getElementById('pluginModalPanel');
+  const body = document.querySelector('#pluginModalPanel .plugin-modal-body');
+  const actions = panel ? panel.querySelector('.plugin-modal-actions') : null;
   if (!(dd instanceof HTMLElement) || !(trigger instanceof HTMLElement) || !(panel instanceof HTMLElement)) return;
   const panelRect = panel.getBoundingClientRect();
+  const bodyRect = body instanceof HTMLElement ? body.getBoundingClientRect() : panelRect;
   const triggerRect = trigger.getBoundingClientRect();
-  if (!panelRect.height || !triggerRect.height) return;
+  if (!panelRect.height || !triggerRect.height || !bodyRect.height) return;
   const gap = PLUGIN_MODAL_MODEL_DROPDOWN_GAP;
   const panelPadding = 12;
-  const spaceBelow = Math.max(0, panelRect.bottom - panelPadding - triggerRect.bottom - gap);
-  const spaceAbove = Math.max(0, triggerRect.top - panelRect.top - panelPadding - gap);
-  const openBelow = spaceBelow >= Math.min(180, PLUGIN_MODAL_MODEL_DROPDOWN_MAX_HEIGHT) || spaceBelow >= spaceAbove;
+  const upperBound = bodyRect.top + panelPadding;
+  const lowerBound = Math.min(
+    bodyRect.bottom - panelPadding,
+    actions instanceof HTMLElement ? actions.getBoundingClientRect().top - panelPadding : bodyRect.bottom - panelPadding
+  );
+  const desiredHeight = Math.max(72, Math.ceil(dd.scrollHeight || 0));
+  const spaceBelow = Math.max(0, lowerBound - triggerRect.bottom - gap);
+  const spaceAbove = Math.max(0, triggerRect.top - upperBound - gap);
+  const comfortableHeight = Math.min(180, desiredHeight, PLUGIN_MODAL_MODEL_DROPDOWN_MAX_HEIGHT);
+  const openBelow = spaceBelow >= comfortableHeight || spaceBelow >= spaceAbove;
   const availableHeight = openBelow ? spaceBelow : spaceAbove;
-  const maxHeight = Math.min(PLUGIN_MODAL_MODEL_DROPDOWN_MAX_HEIGHT, Math.max(0, Math.floor(availableHeight)));
+  const maxHeight = Math.min(
+    PLUGIN_MODAL_MODEL_DROPDOWN_MAX_HEIGHT,
+    desiredHeight,
+    Math.max(0, Math.floor(availableHeight))
+  );
   dd.style.top = openBelow ? `calc(100% + ${gap}px)` : 'auto';
   dd.style.bottom = openBelow ? 'auto' : `calc(100% + ${gap}px)`;
-  dd.style.maxHeight = `${maxHeight || 72}px`;
+  dd.style.maxHeight = `${maxHeight}px`;
   dd.setAttribute('data-side-y', openBelow ? 'bottom' : 'top');
 }
 
@@ -22426,6 +22443,8 @@ function pluginModalToggleModelDropdown(event) {
   }
   pluginModalRenderModelDropdown();
   dd.classList.add('show');
+  const trigger = document.getElementById('pluginModalModelItem');
+  if (trigger) trigger.classList.add('dropdown-open');
   pluginModalPositionModelDropdown();
 }
 
@@ -24612,6 +24631,40 @@ function buildQueuedCenterInsertedRestoreSendOptions(chatId) {
   };
 }
 
+function getQueuedCenterRecoveredInsertTid(item) {
+  if (!item || typeof item !== 'object') return '';
+  const directTid = String(item.recoveredInsertTid || '').trim();
+  if (directTid) return directTid;
+  const itemId = String(item.id || '').trim();
+  return itemId.startsWith('message-insert:') ? itemId.slice('message-insert:'.length).trim() : '';
+}
+
+function getQueuedCenterInsertTid(item) {
+  const insertState = getQueuedCenterInsertState(item);
+  const activeTid = String(insertState && insertState.tid || '').trim();
+  if (activeTid) return activeTid;
+  return getQueuedCenterRecoveredInsertTid(item);
+}
+
+async function ensureQueuedCenterInsertDeleted(chatId, item, options) {
+  const resolvedTid = getQueuedCenterInsertTid(item);
+  if (!resolvedTid) return true;
+  const opts = options || {};
+  try {
+    await postQueuedCenterMessageInsertDelete(chatId, [resolvedTid]);
+    if (item && typeof item === 'object' && item.insertSync) delete item.insertSync;
+    return true;
+  } catch (err) {
+    if (opts.toastOnError !== false) {
+      vfsShowUploadToast(
+        normalizeMessageInsertErrorMessage(err, opts.errorMessage || '清理插入待处理消息失败'),
+        true
+      );
+    }
+    return false;
+  }
+}
+
 function hasQueuedCenterRecoveredInsertItem(queue) {
   return !!(queue && Array.isArray(queue.items) && queue.items.some(item => !!(item && item.recoveredFromInsert)));
 }
@@ -24749,7 +24802,8 @@ function getQueuedCenterRequestItemByInsertTid(chatId, tid, agentId) {
   if (!resolvedTid) return null;
   return getQueuedCenterRequests(chatId, agentId).find(item => {
     const insertState = getQueuedCenterInsertState(item);
-    return !!insertState && String(insertState.tid || '').trim() === resolvedTid;
+    if (insertState && String(insertState.tid || '').trim() === resolvedTid) return true;
+    return getQueuedCenterRecoveredInsertTid(item) === resolvedTid;
   }) || null;
 }
 
@@ -24861,6 +24915,14 @@ function materializeQueuedCenterInsertedRequestMessage(chatId, agentId, item, op
   if (state.activeChat === resolvedChatId) renderMessages();
   renderChatList();
   return true;
+}
+
+function hasMaterializedInsertedUserMessageByTid(chatId, tid) {
+  const resolvedChatId = String(chatId || '').trim();
+  const resolvedTid = String(tid || '').trim();
+  const chat = state.chats[resolvedChatId];
+  if (!resolvedChatId || !resolvedTid || !chat || !Array.isArray(chat.messages)) return false;
+  return chat.messages.some(msg => msg && msg.role === 'user' && String(msg.insertTid || '').trim() === resolvedTid);
 }
 
 async function postQueuedCenterMessageInsertAdd(agentId, chatId, tid, message) {
@@ -25048,7 +25110,8 @@ function convertQueuedCenterInsertedItemsToPending(chatId, agentId, items) {
         draftHtml: text,
         options: buildQueuedCenterInsertedRestoreSendOptions(resolvedChatId),
         queuedAt: Date.parse(serviceCreatedAt) || Date.now(),
-        recoveredFromInsert: true
+        recoveredFromInsert: true,
+        recoveredInsertTid: tid
       });
       changed = true;
       return;
@@ -25078,6 +25141,10 @@ function convertQueuedCenterInsertedItemsToPending(chatId, agentId, items) {
       item.recoveredFromInsert = true;
       changed = true;
     }
+    if (getQueuedCenterRecoveredInsertTid(item) !== tid) {
+      item.recoveredInsertTid = tid;
+      changed = true;
+    }
     if (item.insertSync) {
       delete item.insertSync;
       changed = true;
@@ -25100,7 +25167,22 @@ function syncQueuedCenterInsertedMessagesFromServer(chatId, agentId, options) {
     .catch(() => [])
     .then(async () => {
       try {
-        const items = await fetchQueuedCenterMessageInsertList(resolvedChatId, opts.limit || QUEUED_CENTER_REQUEST_LIMIT);
+        const fetchedItems = await fetchQueuedCenterMessageInsertList(resolvedChatId, opts.limit || QUEUED_CENTER_REQUEST_LIMIT);
+        const staleMaterializedTids = [];
+        const items = fetchedItems.filter(rawItem => {
+          const tid = String(rawItem && rawItem.tid || '').trim();
+          if (!tid) return false;
+          if (!hasMaterializedInsertedUserMessageByTid(resolvedChatId, tid)) return true;
+          staleMaterializedTids.push(tid);
+          return false;
+        });
+        if (staleMaterializedTids.length > 0) {
+          try {
+            await postQueuedCenterMessageInsertDelete(resolvedChatId, staleMaterializedTids);
+          } catch (err) {
+            if (!opts.silent) vfsShowUploadToast(normalizeMessageInsertErrorMessage(err, '清理已完成插入消息失败'), true);
+          }
+        }
         if (items.length > 0 && shouldConvertQueuedCenterInsertedMessagesToPending(resolvedChatId)) {
           const converted = convertQueuedCenterInsertedItemsToPending(resolvedChatId, resolvedAgentId, items);
           if (converted.tids.length > 0) {
@@ -25189,7 +25271,7 @@ function confirmQueuedCenterInsertedMessage(chatId, agentId, tid) {
     if (!state || state.removing) return;
     if (String(state.tid || '').trim() !== resolvedTid) return;
     materializeQueuedCenterInsertedRequestMessage(resolvedChatId, resolvedAgentId, item, { tid: resolvedTid });
-    removeQueuedCenterRequestById(resolvedChatId, item.id, resolvedAgentId, { skipInsertCancel: true });
+    removeQueuedCenterRequestById(resolvedChatId, item.id, resolvedAgentId);
     confirmed = true;
   });
   if (confirmed) syncQueuedCenterInputUI(resolvedChatId, resolvedAgentId);
@@ -25657,19 +25739,15 @@ function findQueuedCenterRequestIndex(chatId, itemId, agentId) {
   return getQueuedCenterRequests(chatId, agentId).findIndex(item => String(item && item.id || '').trim() === resolvedItemId);
 }
 
-function removeQueuedCenterRequestById(chatId, itemId, agentId, options) {
+function removeQueuedCenterRequestById(chatId, itemId, agentId) {
   const queue = getQueuedCenterQueue(chatId, agentId);
   const index = findQueuedCenterRequestIndex(chatId, itemId, agentId);
   if (!queue || index < 0) return false;
   const item = queue.items[index];
-  const opts = options || {};
   const insertState = getQueuedCenterInsertState(item);
   if (insertState && insertState.removalTimer) {
     clearTimeout(insertState.removalTimer);
     insertState.removalTimer = 0;
-  }
-  if (insertState && opts.skipInsertCancel !== true) {
-    void cancelQueuedCenterInsertedMessage(chatId, agentId, item, { ignoreErrors: true });
   }
   queue.items.splice(index, 1);
   syncQueuedCenterRecoveredInsertHold(chatId, agentId);
@@ -25678,14 +25756,14 @@ function removeQueuedCenterRequestById(chatId, itemId, agentId, options) {
   return true;
 }
 
-function consumeMatchingQueuedCenterRequest(chatId, text, agentId, options) {
+async function consumeMatchingQueuedCenterRequest(chatId, text, agentId, options) {
   const resolvedChatId = String(chatId || '').trim();
   const resolvedAgentId = String(agentId != null ? agentId : getChatAgentId(resolvedChatId)).trim();
   const normalizedText = normalizeMessageText(text);
   const opts = options || {};
-  if (!resolvedChatId || !resolvedAgentId || !normalizedText) return false;
+  if (!resolvedChatId || !resolvedAgentId || !normalizedText) return { matched: false, blocked: false };
   const queue = getQueuedCenterQueue(resolvedChatId, resolvedAgentId);
-  if (!queue || !Array.isArray(queue.items) || !queue.items.length) return false;
+  if (!queue || !Array.isArray(queue.items) || !queue.items.length) return { matched: false, blocked: false };
   const excludedItemId = String(opts.excludeItemId || '').trim();
   const matchedItem = queue.items.find(item => {
     if (!item || isQueuedCenterInsertRemoving(item)) return false;
@@ -25693,10 +25771,13 @@ function consumeMatchingQueuedCenterRequest(chatId, text, agentId, options) {
     if (excludedItemId && currentItemId === excludedItemId) return false;
     return normalizeMessageText(item.text) === normalizedText;
   });
-  if (!matchedItem) return false;
-  return removeQueuedCenterRequestById(resolvedChatId, matchedItem.id, resolvedAgentId, {
-    skipInsertCancel: !!opts.skipInsertCancel
+  if (!matchedItem) return { matched: false, blocked: false };
+  const insertDeleted = await ensureQueuedCenterInsertDeleted(resolvedChatId, matchedItem, {
+    errorMessage: '删除插入待处理消息失败，已阻止继续发送'
   });
+  if (!insertDeleted) return { matched: true, blocked: true };
+  const removed = removeQueuedCenterRequestById(resolvedChatId, matchedItem.id, resolvedAgentId);
+  return { matched: true, blocked: !removed };
 }
 
 function handleChatQueueBadgeClick(event) {
@@ -25789,7 +25870,8 @@ async function deleteQueuedCenterRequest(event, chatId, agentId, itemId) {
       successMessage: '已取消加入插入消息'
     });
   }
-  const removed = removeQueuedCenterRequestById(chatId, itemId, agentId);
+  const insertDeleted = await ensureQueuedCenterInsertDeleted(chatId, item);
+  const removed = insertDeleted ? removeQueuedCenterRequestById(chatId, itemId, agentId) : false;
   if (removed) vfsShowUploadToast('已删除待发送消息', false);
   return removed;
 }
@@ -26276,10 +26358,16 @@ function scheduleQueuedCenterRequestDrain(chatId, agentId) {
       return;
     }
     const nextItem = (latestQueue.items || []).find(item => !isQueuedCenterInsertRemoving(item)) || null;
-    if (nextItem && hasQueuedCenterInsertState(nextItem)) {
-      await cancelQueuedCenterInsertedMessage(chatId, resolvedAgentId, nextItem, { ignoreErrors: true });
+    if (nextItem) {
+      const insertDeleted = await ensureQueuedCenterInsertDeleted(chatId, nextItem, {
+        errorMessage: '删除插入待处理消息失败，已阻止自动发送'
+      });
+      if (!insertDeleted) {
+        syncQueuedCenterInputUI(chatId, resolvedAgentId);
+        return;
+      }
     }
-    if (nextItem) removeQueuedCenterRequestById(chatId, nextItem.id, resolvedAgentId, { skipInsertCancel: true });
+    if (nextItem) removeQueuedCenterRequestById(chatId, nextItem.id, resolvedAgentId);
     if (!nextItem) return;
     const sendText = String(nextItem.text || '').trim();
     const sendOptions = cloneQueuedCenterSendOptions(nextItem.options);
@@ -32161,9 +32249,10 @@ async function sendCenterMessage(rawText, options) {
     clearChatFooterInlineHint(chatId);
     clearChatTaskBadges(chatId);
     if (opts.consumeQueuedMatch !== false) {
-      consumeMatchingQueuedCenterRequest(chatId, text, chatAgentId, {
+      const consumedQueueItem = await consumeMatchingQueuedCenterRequest(chatId, text, chatAgentId, {
         excludeItemId: opts.excludeQueuedItemId
       });
+      if (consumedQueueItem && consumedQueueItem.blocked) return false;
     }
     const userMsg = { role: 'user', content: text, createdAt: toChatTimestamp(new Date()) };
     if (requestSource) userMsg.requestSource = requestSource;

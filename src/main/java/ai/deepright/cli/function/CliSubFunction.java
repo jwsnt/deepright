@@ -184,9 +184,9 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
                 // GZIP+BASE64后的CMD
                 String content = new String(GzipUtils.decompressAsBase64(new String(result, StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
                 CliPubData pubData = JsonUtils.read(content, CliPubData.class);
+                this.insert(workTask, pubData);
                 // CLI成功，清除BLOCK计数
                 this.cliSubBlocker.clean(workTask);
-                this.insert(workTask, pubData);
                 this.notify(workTask, router);
                 // 失败回显
                 if (!pubData.isOk()) {

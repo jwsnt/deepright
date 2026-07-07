@@ -56,6 +56,9 @@ cd /path/to/deepright/cli/module/integration
   "agentDir": "agent",
   "default_dir": "config",
   "site": "site",
+  "queue": 1000,
+  "retry_interval": 10000,
+  "retry_times": 1,
   "http": {
     "http_connect_timeout": 15000,
     "http_socket_timeout": 45000,
@@ -95,7 +98,10 @@ cd /path/to/deepright/cli/module/integration
 | `--install_app` | 否 | 空 | 额外待安装应用，逗号分隔，会合并到 `/install_app` 返回中 | proxy |
 | `--reply` | 否 | `<开始执行>可通过新消息更新任务` | 三方插件开始执行时的推送文案 | proxy |
 | `--sleep` | 否 | `3000` | cli-get 心跳请求失败或非 200 时的重试等待时间（毫秒） | cli-get |
-| `--thread` | 否 | `3` | 工作线程池大小 | cli-get |
+| `--thread` | 否 | `20` | 执行 Worker 数量 | cli-get |
+| `--queue` | 否 | `1000` | cli-get 本地任务队列容量；队列满时暂停发 `/cli/get` | cli-get |
+| `--retry_interval` | 否 | `10000` | cli-get `/cli/pub` 失败后的重试等待时间（毫秒） | cli-get |
+| `--retry_times` | 否 | `1` | cli-get `/cli/pub` 首次失败后允许额外重试的次数 | cli-get |
 | `--http_timeout` | 否 | `45000` | HTTP 总超时（毫秒） | cli-get |
 | `--http_connect_timeout` | 否 | `15000` | HTTP 连接超时（毫秒） | cli-get |
 | `--http_socket_timeout` | 否 | `45000` | HTTP 读取超时（毫秒） | cli-get |
@@ -139,7 +145,7 @@ cd /path/to/deepright/cli/module/integration
 
 # 完整配置
 ./integration --agent-dir ./agent --port 8080 --host http://api.example.com:9998 \
-  --site ./web --thread 5 --sleep 1000 \
+  --site ./web --thread 5 --queue 2000 --retry_interval 5000 --retry_times 1 --sleep 1000 \
   --knowledge_update_interval 7200000 --knowledge_update_lock 1800000
 ```
 
@@ -719,7 +725,10 @@ curl http://127.0.0.1:8080/install_app
   "site": "/absolute/path/to/site",
   "connect_timeout": 15000,
   "sleep": 3000,
-  "thread": 3,
+  "thread": 20,
+  "queue": 1000,
+  "retry_interval": 10000,
+  "retry_times": 1,
   "http_timeout": 45000,
   "http_connect_timeout": 15000,
   "http_socket_timeout": 45000,
@@ -1234,7 +1243,8 @@ curl -X POST 'http://127.0.0.1:8080/api/cron/create?agentId=demo-agent' \
                     │  (静态文件服务)                   │
                     │                                  │
                     │  cli-get 模块 (后台线程)          │
-                    │  (心跳上报 + 任务执行 + 结果回传) │──► 上游服务
+                    │  (心跳上报 + 本地队列 + 执行 +    │
+                    │   发布重试)                       │──► 上游服务
                     │                                  │
                     │  cron 模块 (后台线程 + HTTP API)  │
                     │  (定时生成任务 / 执行 / 落库)      │──► 上游服务
@@ -1615,6 +1625,7 @@ Integration 与 proxy 保持一致，统一提供模型密钥读写接口。
 - 物理删除指定 `chatId` 下、状态仍为未终态的插入消息记录
 - 这类删除不会把状态改成 `2`，而是直接从 `message_insert` 表移除
 - 主要用于前端在“会话已结束，但仍残留旧的插入跟踪记录”时做恢复清理，防止后续再次切换会话时重复恢复
+- 前端待发送队列中的消息如果正式轮到自动发送，或用户明确从队列里删除这条消息，也会先调用这个接口清掉对应 `tid`；只有接口返回成功，前端才会继续出队
 - 如果目标记录不存在，接口仍返回成功，只是 `affected=0`
 
 ### `cli/pub` 插入消息上报
@@ -1634,6 +1645,23 @@ Integration 与 proxy 保持一致，统一提供模型密钥读写接口。
 - 只有当 integration 收到响应报文中 `metadata.__PROCESS__ = rag_insert` 且 `metadata.__TID__` 相同，这条消息才会自动更新为 `1`
 - 如果上层在会话结束后决定不再把残留插入消息按“插入态”恢复，而是降级回普通待发送消息，应调用 `/api/message_insert/delete` 清掉这些旧记录，避免重复恢复
 - 如果读取或回写状态失败，不会中断原有 `cli/pub` 主链路，但会在标准日志里记录错误
+
+### 内置 CLI-Get 队列与重试
+
+- `integration` 内置的 `cli-get` 当前实际为两段式流水线：
+  - `cli/get -> taskQueue -> execute workers -> publishQueue -> cli/pub`
+- 心跳线程不会因为执行 Worker 正忙而阻塞；只有当本地 `taskQueue` 已满时，才会暂停发新的 `/cli/get`
+- 本地 `taskQueue` 是纯内存队列，不做持久化恢复
+- 执行 Worker 在真正执行前会重新检查任务 `ddl`
+- 如果当前时间已超过 `ddl`：
+  - 任务会被直接丢弃
+  - 不会执行命令
+  - 不会提交 `/cli/pub`
+  - 会输出包含 `tid` 的日志
+- 执行结果会先进入 `publishQueue`，由独立发布 Worker 提交 `/cli/pub`
+- `/cli/pub` 返回网络错误、超时、HTTP 非 `200`、或响应解析失败时，会按 `--retry_interval` 与 `--retry_times` 做重试
+- 发布重试不会占住执行 Worker
+- 发布重试允许同一 `tid` 因超时或网络异常而重复推送
 
 ### `/api/plugins/meta`
 
@@ -2058,6 +2086,7 @@ data: log file not found: release/plugins/feishu.log
 - 共享的 Agent 元数据新增 `git` 字段，表示本机 git 可执行文件绝对路径；macOS/Linux 与 Windows 分别按系统方式探测，失败时返回空字符串
 - proxy 和 static 共用同一个 HTTP 端口和路由
 - cli-get 以后台 goroutine 运行，不影响 HTTP 服务
+- cli-get 后台链路当前实际为“心跳线程 + 本地任务队列 + 执行 Worker + 本地发布队列 + 发布重试”
 - cron 也以后台 goroutine 运行，默认每分钟检查和执行一次
 - 相同名称的命令行参数（host、device、agent-dir、agent-cache）在所有模块间共享
 - 会话日志与恢复接口沿用 proxy 语义：Q 单条写入，A 按 SSE 增量块实时落库，X 表示主动取消；同时记录 `chatType`（用户会话/定时任务）和 `responseType`（正常/异常）

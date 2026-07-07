@@ -113,6 +113,18 @@ func disableIntegrationManagedRuntimeForTest(t *testing.T) {
 	integrationRuntimeGOOS = "windows"
 }
 
+func stubIntegrationReadyCheckForPID(t *testing.T, pidFile string) {
+	t.Helper()
+	oldReadyCheck := integrationReadyCheck
+	integrationReadyCheck = func(string) bool {
+		_, ok := readRunningPID(pidFile)
+		return ok
+	}
+	t.Cleanup(func() {
+		integrationReadyCheck = oldReadyCheck
+	})
+}
+
 func findAgentMetadataInList(t *testing.T, metadata map[string]interface{}, agentID string) map[string]interface{} {
 	t.Helper()
 	agents, ok := metadata["agents"].([]interface{})
@@ -4079,9 +4091,7 @@ func TestStartIntegrationProcessLogsToFileOnly(t *testing.T) {
 	integrationExecutableFn = func() (string, error) {
 		return scriptPath, nil
 	}
-	oldReadyCheck := integrationReadyCheck
-	integrationReadyCheck = func(string) bool { return true }
-	defer func() { integrationReadyCheck = oldReadyCheck }()
+	stubIntegrationReadyCheckForPID(t, pidFile)
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -4160,6 +4170,100 @@ func TestStopIntegrationProcessLogsToFileOnlyWhenAlreadyStopped(t *testing.T) {
 	}
 }
 
+func TestIntegrationDailyLogWriterRotatesAcrossDays(t *testing.T) {
+	tempDir := t.TempDir()
+	logFile := filepath.Join(tempDir, "integration.log")
+	currentTime := time.Date(2026, 7, 7, 23, 59, 0, 0, time.Local)
+
+	writer, err := newIntegrationDailyLogWriterWithClock(logFile, integrationLogRetentionDays, func() time.Time {
+		return currentTime
+	})
+	if err != nil {
+		t.Fatalf("newIntegrationDailyLogWriterWithClock: %v", err)
+	}
+	defer writer.Close()
+
+	if _, err := writer.Write([]byte("day-1\n")); err != nil {
+		t.Fatalf("write day-1: %v", err)
+	}
+
+	currentTime = currentTime.Add(2 * time.Minute)
+	if _, err := writer.Write([]byte("day-2\n")); err != nil {
+		t.Fatalf("write day-2: %v", err)
+	}
+
+	currentData, err := os.ReadFile(logFile)
+	if err != nil {
+		t.Fatalf("read current log: %v", err)
+	}
+	if got := string(currentData); got != "day-2\n" {
+		t.Fatalf("current log = %q, want %q", got, "day-2\n")
+	}
+
+	archivePath := integrationArchivedLogPath(logFile, "2026-07-07")
+	archiveData, err := os.ReadFile(archivePath)
+	if err != nil {
+		t.Fatalf("read archive log: %v", err)
+	}
+	if got := string(archiveData); got != "day-1\n" {
+		t.Fatalf("archive log = %q, want %q", got, "day-1\n")
+	}
+}
+
+func TestIntegrationDailyLogWriterArchivesStaleBaseAndCleansOldArchives(t *testing.T) {
+	tempDir := t.TempDir()
+	logFile := filepath.Join(tempDir, "integration.log")
+	staleArchivePath := integrationArchivedLogPath(logFile, "2026-07-06")
+	oldArchivePath := integrationArchivedLogPath(logFile, "2026-07-03")
+
+	if err := os.WriteFile(staleArchivePath, []byte("archived-day-6\n"), 0o644); err != nil {
+		t.Fatalf("write existing archive: %v", err)
+	}
+	if err := os.WriteFile(oldArchivePath, []byte("expired\n"), 0o644); err != nil {
+		t.Fatalf("write old archive: %v", err)
+	}
+	if err := os.WriteFile(logFile, []byte("stale-base\n"), 0o644); err != nil {
+		t.Fatalf("write stale base log: %v", err)
+	}
+
+	staleTime := time.Date(2026, 7, 6, 21, 0, 0, 0, time.Local)
+	if err := os.Chtimes(logFile, staleTime, staleTime); err != nil {
+		t.Fatalf("chtimes stale base log: %v", err)
+	}
+
+	writer, err := newIntegrationDailyLogWriterWithClock(logFile, integrationLogRetentionDays, func() time.Time {
+		return time.Date(2026, 7, 7, 9, 0, 0, 0, time.Local)
+	})
+	if err != nil {
+		t.Fatalf("newIntegrationDailyLogWriterWithClock: %v", err)
+	}
+	defer writer.Close()
+
+	if _, err := writer.Write([]byte("today\n")); err != nil {
+		t.Fatalf("write today log: %v", err)
+	}
+
+	currentData, err := os.ReadFile(logFile)
+	if err != nil {
+		t.Fatalf("read current log: %v", err)
+	}
+	if got := string(currentData); got != "today\n" {
+		t.Fatalf("current log = %q, want %q", got, "today\n")
+	}
+
+	staleArchiveData, err := os.ReadFile(staleArchivePath)
+	if err != nil {
+		t.Fatalf("read stale archive: %v", err)
+	}
+	if got := string(staleArchiveData); got != "archived-day-6\nstale-base\n" {
+		t.Fatalf("stale archive = %q, want %q", got, "archived-day-6\nstale-base\n")
+	}
+
+	if _, err := os.Stat(oldArchivePath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("old archive stat err = %v, want not exist", err)
+	}
+}
+
 func TestStopIntegrationProcessPreservesStartupConfigWhenAlreadyStopped(t *testing.T) {
 	tempDir := t.TempDir()
 	configDir := filepath.Join(tempDir, "config")
@@ -4197,6 +4301,7 @@ func TestStopIntegrationProcessPreservesStartupConfigWhenAlreadyStopped(t *testi
 
 func TestStartIntegrationProcessCleansStartupPIDFilesBeforeLaunch(t *testing.T) {
 	tempDir := t.TempDir()
+	useIntegrationExecutableDir(t, tempDir)
 	originalWD, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -4209,7 +4314,7 @@ func TestStartIntegrationProcessCleansStartupPIDFilesBeforeLaunch(t *testing.T) 
 	pidFile := filepath.Join(tempDir, "integration.pid")
 	logFile := filepath.Join(tempDir, "integration.log")
 	scriptPath := filepath.Join(tempDir, "fake-integration.sh")
-	stalePluginPID := filepath.Join(tempDir, "browser.pid")
+	stalePluginPID := filepath.Join(integrationStartupDir(pidFile), "browser.pid")
 	if err := os.WriteFile(stalePluginPID, []byte("12345"), 0o644); err != nil {
 		t.Fatalf("write stale pid: %v", err)
 	}
@@ -4243,9 +4348,7 @@ func TestStartIntegrationProcessCleansStartupPIDFilesBeforeLaunch(t *testing.T) 
 	integrationExecutableFn = func() (string, error) {
 		return scriptPath, nil
 	}
-	oldReadyCheck := integrationReadyCheck
-	integrationReadyCheck = func(string) bool { return true }
-	defer func() { integrationReadyCheck = oldReadyCheck }()
+	stubIntegrationReadyCheckForPID(t, pidFile)
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -4282,9 +4385,7 @@ func TestStartIntegrationProcessOpensBrowserWhenAlreadyRunning(t *testing.T) {
 		t.Fatalf("write pid file: %v", err)
 	}
 
-	oldReadyCheck := integrationReadyCheck
 	integrationReadyCheck = func(string) bool { return true }
-	defer func() { integrationReadyCheck = oldReadyCheck }()
 	oldBrowserEntryReadyCheck := integrationBrowserEntryReadyCheck
 	integrationBrowserEntryReadyCheck = func(int) bool { return true }
 	defer func() { integrationBrowserEntryReadyCheck = oldBrowserEntryReadyCheck }()
@@ -4338,9 +4439,7 @@ func TestStartIntegrationProcessOpensBrowserWhenServiceReadyWithoutPIDFile(t *te
 		"port":     strconv.Itoa(integrationServicePort),
 	}
 
-	oldReadyCheck := integrationReadyCheck
 	integrationReadyCheck = func(string) bool { return true }
-	defer func() { integrationReadyCheck = oldReadyCheck }()
 	oldBrowserEntryReadyCheck := integrationBrowserEntryReadyCheck
 	integrationBrowserEntryReadyCheck = func(int) bool { return true }
 	defer func() { integrationBrowserEntryReadyCheck = oldBrowserEntryReadyCheck }()
@@ -4503,7 +4602,7 @@ func TestStartIntegrationProcessOpensBrowserWhenAlreadyRunningEvenIfBrowserEntry
 		integrationOpenBrowserFn = oldOpenBrowser
 	}()
 
-	integrationReadyCheck = func(string) bool { return true }
+	stubIntegrationReadyCheckForPID(t, pidFile)
 	integrationBrowserEntryReadyCheck = func(int) bool { return false }
 	integrationBrowserEntryWait = 5 * time.Millisecond
 	integrationBrowserEntryPollInterval = time.Millisecond
@@ -4685,9 +4784,7 @@ func TestStartIntegrationProcessUsesAbsoluteRuntimePIDFileForBundledApp(t *testi
 		return scriptPath, nil
 	}
 
-	oldReadyCheck := integrationReadyCheck
-	integrationReadyCheck = func(string) bool { return true }
-	defer func() { integrationReadyCheck = oldReadyCheck }()
+	stubIntegrationReadyCheckForPID(t, pidFile)
 
 	oldOpenBrowser := integrationOpenBrowserFn
 	integrationOpenBrowserFn = func(string) error { return nil }
@@ -4715,6 +4812,7 @@ func TestStartIntegrationProcessUsesAbsoluteRuntimePIDFileForBundledApp(t *testi
 
 func TestStopIntegrationProcessCleansStartupPIDFilesAfterShutdown(t *testing.T) {
 	tempDir := t.TempDir()
+	useIntegrationExecutableDir(t, tempDir)
 	originalWD, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -4757,9 +4855,7 @@ func TestStopIntegrationProcessCleansStartupPIDFilesAfterShutdown(t *testing.T) 
 	integrationExecutableFn = func() (string, error) {
 		return scriptPath, nil
 	}
-	oldReadyCheck := integrationReadyCheck
-	integrationReadyCheck = func(string) bool { return true }
-	defer func() { integrationReadyCheck = oldReadyCheck }()
+	stubIntegrationReadyCheckForPID(t, pidFile)
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -4767,7 +4863,7 @@ func TestStopIntegrationProcessCleansStartupPIDFilesAfterShutdown(t *testing.T) 
 	if code != 0 {
 		t.Fatalf("start code = %d, stderr=%s", code, stderr.String())
 	}
-	stalePluginPID := filepath.Join(tempDir, "browser.pid")
+	stalePluginPID := filepath.Join(integrationStartupDir(pidFile), "browser.pid")
 	if err := os.WriteFile(stalePluginPID, []byte("12345"), 0o644); err != nil {
 		t.Fatalf("write stale pid: %v", err)
 	}
@@ -4829,7 +4925,7 @@ func TestStopIntegrationProcessStopsPluginsBeforeIntegration(t *testing.T) {
 	integrationExecutableFn = func() (string, error) {
 		return scriptPath, nil
 	}
-	integrationReadyCheck = func(string) bool { return true }
+	stubIntegrationReadyCheckForPID(t, pidFile)
 	runConnectListMeta = func() ([]connectMetaConfigListItem, error) {
 		return []connectMetaConfigListItem{
 			{Key: "feishu", Name: "feishu", Callback: filepath.Join(pluginsDir, "feishu")},
@@ -4935,7 +5031,7 @@ func TestStopIntegrationProcessStillSignalsProcessWhenPluginStopFails(t *testing
 	integrationExecutableFn = func() (string, error) {
 		return scriptPath, nil
 	}
-	integrationReadyCheck = func(string) bool { return true }
+	stubIntegrationReadyCheckForPID(t, pidFile)
 	runConnectListMeta = func() ([]connectMetaConfigListItem, error) {
 		return []connectMetaConfigListItem{
 			{Key: "feishu", Name: "feishu", Callback: filepath.Join(pluginsDir, "feishu")},
@@ -5042,9 +5138,7 @@ func TestStopIntegrationProcessPreservesStartupConfigAfterShutdown(t *testing.T)
 	}
 	defer func() { integrationExecutableFn = originalExecutable }()
 
-	oldReadyCheck := integrationReadyCheck
-	integrationReadyCheck = func(string) bool { return true }
-	defer func() { integrationReadyCheck = oldReadyCheck }()
+	stubIntegrationReadyCheckForPID(t, pidFile)
 
 	oldOpenBrowser := integrationOpenBrowserFn
 	integrationOpenBrowserFn = func(string) error { return nil }
@@ -5111,7 +5205,7 @@ func TestStopIntegrationProcessSkipsPluginsThatAreNotStarted(t *testing.T) {
 	integrationExecutableFn = func() (string, error) {
 		return scriptPath, nil
 	}
-	integrationReadyCheck = func(string) bool { return true }
+	stubIntegrationReadyCheckForPID(t, pidFile)
 	runConnectListMeta = func() ([]connectMetaConfigListItem, error) {
 		return []connectMetaConfigListItem{
 			{Key: "browser", Name: "browser", Callback: filepath.Join(tempDir, "plugins", "browser")},
@@ -5190,7 +5284,7 @@ func TestStopIntegrationProcessPassesConnectBinToPluginStop(t *testing.T) {
 	integrationExecutableFn = func() (string, error) {
 		return scriptPath, nil
 	}
-	integrationReadyCheck = func(string) bool { return true }
+	stubIntegrationReadyCheckForPID(t, pidFile)
 	runConnectListMeta = func() ([]connectMetaConfigListItem, error) {
 		return []connectMetaConfigListItem{
 			{Key: "browser", Name: "browser", Callback: filepath.Join(pluginsDir, "browser")},

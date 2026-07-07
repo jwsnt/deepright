@@ -6,6 +6,7 @@ import ai.deepright.lang.XmlResourceLang;
 import ai.deepright.llm.notifier.MultiSourceFlag;
 import ai.deepright.llm.provider.RequestContextBuilder;
 import ai.open.right.resouce.ResourceService;
+import ai.open.right.utils.SplitUtils;
 import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.llm.Segment;
 import ai.open.right.workflow.flow.llm.rag.RagCondition;
@@ -84,6 +85,9 @@ public class CliInsertRag extends RagCondition implements CliInsertService, RagS
     @Override
     public RagFuture rag(RagConfig ragConfig, RagData ragData) throws Exception {
         if (!this.allowed(ragConfig, ragData)) {
+            if (log.isInfoEnabled()) {
+                log.info("The message was not allowed, workflow={},knowledge={},task={},daemon={},silent={}", SplitUtils.join(ragData.getQuery()), FeatureFlag.isKnowledgeCommit(ragData.getQuery()), FeatureFlag.isTask(ragData.getQuery()), FeatureFlag.isDaemon(ragData.getQuery()), FeatureFlag.isSilent(ragData.getQuery()));
+            }
             return RagFuture.NOTHING;
         }
         this.storeQuery(ragConfig, ragData);
@@ -148,7 +152,7 @@ public class CliInsertRag extends RagCondition implements CliInsertService, RagS
                 ragData.getQuery().getHistories().addAll(recall);
                 ragData.getQuery().getHistories().add(RequestContextBuilder.buildContext(ragData.getRequest(), this.template4insert, recall.getLast().getCreated() + RequestContextBuilder.NEXT));
                 if (log.isInfoEnabled()) {
-                    log.info("The recall histories={}", recall.size());
+                    log.info("The message was added to the history={}", recall.size());
                 }
             }
         }

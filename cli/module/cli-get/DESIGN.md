@@ -578,7 +578,7 @@ CREATE INDEX IF NOT EXISTS idx_agent_message_log_agent_chat_type_time
 + `--sleep`
     + 心跳错误退避基线，默认 3000ms
 + `--thread`
-    + worker 数量，默认 3
+    + worker 数量，默认 20
 + `--http_timeout`
     + HTTP 总超时
 + `--http_connect_timeout`

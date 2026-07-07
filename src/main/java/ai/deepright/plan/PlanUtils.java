@@ -76,7 +76,6 @@ public class PlanUtils {
 
     // 是否需要规划
     public static Boolean shouldPlan(WorkflowTask workTask) throws Exception {
-        // 标记
         if (MapUtils.getBoolean(workTask.getUserContext().getMetadata(), PlanUtils.KEY_PLAN_DISABLE + PlanUtils.fetchKey(workTask), false)) {
             return false;
         }

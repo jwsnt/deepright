@@ -30,7 +30,6 @@ import (
 	taskexec "cli-get/taskexec"
 
 	_ "github.com/glebarez/go-sqlite"
-	"github.com/panjf2000/ants/v2"
 )
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -524,6 +523,7 @@ type TaskContent struct {
 	Timeout int    `json:"timeout"`
 	Suffix  string `json:"suffix"`
 	Type    string `json:"type"`
+	Ddl     int64  `json:"ddl"`
 	Tid     string `json:"tid"`
 	Cmd     string `json:"cmd"`
 	AgentId string `json:"agentId"`
@@ -546,6 +546,16 @@ type ResultPayload struct {
 	Cmd     string                     `json:"cmd"`
 	Tid     string                     `json:"tid"`
 	Insert  []messageInsertPublishItem `json:"insert,omitempty"`
+}
+
+type queuedTask struct {
+	task     TaskContent
+	metadata *AgentOutput
+}
+
+type queuedPublish struct {
+	result   *ResultPayload
+	metadata *AgentOutput
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -695,9 +705,8 @@ func PublishResult(client *http.Client, host string, result *ResultPayload, meta
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "message_insert load pending error chat=%s: %v\n", strings.TrimSpace(result.Chat), err)
 		} else if len(items) > 0 {
-			cloned := *result
-			cloned.Insert = items
-			payloadResult = &cloned
+			result.Insert = items
+			payloadResult = result
 			pendingInsertItems = items
 		}
 	}
@@ -1082,23 +1091,91 @@ func ExecuteTaskViaSandboxApp(task *TaskContent, sandboxExecutable string) *Resu
 }
 
 func ProcessTask(client *http.Client, host string, task *TaskContent, terminal string, metadata *AgentOutput, sandboxExecutable string) error {
-	mode, err := sandboxModeForTask(metadata, task)
+	result, err := BuildTaskResult(task, terminal, metadata, sandboxExecutable)
 	if err != nil {
 		return err
+	}
+	return PublishResult(client, host, result, metadata)
+}
+
+func BuildTaskResult(task *TaskContent, terminal string, metadata *AgentOutput, sandboxExecutable string) (*ResultPayload, error) {
+	mode, err := sandboxModeForTask(metadata, task)
+	if err != nil {
+		return nil, err
 	}
 	if mode != "" {
 		resolvedSandboxExecutable, err := resolveSandboxExecutablePath(sandboxExecutable, mode)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if strings.TrimSpace(resolvedSandboxExecutable) == "" {
-			return fmt.Errorf("sandbox enabled for agent=%s chat=%s but sandbox_app is not configured", strings.TrimSpace(task.AgentId), strings.TrimSpace(task.Chat))
+			return nil, fmt.Errorf("sandbox enabled for agent=%s chat=%s but sandbox_app is not configured", strings.TrimSpace(task.AgentId), strings.TrimSpace(task.Chat))
 		}
-		result := ExecuteTaskViaSandboxApp(task, resolvedSandboxExecutable)
-		return PublishResult(client, host, result, metadata)
+		return ExecuteTaskViaSandboxApp(task, resolvedSandboxExecutable), nil
 	}
-	result := ExecuteTask(task, terminal)
-	return PublishResult(client, host, result, metadata)
+	return ExecuteTask(task, terminal), nil
+}
+
+func isTaskExpired(task *TaskContent, now time.Time) bool {
+	if task == nil || task.Ddl <= 0 {
+		return false
+	}
+	return now.UnixMilli() > task.Ddl
+}
+
+func publishWithRetry(client *http.Client, host string, result *ResultPayload, metadata *AgentOutput, retryInterval time.Duration, retryTimes int) error {
+	for attempt := 0; ; attempt++ {
+		err := PublishResult(client, host, result, metadata)
+		if err == nil {
+			if attempt > 0 {
+				fmt.Printf("cli-get: publish retry success tid=%s retries=%d\n", strings.TrimSpace(result.Tid), attempt)
+			}
+			return nil
+		}
+		if attempt >= retryTimes {
+			fmt.Fprintf(os.Stderr, "cli-get: publish give up tid=%s retries=%d err=%v\n", strings.TrimSpace(result.Tid), attempt, err)
+			return err
+		}
+		nextRetry := attempt + 1
+		fmt.Fprintf(os.Stderr, "cli-get: publish retry scheduled tid=%s retry=%d max=%d wait_ms=%d err=%v\n",
+			strings.TrimSpace(result.Tid), nextRetry, retryTimes, retryInterval.Milliseconds(), err)
+		time.Sleep(retryInterval)
+	}
+}
+
+func runExecuteWorker(taskQueue <-chan queuedTask, publishQueue chan<- queuedPublish, terminal string, sandboxExecutable string) {
+	for item := range taskQueue {
+		task := item.task
+		if isTaskExpired(&task, time.Now()) {
+			fmt.Fprintf(os.Stderr, "cli-get: drop expired task agentId=%s chat=%s tid=%s ddl=%d now=%d cmd=%q\n",
+				strings.TrimSpace(task.AgentId),
+				strings.TrimSpace(task.Chat),
+				strings.TrimSpace(task.Tid),
+				task.Ddl,
+				time.Now().UnixMilli(),
+				task.Cmd,
+			)
+			continue
+		}
+		result, err := BuildTaskResult(&task, terminal, item.metadata, sandboxExecutable)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "cli-get: execute prepare error tid=%s: %v\n", strings.TrimSpace(task.Tid), err)
+			continue
+		}
+		publishQueue <- queuedPublish{result: result, metadata: item.metadata}
+		fmt.Printf("cli-get: publish queued tid=%s pending=%d\n", strings.TrimSpace(task.Tid), len(publishQueue))
+	}
+}
+
+func runPublishWorker(client *http.Client, host string, publishQueue <-chan queuedPublish, retryInterval time.Duration, retryTimes int) {
+	for item := range publishQueue {
+		if item.result == nil {
+			continue
+		}
+		if err := publishWithRetry(client, host, item.result, item.metadata, retryInterval, retryTimes); err != nil {
+			fmt.Fprintf(os.Stderr, "cli-get: publish error tid=%s: %v\n", strings.TrimSpace(item.result.Tid), err)
+		}
+	}
 }
 
 func extractAgentAndChatIDs(metadata *AgentOutput, task *TaskContent) (string, string) {
@@ -1129,6 +1206,9 @@ type Config struct {
 	AgentCacheMs      int
 	SleepMs           int
 	Thread            int
+	Queue             int
+	RetryIntervalMs   int
+	RetryTimes        int
 	HTTPTimeout       int
 	HTTPConnTimeout   int
 	HTTPSocketTimeout int
@@ -1146,7 +1226,10 @@ func main() {
 	flag.StringVar(&cfg.SandboxApp, "sandbox_app", "", "relative path to CLI_SANDBOX(.app); defaults to config/config.json sandbox_app")
 	flag.IntVar(&cfg.AgentCacheMs, "agent-cache", 120000, "agent metadata cache TTL in ms")
 	flag.IntVar(&cfg.SleepMs, "sleep", 3000, "sleep after heartbeat errors in ms")
-	flag.IntVar(&cfg.Thread, "thread", 3, "worker pool size")
+	flag.IntVar(&cfg.Thread, "thread", 20, "worker pool size")
+	flag.IntVar(&cfg.Queue, "queue", 1000, "local task queue size")
+	flag.IntVar(&cfg.RetryIntervalMs, "retry_interval", 10000, "cli/pub retry interval in ms")
+	flag.IntVar(&cfg.RetryTimes, "retry_times", 1, "cli/pub retry count after first failure")
 	flag.IntVar(&cfg.HTTPTimeout, "http_timeout", 60000, "HTTP total timeout in ms")
 	flag.IntVar(&cfg.HTTPConnTimeout, "http_connect_timeout", 15000, "HTTP connect timeout in ms")
 	flag.IntVar(&cfg.HTTPSocketTimeout, "http_socket_timeout", 45000, "HTTP read timeout in ms")
@@ -1173,24 +1256,46 @@ func main() {
 		time.Duration(cfg.HTTPTimeout)*time.Millisecond,
 		time.Duration(cfg.IdleTimeout)*time.Second,
 	)
-
-	pool, err := ants.NewPool(cfg.Thread)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error creating worker pool: %v\n", err)
+	if cfg.Thread <= 0 {
+		fmt.Fprintln(os.Stderr, "error: --thread must be greater than 0")
 		os.Exit(1)
 	}
-	defer pool.Release()
+	if cfg.Queue <= 0 {
+		fmt.Fprintln(os.Stderr, "error: --queue must be greater than 0")
+		os.Exit(1)
+	}
+	if cfg.RetryIntervalMs < 0 {
+		fmt.Fprintln(os.Stderr, "error: --retry_interval must be >= 0")
+		os.Exit(1)
+	}
+	if cfg.RetryTimes < 0 {
+		fmt.Fprintln(os.Stderr, "error: --retry_times must be >= 0")
+		os.Exit(1)
+	}
 
 	agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
 	sleepDur := time.Duration(cfg.SleepMs) * time.Millisecond
+	retryInterval := time.Duration(cfg.RetryIntervalMs) * time.Millisecond
 	heartbeatBackoff := sleepDur
 	maxHeartbeatBackoff := 15 * time.Second
+	taskQueue := make(chan queuedTask, cfg.Queue)
+	publishQueue := make(chan queuedPublish, cfg.Queue)
 
-	fmt.Printf("cli-get started: host=%s, agent-dir=%s, threads=%d, sleep=%dms, sandbox_app=%s\n",
-		cfg.Host, cfg.AgentDir, cfg.Thread, cfg.SleepMs, cfg.SandboxApp)
+	for i := 0; i < cfg.Thread; i++ {
+		go runExecuteWorker(taskQueue, publishQueue, terminal, cfg.SandboxApp)
+		go runPublishWorker(client, cfg.Host, publishQueue, retryInterval, cfg.RetryTimes)
+	}
+
+	fmt.Printf("cli-get started: host=%s, agent-dir=%s, threads=%d, queue=%d, sleep=%dms, retry_interval=%dms, retry_times=%d, sandbox_app=%s\n",
+		cfg.Host, cfg.AgentDir, cfg.Thread, cfg.Queue, cfg.SleepMs, cfg.RetryIntervalMs, cfg.RetryTimes, cfg.SandboxApp)
 
 	// Master heartbeat loop
 	for {
+		if len(taskQueue) >= cap(taskQueue) {
+			fmt.Printf("cli-get: task queue full pending=%d capacity=%d, skip /cli/get\n", len(taskQueue), cap(taskQueue))
+			time.Sleep(sleepDur)
+			continue
+		}
 		metadata, err := getAgentOutput(cfg.AgentDir, cfg.Device, agentTTL)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "agent scan error: %v\n", err)
@@ -1214,12 +1319,7 @@ func main() {
 
 		// Dispatch task to worker pool, then immediately loop for next heartbeat
 		t := *task
-		term := terminal
-		meta := metadata
-		_ = pool.Submit(func() {
-			if err := ProcessTask(client, cfg.Host, &t, term, meta, cfg.SandboxApp); err != nil {
-				fmt.Fprintf(os.Stderr, "task error (tid=%s): %v\n", t.Tid, err)
-			}
-		})
+		taskQueue <- queuedTask{task: t, metadata: metadata}
+		fmt.Printf("cli-get: task queued tid=%s pending=%d capacity=%d\n", strings.TrimSpace(t.Tid), len(taskQueue), cap(taskQueue))
 	}
 }

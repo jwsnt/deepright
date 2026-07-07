@@ -16,8 +16,8 @@
       --text-secondary: #afc4ea;
       --text-muted: rgba(201, 216, 245, 0.58);
       --border: rgba(149, 181, 255, 0.18);
-      --accent: #6d95ff;
-      --accent-hover: #8cafff;
+      --accent: #00e58f;
+      --accent-hover: #36f5a8;
       --error: #ff5a6b;
       --error-bg: rgba(255, 120, 134, 0.14);
       --shadow: 0 24px 64px rgba(0, 0, 0, 0.42);
@@ -249,7 +249,7 @@
       gap: 8px;
       background: var(--accent);
       color: #ffffff;
-      border: none;
+      border: 1px solid transparent;
       border-radius: var(--radius-sm);
       padding: 12px 24px;
       cursor: pointer;
@@ -262,6 +262,21 @@
     button:hover {
       background: var(--accent-hover);
       transform: translateY(-1px);
+    }
+
+    #startBtn {
+      background: var(--bg-input);
+      color: var(--text-primary);
+      border-color: var(--border);
+      box-shadow: none;
+    }
+
+    #startBtn:hover,
+    #startBtn:active,
+    #startBtn:focus-visible {
+      background: var(--bg-input);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(0, 229, 143, 0.14);
     }
 
     button:active {
@@ -375,6 +390,57 @@
       color: var(--text-muted);
       margin-top: 16px;
       line-height: 1.6;
+    }
+
+    .page-top-tip {
+      position: sticky;
+      top: 12px;
+      z-index: 30;
+      display: flex;
+      justify-content: center;
+      pointer-events: none;
+      margin: 0 auto 12px;
+      padding: 0 16px;
+    }
+
+    .page-top-tip[hidden] {
+      display: none !important;
+    }
+
+    .page-top-tip__inner {
+      max-width: min(680px, calc(100vw - 32px));
+      padding: 10px 16px;
+      border-radius: 0;
+      border: 1px solid rgba(0, 255, 170, 0.92);
+      background: transparent;
+      color: #cffff0;
+      box-shadow: 0 0 0 1px rgba(0, 255, 170, 0.12);
+      text-shadow: none;
+      font-size: 13px;
+      line-height: 1.5;
+      letter-spacing: 0.02em;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      animation: pageTopTipPulse 1.9s ease-in-out infinite;
+    }
+
+    .page-top-tip.is-error .page-top-tip__inner {
+      border-color: rgba(0, 255, 170, 0.68);
+      background: transparent;
+      color: #d9fff1;
+      box-shadow: 0 0 0 1px rgba(0, 255, 170, 0.08);
+    }
+
+    @keyframes pageTopTipPulse {
+      0%,
+      100% {
+        box-shadow: 0 0 0 1px rgba(0, 255, 170, 0.08), 0 12px 28px rgba(0, 255, 170, 0.12), 0 0 8px rgba(73, 255, 194, 0.1);
+        filter: brightness(1);
+      }
+      50% {
+        box-shadow: 0 0 0 1px rgba(0, 255, 170, 0.12), 0 12px 30px rgba(0, 255, 170, 0.16), 0 0 12px rgba(73, 255, 194, 0.18);
+        filter: brightness(1.04);
+      }
     }
 
     /* Frames Grid */
@@ -759,6 +825,9 @@
   </style>
 </head>
 <body>
+  <div id="pageTopTip" class="page-top-tip" hidden aria-live="polite" aria-atomic="true">
+    <div id="pageTopTipText" class="page-top-tip__inner">路径已复制到粘贴板</div>
+  </div>
   <div class="app-container">
     <header>
       <div class="logo-area">
@@ -855,6 +924,7 @@
       <div class="modal-head">
         <div class="modal-title" id="modalTitle">帧编辑器</div>
         <div class="editor-actions">
+          <button id="pathBtn" class="secondary-btn">路径</button>
           <button id="closeModalBtn" class="secondary-btn">关闭</button>
         </div>
       </div>
@@ -918,6 +988,8 @@
     const prevPageBottomBtn = document.getElementById('prevPageBottomBtn');
     const nextPageBottomBtn = document.getElementById('nextPageBottomBtn');
     const pageInfoBottom = document.getElementById('pageInfoBottom');
+    const pageTopTip = document.getElementById('pageTopTip');
+    const pageTopTipText = document.getElementById('pageTopTipText');
     const summaryBadge = document.getElementById('summaryBadge');
     const pageBadge = document.getElementById('pageBadge');
     const meta = document.getElementById('meta');
@@ -929,6 +1001,7 @@
 
     const previewModal = document.getElementById('previewModal');
     const closeModalBtn = document.getElementById('closeModalBtn');
+    const pathBtn = document.getElementById('pathBtn');
     const modalImage = document.getElementById('modalImage');
     const modalTitle = document.getElementById('modalTitle');
     const editorCanvasWrap = document.getElementById('editorCanvasWrap');
@@ -954,8 +1027,15 @@
     let currentFile = null;
     let currentUrl = null;
     let extracting = false;
+    let pageTopTipTimer = 0;
     let abortController = null;
     let frameDataList = [];
+    const pathCaptureState = {
+      armed: false,
+      recording: false,
+      points: [],
+      lastSerialized: ''
+    };
     let currentPage = 1;
     let activeTool = 'select';
     let activeFrameIndex = null;
@@ -1303,6 +1383,7 @@
     prevPageBottomBtn.addEventListener('click', () => changePage(-1));
     nextPageBottomBtn.addEventListener('click', () => changePage(1));
 
+    pathBtn && pathBtn.addEventListener('click', resetPathCaptureSession);
     closeModalBtn.addEventListener('click', closeModal);
     previewModal.addEventListener('click', (e) => {
       if (e.target === previewModal) closeModal();
@@ -1405,13 +1486,25 @@
     }
 
     editorOverlayCanvas.addEventListener('pointerdown', (event) => {
+      const pathHandled = handlePathCapturePointerDown(event);
+      if (pathHandled) {
+        pushFrameCoordDebug('overlay-pointerdown', {
+          pathHandled,
+          pathRecording: pathCaptureState.recording,
+          pointCount: pathCaptureState.points.length,
+          badge: frameCoordBadge ? frameCoordBadge.textContent : ''
+        });
+        return;
+      }
       const rect = modalImage.getBoundingClientRect();
       
       const point = toCanvasPoint(event);
       const relX = Math.max(0, Math.round(point.x));
       const relY = Math.max(0, Math.round(editorOverlayCanvas.height - point.y));
       setFrameCoordBadge(relX, relY);
+      showPointCopiedTip(relX, relY);
       pushFrameCoordDebug('overlay-pointerdown', {
+        pathHandled,
         clientX: Math.round(event.clientX || 0),
         clientY: Math.round(event.clientY || 0),
         rectLeft: Math.round(rect.left || 0),
@@ -1534,7 +1627,7 @@
       if (!frameAnnotations.has(index)) frameAnnotations.set(index, []);
       modalTitle.innerHTML = `帧编辑器｜第${item.index}帧 第${item.time.toFixed(3)}秒`;
       previewModal.classList.add('open');
-      clearOverlayCanvas();
+      resetPathCaptureState();
       const stageWidth = Math.max(editorStage.clientWidth - 32, 320);
       const targetWidth = Math.max(1, Math.min(item.width || stageWidth, stageWidth));
       const targetHeight = Math.max(1, Math.round(targetWidth * Math.max(item.height || 1, 1) / Math.max(item.width || targetWidth, 1)));
@@ -1608,7 +1701,7 @@
       resetFrameCoordBadge();
       drawingShape = null;
       isPointerDown = false;
-      clearOverlayCanvas();
+      resetPathCaptureState();
       setDebugPlaceholder('等待选择帧');
       updateEditorRuntimeState({ loadState: 'idle', lastStep: 'closeModal', lastEvent: 'close', error: '' });
       refreshShapeList();
@@ -1704,6 +1797,7 @@
     }
 
     function onEditorPointerMove(event) {
+      handlePathCapturePointerMove(event);
       const point = toCanvasPoint(event);
       const relativeX = Math.max(0, Math.round(point.x));
       const relativeY = Math.max(0, Math.round(editorOverlayCanvas.height - point.y));
@@ -1739,6 +1833,194 @@
       overlayCtx.clearRect(0, 0, editorOverlayCanvas.width, editorOverlayCanvas.height);
     }
 
+    function showPageTopTip(message, options = {}) {
+      if (!pageTopTip || !pageTopTipText) return;
+      const { type = 'success', duration = 2200 } = options;
+      pageTopTipText.textContent = message;
+      pageTopTip.classList.toggle('is-error', type === 'error');
+      pageTopTip.hidden = false;
+      if (pageTopTipTimer) window.clearTimeout(pageTopTipTimer);
+      pageTopTipTimer = window.setTimeout(() => {
+        pageTopTip.hidden = true;
+      }, duration);
+    }
+
+    function updatePathButtonState() {
+      if (!pathBtn) return;
+      if (pathCaptureState.recording) {
+        pathBtn.textContent = '路径(记录中)';
+        return;
+      }
+      if (pathCaptureState.armed) {
+        pathBtn.textContent = '路径(待开始)';
+        return;
+      }
+      pathBtn.textContent = '路径';
+    }
+
+    function resetPathCaptureState() {
+      pathCaptureState.armed = false;
+      pathCaptureState.recording = false;
+      pathCaptureState.points = [];
+      clearOverlayCanvas();
+      updatePathButtonState();
+    }
+
+    function resetPathCaptureSession() {
+      resetPathCaptureState();
+      pathCaptureState.armed = true;
+      pathCaptureState.lastSerialized = '';
+      updatePathButtonState();
+      setFrameCoordBadge('-', '-', { copyToClipboard: false, hide: true });
+    }
+
+    function getCanvasSizeText() {
+      return `${editorOverlayCanvas.width}x${editorOverlayCanvas.height}`;
+    }
+
+    function buildPointCopyText(x, y) {
+      return `点坐标：{x:${x},y:${y}}\n画布大小：${getCanvasSizeText()}`;
+    }
+
+    function buildPathPayload() {
+      const orderedPoints = pathCaptureState.points.map((point) => ({
+        x: point.x,
+        y: point.y
+      }));
+      if (orderedPoints.length <= 1) {
+        const point = orderedPoints[0] || { x: '-', y: '-' };
+        return buildPointCopyText(point.x, point.y);
+      }
+      return `路径坐标：${JSON.stringify(orderedPoints)}\n画布大小：${getCanvasSizeText()}`;
+    }
+
+    function drawPathCaptureOverlay() {
+      clearOverlayCanvas();
+      const points = pathCaptureState.points;
+      if (!points.length) return;
+      overlayCtx.save();
+      overlayCtx.strokeStyle = '#22c55e';
+      overlayCtx.lineWidth = 3;
+      overlayCtx.lineJoin = 'round';
+      overlayCtx.lineCap = 'round';
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) {
+        overlayCtx.lineTo(points[i].x, points[i].y);
+      }
+      overlayCtx.stroke();
+      points.forEach((point, index) => {
+        overlayCtx.beginPath();
+        overlayCtx.fillStyle = index === 0 ? '#f59e0b' : '#22c55e';
+        overlayCtx.arc(point.x, point.y, index === points.length - 1 ? 4 : 3, 0, Math.PI * 2);
+        overlayCtx.fill();
+      });
+      overlayCtx.restore();
+    }
+
+    function appendPathPoint(point, force = false) {
+      const last = pathCaptureState.points[pathCaptureState.points.length - 1];
+      if (last) {
+        const deltaX = point.x - last.x;
+        const deltaY = point.y - last.y;
+        const distance = Math.hypot(deltaX, deltaY);
+        if (!force && (distance < 2 || (last.x === point.x && last.y === point.y))) return;
+      }
+      pathCaptureState.points.push(point);
+      drawPathCaptureOverlay();
+    }
+
+    function fallbackCopyText(text) {
+      if (!document.body) return false;
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', 'readonly');
+      textarea.setAttribute('aria-hidden', 'true');
+      textarea.style.position = 'fixed';
+      textarea.style.top = '-9999px';
+      textarea.style.left = '-9999px';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      textarea.setSelectionRange(0, textarea.value.length);
+      let copied = false;
+      try {
+        copied = document.execCommand('copy');
+      } catch (error) {
+        copied = false;
+      }
+      textarea.remove();
+      return copied;
+    }
+
+    async function copyPathPayloadToClipboard(serialized) {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(serialized);
+        return 'clipboard';
+      }
+      if (fallbackCopyText(serialized)) {
+        return 'execCommand';
+      }
+      throw new Error('clipboard unavailable');
+    }
+
+    async function finishPathCapture() {
+      const serialized = buildPathPayload();
+      const hasValidPath = pathCaptureState.points.length >= 2;
+      pathCaptureState.lastSerialized = serialized;
+      pathCaptureState.armed = false;
+      pathCaptureState.recording = false;
+      updatePathButtonState();
+      if (!pathCaptureState.points.length) {
+        setFrameCoordBadge('路径', '无有效路径', { copyToClipboard: false, hide: false });
+        showPageTopTip('路径点不足，未生成可复制内容', { type: 'error' });
+        pathCaptureState.points = [];
+        clearOverlayCanvas();
+        return;
+      }
+      try {
+        await copyPathPayloadToClipboard(serialized);
+        setFrameCoordBadge('路径', '已复制', { copyToClipboard: false, hide: false });
+        showPageTopTip('路径已复制到粘贴板');
+      } catch (error) {
+        console.warn('path clipboard write failed', error);
+        setFrameCoordBadge('路径', '复制失败', { copyToClipboard: false, hide: false });
+        showPageTopTip(`路径复制失败，请手动复制：${serialized}`, { type: 'error', duration: 5200 });
+      }
+      pathCaptureState.points = [];
+      clearOverlayCanvas();
+    }
+
+    function handlePathCapturePointerDown(event) {
+      if (!pathCaptureState.armed && !pathCaptureState.recording) return false;
+      const point = toCanvasPoint(event);
+      const normalizedPoint = {
+        x: Math.max(0, Math.round(point.x)),
+        y: Math.max(0, Math.round(editorOverlayCanvas.height - point.y))
+      };
+      if (!pathCaptureState.recording) {
+        pathCaptureState.recording = true;
+        pathCaptureState.points = [];
+        appendPathPoint({ x: normalizedPoint.x, y: editorOverlayCanvas.height - normalizedPoint.y }, true);
+        updatePathButtonState();
+        return true;
+      }
+      appendPathPoint({ x: normalizedPoint.x, y: editorOverlayCanvas.height - normalizedPoint.y }, true);
+      finishPathCapture();
+      return true;
+    }
+
+    function handlePathCapturePointerMove(event) {
+      if (!pathCaptureState.recording) return false;
+      const point = toCanvasPoint(event);
+      appendPathPoint({
+        x: Math.max(0, Math.round(point.x)),
+        y: Math.max(0, Math.round(point.y))
+      });
+      return true;
+    }
+
     let lastValidFrameCoordText = '';
 
     function setFrameCoordBadge(x, y, options = {}) {
@@ -1748,13 +2030,19 @@
       frameCoordBadge.textContent = coordText;
       frameCoordBadge.hidden = !!hide;
       if (x !== '-' && y !== '-') {
-        lastValidFrameCoordText = `相对左下角的坐标(${x},${y})，画布大小[${editorOverlayCanvas.width}x${editorOverlayCanvas.height}]`;
+        lastValidFrameCoordText = buildPointCopyText(x, y);
       }
       if (copyToClipboard && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-        const textToCopy = x === '-' && y === '-' ? (lastValidFrameCoordText || `相对左下角的坐标(${x},${y})，画布大小[${editorOverlayCanvas.width}x${editorOverlayCanvas.height}]`) : `相对左下角的坐标(${x},${y})，画布大小[${editorOverlayCanvas.width}x${editorOverlayCanvas.height}]`;
+        const textToCopy = x === '-' && y === '-' ? (lastValidFrameCoordText || buildPointCopyText(x, y)) : buildPointCopyText(x, y);
         navigator.clipboard.writeText(textToCopy).catch(() => {});
       }
-    } function resetFrameCoordBadge() {
+    }
+
+    function showPointCopiedTip(x, y) {
+      showPageTopTip(`点坐标已复制 · {x:${x}, y:${y}} · 画布 ${getCanvasSizeText()}`);
+    }
+
+    function resetFrameCoordBadge() {
       setFrameCoordBadge('-', '-', { copyToClipboard: false, hide: true });
     }
 

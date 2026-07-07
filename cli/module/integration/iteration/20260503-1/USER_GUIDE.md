@@ -31,7 +31,7 @@
   "site": "../site",
   "connect_timeout": 15000,
   "sleep": 3000,
-  "thread": 3,
+  "thread": 20,
   "http_timeout": 60000,
   "http_connect_timeout": 15000,
   "http_socket_timeout": 45000,

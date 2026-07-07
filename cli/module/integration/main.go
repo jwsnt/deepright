@@ -41,7 +41,6 @@ import (
 	"connect/pluginlog"
 	"connect/sharedutil"
 	_ "github.com/glebarez/go-sqlite"
-	"github.com/panjf2000/ants/v2"
 	"github.com/robfig/cron/v3"
 	integrationagentarchive "integration/agentarchive"
 	integrationagentcopy "integration/agentcopy"
@@ -1852,6 +1851,7 @@ type TaskContent struct {
 	Timeout int    `json:"timeout"`
 	Suffix  string `json:"suffix"`
 	Type    string `json:"type"`
+	Ddl     int64  `json:"ddl"`
 	Tid     string `json:"tid"`
 	Cmd     string `json:"cmd"`
 	AgentId string `json:"agentId"`
@@ -1874,6 +1874,16 @@ type ResultPayload struct {
 	Cmd     string                     `json:"cmd"`
 	Tid     string                     `json:"tid"`
 	Insert  []messageInsertPublishItem `json:"insert,omitempty"`
+}
+
+type queuedCliGetTask struct {
+	task     TaskContent
+	metadata *AgentOutput
+}
+
+type queuedCliGetPublish struct {
+	result   *ResultPayload
+	metadata *AgentOutput
 }
 
 const (
@@ -2223,9 +2233,8 @@ func publishResult(client *http.Client, host string, result *ResultPayload, meta
 		if err != nil {
 			log.Printf("message_insert load pending failed chatId=%s: %v", strings.TrimSpace(result.Chat), err)
 		} else if len(items) > 0 {
-			cloned := *result
-			cloned.Insert = items
-			payloadResult = &cloned
+			result.Insert = items
+			payloadResult = result
 			pendingInsertItems = items
 		}
 	}
@@ -2269,10 +2278,128 @@ func publishResult(client *http.Client, host string, result *ResultPayload, meta
 	if len(pendingInsertItems) > 0 {
 		if err := markPublishedMessageInsertPublishItems(strings.TrimSpace(result.Chat), pendingInsertItems); err != nil {
 			log.Printf("message_insert mark published failed chatId=%s tids=%d: %v", strings.TrimSpace(result.Chat), len(pendingInsertItems), err)
+		} else {
+			log.Printf(
+				"message_insert mark published success chatId=%s reportedAt=%s tids=%s",
+				strings.TrimSpace(result.Chat),
+				time.Now().Format(time.RFC3339),
+				strings.Join(messageInsertPublishItemTIDs(pendingInsertItems), ","),
+			)
 		}
 	}
 	markConfirmedMessageInsertUploads(strings.TrimSpace(result.Chat), string(body))
 	return nil
+}
+
+func messageInsertPublishItemTIDs(items []messageInsertPublishItem) []string {
+	tids := make([]string, 0, len(items))
+	for _, item := range items {
+		if tid := strings.TrimSpace(item.Tid); tid != "" {
+			tids = append(tids, tid)
+		}
+	}
+	return tids
+}
+
+func isQueuedCliGetTaskExpired(task *TaskContent, now time.Time) bool {
+	if task == nil || task.Ddl <= 0 {
+		return false
+	}
+	return now.UnixMilli() > task.Ddl
+}
+
+func publishResultWithRetry(ctx context.Context, client *http.Client, hostFn func() string, result *ResultPayload, metadata *AgentOutput, retryInterval time.Duration, retryTimes int, cfg *Config) error {
+	for attempt := 0; ; attempt++ {
+		err := publishResult(client, hostFn(), result, metadata, cfg)
+		if err == nil {
+			if attempt > 0 {
+				log.Printf("cli-get: publish retry success tid=%s retries=%d", strings.TrimSpace(result.Tid), attempt)
+			}
+			return nil
+		}
+		if attempt >= retryTimes {
+			log.Printf("cli-get: publish give up tid=%s retries=%d err=%v", strings.TrimSpace(result.Tid), attempt, err)
+			return err
+		}
+		nextRetry := attempt + 1
+		log.Printf("cli-get: publish retry scheduled tid=%s retry=%d max=%d wait_ms=%d err=%v",
+			strings.TrimSpace(result.Tid), nextRetry, retryTimes, retryInterval.Milliseconds(), err)
+		if !sleepContext(ctx, retryInterval) {
+			return ctx.Err()
+		}
+	}
+}
+
+func runCliGetExecuteWorker(ctx context.Context, taskQueue <-chan queuedCliGetTask, publishQueue chan<- queuedCliGetPublish, terminal string) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case item := <-taskQueue:
+			task := item.task
+			now := time.Now()
+			if isQueuedCliGetTaskExpired(&task, now) {
+				log.Printf("cli-get: drop expired task agentId=%s chat=%s tid=%s ddl=%d now=%d cmd=%q",
+					strings.TrimSpace(task.AgentId),
+					strings.TrimSpace(task.Chat),
+					strings.TrimSpace(task.Tid),
+					task.Ddl,
+					now.UnixMilli(),
+					task.Cmd,
+				)
+				continue
+			}
+
+			receivedAt := now.Format("2006-01-02T15:04:05")
+			var cmdLogID int64
+			if cronDB != nil && task.AgentId != "" && task.Chat != "" && task.Cmd != "" {
+				res, err := cronDB.Exec(`INSERT INTO cmd_log (agent_id, chat_id, tid, cmd, received_at) VALUES (?,?,?,?,?)`,
+					task.AgentId, task.Chat, task.Tid, task.Cmd, receivedAt)
+				if err == nil {
+					cmdLogID, _ = res.LastInsertId()
+				}
+			}
+
+			term := terminal
+			if term == "" {
+				term = detectTerminal()
+			}
+			if term == "" {
+				log.Printf("cli-get: no SHELL available for tid=%s", task.Tid)
+				continue
+			}
+
+			result := executeTask(&task, term)
+			if cronDB != nil && cmdLogID > 0 && result != nil {
+				completedAt := time.Now().Format("2006-01-02T15:04:05")
+				cronDB.Exec(`UPDATE cmd_log SET result = ?, status = ?, completed_at = ? WHERE id = ?`,
+					result.Cmd, result.Status, completedAt, cmdLogID)
+			}
+
+			select {
+			case <-ctx.Done():
+				return
+			case publishQueue <- queuedCliGetPublish{result: result, metadata: item.metadata}:
+				log.Printf("cli-get: publish queued tid=%s pending=%d", strings.TrimSpace(task.Tid), len(publishQueue))
+			}
+		}
+	}
+}
+
+func runCliGetPublishWorker(ctx context.Context, client *http.Client, publishQueue <-chan queuedCliGetPublish, retryInterval time.Duration, retryTimes int, cfg *Config) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case item := <-publishQueue:
+			if item.result == nil {
+				continue
+			}
+			if err := publishResultWithRetry(ctx, client, cfg.currentHost, item.result, item.metadata, retryInterval, retryTimes, cfg); err != nil && ctx.Err() == nil {
+				log.Printf("cli-get: publish error tid=%s: %v", strings.TrimSpace(item.result.Tid), err)
+			}
+		}
+	}
 }
 
 // startCliGet runs the cli-get heartbeat loop as a background goroutine.
@@ -2284,28 +2411,53 @@ func startCliGet(ctx context.Context, cfg *Config) {
 	}
 
 	client := createCliGetHTTPClient(cfg)
-
-	pool, err := ants.NewPool(cfg.Thread)
-	if err != nil {
-		log.Printf("cli-get: pool error: %v", err)
+	if cfg.Thread <= 0 {
+		log.Printf("cli-get: invalid thread=%d", cfg.Thread)
+		return
+	}
+	if cfg.Queue <= 0 {
+		log.Printf("cli-get: invalid queue=%d", cfg.Queue)
+		return
+	}
+	if cfg.RetryIntervalMs < 0 {
+		log.Printf("cli-get: invalid retry_interval=%d", cfg.RetryIntervalMs)
+		return
+	}
+	if cfg.RetryTimes < 0 {
+		log.Printf("cli-get: invalid retry_times=%d", cfg.RetryTimes)
 		return
 	}
 
 	agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
 	sleepDur := time.Duration(cfg.SleepMs) * time.Millisecond
+	retryInterval := time.Duration(cfg.RetryIntervalMs) * time.Millisecond
 	heartbeatBackoff := sleepDur
 	maxHeartbeatBackoff := 15 * time.Second
+	taskQueue := make(chan queuedCliGetTask, cfg.Queue)
+	publishQueue := make(chan queuedCliGetPublish, cfg.Queue)
 
-	log.Printf("cli-get: started (host=%s, threads=%d, sleep=%dms)", cfg.currentHost(), cfg.Thread, cfg.SleepMs)
+	for i := 0; i < cfg.Thread; i++ {
+		go runCliGetExecuteWorker(ctx, taskQueue, publishQueue, terminal)
+		go runCliGetPublishWorker(ctx, client, publishQueue, retryInterval, cfg.RetryTimes, cfg)
+	}
+
+	log.Printf("cli-get: started (host=%s, threads=%d, queue=%d, sleep=%dms, retry_interval=%dms, retry_times=%d)",
+		cfg.currentHost(), cfg.Thread, cfg.Queue, cfg.SleepMs, cfg.RetryIntervalMs, cfg.RetryTimes)
 
 	go func() {
-		defer pool.Release()
 		defer closeHTTPClientIdleConnections(client)
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			default:
+			}
+			if len(taskQueue) >= cap(taskQueue) {
+				log.Printf("cli-get: task queue full pending=%d capacity=%d, skip /cli/get", len(taskQueue), cap(taskQueue))
+				if !sleepContext(ctx, sleepDur) {
+					return
+				}
+				continue
 			}
 			currentChatID := resolveCurrentPageSessionChatID()
 			var (
@@ -2342,41 +2494,12 @@ func startCliGet(ctx context.Context, cfg *Config) {
 			}
 			recordHeartbeat(2) // success, has task
 			t := *task
-			meta := metadata
-			_ = pool.Submit(func() {
-				if ctx.Err() != nil {
-					return
-				}
-				// Log command received
-				receivedAt := time.Now().Format("2006-01-02T15:04:05")
-				var cmdLogId int64
-				if cronDB != nil && t.AgentId != "" && t.Chat != "" && t.Cmd != "" {
-					res, err := cronDB.Exec(`INSERT INTO cmd_log (agent_id, chat_id, tid, cmd, received_at) VALUES (?,?,?,?,?)`,
-						t.AgentId, t.Chat, t.Tid, t.Cmd, receivedAt)
-					if err == nil {
-						cmdLogId, _ = res.LastInsertId()
-					}
-				}
-				term := terminal
-				if term == "" {
-					term = detectTerminal()
-				}
-				if term == "" {
-					log.Printf("cli-get: no SHELL available for tid=%s", t.Tid)
-					return
-				}
-				result := executeTask(&t, term)
-				// Log command completed
-				if cronDB != nil && cmdLogId > 0 && result != nil {
-					completedAt := time.Now().Format("2006-01-02T15:04:05")
-					cronDB.Exec(`UPDATE cmd_log SET result = ?, status = ?, completed_at = ? WHERE id = ?`,
-						result.Cmd, result.Status, completedAt, cmdLogId)
-				}
-				err := publishResult(client, cfg.currentHost(), result, meta, cfg)
-				if err != nil {
-					log.Printf("cli-get: publish error (tid=%s): %v", t.Tid, err)
-				}
-			})
+			select {
+			case <-ctx.Done():
+				return
+			case taskQueue <- queuedCliGetTask{task: t, metadata: metadata}:
+				log.Printf("cli-get: task queued tid=%s pending=%d capacity=%d", strings.TrimSpace(t.Tid), len(taskQueue), cap(taskQueue))
+			}
 		}
 	}()
 }
@@ -11111,6 +11234,9 @@ type Config struct {
 	// cli-get specific
 	SleepMs           int
 	Thread            int
+	Queue             int
+	RetryIntervalMs   int
+	RetryTimes        int
 	HTTPTimeout       int
 	HTTPConnTimeout   int
 	HTTPSocketTimeout int
@@ -11127,14 +11253,15 @@ type integrationStartupOptions struct {
 }
 
 const (
-	integrationServicePort     = 8080
-	integrationDefaultPIDFile  = "integration.pid"
-	integrationDefaultLogFile  = "integration.log"
-	integrationStopWait        = 15 * time.Second
-	integrationShutdownTimeout = 5 * time.Second
-	integrationReadyPath       = "/api/heartbeat"
-	defaultPluginExecTimeoutMs = 600000
-	integrationSkipBrowserEnv  = "DEEPRIGHT_INTEGRATION_SKIP_BROWSER"
+	integrationServicePort      = 8080
+	integrationDefaultPIDFile   = "integration.pid"
+	integrationDefaultLogFile   = "integration.log"
+	integrationLogRetentionDays = 3
+	integrationStopWait         = 15 * time.Second
+	integrationShutdownTimeout  = 5 * time.Second
+	integrationReadyPath        = "/api/heartbeat"
+	defaultPluginExecTimeoutMs  = 600000
+	integrationSkipBrowserEnv   = "DEEPRIGHT_INTEGRATION_SKIP_BROWSER"
 )
 
 var integrationStartWait = 5 * time.Second
@@ -11260,7 +11387,10 @@ func defaultIntegrationStartupOptions() integrationStartupOptions {
 			InstallApp:                "",
 			Reply:                     "",
 			SleepMs:                   3000,
-			Thread:                    3,
+			Thread:                    20,
+			Queue:                     1000,
+			RetryIntervalMs:           10000,
+			RetryTimes:                1,
 			HTTPTimeout:               45000,
 			HTTPConnTimeout:           15000,
 			HTTPSocketTimeout:         45000,
@@ -11294,6 +11424,9 @@ var integrationStartupConfigKeys = map[string]string{
 	"reply":                   "reply",
 	"sleep":                   "sleep",
 	"thread":                  "thread",
+	"queue":                   "queue",
+	"retryinterval":           "retry_interval",
+	"retrytimes":              "retry_times",
 	"idletimeout":             "idle_timeout",
 	"pluginexectimeout":       "plugin_exec_timeout",
 	"skillextract":            "skill_extract",
@@ -11523,6 +11656,18 @@ func applyIntegrationStartupConfig(opts *integrationStartupOptions, values map[s
 			if err := assignIntegrationStartupConfigInt(raw, key, &opts.Config.Thread); err != nil {
 				return err
 			}
+		case "queue":
+			if err := assignIntegrationStartupConfigInt(raw, key, &opts.Config.Queue); err != nil {
+				return err
+			}
+		case "retry_interval":
+			if err := assignIntegrationStartupConfigInt(raw, key, &opts.Config.RetryIntervalMs); err != nil {
+				return err
+			}
+		case "retry_times":
+			if err := assignIntegrationStartupConfigInt(raw, key, &opts.Config.RetryTimes); err != nil {
+				return err
+			}
 		case "http_timeout":
 			if err := assignIntegrationStartupConfigInt(raw, key, &opts.Config.HTTPTimeout); err != nil {
 				return err
@@ -11631,6 +11776,9 @@ func bindIntegrationServeFlags(fs *flag.FlagSet, cfg *Config, pidFileFlag, logFi
 	fs.StringVar(&cfg.Reply, "reply", defaults.Config.Reply, "reply text sent once per plugin when scheduled details are created")
 	fs.IntVar(&cfg.SleepMs, "sleep", defaults.Config.SleepMs, "cli-get heartbeat error sleep in ms")
 	fs.IntVar(&cfg.Thread, "thread", defaults.Config.Thread, "cli-get worker pool size")
+	fs.IntVar(&cfg.Queue, "queue", defaults.Config.Queue, "cli-get local task queue size")
+	fs.IntVar(&cfg.RetryIntervalMs, "retry_interval", defaults.Config.RetryIntervalMs, "cli-get publish retry interval in ms")
+	fs.IntVar(&cfg.RetryTimes, "retry_times", defaults.Config.RetryTimes, "cli-get publish retry count after first failure")
 	fs.IntVar(&cfg.HTTPTimeout, "http_timeout", defaults.Config.HTTPTimeout, "cli-get HTTP total timeout in ms")
 	fs.IntVar(&cfg.HTTPConnTimeout, "http_connect_timeout", defaults.Config.HTTPConnTimeout, "cli-get HTTP connect timeout in ms")
 	fs.IntVar(&cfg.HTTPSocketTimeout, "http_socket_timeout", defaults.Config.HTTPSocketTimeout, "cli-get HTTP read timeout in ms")
@@ -13517,6 +13665,29 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 		return 1
 	}
 
+	logFilePath := integrationLogFilePath(map[string]string{"log-file": logFileFlag})
+	serveLogWriter, err := newIntegrationDailyLogWriter(logFilePath, integrationLogRetentionDays)
+	if err != nil {
+		message := fmt.Sprintf("error: %v", err)
+		if statusErr := writeIntegrationStartupStatus(startupStatusFile, integrationStartupStatus{
+			Status:  "failed",
+			Message: message,
+		}); statusErr != nil {
+			fmt.Fprintf(stderr, "startup status write failed: %v\n", statusErr)
+		}
+		fmt.Fprintln(stderr, message)
+		return 1
+	}
+	defer serveLogWriter.Close()
+
+	originalLogWriter := log.Writer()
+	logOutput := io.Writer(serveLogWriter)
+	if strings.TrimSpace(startupStatusFile) == "" {
+		logOutput = io.MultiWriter(stderr, serveLogWriter)
+	}
+	log.SetOutput(logOutput)
+	defer log.SetOutput(originalLogWriter)
+
 	reportStartupFailure := func(format string, args ...interface{}) int {
 		message := fmt.Sprintf(format, args...)
 		if err := writeIntegrationStartupStatus(startupStatusFile, integrationStartupStatus{
@@ -13596,6 +13767,9 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 		"reply":                     cfg.Reply,
 		"sleep":                     cfg.SleepMs,
 		"thread":                    cfg.Thread,
+		"queue":                     cfg.Queue,
+		"retry_interval":            cfg.RetryIntervalMs,
+		"retry_times":               cfg.RetryTimes,
 		"http_timeout":              cfg.HTTPTimeout,
 		"http_connect_timeout":      cfg.HTTPConnTimeout,
 		"http_socket_timeout":       cfg.HTTPSocketTimeout,
@@ -15035,6 +15209,9 @@ func mergeIntegrationRuntimeFlags(flags map[string]string) map[string]string {
 		"reply",
 		"sleep",
 		"thread",
+		"queue",
+		"retry_interval",
+		"retry_times",
 		"idle_timeout",
 		"pid-file",
 		"log-file",
@@ -15091,12 +15268,9 @@ func integrationLogFilePath(flags map[string]string) string {
 	return abs
 }
 
-func openIntegrationLifecycleLog(flags map[string]string) (*os.File, string, error) {
+func openIntegrationLifecycleLog(flags map[string]string) (io.WriteCloser, string, error) {
 	path := integrationLogFilePath(flags)
-	if err := ensureParentDir(path); err != nil {
-		return nil, path, err
-	}
-	writer, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	writer, err := newIntegrationDailyLogWriter(path, integrationLogRetentionDays)
 	if err != nil {
 		return nil, path, err
 	}
@@ -15108,6 +15282,221 @@ func integrationLifecycleLog(writer io.Writer, format string, args ...interface{
 		return
 	}
 	_, _ = fmt.Fprintf(writer, "%s [integration lifecycle] %s\n", time.Now().Format(time.RFC3339), fmt.Sprintf(format, args...))
+}
+
+type integrationDailyLogWriter struct {
+	mu         sync.Mutex
+	basePath   string
+	keepDays   int
+	now        func() time.Time
+	currentDay string
+	file       *os.File
+}
+
+func newIntegrationDailyLogWriter(path string, keepDays int) (*integrationDailyLogWriter, error) {
+	return newIntegrationDailyLogWriterWithClock(path, keepDays, time.Now)
+}
+
+func newIntegrationDailyLogWriterWithClock(path string, keepDays int, now func() time.Time) (*integrationDailyLogWriter, error) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return nil, fmt.Errorf("log path is required")
+	}
+	if keepDays <= 0 {
+		keepDays = 1
+	}
+	if now == nil {
+		now = time.Now
+	}
+	writer := &integrationDailyLogWriter{
+		basePath: path,
+		keepDays: keepDays,
+		now:      now,
+	}
+	if err := writer.ensureFileLocked(now()); err != nil {
+		return nil, err
+	}
+	return writer, nil
+}
+
+func (w *integrationDailyLogWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if err := w.ensureFileLocked(w.now()); err != nil {
+		return 0, err
+	}
+	return w.file.Write(p)
+}
+
+func (w *integrationDailyLogWriter) Close() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.file == nil {
+		return nil
+	}
+	err := w.file.Close()
+	w.file = nil
+	return err
+}
+
+func (w *integrationDailyLogWriter) ensureFileLocked(now time.Time) error {
+	today := now.Format("2006-01-02")
+	if w.file != nil && w.currentDay == today {
+		return nil
+	}
+	if err := ensureParentDir(w.basePath); err != nil {
+		return err
+	}
+	if w.file != nil {
+		if err := w.file.Close(); err != nil {
+			return err
+		}
+		w.file = nil
+		if w.currentDay != "" && w.currentDay != today {
+			if err := archiveIntegrationBaseLog(w.basePath, w.currentDay); err != nil {
+				return err
+			}
+		}
+		w.currentDay = ""
+	}
+	if err := rotateStaleIntegrationBaseLog(w.basePath, today); err != nil {
+		return err
+	}
+	file, err := os.OpenFile(w.basePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	w.file = file
+	w.currentDay = today
+	return cleanupExpiredIntegrationLogArchives(w.basePath, today, w.keepDays)
+}
+
+func rotateStaleIntegrationBaseLog(basePath, today string) error {
+	info, err := os.Stat(basePath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	if info.IsDir() {
+		return fmt.Errorf("log path is a directory: %s", basePath)
+	}
+	day := info.ModTime().Format("2006-01-02")
+	if day == today {
+		return nil
+	}
+	return archiveIntegrationBaseLog(basePath, day)
+}
+
+func archiveIntegrationBaseLog(basePath, day string) error {
+	basePath = strings.TrimSpace(basePath)
+	day = strings.TrimSpace(day)
+	if basePath == "" || day == "" {
+		return nil
+	}
+	if _, err := os.Stat(basePath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	archivePath := integrationArchivedLogPath(basePath, day)
+	if _, err := os.Stat(archivePath); err == nil {
+		if err := appendFileContents(archivePath, basePath); err != nil {
+			return err
+		}
+		return os.Remove(basePath)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return os.Rename(basePath, archivePath)
+}
+
+func appendFileContents(targetPath, sourcePath string) error {
+	src, err := os.Open(sourcePath)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	dst, err := os.OpenFile(targetPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer dst.Close()
+
+	_, err = io.Copy(dst, src)
+	return err
+}
+
+func cleanupExpiredIntegrationLogArchives(basePath, today string, keepDays int) error {
+	if keepDays <= 0 {
+		keepDays = 1
+	}
+	todayTime, err := time.Parse("2006-01-02", today)
+	if err != nil {
+		return err
+	}
+	cutoff := todayTime.AddDate(0, 0, -(keepDays - 1))
+	dir := filepath.Dir(basePath)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		archiveDay, ok := integrationArchivedLogDay(basePath, entry.Name())
+		if !ok {
+			continue
+		}
+		archiveTime, err := time.Parse("2006-01-02", archiveDay)
+		if err != nil {
+			continue
+		}
+		if archiveTime.Before(cutoff) {
+			if err := os.Remove(filepath.Join(dir, entry.Name())); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func integrationArchivedLogPath(basePath, day string) string {
+	ext := filepath.Ext(basePath)
+	base := strings.TrimSuffix(basePath, ext)
+	return base + "-" + day + ext
+}
+
+func integrationArchivedLogDay(basePath, entryName string) (string, bool) {
+	baseName := filepath.Base(basePath)
+	ext := filepath.Ext(baseName)
+	stem := strings.TrimSuffix(baseName, ext)
+	prefix := stem + "-"
+	suffix := ext
+	if !strings.HasPrefix(entryName, prefix) {
+		return "", false
+	}
+	if suffix != "" {
+		if !strings.HasSuffix(entryName, suffix) {
+			return "", false
+		}
+		entryName = strings.TrimSuffix(entryName, suffix)
+	}
+	day := strings.TrimPrefix(entryName, prefix)
+	if len(day) != len("2006-01-02") {
+		return "", false
+	}
+	if _, err := time.Parse("2006-01-02", day); err != nil {
+		return "", false
+	}
+	return day, true
 }
 
 func ensureParentDir(path string) error {

@@ -1208,3 +1208,58 @@ func decodeGzipBase64(t *testing.T, raw string) string {
 	_ = gz.Close()
 	return string(body)
 }
+
+func TestIsTaskExpired(t *testing.T) {
+	now := time.UnixMilli(1_717_000_000_000)
+	if isTaskExpired(&TaskContent{Ddl: now.Add(-time.Millisecond).UnixMilli()}, now) != true {
+		t.Fatal("expired task should return true")
+	}
+	if isTaskExpired(&TaskContent{Ddl: now.UnixMilli()}, now) {
+		t.Fatal("task at ddl boundary should not be expired")
+	}
+	if isTaskExpired(&TaskContent{Ddl: now.Add(time.Millisecond).UnixMilli()}, now) {
+		t.Fatal("future ddl should not be expired")
+	}
+	if isTaskExpired(&TaskContent{}, now) {
+		t.Fatal("zero ddl should not be expired")
+	}
+}
+
+func TestPublishWithRetryRetriesOnce(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			http.Error(w, "temporary", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(ResponsePayload{Code: 200})
+	}))
+	defer server.Close()
+
+	result := &ResultPayload{Status: 0, Suffix: "cmd", Type: "cmd", Cmd: gzipBase64String("ok"), Tid: "retry-once"}
+	if err := publishWithRetry(server.Client(), server.URL, result, &AgentOutput{}, time.Millisecond, 1); err != nil {
+		t.Fatalf("publishWithRetry: %v", err)
+	}
+	if attempts != 2 {
+		t.Fatalf("attempts = %d, want 2", attempts)
+	}
+}
+
+func TestPublishWithRetryStopsAfterRetryLimit(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		http.Error(w, "temporary", http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	result := &ResultPayload{Status: 0, Suffix: "cmd", Type: "cmd", Cmd: gzipBase64String("fail"), Tid: "retry-stop"}
+	if err := publishWithRetry(server.Client(), server.URL, result, &AgentOutput{}, time.Millisecond, 1); err == nil {
+		t.Fatal("publishWithRetry error = nil, want failure")
+	}
+	if attempts != 2 {
+		t.Fatalf("attempts = %d, want 2", attempts)
+	}
+}

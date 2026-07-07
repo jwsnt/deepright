@@ -1,6 +1,7 @@
 package ai.deepright.workflow.assistant;
 
 import ai.deepright.cli.CliPrinter;
+import ai.deepright.cli.insert.CliInsertRag;
 import ai.deepright.cli.insert.CliRecall;
 import ai.deepright.feature.FeatureField;
 import ai.deepright.feature.FeatureFlag;
@@ -207,14 +208,25 @@ public class LogicVerifyAssistant extends DefaultAssistant {
 
     // 重置时间
     protected WorkflowTask reConfig(WorkflowConfig workflowConfig, WorkflowTask workTask, String query) throws Exception {
-        ResetStateWorkTask workWrap = new ResetStateWorkTask(workTask, this.buildQuery(workflowConfig, workTask, query));
-        // CliInsertRag.KEY_RECALL不需要保留，会从缓存召回
-        workWrap.getUserContext().getMetadata().clear();
+        WorkflowTask workWrap = new ResetStateWorkTask(workTask, this.buildQuery(workflowConfig, workTask, query));
+        workWrap = this.reContext(workWrap);
         // 不存储Query
         workWrap.getMetadata().put("__storeQuery", false);
         workWrap.setWorkflow("main");
         workWrap.setBiz("main");
         return workWrap;
+    }
+
+    protected WorkflowTask reContext(WorkflowTask workTask) throws Exception {
+        // 清空整个共享UserContext.metadata，仅保留KEY_INSERT
+        // CliInsertRag.KEY_RECALL不需要保留，会从缓存召回
+        // CliInsertRag.KEY_INSERT需要保留，尚未插入
+        Object insert = workTask.getUserContext().getMetadata(CliInsertRag.KEY_INSERT, Object.class);
+        workTask.getUserContext().getMetadata().clear();
+        if (insert != null) {
+            workTask.getUserContext().putMetadata(CliInsertRag.KEY_INSERT, insert);
+        }
+        return workTask;
     }
 
     @Configuration

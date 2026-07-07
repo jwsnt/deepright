@@ -98,6 +98,10 @@ curl --location 'http://xxx/cli/get' \
         "type": string,
         "description": "无需理解，pub回传时原样带上"
     },
+    "ddl": {
+        "type": long,
+        "description": "执行超时时间戳，Dead line"
+    },
     "tid": {
         "type": string,
         "description": "任务 ID"
@@ -238,7 +242,7 @@ curl --location 'http://127.0.0.1:9998/cli/pub' \
 
 ### 编写代码
 + 以Golang编写以上代码，要求：
-    + 启动一根master线程上报cli/get，如果有待执行任务则交由命令行参数--thread指定的work线程池执行（默认为3）
+    + 启动一根master线程上报cli/get，如果有待执行任务则交由命令行参数--thread指定的work线程池执行（默认为20）
     + 如果cli/get没有待执行任务或任何异常，则休眠由命令行参数--sleep指定的毫秒时间（默认为3000）
     + 如果cli/get返回待执行任务，转交对应work线程后立即进入下一次心跳上报
     + 代码简洁，包体积越小越好，能用开源包的就用开源包
