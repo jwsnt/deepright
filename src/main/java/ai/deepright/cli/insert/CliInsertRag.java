@@ -176,6 +176,7 @@ public class CliInsertRag extends RagCondition implements CliInsertService, RagS
         if (!FeatureFlag.isSilent(workTask)) {
             Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
                     .content(new StringBuffer(XmlResourceLang.get(CliInsertRag.KEY_INSERT)))
+                    .metadata(CliPrinter.process(CliInsertRag.RAG_KEY))
                     .workflow(workTask.getWorkflow())
                     .notifier(Notifier.SOURCE)
                     .build();
