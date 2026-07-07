@@ -121,6 +121,12 @@ a{color:var(--accent);text-decoration:none}
 /* Sidebar */
 .sidebar-header,.right-sidebar-header{padding:16px 20px;display:flex;align-items:center;gap:10px}
 .logo{font-size:20px;font-weight:700;color:var(--accent)}
+.cli-get-queue-status{display:none;align-items:center;justify-content:center;flex:0 0 auto;min-width:58px;height:28px;padding:0 10px;border-radius:999px;border:1px solid color-mix(in srgb,var(--border) 88%,var(--accent) 12%);background:linear-gradient(180deg,rgba(255,255,255,.8),rgba(232,240,255,.86));box-shadow:0 8px 18px rgba(77,107,254,.08),inset 0 1px 0 rgba(255,255,255,.88);color:var(--text-secondary);font-size:11px;font-weight:800;letter-spacing:.04em;line-height:1;white-space:nowrap;user-select:none;position:relative;transform:translateY(10px)}
+.cli-get-queue-status.show{display:inline-flex}
+.cli-get-queue-status::before,.cli-get-queue-status::after{position:absolute;left:50%;pointer-events:none;opacity:0;transition:opacity .06s ease,transform .06s ease}
+.cli-get-queue-status::before{content:attr(data-tooltip);bottom:calc(100% + 9px);transform:translate(-50%,3px);padding:4px 8px;border-radius:8px;background:rgba(23,30,48,.96);box-shadow:0 10px 22px rgba(7,12,24,.26);color:#f5f8ff;font-size:10px;line-height:1.2;font-weight:600;letter-spacing:.01em;white-space:nowrap;z-index:12}
+.cli-get-queue-status::after{content:'';bottom:calc(100% + 4px);transform:translate(-50%,3px);border:5px solid transparent;border-top-color:rgba(23,30,48,.96);z-index:11}
+.cli-get-queue-status:hover::before,.cli-get-queue-status:hover::after,.cli-get-queue-status:focus-visible::before,.cli-get-queue-status:focus-visible::after{opacity:1;transform:translate(-50%,0)}
 .logo-svg{flex-shrink:0;color:var(--accent);cursor:pointer;transition:color .24s ease,filter .24s ease,transform .24s ease,opacity .24s ease}
 .logo-svg:focus-visible{outline:none;transform:translateY(-1px)}
 .logo-svg .logo-ring{stroke:currentColor;transition:stroke .24s ease,opacity .24s ease}
@@ -138,18 +144,32 @@ a{color:var(--accent);text-decoration:none}
 .logo-svg.hb-ok{animation:hbSlow 3s ease-in-out infinite}
 .logo-svg.hb-fail{animation:hbFast .6s ease-in-out infinite;filter:grayscale(100%)}
 .logo-svg.hb-task{animation:hbRush .3s ease-in-out infinite;filter:hue-rotate(-97deg) saturate(0.8) brightness(1.2)}
+.heartbeat-alert-overlay{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(circle at 50% 50%,rgba(255,244,244,.26) 0,rgba(255,244,244,.08) 18%,rgba(190,0,0,.42) 44%,rgba(68,0,0,.92) 100%);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .22s ease,visibility .22s ease}
+.heartbeat-alert-overlay.show{opacity:1;visibility:visible;animation:heartbeatAlertBackdrop .78s ease-in-out infinite alternate}
+.heartbeat-alert-overlay::before{content:"";position:absolute;inset:-18%;background:repeating-linear-gradient(180deg,rgba(255,255,255,.16) 0,rgba(255,255,255,.16) 2px,transparent 2px,transparent 14px);opacity:.18;mix-blend-mode:screen;animation:heartbeatAlertScan 5.2s linear infinite}
+.heartbeat-alert-panel{position:relative;display:flex;flex-direction:column;align-items:center;gap:16px;max-width:min(92vw,900px);padding:42px 48px;border:1px solid rgba(255,224,224,.42);border-radius:28px;background:linear-gradient(180deg,rgba(76,0,0,.86),rgba(30,0,0,.96));box-shadow:0 24px 80px rgba(0,0,0,.4),0 0 0 1px rgba(255,255,255,.05) inset;text-align:center}
+.heartbeat-alert-badge{display:inline-flex;align-items:center;gap:10px;padding:8px 14px;border-radius:999px;background:rgba(255,255,255,.1);color:#ffe5e5;font-size:12px;font-weight:700;letter-spacing:.36em;text-transform:uppercase}
+.heartbeat-alert-dot{width:11px;height:11px;border-radius:50%;background:#ff6b6b;box-shadow:0 0 18px rgba(255,107,107,.9);animation:heartbeatAlertBeacon .55s ease-in-out infinite}
+.heartbeat-alert-title{margin:0;color:#fff7f7;font-size:clamp(28px,5.5vw,68px);font-weight:800;letter-spacing:.12em;text-transform:uppercase;text-shadow:0 0 24px rgba(255,111,111,.42)}
 @keyframes hbSlow{0%,100%{opacity:1}50%{opacity:.4}}
 @keyframes hbFast{0%,100%{opacity:1}50%{opacity:.2}}
 @keyframes hbRush{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes heartbeatAlertBackdrop{0%{background-color:rgba(255,0,0,.08)}100%{background-color:rgba(255,72,72,.18)}}
+@keyframes heartbeatAlertScan{0%{transform:translateY(-8%)}100%{transform:translateY(8%)}}
+@keyframes heartbeatAlertBeacon{0%,100%{transform:scale(.86);opacity:.58}50%{transform:scale(1.18);opacity:1}}
+@media (max-width:720px){.heartbeat-alert-overlay{padding:18px}.heartbeat-alert-panel{padding:28px 20px;border-radius:22px}.heartbeat-alert-badge{font-size:11px;letter-spacing:.28em}}
 .sidebar-toggle,.right-sidebar-toggle{margin-left:auto;width:28px;height:28px;border-radius:6px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:var(--transition);flex-shrink:0}
 .sidebar-toggle:hover,.right-sidebar-toggle:hover,.right-sidebar-toggle:focus-visible{background:var(--bg-card);color:var(--text-primary);outline:none}
 .sidebar-toggle svg,.right-sidebar-toggle svg{width:18px;height:18px;display:block}
 .sidebar.collapsed{width:48px;min-width:48px;overflow:hidden}
 .sidebar.collapsed .sidebar-header{padding:12px 10px;justify-content:flex-start}
-.sidebar.collapsed .sidebar-header .logo,.sidebar.collapsed .sidebar-header>svg:first-child,.sidebar.collapsed .top-action-cluster,.sidebar.collapsed .sidebar-section-header,.sidebar.collapsed .chat-list,.sidebar.collapsed .vfs,.sidebar.collapsed .sidebar-footer{display:none}
+.sidebar.collapsed .sidebar-header .logo,.sidebar.collapsed .sidebar-header .cli-get-queue-status,.sidebar.collapsed .sidebar-header>svg:first-child,.sidebar.collapsed .top-action-cluster,.sidebar.collapsed .sidebar-section-header,.sidebar.collapsed .chat-list,.sidebar.collapsed .vfs,.sidebar.collapsed .sidebar-footer{display:none}
 .sidebar.collapsed .sidebar-toggle{margin-left:0}
 .sidebar.collapsed .sidebar-toggle.has-chat-completion-beacon{color:var(--completion-beacon-color);background:var(--completion-beacon-bg);box-shadow:0 0 0 1px var(--completion-beacon-ring),0 0 16px var(--completion-beacon-glow);animation:leftSidebarCompletionBeacon 1.1s ease-in-out infinite}
 .sidebar.collapsed .sidebar-toggle.has-chat-completion-beacon svg{filter:drop-shadow(0 0 6px var(--completion-beacon-glow-strong))}
+[data-theme="dark"] .cli-get-queue-status{border-color:rgba(143,175,255,.22);background:linear-gradient(180deg,rgba(18,35,70,.96),rgba(11,24,49,.94));box-shadow:0 10px 20px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.06);color:#dce7ff}
+[data-theme="dark"] .cli-get-queue-status::before{background:rgba(10,14,24,.96);box-shadow:0 12px 24px rgba(0,0,0,.34);color:#f7f9ff}
+[data-theme="dark"] .cli-get-queue-status::after{border-top-color:rgba(10,14,24,.96)}
 @keyframes leftSidebarCompletionBeacon{0%,100%{box-shadow:0 0 0 1px var(--completion-beacon-bg),0 0 0 rgba(0,0,0,0);filter:brightness(.96)}50%{box-shadow:0 0 0 1px var(--completion-beacon-ring),0 0 22px var(--completion-beacon-glow-strong),0 0 34px var(--completion-beacon-glow);filter:brightness(1.22)}}
 .top-action-cluster{position:relative;display:flex;align-items:center;gap:8px;margin:8px 16px;min-height:48px;isolation:isolate;z-index:6}
 .chat-list{transition:filter .26s ease,opacity .26s ease}
@@ -3437,6 +3457,12 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
 </style>
 </head>
 <body>
+<div id="heartbeatAlertOverlay" class="heartbeat-alert-overlay" aria-hidden="true">
+  <div class="heartbeat-alert-panel" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="heartbeat-alert-badge"><span class="heartbeat-alert-dot" aria-hidden="true"></span>Remote Service Alert</div>
+    <h1 class="heartbeat-alert-title">Heartbeat Error</h1>
+  </div>
+</div>
 <div class="app" id="app">
   <!-- Sidebar -->
   <div class="sidebar collapsed">
@@ -3456,6 +3482,7 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
         </g>
       </svg>
       <span class="logo">DeepRight</span>
+      <span id="cliGetQueueStatus" class="cli-get-queue-status" data-tooltip="等待回传 0 / 正在执行 0 / 等待执行 0" aria-label="等待回传 0 / 正在执行 0 / 等待执行 0" aria-hidden="true">0/0/0</span>
       <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="展开菜单" aria-label="展开菜单">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
       </button>
@@ -6118,6 +6145,7 @@ const INSTALL_APP_REFRESH_INTERVAL_SEC = 60;
 const PAGE_TASK_SCHEDULER_INTERVAL_SEC = 10;
 const PAGE_TASK_SCHEDULER_INTERVAL_ENERGY_SAVER_SEC = 15;
 const PAGE_TASK_HEARTBEAT_INTERVAL_SEC = 30;
+const CLI_GET_QUEUE_STATUS_ACTIVE_INTERVAL_MS = 5000;
 const PAGE_TASK_CHAT_AUTO_RELOAD_INTERVAL_SEC = 30;
 const PAGE_TASK_VFS_INTERVAL_SEC = 30;
 const PAGE_TASK_SKILLS_WARNINGS_INTERVAL_SEC = 30;
@@ -6465,6 +6493,7 @@ let soulTidyState = {
 };
 let pageTaskSchedulerTimer = null;
 let pageTaskSchedulerTick = 0;
+let cliGetQueueStatusTimer = 0;
 let pageTaskSchedulerRunning = {
   heartbeat: false,
   chatAutoReload: false,
@@ -24570,6 +24599,20 @@ function isChatBusy(chatId) {
   return !!(cs && cs.streaming) || isChatRestorePolling(chatId);
 }
 
+function hasGlobalPendingSseResponse() {
+  for (const key in chatStreaming) {
+    if (!Object.prototype.hasOwnProperty.call(chatStreaming, key)) continue;
+    const streamState = chatStreaming[key];
+    if (streamState && streamState.streaming) return true;
+  }
+  for (const key in restorePolling) {
+    if (!Object.prototype.hasOwnProperty.call(restorePolling, key)) continue;
+    const pollState = restorePolling[key];
+    if (pollState && pollState.active) return true;
+  }
+  return false;
+}
+
 function isChatCancelling(chatId) {
   const cs = chatStreaming[chatId];
   const poll = restorePolling[chatId];
@@ -26460,6 +26503,7 @@ function stopChatRestorePolling(chatId) {
   if (!poll) return;
   if (poll.timer) clearTimeout(poll.timer);
   delete restorePolling[chatId];
+  syncCliGetQueueStatusPolling({ refreshNow: false });
   updateChatAsyncUI(chatId);
 }
 
@@ -32318,6 +32362,7 @@ async function sendCenterMessage(rawText, options) {
       sawTarget: false,
       sessionToken: streamSessionToken
     };
+    syncCliGetQueueStatusPolling();
     // Once the chat enters the async lifecycle, busy/streaming should own the UI.
     // Keeping dispatching=true for the whole SSE session incorrectly locks input
     // editing and disables the stop button, which prevents queueing follow-up
@@ -33105,6 +33150,7 @@ function finishStreamingFor(chatId) {
     streamState.sawTarget = false;
     streamState.sessionToken = '';
   }
+  syncCliGetQueueStatusPolling({ refreshNow: false });
   clearChatTaskBadgesAfterSseEnd(chatId);
   // Only update UI if this is the active chat
   if (state.activeChat === chatId) {
@@ -35395,6 +35441,7 @@ async function ensureChatRestorePolling(chatId) {
   } else {
     poll.active = true;
   }
+  syncCliGetQueueStatusPolling();
   updateChatAsyncUI(chatId);
   if (poll.running || poll.timer) return;
   const run = async () => {
@@ -42749,7 +42796,132 @@ function startStarAnim() {
 }
 
 // ===== Heartbeat Monitor =====
+const HEARTBEAT_ALERT_DURATION_MS = 10000;
 let heartbeatFailCount = 0;
+let heartbeatAlertHideTimer = 0;
+let heartbeatAlertActiveUntil = 0;
+
+function getHeartbeatAlertElements() {
+  return {
+    overlay: document.getElementById('heartbeatAlertOverlay')
+  };
+}
+
+function hideHeartbeatAlert() {
+  const { overlay } = getHeartbeatAlertElements();
+  heartbeatAlertActiveUntil = 0;
+  if (heartbeatAlertHideTimer) {
+    clearTimeout(heartbeatAlertHideTimer);
+    heartbeatAlertHideTimer = 0;
+  }
+  if (!overlay) return;
+  overlay.classList.remove('show');
+  overlay.setAttribute('aria-hidden', 'true');
+}
+
+function scheduleHeartbeatAlertHide() {
+  if (heartbeatAlertHideTimer) {
+    clearTimeout(heartbeatAlertHideTimer);
+    heartbeatAlertHideTimer = 0;
+  }
+  const remainMs = heartbeatAlertActiveUntil - Date.now();
+  if (remainMs <= 0) {
+    hideHeartbeatAlert();
+    return;
+  }
+  heartbeatAlertHideTimer = window.setTimeout(() => {
+    heartbeatAlertHideTimer = 0;
+    scheduleHeartbeatAlertHide();
+  }, remainMs);
+}
+
+function triggerHeartbeatAlert() {
+  const { overlay } = getHeartbeatAlertElements();
+  if (!overlay) return;
+  const now = Date.now();
+  heartbeatAlertActiveUntil = Math.max(heartbeatAlertActiveUntil, now) + HEARTBEAT_ALERT_DURATION_MS;
+  overlay.classList.add('show');
+  overlay.setAttribute('aria-hidden', 'false');
+  scheduleHeartbeatAlertHide();
+}
+
+function handleHeartbeatFailureAlert() {
+  triggerHeartbeatAlert();
+}
+
+function clearHeartbeatFailureAlert() {
+  hideHeartbeatAlert();
+}
+
+function getCliGetQueueStatusElement() {
+  return document.getElementById('cliGetQueueStatus');
+}
+
+function normalizeCliGetStatusCount(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num < 0) return 0;
+  return Math.floor(num);
+}
+
+function setCliGetQueueStatusVisible(visible) {
+  const el = getCliGetQueueStatusElement();
+  if (!el) return false;
+  const nextVisible = !!visible;
+  el.classList.toggle('show', nextVisible);
+  el.setAttribute('aria-hidden', nextVisible ? 'false' : 'true');
+  return nextVisible;
+}
+
+function applyCliGetQueueStatus(data) {
+  const el = getCliGetQueueStatusElement();
+  if (!el || !data || typeof data !== 'object') return;
+  const pendingPublishes = normalizeCliGetStatusCount(data.pendingPublishes);
+  const runningWorkers = normalizeCliGetStatusCount(data.runningWorkers);
+  const pendingTasks = normalizeCliGetStatusCount(data.pendingTasks);
+  const text = `${pendingPublishes}/${runningWorkers}/${pendingTasks}`;
+  const tooltip = `等待回传 ${pendingPublishes} / 正在执行 ${runningWorkers} / 等待执行 ${pendingTasks}`;
+  el.textContent = text;
+  el.setAttribute('data-tooltip', tooltip);
+  el.setAttribute('aria-label', tooltip);
+  el.removeAttribute('title');
+}
+
+function stopCliGetQueueStatusPolling() {
+  if (cliGetQueueStatusTimer) {
+    clearInterval(cliGetQueueStatusTimer);
+    cliGetQueueStatusTimer = 0;
+  }
+}
+
+async function refreshCliGetQueueStatus() {
+  if (!hasGlobalPendingSseResponse()) {
+    stopCliGetQueueStatusPolling();
+    setCliGetQueueStatusVisible(false);
+    return;
+  }
+  setCliGetQueueStatusVisible(true);
+  try {
+    const resp = await fetchExecApi('/api/heartbeat', { cache: 'no-store' });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    applyCliGetQueueStatus(data);
+  } catch {}
+}
+
+function syncCliGetQueueStatusPolling(options) {
+  const opts = options || {};
+  if (!hasGlobalPendingSseResponse()) {
+    stopCliGetQueueStatusPolling();
+    setCliGetQueueStatusVisible(false);
+    return false;
+  }
+  setCliGetQueueStatusVisible(true);
+  if (!cliGetQueueStatusTimer) {
+    cliGetQueueStatusTimer = window.setInterval(refreshCliGetQueueStatus, CLI_GET_QUEUE_STATUS_ACTIVE_INTERVAL_MS);
+  }
+  if (opts.refreshNow !== false) refreshCliGetQueueStatus();
+  return true;
+}
 
 async function checkHeartbeat() {
   const svg = document.getElementById('logoSvg');
@@ -42758,6 +42930,7 @@ async function checkHeartbeat() {
     const resp = await fetchExecApi('/api/heartbeat', { cache: 'no-store' });
     if (!resp.ok) {
       heartbeatFailCount += 1;
+      handleHeartbeatFailureAlert(`本地心跳状态接口异常：HTTP ${resp.status}`);
       if (heartbeatFailCount >= 5) {
         setLogoVisualState(logoVisualMode, 'hb-fail');
       }
@@ -42766,21 +42939,25 @@ async function checkHeartbeat() {
     const data = await resp.json();
     if (data.lastTimestamp === 0) {
       heartbeatFailCount = 0;
+      clearHeartbeatFailureAlert();
       setLogoVisualState('report', 'hb-ok');
       return;
     }
     if (data.status === 1) {
       heartbeatFailCount += 1;
+      handleHeartbeatFailureAlert();
       if (heartbeatFailCount >= 5) {
         setLogoVisualState(logoVisualMode, 'hb-fail');
       }
       return;
     }
     heartbeatFailCount = 0;
+    clearHeartbeatFailureAlert();
     if (data.status === 2) setLogoVisualState('default', 'hb-task');
     else setLogoVisualState('report', 'hb-ok');
   } catch {
     heartbeatFailCount += 1;
+    handleHeartbeatFailureAlert('本地心跳状态接口不可达，请检查页面服务是否仍在运行。');
     if (heartbeatFailCount >= 5) {
       setLogoVisualState(logoVisualMode, 'hb-fail');
     }
@@ -42877,6 +43054,7 @@ function startPageTaskScheduler() {
   if (pageTaskSchedulerTimer) clearInterval(pageTaskSchedulerTimer);
   pageTaskSchedulerTick = 0;
   runPageTask('heartbeat', checkHeartbeat);
+  syncCliGetQueueStatusPolling({ refreshNow: false });
   const schedulerInterval = getPageTaskIntervalSec('scheduler', PAGE_TASK_SCHEDULER_INTERVAL_SEC);
   pageTaskSchedulerTimer = window.setInterval(pageTaskSchedulerStep, schedulerInterval * 1000);
 }
@@ -42885,6 +43063,9 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
     refreshInstallAppIndicator();
     scheduleRefreshCronViews(0);
+    syncCliGetQueueStatusPolling();
+  } else {
+    syncCliGetQueueStatusPolling({ refreshNow: false });
   }
 });
 

@@ -118,9 +118,9 @@ public class CliPubFunction extends BaseFunction {
         @SuppressWarnings("unchecked")
         public Object execute(RedisOperations operations) {
             // 推送通道并指定超时
-            operations.opsForList().rightPush(this.tid, this.data.getBytes(StandardCharsets.UTF_8));
+            Object result = operations.opsForList().rightPush(this.tid, this.data.getBytes(StandardCharsets.UTF_8));
             operations.expire(this.tid, this.expire, TimeUnit.MILLISECONDS);
-            return null;
+            return result;
         }
     }
 
@@ -147,7 +147,7 @@ public class CliPubFunction extends BaseFunction {
         @Override
         public Object doExec() throws Exception {
             try {
-                return this.redis4event.executePipelined(new CliPubCallback(this.expire, this.data, this.tid)).getFirst();
+                return this.redis4event.execute(new CliPubCallback(this.expire, this.data, this.tid));
             } catch (Exception e) {
                 log.error(e.getMessage(), e);
                 return null;

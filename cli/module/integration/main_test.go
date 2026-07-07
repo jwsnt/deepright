@@ -33,6 +33,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -111,6 +112,173 @@ func disableIntegrationManagedRuntimeForTest(t *testing.T) {
 		integrationRuntimeGOOS = oldGOOS
 	})
 	integrationRuntimeGOOS = "windows"
+}
+
+func TestHandleHeartbeatIncludesCliGetRuntimeStatus(t *testing.T) {
+	hbMu.Lock()
+	oldTimestamp := hbLastTimestamp
+	oldStatus := hbLastStatus
+	oldError := hbLastError
+	hbMu.Unlock()
+	cliGetRuntimeMu.RLock()
+	oldTaskQueue := cliGetTaskQueue
+	oldPublishQueue := cliGetPublishQueue
+	cliGetRuntimeMu.RUnlock()
+	oldRunningWorkers := atomic.LoadInt64(&cliGetRunningWorkers)
+	cliGetActivityMu.Lock()
+	oldRecentActivity := append([]cliGetRuntimeEvent(nil), cliGetRecentActivity...)
+	cliGetActivityMu.Unlock()
+	t.Cleanup(func() {
+		hbMu.Lock()
+		hbLastTimestamp = oldTimestamp
+		hbLastStatus = oldStatus
+		hbLastError = oldError
+		hbMu.Unlock()
+		setCliGetRuntimeQueues(oldTaskQueue, oldPublishQueue)
+		setCliGetRunningWorkers(oldRunningWorkers)
+		cliGetActivityMu.Lock()
+		cliGetRecentActivity = oldRecentActivity
+		cliGetActivityMu.Unlock()
+	})
+
+	cliGetActivityMu.Lock()
+	cliGetRecentActivity = []cliGetRuntimeEvent{
+		{At: time.Now().Add(-2 * time.Second), cliGetRuntimeSnapshot: cliGetRuntimeSnapshot{PendingPublishes: 1}},
+		{At: time.Now().Add(-1500 * time.Millisecond), cliGetRuntimeSnapshot: cliGetRuntimeSnapshot{RunningWorkers: 3}},
+		{At: time.Now().Add(-1 * time.Second), cliGetRuntimeSnapshot: cliGetRuntimeSnapshot{PendingTasks: 2}},
+	}
+	cliGetActivityMu.Unlock()
+	recordHeartbeat(2, "")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/heartbeat", nil)
+	rec := httptest.NewRecorder()
+	handleHeartbeat().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var resp struct {
+		LastTimestamp    int64  `json:"lastTimestamp"`
+		Status           int    `json:"status"`
+		LastError        string `json:"lastError"`
+		PendingPublishes int    `json:"pendingPublishes"`
+		RunningWorkers   int    `json:"runningWorkers"`
+		PendingTasks     int    `json:"pendingTasks"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode heartbeat response: %v", err)
+	}
+	if resp.LastTimestamp <= 0 {
+		t.Fatalf("lastTimestamp = %d, want > 0", resp.LastTimestamp)
+	}
+	if resp.Status != 2 {
+		t.Fatalf("status = %d, want 2", resp.Status)
+	}
+	if resp.LastError != "" {
+		t.Fatalf("lastError = %q, want empty", resp.LastError)
+	}
+	if resp.PendingPublishes != 1 {
+		t.Fatalf("pendingPublishes = %d, want 1", resp.PendingPublishes)
+	}
+	if resp.RunningWorkers != 3 {
+		t.Fatalf("runningWorkers = %d, want 3", resp.RunningWorkers)
+	}
+	if resp.PendingTasks != 2 {
+		t.Fatalf("pendingTasks = %d, want 2", resp.PendingTasks)
+	}
+}
+
+func TestHandleHeartbeatDropsExpiredCliGetRuntimeEvents(t *testing.T) {
+	hbMu.Lock()
+	oldTimestamp := hbLastTimestamp
+	oldStatus := hbLastStatus
+	oldError := hbLastError
+	hbMu.Unlock()
+	cliGetRuntimeMu.RLock()
+	oldTaskQueue := cliGetTaskQueue
+	oldPublishQueue := cliGetPublishQueue
+	cliGetRuntimeMu.RUnlock()
+	oldRunningWorkers := atomic.LoadInt64(&cliGetRunningWorkers)
+	cliGetActivityMu.Lock()
+	oldRecentActivity := append([]cliGetRuntimeEvent(nil), cliGetRecentActivity...)
+	cliGetActivityMu.Unlock()
+	t.Cleanup(func() {
+		hbMu.Lock()
+		hbLastTimestamp = oldTimestamp
+		hbLastStatus = oldStatus
+		hbLastError = oldError
+		hbMu.Unlock()
+		setCliGetRuntimeQueues(oldTaskQueue, oldPublishQueue)
+		setCliGetRunningWorkers(oldRunningWorkers)
+		cliGetActivityMu.Lock()
+		cliGetRecentActivity = oldRecentActivity
+		cliGetActivityMu.Unlock()
+	})
+
+	cliGetActivityMu.Lock()
+	cliGetRecentActivity = []cliGetRuntimeEvent{
+		{At: time.Now().Add(-6 * time.Second), cliGetRuntimeSnapshot: cliGetRuntimeSnapshot{PendingPublishes: 9, RunningWorkers: 9, PendingTasks: 9}},
+		{At: time.Now().Add(-1 * time.Second), cliGetRuntimeSnapshot: cliGetRuntimeSnapshot{PendingPublishes: 2, RunningWorkers: 1, PendingTasks: 3}},
+	}
+	cliGetActivityMu.Unlock()
+	recordHeartbeat(2, "")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/heartbeat", nil)
+	rec := httptest.NewRecorder()
+	handleHeartbeat().ServeHTTP(rec, req)
+
+	var resp struct {
+		PendingPublishes int `json:"pendingPublishes"`
+		RunningWorkers   int `json:"runningWorkers"`
+		PendingTasks     int `json:"pendingTasks"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode heartbeat response: %v", err)
+	}
+	if resp.PendingPublishes != 2 || resp.RunningWorkers != 1 || resp.PendingTasks != 3 {
+		t.Fatalf("recent activity accumulation = %+v, want pendingPublishes=2 runningWorkers=1 pendingTasks=3", resp)
+	}
+}
+
+func TestHandleHeartbeatIncludesLastError(t *testing.T) {
+	hbMu.Lock()
+	oldTimestamp := hbLastTimestamp
+	oldStatus := hbLastStatus
+	oldError := hbLastError
+	hbMu.Unlock()
+	t.Cleanup(func() {
+		hbMu.Lock()
+		hbLastTimestamp = oldTimestamp
+		hbLastStatus = oldStatus
+		hbLastError = oldError
+		hbMu.Unlock()
+	})
+
+	wantError := "cli-get: heartbeat error (host=https://www.deepright.cn): heartbeat HTTP 502"
+	recordHeartbeat(1, wantError)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/heartbeat", nil)
+	rec := httptest.NewRecorder()
+	handleHeartbeat().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var resp struct {
+		Status    int    `json:"status"`
+		LastError string `json:"lastError"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode heartbeat response: %v", err)
+	}
+	if resp.Status != 1 {
+		t.Fatalf("status = %d, want 1", resp.Status)
+	}
+	if resp.LastError != wantError {
+		t.Fatalf("lastError = %q, want %q", resp.LastError, wantError)
+	}
 }
 
 func stubIntegrationReadyCheckForPID(t *testing.T, pidFile string) {

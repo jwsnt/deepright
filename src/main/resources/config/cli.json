@@ -50,7 +50,7 @@
         },
         "timeout_seconds": {
           "type": "integer",
-          "description": "Expected execution timeout in seconds. Default: ${cli.sub.timeout}."
+          "description": "Expected execution timeout in seconds. Default: ${cli.sub.timeout}, and minimum value allowed is ${cli.sub.minimum} seconds."
         },
         "target_device": {
           "type": "string",

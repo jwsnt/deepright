@@ -32,6 +32,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 	"unicode/utf8"
@@ -2019,6 +2020,9 @@ func executeTask(task *TaskContent, terminal string) *ResultPayload {
 		}
 	}
 
+	changeCliGetRunningWorkers(1)
+	defer changeCliGetRunningWorkers(-1)
+
 	var activeKey string
 	var status int
 	var output string
@@ -2380,6 +2384,7 @@ func runCliGetExecuteWorker(ctx context.Context, taskQueue <-chan queuedCliGetTa
 			case <-ctx.Done():
 				return
 			case publishQueue <- queuedCliGetPublish{result: result, metadata: item.metadata}:
+				recordCliGetRuntimeEvent(cliGetRuntimeSnapshot{PendingPublishes: 1})
 				log.Printf("cli-get: publish queued tid=%s pending=%d", strings.TrimSpace(task.Tid), len(publishQueue))
 			}
 		}
@@ -2435,6 +2440,8 @@ func startCliGet(ctx context.Context, cfg *Config) {
 	maxHeartbeatBackoff := 15 * time.Second
 	taskQueue := make(chan queuedCliGetTask, cfg.Queue)
 	publishQueue := make(chan queuedCliGetPublish, cfg.Queue)
+	setCliGetRuntimeQueues(taskQueue, publishQueue)
+	setCliGetRunningWorkers(0)
 
 	for i := 0; i < cfg.Thread; i++ {
 		go runCliGetExecuteWorker(ctx, taskQueue, publishQueue, terminal)
@@ -2446,6 +2453,7 @@ func startCliGet(ctx context.Context, cfg *Config) {
 
 	go func() {
 		defer closeHTTPClientIdleConnections(client)
+		defer resetCliGetRuntimeStatus()
 		for {
 			select {
 			case <-ctx.Done():
@@ -2479,8 +2487,9 @@ func startCliGet(ctx context.Context, cfg *Config) {
 			host := cfg.currentHost()
 			task, err := heartbeat(client, host, metadata, cfg)
 			if shouldSleepAfterHeartbeat(task, err) {
-				log.Printf("%s", formatCliGetHeartbeatError(host, err))
-				recordHeartbeat(1) // failure
+				errText := formatCliGetHeartbeatError(host, err)
+				log.Printf("%s", errText)
+				recordHeartbeat(1, errText) // failure
 				if !sleepContext(ctx, heartbeatBackoff) {
 					return
 				}
@@ -2489,15 +2498,16 @@ func startCliGet(ctx context.Context, cfg *Config) {
 			}
 			heartbeatBackoff = sleepDur
 			if task == nil {
-				recordHeartbeat(0) // success, no task
+				recordHeartbeat(0, "") // success, no task
 				continue
 			}
-			recordHeartbeat(2) // success, has task
+			recordHeartbeat(2, "") // success, has task
 			t := *task
 			select {
 			case <-ctx.Done():
 				return
 			case taskQueue <- queuedCliGetTask{task: t, metadata: metadata}:
+				recordCliGetRuntimeEvent(cliGetRuntimeSnapshot{PendingTasks: 1})
 				log.Printf("cli-get: task queued tid=%s pending=%d capacity=%d", strings.TrimSpace(t.Tid), len(taskQueue), cap(taskQueue))
 			}
 		}
@@ -5004,13 +5014,128 @@ func handleSkillsWarning(cfg *Config) http.HandlerFunc {
 var hbMu sync.Mutex
 var hbLastTimestamp int64
 var hbLastStatus int // 0=success no task, 1=failure, 2=success with task
+var hbLastError string
+
+var cliGetRuntimeMu sync.RWMutex
+var cliGetTaskQueue chan queuedCliGetTask
+var cliGetPublishQueue chan queuedCliGetPublish
+var cliGetRunningWorkers int64
+var cliGetActivityMu sync.Mutex
+
+const cliGetRuntimeAccumulationWindow = 5 * time.Second
+
+type cliGetRuntimeSnapshot struct {
+	PendingPublishes int
+	RunningWorkers   int
+	PendingTasks     int
+}
+
+type cliGetRuntimeEvent struct {
+	At time.Time
+	cliGetRuntimeSnapshot
+}
+
+func setCliGetRuntimeQueues(taskQueue chan queuedCliGetTask, publishQueue chan queuedCliGetPublish) {
+	cliGetRuntimeMu.Lock()
+	cliGetTaskQueue = taskQueue
+	cliGetPublishQueue = publishQueue
+	cliGetRuntimeMu.Unlock()
+}
+
+func snapshotCliGetRuntimeQueues() (pendingPublishes int, pendingTasks int) {
+	cliGetRuntimeMu.RLock()
+	taskQueue := cliGetTaskQueue
+	publishQueue := cliGetPublishQueue
+	cliGetRuntimeMu.RUnlock()
+	if publishQueue != nil {
+		pendingPublishes = len(publishQueue)
+	}
+	if taskQueue != nil {
+		pendingTasks = len(taskQueue)
+	}
+	return pendingPublishes, pendingTasks
+}
+
+var cliGetRecentActivity []cliGetRuntimeEvent
+
+func trimCliGetRuntimeEventsLocked(now time.Time) {
+	if len(cliGetRecentActivity) == 0 {
+		return
+	}
+	cutoff := now.Add(-cliGetRuntimeAccumulationWindow)
+	trimIndex := 0
+	for trimIndex < len(cliGetRecentActivity) && cliGetRecentActivity[trimIndex].At.Before(cutoff) {
+		trimIndex++
+	}
+	if trimIndex <= 0 {
+		return
+	}
+	cliGetRecentActivity = append([]cliGetRuntimeEvent(nil), cliGetRecentActivity[trimIndex:]...)
+}
+
+func recordCliGetRuntimeEvent(snapshot cliGetRuntimeSnapshot) {
+	if snapshot.PendingPublishes <= 0 && snapshot.RunningWorkers <= 0 && snapshot.PendingTasks <= 0 {
+		return
+	}
+	cliGetActivityMu.Lock()
+	now := time.Now()
+	trimCliGetRuntimeEventsLocked(now)
+	cliGetRecentActivity = append(cliGetRecentActivity, cliGetRuntimeEvent{
+		At:                    now,
+		cliGetRuntimeSnapshot: snapshot,
+	})
+	cliGetActivityMu.Unlock()
+}
+
+func heartbeatCliGetRuntimeSnapshot() cliGetRuntimeSnapshot {
+	cliGetActivityMu.Lock()
+	now := time.Now()
+	trimCliGetRuntimeEventsLocked(now)
+	var total cliGetRuntimeSnapshot
+	for _, item := range cliGetRecentActivity {
+		total.PendingPublishes += item.PendingPublishes
+		total.RunningWorkers += item.RunningWorkers
+		total.PendingTasks += item.PendingTasks
+	}
+	defer cliGetActivityMu.Unlock()
+	return total
+}
+
+func setCliGetRunningWorkers(count int64) {
+	atomic.StoreInt64(&cliGetRunningWorkers, count)
+}
+
+func changeCliGetRunningWorkers(delta int64) int64 {
+	count := atomic.AddInt64(&cliGetRunningWorkers, delta)
+	if delta > 0 {
+		recordCliGetRuntimeEvent(cliGetRuntimeSnapshot{RunningWorkers: int(delta)})
+	}
+	return count
+}
+
+func cliGetRunningWorkerCount() int {
+	count := atomic.LoadInt64(&cliGetRunningWorkers)
+	if count < 0 {
+		return 0
+	}
+	return int(count)
+}
+
+func resetCliGetRuntimeStatus() {
+	setCliGetRuntimeQueues(nil, nil)
+	setCliGetRunningWorkers(0)
+	cliGetActivityMu.Lock()
+	cliGetRecentActivity = nil
+	cliGetActivityMu.Unlock()
+}
 
 // recordHeartbeat records status: 0=success no task, 1=failure, 2=success with task
-func recordHeartbeat(status int) {
+func recordHeartbeat(status int, lastError string) {
 	hbMu.Lock()
 	defer hbMu.Unlock()
 	hbLastTimestamp = time.Now().UnixMilli()
 	hbLastStatus = status
+	hbLastError = strings.TrimSpace(lastError)
 }
 
 func handleHeartbeat() http.HandlerFunc {
@@ -5019,13 +5144,22 @@ func handleHeartbeat() http.HandlerFunc {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
+		snapshot := heartbeatCliGetRuntimeSnapshot()
 		hbMu.Lock()
 		resp := struct {
-			LastTimestamp int64 `json:"lastTimestamp"`
-			Status        int   `json:"status"`
+			LastTimestamp    int64  `json:"lastTimestamp"`
+			Status           int    `json:"status"`
+			LastError        string `json:"lastError"`
+			PendingPublishes int    `json:"pendingPublishes"`
+			RunningWorkers   int    `json:"runningWorkers"`
+			PendingTasks     int    `json:"pendingTasks"`
 		}{
-			LastTimestamp: hbLastTimestamp,
-			Status:        hbLastStatus,
+			LastTimestamp:    hbLastTimestamp,
+			Status:           hbLastStatus,
+			LastError:        hbLastError,
+			PendingPublishes: snapshot.PendingPublishes,
+			RunningWorkers:   snapshot.RunningWorkers,
+			PendingTasks:     snapshot.PendingTasks,
 		}
 		hbMu.Unlock()
 		w.Header().Set("Content-Type", "application/json")

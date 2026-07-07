@@ -76,7 +76,7 @@ public class CliGetFunction extends BaseFunction {
             close = System.currentTimeMillis() - start;
         }
         // 超时日志
-        if (log.isWarnEnabled() && close > (this.timeout + interval)) {
+        if (log.isWarnEnabled() && close > (this.timeout + this.interval)) {
             log.warn("The cli@get fetch the value, key={}, value={}, waiting={}", router.key(), rest, (System.currentTimeMillis() - functionContext.getWorkTask().getCreated()));
         }
         return rest;

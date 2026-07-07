@@ -13,6 +13,7 @@ import ai.deepright.safety.SafetyService;
 import ai.deepright.utils.TemplateChecker;
 import ai.deepright.workflow.worktask.MarkQueryWorkTask;
 import ai.open.right.WorkflowException;
+import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.resouce.ResourceService;
 import ai.open.right.utils.GzipUtils;
 import ai.open.right.utils.JsonUtils;
@@ -41,6 +42,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.dao.QueryTimeoutException;
+import org.springframework.data.redis.RedisSystemException;
 import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.SessionCallback;
@@ -100,11 +103,15 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
 
     protected Integer oversize;
 
+    protected Integer minimum;
+
     // 队列Key过期时间（ms），与Pub共享
     protected Integer expire;
 
     // 是否软检查
     protected Boolean safety;
+
+    protected Boolean debug;
 
     // 异步返回时的固定文案（模型需要使用）
     protected String def;
@@ -175,7 +182,7 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
             // 推送CLI任务队列到指定设备 并推送到端
             Object subRequest = new CliSubRequestExec(this.redis4event, this.interval, timeout, this.expire, router.getDevice(), JsonUtils.write(subData)).exec();
             // 需要模型可读
-            Assert.notNull(subRequest, "The response is invalid; please try a different command.");
+            Assert.notNull(subRequest, "The response is timeout, please try a different command.");
             if (waitPub) {
                 // 等待通道结果
                 Object subResponse = new CliSubResponseExec(this.redis4event, this.interval, timeout, subData.getTid()).exec();
@@ -204,6 +211,9 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
                 // 异步，固定结果
                 return this.def;
             }
+        } catch (RedisSystemException | QueryTimeoutException e) {
+            this.cliSubBlocker.block(workTask);
+            throw new WorkflowException(e, this.debug ? ProtocolCode.C500 : ProtocolCode.C915).needSilent();
         } catch (Exception e) {
             this.cliSubBlocker.block(workTask);
             throw e;
@@ -420,7 +430,7 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
         Integer timeout = this.timeout4sub;
         Integer seconds = MapUtils.getInteger(source, "timeout_seconds");
         if (seconds != null && seconds > 0) {
-            timeout = Math.min(seconds, this.timeout4sub);
+            timeout = Math.min(Math.max(this.minimum, seconds), this.timeout4sub);
         }
         return (int) TimeUnit.MILLISECONDS.convert(timeout, TimeUnit.SECONDS);
     }
@@ -509,9 +519,9 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
         @SuppressWarnings("unchecked")
         public Object execute(RedisOperations operations) {
             // 推送CLI任务队列到指定设备 并推送到端
-            operations.opsForList().rightPush(this.device, this.data.getBytes(StandardCharsets.UTF_8));
+            Object result = operations.opsForList().rightPush(this.device, this.data.getBytes(StandardCharsets.UTF_8));
             operations.expire(this.device, this.expire, TimeUnit.MILLISECONDS);
-            return null;
+            return result;
         }
     }
 
@@ -534,6 +544,11 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
         public Object doExec() throws Exception {
             try {
                 return this.redis4event.opsForList().leftPop(this.tid, this.interval, TimeUnit.MILLISECONDS);
+            } catch (RedisSystemException e) {
+                if (log.isInfoEnabled()) {
+                    log.info(e.getMessage());
+                }
+                return null;
             } catch (Exception e) {
                 WorkflowException.dolog(e);
                 return null;
@@ -562,7 +577,7 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
         @Override
         public Object doExec() throws Exception {
             try {
-                return this.redis4event.executePipelined(new CliSubRequestCallable(this.expire, this.device, this.data)).getFirst();
+                return this.redis4event.execute(new CliSubRequestCallable(this.expire, this.device, this.data));
             } catch (Exception e) {
                 WorkflowException.dolog(e);
                 return null;
@@ -624,6 +639,10 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
         @Value("${cli.sub.oversize:51200}")
         protected Integer oversize;
 
+        // 最小超时时间
+        @Value("${cli.sub.minimum:60}")
+        protected Integer minimum;
+
         // 与Pub共享的队列超时
         @Value("${cli.expire:300000}")
         protected Integer expire;
@@ -631,6 +650,9 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
         // 是否使用软件检查
         @Value("${cli.safety:false}")
         protected Boolean safety;
+
+        @Value("${debug:false}")
+        protected Boolean debug;
 
         // 不等待结果时的返回
         @Value("${cli.def:SUCCESS}")
