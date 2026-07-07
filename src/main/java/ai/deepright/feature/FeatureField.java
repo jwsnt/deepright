@@ -36,6 +36,8 @@ public interface FeatureField {
 
     public static final String KEY_AGENTID = "agentId";
 
+    public static final String KEY_VERIFY = "verify";
+
     // 后台进程（刷新知识库或Task等）
     public static final String KEY_DAEMON = "daemon";
 

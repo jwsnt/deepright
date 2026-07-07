@@ -40,6 +40,10 @@
         {
           "prefix": "[plan-update]",
           "name": "plan@update"
+        },
+        {
+          "prefix": "[plan-delete]",
+          "name": "plan@delete"
         }
       ]
     },

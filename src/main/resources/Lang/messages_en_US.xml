@@ -38,4 +38,5 @@
     <entry key="token.chat">对话</entry>
     <entry key="plan.create">[正在制定规划]</entry>
     <entry key="plan.update">[正在更新规划]</entry>
+    <entry key="plan.delete">[正在重置规划]</entry>
 </properties>

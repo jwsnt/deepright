@@ -51,8 +51,6 @@ public class LogicVerifyAssistant extends DefaultAssistant {
 
     public static final String WORKFLOW_NAME = "logic";
 
-    public static final String KEY_VERIFY = "verify";
-
     protected Set<String> excludedProvider = new HashSet<String>();
 
     protected ResourceService resourceService;
@@ -128,7 +126,7 @@ public class LogicVerifyAssistant extends DefaultAssistant {
     protected Boolean skipLogic(WorkflowConfig workflowConfig, WorkflowTask workTask) throws Exception {
         // Verify不是True（默认False）一律跳过
         // 如果为True，当属于Task、后台任务、供应商不支持或到达最大次数 任一条件触发时也跳过
-        return !MapUtils.getBoolean(workTask.getMetadata(), LogicVerifyAssistant.KEY_VERIFY, false) || FeatureFlag.isTask(workTask) || FeatureFlag.isDaemon(workTask) || this.excludedProvider.contains(workTask.getMetadata(ProviderRequestService.KEY_PROVIDER, String.class)) || this.isMaxTime(workflowConfig, workTask);
+        return !FeatureFlag.isVerify(workTask) || FeatureFlag.isTask(workTask) || FeatureFlag.isDaemon(workTask) || this.excludedProvider.contains(workTask.getMetadata(ProviderRequestService.KEY_PROVIDER, String.class)) || this.isMaxTime(workflowConfig, workTask);
     }
 
     protected Boolean isMaxTime(WorkflowConfig workflowConfig, WorkflowTask workTask) throws Exception {

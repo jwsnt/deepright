@@ -1,5 +1,6 @@
 package ai.deepright.plan;
 
+import ai.deepright.feature.FeatureFlag;
 import ai.deepright.llm.provider.RequestContextBuilder;
 import ai.open.right.resouce.ResourceService;
 import ai.open.right.workflow.flow.llm.rag.RagCondition;
@@ -36,20 +37,28 @@ public class PlanRag extends RagCondition implements RagService {
 
     protected ResourceService resourceService;
 
+    protected String template4appendVerify;
+
+    protected String template4updateVerify;
+
+    protected String template4appendShort;
+
     protected String template4create;
 
     protected String template4update;
 
-    protected String template4append;
-
     @PostConstruct
     public void init() throws Exception {
+        this.template4updateVerify = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4updateVerify).openStream()), StandardCharsets.UTF_8);
+        this.template4appendVerify = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4appendVerify).openStream()), StandardCharsets.UTF_8);
+        this.template4appendShort = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4appendShort).openStream()), StandardCharsets.UTF_8);
         this.template4create = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4create).openStream()), StandardCharsets.UTF_8);
         this.template4update = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4update).openStream()), StandardCharsets.UTF_8);
-        this.template4append = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4append).openStream()), StandardCharsets.UTF_8);
+        Assert.hasText(this.template4updateVerify, "The plan update verify template can not be empty");
+        Assert.hasText(this.template4appendVerify, "The plan append verify template can not be empty");
+        Assert.hasText(this.template4appendShort, "The plan append short template can not be empty");
         Assert.hasText(this.template4create, "The plan create template can not be empty");
         Assert.hasText(this.template4update, "The plan update template can not be empty");
-        Assert.hasText(this.template4append, "The plan append template can not be empty");
     }
 
     @Override
@@ -62,8 +71,8 @@ public class PlanRag extends RagCondition implements RagService {
             String plan = PlanUtils.fetchPlan(ragData.getQuery());
             if (!StringUtils.isEmpty(plan)) {
                 // 提示更新
-                History assistant = RequestContextBuilder.buildContext(ragData.getRequest(), this.template4update.replace("#plan", plan), History.ROLE_ASSISTANT, PlanUtils.fetchTime(ragData.getQuery()));
-                History user = RequestContextBuilder.buildContext(ragData.getRequest(), this.template4append, assistant.getCreated() + RequestContextBuilder.NEXT);
+                History assistant = RequestContextBuilder.buildContext(ragData.getRequest(), this.template4update.replace("#verify", FeatureFlag.isVerify(ragData.getQuery()) ? this.template4updateVerify : "").replace("#plan", plan), History.ROLE_ASSISTANT, PlanUtils.fetchTime(ragData.getQuery()));
+                History user = RequestContextBuilder.buildContext(ragData.getRequest(), FeatureFlag.isVerify(ragData.getQuery()) ? this.template4appendVerify : this.template4appendShort, assistant.getCreated() + RequestContextBuilder.NEXT);
                 ragData.getRequest().getMessage().getHistories().addAll(List.of(assistant, user));
             } else {
                 // 提示创建（Gemini特殊处理）
@@ -81,14 +90,20 @@ public class PlanRag extends RagCondition implements RagService {
         @Autowired
         protected ResourceService resourceService;
 
-        @Value("${plan.rag.template.create:classpath:config/plan/create.md}")
-        protected String template4create;
+        @Value("${plan.rag.template.append.verify:classpath:config/plan/append_verify.md}")
+        protected String template4appendVerify;
+
+        @Value("${plan.rag.template.update.verify:classpath:config/plan/update_verify.md}")
+        protected String template4updateVerify;
+
+        @Value("${plan.rag.template.append.short:classpath:config/plan/append_short.md}")
+        protected String template4appendShort;
 
         @Value("${plan.rag.template.update:classpath:config/plan/update.md}")
         protected String template4update;
 
-        @Value("${plan.rag.template.update:classpath:config/plan/append.md}")
-        protected String template4append;
+        @Value("${plan.rag.template.create:classpath:config/plan/create.md}")
+        protected String template4create;
 
         @Bean(PlanRag.RAG_KEY)
         @ConditionalOnMissingBean(name = PlanRag.RAG_KEY)

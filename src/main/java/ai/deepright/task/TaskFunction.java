@@ -454,7 +454,7 @@ public class TaskFunction extends BaseFunction implements TaskResult {
     protected void finishAndClean(WorkflowTask workTask, TaskSync syncTask) throws Exception {
         this.notify(workTask, syncTask.getTargetDevice(), MultiSourceFlag.KEY_CLOSE, TaskFunction.LANG_KEY_CLOSE);
         // 结束前清理任务Plan
-        String plan = PlanUtils.cleanPlan(workTask, syncTask.getTargetDevice().key());
+        String plan = PlanUtils.deletePlan(workTask, syncTask.getTargetDevice().key());
         if (!StringUtils.isEmpty(plan) && log.isInfoEnabled()) {
             log.info("The task clean the plan");
         }

@@ -79,6 +79,10 @@ public class FeatureFlag {
         }
     }
 
+    public static Boolean isVerify(WorkflowTask workTask) throws Exception {
+        return MapUtils.getBoolean(workTask.getMetadata(), FeatureField.KEY_VERIFY, false);
+    }
+
     // 与cli.go/get请求一致，{"sys": runtime.GOOS}，据此判断是否为Windows
     public static Boolean isWindows(WorkflowTask workTask) throws Exception {
         return FeatureFlag.isWindows(StringUtils.trim(MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_SYS)));

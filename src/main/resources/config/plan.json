@@ -68,6 +68,24 @@
       "name": "fun_plan_update"
     }
   },
+  "delete": {
+    "assistant": "def-function",
+    "funCall": {
+      "description": "Delete plan immediately",
+      "properties": {
+        "why_do_this": {
+          "type": "string",
+          "description": "Brief reasoning for executing this command. Must retain granular data and operational logs for process summarization. The more granular, the better."
+        }
+      },
+      "required": [
+        "why_do_this"
+      ]
+    },
+    "function": {
+      "name": "fun_plan_delete"
+    }
+  },
   "config": {
     "llm": {
       "global": {

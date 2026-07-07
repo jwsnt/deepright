@@ -9615,7 +9615,7 @@ func runServe(opts serveOptions) {
 		log.Printf("browser opened maximized: %s", browserURL)
 	}()
 
-	if err := http.ListenAndServe(addr, sharedutil.WithLocalCORS(mux)); err != nil {
+	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatalf("server failed: %v", err)
 	}
 }

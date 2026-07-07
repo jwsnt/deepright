@@ -13721,7 +13721,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	defer stop()
 	shutdownController := newIntegrationShutdownController(stop, nil)
 	mux.HandleFunc("/api/shutdown", handleShutdown(shutdownController))
-	server := &http.Server{Handler: withStandaloneAPIProtection(sharedutil.WithLocalCORS(mux), &cfg)}
+	server := &http.Server{Handler: withStandaloneAPIProtection(mux, &cfg)}
 	defer func() {
 		if removed, err := cleanupStartupPIDFiles(pidFile); err != nil {
 			log.Printf("serve cleanup startup pid files failed: %v", err)

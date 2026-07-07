@@ -33,15 +33,22 @@ public class PlanUtils {
 
     public static final Double DISTANCE = 0.7;
 
+    public static String fetchKey(WorkflowTask workTask, String key) throws Exception {
+        return PlanUtils.KEY_PLAN + StringUtils.defaultIfEmpty(MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_ROUTER_UPSTREAM), key);
+    }
+
+    public static String fetchKey(WorkflowTask workTask) throws Exception {
+        return PlanUtils.fetchKey(workTask, RouterDevice.key(workTask));
+    }
+
     public static String fetchPlan(WorkflowTask workTask) throws Exception {
         // 如果是Task任务则添加后缀
-        String key = PlanUtils.KEY_PLAN + StringUtils.defaultIfEmpty(MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_ROUTER_UPSTREAM), RouterDevice.key(workTask));
-        return workTask.getUserContext().getMetadata(key, String.class);
+        return workTask.getUserContext().getMetadata(PlanUtils.fetchKey(workTask), String.class);
     }
 
     public static Long fetchTime(WorkflowTask workTask) throws Exception {
         // 如果是Task任务则添加后缀
-        String key = PlanUtils.KEY_PLAN + StringUtils.defaultIfEmpty(MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_ROUTER_UPSTREAM), RouterDevice.key(workTask));
+        String key = PlanUtils.fetchKey(workTask);
         Long time = workTask.getUserContext().getMetadata(key + PlanUtils.KEY_PLAN_TIME, Long.class);
         workTask.getUserContext().putMetadata(key + PlanUtils.KEY_PLAN_TIME, time = time != null ? time : System.currentTimeMillis());
         return time;
@@ -50,25 +57,29 @@ public class PlanUtils {
     // 为当前Router存储规划
     public static String storePlan(WorkflowTask workTask, String plan) throws Exception {
         // 追加当前Router在跨Task时不冲突
-        String key = PlanUtils.KEY_PLAN + RouterDevice.key(workTask);
+        String key = PlanUtils.fetchKey(workTask);
         workTask.getUserContext().putMetadata(key, PlanEncode.replace(plan));
         workTask.getUserContext().delMetadata(key + PlanUtils.KEY_PLAN_TIME, Long.class);
         return key;
     }
 
-    public static String cleanPlan(WorkflowTask workTask, String key) throws Exception {
-        String disable = PlanUtils.KEY_PLAN_DISABLE + StringUtils.defaultIfEmpty(MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_ROUTER_UPSTREAM), key);
-        String store = PlanUtils.KEY_PLAN + StringUtils.defaultIfEmpty(MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_ROUTER_UPSTREAM), key);
-        workTask.getUserContext().getMetadata().remove(disable + PlanUtils.KEY_PLAN_TIME);
+    public static String deletePlan(WorkflowTask workTask, String key) throws Exception {
+        String store = PlanUtils.fetchKey(workTask, key);
+        String disable = PlanUtils.KEY_PLAN_DISABLE + store;
+        String deleted = String.class.cast(workTask.getUserContext().getMetadata().remove(store));
+        workTask.getUserContext().getMetadata().remove(store + PlanUtils.KEY_PLAN_TIME);
         workTask.getUserContext().getMetadata().remove(disable);
-        return String.class.cast(workTask.getUserContext().getMetadata().remove(store));
+        return deleted;
+    }
+
+    public static String deletePlan(WorkflowTask workTask) throws Exception {
+        return PlanUtils.deletePlan(workTask, RouterDevice.key(workTask));
     }
 
     // 是否需要规划
     public static Boolean shouldPlan(WorkflowTask workTask) throws Exception {
         // 标记
-        String key = PlanUtils.KEY_PLAN_DISABLE + StringUtils.defaultIfEmpty(MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_ROUTER_UPSTREAM), RouterDevice.key(workTask));
-        if (MapUtils.getBoolean(workTask.getUserContext().getMetadata(), key, false)) {
+        if (MapUtils.getBoolean(workTask.getUserContext().getMetadata(), PlanUtils.KEY_PLAN_DISABLE + PlanUtils.fetchKey(workTask), false)) {
             return false;
         }
         // 未标记
@@ -82,8 +93,7 @@ public class PlanUtils {
     }
 
     public static void disablePlan(WorkflowTask workTask) throws Exception {
-        String key = PlanUtils.KEY_PLAN_DISABLE + StringUtils.defaultIfEmpty(MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_ROUTER_UPSTREAM), RouterDevice.key(workTask));
-        workTask.getUserContext().putMetadata(key, true);
+        workTask.getUserContext().putMetadata(PlanUtils.KEY_PLAN_DISABLE + PlanUtils.fetchKey(workTask), true);
     }
 
     // 通过PlanPattern替换Content中的所有匹配内容
