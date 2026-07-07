@@ -65,10 +65,8 @@ public class PlanUtils {
 
     public static String deletePlan(WorkflowTask workTask, String key) throws Exception {
         String store = PlanUtils.fetchKey(workTask, key);
-        String disable = PlanUtils.KEY_PLAN_DISABLE + store;
         String deleted = String.class.cast(workTask.getUserContext().getMetadata().remove(store));
         workTask.getUserContext().getMetadata().remove(store + PlanUtils.KEY_PLAN_TIME);
-        workTask.getUserContext().getMetadata().remove(disable);
         return deleted;
     }
 

@@ -51,8 +51,8 @@ public class PlanDeleteFunction extends BaseFunction {
     @Override
     public Object call(FunctionContext functionContext) throws Exception {
         WorkflowTask workTask = functionContext.getWorkTask().printQuery();
-        if (StringUtils.isEmpty(PlanUtils.deletePlan(workTask)) && log.isErrorEnabled()) {
-            log.error("The expected plan was not deleted.");
+        if (StringUtils.isEmpty(PlanUtils.deletePlan(workTask)) && log.isWarnEnabled()) {
+            log.warn("The expected plan was not deleted.");
         }
         this.notify(workTask);
         return this.buildAnswer(workTask);

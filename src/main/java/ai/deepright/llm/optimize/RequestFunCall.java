@@ -111,7 +111,7 @@ public class RequestFunCall {
     }
 
     protected Boolean shouldPlanUpdate(ProviderRequest providerRequest, LLMConfig llmConfig, LLMQuery llmQuery, String funcall) throws Exception {
-        if (StringUtils.equalsIgnoreCase(funcall, "plan@update")) {
+        if (StringUtils.equalsIgnoreCase(funcall, "plan@update") || StringUtils.equalsIgnoreCase(funcall, "plan@delete")) {
             // 有规划
             return !StringUtils.isEmpty(PlanUtils.fetchPlan(providerRequest.getMessage()));
         } else {

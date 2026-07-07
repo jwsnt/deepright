@@ -1,4 +1,5 @@
 ### 响应格式
++ 结论优先、用词简洁
 + 使用结构化的HTML，数据以表格展示
 ``` 支持结构
 + 文本结构：div section article p span br hr
