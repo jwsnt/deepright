@@ -202,7 +202,7 @@ http://127.0.0.1:9876/site/
 - 输入框区域的 `打开 Agent 目录` 按钮会复用同一套目录确认浮层，但不会额外打开或关闭设置浮层
 - 左侧虚拟文件系统中的 `打开目录` 按钮会直接打开当前目录，不会额外弹出设置浮层
 - **模型与密钥**：至少配置一组
-  - 可选模型：deepright、deepseek、bigmodel、gemini、openai、anthropic、kimi、minimax、qwen、xiaomi
+  - 可选模型：deepright、seedream、deepseek、bigmodel、gemini、openai、anthropic、kimi、minimax、qwen、xiaomi
   - 密钥：密码输入框，最长 250 位，点击小眼睛图标可切换明文/密文
   - 同一模型不可重复配置
   - 添加或修改模型时，当前已配置的其它模型会自动从下拉列表中移除；即使密钥错误，也不会重复出现在候选列表里
@@ -258,8 +258,24 @@ http://127.0.0.1:9876/site/
 - 已保存模型的删除动作通过 `/api/config` 单独持久化；保存按钮继续负责批量新增或更新当前剩余模型
 - 页面本地仅保存 `agentId`，不再把模型密钥落到浏览器 localStorage
 
+Seedream 特殊说明：
+
+- `seedream` 可以在设置里的 `模型与密钥` 中正常配置
+- 但 `seedream` 不会出现在居中会话输入框的模型选择列表中，不能作为主聊天模型直接选择
+- `seedream` 也不会出现在右侧备忘录输入框的模型选择列表中，不能作为备忘录执行模型直接选择
+- `seedream` 同样不会出现在插件浮层的模型选择列表中，不能作为插件运行模型直接选择
+- Seedream 的能力改为通过内部技能 `__internal_seedream` 暴露，而不是把 `seedream` 当成普通对话模型直接使用
+- 这个内部技能只会在 Seedream 已完成可用配置时出现；未配置完成时，前端 `@技能` 菜单、后端 `/api/skills`、转发 `/v1/chat/completions` 的 `metadata.agents[].skills` 以及 `cli/get` 的 `metadata.agents[].skills` 都不会上报它
+- 可用配置的判定以 `integration token --provider seedream` 为准：必须拿到可用 `token`，并且 `__url` 与 `__model_multi_output` 在显式配置或默认值补全后都有效
+
 默认客户化配置如下：
 
+- `seedream`
+  - `__url=https://ark.cn-beijing.volces.com/api/v3/images/generations`
+  - `__url` 可编辑，默认值为上面的地址
+  - 支持填写 `__url`、`__model_multi_output`
+  - `__model_multi_output=doubao-seedream-4.5`
+  - 不支持 `__model`、`__model_fast`、`__model_thinking`、`__model_multi_input`
 - `deepseek`
   - `__url=https://api.deepseek.com/chat/completions`
   - `__model=deepseek-v4-flash`
@@ -705,6 +721,9 @@ http://127.0.0.1:9876/site/
 - 每个会话右侧 CLI 子面板最多展示最近 100 条独立响应气泡
 - 页面展示最近 500 条，向上滚动时惰性加载历史消息
 - 会话、草稿、主题等页面状态保存在浏览器 localStorage 中
+- 当本地存储空间紧张时，页面会优先移除已完成 assistant 消息中仅用于恢复的 `rawSse` 原始流记录，再逐步裁剪 CLI 子面板历史与较旧的会话消息窗口
+- 如果压缩后仍可成功落盘，会提示 `本地存储空间不足，已仅保存最近部分会话历史`
+- 如果经过多轮压缩后仍然无法写入，会提示 `本地存储已满，新的会话历史暂未保存`
 - 模型与密钥保存在服务端 `/api/token` 对应的 SQLite `token_store` 表中
 - `token_store` 中每条模型记录除了 `token` 外，还会额外保存 `__url`、`__model`、`__model_fast`、`__model_thinking`、`__model_multi_input`、`__model_multi_output`
 
@@ -773,6 +792,7 @@ Header 中 `Authorization` 为对应模型的密钥。
 - 浏览器需支持 Fetch API 和 ReadableStream
 - 已展示远程图片的离线/失效回显依赖浏览器本地缓存能力，当前实现优先使用 `Service Worker + Cache Storage`，并补充 `IndexedDB` 作为刷新后的持久回退
 - 清除浏览器 localStorage 会丢失本地会话、主题和当前 Agent 选择，但不会删除服务端已保存的模型密钥
+- 如果历史会话较多且浏览器站点配额较紧，页面可能只保留最近一部分本地会话历史；该行为优先牺牲 `rawSse` 与较旧历史，而不是优先牺牲当前可见会话内容
 
 ## 迭代更新汇总（20260502-20260530）
 
@@ -1269,3 +1289,17 @@ Header 中 `Authorization` 为对应模型的密钥。
 - 此时模型配置整体进入只读态：不允许新增模型、不允许删除模型，也不允许修改或保存客户化配置
 - 客户化配置区仍可展开查看，但只保留只读展示，不再提供 `重置`、`清空`、`保存` 等写操作入口
 - 插件浮层在非本机访问下会隐藏全部插件参数，并禁用 `启动 / 重启` 与 `关闭`，只保留日志查看能力
+
+---
+
+## 迭代 20260708-2：Seedream 特殊模型与技能上报
+
+本次迭代把 `seedream` 调整为“可配置但不可直接选用”的特殊模型，并同步收紧了对应技能的上报规则。
+
+- `seedream` 仍然可以在设置中的 `模型与密钥` 里配置，用于保存 `token`、`__url` 与 `__model_multi_output`
+- 但它不会出现在居中输入框、右侧备忘录输入框和插件浮层中的模型选择列表里，不能作为普通聊天模型直接选中
+- 系统不再对外使用容易冲突的 `image-seedream` 名称，统一改为内部技能名 `__internal_seedream`
+- `__internal_seedream` 只有在 Seedream 已具备可用配置时才会上报；判断方式以 `integration token --provider seedream` 为准
+- 可用配置要求：`token` 必须真实存在，`__url` 与 `__model_multi_output` 则允许使用系统默认值补全
+- 满足条件后，`__internal_seedream` 才会同时出现在 `/api/skills`、前端 `@技能` 菜单、转发 `/v1/chat/completions` 的 `metadata.agents[].skills` 以及 `cli/get` 的 `metadata.agents[].skills`
+- 如果 Seedream 尚未配置完成，上述所有链路都不会暴露 `__internal_seedream`

@@ -120,7 +120,7 @@ public class TaskFunction extends BaseFunction implements TaskResult {
         Assert.hasText(this.template4artifact, "The template artifact must not be empty");
         Assert.hasText(this.template4answer, "The template answer must not be empty");
         Assert.notEmpty(this.responseSchema, "The response schema can not be empty");
-        Assert.hasText(this.template4async, "The template asnyc must not be empty");
+        Assert.hasText(this.template4async, "The template async must not be empty");
         Assert.hasText(this.template4query, "The template query must not be empty");
         Assert.hasText(this.template4error, "The template error must not be empty");
         this.timeout = (int) TimeUnit.MILLISECONDS.convert(this.timeout, TimeUnit.SECONDS);
@@ -570,7 +570,6 @@ public class TaskFunction extends BaseFunction implements TaskResult {
             return this.targetDevice.getDevice();
         }
     }
-
 
     @Builder
     @Getter

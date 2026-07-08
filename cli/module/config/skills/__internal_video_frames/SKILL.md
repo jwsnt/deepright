@@ -1,5 +1,5 @@
 ---
-name: video-frames
+name: __internal_video_frames
 description: 视频帧快照、位置和轨迹提取
 ---
 

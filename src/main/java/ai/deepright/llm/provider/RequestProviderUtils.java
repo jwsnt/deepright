@@ -1,8 +1,8 @@
 package ai.deepright.llm.provider;
 
+import ai.deepright.feature.FeatureUtils;
 import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.llm.LLMQueryService;
-import ai.deepright.feature.FeatureUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.LinkedHashMap;
@@ -49,12 +49,15 @@ public class RequestProviderUtils {
 
     // 是否为多模态模型
     public static Boolean isMultiOutputModel(WorkflowTask workTask) throws Exception {
-        String provider = RequestProviderUtils.findProvider(workTask);
+        return RequestProviderUtils.isMultiOutputModel(RequestProviderUtils.findProvider(workTask));
+    }
+
+    public static Boolean isMultiOutputModel(String provider) throws Exception {
         // 为空，或者为Gemini或Vertex
         return StringUtils.isEmpty(provider) ||
                 (
-                        StringUtils.equalsIgnoreCase(provider, LLMQueryService.LLM_GEMINI) ||
-                        StringUtils.equalsIgnoreCase(provider, LLMQueryService.LLM_VERTEX)
+                    StringUtils.equalsIgnoreCase(provider, LLMQueryService.LLM_GEMINI) ||
+                    StringUtils.equalsIgnoreCase(provider, LLMQueryService.LLM_VERTEX)
                 );
     }
 

@@ -121,11 +121,11 @@ a{color:var(--accent);text-decoration:none}
 /* Sidebar */
 .sidebar-header,.right-sidebar-header{padding:16px 20px;display:flex;align-items:center;gap:10px}
 .logo{font-size:20px;font-weight:700;color:var(--accent)}
-.cli-get-queue-status{display:none;align-items:center;justify-content:center;flex:0 0 auto;min-width:58px;height:28px;padding:0 10px;border-radius:999px;border:1px solid color-mix(in srgb,var(--border) 88%,var(--accent) 12%);background:linear-gradient(180deg,rgba(255,255,255,.8),rgba(232,240,255,.86));box-shadow:0 8px 18px rgba(77,107,254,.08),inset 0 1px 0 rgba(255,255,255,.88);color:var(--text-secondary);font-size:11px;font-weight:800;letter-spacing:.04em;line-height:1;white-space:nowrap;user-select:none;position:relative;transform:translateY(10px)}
+.cli-get-queue-status{display:none;align-items:center;justify-content:center;flex:0 0 auto;min-width:58px;height:28px;padding:0 10px;border-radius:999px;border:1px solid color-mix(in srgb,var(--border) 88%,var(--accent) 12%);background:linear-gradient(180deg,rgba(255,255,255,.8),rgba(232,240,255,.86));box-shadow:0 8px 18px rgba(77,107,254,.08),inset 0 1px 0 rgba(255,255,255,.88);color:var(--text-secondary);font-size:11px;font-weight:800;letter-spacing:.04em;line-height:1;white-space:nowrap;user-select:none;position:relative}
 .cli-get-queue-status.show{display:inline-flex}
 .cli-get-queue-status::before,.cli-get-queue-status::after{position:absolute;left:50%;pointer-events:none;opacity:0;transition:opacity .06s ease,transform .06s ease}
-.cli-get-queue-status::before{content:attr(data-tooltip);bottom:calc(100% + 9px);transform:translate(-50%,3px);padding:4px 8px;border-radius:8px;background:rgba(23,30,48,.96);box-shadow:0 10px 22px rgba(7,12,24,.26);color:#f5f8ff;font-size:10px;line-height:1.2;font-weight:600;letter-spacing:.01em;white-space:nowrap;z-index:12}
-.cli-get-queue-status::after{content:'';bottom:calc(100% + 4px);transform:translate(-50%,3px);border:5px solid transparent;border-top-color:rgba(23,30,48,.96);z-index:11}
+.cli-get-queue-status::before{content:attr(data-tooltip);top:calc(100% + 9px);transform:translate(-50%,-3px);padding:4px 8px;border-radius:8px;background:rgba(23,30,48,.96);box-shadow:0 10px 22px rgba(7,12,24,.26);color:#f5f8ff;font-size:10px;line-height:1.2;font-weight:600;letter-spacing:.01em;white-space:nowrap;z-index:12}
+.cli-get-queue-status::after{content:'';top:calc(100% + 4px);transform:translate(-50%,-3px);border:5px solid transparent;border-bottom-color:rgba(23,30,48,.96);z-index:11}
 .cli-get-queue-status:hover::before,.cli-get-queue-status:hover::after,.cli-get-queue-status:focus-visible::before,.cli-get-queue-status:focus-visible::after{opacity:1;transform:translate(-50%,0)}
 .logo-svg{flex-shrink:0;color:var(--accent);cursor:pointer;transition:color .24s ease,filter .24s ease,transform .24s ease,opacity .24s ease}
 .logo-svg:focus-visible{outline:none;transform:translateY(-1px)}
@@ -169,7 +169,7 @@ a{color:var(--accent);text-decoration:none}
 .sidebar.collapsed .sidebar-toggle.has-chat-completion-beacon svg{filter:drop-shadow(0 0 6px var(--completion-beacon-glow-strong))}
 [data-theme="dark"] .cli-get-queue-status{border-color:rgba(143,175,255,.22);background:linear-gradient(180deg,rgba(18,35,70,.96),rgba(11,24,49,.94));box-shadow:0 10px 20px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.06);color:#dce7ff}
 [data-theme="dark"] .cli-get-queue-status::before{background:rgba(10,14,24,.96);box-shadow:0 12px 24px rgba(0,0,0,.34);color:#f7f9ff}
-[data-theme="dark"] .cli-get-queue-status::after{border-top-color:rgba(10,14,24,.96)}
+[data-theme="dark"] .cli-get-queue-status::after{border-bottom-color:rgba(10,14,24,.96)}
 @keyframes leftSidebarCompletionBeacon{0%,100%{box-shadow:0 0 0 1px var(--completion-beacon-bg),0 0 0 rgba(0,0,0,0);filter:brightness(.96)}50%{box-shadow:0 0 0 1px var(--completion-beacon-ring),0 0 22px var(--completion-beacon-glow-strong),0 0 34px var(--completion-beacon-glow);filter:brightness(1.22)}}
 .top-action-cluster{position:relative;display:flex;align-items:center;gap:8px;margin:8px 16px;min-height:48px;isolation:isolate;z-index:6}
 .chat-list{transition:filter .26s ease,opacity .26s ease}
@@ -790,6 +790,13 @@ animation:queuedInsertExplosion .62s ease-out both}
 .message.user .md-content pre code{display:block;min-width:max-content;background:none;padding:0;white-space:pre;overflow-wrap:normal;word-break:normal}
 .message.user .md-content a{color:#fff;text-decoration:underline}
 .message.assistant{background:linear-gradient(155deg,color-mix(in srgb,var(--glass-surface-strong) 85%,transparent),color-mix(in srgb,var(--glass-surface) 68%,transparent));border:1px solid color-mix(in srgb,var(--glass-edge-strong) 58%,transparent);align-self:flex-start;border-bottom-left-radius:10px}
+.message.assistant.message-structured-result{backdrop-filter:none;-webkit-backdrop-filter:none;background:linear-gradient(180deg,rgba(252,253,255,.96),rgba(244,247,255,.94));border-color:rgba(107,132,186,.22);box-shadow:0 18px 40px rgba(41,69,145,.09),inset 0 1px 0 rgba(255,255,255,.78)}
+.message.assistant.message-structured-result::before{display:none}
+.message.assistant.message-structured-result .message-table-shell{padding:10px;border-radius:18px;background:rgba(255,255,255,.76);border:1px solid rgba(107,132,186,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.62)}
+.message.assistant.message-structured-result .message-table-shell > .table-scroll{margin:0;border-radius:12px}
+.message.assistant.message-structured-result .md-content td{background:rgba(255,255,255,.82)}
+.message.assistant.message-structured-result .md-content th{background:rgba(235,241,255,.96)}
+.message.assistant.message-structured-result .md-content .deepright-response{background:rgba(255,255,255,.88);box-shadow:none}
 .message.assistant .md-content{word-break:break-word;overflow-wrap:anywhere;min-width:0}
 [data-theme="light"] .message.user{background:linear-gradient(160deg,rgba(144,208,235,.92),rgba(160,219,242,.84) 56%,rgba(208,240,251,.66));color:#143152;border-color:rgba(255,255,255,.36);box-shadow:0 18px 42px rgba(75,136,170,.1),inset 0 1px 0 rgba(255,255,255,.3)}
 [data-theme="light"] .message.user::before{background:linear-gradient(180deg,rgba(255,255,255,.28),rgba(255,255,255,0));opacity:.62}
@@ -803,6 +810,11 @@ animation:queuedInsertExplosion .62s ease-out both}
 [data-theme="light"] .message.user .md-content .katex-display{background:rgba(255,255,255,.18);border-color:rgba(20,49,82,.1)}
 [data-theme="light"] .message.assistant{background:linear-gradient(155deg,rgba(250,252,255,.9),rgba(238,244,255,.82) 58%,rgba(229,238,255,.76));border-color:rgba(107,132,186,.24);box-shadow:0 22px 56px rgba(41,69,145,.1),inset 0 1px 0 rgba(255,255,255,.74)}
 [data-theme="light"] .message.assistant::before{background:linear-gradient(180deg,rgba(255,255,255,.56),rgba(255,255,255,0));opacity:.58}
+[data-theme="dark"] .message.assistant.message-structured-result{background:linear-gradient(180deg,rgba(12,22,40,.96),rgba(10,19,35,.92));border-color:rgba(169,190,227,.18);box-shadow:0 20px 44px rgba(0,0,0,.32),inset 0 1px 0 rgba(255,255,255,.06)}
+[data-theme="dark"] .message.assistant.message-structured-result .message-table-shell{background:rgba(9,18,34,.72);border-color:rgba(169,190,227,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+[data-theme="dark"] .message.assistant.message-structured-result .md-content td{background:rgba(8,16,30,.84)}
+[data-theme="dark"] .message.assistant.message-structured-result .md-content th{background:rgba(16,28,48,.96)}
+[data-theme="dark"] .message.assistant.message-structured-result .md-content .deepright-response{background:rgba(9,18,34,.88)}
 .message .md-content.render-plain{white-space:normal}
 .message .md-content.render-plain br{content:''}
 .message.assistant.streaming .md-content::after{content:'▌';animation:blink .6s step-end infinite;color:var(--accent)}
@@ -2136,6 +2148,7 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .form-select{width:100%;padding:8px 12px;border:1px solid rgba(72,99,143,.18);border-radius:14px;background-color:rgba(255,255,255,.86);color:#16305d;font-size:13px;outline:none;transition:var(--transition);appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23526b95' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;box-shadow:inset 0 1px 0 rgba(255,255,255,.78)}
 .form-select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(109,149,255,.14)}
 .model-entry{display:flex;flex-direction:column;gap:6px;margin-bottom:8px;padding:8px 10px;border:1px solid rgba(72,99,143,.12);border-radius:16px;background:rgba(255,255,255,.24);animation:fadeIn .2s ease}
+.model-entry.pending{border-style:dashed;background:rgba(255,255,255,.2)}
 .model-entry-main{display:flex;gap:6px;align-items:center}
 .model-entry select{flex:1;min-height:36px;padding:0 32px 0 12px;box-sizing:border-box;border:1px solid rgba(72,99,143,.18);border-radius:14px;background:rgba(255,255,255,.86);color:#16305d;font-size:13px;line-height:1.4;outline:none;transition:var(--transition);appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23526b95' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;background-size:12px 12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.78)}
 .model-entry select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(109,149,255,.14)}
@@ -2154,6 +2167,8 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .password-media-launch-btn:hover .media-output-launch-dot,.password-media-launch-btn:focus-visible .media-output-launch-dot{transform:scale(1.14);filter:brightness(1.08)}
 .password-media-launch-btn:focus-visible{outline:none}
 .password-wrap.has-media-launcher.no-eye .password-media-launch-btn{right:-8px}
+.model-entry-status{display:none;align-items:center;justify-content:center;height:24px;padding:0 8px;border-radius:999px;border:1px dashed rgba(245,166,35,.34);background:rgba(245,166,35,.1);color:#8a5a00;font-size:11px;font-weight:700;letter-spacing:.02em;white-space:nowrap;flex-shrink:0}
+.model-entry.pending .model-entry-status{display:inline-flex}
 .model-config-toggle{width:32px;height:32px;border-radius:50%;border:1px solid var(--border);background:transparent;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:var(--transition);flex-shrink:0}
 .model-config-toggle:hover{border-color:var(--accent);color:var(--accent);background:rgba(109,149,255,.08)}
 .model-config-toggle.active{border-color:var(--accent);color:var(--accent);background:rgba(109,149,255,.12)}
@@ -2234,10 +2249,12 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 [data-theme="dark"] .form-select,[data-theme="dark"] .model-entry select,[data-theme="dark"] .password-wrap input,[data-theme="dark"] .model-config-field input{background-color:rgba(255,255,255,.08);border-color:rgba(169,190,227,.18);color:#ecf3ff;box-shadow:none}
 [data-theme="dark"] .password-media-launch-btn{color:#8fdcff}
 [data-theme="dark"] .model-entry{background:rgba(255,255,255,.04);border-color:rgba(169,190,227,.16)}
+[data-theme="dark"] .model-entry.pending{background:rgba(255,255,255,.03)}
 [data-theme="dark"] .model-config-reset-btn{background:rgba(255,255,255,.06);border-color:rgba(169,190,227,.18);color:#d7e5ff}
 [data-theme="dark"] .model-config-reset-btn:hover{background:rgba(109,149,255,.12);border-color:rgba(127,165,255,.54);color:#9fc4ff}
 [data-theme="dark"] .model-config-clear-btn{background:rgba(255,255,255,.06);border-color:rgba(255,90,107,.26);color:#ffb5bf}
 [data-theme="dark"] .model-config-clear-btn:hover{background:rgba(255,90,107,.14);border-color:rgba(255,90,107,.5);color:#ffd5db}
+[data-theme="dark"] .model-entry-status{border-color:rgba(245,166,35,.32);background:rgba(245,166,35,.14);color:#ffcf83}
 [data-theme="dark"] .model-config-toggle.has-config{border-color:rgba(127,165,255,.48);background:rgba(109,149,255,.18);color:#9fc4ff}
 [data-theme="dark"] .model-config-overflow-preview{box-shadow:0 20px 44px rgba(0,0,0,.36),inset 0 1px 0 rgba(255,255,255,.08)}
 [data-theme="dark"] .model-key-hint-preview{border-color:rgba(127,165,255,.34);background:linear-gradient(180deg,rgba(15,27,49,.98),rgba(10,20,38,.94));color:#a9c7ff;box-shadow:0 22px 46px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.08)}
@@ -5171,13 +5188,14 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
 !function(e,t){"object"==typeof exports&&"object"==typeof module?module.exports=t(require("katex")):"function"==typeof define&&define.amd?define(["katex"],t):"object"==typeof exports?exports.renderMathInElement=t(require("katex")):e.renderMathInElement=t(e.katex)}("undefined"!=typeof self?self:this,(function(e){return function(){"use strict";var t={771:function(t){t.exports=e}},n={};function r(e){var o=n[e];if(void 0!==o)return o.exports;var i=n[e]={exports:{}};return t[e](i,i.exports,r),i.exports}r.n=function(e){var t=e&&e.__esModule?function(){return e.default}:function(){return e};return r.d(t,{a:t}),t},r.d=function(e,t){for(var n in t)r.o(t,n)&&!r.o(e,n)&&Object.defineProperty(e,n,{enumerable:!0,get:t[n]})},r.o=function(e,t){return Object.prototype.hasOwnProperty.call(e,t)};var o={};return function(){r.d(o,{default:function(){return d}});var e=r(771),t=r.n(e);const n=function(e,t,n){let r=n,o=0;const i=e.length;for(;r<t.length;){const n=t[r];if(o<=0&&t.slice(r,r+i)===e)return r;"\\"===n?r++:"{"===n?o++:"}"===n&&o--,r++}return-1},i=/^\\begin{/;var a=function(e,t){let r;const o=[],a=new RegExp("("+t.map((e=>e.left.replace(/[-/\\^$*+?.()|[\]{}]/g,"\\$&"))).join("|")+")");for(;r=e.search(a),-1!==r;){r>0&&(o.push({type:"text",data:e.slice(0,r)}),e=e.slice(r));const a=t.findIndex((t=>e.startsWith(t.left)));if(r=n(t[a].right,e,t[a].left.length),-1===r)break;const l=e.slice(0,r+t[a].right.length),s=i.test(l)?l:e.slice(t[a].left.length,r);o.push({type:"math",data:s,rawData:l,display:t[a].display}),e=e.slice(r+t[a].right.length)}return""!==e&&o.push({type:"text",data:e}),o};const l=function(e,n){const r=a(e,n.delimiters);if(1===r.length&&"text"===r[0].type)return null;const o=document.createDocumentFragment();for(let e=0;e<r.length;e++)if("text"===r[e].type)o.appendChild(document.createTextNode(r[e].data));else{const i=document.createElement("span");let a=r[e].data;n.displayMode=r[e].display;try{n.preProcess&&(a=n.preProcess(a)),t().render(a,i,n)}catch(i){if(!(i instanceof t().ParseError))throw i;n.errorCallback("KaTeX auto-render: Failed to parse `"+r[e].data+"` with ",i),o.appendChild(document.createTextNode(r[e].rawData));continue}o.appendChild(i)}return o},s=function(e,t){for(let n=0;n<e.childNodes.length;n++){const r=e.childNodes[n];if(3===r.nodeType){let o=r.textContent,i=r.nextSibling,a=0;for(;i&&i.nodeType===Node.TEXT_NODE;)o+=i.textContent,i=i.nextSibling,a++;const s=l(o,t);if(s){for(let e=0;e<a;e++)r.nextSibling.remove();n+=s.childNodes.length-1,e.replaceChild(s,r)}else n+=a}else if(1===r.nodeType){const e=" "+r.className+" ";-1===t.ignoredTags.indexOf(r.nodeName.toLowerCase())&&t.ignoredClasses.every((t=>-1===e.indexOf(" "+t+" ")))&&s(r,t)}}};var d=function(e,t){if(!e)throw new Error("No element provided to render");const n={};for(const e in t)t.hasOwnProperty(e)&&(n[e]=t[e]);n.delimiters=n.delimiters||[{left:"$$",right:"$$",display:!0},{left:"\\(",right:"\\)",display:!1},{left:"\\begin{equation}",right:"\\end{equation}",display:!0},{left:"\\begin{align}",right:"\\end{align}",display:!0},{left:"\\begin{alignat}",right:"\\end{alignat}",display:!0},{left:"\\begin{gather}",right:"\\end{gather}",display:!0},{left:"\\begin{CD}",right:"\\end{CD}",display:!0},{left:"\\[",right:"\\]",display:!0}],n.ignoredTags=n.ignoredTags||["script","noscript","style","textarea","pre","code","option"],n.ignoredClasses=n.ignoredClasses||[],n.errorCallback=n.errorCallback||console.error,n.macros=n.macros||{},s(e,n)}}(),o=o.default}()}));
 </script><script>
 // ===== State =====
-const MODELS = ['deepright','deepseek','bigmodel','gemini','openai','anthropic','kimi','minimax','qwen','xiaomi'];
+const MODELS = ['deepright','seedream','deepseek','bigmodel','gemini','openai','anthropic','kimi','minimax','qwen','xiaomi'];
 const MODEL_ALIASES = {
   aioright: 'deepright',
   aiorhight: 'deepright',
   aiohright: 'deepright',
   openai: 'openai'
 };
+const DIRECT_SELECTION_BLOCKED_MODELS = new Set(['seedream']);
 const MODEL_KEY_HELP_LINKS = {
   deepseek: 'https://www.deepseek.com/',
   bigmodel: 'https://www.zhipuai.cn/',
@@ -5192,6 +5210,21 @@ const MODEL_KEY_HELP_LINKS = {
 const MODEL_CUSTOM_CONFIG_DEFAULTS = {
   deepright: {
     configurable: false
+  },
+  seedream: {
+    configurable: true,
+    outputOnly: true,
+    supportsBaseModel: false,
+    supportsFastModel: false,
+    supportsThinkingModel: false,
+    __url: 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
+    __model: '',
+    __model_fast: '',
+    __model_thinking: '',
+    __model_multi_input: '',
+    __model_multi_output: 'doubao-seedream-4.5',
+    supportsMultiInput: false,
+    supportsMultiOutput: true
   },
   deepseek: {
     configurable: true,
@@ -5480,6 +5513,40 @@ function isRemoteReadonlySiteAccess() {
   return !isLocalHostName(String(location.hostname || '').trim().toLowerCase());
 }
 
+let settingsPendingModelOrderSeq = 0;
+
+function getModelEntryPendingOrder(entry) {
+  if (!entry) return 0;
+  const raw = Number(entry.getAttribute('data-pending-order') || 0);
+  if (raw > 0) return raw;
+  settingsPendingModelOrderSeq += 1;
+  entry.setAttribute('data-pending-order', String(settingsPendingModelOrderSeq));
+  return settingsPendingModelOrderSeq;
+}
+
+function isModelEntryPending(entry) {
+  if (!entry) return false;
+  const model = normalizeModelName(entry.querySelector('select') && entry.querySelector('select').value);
+  if (!model) return false;
+  const token = String(entry.querySelector('.model-token-input') && entry.querySelector('.model-token-input').value || '').trim();
+  return !token;
+}
+
+function refreshModelEntryPendingState(entry) {
+  if (!entry) return false;
+  const pending = isModelEntryPending(entry);
+  entry.classList.toggle('pending', pending);
+  entry.setAttribute('data-pending', pending ? '1' : '0');
+  if (pending) {
+    getModelEntryPendingOrder(entry);
+    entry.title = '待完成：填写密钥后再保存';
+  } else {
+    entry.removeAttribute('data-pending-order');
+    entry.removeAttribute('title');
+  }
+  return pending;
+}
+
 function compareConfiguredModelNames(a, b) {
   const modelA = normalizeModelName(a);
   const modelB = normalizeModelName(b);
@@ -5494,6 +5561,49 @@ function compareConfiguredModelNames(a, b) {
 
 function getOrderedConfiguredModelNames(modelMap) {
   return Object.keys(modelMap || {}).sort(compareConfiguredModelNames);
+}
+
+function isOutputOnlyModel(model) {
+  return getModelCustomConfigSpec(model).outputOnly === true;
+}
+
+function isDirectSelectionBlockedModel(model) {
+  const normalizedModel = normalizeModelName(model);
+  return !!normalizedModel && DIRECT_SELECTION_BLOCKED_MODELS.has(normalizedModel);
+}
+
+function getSelectableConfiguredModelNames(modelMap) {
+  const models = normalizeModelMap(modelMap || {});
+  return getOrderedConfiguredModelNames(models).filter(model => !isOutputOnlyModel(model) && !isDirectSelectionBlockedModel(model));
+}
+
+function getFirstSelectableConfiguredModelName(modelMap) {
+  return normalizeModelName(getSelectableConfiguredModelNames(modelMap)[0] || '');
+}
+
+function resolveSelectableConfiguredModelName(model, modelMap) {
+  const normalizedModel = normalizeModelName(model);
+  if (isSelectableConfiguredModel(normalizedModel, modelMap)) return normalizedModel;
+  return getFirstSelectableConfiguredModelName(modelMap);
+}
+
+function isSelectableConfiguredModel(model, modelMap) {
+  const normalizedModel = normalizeModelName(model);
+  if (!normalizedModel) return false;
+  const models = normalizeModelMap(modelMap || {});
+  return Object.prototype.hasOwnProperty.call(models, normalizedModel)
+    && !isOutputOnlyModel(normalizedModel)
+    && !isDirectSelectionBlockedModel(normalizedModel);
+}
+
+function getSelectableModelEmptyMessage(modelMap) {
+  return Object.keys(normalizeModelMap(modelMap || {})).length
+    ? '当前已配置模型仅支持多模态输出，请再配置一个对话模型'
+    : '请先在设置中配置模型';
+}
+
+function hasSelectableConfiguredModels() {
+  return getSelectableConfiguredModelNames(state.settings.models || {}).length > 0;
 }
 
 function normalizeModelMap(input) {
@@ -5557,6 +5667,12 @@ function getModelCustomConfigSpec(model) {
   if (!spec) {
     return {
       configurable: true,
+      outputOnly: false,
+      supportsUrl: true,
+      editableUrl: true,
+      supportsBaseModel: true,
+      supportsFastModel: true,
+      supportsThinkingModel: true,
       __url: '',
       __model: '',
       __model_fast: '',
@@ -5569,6 +5685,12 @@ function getModelCustomConfigSpec(model) {
   }
   return {
     configurable: spec.configurable !== false,
+    outputOnly: spec.outputOnly === true,
+    supportsUrl: spec.supportsUrl !== false,
+    editableUrl: spec.editableUrl !== false,
+    supportsBaseModel: spec.supportsBaseModel !== false,
+    supportsFastModel: spec.supportsFastModel !== false,
+    supportsThinkingModel: spec.supportsThinkingModel !== false,
     __url: String(spec.__url || ''),
     __model: String(spec.__model || ''),
     __model_fast: String(spec.__model_fast || ''),
@@ -5648,10 +5770,10 @@ function buildEffectiveModelConfig(model, rawConfig) {
   }
   const effective = {
     token: cfg.token,
-    __url: cfg.__custom_cleared ? cfg.__url : (cfg.__url || spec.__url || ''),
-    __model: cfg.__custom_cleared ? cfg.__model : (cfg.__model || spec.__model || ''),
-    __model_fast: cfg.__custom_cleared ? cfg.__model_fast : (cfg.__model_fast || spec.__model_fast || ''),
-    __model_thinking: cfg.__custom_cleared ? cfg.__model_thinking : (cfg.__model_thinking || spec.__model_thinking || ''),
+    __url: spec.supportsUrl ? (spec.editableUrl ? (cfg.__custom_cleared ? cfg.__url : (cfg.__url || spec.__url || '')) : (spec.__url || '')) : '',
+    __model: spec.supportsBaseModel ? (cfg.__custom_cleared ? cfg.__model : (cfg.__model || spec.__model || '')) : '',
+    __model_fast: spec.supportsFastModel ? (cfg.__custom_cleared ? cfg.__model_fast : (cfg.__model_fast || spec.__model_fast || '')) : '',
+    __model_thinking: spec.supportsThinkingModel ? (cfg.__custom_cleared ? cfg.__model_thinking : (cfg.__model_thinking || spec.__model_thinking || '')) : '',
     __model_multi_input: spec.supportsMultiInput ? (cfg.__custom_cleared ? cfg.__model_multi_input : (cfg.__model_multi_input || spec.__model_multi_input || '')) : '',
     __model_multi_output: spec.supportsMultiOutput ? (cfg.__custom_cleared ? cfg.__model_multi_output : (cfg.__model_multi_output || spec.__model_multi_output || '')) : ''
   };
@@ -10604,7 +10726,7 @@ function hasConfiguredModels() {
 }
 
 function revealLeftSidebarForModelSetup() {
-  if (hasConfiguredModels() || !isLeftSidebarCollapsed()) return false;
+  if (hasSelectableConfiguredModels() || !isLeftSidebarCollapsed()) return false;
   applyLeftSidebarState(false);
   return true;
 }
@@ -13116,9 +13238,14 @@ function rsSetModelDropdownOpen(open) {
     dd.classList.remove('show');
     return false;
   }
-  const models = state.settings.models || {};
+  const models = getSelectableConfiguredModelNames(state.settings.models || {});
   const selectedModel = rsGetSelectedModel();
-  dd.innerHTML = Object.keys(models).map(m => '<div class="model-option' + (m === selectedModel ? ' active' : '') + '" onclick="rsSelectModel(\'' + m + '\')">' + m + '</div>').join('');
+  if (!models.length) {
+    dd.innerHTML = '<div class="model-option" style="color:var(--text-muted)">' + esc(getSelectableModelEmptyMessage(state.settings.models || {})) + '</div>';
+    dd.classList.add('show');
+    return true;
+  }
+  dd.innerHTML = models.map(m => '<div class="model-option' + (m === selectedModel ? ' active' : '') + '" onclick="rsSelectModel(\'' + m + '\')">' + m + '</div>').join('');
   dd.classList.add('show');
   return true;
 }
@@ -13173,7 +13300,7 @@ function setMemoTourControlLock(locked) {
 function renderMemoTourMetadataList() {
   const list = document.getElementById('rsMetaList');
   if (!list) return;
-  const model = normalizeModelName(rsSelectedModel || state.selectedModel || Object.keys(state.settings.models || {})[0] || '') || '未选择';
+  const model = resolveSelectableConfiguredModelName(rsSelectedModel || state.selectedModel, state.settings.models || {}) || '未选择';
   list.innerHTML =
     '<div class="rs-meta-item" id="rsTourMetaItem" data-content="测试任务" data-agent="' + esc(state.settings.agentId || 'DEF_AGENT').replace(/"/g, '&quot;') + '" data-verify="否" data-type="cron" data-cycle="工作日" data-time="05-26 09:30" data-model="' + esc(model).replace(/"/g, '&quot;') + '" data-thinking="Auto" data-swarm="关闭">' +
       '<div class="rs-meta-info">' +
@@ -13375,7 +13502,7 @@ function syncMemoTourStep(step) {
 }
 
 function getFirstConfiguredModelName() {
-  return normalizeModelName(Object.keys(state.settings.models || {})[0] || '');
+  return getFirstSelectableConfiguredModelName(state.settings.models || {});
 }
 
 function snapshotMemoTaskTourDraftState() {
@@ -22314,9 +22441,8 @@ function pluginModalResolveEffectiveAgentId() {
 function pluginModalResolveEffectiveModel() {
   const savedModel = normalizeModelName(pluginModalState.plugin && pluginModalState.plugin.model);
   const currentModel = normalizeModelName(pluginModalState.selectedModel || savedModel || state.selectedModel);
-  if (currentModel) return currentModel;
-  const models = Object.keys(state.settings.models || {});
-  return normalizeModelName(models[0] || '');
+  if (isSelectableConfiguredModel(currentModel, state.settings.models || {})) return currentModel;
+  return getFirstSelectableConfiguredModelName(state.settings.models || {});
 }
 
 function createPluginModalValidationError(message, code) {
@@ -22326,16 +22452,15 @@ function createPluginModalValidationError(message, code) {
 }
 
 function pluginModalResolveProviderModelValidationError(model) {
-  const models = normalizeModelMap(state.settings.models || {});
-  const availableModels = Object.keys(models);
+  const availableModels = getSelectableConfiguredModelNames(state.settings.models || {});
   if (!availableModels.length) {
-    return createPluginModalValidationError('请先在设置中配置模型', 'plugin_provider_model_missing');
+    return createPluginModalValidationError(getSelectableModelEmptyMessage(state.settings.models || {}), 'plugin_provider_model_missing');
   }
   const normalizedModel = normalizeModelName(model);
   if (!normalizedModel) {
     return createPluginModalValidationError('请先选择模型', 'plugin_provider_model_missing');
   }
-  if (!Object.prototype.hasOwnProperty.call(models, normalizedModel)) {
+  if (!availableModels.includes(normalizedModel)) {
     return createPluginModalValidationError('当前模型不可用，请重新选择可用模型', 'plugin_provider_model_unavailable');
   }
   return null;
@@ -22448,10 +22573,10 @@ function pluginModalSyncModelDropdownPosition() {
 function pluginModalRenderModelDropdown() {
   const dd = document.getElementById('pluginModalModelDropdown');
   if (!dd) return;
-  const models = Object.keys(state.settings.models || {});
+  const models = getSelectableConfiguredModelNames(state.settings.models || {});
   const currentModel = pluginModalResolveEffectiveModel();
   if (!models.length) {
-    dd.innerHTML = '<div class="model-dropdown-item" style="color:var(--text-muted)">请先在设置中配置模型</div>';
+    dd.innerHTML = '<div class="model-dropdown-item" style="color:var(--text-muted)">' + esc(getSelectableModelEmptyMessage(state.settings.models || {})) + '</div>';
     return;
   }
   dd.innerHTML = models.map(m => {
@@ -23477,7 +23602,7 @@ async function openPluginModal(plugin) {
   const defaultChatId = getPluginDefaultChatId(plugin);
   const agents = await fetchAgentList();
   const defaultAgentId = resolveAgentSelection('', agents);
-  const defaultModel = normalizeModelName(Object.keys(state.settings.models || {})[0] || '');
+  const defaultModel = getFirstSelectableConfiguredModelName(state.settings.models || {});
   const shouldUseContainerDefaults = !pluginHasSavedConfig(plugin);
   const hasSavedReuseChat = !!(pluginSupportsScope(plugin, 'reuse')
     && savedChatId
@@ -23677,16 +23802,13 @@ async function loadTokenSettings() {
     state.settings.models = {};
   }
   syncModelRuntimeTokenCacheFromSettings();
-  const modelKeys = Object.keys(state.settings.models || {});
-  state.selectedModel = normalizeModelName(state.selectedModel);
-  if (!state.selectedModel || !state.settings.models[state.selectedModel]) {
-    state.selectedModel = modelKeys[0] || null;
-  }
+  state.selectedModel = resolveSelectableConfiguredModelName(state.selectedModel, state.settings.models || {}) || null;
   if (state.activeChat && chatModels[state.activeChat]) {
     const chatModel = normalizeModelName(chatModels[state.activeChat]);
     chatModels[state.activeChat] = chatModel;
-    if (state.settings.models[chatModel]) {
-      state.selectedModel = chatModel;
+    const activeChatModel = resolveSelectableConfiguredModelName(chatModel, state.settings.models || {});
+    if (activeChatModel) {
+      state.selectedModel = activeChatModel;
     }
   }
 }
@@ -23804,6 +23926,26 @@ function trimStoredChatMessages(chat, limit) {
   return true;
 }
 
+function compactStoredChatPayload(payload, options) {
+  if (!payload || !payload.chats || typeof payload.chats !== 'object') return false;
+  const opts = options || {};
+  const stripRawSseAll = !!opts.stripRawSse;
+  const stripCompletedRawSse = !!opts.stripCompletedRawSse;
+  let changed = false;
+  Object.keys(payload.chats).forEach(chatId => {
+    const chat = payload.chats[chatId];
+    if (!chat || !Array.isArray(chat.messages)) return;
+    const stripRawSseForChat = stripRawSseAll || (stripCompletedRawSse && !chat.pendingRequest);
+    if (!stripRawSseForChat) return;
+    chat.messages.forEach(msg => {
+      if (!msg || msg.role !== 'assistant' || !Object.prototype.hasOwnProperty.call(msg, 'rawSse')) return;
+      delete msg.rawSse;
+      changed = true;
+    });
+  });
+  return changed;
+}
+
 function createQuotaCompactedChatsPayload(basePayload, options) {
   const payload = JSON.parse(JSON.stringify(basePayload));
   const opts = options || {};
@@ -23822,6 +23964,8 @@ function createQuotaCompactedChatsPayload(basePayload, options) {
     if (trimStoredCliHistory(chat, isActive ? activeCliLimit : inactiveCliLimit)) changed = true;
     if (trimStoredChatMessages(chat, isActive ? activeMessageLimit : inactiveMessageLimit)) changed = true;
   });
+  // Drop duplicated SSE transcripts before sacrificing visible chat content.
+  if (compactStoredChatPayload(payload, opts)) changed = true;
   return changed ? payload : null;
 }
 
@@ -23841,10 +23985,10 @@ function saveChats() {
     if (!isStorageQuotaError(err)) throw err;
   }
   const fallbackConfigs = [
-    { inactiveCliLimit: 40, activeCliLimit: 120, inactiveMessageLimit: 240, activeMessageLimit: Infinity },
-    { inactiveCliLimit: 20, activeCliLimit: 80, inactiveMessageLimit: 120, activeMessageLimit: Infinity },
-    { inactiveCliLimit: 0, activeCliLimit: 40, inactiveMessageLimit: 60, activeMessageLimit: 160 },
-    { inactiveCliLimit: 0, activeCliLimit: 20, inactiveMessageLimit: 24, activeMessageLimit: 80 }
+    { stripCompletedRawSse: true, inactiveCliLimit: 40, activeCliLimit: 120, inactiveMessageLimit: 240, activeMessageLimit: Infinity },
+    { stripCompletedRawSse: true, inactiveCliLimit: 20, activeCliLimit: 80, inactiveMessageLimit: 120, activeMessageLimit: Infinity },
+    { stripRawSse: true, inactiveCliLimit: 0, activeCliLimit: 40, inactiveMessageLimit: 60, activeMessageLimit: 160 },
+    { stripRawSse: true, inactiveCliLimit: 0, activeCliLimit: 20, inactiveMessageLimit: 24, activeMessageLimit: 80 }
   ];
   for (const config of fallbackConfigs) {
     const compactedPayload = createQuotaCompactedChatsPayload(basePayload, config);
@@ -26883,7 +27027,8 @@ function switchChat(id) {
       updateBeeIcons();
     }
     if (chatModels[id]) {
-      state.selectedModel = normalizeModelName(chatModels[id]);
+      const activeChatModel = resolveSelectableConfiguredModelName(chatModels[id], state.settings.models || {});
+      if (activeChatModel) state.selectedModel = activeChatModel;
     }
     thinkingEnabled = !!chatThinking[id];
     updateModelIndicator();
@@ -26976,8 +27121,8 @@ function updateModelSelectToastContent() {
   const title = document.getElementById('modelSelectToastTitle');
   const desc = document.getElementById('modelSelectToastDesc');
   const card = document.getElementById('modelSelectToastCard');
-  const needsConfig = !hasConfiguredModels();
-  if (title) title.textContent = needsConfig ? '请先在设置中配置模型' : '请先选择模型';
+  const needsConfig = !hasSelectableConfiguredModels();
+  if (title) title.textContent = needsConfig ? '请先在设置中配置可用模型' : '请先选择模型';
   if (desc) {
     desc.textContent = needsConfig ? '' : '点击输入框左侧小地球选择模型';
     desc.style.display = needsConfig ? 'none' : '';
@@ -26992,7 +27137,7 @@ function updateModelSelectToastContent() {
 
 function handleModelSelectToastCardClick(event) {
   if (event) event.stopPropagation();
-  if (modelSelectToastGuideTimer || hasConfiguredModels()) return;
+  if (modelSelectToastGuideTimer || hasSelectableConfiguredModels()) return;
   if (modelSelectToastTimer) {
     clearTimeout(modelSelectToastTimer);
     modelSelectToastTimer = null;
@@ -27011,7 +27156,7 @@ function handleModelSelectToastCardClick(event) {
 }
 
 function handleModelSelectToastCardKeydown(event) {
-  if (!event || hasConfiguredModels()) return;
+  if (!event || hasSelectableConfiguredModels()) return;
   if (event.key !== 'Enter' && event.key !== ' ') return;
   event.preventDefault();
   handleModelSelectToastCardClick(event);
@@ -27020,7 +27165,7 @@ function handleModelSelectToastCardKeydown(event) {
 function showModelSelectToast() {
   const el = document.getElementById('modelSelectToast');
   if (!el) return;
-  const needsConfig = !hasConfiguredModels();
+  const needsConfig = !hasSelectableConfiguredModels();
   if (modelSelectToastTimer) clearTimeout(modelSelectToastTimer);
   if (modelSelectToastGuideTimer) {
     clearTimeout(modelSelectToastGuideTimer);
@@ -27420,7 +27565,8 @@ function msgHtml(m, options) {
   const assistantBindingAttrs = assistantStreamBindingAttrs(m);
   const assistantBeacon = assistantExplosionBeaconHtml(m);
   const assistantBeaconClass = assistantBeacon ? ' has-explosion-beacon' : '';
-  return `<div class="message-wrap assistant"${assistantBindingAttrs}><div class="message assistant${assistantBeaconClass}">${assistantBeacon}<div class="${mdClass}"${richPendingAttr}${decoratePathsAttr}>${contentHtml}</div>${assistantMetaHtml(m)}</div>${messageFooterHtml(m)}</div>`;
+  const assistantMaterialClass = getAssistantResultMaterialClass(m);
+  return `<div class="message-wrap assistant"${assistantBindingAttrs}><div class="message assistant${assistantBeaconClass}${assistantMaterialClass}">${assistantBeacon}<div class="${mdClass}"${richPendingAttr}${decoratePathsAttr}>${contentHtml}</div>${assistantMetaHtml(m)}</div>${messageFooterHtml(m)}</div>`;
 }
 
 function createMessageNode(message, options) {
@@ -27431,7 +27577,10 @@ function createMessageNode(message, options) {
   const node = host.firstElementChild;
   if (node && message && message.role === 'assistant' && !message.error) {
     const msgEl = node.querySelector('.message.assistant');
-    if (msgEl) syncAssistantExplosionBeacon(msgEl, message);
+    if (msgEl) {
+      syncAssistantExplosionBeacon(msgEl, message);
+      syncAssistantResultMaterialState(msgEl, message);
+    }
   }
   return node;
 }
@@ -28073,6 +28222,7 @@ function flushStreamingMessage(streamKey) {
   decorateChatMessagePathLinks(mdEl);
   maybeQueueMessageUrlTourFromRoot(mdEl);
   syncAssistantExplosionBeacon(msgEl, assistantMsg);
+  syncAssistantResultMaterialState(msgEl, assistantMsg);
   msgEl.classList.remove('type-switch-gap');
   msgEl.style.removeProperty('--stream-gap-height');
   let metaEl = msgEl.querySelector('.message-meta');
@@ -28188,6 +28338,52 @@ function messageCopyButtonHtml(m) {
   return `<button type="button" class="message-copy-btn" data-copy-text="${text}" onclick="copyCenterMessage(event)" title="复制" aria-label="复制"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M6.55 1.2a.7.7 0 0 0-.7.7v.35h-1.2a1.1 1.1 0 0 0-1.1 1.1v3.9c0 .61.49 1.1 1.1 1.1h3.2a1.1 1.1 0 0 0 1.1-1.1v-3.9a1.1 1.1 0 0 0-1.1-1.1h-1.2V1.9a.7.7 0 0 0-.7-.7h-.7Zm0 .7h.7v.7h-.7v-.7Zm-1.9 1.4h3.2a.4.4 0 0 1 .4.4v3.9a.4.4 0 0 1-.4.4h-3.2a.4.4 0 0 1-.4-.4v-3.9a.4.4 0 0 1 .4-.4ZM2.3 4.05a.35.35 0 0 1 .35.35v3.5c0 .08.07.15.15.15h3.5a.35.35 0 1 1 0 .7H2.8c-.47 0-.85-.38-.85-.85V4.4a.35.35 0 0 1 .35-.35Zm5.45-2.65.19.66.66.19-.66.19-.19.66-.19-.66-.66-.19.66-.19.19-.66Z"></path></svg></button>`;
 }
 
+function unwrapStructuredResultSource(text) {
+  const normalized = normalizeRenderableMessageText(text);
+  const deeprightInner = extractDeeprightEnvelope(normalized);
+  return normalizeRenderableMessageText(deeprightInner !== null ? deeprightInner : normalized);
+}
+
+function getMaxMarkdownTableRun(text) {
+  const lines = String(text || '').split('\n');
+  let run = 0;
+  let maxRun = 0;
+  lines.forEach(line => {
+    if (/^\s*\|.*\|\s*$/.test(line)) {
+      run += 1;
+      if (run > maxRun) maxRun = run;
+      return;
+    }
+    run = 0;
+  });
+  return maxRun;
+}
+
+function countStructuredResultHeadings(text) {
+  return String(text || '')
+    .split('\n')
+    .filter(line => /^\s{0,3}#{1,6}\s+\S/.test(line))
+    .length;
+}
+
+function shouldDegradeAssistantResultMaterial(message) {
+  if (!message || message.role !== 'assistant' || message.error) return false;
+  const content = unwrapStructuredResultSource(String(message.content || ''));
+  if (!content) return false;
+  const tableRun = getMaxMarkdownTableRun(content);
+  if (tableRun >= 4) return true;
+  return tableRun >= 2 && countStructuredResultHeadings(content) >= 2 && content.length >= 900;
+}
+
+function getAssistantResultMaterialClass(message) {
+  return shouldDegradeAssistantResultMaterial(message) ? ' message-structured-result' : '';
+}
+
+function syncAssistantResultMaterialState(msgEl, message) {
+  if (!msgEl || !msgEl.classList) return;
+  msgEl.classList.toggle('message-structured-result', shouldDegradeAssistantResultMaterial(message));
+}
+
 function messageScrollTopButtonHtml() {
   return `<button type="button" class="message-scroll-top-btn" onclick="scrollAssistantMessageToStart(event)" title="回到该响应开头" aria-label="回到该响应开头" aria-hidden="true"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 15V5"></path><path d="m5.75 9.25 4.25-4.25 4.25 4.25"></path></svg></button>`;
 }
@@ -28205,14 +28401,15 @@ function messageEditButtonHtml(m) {
 function centerMessageWrapHtml(message, cls, plain) {
   const wrapClass = (cls || '').includes('user') ? 'user' : ((cls || '').includes('error') ? 'error' : 'assistant');
   const wrapAttrs = wrapClass === 'assistant' ? assistantStreamBindingAttrs(message) : '';
+  const materialClass = wrapClass === 'assistant' ? getAssistantResultMaterialClass(message) : '';
   const meta = wrapClass === 'user'
     ? userMetaHtml(message)
     : (wrapClass === 'assistant' && !(plain || false) ? assistantMetaHtml(message) : '');
   const assistantBeacon = wrapClass === 'assistant' && !(plain || false) ? assistantExplosionBeaconHtml(message) : '';
   const beaconClass = assistantBeacon ? ' has-explosion-beacon' : '';
   const body = plain
-    ? `<div class="${cls || ''}">${esc(message && message.content || '')}</div>`
-    : `<div class="${cls || ''}${beaconClass}">${assistantBeacon}<div class="md-content">${renderMd(message && message.content || '', {
+    ? `<div class="${cls || ''}${materialClass}">${esc(message && message.content || '')}</div>`
+    : `<div class="${cls || ''}${beaconClass}${materialClass}">${assistantBeacon}<div class="md-content">${renderMd(message && message.content || '', {
         standaloneJsonCodeFence: shouldRenderMessageAsStandaloneJsonCodeFence(message)
       })}</div>${meta}</div>`;
   return `<div class="message-wrap ${wrapClass}"${wrapAttrs}>${body}${messageFooterHtml(message)}</div>`;
@@ -30150,10 +30347,10 @@ function toggleModelDropdown() {
   const dd = document.getElementById('modelDropdown');
   if (dd.classList.contains('show')) { closeModelDropdown(); return; }
   closeQueuedCenterPanel(true);
-  const models = Object.keys(state.settings.models || {});
+  const models = getSelectableConfiguredModelNames(state.settings.models || {});
   if (models.length === 0) {
     revealLeftSidebarForModelSetup();
-    dd.innerHTML = '<div class="model-dropdown-item" style="color:var(--text-muted)">请先在设置中配置模型</div>';
+    dd.innerHTML = '<div class="model-dropdown-item" style="color:var(--text-muted)">' + esc(getSelectableModelEmptyMessage(state.settings.models || {})) + '</div>';
     if (modelDropdownGuideTimer) {
       clearTimeout(modelDropdownGuideTimer);
       modelDropdownGuideTimer = null;
@@ -30186,6 +30383,7 @@ function closeModelDropdown() {
 function selectModel(m) {
   const previousModel = normalizeModelName(state.selectedModel);
   const nextModel = normalizeModelName(m);
+  if (!isSelectableConfiguredModel(nextModel, state.settings.models || {})) return;
   const activeChatId = String(state.activeChat || '').trim();
   const shouldQueueModelSwitchTour = !!(
     activeChatId &&
@@ -32262,7 +32460,7 @@ async function sendCenterMessage(rawText, options) {
     delete requestMetadata.extract;
     requestMetadata.skill_extract = true;
   }
-  const selectedModel = normalizeModelName(opts.model || chatModels[chatId] || state.selectedModel);
+  const selectedModel = resolveSelectableConfiguredModelName(opts.model || chatModels[chatId] || state.selectedModel, state.settings.models || {});
   if (!selectedModel) {
     revealLeftSidebarForModelSetup();
     showModelSelectToast();
@@ -36688,10 +36886,10 @@ function getSettingsDraftModels() {
     const cleared = entry.getAttribute('data-custom-cleared') === '1';
     draft[model] = {
       token,
-      __url: String(entry.querySelector('.model-base-url-input') && entry.querySelector('.model-base-url-input').value || '').trim(),
-      __model: String(entry.querySelector('.model-base-model-input') && entry.querySelector('.model-base-model-input').value || '').trim(),
-      __model_fast: String(entry.querySelector('.model-fast-model-input') && entry.querySelector('.model-fast-model-input').value || '').trim(),
-      __model_thinking: String(entry.querySelector('.model-thinking-model-input') && entry.querySelector('.model-thinking-model-input').value || '').trim(),
+      __url: spec.supportsUrl && spec.editableUrl ? String(entry.querySelector('.model-base-url-input') && entry.querySelector('.model-base-url-input').value || '').trim() : '',
+      __model: spec.supportsBaseModel ? String(entry.querySelector('.model-base-model-input') && entry.querySelector('.model-base-model-input').value || '').trim() : '',
+      __model_fast: spec.supportsFastModel ? String(entry.querySelector('.model-fast-model-input') && entry.querySelector('.model-fast-model-input').value || '').trim() : '',
+      __model_thinking: spec.supportsThinkingModel ? String(entry.querySelector('.model-thinking-model-input') && entry.querySelector('.model-thinking-model-input').value || '').trim() : '',
       __model_multi_input: spec.supportsMultiInput ? String(entry.querySelector('.model-multi-input-input') && entry.querySelector('.model-multi-input-input').value || '').trim() : '',
       __model_multi_output: spec.supportsMultiOutput ? String(entry.querySelector('.model-multi-output-input') && entry.querySelector('.model-multi-output-input').value || '').trim() : '',
       __custom_cleared: cleared
@@ -37192,7 +37390,6 @@ function renderModelEntries() {
   hideModelConfigOverflowPreview();
   if (keys.length === 0) {
     container.innerHTML = '';
-    if (!isRemoteReadonlySiteAccess()) addModelEntry();
     renderSettingsAccessNote();
     refreshSwarmModelAvailability();
     scheduleOnboardingSync();
@@ -37212,6 +37409,12 @@ function sortModelEntryElements() {
   const entries = Array.from(container.querySelectorAll('.model-entry'));
   if (!entries.length) return;
   entries.sort((entryA, entryB) => {
+    const pendingA = refreshModelEntryPendingState(entryA);
+    const pendingB = refreshModelEntryPendingState(entryB);
+    if (pendingA !== pendingB) return pendingA ? 1 : -1;
+    if (pendingA && pendingB) {
+      return getModelEntryPendingOrder(entryA) - getModelEntryPendingOrder(entryB);
+    }
     const modelA = normalizeModelName(entryA.querySelector('select') && entryA.querySelector('select').value);
     const modelB = normalizeModelName(entryB.querySelector('select') && entryB.querySelector('select').value);
     return compareConfiguredModelNames(modelA, modelB);
@@ -37229,7 +37432,11 @@ function buildAvailableModelOptions(currentModel, currentEntry) {
     const selectedModel = normalizeModelName(entry.querySelector('select') && entry.querySelector('select').value);
     if (selectedModel) occupiedModels.add(selectedModel);
   });
-  return MODELS.filter(modelName => modelName === currentModel || !occupiedModels.has(modelName))
+  const optionModels = MODELS.filter(modelName => modelName === currentModel || !occupiedModels.has(modelName));
+  if (currentModel && !optionModels.includes(currentModel)) {
+    optionModels.unshift(currentModel);
+  }
+  return optionModels
     .map(modelName => `<option value="${modelName}"${modelName === currentModel ? ' selected' : ''}>${modelName}</option>`)
     .join('');
 }
@@ -37250,7 +37457,8 @@ function modelEntryHtml(idx, model, rawConfig, originalModel) {
   const built = buildEffectiveModelConfig(model, rawConfig);
   const cfg = built.effective;
   const spec = built.spec;
-  const opts = MODELS.map(m => `<option value="${m}"${m === model ? ' selected' : ''}>${m}</option>`).join('');
+  const optionModels = MODELS.includes(model) || !model ? MODELS : [model].concat(MODELS);
+  const opts = optionModels.map(m => `<option value="${m}"${m === model ? ' selected' : ''}>${m}</option>`).join('');
   const rawCfg = normalizeModelConfig(rawConfig);
   const hasConfig = !!(rawCfg.__url || rawCfg.__model || rawCfg.__model_fast || rawCfg.__model_thinking || rawCfg.__model_multi_input || rawCfg.__model_multi_output);
   const canCustomize = spec.configurable;
@@ -37260,7 +37468,10 @@ function modelEntryHtml(idx, model, rawConfig, originalModel) {
   const remotePersisted = remoteRestricted && !!normalizedOriginalModel;
   const remoteMaskedToken = remotePersisted && isMaskedRemoteTokenValue(rawCfg.token || cfg.token);
   const tokenInputReadonlyAttr = remotePersisted ? ' readonly' : '';
-  const inputDisabledAttr = !canCustomize ? ' disabled' : (remotePersisted ? ' readonly' : '');
+  const urlAttr = !canCustomize || !spec.supportsUrl || !spec.editableUrl ? ' disabled' : (remotePersisted ? ' readonly' : '');
+  const baseAttr = !canCustomize || !spec.supportsBaseModel ? ' disabled' : (remotePersisted ? ' readonly' : '');
+  const fastAttr = !canCustomize || !spec.supportsFastModel ? ' disabled' : (remotePersisted ? ' readonly' : '');
+  const thinkingAttr = !canCustomize || !spec.supportsThinkingModel ? ' disabled' : (remotePersisted ? ' readonly' : '');
   const selectDisabledAttr = remotePersisted ? ' disabled' : '';
   const multiInputAttr = !canCustomize || !spec.supportsMultiInput ? ' disabled' : (remotePersisted ? ' readonly' : '');
   const multiOutputAttr = !canCustomize || !spec.supportsMultiOutput ? ' disabled' : (remotePersisted ? ' readonly' : '');
@@ -37283,6 +37494,7 @@ function modelEntryHtml(idx, model, rawConfig, originalModel) {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
         </button>`}
       </div>
+      <span class="model-entry-status">待完成</span>
       ${canCustomize ? `<button class="model-config-toggle${hasConfig ? ' has-config' : ''}" onclick="toggleModelConfig(this)" type="button" title="${configToggleTitle}">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l2.7 5.46L21 9.27l-4.5 4.38 1.06 6.19L12 16.98 6.44 19.84 7.5 13.65 3 9.27l6.3-.81z"/></svg>
       </button>` : ''}
@@ -37294,7 +37506,7 @@ function modelEntryHtml(idx, model, rawConfig, originalModel) {
           <div class="model-config-head">
             <span class="model-config-head-label">模型URL</span>
           </div>
-          <input class="model-base-url-input" type="text" value="${esc(cfg.__url || '')}" placeholder="https://api.example.com/v1" autocomplete="off"${inputDisabledAttr} />
+          <input class="model-base-url-input" type="text" value="${esc(cfg.__url || '')}" placeholder="https://api.example.com/v1" autocomplete="off"${urlAttr} />
         </label>
       </div>
       <div class="model-config-split">
@@ -37302,19 +37514,19 @@ function modelEntryHtml(idx, model, rawConfig, originalModel) {
           <div class="model-config-head">
             <span class="model-config-head-label">基础模型</span>
           </div>
-          <input class="model-base-model-input" type="text" value="${esc(cfg.__model || '')}" placeholder="gpt-4.1" autocomplete="off"${inputDisabledAttr} />
+          <input class="model-base-model-input" type="text" value="${esc(cfg.__model || '')}" placeholder="gpt-4.1" autocomplete="off"${baseAttr} />
         </label>
         <label class="model-config-field model-fast-field">
           <div class="model-config-head">
             <span class="model-config-head-label">快速响应</span>
           </div>
-          <input class="model-fast-model-input" type="text" value="${esc(cfg.__model_fast || '')}" placeholder="gpt-4.1-mini" autocomplete="off"${inputDisabledAttr} />
+          <input class="model-fast-model-input" type="text" value="${esc(cfg.__model_fast || '')}" placeholder="gpt-4.1-mini" autocomplete="off"${fastAttr} />
         </label>
         <label class="model-config-field model-thinking-field">
           <div class="model-config-head">
             <span class="model-config-head-label">深度思考</span>
           </div>
-          <input class="model-thinking-model-input" type="text" value="${esc(cfg.__model_thinking || '')}" placeholder="o3" autocomplete="off"${inputDisabledAttr} />
+          <input class="model-thinking-model-input" type="text" value="${esc(cfg.__model_thinking || '')}" placeholder="o3" autocomplete="off"${thinkingAttr} />
         </label>
         <label class="model-config-field model-multi-input-field${spec.supportsMultiInput ? '' : ' disabled'}">
           <div class="model-config-head">
@@ -37355,6 +37567,7 @@ function replaceModelEntry(entry, model, rawConfig) {
   if (hadOnboardingTarget) nextEntry.classList.add('onboarding-model-config-target');
   entry.replaceWith(nextEntry);
   attachModelConfigInputListeners(nextEntry);
+  refreshModelEntryPendingState(nextEntry);
   return nextEntry;
 }
 
@@ -37392,7 +37605,8 @@ async function removeModelEntry(btn) {
     hideModelConfigOverflowPreview();
   }
   const model = normalizeModelName(entry.querySelector('select') && entry.querySelector('select').value);
-  const persisted = !!(model && state.settings.models && state.settings.models[model]);
+  const persistedModel = model || originalModel;
+  const persisted = !!(persistedModel && state.settings.models && state.settings.models[persistedModel]);
   if (persisted) {
     clearSettingsErrorState();
     btn.disabled = true;
@@ -37400,7 +37614,7 @@ async function removeModelEntry(btn) {
       const resp = await fetch('/api/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'delete_model', model })
+        body: JSON.stringify({ action: 'delete_model', model: persistedModel })
       });
       const data = await resp.json();
       if (!resp.ok || !data || data.status !== 0) {
@@ -37410,9 +37624,7 @@ async function removeModelEntry(btn) {
       }
       state.settings.models = normalizeModelMap(data.models || {});
       syncModelRuntimeTokenCacheFromSettings();
-      if (state.selectedModel && !state.settings.models[state.selectedModel]) {
-        state.selectedModel = Object.keys(state.settings.models || {})[0] || null;
-      }
+      state.selectedModel = resolveSelectableConfiguredModelName(state.selectedModel, state.settings.models || {}) || null;
     } catch (e) {
       setSettingsErrorMessage('删除模型失败：' + (e && e.message ? e.message : '网络异常'));
       btn.disabled = false;
@@ -37422,9 +37634,6 @@ async function removeModelEntry(btn) {
   if (model) clearModelRuntimeToken(model);
   if (originalModel && originalModel !== model) clearModelRuntimeToken(originalModel);
   entry.remove();
-  if (!document.querySelector('#modelEntries .model-entry')) {
-    addModelEntry();
-  }
   refreshModelEntryOptions();
   refreshSwarmModelAvailability();
   scheduleOnboardingSync();
@@ -37443,10 +37652,10 @@ function resetModelCustomConfig(btn) {
     input.value = value || '';
     input.disabled = !!disabled;
   };
-  setInput('.model-base-url-input', cfg.__url, !spec.configurable);
-  setInput('.model-base-model-input', cfg.__model, !spec.configurable);
-  setInput('.model-fast-model-input', cfg.__model_fast, !spec.configurable);
-  setInput('.model-thinking-model-input', cfg.__model_thinking, !spec.configurable);
+  setInput('.model-base-url-input', cfg.__url, !(spec.configurable && spec.supportsUrl && spec.editableUrl));
+  setInput('.model-base-model-input', cfg.__model, !(spec.configurable && spec.supportsBaseModel));
+  setInput('.model-fast-model-input', cfg.__model_fast, !(spec.configurable && spec.supportsFastModel));
+  setInput('.model-thinking-model-input', cfg.__model_thinking, !(spec.configurable && spec.supportsThinkingModel));
   setInput('.model-multi-input-input', cfg.__model_multi_input, !(spec.configurable && spec.supportsMultiInput));
   setInput('.model-multi-output-input', cfg.__model_multi_output, !(spec.configurable && spec.supportsMultiOutput));
   entry.setAttribute('data-custom-cleared', '0');
@@ -37464,10 +37673,10 @@ function clearModelCustomConfig(btn) {
     input.value = value || '';
     input.disabled = !!disabled;
   };
-  setInput('.model-base-url-input', '', !spec.configurable);
-  setInput('.model-base-model-input', '', !spec.configurable);
-  setInput('.model-fast-model-input', '', !spec.configurable);
-  setInput('.model-thinking-model-input', '', !spec.configurable);
+  setInput('.model-base-url-input', spec.supportsUrl && !spec.editableUrl ? (spec.__url || '') : '', !(spec.configurable && spec.supportsUrl && spec.editableUrl));
+  setInput('.model-base-model-input', '', !(spec.configurable && spec.supportsBaseModel));
+  setInput('.model-fast-model-input', '', !(spec.configurable && spec.supportsFastModel));
+  setInput('.model-thinking-model-input', '', !(spec.configurable && spec.supportsThinkingModel));
   setInput('.model-multi-input-input', '', !(spec.configurable && spec.supportsMultiInput));
   setInput('.model-multi-output-input', '', !(spec.configurable && spec.supportsMultiOutput));
   entry.setAttribute('data-custom-cleared', '1');
@@ -37481,17 +37690,17 @@ function getModelEntryCustomConfigState(entry) {
   const valueOf = selector => String(entry.querySelector(selector) && entry.querySelector(selector).value || '').trim();
   const defaultSpec = getModelCustomConfigSpec(model);
   const hasConfig = !!(
-    valueOf('.model-base-url-input') !== String(defaultSpec.__url || '') ||
-    valueOf('.model-base-model-input') !== String(defaultSpec.__model || '') ||
-    valueOf('.model-fast-model-input') !== String(defaultSpec.__model_fast || '') ||
-    valueOf('.model-thinking-model-input') !== String(defaultSpec.__model_thinking || '') ||
+    valueOf('.model-base-url-input') !== String(defaultSpec.supportsUrl ? (defaultSpec.__url || '') : '') ||
+    valueOf('.model-base-model-input') !== String(defaultSpec.supportsBaseModel ? (defaultSpec.__model || '') : '') ||
+    valueOf('.model-fast-model-input') !== String(defaultSpec.supportsFastModel ? (defaultSpec.__model_fast || '') : '') ||
+    valueOf('.model-thinking-model-input') !== String(defaultSpec.supportsThinkingModel ? (defaultSpec.__model_thinking || '') : '') ||
     valueOf('.model-multi-input-input') !== String(defaultSpec.supportsMultiInput ? (defaultSpec.__model_multi_input || '') : '') ||
     valueOf('.model-multi-output-input') !== String(defaultSpec.supportsMultiOutput ? (defaultSpec.__model_multi_output || '') : '')
   ) && !!(
-    valueOf('.model-base-url-input') ||
-    valueOf('.model-base-model-input') ||
-    valueOf('.model-fast-model-input') ||
-    valueOf('.model-thinking-model-input') ||
+    (defaultSpec.supportsUrl && valueOf('.model-base-url-input')) ||
+    (defaultSpec.supportsBaseModel && valueOf('.model-base-model-input')) ||
+    (defaultSpec.supportsFastModel && valueOf('.model-fast-model-input')) ||
+    (defaultSpec.supportsThinkingModel && valueOf('.model-thinking-model-input')) ||
     valueOf('.model-multi-input-input') ||
     valueOf('.model-multi-output-input')
   );
@@ -37528,15 +37737,16 @@ function attachModelConfigInputListeners(entry) {
     });
     tokenInput.addEventListener('blur', () => scheduleHideModelKeyHintPreview(tokenInput));
     tokenInput.addEventListener('input', () => {
+      const wasPending = entry.getAttribute('data-pending') === '1';
       if (String(tokenInput.value || '').trim()) {
         if (modelKeyHintPreviewState.trigger === tokenInput || modelKeyHintPreviewState.hoverTrigger === tokenInput) {
           hideModelKeyHintPreview();
         }
-        return;
-      }
-      if ((typeof tokenInput.matches === 'function' && tokenInput.matches(':focus')) || (typeof tokenInput.matches === 'function' && tokenInput.matches(':hover'))) {
+      } else if ((typeof tokenInput.matches === 'function' && tokenInput.matches(':focus')) || (typeof tokenInput.matches === 'function' && tokenInput.matches(':hover'))) {
         scheduleModelKeyHintPreview(tokenInput);
       }
+      const nextPending = refreshModelEntryPendingState(entry);
+      if (wasPending !== nextPending) sortModelEntryElements();
     });
   }
   const configSelectors = [
@@ -37596,6 +37806,7 @@ function attachModelConfigInputListeners(entry) {
   const currentCfg = normalizeModelConfig(getCurrentModelEntryRawConfig(entry));
   entry.setAttribute('data-custom-cleared', currentCfg.__custom_cleared ? '1' : '0');
   updateModelConfigToggleState(entry);
+  refreshModelEntryPendingState(entry);
 }
 
 function getCurrentModelEntryRawConfig(entry) {
@@ -37616,10 +37827,10 @@ function getCurrentModelEntryRawConfig(entry) {
   }
   return {
     token,
-    __url: String(entry.querySelector('.model-base-url-input') && entry.querySelector('.model-base-url-input').value || '').trim(),
-    __model: String(entry.querySelector('.model-base-model-input') && entry.querySelector('.model-base-model-input').value || '').trim(),
-    __model_fast: String(entry.querySelector('.model-fast-model-input') && entry.querySelector('.model-fast-model-input').value || '').trim(),
-    __model_thinking: String(entry.querySelector('.model-thinking-model-input') && entry.querySelector('.model-thinking-model-input').value || '').trim(),
+    __url: spec.supportsUrl && spec.editableUrl ? String(entry.querySelector('.model-base-url-input') && entry.querySelector('.model-base-url-input').value || '').trim() : '',
+    __model: spec.supportsBaseModel ? String(entry.querySelector('.model-base-model-input') && entry.querySelector('.model-base-model-input').value || '').trim() : '',
+    __model_fast: spec.supportsFastModel ? String(entry.querySelector('.model-fast-model-input') && entry.querySelector('.model-fast-model-input').value || '').trim() : '',
+    __model_thinking: spec.supportsThinkingModel ? String(entry.querySelector('.model-thinking-model-input') && entry.querySelector('.model-thinking-model-input').value || '').trim() : '',
     __model_multi_input: spec.supportsMultiInput ? String(entry.querySelector('.model-multi-input-input') && entry.querySelector('.model-multi-input-input').value || '').trim() : '',
     __model_multi_output: spec.supportsMultiOutput ? String(entry.querySelector('.model-multi-output-input') && entry.querySelector('.model-multi-output-input').value || '').trim() : '',
     __custom_cleared: entry.getAttribute('data-custom-cleared') === '1'
@@ -37722,9 +37933,9 @@ async function saveSettingsAsync() {
   const entries = document.querySelectorAll('#modelEntries .model-entry');
   const models = {};
   const removedModels = [];
+  const pendingEntries = [];
   let err = '';
   const remoteRestricted = isRemoteReadonlySiteAccess();
-  let hasAnyConfiguredModel = false;
   entries.forEach(e => {
     if (err) return;
     const m = normalizeModelName(e.querySelector('select').value);
@@ -37732,7 +37943,6 @@ async function saveSettingsAsync() {
     const spec = getModelCustomConfigSpec(m);
     const canCustomize = !!spec.configurable;
     const draftCfg = getCurrentModelEntryRawConfig(e);
-    if (m) hasAnyConfiguredModel = true;
     if (remoteRestricted && originalModel) {
       const storedCfg = normalizeModelConfig(state.settings.models && state.settings.models[originalModel]);
       const unchanged = (
@@ -37759,27 +37969,36 @@ async function saveSettingsAsync() {
     }
     const cfg = {
       token: tokenValue,
-      __url: canCustomize ? String(e.querySelector('.model-base-url-input') && e.querySelector('.model-base-url-input').value || '').trim() : '',
-      __model: canCustomize ? String(e.querySelector('.model-base-model-input') && e.querySelector('.model-base-model-input').value || '').trim() : '',
-      __model_fast: canCustomize ? String(e.querySelector('.model-fast-model-input') && e.querySelector('.model-fast-model-input').value || '').trim() : '',
-      __model_thinking: canCustomize ? String(e.querySelector('.model-thinking-model-input') && e.querySelector('.model-thinking-model-input').value || '').trim() : '',
+      __url: canCustomize && spec.supportsUrl && spec.editableUrl ? String(e.querySelector('.model-base-url-input') && e.querySelector('.model-base-url-input').value || '').trim() : '',
+      __model: canCustomize && spec.supportsBaseModel ? String(e.querySelector('.model-base-model-input') && e.querySelector('.model-base-model-input').value || '').trim() : '',
+      __model_fast: canCustomize && spec.supportsFastModel ? String(e.querySelector('.model-fast-model-input') && e.querySelector('.model-fast-model-input').value || '').trim() : '',
+      __model_thinking: canCustomize && spec.supportsThinkingModel ? String(e.querySelector('.model-thinking-model-input') && e.querySelector('.model-thinking-model-input').value || '').trim() : '',
       __model_multi_input: canCustomize && spec.supportsMultiInput ? String(e.querySelector('.model-multi-input-input') && e.querySelector('.model-multi-input-input').value || '').trim() : '',
       __model_multi_output: canCustomize && spec.supportsMultiOutput ? String(e.querySelector('.model-multi-output-input') && e.querySelector('.model-multi-output-input').value || '').trim() : '',
       __custom_cleared: canCustomize && e.getAttribute('data-custom-cleared') === '1'
     };
     if (!m && !cfg.token && !cfg.__url && !cfg.__model && !cfg.__model_fast && !cfg.__model_thinking && !cfg.__model_multi_input && !cfg.__model_multi_output) return;
-    if (m && !cfg.token) { err = `模型 ${m} 必须配置密钥`; return; }
+    if (m && !cfg.token) {
+      if (originalModel) {
+        err = `模型 ${m} 必须配置密钥`;
+        return;
+      }
+      pendingEntries.push(e);
+      refreshModelEntryPendingState(e);
+      return;
+    }
     if (!m && (cfg.token || cfg.__url || cfg.__model || cfg.__model_fast || cfg.__model_thinking || cfg.__model_multi_input || cfg.__model_multi_output)) { err = '请选择模型'; return; }
     if (models[m]) { err = `模型 ${m} 重复`; return; }
     if (originalModel && originalModel !== m) removedModels.push(originalModel);
     models[m] = cfg;
   });
   if (err) { setSettingsErrorMessage(err); return; }
-  const shouldWarnMissingModel = !hasAnyConfiguredModel;
+  const hasPendingEntries = pendingEntries.length > 0;
+  const shouldWarnMissingModel = Object.keys(models).length === 0;
   if (shouldWarnMissingModel) {
-    setSettingsErrorMessage('至少配置一组模型和密钥', { attention: true, autoCloseMs: 3000 });
+    setSettingsErrorMessage('至少配置一组模型和密钥', hasPendingEntries ? { attention: true } : { attention: true, autoCloseMs: 3000 });
   }
-  const shouldQueueModelSaveVerifyTour = !shouldWarnMissingModel && !hasModelSaveVerifyTourClickRecord() && !hasPendingModelSaveVerifyTourRecord();
+  const shouldQueueModelSaveVerifyTour = !shouldWarnMissingModel && !hasPendingEntries && !hasModelSaveVerifyTourClickRecord() && !hasPendingModelSaveVerifyTourRecord();
   const normalizedRemovedModels = Array.from(new Set(removedModels.filter(model => model && !Object.prototype.hasOwnProperty.call(models, model))));
   const shouldSaveTokenStore = Object.keys(models).length > 0 || normalizedRemovedModels.length > 0;
   if (shouldSaveTokenStore) {
@@ -37796,6 +38015,17 @@ async function saveSettingsAsync() {
       }
       state.settings.models = normalizeModelMap(data.models || {});
       syncModelRuntimeTokenCacheFromSettings();
+      document.querySelectorAll('#modelEntries .model-entry').forEach(entry => {
+        const model = normalizeModelName(entry.querySelector('select') && entry.querySelector('select').value);
+        const token = String(entry.querySelector('.model-token-input') && entry.querySelector('.model-token-input').value || '').trim();
+        if (model && token && Object.prototype.hasOwnProperty.call(state.settings.models || {}, model)) {
+          entry.setAttribute('data-original-model', model);
+        }
+        refreshModelEntryPendingState(entry);
+      });
+      sortModelEntryElements();
+      refreshModelEntryOptions();
+      refreshSwarmModelAvailability();
     } catch (e) {
       setSettingsErrorMessage('保存模型密钥失败：' + (e && e.message ? e.message : '网络异常'));
       return;
@@ -37854,10 +38084,7 @@ async function saveSettingsAsync() {
     chatSwarm[state.activeChat] = false;
   }
   saveChats();
-  state.selectedModel = normalizeModelName(state.selectedModel);
-  if (!state.selectedModel || !state.settings.models[state.selectedModel]) {
-    state.selectedModel = Object.keys(state.settings.models || {})[0] || null;
-  }
+  state.selectedModel = resolveSelectableConfiguredModelName(state.selectedModel, state.settings.models || {}) || null;
   if (state.activeChat && chatModels[state.activeChat]) {
     const activeChatModel = normalizeModelName(chatModels[state.activeChat]);
     if (!state.settings.models[activeChatModel]) {
@@ -37866,7 +38093,10 @@ async function saveSettingsAsync() {
     }
   }
   if (!shouldWarnMissingModel) {
-    if (shouldQueueModelSaveVerifyTour && !isOnboardingActive()) closeSettings(true);
+    if (hasPendingEntries) {
+      const toastPlacement = isLeftSidebarCollapsed() ? 'center-top' : 'vfs';
+      vfsShowUploadToast('已保存已完成模型，未填写密钥的模型保持待完成并置底', false, { placement: toastPlacement });
+    } else if (shouldQueueModelSaveVerifyTour && !isOnboardingActive()) closeSettings(true);
     else closeSettings();
   }
   // Reset memo only when agent switched and the memo content input had text.
@@ -43700,7 +43930,7 @@ function rsSetModelMissingState(missing) {
 
 function rsGetSelectedModel() {
   const model = normalizeModelName(rsSelectedModel);
-  if (model && state.settings.models && state.settings.models[model]) {
+  if (isSelectableConfiguredModel(model, state.settings.models || {})) {
     rsSelectedModel = model;
     rsSetModelMissingState(false);
     return model;
@@ -43823,11 +44053,13 @@ function rsToggleModelDropdown() {
 function rsSelectModel(m) {
   if (isMemoTourInteractionLocked()) return;
   rsHideConfirm();
-  rsSelectedModel = normalizeModelName(m);
+  const normalizedModel = normalizeModelName(m);
+  if (!isSelectableConfiguredModel(normalizedModel, state.settings.models || {})) return;
+  rsSelectedModel = normalizedModel;
   rsSetModelMissingState(false);
   const label = document.getElementById('rsModelLabel');
   label.style.opacity = '0';
-  setTimeout(() => { label.textContent = m; label.style.opacity = '1'; }, 150);
+  setTimeout(() => { label.textContent = normalizedModel; label.style.opacity = '1'; }, 150);
   document.getElementById('rsModelDropdown').classList.remove('show');
 }
 function rsSaveNote(options = {}) {

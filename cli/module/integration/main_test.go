@@ -312,6 +312,102 @@ func findAgentMetadataInList(t *testing.T, metadata map[string]interface{}, agen
 	return nil
 }
 
+func integrationSkillNamesFromMetadataAgent(t *testing.T, agent map[string]interface{}) []string {
+	t.Helper()
+	items, ok := agent["skills"].([]interface{})
+	if !ok {
+		t.Fatalf("agent.skills = %#v, want []interface{}", agent["skills"])
+	}
+	names := make([]string, 0, len(items))
+	for _, item := range items {
+		skill, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		name := strings.TrimSpace(fmt.Sprint(skill["name"]))
+		if name != "" {
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
+func TestBuildCLIRequestMetadataMapReportsSeedreamOnlyWhenConfigured(t *testing.T) {
+	flushAgentCache()
+	tmp := t.TempDir()
+
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	db, err := sql.Open("sqlite", filepath.Join(tmp, "data"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+	oldCronDB := cronDB
+	cronDB = db
+	defer func() { cronDB = oldCronDB }()
+
+	agentRoot := filepath.Join(tmp, "agents")
+	agentDir := filepath.Join(agentRoot, "A")
+	if err := os.MkdirAll(agentDir, 0o755); err != nil {
+		t.Fatalf("mkdir agent: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(tmp, "knowledge"), 0o755); err != nil {
+		t.Fatalf("mkdir knowledge: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(agentDir, "SOUL.md"), []byte("soul"), 0o644); err != nil {
+		t.Fatalf("write soul: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(agentDir, "USER.md"), []byte("user"), 0o644); err != nil {
+		t.Fatalf("write user: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(agentDir, "config.json"), []byte(`{}`), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	readSkills := func() []string {
+		metadata, err := getAgentOutput(agentRoot, "test-dev-cli-seedream", 0)
+		if err != nil {
+			t.Fatalf("getAgentOutput: %v", err)
+		}
+		metaMap := buildCLIRequestMetadataMap(metadata)
+		agent := findAgentMetadataInList(t, metaMap, "A")
+		return integrationSkillNamesFromMetadataAgent(t, agent)
+	}
+
+	skills := readSkills()
+	for _, name := range skills {
+		if name == seedreamInternalSkillName {
+			t.Fatalf("cli/get skills without config = %v, want %q absent", skills, seedreamInternalSkillName)
+		}
+	}
+
+	if err := writeTokenStoreConfigs(db, map[string]tokenConfig{
+		seedreamProviderName: {Token: "seedream-token"},
+	}); err != nil {
+		t.Fatalf("write seedream token config: %v", err)
+	}
+
+	skills = readSkills()
+	found := false
+	for _, name := range skills {
+		if name == seedreamInternalSkillName {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("cli/get skills with defaults = %v, want %q present", skills, seedreamInternalSkillName)
+	}
+}
+
 func TestDetectResponseType(t *testing.T) {
 	t.Parallel()
 
@@ -15184,6 +15280,16 @@ func TestHandleSkillsIncludesInternalSkills(t *testing.T) {
 		t.Cleanup(func() {
 			integrationExecutableFn = originalExecutable
 		})
+		db, err := sql.Open("sqlite", filepath.Join(appRoot, "data"))
+		if err != nil {
+			t.Fatalf("open isolated db: %v", err)
+		}
+		oldCronDB := cronDB
+		cronDB = db
+		t.Cleanup(func() {
+			cronDB = oldCronDB
+			_ = db.Close()
+		})
 	}
 
 	t.Run("cron only", func(t *testing.T) {
@@ -15293,6 +15399,82 @@ func TestHandleSkillsIncludesInternalSkills(t *testing.T) {
 			t.Fatalf("skills = %v, want %v", names, wantStarted)
 		}
 	})
+}
+
+func TestHandleSkillsReportsSeedreamOnlyWhenConfigured(t *testing.T) {
+	agentDir, err := filepath.Abs("../proxy/iteration/20260419_4/test-case")
+	if err != nil {
+		t.Fatalf("resolve agent dir: %v", err)
+	}
+
+	tmp := t.TempDir()
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	db, err := sql.Open("sqlite", filepath.Join(tmp, "data"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+	oldCronDB := cronDB
+	cronDB = db
+	defer func() { cronDB = oldCronDB }()
+
+	cfg := &Config{
+		AgentDir:     agentDir,
+		Device:       "test-dev-seedream",
+		AgentCacheMs: 120000,
+	}
+	server := httptest.NewServer(http.HandlerFunc(handleSkills(cfg)))
+	defer server.Close()
+
+	getSkills := func() []string {
+		resp, err := http.Get(server.URL + "/api/skills?agentId=a")
+		if err != nil {
+			t.Fatalf("GET failed: %v", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			t.Fatalf("status = %d, body = %s", resp.StatusCode, string(body))
+		}
+		var names []string
+		if err := json.NewDecoder(resp.Body).Decode(&names); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		return names
+	}
+
+	names := getSkills()
+	for _, name := range names {
+		if name == seedreamInternalSkillName {
+			t.Fatalf("skills without seedream config = %v, want %q absent", names, seedreamInternalSkillName)
+		}
+	}
+
+	if err := writeTokenStoreConfigs(db, map[string]tokenConfig{
+		seedreamProviderName: {Token: "seedream-token"},
+	}); err != nil {
+		t.Fatalf("write seedream token config: %v", err)
+	}
+
+	names = getSkills()
+	found := false
+	for _, name := range names {
+		if name == seedreamInternalSkillName {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("skills with defaults = %v, want %q present", names, seedreamInternalSkillName)
+	}
 }
 
 func TestHandleSkillsRespectsChatSkillState(t *testing.T) {

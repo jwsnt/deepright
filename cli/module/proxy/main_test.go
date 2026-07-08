@@ -70,6 +70,45 @@ func pluginParamFields(keys ...string) connectsvc.PluginParamFields {
 	return fields
 }
 
+func findProxyAgentMetadataInList(t *testing.T, metadata map[string]interface{}, agentID string) map[string]interface{} {
+	t.Helper()
+	agents, ok := metadata["agents"].([]interface{})
+	if !ok || len(agents) == 0 {
+		t.Fatalf("metadata.agents = %#v, want non-empty agent list", metadata["agents"])
+	}
+	for _, item := range agents {
+		agent, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if strings.TrimSpace(fmt.Sprint(agent["agentId"])) == strings.TrimSpace(agentID) {
+			return agent
+		}
+	}
+	t.Fatalf("metadata.agents missing agent %q: %#v", agentID, agents)
+	return nil
+}
+
+func proxySkillNamesFromMetadataAgent(t *testing.T, agent map[string]interface{}) []string {
+	t.Helper()
+	items, ok := agent["skills"].([]interface{})
+	if !ok {
+		t.Fatalf("agent.skills = %#v, want []interface{}", agent["skills"])
+	}
+	names := make([]string, 0, len(items))
+	for _, item := range items {
+		skill, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		name := strings.TrimSpace(fmt.Sprint(skill["name"]))
+		if name != "" {
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
 func TestDetectResponseType(t *testing.T) {
 	t.Parallel()
 
@@ -2179,6 +2218,119 @@ func TestProxyChatCompletionsInjectsConfiguredModelMetadata(t *testing.T) {
 	}
 	if _, exists := meta["__model_thinking"]; exists {
 		t.Fatalf("metadata.__model_thinking should be absent when config is empty: %#v", meta["__model_thinking"])
+	}
+}
+
+func TestProxyChatCompletionsReportsSeedreamSkillOnlyWhenConfigured(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tmp, "knowledge"), 0o755); err != nil {
+		t.Fatalf("mkdir knowledge: %v", err)
+	}
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	sharedDataDB = pooledDB{}
+	defer func() {
+		if sharedDataDB.db != nil {
+			_ = sharedDataDB.db.Close()
+		}
+		sharedDataDB = pooledDB{}
+	}()
+
+	agentRoot := filepath.Join(tmp, "agents")
+	agentDir := filepath.Join(agentRoot, "A")
+	if err := os.MkdirAll(agentDir, 0o755); err != nil {
+		t.Fatalf("mkdir agent: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(agentDir, "SOUL.md"), []byte("soul"), 0o644); err != nil {
+		t.Fatalf("write soul: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(agentDir, "USER.md"), []byte("user"), 0o644); err != nil {
+		t.Fatalf("write user: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(agentDir, "config.json"), []byte(`{}`), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join("config", "skills", seedreamInternalSkillName), 0o755); err != nil {
+		t.Fatalf("mkdir seedream skill dir: %v", err)
+	}
+
+	var capturedBody map[string]interface{}
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &capturedBody)
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "data: [DONE]\n\n")
+	}))
+	defer upstream.Close()
+
+	proxy := &ProxyServer{
+		Host:     upstream.URL,
+		AgentDir: agentRoot,
+		DeviceID: "test-device-seedream",
+		CacheTTL: time.Second,
+		Client:   &http.Client{Timeout: 10 * time.Second},
+	}
+	server := httptest.NewServer(http.HandlerFunc(proxy.HandleChatCompletions))
+	defer server.Close()
+
+	send := func() []string {
+		capturedBody = nil
+		reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"HELLO SEEDREAM"}],"metadata":{"agentId":"A"}}`
+		req, err := http.NewRequest(http.MethodPost, server.URL+"/v1/chat/completions", strings.NewReader(reqBody))
+		if err != nil {
+			t.Fatalf("new request: %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("status = %d, want 200", resp.StatusCode)
+		}
+		meta, ok := capturedBody["metadata"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("metadata not injected: %#v", capturedBody["metadata"])
+		}
+		agent := findProxyAgentMetadataInList(t, meta, "A")
+		return proxySkillNamesFromMetadataAgent(t, agent)
+	}
+
+	skills := send()
+	for _, name := range skills {
+		if name == seedreamInternalSkillName {
+			t.Fatalf("metadata skills without config = %v, want %q absent", skills, seedreamInternalSkillName)
+		}
+	}
+
+	db, err := getDataDB()
+	if err != nil {
+		t.Fatalf("getDataDB: %v", err)
+	}
+	if err := writeTokenStoreConfigs(db, map[string]tokenConfig{
+		seedreamProviderName: {Token: "seedream-token"},
+	}); err != nil {
+		t.Fatalf("write seedream token config: %v", err)
+	}
+
+	skills = send()
+	found := false
+	for _, name := range skills {
+		if name == seedreamInternalSkillName {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("metadata skills with defaults = %v, want %q present", skills, seedreamInternalSkillName)
 	}
 }
 
@@ -5586,6 +5738,97 @@ func TestHandleSkills(t *testing.T) {
 		t.Errorf("unknown agentId: status = %d, want 404", resp4.StatusCode)
 	}
 	resp4.Body.Close()
+}
+
+func TestHandleSkillsReportsSeedreamOnlyWhenConfigured(t *testing.T) {
+	agentDir, err := filepath.Abs("iteration/20260419_4/test-case")
+	if err != nil {
+		t.Fatalf("resolve agent dir: %v", err)
+	}
+
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	sharedDataDB = pooledDB{}
+	defer func() {
+		if sharedDataDB.db != nil {
+			_ = sharedDataDB.db.Close()
+		}
+		sharedDataDB = pooledDB{}
+	}()
+
+	if err := os.MkdirAll(filepath.Join("config", "skills", seedreamInternalSkillName), 0o755); err != nil {
+		t.Fatalf("mkdir seedream skill dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join("config", "config.json"), []byte(`{}`), 0o644); err != nil {
+		t.Fatalf("write config.json: %v", err)
+	}
+
+	proxy := &ProxyServer{
+		AgentDir: agentDir,
+		DeviceID: "test-dev-seedream",
+		CacheTTL: 120 * time.Second,
+	}
+	server := httptest.NewServer(http.HandlerFunc(proxy.HandleSkills))
+	defer server.Close()
+
+	getSkills := func() []string {
+		resp, err := http.Get(server.URL + "/api/skills?agentId=a")
+		if err != nil {
+			t.Fatalf("GET failed: %v", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			t.Fatalf("status = %d, body = %s", resp.StatusCode, string(body))
+		}
+		var names []string
+		if err := json.NewDecoder(resp.Body).Decode(&names); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		return names
+	}
+
+	names := getSkills()
+	hasSeedream := false
+	for _, name := range names {
+		if name == seedreamInternalSkillName {
+			hasSeedream = true
+			break
+		}
+	}
+	if hasSeedream {
+		t.Fatalf("skills without seedream config = %v, want %q absent", names, seedreamInternalSkillName)
+	}
+
+	db, err := getDataDB()
+	if err != nil {
+		t.Fatalf("getDataDB: %v", err)
+	}
+	if err := writeTokenStoreConfigs(db, map[string]tokenConfig{
+		seedreamProviderName: {Token: "seedream-token"},
+	}); err != nil {
+		t.Fatalf("write seedream token config: %v", err)
+	}
+
+	names = getSkills()
+	hasSeedream = false
+	for _, name := range names {
+		if name == seedreamInternalSkillName {
+			hasSeedream = true
+			break
+		}
+	}
+	if !hasSeedream {
+		t.Fatalf("skills with seedream defaults = %v, want %q present", names, seedreamInternalSkillName)
+	}
 }
 
 func TestHandleSkillsRespectsChatSkillState(t *testing.T) {

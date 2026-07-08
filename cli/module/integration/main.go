@@ -61,6 +61,15 @@ type KillRequest = sharedutil.KillRequest
 type CmdResponse = sharedutil.CmdResponse
 type KillResponse = sharedutil.KillResponse
 
+const (
+	seedreamProviderName            = "seedream"
+	seedreamInternalSkillName       = "__internal_seedream"
+	legacySeedreamSkillName         = "image-seedream"
+	seedreamDefaultURL              = "https://ark.cn-beijing.volces.com/api/v3/images/generations"
+	seedreamDefaultModelMultiOutput = "doubao-seedream-4.5"
+	seedreamSkillDescription        = "文生图、单图/多图生图。凭据自动获取，支持自定义尺寸/数量/返回格式"
+)
+
 func findAgent(agents []agentcore.Agent, agentID string) *agentcore.Agent {
 	for i := range agents {
 		if agents[i].AgentID == agentID {
@@ -1301,7 +1310,9 @@ func hydrateAgentOutput(output *AgentOutput, chatID string) {
 		return
 	}
 	chatID = strings.TrimSpace(chatID)
+	seedreamSkill, seedreamEnabled := integrationSeedreamSkillDefinition()
 	for i := range output.Agents {
+		output.Agents[i].Skills = integrationApplySeedreamSkill(output.Agents[i].Skills, seedreamSkill, seedreamEnabled)
 		output.Agents[i].Sandbox = ""
 		if chatID == "" {
 			continue
@@ -1373,6 +1384,93 @@ func cloneStringAnyMap(src map[string]interface{}) map[string]interface{} {
 		cloned[k] = v
 	}
 	return cloned
+}
+
+func normalizeConfiguredIntegrationSkillName(name string) string {
+	name = strings.TrimSpace(name)
+	switch name {
+	case "", legacySeedreamSkillName:
+		if name == legacySeedreamSkillName {
+			return seedreamInternalSkillName
+		}
+		return ""
+	default:
+		return name
+	}
+}
+
+func applySeedreamTokenDefaults(cfg tokenConfig) tokenConfig {
+	cfg = normalizeTokenConfig(cfg)
+	if cfg.BaseURL == "" {
+		cfg.BaseURL = seedreamDefaultURL
+	}
+	if cfg.ModelMultiOutput == "" {
+		cfg.ModelMultiOutput = seedreamDefaultModelMultiOutput
+	}
+	return cfg
+}
+
+func integrationSeedreamTokenConfig() (tokenConfig, bool, error) {
+	if cronDB != nil {
+		return integrationSeedreamTokenConfigFromDB(cronDB)
+	}
+	db, err := sql.Open("sqlite", resolveIntegrationDBPath())
+	if err != nil {
+		return tokenConfig{}, false, err
+	}
+	defer db.Close()
+	return integrationSeedreamTokenConfigFromDB(db)
+}
+
+func integrationSeedreamTokenConfigFromDB(db *sql.DB) (tokenConfig, bool, error) {
+	cfg, err := lookupTokenConfigByModel(db, seedreamProviderName)
+	if err != nil {
+		return tokenConfig{}, false, err
+	}
+	cfg = applySeedreamTokenDefaults(cfg)
+	if cfg.Token == "" || cfg.BaseURL == "" || cfg.ModelMultiOutput == "" {
+		return cfg, false, nil
+	}
+	return cfg, true, nil
+}
+
+func integrationSeedreamSkillEnabled() bool {
+	_, enabled, err := integrationSeedreamTokenConfig()
+	return err == nil && enabled
+}
+
+func integrationInternalSkillPath(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return ""
+	}
+	return integrationResolveResourcePath(filepath.Join("config", "skills", name, "SKILL.md"))
+}
+
+func integrationSeedreamSkillDefinition() (agentcore.Skill, bool) {
+	_, enabled, err := integrationSeedreamTokenConfig()
+	if err != nil || !enabled {
+		return agentcore.Skill{}, false
+	}
+	return agentcore.Skill{
+		Name:        seedreamInternalSkillName,
+		Description: seedreamSkillDescription,
+		Location:    integrationInternalSkillPath(seedreamInternalSkillName),
+	}, true
+}
+
+func integrationApplySeedreamSkill(skills []agentcore.Skill, seedream agentcore.Skill, enabled bool) []agentcore.Skill {
+	filtered := make([]agentcore.Skill, 0, len(skills)+1)
+	for _, skill := range skills {
+		if strings.TrimSpace(skill.Name) == seedreamInternalSkillName {
+			continue
+		}
+		filtered = append(filtered, skill)
+	}
+	if enabled {
+		filtered = append(filtered, seedream)
+	}
+	return filtered
 }
 
 func readLiveAgentMedia(workspace string) map[string]interface{} {
@@ -3624,11 +3722,15 @@ func configuredIntegrationSkillNames() []string {
 }
 
 func buildIntegrationRuntimeSkillNames(base []string) []string {
-	out := append([]string(nil), base...)
+	out := make([]string, 0, len(base)+5)
 	seen := make(map[string]struct{}, len(base)+4)
+	seedreamEnabled := integrationSeedreamSkillEnabled()
 	appendIfMissing := func(name string, enabled bool) {
 		name = strings.TrimSpace(name)
 		if !enabled || name == "" {
+			return
+		}
+		if name == seedreamInternalSkillName && !seedreamEnabled {
 			return
 		}
 		if _, ok := seen[name]; ok {
@@ -3638,16 +3740,13 @@ func buildIntegrationRuntimeSkillNames(base []string) []string {
 		seen[name] = struct{}{}
 	}
 
-	for _, name := range out {
-		name = strings.TrimSpace(name)
-		if name == "" {
-			continue
-		}
-		seen[name] = struct{}{}
-	}
-	for _, name := range configuredIntegrationSkillNames() {
+	for _, name := range base {
 		appendIfMissing(name, true)
 	}
+	for _, name := range configuredIntegrationSkillNames() {
+		appendIfMissing(normalizeConfiguredIntegrationSkillName(name), true)
+	}
+	appendIfMissing(seedreamInternalSkillName, seedreamEnabled)
 	for _, item := range []struct {
 		key   string
 		skill string
