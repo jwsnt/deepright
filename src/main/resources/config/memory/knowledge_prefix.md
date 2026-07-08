@@ -1,5 +1,4 @@
-### 知识库地址
-+ #knowledge
+#init
 ### 更新准则
 + 逐次读取git：#git 在`#lastUpdate`至`#limitUpdate`内每个COMMIT。单次小于5个COMMIT，仅取摘要
 + 每页WIKI记录上下文摘要、关联Commit。实体词间交叉引用，高频关联实体词抽象公共概念作为新实体词聚合

@@ -1,5 +1,7 @@
 package ai.deepright.feature;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
 import ai.open.right.workflow.flow.WorkflowTask;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;

@@ -1,5 +1,7 @@
 package ai.deepright.memory.git;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
 import ai.deepright.lang.XmlResourceLang;
 import ai.open.right.workflow.flow.WorkflowTask;
 import org.apache.commons.lang3.StringUtils;

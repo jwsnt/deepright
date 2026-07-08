@@ -1,5 +1,7 @@
 package ai.deepright.llm;
 
+import ai.open.right.protocol.ProtocolCode;
+
 import ai.open.right.WorkflowException;
 import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.llm.provider.ProviderReaderCallback;
@@ -7,7 +9,6 @@ import ai.open.right.workflow.flow.llm.provider.ProviderReaderConfig;
 import ai.open.right.workflow.flow.llm.provider.ProviderRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.MapUtils;
-import org.springframework.util.Assert;
 
 import java.util.concurrent.BlockingQueue;
 
@@ -21,7 +22,7 @@ public class RetryCallback extends ProviderReaderCallback {
     public RetryCallback(ProviderReaderConfig<ProviderRequest> providerReaderConfig, BlockingQueue<Object> messageQueue, ProviderRequest request, WorkflowTask workTask) throws Exception {
         super(providerReaderConfig, messageQueue, request, workTask);
         RetryConfig retryConfig = RetryConfig.class.cast(MapUtils.getObject(providerReaderConfig.getExtension(), RetryUtils.RETRY));
-        Assert.notNull(retryConfig, "The retry config can not be empty");
+        WorkflowException.check(retryConfig == null, "The retry config can not be empty", ProtocolCode.C400);
         this.retryConfig = retryConfig.check();
     }
 

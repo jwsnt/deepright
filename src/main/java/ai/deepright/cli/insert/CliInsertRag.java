@@ -5,6 +5,8 @@ import ai.deepright.feature.FeatureFlag;
 import ai.deepright.lang.XmlResourceLang;
 import ai.deepright.llm.notifier.MultiSourceFlag;
 import ai.deepright.llm.provider.RequestContextBuilder;
+import ai.open.right.WorkflowException;
+import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.resouce.ResourceService;
 import ai.open.right.utils.SplitUtils;
 import ai.open.right.workflow.flow.WorkflowTask;
@@ -26,13 +28,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.util.Assert;
 
 import java.io.BufferedInputStream;
 import java.nio.charset.StandardCharsets;
@@ -62,7 +64,7 @@ public class CliInsertRag extends RagCondition implements CliInsertService, RagS
     @PostConstruct
     public void init() throws Exception {
         this.template4insert = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4insert).openStream()), StandardCharsets.UTF_8);
-        Assert.hasText(this.template4insert, "The template insert must not be empty");
+        WorkflowException.check(StringUtils.isEmpty(this.template4insert), "The template insert must not be empty", ProtocolCode.C400);
     }
 
     @Override

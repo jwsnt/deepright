@@ -1,5 +1,7 @@
 package ai.deepright.memory.impl;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
 import ai.deepright.feature.FeatureUtils;
 import ai.deepright.memory.MemoryRecall;
 import ai.deepright.memory.MemoryService;

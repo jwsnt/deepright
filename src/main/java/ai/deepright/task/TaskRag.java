@@ -1,5 +1,16 @@
 package ai.deepright.task;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
+import static org.springframework.util.StringUtils.hasText;
+
+
+
+
+import ai.open.right.protocol.ProtocolCode;
+
+import ai.open.right.WorkflowException;
+
 import ai.deepright.feature.FeatureField;
 import ai.deepright.feature.FeatureFlag;
 import ai.deepright.llm.notifier.MultiSourceNotifier;
@@ -27,7 +38,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.util.Assert;
 
 import java.io.BufferedInputStream;
 import java.nio.charset.StandardCharsets;
@@ -57,9 +67,9 @@ public class TaskRag extends RagCondition implements RagService {
         this.template4schemaHtml = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4schemaHtml).openStream()), StandardCharsets.UTF_8);
         this.template4schemaJson = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4schemaJson).openStream()), StandardCharsets.UTF_8);
         this.template4schemaDef = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4schemaDef).openStream()), StandardCharsets.UTF_8);
-        Assert.hasText(this.template4schemaJson, "The template json schema must not be empty");
-        Assert.hasText(this.template4schemaHtml, "The template html schema must not be empty");
-        Assert.hasText(this.template4schemaDef, "The template def schema must not be empty");
+        WorkflowException.check(!hasText(this.template4schemaJson), "The template json schema must not be empty", ProtocolCode.C400);
+        WorkflowException.check(!hasText(this.template4schemaHtml), "The template html schema must not be empty", ProtocolCode.C400);
+        WorkflowException.check(!hasText(this.template4schemaDef), "The template def schema must not be empty", ProtocolCode.C400);
     }
 
     @Override
@@ -79,13 +89,13 @@ public class TaskRag extends RagCondition implements RagService {
             if (FeatureFlag.isTask(ragData.getQuery())) {
                 // @see CliTaskFunction metadata
                 Map<String, Object> output = ragData.getQuery().getMetadata(FeatureField.KEY_OUTPUT, Map.class);
-                Assert.notEmpty(output, "The output can not be empty, please check the task.json");
+                WorkflowException.check(isEmpty(output), "The output can not be empty, please check the task.json", ProtocolCode.C400);
                 responseSchema = JsonUtils.write(output);
             } else if (FeatureFlag.isResponseSchema(ragData.getQuery())) {
                 responseSchema = this.buildResponseSchema(ragData.getQuery());
             }
             // 精确匹配
-            Assert.hasText(responseSchema, "The schema template can not be empty");
+            WorkflowException.check(!hasText(responseSchema), "The schema template can not be empty", ProtocolCode.C400);
             String schema = this.buildPlugin(ragData, this.template4schemaJson.replace("#schema", StringUtils.defaultIfEmpty(responseSchema, "")));
             if (log.isWarnEnabled() && !TemplateChecker.check(schema)) {
                 log.warn("The schema template contains unexpected characters, please check: {}", schema);

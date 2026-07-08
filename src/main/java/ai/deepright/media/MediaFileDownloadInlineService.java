@@ -1,5 +1,7 @@
 package ai.deepright.media;
 
+import ai.open.right.protocol.ProtocolCode;
+
 import ai.deepright.cli.CliPubData;
 import ai.deepright.cli.CliPubSub;
 import ai.deepright.cli.CliSubFetcher;
@@ -23,7 +25,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.util.Assert;
 
 import java.io.File;
 import java.net.URI;
@@ -60,7 +61,7 @@ public class MediaFileDownloadInlineService extends MediaInlineServiceImpl {
                 .w(List.of(file))
                 .exempted(true)
                 .build(), CliPubSub.buildPushURL(workTask, resource, file), "").valid();
-        Assert.isTrue(pubData.isOk(), pubData.getCmd());
+        WorkflowException.check(!(pubData.isOk()), pubData.getCmd(), ProtocolCode.C400);
         return file;
     }
 

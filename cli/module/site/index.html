@@ -3953,7 +3953,7 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
             <button type="button" class="rs-wiki-tidy-btn" id="rsWikiTidyBtn" title="整理知识库WIKI" aria-label="整理知识库WIKI" onclick="toggleWikiTidyPopover(event)">
               <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 21h6v-1H9v1Zm3-20a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-3.26A7 7 0 0 0 12 1Zm2.59 11.29-.59.42V16h-4v-3.29l-.59-.42a5 5 0 1 1 5.18 0Z"/></svg>
             </button>
-            <button type="button" class="rs-wiki-auto-toggle" id="rsWikiAutoToggle" role="switch" aria-checked="true" title="自动整理知识库WIKI：开启" aria-label="自动整理知识库WIKI：开启" onclick="toggleWikiAutoTidy(event)">
+            <button type="button" class="rs-wiki-auto-toggle off" id="rsWikiAutoToggle" role="switch" aria-checked="false" title="自动整理知识库WIKI：关闭" aria-label="自动整理知识库WIKI：关闭" onclick="toggleWikiAutoTidy(event)">
               <span class="rs-wiki-auto-label">自动</span>
               <span class="rs-wiki-auto-track" aria-hidden="true"><span class="rs-wiki-auto-thumb"></span></span>
             </button>
@@ -9332,7 +9332,7 @@ function getOnboardingStepConfig(step) {
       return {
         domain: 'right',
         selector: '#rsWikiAutoToggle',
-        message: '知识库会自动整理，点击关闭后切换为手动模式。',
+        message: '默认关闭自动整理，点击开启后会切换为自动模式。',
         actionLabel: '完成',
         padding: 6,
         highlightPadding: 10,
@@ -20188,8 +20188,9 @@ function ensureKnowledgeDisableSettings() {
 
 function getKnowledgeDisableSetting(agentId = getCurrentWikiAgentId()) {
   const resolvedAgentId = String(agentId || '').trim();
-  if (!resolvedAgentId) return false;
+  if (!resolvedAgentId) return true;
   const knowledgeDisableByAgent = ensureKnowledgeDisableSettings();
+  if (!Object.prototype.hasOwnProperty.call(knowledgeDisableByAgent, resolvedAgentId)) return true;
   return readMetadataBoolean(knowledgeDisableByAgent[resolvedAgentId]) === true;
 }
 

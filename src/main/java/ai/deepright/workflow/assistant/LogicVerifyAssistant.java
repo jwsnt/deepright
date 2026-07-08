@@ -1,5 +1,14 @@
 package ai.deepright.workflow.assistant;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
+import static org.springframework.util.StringUtils.hasText;
+
+
+
+
+import ai.open.right.protocol.ProtocolCode;
+
 import ai.deepright.cli.CliPrinter;
 import ai.deepright.cli.insert.CliInsertRag;
 import ai.deepright.cli.insert.CliRecall;
@@ -37,7 +46,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.util.Assert;
 
 import java.io.BufferedInputStream;
 import java.nio.charset.StandardCharsets;
@@ -74,8 +82,8 @@ public class LogicVerifyAssistant extends DefaultAssistant {
     public void init() throws Exception {
         this.template4verify = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4verify).openStream()), StandardCharsets.UTF_8);
         this.template4query = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4query).openStream()), StandardCharsets.UTF_8);
-        Assert.hasText(this.template4verify, "The template verify must not be empty");
-        Assert.hasText(this.template4query, "The template query must not be empty");
+        WorkflowException.check(!hasText(this.template4verify), "The template verify must not be empty", ProtocolCode.C400);
+        WorkflowException.check(!hasText(this.template4query), "The template query must not be empty", ProtocolCode.C400);
     }
 
     @Override
@@ -168,7 +176,7 @@ public class LogicVerifyAssistant extends DefaultAssistant {
         response = JsonUtils.like(response) ? response : JsonUtils.extract(response);
         try {
             Map<String, Object> result = JsonUtils.read(response, Map.class);
-            Assert.notNull(MapUtils.getBoolean(result, "passed"), "The passed must not be empty");
+            WorkflowException.check(MapUtils.getBoolean(result, "passed") == null, "The passed must not be empty", ProtocolCode.C400);
             return result;
         } catch (Exception e) {
             if (log.isDebugEnabled()) {
@@ -180,7 +188,7 @@ public class LogicVerifyAssistant extends DefaultAssistant {
             String extract = StringUtils.trim(this.commit(workTask, "extract", response));
             extract = JsonUtils.like(extract) ? extract : JsonUtils.extract(extract);
             Map<String, Object> result = JsonUtils.read(extract, Map.class);
-            Assert.notNull(MapUtils.getBoolean(result, "passed"), "The passed must not be empty");
+            WorkflowException.check(MapUtils.getBoolean(result, "passed") == null, "The passed must not be empty", ProtocolCode.C400);
             return result;
         } catch (Exception inner) {
             if (log.isDebugEnabled()) {

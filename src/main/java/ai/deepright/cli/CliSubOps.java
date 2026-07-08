@@ -1,5 +1,7 @@
 package ai.deepright.cli;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
 import ai.deepright.feature.FeatureFlag;
 import ai.deepright.feature.FeatureUtils;
 import ai.open.right.WorkflowException;

@@ -1,5 +1,9 @@
 package ai.deepright.task;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
+import ai.open.right.protocol.ProtocolCode;
+
 import ai.deepright.cli.CliPubData;
 import ai.deepright.cli.CliPubSub;
 import ai.deepright.cli.CliSubFetcher;
@@ -12,7 +16,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.util.Assert;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -72,7 +75,7 @@ public class TaskExec implements Runnable {
                     .w(List.of(this.filename))
                     .exempted(true)
                     .build(), CliPubSub.buildPushCmd(this.workTask, this.defStore, this.oversize, answer.toString(), this.filename), "");
-            Assert.isTrue(pubData.isOk(), pubData.getCmd());
+            WorkflowException.check(!(pubData.isOk()), pubData.getCmd(), ProtocolCode.C400);
         } catch (Exception e) {
             WorkflowException.dolog(e);
         }

@@ -1,5 +1,7 @@
 package ai.deepright.plan;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
 import ai.deepright.complex.ComplexityMode;
 import ai.deepright.complex.ComplexityUtils;
 import ai.deepright.feature.FeatureField;

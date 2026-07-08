@@ -1,5 +1,9 @@
 package ai.deepright.llm.optimize.compressor;
 
+import ai.open.right.protocol.ProtocolCode;
+
+import ai.open.right.WorkflowException;
+
 import ai.open.right.utils.JsonUtils;
 import ai.open.right.workflow.flow.file.FileStore;
 import ai.open.right.workflow.flow.llm.LLMFunCallRequest;
@@ -14,7 +18,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.util.Assert;
 
 import java.nio.charset.StandardCharsets;
 
@@ -29,7 +32,7 @@ public class OpenAICompressor extends StoreCompressor {
             // String type
             String original = String.class.cast(funCallRequest.getArgs());
             FileStore fileStore = this.defStore.fetchStore(this.store);
-            Assert.notNull(fileStore, "The file store can not empty: " + this.store);
+            WorkflowException.check(fileStore == null, "The file store can not empty: " + this.store, ProtocolCode.C400);
             // URL压缩在属性中
             String url = this.buildUrl(providerRequest, fileStore.store(original.getBytes(StandardCharsets.UTF_8), ".json", providerRequest.getMessage()));
             funCallRequest.setArgs(JsonUtils.write(ImmutableMap.of("the_original_digest", this.buildRecallQuery(providerRequest, original), "the_complete_content", url)));

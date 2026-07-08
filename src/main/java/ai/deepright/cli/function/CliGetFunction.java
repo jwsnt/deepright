@@ -5,6 +5,7 @@ import ai.deepright.cli.CliSubData;
 import ai.deepright.cli.CliSubFetcher;
 import ai.deepright.router.RouterDevice;
 import ai.deepright.router.RouterService;
+import ai.open.right.WorkflowException;
 import ai.open.right.utils.JsonUtils;
 import ai.open.right.utils.SpinExec;
 import ai.open.right.workflow.flow.WorkflowTask;
@@ -46,40 +47,45 @@ public class CliGetFunction extends BaseFunction {
     protected Integer circle;
 
     public Object call(FunctionContext functionContext) throws Exception {
-        CliPubSub.checkValid(functionContext.getWorkTask());
-        RouterDevice router = new RouterDevice(functionContext.getWorkTask());
-        if (log.isInfoEnabled()) {
-            log.info("The cli@get router key={}", router.key());
-        }
-        // 同步心跳（堵塞）
-        this.heartbeat(functionContext.getWorkTask());
-        // 没有获取到可以用Result或超时则返回
-        Object rest = null;
-        long start = System.currentTimeMillis();
-        long close = 0;
-        while (rest == null && ((this.timeout - this.interval) > close)) {
-            rest = new CliGetExec(this.redis4event, this.interval, this.timeout, this.circle, router.getDevice()).exec();
-            if (rest != null) {
-                // CMD + TID
-                CliSubData subData = JsonUtils.read((byte[]) rest, CliSubData.class).check();
-                if (!subData.isExpired()) {
-                    if (log.isInfoEnabled()) {
-                        log.info("The cli@get fetch the task, key={}", router.key());
-                    }
-                    rest = subData;
-                } else if (log.isWarnEnabled()) {
-                    // 过期丢弃
-                    log.warn("The cli@get task was expired={}, key={}", subData.getDdl(), router.key());
-                    rest = null;
-                }
+        try {
+            CliPubSub.checkValid(functionContext.getWorkTask());
+            RouterDevice router = new RouterDevice(functionContext.getWorkTask());
+            if (log.isInfoEnabled()) {
+                log.info("The cli@get router key={}", router.key());
             }
-            close = System.currentTimeMillis() - start;
+            // 同步心跳（堵塞）
+            this.heartbeat(functionContext.getWorkTask());
+            // 没有获取到可以用Result或超时则返回
+            Object rest = null;
+            long start = System.currentTimeMillis();
+            long close = 0;
+            while (rest == null && ((this.timeout - this.interval) > close)) {
+                rest = new CliGetExec(this.redis4event, this.interval, this.timeout, this.circle, router.getDevice()).exec();
+                if (rest != null) {
+                    // CMD + TID
+                    CliSubData subData = JsonUtils.read((byte[]) rest, CliSubData.class).check();
+                    if (!subData.isExpired()) {
+                        if (log.isInfoEnabled()) {
+                            log.info("The cli@get fetch the task, key={}", router.key());
+                        }
+                        rest = subData;
+                    } else if (log.isWarnEnabled()) {
+                        // 过期丢弃
+                        log.warn("The cli@get task was expired={}, key={}", subData.getDdl(), router.key());
+                        rest = null;
+                    }
+                }
+                close = System.currentTimeMillis() - start;
+            }
+            // 超时日志
+            if (log.isWarnEnabled() && close > (this.timeout + this.interval)) {
+                log.warn("The cli@get fetch the value, key={}, value={}, waiting={}", router.key(), rest, (System.currentTimeMillis() - functionContext.getWorkTask().getCreated()));
+            }
+            return rest;
+        } catch (Exception e) {
+            WorkflowException.dolog(e);
+            return null;
         }
-        // 超时日志
-        if (log.isWarnEnabled() && close > (this.timeout + this.interval)) {
-            log.warn("The cli@get fetch the value, key={}, value={}, waiting={}", router.key(), rest, (System.currentTimeMillis() - functionContext.getWorkTask().getCreated()));
-        }
-        return rest;
     }
 
     // 心跳

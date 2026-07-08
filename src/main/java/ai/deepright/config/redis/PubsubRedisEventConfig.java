@@ -1,5 +1,7 @@
 package ai.deepright.config.redis;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 import org.springframework.beans.factory.annotation.Qualifier;

@@ -1,5 +1,16 @@
 package ai.deepright.plan.function;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
+import static org.springframework.util.StringUtils.hasText;
+
+
+
+
+import ai.open.right.protocol.ProtocolCode;
+
+import ai.open.right.WorkflowException;
+
 import ai.deepright.cli.CliPrinter;
 import ai.deepright.feature.FeatureFlag;
 import ai.deepright.lang.XmlResourceLang;
@@ -21,7 +32,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.util.Assert;
 
 import java.io.BufferedInputStream;
 import java.nio.charset.StandardCharsets;
@@ -45,7 +55,7 @@ public class PlanDeleteFunction extends BaseFunction {
         this.template4delete = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4delete).openStream()), StandardCharsets.UTF_8);
         // 覆盖（rewrite），不需要重入
         // 启动检测，必要资源
-        Assert.hasText(this.template4delete, "The template delete must not be empty");
+        WorkflowException.check(!hasText(this.template4delete), "The template delete must not be empty", ProtocolCode.C400);
     }
 
     @Override

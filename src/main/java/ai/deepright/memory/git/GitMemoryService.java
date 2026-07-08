@@ -1,5 +1,14 @@
 package ai.deepright.memory.git;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
+import static org.springframework.util.StringUtils.hasText;
+
+
+
+
+import ai.open.right.protocol.ProtocolCode;
+
 import ai.deepright.cli.CliPrinter;
 import ai.deepright.cli.CliPubData;
 import ai.deepright.cli.CliSubFetcher;
@@ -46,7 +55,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.util.Assert;
 import org.unix4j.Unix4j;
 import org.unix4j.line.Line;
 import org.unix4j.unix.Grep;
@@ -117,9 +125,9 @@ public class GitMemoryService extends BaseFunction implements GitPath, MemorySer
         // IOUtils/JsonUtils负责关闭资源
         // 覆盖（rewrite），不需要重入
         // 启动检测，必要资源
-        Assert.hasText(this.template4summaryStore, "The template summary store must not be empty");
-        Assert.hasText(this.template4summaryQuery, "The template summary query must not be empty");
-        Assert.hasText(this.template4memory, "The template init must not be empty");
+        WorkflowException.check(!hasText(this.template4summaryStore), "The template summary store must not be empty", ProtocolCode.C400);
+        WorkflowException.check(!hasText(this.template4summaryQuery), "The template summary query must not be empty", ProtocolCode.C400);
+        WorkflowException.check(!hasText(this.template4memory), "The template init must not be empty", ProtocolCode.C400);
     }
 
     @Override
@@ -144,7 +152,7 @@ public class GitMemoryService extends BaseFunction implements GitPath, MemorySer
         if (log.isInfoEnabled()) {
             log.info("The recalled memory={}, device={}", StringUtils.length(pubData.getCmd()), workTask.getDevice());
         }
-        Assert.isTrue(pubData.isOk(), pubData.getCmd());
+        WorkflowException.check(!(pubData.isOk()), pubData.getCmd(), ProtocolCode.C400);
         return SecurityTruncater.truncate(this.buildRecallCompress(workTask, recall, pubData.getCmd()), this.truncate);
     }
 
@@ -380,7 +388,7 @@ public class GitMemoryService extends BaseFunction implements GitPath, MemorySer
                 String digest = null;
                 if (JsonUtils.like(this.buffer.toString())) {
                     Map<String, Object> memory = JsonUtils.read(this.buffer.toString(), Map.class);
-                    Assert.notEmpty(memory, "The git memory commit can not be empty");
+                    WorkflowException.check(isEmpty(memory), "The git memory commit can not be empty", ProtocolCode.C400);
                     Integer important = MapUtils.getInteger(memory, "important", 0);
                     digest = "[datetime=" + GitMemoryService.DATE_FORMAT.format(this.workTask.getCreated()) + "][important=" + important + "][needs=" + MapUtils.getString(memory, "needs") + "][digest=" + MapUtils.getString(memory, "digest", "") + "]";
                     why = MapUtils.getString(memory, "why_do_this");

@@ -1,5 +1,9 @@
 package ai.deepright.cli.function;
 
+import ai.open.right.protocol.ProtocolCode;
+
+import ai.open.right.WorkflowException;
+
 import ai.deepright.cli.CliPubData;
 import ai.deepright.cli.CliPubSub;
 import ai.deepright.cli.CliSubFetcher;
@@ -23,7 +27,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.SessionCallback;
-import org.springframework.util.Assert;
 
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
@@ -67,12 +70,12 @@ public class CliPubFunction extends BaseFunction {
             log.info("The cli@pub router key={}", router.key());
         }
         CliPubData pubData = workTask.getObjectQuery(CliPubData.class);
-        Assert.notNull(pubData, "The cli@pub can not be empty: " + router.key());
+        WorkflowException.check(pubData == null, "The cli@pub can not be empty: " + router.key(), ProtocolCode.C400);
         // 解码
         pubData = this.decodeData(workTask, pubData.check());
         // GZIP+BASE64后的CMD
         Object result = new CliPubExec(this.redis4event, this.timeout, this.circle, this.expire, GzipUtils.compressAsBase64(JsonUtils.write(pubData)), pubData.getTid()).exec();
-        Assert.notNull(result, "The cli@pub failed: " + pubData.getTid());
+        WorkflowException.check(result == null, "The cli@pub failed: " + pubData.getTid(), ProtocolCode.C400);
         return result;
     }
 
@@ -82,7 +85,7 @@ public class CliPubFunction extends BaseFunction {
         // 执行成功、Type!=FUN 且超过指定大小或二进制格式（图片等），上传URL
         if (pubData.isOk() && !pubData.isType(CliPubSub.FUN) && (BytesUtils.utf8Bytes(pubData.getCmd()) >= this.oversize || SuffixUtils.isBinary(pubData.getSuffix()))) {
             FileStore fileStore = this.defStore.fetchStore(this.store);
-            Assert.notNull(fileStore, "The file store can not be empty");
+            WorkflowException.check(fileStore == null, "The file store can not be empty", ProtocolCode.C400);
             pubData.setCmd(fileStore.store(decode, pubData.getSuffix(), workTask));
             pubData.setEncode(CliPubData.URL);
             return pubData;

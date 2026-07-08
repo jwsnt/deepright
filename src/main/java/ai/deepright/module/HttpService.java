@@ -1,5 +1,11 @@
 package ai.deepright.module;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
+
+
+import ai.open.right.protocol.ProtocolCode;
+
 import ai.open.right.WorkflowException;
 import ai.open.right.netty.NettyAlarm;
 import ai.open.right.netty.NettyCloser;
@@ -28,7 +34,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.util.Assert;
 
 import java.io.RandomAccessFile;
 import java.util.List;
@@ -113,7 +118,7 @@ public class HttpService extends NettyHttpHandler {
 
     protected void doDownload(ChannelHandlerContext ctx, QueryStringDecoder query) throws Exception {
         List<String> params = List.class.cast(MapUtils.getObject(query.parameters(), "name"));
-        Assert.notEmpty(params, "The http server download param can not be empty");
+        WorkflowException.check(isEmpty(params), "The http server download param can not be empty", ProtocolCode.C400);
         RandomAccessFile random = this.sysStore.access(params.getFirst());
         if (random != null) {
             try {

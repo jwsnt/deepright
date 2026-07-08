@@ -1,5 +1,14 @@
 package ai.deepright.task;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
+import static org.springframework.util.StringUtils.hasText;
+
+
+
+
+import ai.open.right.protocol.ProtocolCode;
+
 import ai.deepright.cli.*;
 import ai.deepright.cli.function.CliSubFunction;
 import ai.deepright.feature.FeatureField;
@@ -49,7 +58,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.util.Assert;
 
 import java.io.BufferedInputStream;
 import java.nio.charset.StandardCharsets;
@@ -117,12 +125,12 @@ public class TaskFunction extends BaseFunction implements TaskResult {
         this.template4error = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4error).openStream()), StandardCharsets.UTF_8);
         this.template4query = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4query).openStream()), StandardCharsets.UTF_8);
         this.template4async = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4async).openStream()), StandardCharsets.UTF_8);
-        Assert.hasText(this.template4artifact, "The template artifact must not be empty");
-        Assert.hasText(this.template4answer, "The template answer must not be empty");
-        Assert.notEmpty(this.responseSchema, "The response schema can not be empty");
-        Assert.hasText(this.template4async, "The template async must not be empty");
-        Assert.hasText(this.template4query, "The template query must not be empty");
-        Assert.hasText(this.template4error, "The template error must not be empty");
+        WorkflowException.check(!hasText(this.template4artifact), "The template artifact must not be empty", ProtocolCode.C400);
+        WorkflowException.check(!hasText(this.template4answer), "The template answer must not be empty", ProtocolCode.C400);
+        WorkflowException.check(isEmpty(this.responseSchema), "The response schema can not be empty", ProtocolCode.C400);
+        WorkflowException.check(!hasText(this.template4async), "The template async must not be empty", ProtocolCode.C400);
+        WorkflowException.check(!hasText(this.template4query), "The template query must not be empty", ProtocolCode.C400);
+        WorkflowException.check(!hasText(this.template4error), "The template error must not be empty", ProtocolCode.C400);
         this.timeout = (int) TimeUnit.MILLISECONDS.convert(this.timeout, TimeUnit.SECONDS);
     }
 
@@ -130,7 +138,7 @@ public class TaskFunction extends BaseFunction implements TaskResult {
     public Object call(FunctionContext functionContext) throws Exception {
         WorkflowTask workTask = functionContext.getWorkTask().printQuery();
         TaskData[] taskArray = this.buildTaskData(workTask);
-        Assert.notEmpty(taskArray, "The assigned task cannot be empty, please check again.");
+        WorkflowException.check(isEmpty(taskArray), "The assigned task cannot be empty, please check again.", ProtocolCode.C400);
         RouterDevice sourceDevice = new RouterDevice(workTask).printRouter();
         Integer timeout = this.buildTimeout(workTask, taskArray);
         List<TaskSync> syncTasks = this.buildSyncTasks(workTask, sourceDevice, taskArray, timeout);
@@ -212,7 +220,7 @@ public class TaskFunction extends BaseFunction implements TaskResult {
     protected TaskData[] buildTaskData(WorkflowTask workTask) throws Exception {
         String query = StringUtils.trim(workTask.printQuery().getQuery());
         query = JsonUtils.like(query) ? query : JsonUtils.extract(query);
-        Assert.isTrue(JsonUtils.like(query), "The response cannot be parsed as JSON due to unexpected formatting: " + workTask.getQuery());
+        WorkflowException.check(!(JsonUtils.like(query)), "The response cannot be parsed as JSON due to unexpected formatting: " + workTask.getQuery(), ProtocolCode.C400);
         TaskData[] taskData = null;
         // 适配多模型结果
         if (JsonUtils.map(workTask.getQuery())) {
@@ -229,7 +237,7 @@ public class TaskFunction extends BaseFunction implements TaskResult {
         } else {
             taskData = workTask.getObjectQuery(TaskData[].class);
         }
-        Assert.notNull(taskData, "The task data cannot be empty: " + workTask.getQuery());
+        WorkflowException.check(taskData == null, "The task data cannot be empty: " + workTask.getQuery(), ProtocolCode.C400);
         return taskData;
     }
 
@@ -349,7 +357,7 @@ public class TaskFunction extends BaseFunction implements TaskResult {
     }
 
     protected Map<String, Object> buildModelAndToken(WorkflowTask workTask, RouterDevice routerDevice, Map<String, Object> metadata) throws Exception {
-        Assert.hasText(routerDevice.getProvider(), "The router provider can not be empty");
+        WorkflowException.check(!hasText(routerDevice.getProvider()), "The router provider can not be empty", ProtocolCode.C400);
         String app = FeatureUtils.buildApp(routerDevice.getMetadata());
         String path = FeatureUtils.escapePath(FeatureFlag.isWindows(routerDevice.getSys()), app + " token --provider " + routerDevice.getProvider());
         CliPubData pubData = this.cliSubFetcher.command(workTask, routerDevice, CliSubOps.builder()
@@ -357,7 +365,7 @@ public class TaskFunction extends BaseFunction implements TaskResult {
                 .r(List.of(path))
                 .exempted(true)
                 .build(), path, "");
-        Assert.isTrue(pubData.isOk(), pubData.getCmd());
+        WorkflowException.check(!(pubData.isOk()), pubData.getCmd(), ProtocolCode.C400);
         Map<String, String> provider = MapUtils.getMap(JsonUtils.read(pubData.getCmd(), Map.class), routerDevice.getProvider());
         String multiOutput = MapUtils.getString(provider, RequestModelSelect.KEY_MODEL_MULTI_OUTPUT);
         String multiInput = MapUtils.getString(provider, RequestModelSelect.KEY_MODEL_MULTI_INPUT);
@@ -366,7 +374,7 @@ public class TaskFunction extends BaseFunction implements TaskResult {
         String fast = MapUtils.getString(provider, RequestModelSelect.KEY_MODEL_FAST);
         String token = MapUtils.getString(provider, "token");
         String url = MapUtils.getString(provider, "__url");
-        Assert.hasText(token, "The router provider token can not be empty: " + routerDevice.getProvider());
+        WorkflowException.check(!hasText(token), "The router provider token can not be empty: " + routerDevice.getProvider(), ProtocolCode.C400);
         metadata.put(ProviderRequestService.KEY_INTERNAL + ProviderRequestService.KEY_TOKEN, token);
         metadata.put(ProviderRequestService.KEY_PROVIDER, routerDevice.getProvider());
         if (!StringUtils.isEmpty(multiOutput)) {
@@ -392,8 +400,8 @@ public class TaskFunction extends BaseFunction implements TaskResult {
 
     protected RouterDevice buildTargetDevice(WorkflowTask workTask, TaskData taskData) throws Exception {
         RouterDevice targetDevice = this.routerService.fetch(workTask, taskData.getDevice(), taskData.getAgent());
-        Assert.isTrue(targetDevice != null && !targetDevice.isExpired(this.expire), "The router " + taskData.getAgent() + " is offline, so the assigned task cannot be completed.");
-        Assert.isTrue(!targetDevice.isSame(workTask), "The router " + taskData.getAgent() + " must not assign tasks to itself");
+        WorkflowException.check(targetDevice == null || targetDevice.isExpired(this.expire), "The router " + taskData.getAgent() + " is offline, so the assigned task cannot be completed.", ProtocolCode.C400);
+        WorkflowException.check(targetDevice.isSame(workTask), "The router " + taskData.getAgent() + " must not assign tasks to itself", ProtocolCode.C400);
         return targetDevice;
     }
 
@@ -557,7 +565,7 @@ public class TaskFunction extends BaseFunction implements TaskResult {
         public void checkClosed() throws Exception {
             super.checkClosed();
             // 超时检查
-            Assert.isTrue(this.ddl > System.currentTimeMillis(), "The task was timeout: " + this.ddl);
+            WorkflowException.check(!(this.ddl > System.currentTimeMillis()), "The task was timeout: " + this.ddl, ProtocolCode.C400);
         }
 
         @Override

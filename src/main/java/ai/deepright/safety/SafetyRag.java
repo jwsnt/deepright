@@ -1,5 +1,7 @@
 package ai.deepright.safety;
 
+import ai.open.right.WorkflowException;
+import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.resouce.ResourceService;
 import ai.open.right.workflow.flow.llm.rag.RagCondition;
 import ai.open.right.workflow.flow.llm.rag.RagConfig;
@@ -12,13 +14,13 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.util.Assert;
 
 import java.io.BufferedInputStream;
 import java.nio.charset.StandardCharsets;
@@ -40,7 +42,7 @@ public class SafetyRag extends RagCondition implements RagService {
         this.template = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template).openStream()), StandardCharsets.UTF_8);
         // 覆盖（rewrite），不需要重入
         // 启动检测，必要资源
-        Assert.hasText(this.template, "The template must not be empty");
+        WorkflowException.check(StringUtils.isEmpty(this.template), "The template must not be empty", ProtocolCode.C400);
     }
 
     @Override

@@ -1,5 +1,10 @@
 package ai.deepright.media;
 
+import static org.springframework.util.StringUtils.hasText;
+
+
+import ai.open.right.protocol.ProtocolCode;
+
 import ai.deepright.cli.CliPrinter;
 import ai.deepright.cli.CliPubData;
 import ai.deepright.cli.CliSubFetcher;
@@ -27,7 +32,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.util.Assert;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -113,7 +117,7 @@ public class MediaFileUploadTransferService extends MediaTransferServiceImpl {
         public void init() throws Exception {
             // 从客户端上传图片
             CliPubData pubData = this.cliSubFetcher.fetch(this.workTask, new RouterDevice(this.workTask), this.uri, "");
-            Assert.isTrue(pubData.isOk(), pubData.getCmd());
+            WorkflowException.check(!(pubData.isOk()), pubData.getCmd(), ProtocolCode.C400);
             // Vertex容易触发400:URL_REJECTED-REJECTED_FC_TOO_MANY_PENDING，需要转成base64
             this.fullData(pubData);
         }
@@ -127,7 +131,7 @@ public class MediaFileUploadTransferService extends MediaTransferServiceImpl {
                 this.mediaContext.setData(pubData.forceText(this.resource, this.sysStore, this.timeout, true).getCmd());
             }
             // 错误模型需要使用
-            Assert.hasText(this.mediaContext.getData(), pubData.getCmd());
+            WorkflowException.check(!hasText(this.mediaContext.getData()), pubData.getCmd(), ProtocolCode.C400);
             // 重写Mime Type
             this.mediaContext.setType(MediaContext.PREFIX_INLINE + this.mediaContext.getType());
         }

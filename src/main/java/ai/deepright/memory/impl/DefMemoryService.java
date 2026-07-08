@@ -4,7 +4,6 @@ import ai.deepright.complex.ComplexityMode;
 import ai.deepright.complex.ComplexityUtils;
 import ai.deepright.feature.FeatureField;
 import ai.deepright.feature.FeatureFlag;
-import ai.deepright.feature.FeatureUtils;
 import ai.deepright.llm.provider.RequestModelSelect;
 import ai.deepright.memory.MemoryRecall;
 import ai.deepright.memory.MemoryService;
@@ -14,8 +13,8 @@ import ai.deepright.utils.TemplateChecker;
 import ai.deepright.workflow.worktask.HeartbeatWorkTask;
 import ai.open.right.WorkflowException;
 import ai.open.right.config.RedisConfig;
+import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.resouce.ResourceService;
-import ai.open.right.utils.BytesUtils;
 import ai.open.right.utils.SpinExec;
 import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.function.FunctionContext;
@@ -33,6 +32,7 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -40,7 +40,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.util.Assert;
 
 import java.io.BufferedInputStream;
 import java.nio.charset.StandardCharsets;
@@ -86,8 +85,8 @@ public class DefMemoryService extends BaseFunction implements MemoryService {
         this.template4refreshSession = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4refreshSession).openStream()), StandardCharsets.UTF_8);
         // 覆盖（rewrite），不需要重入
         // 启动检测，必要资源
-        Assert.hasText(this.template4refreshSummary, "The template refresh summary must not be empty");
-        Assert.hasText(this.template4refreshSession, "The template session summary must not be empty");
+        WorkflowException.check(StringUtils.isEmpty(this.template4refreshSummary), "The template refresh summary must not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4refreshSession), "The template session summary must not be empty", ProtocolCode.C400);
     }
 
 

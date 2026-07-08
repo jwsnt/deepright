@@ -1,5 +1,11 @@
 package ai.deepright.cli;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
+import ai.open.right.protocol.ProtocolCode;
+
+import ai.open.right.WorkflowException;
+
 import ai.open.right.context.UserContext;
 import ai.open.right.utils.BytesUtils;
 import ai.open.right.utils.GzipUtils;
@@ -8,7 +14,6 @@ import ai.open.right.workflow.flow.file.FileStore;
 import ai.deepright.feature.FeatureUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.util.Assert;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -23,7 +28,7 @@ public interface CliPubSub {
     // 检查Device
     public static void checkValid(WorkflowTask workTask) throws Exception {
         // 设备号不能为Null或默认值
-        Assert.isTrue(!StringUtils.equalsIgnoreCase(workTask.getDevice(), UserContext.UNKNOWN) && !StringUtils.isEmpty(workTask.getDevice()), "The cli device can not be empty");
+        WorkflowException.check(StringUtils.equalsIgnoreCase(workTask.getDevice(), UserContext.UNKNOWN) || StringUtils.isEmpty(workTask.getDevice()), "The cli device can not be empty", ProtocolCode.C400);
     }
 
     // 构建推送CMD

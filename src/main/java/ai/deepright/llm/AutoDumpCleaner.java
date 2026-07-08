@@ -1,5 +1,7 @@
 package ai.deepright.llm;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
 import ai.open.right.utils.DumpUtils;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;

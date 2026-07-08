@@ -1,6 +1,8 @@
 package ai.deepright.lang;
 
-import org.springframework.util.Assert;
+import ai.open.right.protocol.ProtocolCode;
+
+import ai.open.right.WorkflowException;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -18,17 +20,17 @@ public class XmlResourceControl extends ResourceBundle.Control {
 
     @Override
     public List<String> getFormats(String baseName) {
-        Assert.notNull(baseName, "The base name must not be empty");
+        WorkflowException.check(baseName == null, "The base name must not be empty", ProtocolCode.C400);
         return List.of(XmlResourceControl.FORMAT_XML);
     }
 
     @Override
     public ResourceBundle newBundle(String baseName, Locale locale, String format, ClassLoader loader, boolean reload) throws IllegalAccessException, InstantiationException, IOException {
-        Assert.notNull(baseName, "The base name must not be empty");
-        Assert.notNull(locale, "The locale must not be empty");
-        Assert.notNull(format, "The format must not be empty");
-        Assert.notNull(loader, "The loader must not be empty");
-        Assert.isTrue(XmlResourceControl.FORMAT_XML.equals(format), "The format can not be support:" + format);
+        WorkflowException.check(baseName == null, "The base name must not be empty", ProtocolCode.C400);
+        WorkflowException.check(locale == null, "The locale must not be empty", ProtocolCode.C400);
+        WorkflowException.check(format == null, "The format must not be empty", ProtocolCode.C400);
+        WorkflowException.check(loader == null, "The loader must not be empty", ProtocolCode.C400);
+        WorkflowException.check(!(XmlResourceControl.FORMAT_XML.equals(format)), "The format can not be support:" + format, ProtocolCode.C400);
         String resourceName = this.toResourceName(this.toBundleName(baseName, locale), XmlResourceControl.FORMAT_XML);
         ResourceBundle bundle = null;
         InputStream stream = null;

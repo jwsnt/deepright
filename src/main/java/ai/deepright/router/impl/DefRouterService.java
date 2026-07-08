@@ -1,5 +1,9 @@
 package ai.deepright.router.impl;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
+import ai.open.right.protocol.ProtocolCode;
+
 import ai.deepright.complex.ComplexityMode;
 import ai.deepright.complex.ComplexityUtils;
 import ai.deepright.feature.FeatureFlag;
@@ -33,7 +37,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.SessionCallback;
-import org.springframework.util.Assert;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -72,7 +75,7 @@ public class DefRouterService implements RouterService {
 
     @PostConstruct
     public void init() throws Exception {
-        Assert.isTrue(this.update > this.cache, "The cli env config is invalid: " + this.update + " / " + this.cache);
+        WorkflowException.check(!(this.update > this.cache), "The cli env config is invalid: " + this.update + " / " + this.cache, ProtocolCode.C400);
         this.cache4expire = CacheBuilder.newBuilder().expireAfterWrite(this.cache, TimeUnit.MILLISECONDS).build();
     }
 
@@ -90,8 +93,8 @@ public class DefRouterService implements RouterService {
     public Boolean hasHeartbeat(RouterDevice routerDevice) throws Exception {
         // 检查Device+Key是否存在
         RouterDevice cacheDevice = this.fetch(routerDevice);
-        Assert.notNull(cacheDevice, "The device [" + routerDevice.key() + "] is not exists");
-        Assert.isTrue(!cacheDevice.isExpired(this.expire), "The device [" + routerDevice.key() + "] is expired");
+        WorkflowException.check(cacheDevice == null, "The device [" + routerDevice.key() + "] is not exists", ProtocolCode.C400);
+        WorkflowException.check(cacheDevice.isExpired(this.expire), "The device [" + routerDevice.key() + "] is expired", ProtocolCode.C400);
         return true;
     }
 

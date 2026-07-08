@@ -1,11 +1,21 @@
 package ai.deepright.task;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
+import static org.springframework.util.StringUtils.hasText;
+
+
+
+
+import ai.open.right.protocol.ProtocolCode;
+
+import ai.open.right.WorkflowException;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.util.Assert;
 
 import java.util.List;
 
@@ -35,9 +45,9 @@ public class TaskData {
 
     public TaskData check() throws Exception {
         // 会抛出模型，需要字段对齐
-        Assert.hasText(this.device, "The target_device can not be empty");
-        Assert.hasText(this.agent, "The target_agent can not be empty");
-        Assert.hasText(this.content, "The content can not be empty");
+        WorkflowException.check(!hasText(this.device), "The target_device can not be empty", ProtocolCode.C400);
+        WorkflowException.check(!hasText(this.agent), "The target_agent can not be empty", ProtocolCode.C400);
+        WorkflowException.check(!hasText(this.content), "The content can not be empty", ProtocolCode.C400);
         return this;
     }
 

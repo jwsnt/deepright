@@ -1,5 +1,12 @@
 package ai.deepright.skills;
 
+import static org.springframework.util.StringUtils.hasText;
+
+
+import ai.open.right.protocol.ProtocolCode;
+
+import ai.open.right.WorkflowException;
+
 import ai.deepright.feature.FeatureFlag;
 import ai.deepright.feature.FeatureUtils;
 import ai.deepright.utils.TemplateChecker;
@@ -24,7 +31,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.util.Assert;
 
 import java.io.BufferedInputStream;
 import java.nio.charset.StandardCharsets;
@@ -55,8 +61,8 @@ public class SkillsSchemaRag extends RagSkills implements SkillsChecker {
         this.template4extract = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4extract).openStream()), StandardCharsets.UTF_8);
         this.template4init = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4init).openStream()), StandardCharsets.UTF_8);
         // 覆盖（rewrite），不需要重入，启动检测，必要资源
-        Assert.hasText(this.template4extract, "The template template4extract must not be empty");
-        Assert.hasText(this.template4init, "The template init must not be empty");
+        WorkflowException.check(!hasText(this.template4extract), "The template template4extract must not be empty", ProtocolCode.C400);
+        WorkflowException.check(!hasText(this.template4init), "The template init must not be empty", ProtocolCode.C400);
         this.activePlugins.put(SkillsChecker.PLUGIN_BROWSER, "browser");
         this.activePlugins.put(SkillsChecker.PLUGIN_REMOTE, "remote");
     }

@@ -1,5 +1,9 @@
 package ai.deepright.llm.optimize.compressor;
 
+import ai.open.right.protocol.ProtocolCode;
+
+import ai.open.right.WorkflowException;
+
 import ai.open.right.utils.BytesUtils;
 import ai.open.right.utils.JsonUtils;
 import ai.open.right.workflow.flow.file.DefStore;
@@ -18,7 +22,6 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.util.Assert;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
@@ -46,7 +49,7 @@ abstract public class StoreCompressor implements FunCallCompressor {
     public void compress(ProviderRequest providerRequest, LLMFunCallResponse funCallResponse) throws Exception {
         if (this.shouldCompress(funCallResponse)) {
             FileStore fileStore = this.defStore.fetchStore(this.store);
-            Assert.notNull(fileStore, "The file store can not empty: " + this.store);
+            WorkflowException.check(fileStore == null, "The file store can not empty: " + this.store, ProtocolCode.C400);
             // URL压缩在Query中
             String url = this.buildUrl(providerRequest, fileStore.store(funCallResponse.getResponse().getBytes(StandardCharsets.UTF_8), ".json", providerRequest.getMessage()));
             funCallResponse.setResponse(this.buildRecallAnswer(funCallResponse, url));
@@ -61,7 +64,7 @@ abstract public class StoreCompressor implements FunCallCompressor {
     public void compress(ProviderRequest providerRequest, LLMFunCallRequest funCallRequest) throws Exception {
         if (this.shouldCompress(funCallRequest)) {
             FileStore fileStore = this.defStore.fetchStore(this.store);
-            Assert.notNull(fileStore, "The file store can not empty: " + this.store);
+            WorkflowException.check(fileStore == null, "The file store can not empty: " + this.store, ProtocolCode.C400);
             String original = JsonUtils.write(Map.class.cast(funCallRequest.getArgs()));
             // URL压缩在属性中
             String url = this.buildUrl(providerRequest, fileStore.store(original.getBytes(StandardCharsets.UTF_8), ".json", providerRequest.getMessage()));

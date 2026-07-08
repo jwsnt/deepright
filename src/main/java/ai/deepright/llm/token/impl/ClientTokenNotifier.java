@@ -9,6 +9,7 @@ import ai.deepright.lang.XmlResourceLang;
 import ai.deepright.llm.token.TokenNotifier;
 import ai.deepright.llm.token.TokenSource;
 import ai.open.right.WorkflowException;
+import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.llm.provider.ProviderRequest;
 import ai.open.right.workflow.flow.llm.token.TokenData;
@@ -16,15 +17,17 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.util.Assert;
 
 import java.util.concurrent.ExecutorService;
+
+import static org.springframework.util.StringUtils.hasText;
 
 @Getter
 @Setter
@@ -98,13 +101,13 @@ public class ClientTokenNotifier implements TokenNotifier, TokenSource {
                 Integer cache = this.tokenData.getCache();
                 Integer input = this.tokenData.getInput();
                 Integer total = this.tokenData.getTotal();
-                Assert.hasText(function, "The function can not be empty");
-                Assert.notNull(thinking, "The thinking can not be empty");
-                Assert.hasText(agentId, "The agent id can not be empty");
-                Assert.notNull(input, "The input can not be empty");
-                Assert.notNull(total, "The total can not be empty");
-                Assert.hasText(model, "The model can not be empty");
-                Assert.hasText(app, "The app can not be empty");
+                WorkflowException.check(StringUtils.isEmpty(function), "The function can not be empty", ProtocolCode.C400);
+                WorkflowException.check(StringUtils.isEmpty(agentId), "The agent id can not be empty", ProtocolCode.C400);
+                WorkflowException.check(StringUtils.isEmpty(model), "The model can not be empty", ProtocolCode.C400);
+                WorkflowException.check(StringUtils.isEmpty(app), "The app can not be empty", ProtocolCode.C400);
+                WorkflowException.check(thinking == null, "The thinking can not be empty", ProtocolCode.C400);
+                WorkflowException.check(input == null, "The input can not be empty", ProtocolCode.C400);
+                WorkflowException.check(total == null, "The total can not be empty", ProtocolCode.C400);
                 StringBuffer buffer = new StringBuffer().append(app).append(" token ");
                 buffer.append(" --function ").append(function);
                 buffer.append(" --thinking ").append(thinking);
@@ -119,7 +122,7 @@ public class ClientTokenNotifier implements TokenNotifier, TokenSource {
                 CliPubData pubData = this.cliSubFetcher.command(this.providerRequest.getMessage(), CliSubOps.builder()
                         .exempted(true)
                         .build(), buffer.toString(), "");
-                Assert.isTrue(pubData.isOk(), pubData.getCmd());
+                WorkflowException.check(!(pubData.isOk()), pubData.getCmd(), ProtocolCode.C400);
             } catch (Exception e) {
                 WorkflowException.dolog(e);
             }

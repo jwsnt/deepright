@@ -1,5 +1,7 @@
 package ai.deepright.llm.optimize.rag;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
 import ai.deepright.cli.CliPrinter;
 import ai.deepright.complex.ComplexityUtils;
 import ai.deepright.feature.FeatureFlag;

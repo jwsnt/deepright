@@ -1,5 +1,7 @@
 package ai.deepright.config;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.env.EnvironmentPostProcessor;

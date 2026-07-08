@@ -1,5 +1,16 @@
 package ai.deepright.memory.knowledge;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
+import static org.springframework.util.StringUtils.hasText;
+
+
+
+
+import ai.open.right.protocol.ProtocolCode;
+
+import ai.open.right.WorkflowException;
+
 import ai.deepright.cli.CliPrinter;
 import ai.deepright.cli.CliPubData;
 import ai.deepright.cli.CliSubFetcher;
@@ -40,7 +51,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.util.Assert;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
@@ -83,6 +93,8 @@ public class KnowledgeService implements MemoryService {
 
     protected String template4prefix;
 
+    protected String template4init;
+
     protected Integer truncate;
 
     protected GitPath gitPath;
@@ -100,12 +112,14 @@ public class KnowledgeService implements MemoryService {
         this.template4prefix = IOUtils.toString(this.resourceService.url(this.template4prefix).openStream(), StandardCharsets.UTF_8);
         this.template4recall = IOUtils.toString(this.resourceService.url(this.template4recall).openStream(), StandardCharsets.UTF_8);
         this.template4commit = IOUtils.toString(this.resourceService.url(this.template4commit).openStream(), StandardCharsets.UTF_8);
+        this.template4init = IOUtils.toString(this.resourceService.url(this.template4init).openStream(), StandardCharsets.UTF_8);
         // IOUtils/JsonUtils负责关闭资源
         // 覆盖（rewrite），不需要重入
         // 启动检测，必要资源
-        Assert.hasText(this.template4prefix, "The template prefix must not be empty");
-        Assert.hasText(this.template4recall, "The template recall must not be empty");
-        Assert.hasText(this.template4commit, "The template commit must not be empty");
+        WorkflowException.check(!hasText(this.template4prefix), "The template prefix must not be empty", ProtocolCode.C400);
+        WorkflowException.check(!hasText(this.template4recall), "The template recall must not be empty", ProtocolCode.C400);
+        WorkflowException.check(!hasText(this.template4commit), "The template commit must not be empty", ProtocolCode.C400);
+        WorkflowException.check(!hasText(this.template4init), "The template init must not be empty", ProtocolCode.C400);
     }
 
     @Override
@@ -113,7 +127,7 @@ public class KnowledgeService implements MemoryService {
         if (FeatureFlag.isKnowledgeCommit(workTask)) {
             return this.buildQuery(workTask);
         } else {
-            return "";
+            return this.template4init.replace("#knowledge", this.buildPath(workTask));
         }
     }
 
@@ -133,9 +147,9 @@ public class KnowledgeService implements MemoryService {
                 .r(List.of(knowledge.getPath()))
                 .exempted(true)
                 .build(), buffer.toString(), "");
-        Assert.isTrue(pubData.isOk(), pubData.getCmd());
+        WorkflowException.check(!(pubData.isOk()), pubData.getCmd(), ProtocolCode.C400);
         if (!StringUtils.isEmpty(pubData.getCmd())) {
-            String query = this.template4recall.replace("#recall", pubData.getCmd());
+            String query = this.template4recall.replace("#init", this.template4init.replace("#knowledge", this.buildPath(workTask, knowledge))).replace("#recall", pubData.getCmd());
             if (log.isWarnEnabled() && !TemplateChecker.check(query)) {
                 log.warn("The recall template contains unexpected characters, please check: {}", query);
             }
@@ -182,11 +196,6 @@ public class KnowledgeService implements MemoryService {
         return this.buildKnowledge(workTask) != null;
     }
 
-    // Knowledge Path / Agent
-    protected String buildPath(WorkflowTask workTask, Knowledge knowledge) throws Exception {
-        return knowledge.getPath();
-    }
-
     protected Map<String, Object> buildMetadata(WorkflowTask workTask) throws Exception {
         Map<String, Object> metadata = new HashMap<String, Object>(workTask.getMetadata());
         // 标记知识库清洗
@@ -201,6 +210,15 @@ public class KnowledgeService implements MemoryService {
 
     protected Knowledge buildKnowledge(WorkflowTask workTask) throws Exception {
         return workTask.getMetadata(KnowledgeService.KEY_KNOWLEDGE, Knowledge.class);
+    }
+
+    // Knowledge Path / Agent
+    protected String buildPath(WorkflowTask workTask, Knowledge knowledge) throws Exception {
+        return knowledge.getPath();
+    }
+
+    protected String buildPath(WorkflowTask workTask) throws Exception {
+        return this.buildPath(workTask, this.buildKnowledge(workTask));
     }
 
     protected String buildQuery(WorkflowTask workTask) throws Exception {
@@ -315,6 +333,9 @@ public class KnowledgeService implements MemoryService {
 
         @Value("${memory.knowledge.template.prefix:classpath:config/memory/knowledge_prefix.md}")
         protected String template4prefix;
+
+        @Value("${memory.knowledge.template.init:classpath:config/memory/knowledge_init.md}")
+        protected String template4init;
 
         @Value("${memory.knowledge.truncate:20480}")
         protected Integer truncate;

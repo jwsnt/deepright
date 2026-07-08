@@ -1,5 +1,14 @@
 package ai.deepright.cli;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
+import static org.springframework.util.StringUtils.hasText;
+
+
+
+
+import ai.open.right.WorkflowException;
+
 import ai.deepright.cli.insert.CliInsert;
 import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.workflow.flow.WorkflowTask;
@@ -15,7 +24,6 @@ import org.apache.http.HttpResponse;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
-import org.springframework.util.Assert;
 
 import java.io.BufferedInputStream;
 import java.nio.charset.StandardCharsets;
@@ -75,7 +83,7 @@ public class CliPubData {
                             .build());
                     HttpResponse response = resource.execute(httpGet, null, null).get(timeout, TimeUnit.MILLISECONDS);
                     // 错误模型需要使用
-                    Assert.isTrue(ProtocolCode.range2xx(response.getStatusLine().getStatusCode()), this.getCmd());
+                    WorkflowException.check(!(ProtocolCode.range2xx(response.getStatusLine().getStatusCode())), this.getCmd(), ProtocolCode.C400);
                     try (BufferedInputStream input = new BufferedInputStream(response.getEntity().getContent())) {
                         this.setCmd(encode ? Base64.getEncoder().encodeToString(input.readAllBytes()) : IOUtils.toString(input, StandardCharsets.UTF_8));
                     }
@@ -107,15 +115,15 @@ public class CliPubData {
     }
 
     public CliPubData valid() throws Exception {
-        Assert.isTrue(CliPubData.SUCCESS.equals(this.getStatus()), this.getCmd());
+        WorkflowException.check(!(CliPubData.SUCCESS.equals(this.getStatus())), this.getCmd(), ProtocolCode.C400);
         return this;
     }
 
     public CliPubData check() throws Exception {
-        Assert.notNull(this.suffix, "The cli@pub suffix can not be empty");
-        Assert.notNull(this.status, "The cli@pub status can not be empty");
-        Assert.hasText(this.cmd, "The cli@pub cmd can not be empty");
-        Assert.hasText(this.tid, "The cli@pub tid can not be empty");
+        WorkflowException.check(this.suffix == null, "The cli@pub suffix can not be empty", ProtocolCode.C400);
+        WorkflowException.check(this.status == null, "The cli@pub status can not be empty", ProtocolCode.C400);
+        WorkflowException.check(!hasText(this.cmd), "The cli@pub cmd can not be empty", ProtocolCode.C400);
+        WorkflowException.check(!hasText(this.tid), "The cli@pub tid can not be empty", ProtocolCode.C400);
         return this;
     }
 

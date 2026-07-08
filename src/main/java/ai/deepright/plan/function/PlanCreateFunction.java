@@ -9,6 +9,8 @@ import ai.deepright.plan.PlanUtils;
 import ai.deepright.router.RouterService;
 import ai.deepright.utils.TemplateChecker;
 import ai.deepright.workflow.worktask.HeartbeatWorkTask;
+import ai.open.right.WorkflowException;
+import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.resouce.ResourceService;
 import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.function.FunctionContext;
@@ -22,18 +24,20 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.util.Assert;
 
 import java.io.BufferedInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+
+import static org.springframework.util.StringUtils.hasText;
 
 @Slf4j
 @Getter
@@ -71,9 +75,9 @@ public class PlanCreateFunction extends BaseFunction {
         this.template4query = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4query).openStream()), StandardCharsets.UTF_8);
         // 覆盖（rewrite），不需要重入
         // 启动检测，必要资源
-        Assert.hasText(this.template4directly, "The template directly must not be empty");
-        Assert.hasText(this.template4answer, "The template answer must not be empty");
-        Assert.hasText(this.template4query, "The template query must not be empty");
+        WorkflowException.check(StringUtils.isEmpty(this.template4directly), "The template directly must not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4answer), "The template answer must not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4query), "The template query must not be empty", ProtocolCode.C400);
     }
 
     @Override
@@ -89,7 +93,7 @@ public class PlanCreateFunction extends BaseFunction {
             return this.buildDirectly(workTask, workflow);
         }
         String why = MapUtils.getString(data, "why_do_this");
-        Assert.hasText(why, "The why_do_this must not be empty");
+        WorkflowException.check(!hasText(why), "The why_do_this must not be empty", ProtocolCode.C400);
         String query = this.buildQuery(workTask, why);
         this.notify(workTask);
         this.source(workTask, CliPrinter.format(why, CliPrinter.SIZE_N));
@@ -130,8 +134,8 @@ public class PlanCreateFunction extends BaseFunction {
 
     protected String buildWorkflow(WorkflowTask workTask, Integer type) throws Exception {
         // 1=Open-ended questions，2=Closed-ended questions
-        Assert.notNull(type, "The plan type cannot be empty, please set it to 1 for open-ended questions and 2 for closed-ended questions.");
-        Assert.isTrue(type <= PlanCreateFunction.CLOSE, "The plan type must be 1 or 2");
+        WorkflowException.check(type == null, "The plan type cannot be empty, please set it to 1 for open-ended questions and 2 for closed-ended questions.", ProtocolCode.C400);
+        WorkflowException.check(type > PlanCreateFunction.CLOSE, "The plan type must be 1 or 2", ProtocolCode.C400);
         return PlanCreateFunction.OPEN.equals(type) ? "plan@open" : "plan@close";
     }
 

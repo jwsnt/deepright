@@ -1,5 +1,16 @@
 package ai.deepright.cli;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
+import static org.springframework.util.StringUtils.hasText;
+
+
+
+
+import ai.open.right.protocol.ProtocolCode;
+
+import ai.open.right.WorkflowException;
+
 import ai.deepright.feature.FeatureField;
 import ai.deepright.feature.FeatureFlag;
 import ai.deepright.feature.FeatureUtils;
@@ -24,7 +35,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.util.Assert;
 
 import java.nio.file.Paths;
 
@@ -82,7 +92,7 @@ public class CliRag extends RagCondition implements RagService {
         String replace = MapUtils.getString(ragConfig.getGlobalConfig(), FeatureField.KEY_WORKSPACE);
         if (!StringUtils.isEmpty(replace)) {
             String workspace = FeatureUtils.buildWorkspace(ragData.getQuery());
-            Assert.hasText(workspace, "The cli workspace can not be empty");
+            WorkflowException.check(!hasText(workspace), "The cli workspace can not be empty", ProtocolCode.C400);
             RagService.updatePrompt(ragConfig, ragData, replace, workspace);
         }
     }
@@ -91,7 +101,7 @@ public class CliRag extends RagCondition implements RagService {
         String replace = MapUtils.getString(ragConfig.getGlobalConfig(), FeatureField.KEY_TERMINAL);
         if (!StringUtils.isEmpty(replace)) {
             String terminal = FeatureUtils.buildTerminal(ragData.getQuery());
-            Assert.hasText(terminal, "The cli terminal can not be empty");
+            WorkflowException.check(!hasText(terminal), "The cli terminal can not be empty", ProtocolCode.C400);
             RagService.updatePrompt(ragConfig, ragData, replace, terminal);
         }
     }
@@ -100,7 +110,7 @@ public class CliRag extends RagCondition implements RagService {
         String replace = MapUtils.getString(ragConfig.getGlobalConfig(), ProviderRequestService.KEY_PROVIDER.replaceFirst(ProviderRequestService.KEY_INTERNAL, ""));
         if (!StringUtils.isEmpty(replace)) {
             String provider = FeatureUtils.buildTargetProvider(ragData.getQuery());
-            Assert.hasText(provider, "The cli provider can not be empty");
+            WorkflowException.check(!hasText(provider), "The cli provider can not be empty", ProtocolCode.C400);
             RagService.updatePrompt(ragConfig, ragData, replace, provider);
         }
     }
@@ -123,7 +133,7 @@ public class CliRag extends RagCondition implements RagService {
         String replace = MapUtils.getString(ragConfig.getGlobalConfig(), FeatureField.KEY_AGENTID);
         if (!StringUtils.isEmpty(replace)) {
             String agent = FeatureUtils.buildAgentId(ragData.getQuery());
-            Assert.hasText(agent, "The cli agent can not be empty");
+            WorkflowException.check(!hasText(agent), "The cli agent can not be empty", ProtocolCode.C400);
             RagService.updatePrompt(ragConfig, ragData, replace, agent);
         }
     }
@@ -160,7 +170,7 @@ public class CliRag extends RagCondition implements RagService {
         if (!StringUtils.isEmpty(replace)) {
             // 系统类型
             String sys = FeatureUtils.buildSys(ragData.getQuery());
-            Assert.hasText(sys, "The cli sys can not be empty");
+            WorkflowException.check(!hasText(sys), "The cli sys can not be empty", ProtocolCode.C400);
             RagService.updatePrompt(ragConfig, ragData, replace, sys);
         }
     }
@@ -169,7 +179,7 @@ public class CliRag extends RagCondition implements RagService {
         String replace = MapUtils.getString(ragConfig.getGlobalConfig(), FeatureField.KEY_APP);
         if (!StringUtils.isEmpty(replace)) {
             String app = FeatureUtils.buildApp(ragData.getQuery());
-            Assert.hasText(app, "The cli app can not be empty");
+            WorkflowException.check(!hasText(app), "The cli app can not be empty", ProtocolCode.C400);
             RagService.updatePrompt(ragConfig, ragData, replace, app);
         }
     }

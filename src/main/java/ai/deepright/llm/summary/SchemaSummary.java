@@ -1,5 +1,13 @@
 package ai.deepright.llm.summary;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
+
+
+import ai.open.right.protocol.ProtocolCode;
+
+import ai.open.right.WorkflowException;
+
 import ai.open.right.utils.BytesUtils;
 import ai.open.right.utils.JsonUtils;
 import ai.open.right.workflow.flow.WorkflowTask;
@@ -21,7 +29,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.util.Assert;
 
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
@@ -131,7 +138,7 @@ public class SchemaSummary extends SummaryServiceImpl {
         }
 
         public static HistoryPair[] toPairs(Summary[] summaries, WorkflowTask workTask) {
-            Assert.notEmpty(summaries, "The history summaries must not be empty");
+            WorkflowException.check(isEmpty(summaries), "The history summaries must not be empty", ProtocolCode.C400);
             HistoryPair[] pairs = new HistoryPair[summaries.length];
             for (int i = 0; i < summaries.length; i++) {
                 pairs[i] = summaries[i].toPair();

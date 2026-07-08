@@ -1,5 +1,14 @@
 package ai.deepright.cli.function;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
+import static org.springframework.util.StringUtils.hasText;
+
+
+
+
+import ai.open.right.protocol.ProtocolCode;
+
 import ai.deepright.cli.CliPubData;
 import ai.deepright.cli.CliSubFetcher;
 import ai.deepright.cli.CliSubOps;
@@ -28,7 +37,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.util.Assert;
 
 import java.io.BufferedInputStream;
 import java.nio.charset.StandardCharsets;
@@ -67,7 +75,7 @@ public class CliVerifyFunction extends BaseFunction {
         this.template = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template).openStream()), StandardCharsets.UTF_8);
         // 覆盖（rewrite），不需要重入
         // 启动检测，必要资源
-        Assert.hasText(this.template, "The template must not be empty");
+        WorkflowException.check(!hasText(this.template), "The template must not be empty", ProtocolCode.C400);
     }
 
 
@@ -76,7 +84,7 @@ public class CliVerifyFunction extends BaseFunction {
         WorkflowTask workTask = functionContext.getWorkTask().printQuery();
         String query = StringUtils.trim(workTask.getQuery());
         query = JsonUtils.like(query) ? query : JsonUtils.extract(query);
-        Assert.isTrue(JsonUtils.like(query), "The cli verify cannot be parsed as JSON due to unexpected formatting: " + workTask.getQuery());
+        WorkflowException.check(!(JsonUtils.like(query)), "The cli verify cannot be parsed as JSON due to unexpected formatting: " + workTask.getQuery(), ProtocolCode.C400);
         Verifier verifier = JsonUtils.read(query, Verifier.class);
         return this.checkArtifacts(workTask, verifier);
     }

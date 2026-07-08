@@ -1,5 +1,12 @@
 package ai.deepright.workflow.assistant;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
+import static org.springframework.util.StringUtils.hasText;
+
+
+
+
 import ai.deepright.cli.CliPubData;
 import ai.deepright.cli.CliPubSub;
 import ai.deepright.cli.CliSubFetcher;
@@ -7,6 +14,7 @@ import ai.deepright.cli.CliSubOps;
 import ai.deepright.lang.XmlResourceLang;
 import ai.deepright.router.RouterDevice;
 import ai.open.right.WorkflowException;
+import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.utils.BytesUtils;
 import ai.open.right.utils.JsonUtils;
 import ai.open.right.utils.SuffixUtils;
@@ -28,7 +36,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.util.Assert;
 
 import java.util.List;
 import java.util.Map;
@@ -82,7 +89,7 @@ public class FileGenFunction extends BaseFunction {
         CliPubData pubData = this.cliSubFetcher.command(workTask, new RouterDevice(workTask), CliSubOps.builder()
                 .w(List.of(file))
                 .build(), CliPubSub.buildPushCmd(workTask, this.defStore, this.oversize, content, file), why);
-        Assert.isTrue(pubData.isOk(), pubData.getCmd());
+        WorkflowException.check(!(pubData.isOk()), pubData.getCmd(), ProtocolCode.C400);
         data.put("file_path", file);
         return data;
     }
@@ -91,21 +98,21 @@ public class FileGenFunction extends BaseFunction {
     protected Map<String, Object> buildQuery(WorkflowTask workTask, Map<String, Object> query) throws Exception {
         List<String> refers = List.class.cast(query.remove("refer_uris"));
         // 异常需要抛给模型
-        Assert.notEmpty(refers, "The refer_uris can not be empty");
+        WorkflowException.check(isEmpty(refers), "The refer_uris can not be empty", ProtocolCode.C400);
         for (String refer : refers) {
-            Assert.hasText(refer, "The refer_uris cannot contain empty values");
+            WorkflowException.check(!hasText(refer), "The refer_uris cannot contain empty values", ProtocolCode.C400);
         }
         if (!refers.isEmpty()) {
             // 禁止exempted=true豁免
             CliPubData pubData = this.cliSubFetcher.fetch(workTask, new RouterDevice(workTask), CliSubOps.builder()
                     .r(refers)
                     .build(), refers, "");
-            Assert.isTrue(!SuffixUtils.isBinary(pubData.getSuffix()), "The referenced file cannot be a binary file: " + pubData.getSuffix());
-            Assert.isTrue(pubData.isOk(), pubData.getCmd());
+            WorkflowException.check(SuffixUtils.isBinary(pubData.getSuffix()), "The referenced file cannot be a binary file: " + pubData.getSuffix(), ProtocolCode.C400);
+            WorkflowException.check(!pubData.isOk(), pubData.getCmd(), ProtocolCode.C400);
             if (!StringUtils.isEmpty(pubData.getCmd())) {
                 // 强制转换为TEXT
                 SysStore sysStore = SysStore.class.cast(this.defStore.fetchStore(SysStore.NAME));
-                Assert.notNull(sysStore, "The file gen sys store can not be empty");
+                WorkflowException.check(sysStore == null, "The file gen sys store can not be empty", ProtocolCode.C400);
                 String referBody = pubData.forceText(this.resource, sysStore, this.timeout).getCmd();
                 this.checkSize(workTask, query, BytesUtils.utf8Bytes(referBody));
                 query.put("refer_body", referBody);

@@ -1,5 +1,7 @@
 package ai.deepright.complex;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
 import ai.deepright.complex.utils.*;
 import ai.deepright.feature.FeatureField;
 import ai.open.right.workflow.flow.WorkflowTask;

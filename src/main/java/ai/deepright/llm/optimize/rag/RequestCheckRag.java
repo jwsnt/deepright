@@ -1,5 +1,11 @@
 package ai.deepright.llm.optimize.rag;
 
+import static org.springframework.util.ObjectUtils.isEmpty;
+
+import ai.open.right.protocol.ProtocolCode;
+
+import ai.open.right.WorkflowException;
+
 import ai.deepright.feature.FeatureFlag;
 import ai.deepright.llm.notifier.MultiSourceNotifier;
 import ai.deepright.utils.TemplateChecker;
@@ -25,7 +31,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.util.Assert;
 
 import java.util.List;
 
@@ -57,28 +62,28 @@ public class RequestCheckRag extends RagCondition implements RagService {
     protected void checkOriginalQuery(RagConfig ragConfig, RagData ragData) throws Exception {
         // 不为Task或后台线程时需要包含原始请求内容
         if (StringUtils.containsIgnoreCase(MultiSourceNotifier.MAIN, SplitUtils.join(ragData.getQuery())) && !FeatureFlag.isTask(ragData.getQuery()) && !FeatureFlag.isDaemon(ragData.getQuery())) {
-            Assert.isTrue(StringUtils.containsIgnoreCase(ragData.getQuery().getQuery(), ragData.getQuery().getOriginal()), "The request query={" + ragData.getQuery().getQuery() + "} must contain original query={" + ragData.getQuery().getOriginal() + "}");
+            WorkflowException.check(!(StringUtils.containsIgnoreCase(ragData.getQuery().getQuery(), ragData.getQuery().getOriginal())), "The request query={" + ragData.getQuery().getQuery() + "} must contain original query={" + ragData.getQuery().getOriginal() + "}", ProtocolCode.C400);
         }
     }
 
     protected void checkInitialQuery(RagConfig ragConfig, RagData ragData) throws Exception {
         // 为Task或后台线程时需要包含初始请求内容
         if (StringUtils.containsIgnoreCase(MultiSourceNotifier.MAIN, SplitUtils.join(ragData.getQuery())) && FeatureFlag.isTask(ragData.getQuery()) || FeatureFlag.isDaemon(ragData.getQuery())) {
-            Assert.isTrue(StringUtils.containsIgnoreCase(ragData.getQuery().getQuery(), ragData.getQuery().getInitial()), "The request query={" + ragData.getQuery().getQuery() + "} must contain initial query={" + ragData.getQuery().getInitial() + "}");
+            WorkflowException.check(!(StringUtils.containsIgnoreCase(ragData.getQuery().getQuery(), ragData.getQuery().getInitial())), "The request query={" + ragData.getQuery().getQuery() + "} must contain initial query={" + ragData.getQuery().getInitial() + "}", ProtocolCode.C400);
         }
     }
 
     protected void checkSchemaOnConfig(RagConfig ragConfig, RagData ragData) throws Exception {
         // 如果配置了Schema且为Open AI系列，Prompt必需包括JSON关键字
         if (MapUtils.getObject(ragConfig.getLlmConfig().getAdditional(), ProviderRequestService.KEY_RESPONSE_SCHEMA) != null && ragData.getRequest().isApi(ProviderRequest.REQUEST_OPENAI)) {
-            Assert.isTrue(StringUtils.containsIgnoreCase(ragData.getPrompt(), "json"), "The request " + SplitUtils.join(ragData.getQuery()) + " must contain the `json` keyword when `rag_schema` is used: " + ragData.getPrompt());
+            WorkflowException.check(!(StringUtils.containsIgnoreCase(ragData.getPrompt(), "json")), "The request " + SplitUtils.join(ragData.getQuery()) + " must contain the `json` keyword when `rag_schema` is used: " + ragData.getPrompt(), ProtocolCode.C400);
         }
     }
 
     protected void checkSchemaOnRuntime(RagConfig ragConfig, RagData ragData) throws Exception {
         // 如果为Main且为Task上下文，Query必需包含JSON关键字
         if (SplitUtils.equals(ragData.getQuery(), MultiSourceNotifier.MAIN) && FeatureFlag.isTask(ragData.getQuery())) {
-            Assert.isTrue(StringUtils.containsIgnoreCase(ragData.getPrompt(), "json"), "The request " + SplitUtils.join(ragData.getQuery()) + " must contain the `json` keyword: " + ragData.getQuery().getQuery());
+            WorkflowException.check(!(StringUtils.containsIgnoreCase(ragData.getPrompt(), "json")), "The request " + SplitUtils.join(ragData.getQuery()) + " must contain the `json` keyword: " + ragData.getQuery().getQuery(), ProtocolCode.C400);
         }
     }
 
@@ -87,15 +92,15 @@ public class RequestCheckRag extends RagCondition implements RagService {
         List<ProviderFunCall> providerFunCallL = ragData.getRequest().getFunCalls();
         if (!CollectionUtils.isEmpty(providerFunCallL)) {
             for (ProviderFunCall funCall : providerFunCallL) {
-                Assert.isTrue(TemplateChecker.check(JsonUtils.write(funCall)), "The request " + SplitUtils.join(ragData.getQuery()) + "'s funcall must not contain placeholders: " + funCall.getName());
+                WorkflowException.check(!(TemplateChecker.check(JsonUtils.write(funCall))), "The request " + SplitUtils.join(ragData.getQuery()) + "'s funcall must not contain placeholders: " + funCall.getName(), ProtocolCode.C400);
             }
         }
     }
 
     protected void checkPromptPlaceholder(RagConfig ragConfig, RagData ragData) throws Exception {
         // 占位符未替换检查
-        Assert.isTrue(TemplateChecker.check(ragData.getQuery().getQuery()), "The request " + SplitUtils.join(ragData.getQuery()) + "'s query must not contain placeholders: " + ragData.getQuery().getQuery());
-        Assert.isTrue(TemplateChecker.check(ragData.getPrompt()), "The request " + SplitUtils.join(ragData.getQuery()) + "'s prompt must not contain placeholders: " + ragData.getPrompt());
+        WorkflowException.check(!(TemplateChecker.check(ragData.getQuery().getQuery())), "The request " + SplitUtils.join(ragData.getQuery()) + "'s query must not contain placeholders: " + ragData.getQuery().getQuery(), ProtocolCode.C400);
+        WorkflowException.check(!(TemplateChecker.check(ragData.getPrompt())), "The request " + SplitUtils.join(ragData.getQuery()) + "'s prompt must not contain placeholders: " + ragData.getPrompt(), ProtocolCode.C400);
     }
 
     @Configuration

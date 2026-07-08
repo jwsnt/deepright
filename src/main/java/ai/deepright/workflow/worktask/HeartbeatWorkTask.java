@@ -1,8 +1,11 @@
 package ai.deepright.workflow.worktask;
 
+import ai.open.right.protocol.ProtocolCode;
+
+import ai.open.right.WorkflowException;
+
 import ai.deepright.router.RouterService;
 import ai.open.right.workflow.flow.WorkflowTask;
-import org.springframework.util.Assert;
 
 public class HeartbeatWorkTask extends MarkQueryWorkTask {
 
@@ -21,6 +24,6 @@ public class HeartbeatWorkTask extends MarkQueryWorkTask {
     @Override
     public void close() throws Exception {
         super.close();
-        Assert.isTrue(this.routerService.hasHeartbeat(this.workTask), "The heartbeat workTask is closed");
+        WorkflowException.check(!(this.routerService.hasHeartbeat(this.workTask)), "The heartbeat workTask is closed", ProtocolCode.C400);
     }
 }
