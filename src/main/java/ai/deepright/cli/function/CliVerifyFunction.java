@@ -59,11 +59,11 @@ public class CliVerifyFunction extends BaseFunction {
 
     public static final String NO = "__NO__";
 
+    protected ExecutorService executorService;
+
     protected ResourceService resourceService;
 
     protected CliSubFetcher cliSubFetcher;
-
-    protected ExecutorService executor;
 
     protected String template;
 
@@ -95,7 +95,7 @@ public class CliVerifyFunction extends BaseFunction {
             List<Future<VerifierResult>> futures = new ArrayList<Future<VerifierResult>>();
             // 检查文件是否存在
             for (Artifact artifact : verifier.getArtifact()) {
-                futures.add(this.executor.submit(VerifierCallable.builder()
+                futures.add(this.executorService.submit(VerifierCallable.builder()
                         .cliSubFetcher(this.cliSubFetcher)
                         .workTask(workTask)
                         .artifact(artifact)
@@ -211,11 +211,11 @@ public class CliVerifyFunction extends BaseFunction {
         protected ResourceService resourceService;
 
         @Autowired
-        protected CliSubFetcher cliSubFetcher;
+        @Qualifier("executor")
+        protected ExecutorService executorService;
 
         @Autowired
-        @Qualifier("executor")
-        protected ExecutorService executor;
+        protected CliSubFetcher cliSubFetcher;
 
         @Value("${cli.verify.template:classpath:config/cli/verify.md}")
         protected String template;

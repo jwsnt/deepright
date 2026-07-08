@@ -26714,6 +26714,10 @@ function normalizeLoadedChat(chat) {
   chat.skipRestoreAfterAbnormal = !!chat.skipRestoreAfterAbnormal;
   chat.skipRestoreAfterAbnormalScopeKey = String(chat.skipRestoreAfterAbnormalScopeKey || '').trim();
   chat.completedWhileInactive = !!chat.completedWhileInactive;
+  if (chat.completedWhileInactive && !getLastCenterRenderableAssistantMessage(chat)) {
+    chat.completedWhileInactive = false;
+    changed = true;
+  }
   if (typeof chat.pendingRequest !== 'boolean') {
     chat.pendingRequest = pending.start >= 0 && (!pending.assistant || !isAssistantTerminalMessage(pending.assistant));
   } else if (chat.pendingRequest && pending.assistant && isAssistantTerminalMessage(pending.assistant)) {
@@ -26755,11 +26759,23 @@ function getLastAssistantMessage(chat) {
   return null;
 }
 
+function getLastCenterRenderableAssistantMessage(chat) {
+  if (!chat || !Array.isArray(chat.messages)) return null;
+  for (let i = chat.messages.length - 1; i >= 0; i--) {
+    const msg = chat.messages[i];
+    if (!msg || msg.role !== 'assistant') continue;
+    if (msg.cancelMarker) continue;
+    if (!shouldRenderAssistantCenterMessage(msg)) continue;
+    return msg;
+  }
+  return null;
+}
+
 function markChatCompletionStarIfInactive(chatId) {
   if (!chatId || chatId === state.activeChat) return false;
   const chat = state.chats[chatId];
   if (!chat || chat.pendingRequest) return false;
-  const lastAssistant = getLastAssistantMessage(chat);
+  const lastAssistant = getLastCenterRenderableAssistantMessage(chat);
   if (!lastAssistant || lastAssistant.cancelMarker) return false;
   return setChatCompletionStar(chatId, true);
 }

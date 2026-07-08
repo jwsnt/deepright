@@ -13,8 +13,8 @@ public interface RouterService {
 
     public Boolean hasHeartbeat(WorkflowTask workTask) throws Exception;
 
-    // 更新心跳
-    public void heartbeat(WorkflowTask workTask) throws Exception;
+    // 更新心跳，异步
+    public void heartbeat(WorkflowTask workTask);
 
     public RouterDevice fetch(WorkflowTask workTask, String device, String agent) throws Exception;
 

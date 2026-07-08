@@ -1,26 +1,22 @@
 package ai.deepright.router.impl;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
-import ai.open.right.protocol.ProtocolCode;
-
-import ai.deepright.complex.ComplexityMode;
-import ai.deepright.complex.ComplexityUtils;
-import ai.deepright.feature.FeatureFlag;
+import ai.deepright.feature.FeatureUtils;
+import ai.deepright.router.RouterAgent;
+import ai.deepright.router.RouterDevice;
+import ai.deepright.router.RouterKey;
+import ai.deepright.router.RouterService;
 import ai.open.right.WorkflowException;
 import ai.open.right.config.RedisConfig;
+import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.utils.GzipUtils;
 import ai.open.right.utils.JsonUtils;
 import ai.open.right.utils.SpinExec;
 import ai.open.right.utils.SplitUtils;
 import ai.open.right.workflow.flow.WorkflowTask;
-import ai.deepright.feature.FeatureUtils;
-import ai.deepright.router.RouterAgent;
-import ai.deepright.router.RouterDevice;
-import ai.deepright.router.RouterService;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import jakarta.annotation.PostConstruct;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -49,7 +45,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Getter
 @Setter
-public class DefRouterService implements RouterService {
+public class DefRouterService implements RouterKey, RouterService {
 
     public static final String NAME = "default_router_service";
 
@@ -57,7 +53,7 @@ public class DefRouterService implements RouterService {
 
     protected Cache<String, Boolean> cache4expire;
 
-    protected ExecutorService executor;
+    protected ExecutorService executorService;
 
     // 默认外部团队联系人
     protected List<String> defContact;
@@ -100,24 +96,17 @@ public class DefRouterService implements RouterService {
 
     // 更新心跳
     @Override
-    public void heartbeat(WorkflowTask workTask) throws Exception {
-        RouterAgent[] agents = FeatureUtils.buildRouterAgents(workTask);
-        if (log.isInfoEnabled()) {
-            log.info("The device={} updated heartbeat={}", workTask.getDevice(), ArrayUtils.getLength(agents));
-        }
-        if (!ArrayUtils.isEmpty(agents)) {
-            List<String> device = new ArrayList<String>();
-            List<String> agent = new ArrayList<String>();
-            List<byte[]> val = new ArrayList<byte[]>();
-            for (RouterAgent each : agents) {
-                RouterDevice routerDevice = each.buildRouterDevice(workTask);
-                // 与Fetch/Get时取值对齐
-                val.add(GzipUtils.compress(JsonUtils.write(routerDevice).getBytes(StandardCharsets.UTF_8)));
-                device.add(this.getRouter(routerDevice.getDevice()));
-                agent.add(routerDevice.getAgent());
-            }
-            // 先保存Redis，然后刷新Local Cache（设备维度，用于防止短时间重复提交）
-            this.cache4expire.get(workTask.getDevice(), new RouterSetExec(this.redis4array, device, agent, val, this.expire, this.timeout, this.circle));
+    public void heartbeat(WorkflowTask workTask) {
+        try {
+            this.executorService.execute(RouterHeartbeat.builder()
+                    .cache4expire(this.cache4expire)
+                    .redis4array(this.redis4array)
+                    .expire(this.expire)
+                    .workTask(workTask)
+                    .router(this)
+                    .build());
+        } catch (Exception e) {
+            WorkflowException.dolog(e);
         }
     }
 
@@ -134,7 +123,7 @@ public class DefRouterService implements RouterService {
     @Override
     public RouterDevice fetch(String router, String agent) throws Exception {
         // 检查Device+Key是否存在
-        Object value = new RouterFetchExec(this.redis4array, this.timeout, this.circle, this.getRouter(router), agent).exec();
+        Object value = new RouterFetchExec(this.redis4array, this.timeout, this.circle, this.router(router), agent).exec();
         return value != null ? JsonUtils.read(GzipUtils.decompress((byte[]) value), RouterDevice.class) : null;
     }
 
@@ -153,6 +142,11 @@ public class DefRouterService implements RouterService {
     public RouterDevice fetch(String key) throws Exception {
         String[] parts = SplitUtils.split(key);
         return this.fetch(parts[0], parts[1]);
+    }
+
+    @Override
+    public String router(String router) throws Exception {
+        return RedisConfig.DOMAIN + DefRouterService.class.getSimpleName() + "_r_" + router;
     }
 
     @Override
@@ -208,23 +202,19 @@ public class DefRouterService implements RouterService {
             List<String> agent = new ArrayList<String>();
             for (RouterDevice each : routerDevice) {
                 // 与Set时取值对齐
-                device.add(this.getRouter(each.getDevice()));
+                device.add(this.router(each.getDevice()));
                 agent.add(each.getAgent());
             }
-            this.executor.execute(new RouterDelExec(this.redis4array, device, agent, this.timeout, this.circle));
+            this.executorService.execute(new RouterDelExec(this.redis4array, device, agent, this.timeout, this.circle));
         }
     }
 
     protected List<String> getRouter(List<String> access) throws Exception {
         List<String> router = new ArrayList<>();
         for (String each : access) {
-            router.add(this.getRouter(each));
+            router.add(this.router(each));
         }
         return router;
-    }
-
-    protected String getRouter(String router) throws Exception {
-        return RedisConfig.DOMAIN + DefRouterService.class.getSimpleName() + "_r_" + router;
     }
 
     protected Boolean allowedRouter(WorkflowTask workTask) throws Exception {
@@ -345,7 +335,7 @@ public class DefRouterService implements RouterService {
         }
     }
 
-    public static class RouterSetExec extends SpinExec implements Callable<Boolean> {
+    public static class RouterSetExec implements Callable<Boolean> {
 
         protected final RedisTemplate<String, Object> redis4array;
 
@@ -355,17 +345,10 @@ public class DefRouterService implements RouterService {
 
         protected final List<byte[]> val;
 
-        protected final Integer timeout;
-
         protected final Integer expire;
 
-        protected final Integer circle;
-
-        public RouterSetExec(RedisTemplate<String, Object> redis4array, List<String> device, List<String> agent, List<byte[]> val, Integer expire, Integer timeout, Integer circle) {
-            super(timeout, circle);
+        public RouterSetExec(RedisTemplate<String, Object> redis4array, List<String> device, List<String> agent, List<byte[]> val, Integer expire) {
             this.redis4array = redis4array;
-            this.timeout = timeout;
-            this.circle = circle;
             this.expire = expire;
             this.device = device;
             this.agent = agent;
@@ -373,23 +356,18 @@ public class DefRouterService implements RouterService {
         }
 
         @Override
-        public Object doExec() throws Exception {
+        public Boolean call() throws Exception {
             try {
+                // Fail fast
                 Object result = this.redis4array.executePipelined(new RouterSetRedisCallable(this.device, this.agent, this.val, this.expire));
                 if (log.isInfoEnabled()) {
                     log.info("The router was registered, device={}, agent={}, result={}", this.device, this.agent, result);
                 }
-                return result;
+                return true;
             } catch (Exception e) {
-                log.error(e.getMessage(), e);
-                return null;
+                WorkflowException.dolog(e);
+                return false;
             }
-        }
-
-        @Override
-        public Boolean call() throws Exception {
-            this.doExec();
-            return true;
         }
     }
 
@@ -432,6 +410,49 @@ public class DefRouterService implements RouterService {
         }
     }
 
+    @Slf4j
+    @Getter
+    @Setter
+    @Builder
+    public static class RouterHeartbeat implements Runnable {
+
+        protected RedisTemplate<String, Object> redis4array;
+
+        protected Cache<String, Boolean> cache4expire;
+
+        protected WorkflowTask workTask;
+
+        protected RouterKey router;
+
+        protected Integer expire;
+
+        @Override
+        public void run() {
+            try {
+                RouterAgent[] agents = FeatureUtils.buildRouterAgents(this.workTask);
+                if (log.isInfoEnabled()) {
+                    log.info("The device={} updated heartbeat={}", this.workTask.getDevice(), ArrayUtils.getLength(agents));
+                }
+                if (!ArrayUtils.isEmpty(agents)) {
+                    List<String> device = new ArrayList<String>();
+                    List<String> agent = new ArrayList<String>();
+                    List<byte[]> val = new ArrayList<byte[]>();
+                    for (RouterAgent each : agents) {
+                        RouterDevice routerDevice = each.buildRouterDevice(this.workTask);
+                        // 与Fetch/Get时取值对齐
+                        val.add(GzipUtils.compress(JsonUtils.write(routerDevice).getBytes(StandardCharsets.UTF_8)));
+                        device.add(this.router.router(routerDevice.getDevice()));
+                        agent.add(routerDevice.getAgent());
+                    }
+                    // 先保存Redis，然后刷新Local Cache（设备维度，用于防止短时间重复提交）
+                    this.cache4expire.get(this.workTask.getDevice(), new RouterSetExec(this.redis4array, device, agent, val, this.expire));
+                }
+            } catch (Exception e) {
+                WorkflowException.dolog(e);
+            }
+        }
+    }
+
     @Configuration
     @Getter
     @Setter
@@ -442,7 +463,7 @@ public class DefRouterService implements RouterService {
 
         @Autowired
         @Qualifier("executor")
-        protected ExecutorService executor;
+        protected ExecutorService executorService;
 
         // Timeout内尝试Circle次
         @Value("${router.timeout:10000}")
@@ -466,7 +487,7 @@ public class DefRouterService implements RouterService {
 
         @Bean(DefRouterService.NAME)
         @ConditionalOnMissingBean(name = DefRouterService.NAME)
-        public DefRouterService defaultRouterService() throws Exception {
+        public DefRouterService defRouterService() throws Exception {
             DefRouterService defaultRouterService = new DefRouterService();
             BeanUtils.copyProperties(this, defaultRouterService);
             if (!StringUtils.isEmpty(this.contact)) {
