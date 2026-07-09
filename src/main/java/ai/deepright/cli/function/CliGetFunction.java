@@ -71,7 +71,7 @@ public class CliGetFunction extends BaseFunction {
                         rest = subData;
                     } else if (log.isWarnEnabled()) {
                         // 过期丢弃
-                        log.warn("The cli@get task was expired={}, key={}", subData.getDdl(), router.key());
+                        log.warn("The cli@get task was expired={}, timeout={}, why={}, key={}", subData.getDdl(), subData.getTimeout(), subData.getWhy(), router.key());
                         rest = null;
                     }
                 }

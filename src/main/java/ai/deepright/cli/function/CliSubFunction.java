@@ -484,7 +484,7 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
 
     // LogicVerifyAssistant特殊处理
     protected void logic(WorkflowTask workTask, RouterDevice targetDevice, String content) throws Exception {
-        if (FeatureFlag.isLogic(workTask) && !StringUtils.isEmpty(content)) {
+        if (!FeatureFlag.isSilent(workTask) && FeatureFlag.isLogic(workTask) && !StringUtils.isEmpty(content)) {
             this.source(workTask, CliPrinter.process(FeatureField.KEY_LOGIC), XmlResourceLang.get(CliSubFunction.LANG_KEY_LOGIC_MESSAGE).replace("#content", content));
         }
     }

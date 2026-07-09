@@ -2565,12 +2565,19 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
 .plugin-modal-config-section{padding-top:3px;padding-bottom:15px}
 .plugin-modal-section + .plugin-modal-section{border-top:1px solid color-mix(in srgb,var(--border) 88%,transparent)}
 .plugin-modal-section-title{font-size:12px;font-weight:600;color:var(--text-secondary);letter-spacing:.04em;text-transform:uppercase}
-.plugin-modal-config{display:flex;align-items:center;gap:12px;margin-top:3px;flex-wrap:wrap;overflow:visible}
+.plugin-modal-config{display:flex;flex-direction:column;align-items:stretch;gap:5px;margin-top:1px;overflow:visible}
+.plugin-modal-config-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;overflow:visible}
+.plugin-modal-config-row-secondary{margin-top:-1px}
 .plugin-modal-config-item.hidden{display:none !important}
 .plugin-modal-config-empty{display:none;padding:12px 14px;border:1px dashed var(--border);border-radius:14px;background:color-mix(in srgb,var(--bg-sidebar) 68%,transparent);font-size:12px;line-height:1.6;color:var(--text-secondary)}
 .plugin-modal-config-empty.show{display:block}
 .plugin-modal-checkbox{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary)}
 .plugin-modal-checkbox input{margin:0;width:13px;height:13px;accent-color:var(--accent);cursor:pointer}
+.plugin-modal-view-session-btn{display:inline-flex;align-items:center;gap:7px;padding:5px 10px;border:1px solid color-mix(in srgb,var(--accent) 24%,var(--border) 76%);border-radius:999px;background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 10%,rgba(255,255,255,.96)),color-mix(in srgb,var(--accent) 5%,rgba(255,255,255,.9)));box-shadow:inset 0 1px 0 rgba(255,255,255,.72);color:color-mix(in srgb,var(--accent) 64%,var(--text-primary) 36%);font-size:11px;font-weight:600;letter-spacing:.01em;cursor:pointer;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease,color .18s ease,opacity .18s ease}
+.plugin-modal-view-session-btn svg{width:12px;height:12px;flex:0 0 12px;opacity:.88}
+.plugin-modal-view-session-btn:hover,.plugin-modal-view-session-btn:focus-visible{border-color:color-mix(in srgb,var(--accent) 42%,var(--border) 58%);box-shadow:0 10px 22px rgba(77,107,254,.12),inset 0 1px 0 rgba(255,255,255,.82);color:var(--accent);transform:translateY(-1px);outline:none}
+.plugin-modal-view-session-btn:disabled{opacity:.5;cursor:default;transform:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.72)}
+[data-theme="dark"] .plugin-modal-view-session-btn{background:linear-gradient(180deg,rgba(65,96,160,.2),rgba(31,46,78,.3));box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
 .plugin-modal-agent{display:flex;align-items:center;gap:8px;min-width:0}
 .plugin-modal-agent-label{font-size:11px;color:var(--text-muted);white-space:nowrap}
 .plugin-modal-agent .form-select{width:auto;min-width:160px;max-width:220px;padding:8px 32px 8px 12px;border-radius:14px;font-size:12px}
@@ -2634,6 +2641,11 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
 .plugin-modal-transition-lock[data-tone="error"] .plugin-modal-transition-progress span{background:linear-gradient(90deg,rgba(255,77,79,.34),rgba(255,77,79,.92))}
 @keyframes pluginModalLockGlow{0%,100%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(0,-10px,0) scale(1.03)}}
 @keyframes pluginModalDelayProgress{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.quick-fan-transition-lock{position:fixed;inset:0;z-index:320;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(19,24,36,.16);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .18s ease,visibility 0s linear .18s}
+.quick-fan-transition-lock.show{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .18s ease}
+.quick-fan-transition-lock .plugin-modal-transition-card{width:min(340px,calc(100vw - 40px));transform:translateY(16px) scale(.96);opacity:0;transition:transform .22s cubic-bezier(.22,1,.36,1),opacity .18s ease}
+.quick-fan-transition-lock.show .plugin-modal-transition-card{transform:translateY(0) scale(1);opacity:1}
+body.quick-fan-transition-active{cursor:progress}
 [data-theme="dark"] .plugin-modal-email-warning-card{background:linear-gradient(180deg,rgba(63,24,24,.94),rgba(25,15,24,.94));border-color:rgba(255,138,138,.2);box-shadow:0 24px 60px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.06)}
 [data-theme="dark"] .plugin-modal-email-warning-desc{color:#f2d1d1}
 [data-theme="dark"] .plugin-modal-email-warning-value{background:rgba(255,77,79,.14);border-color:rgba(255,138,138,.22);color:#ffb1b1}
@@ -3418,6 +3430,14 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
 [data-theme="dark"] .message-wrap .md-content .message-inline-token-bubble.token-team{background:linear-gradient(180deg,rgba(154,52,18,.4),rgba(124,45,18,.24));border-color:rgba(253,186,116,.22);color:#fdba74}
 [data-theme="dark"] .message-wrap .md-content a.message-path-link.onboarding-message-url-target{box-shadow:0 0 0 1px rgba(142,180,255,.24),0 18px 34px rgba(0,0,0,.34)}
 .file-editor-header-actions{display:flex;align-items:center;gap:8px;min-width:0}
+.file-editor-open-actions{display:none;align-items:center;gap:6px;min-width:0}
+.file-editor-tabs{display:flex;gap:0;flex-shrink:0}
+.file-editor-open-btn{padding:6px 10px;border-radius:999px;border:1px solid color-mix(in srgb,var(--border) 74%,rgba(255,255,255,.24));background:rgba(255,255,255,.72);color:#27406d;font-size:11px;line-height:1;font-weight:600;cursor:pointer;transition:var(--transition);white-space:nowrap;box-shadow:inset 0 1px 0 rgba(255,255,255,.82)}
+.file-editor-open-btn:hover,.file-editor-open-btn:focus-visible{background:rgba(255,255,255,.92);border-color:rgba(72,99,143,.36);color:#10203f;outline:none}
+.file-editor-open-btn:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+[data-theme="dark"] .file-editor-open-btn{background:rgba(255,255,255,.08);border-color:rgba(169,190,227,.22);color:#d5e4ff;box-shadow:none}
+[data-theme="dark"] .file-editor-open-btn:hover,[data-theme="dark"] .file-editor-open-btn:focus-visible{background:rgba(255,255,255,.12);border-color:rgba(169,190,227,.34);color:#eef4ff}
+[data-theme="dark"] .file-editor-open-btn:disabled{background:rgba(255,255,255,.05);color:#9cb2d9}
 .file-editor-close{width:30px;height:30px;flex:0 0 30px;border-radius:999px;border:1px solid color-mix(in srgb,var(--border) 80%,rgba(255,255,255,.24));background:transparent;color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition)}
 .file-editor-close:hover,.file-editor-close:focus-visible{color:var(--text-primary);border-color:var(--accent);outline:none}
 [data-theme="dark"] .file-editor-close{color:#cfe0ff;border-color:rgba(169,190,227,.22);background:rgba(255,255,255,.04)}
@@ -4206,35 +4226,43 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
       <div class="plugin-modal-view plugin-modal-config-view" id="pluginModalConfigView">
         <div class="plugin-modal-section plugin-modal-config-section">
           <div class="plugin-modal-config">
-            <label class="plugin-modal-checkbox plugin-modal-config-item" id="pluginModalReuseItem" for="pluginModalReuseChat">
-              <input type="checkbox" id="pluginModalReuseChat" />
-              <span>复用当前会话</span>
-            </label>
-            <label class="plugin-modal-agent plugin-modal-config-item" id="pluginModalAgentItem" for="pluginModalAgentSelect">
-              <span class="plugin-modal-agent-label">选择 Agent</span>
-              <select class="form-select" id="pluginModalAgentSelect">
-                <option value="">加载中...</option>
-              </select>
-            </label>
-            <div class="plugin-modal-model plugin-modal-config-item" id="pluginModalModelItem" onclick="pluginModalToggleModelDropdown(event)">
-              <button type="button" title="选择模型" aria-label="选择模型">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2z"/></svg>
+            <div class="plugin-modal-config-row plugin-modal-config-row-primary" id="pluginModalConfigPrimaryRow">
+              <label class="plugin-modal-checkbox plugin-modal-config-item" id="pluginModalReuseItem" for="pluginModalReuseChat">
+                <input type="checkbox" id="pluginModalReuseChat" />
+                <span>复用当前会话</span>
+              </label>
+              <label class="plugin-modal-agent plugin-modal-config-item" id="pluginModalAgentItem" for="pluginModalAgentSelect">
+                <span class="plugin-modal-agent-label">选择 Agent</span>
+                <select class="form-select" id="pluginModalAgentSelect">
+                  <option value="">加载中...</option>
+                </select>
+              </label>
+              <div class="plugin-modal-model plugin-modal-config-item" id="pluginModalModelItem" onclick="pluginModalToggleModelDropdown(event)">
+                <button type="button" title="选择模型" aria-label="选择模型">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2z"/></svg>
+                </button>
+                <span class="plugin-modal-model-label" id="pluginModalModelLabel">未选择模型</span>
+                <div class="model-dropdown" id="pluginModalModelDropdown" style="bottom:auto;top:calc(100% + 8px);left:0;position:absolute;z-index:100"></div>
+              </div>
+            </div>
+            <div class="plugin-modal-config-row plugin-modal-config-row-secondary" id="pluginModalConfigSecondaryRow">
+              <button class="plugin-modal-view-session-btn plugin-modal-config-item" type="button" id="pluginModalViewSessionBtn" onclick="pluginModalAction('view-session')" hidden>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2.5 12s3.6-6 9.5-6 9.5 6 9.5 6-3.6 6-9.5 6-9.5-6-9.5-6Z"></path><circle cx="12" cy="12" r="2.8"></circle></svg>
+                <span>查看会话</span>
               </button>
-              <span class="plugin-modal-model-label" id="pluginModalModelLabel">未选择模型</span>
-              <div class="model-dropdown" id="pluginModalModelDropdown" style="bottom:auto;top:calc(100% + 8px);left:0;position:absolute;z-index:100"></div>
-            </div>
-            <div class="plugin-modal-thinking plugin-modal-config-item" id="pluginModalSwarmItem">
-              <div class="input-thinking-toggle" id="pluginModalSwarmToggle" onclick="pluginModalToggleSwarm(event)" title="SWARM"></div>
-              <span class="input-thinking-label" id="pluginModalSwarmLabel">SWARM</span>
-            </div>
-            <div class="plugin-modal-thinking plugin-modal-config-item" id="pluginModalThinkingItem">
-              <div class="input-thinking-toggle" id="pluginModalThinkingToggle" onclick="pluginModalToggleThinking(event)" title="Thinking"></div>
-              <span class="input-thinking-label" id="pluginModalThinkingLabel">Auto</span>
-              <div class="input-reload-confirm thinking-verify-confirm" id="pluginModalThinkingVerifyConfirm" role="dialog" aria-hidden="true" onclick="event.stopPropagation()">
-                <div class="reload-title">是否开启目标校验</div>
-                <div class="reload-actions">
-                  <button class="reload-cancel-btn" onclick="cancelThinkingVerifyPrompt()">取消</button>
-                  <button class="reload-confirm-btn" onclick="confirmThinkingVerifyPrompt()">确认</button>
+              <div class="plugin-modal-thinking plugin-modal-config-item" id="pluginModalSwarmItem">
+                <div class="input-thinking-toggle" id="pluginModalSwarmToggle" onclick="pluginModalToggleSwarm(event)" title="SWARM"></div>
+                <span class="input-thinking-label" id="pluginModalSwarmLabel">SWARM</span>
+              </div>
+              <div class="plugin-modal-thinking plugin-modal-config-item" id="pluginModalThinkingItem">
+                <div class="input-thinking-toggle" id="pluginModalThinkingToggle" onclick="pluginModalToggleThinking(event)" title="Thinking"></div>
+                <span class="input-thinking-label" id="pluginModalThinkingLabel">Auto</span>
+                <div class="input-reload-confirm thinking-verify-confirm" id="pluginModalThinkingVerifyConfirm" role="dialog" aria-hidden="true" onclick="event.stopPropagation()">
+                  <div class="reload-title">是否开启目标校验</div>
+                  <div class="reload-actions">
+                    <button class="reload-cancel-btn" onclick="cancelThinkingVerifyPrompt()">取消</button>
+                    <button class="reload-confirm-btn" onclick="confirmThinkingVerifyPrompt()">确认</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -4303,6 +4331,14 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
     <div class="browser-instance-init-actions">
       <button class="btn btn-primary" id="browserInstanceInitDoneBtn" type="button" onclick="handleBrowserInstanceInitDoneClick(event)">完成</button>
     </div>
+  </div>
+</div>
+<div class="quick-fan-transition-lock" id="quickFanTransitionLock" aria-hidden="true">
+  <div class="plugin-modal-transition-card">
+    <div class="plugin-modal-transition-spinner"></div>
+    <div class="plugin-modal-transition-title" id="quickFanTransitionTitle">正在加载快捷浮层</div>
+    <div class="plugin-modal-transition-desc" id="quickFanTransitionDesc">正在同步插件信息，请稍候</div>
+    <div class="plugin-modal-transition-progress"><span id="quickFanTransitionProgress"></span></div>
   </div>
 </div>
 <div class="consume-overlay" id="consumeOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="26" onclick="handleConsumeOverlayClick(event)" aria-hidden="true">
@@ -4788,6 +4824,11 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
     <div class="file-editor-header">
       <span id="fileEditorPath"></span>
       <div class="file-editor-header-actions">
+        <div class="file-editor-open-actions" id="fileEditorOpenActions">
+          <button class="file-editor-open-btn" type="button" id="fileEditorOpenOutsideBtn" onclick="feOpenCurrentAppOutside()">应用外打开</button>
+          <button class="file-editor-open-btn" type="button" id="fileEditorOpenInsideBtn" onclick="feOpenCurrentAppInside()">应用内打开</button>
+          <button class="file-editor-open-btn" type="button" id="fileEditorCopyLinkBtn" onclick="feCopyCurrentAppLink()">复制链接</button>
+        </div>
         <div class="file-editor-tabs">
           <div class="file-editor-tab active" id="tabView" onclick="feSetTab('view')">预览</div>
           <div class="file-editor-tab" id="tabEdit" onclick="feSetTab('edit')">编辑</div>
@@ -7429,6 +7470,8 @@ const PLUGIN_MODAL_LOG_DELAY_MS = 2000;
 const PLUGIN_MODAL_WAIT_HINT = '可能需要1至2分钟，请耐心等待';
 const PLUGIN_MODAL_LOG_HINT = '日志流会在这里实时滚动展示，点击“修改配置”可关闭日志读取并恢复参数输入';
 const PLUGIN_MODAL_CONFIG_EMPTY_HINT = '当前插件未开放容器配置项';
+const QUICK_FAN_MENU_WAIT_HINT = '正在同步插件信息，请稍候';
+const QUICK_FAN_MODAL_WAIT_HINT = '正在准备插件配置与会话环境，请稍候';
 const PLUGIN_MODAL_MODEL_DROPDOWN_GAP = 8;
 const PLUGIN_MODAL_MODEL_DROPDOWN_MAX_HEIGHT = 280;
 const PLUGIN_MODAL_BROWSER_RESTART_CONFIRM_HINT = [
@@ -7471,6 +7514,7 @@ let thinkingVerifyPromptState = {
   scope: '',
   resolve: null
 };
+let quickFanTransitionLockCount = 0;
 let pluginMetaPlaceholderPreviewState = {
   input: null,
   hoverInput: null,
@@ -16686,6 +16730,43 @@ function getFirstQuickPlugin() {
   return items[0] || null;
 }
 
+function syncQuickFanTransitionLock(visible, options) {
+  const overlay = document.getElementById('quickFanTransitionLock');
+  const titleEl = document.getElementById('quickFanTransitionTitle');
+  const descEl = document.getElementById('quickFanTransitionDesc');
+  const progress = document.getElementById('quickFanTransitionProgress');
+  const active = !!visible;
+  const opts = options && typeof options === 'object' ? options : {};
+  const titleText = String(opts.title || '正在加载快捷浮层').trim() || '正在加载快捷浮层';
+  const descText = String(opts.desc || QUICK_FAN_MENU_WAIT_HINT).trim() || QUICK_FAN_MENU_WAIT_HINT;
+  if (titleEl) titleEl.textContent = titleText;
+  if (descEl) descEl.textContent = descText;
+  if (overlay) {
+    overlay.classList.toggle('show', active);
+    overlay.setAttribute('aria-hidden', active ? 'false' : 'true');
+  }
+  document.body.classList.toggle('quick-fan-transition-active', active);
+  if (progress) {
+    progress.style.animation = 'none';
+    progress.style.transform = 'scaleX(0)';
+    if (active) {
+      void progress.offsetWidth;
+      progress.style.animation = 'pluginModalDelayProgress var(--plugin-log-delay-ms) linear infinite';
+      progress.style.transform = '';
+    }
+  }
+}
+
+function pushQuickFanTransitionLock(options) {
+  quickFanTransitionLockCount += 1;
+  syncQuickFanTransitionLock(true, options);
+}
+
+function popQuickFanTransitionLock() {
+  quickFanTransitionLockCount = Math.max(0, quickFanTransitionLockCount - 1);
+  if (!quickFanTransitionLockCount) syncQuickFanTransitionLock(false);
+}
+
 function getPluginTourActiveKey() {
   const plugin = pluginModalState && pluginModalState.plugin;
   return getPluginRuntimeKey(plugin);
@@ -18807,6 +18888,11 @@ function getPluginDefaultChatId(plugin) {
   if (isFeishuPlugin(plugin)) return 'feishu';
   if (isEmailPlugin(plugin)) return 'email';
   return '';
+}
+
+function pluginSupportsSessionView(plugin) {
+  const pluginKey = getPluginRuntimeKey(plugin).toLowerCase();
+  return pluginKey === 'feishu' || pluginKey === 'email';
 }
 
 function isRemotePlugin(plugin) {
@@ -22359,8 +22445,18 @@ async function toggleQuickFanMenu(event) {
   }
   const sidebar = document.querySelector('.sidebar');
   if (sidebar && sidebar.classList.contains('collapsed')) return;
+  let shouldUnlock = false;
   if (!state.quickPluginsLoaded || !state.quickPlugins.length) {
-    await loadQuickPlugins({ silent: false, force: !state.quickPluginsLoaded || !state.quickPlugins.length });
+    pushQuickFanTransitionLock({
+      title: '正在加载快捷浮层',
+      desc: QUICK_FAN_MENU_WAIT_HINT
+    });
+    shouldUnlock = true;
+    try {
+      await loadQuickPlugins({ silent: false, force: !state.quickPluginsLoaded || !state.quickPlugins.length });
+    } finally {
+      if (shouldUnlock) popQuickFanTransitionLock();
+    }
   }
   if (!state.quickPlugins.length) return;
   const menu = document.getElementById('quickFanMenu');
@@ -22430,6 +22526,88 @@ function pluginSupportsScope(plugin, key) {
 function pluginModalResolveConfiguredChatId(reuseChat, activeChatId) {
   if (reuseChat) return String(activeChatId || '').trim();
   return getPluginDefaultChatId(pluginModalState.plugin);
+}
+
+function pluginModalResolveViewSessionConfig() {
+  const plugin = pluginModalState.plugin;
+  if (!plugin || !pluginSupportsSessionView(plugin) || !pluginHasSavedConfig(plugin)) return null;
+  const preferredAgentId = String(plugin.agentId || state.settings.agentId || '').trim();
+  const resolvedAgentId = resolveAgentSelection(preferredAgentId, pluginModalState.availableAgents) || preferredAgentId;
+  const chatId = String(plugin.chatId || getPluginDefaultChatId(plugin) || '').trim();
+  if (!chatId) return null;
+  const thinking = !!plugin.thinking;
+  const verify = !!plugin.verify && thinking;
+  return {
+    pluginName: String(plugin.name || '插件').trim() || '插件',
+    chatId,
+    agentId: resolvedAgentId,
+    model: normalizeModelName(plugin.model || ''),
+    thinking,
+    verify,
+    swarm: isPluginSwarmEnabled(plugin)
+  };
+}
+
+function pluginModalApplyViewSessionChatConfig(chatId, config) {
+  const resolvedChatId = String(chatId || '').trim();
+  if (!resolvedChatId || !config || typeof config !== 'object') return;
+  if (config.agentId) chatAgents[resolvedChatId] = config.agentId;
+  else delete chatAgents[resolvedChatId];
+  if (config.model) chatModels[resolvedChatId] = normalizeModelName(config.model);
+  else delete chatModels[resolvedChatId];
+  chatThinking[resolvedChatId] = !!config.thinking;
+  chatVerify[resolvedChatId] = !!config.verify && !!config.thinking;
+  chatHtmlOutput[resolvedChatId] = false;
+  chatSwarm[resolvedChatId] = !!config.swarm;
+  clearChatSandbox(resolvedChatId);
+}
+
+function pluginModalCreateViewSessionChat(config) {
+  const chatId = String(config && config.chatId || '').trim();
+  if (!chatId || state.chats[chatId]) return false;
+  state.chats[chatId] = {
+    id: chatId,
+    messages: [],
+    lastMsg: (config && config.pluginName ? (config.pluginName + '会话') : '插件会话')
+  };
+  state.chatOrder.unshift(chatId);
+  pluginModalApplyViewSessionChatConfig(chatId, config);
+  return true;
+}
+
+function pluginModalOpenViewSession() {
+  const config = pluginModalResolveViewSessionConfig();
+  if (!config) {
+    vfsShowUploadToast('当前暂无会话', false);
+    return;
+  }
+  const chatId = config.chatId;
+  let changed = false;
+  if (!state.chats[chatId]) {
+    if (state.chatOrder.length >= 10) {
+      showLimitToast();
+      return;
+    }
+    if (pluginModalCreateViewSessionChat(config)) changed = true;
+  } else {
+    pluginModalApplyViewSessionChatConfig(chatId, config);
+    changed = true;
+  }
+  if (changed) saveChats();
+  closePluginModal(true);
+  switchChat(chatId);
+  renderChatList();
+  scheduleSwitchedChatAutoReload(chatId, {
+    delayMs: 80,
+    reloadOptions: {
+      silent: false,
+      suppressSuccessToast: true,
+      passiveUi: true,
+      showNoDataTip: true,
+      toastPlacement: 'vfs',
+      noDataTipPlacement: 'vfs'
+    }
+  });
 }
 
 function pluginModalResolveEffectiveAgentId() {
@@ -22695,6 +22873,8 @@ function pluginModalSyncControls() {
   const reuseItem = document.getElementById('pluginModalReuseItem');
   const agentItem = document.getElementById('pluginModalAgentItem');
   const modelItem = document.getElementById('pluginModalModelItem');
+  const secondaryRow = document.getElementById('pluginModalConfigSecondaryRow');
+  const viewSessionBtn = document.getElementById('pluginModalViewSessionBtn');
   const swarmItem = document.getElementById('pluginModalSwarmItem');
   const thinkingItem = document.getElementById('pluginModalThinkingItem');
   const configEmpty = document.getElementById('pluginModalConfigEmpty');
@@ -22704,6 +22884,7 @@ function pluginModalSyncControls() {
   const supportsProvider = pluginSupportsScope(pluginModalState.plugin, 'provider');
   const supportsThinking = pluginSupportsScope(pluginModalState.plugin, 'thinking');
   const supportsSwarm = pluginSupportsScope(pluginModalState.plugin, 'swarm');
+  const canViewSession = pluginSupportsSessionView(pluginModalState.plugin);
   const remoteRestricted = isRemoteReadonlySiteAccess();
   if (reuse) {
     reuse.checked = supportsReuse && !!pluginModalState.reuseChat;
@@ -22736,6 +22917,12 @@ function pluginModalSyncControls() {
   pluginModalUpdateSwarmUI();
   pluginModalUpdateThinkingUI();
   pluginModalCloseModelDropdown();
+  if (viewSessionBtn) {
+    viewSessionBtn.hidden = !canViewSession;
+    viewSessionBtn.classList.toggle('hidden', !canViewSession);
+    viewSessionBtn.style.display = canViewSession ? '' : 'none';
+  }
+  if (secondaryRow) secondaryRow.classList.toggle('hidden', !(canViewSession || (!remoteRestricted && (supportsSwarm || supportsThinking))));
   if (metaSection) metaSection.style.display = remoteRestricted ? 'none' : '';
   if (configEmpty) configEmpty.classList.toggle('show', remoteRestricted || !(supportsReuse || supportsAgent || supportsProvider || supportsThinking || supportsSwarm));
   pluginModalUpdateConfigEmptyMessage();
@@ -22790,6 +22977,7 @@ function pluginModalSyncTransitionLock() {
 function pluginModalUpdateActionButtons() {
   const startBtn = document.getElementById('pluginModalStartBtn');
   const stopBtn = document.getElementById('pluginModalStopBtn');
+  const viewSessionBtn = document.getElementById('pluginModalViewSessionBtn');
   const logBtn = document.getElementById('pluginModalLogBtn');
   const cancelBtn = document.getElementById('pluginModalCancelBtn');
   const closeIconBtn = document.getElementById('pluginModalCloseIconBtn');
@@ -22798,6 +22986,7 @@ function pluginModalUpdateActionButtons() {
   const blocked = busy || locked || !!pluginModalState.browserRestartConfirmVisible || !!pluginModalState.emailIntervalWarningVisible;
   const hasStarted = !!pluginModalState.started;
   const remoteRestricted = isRemoteReadonlySiteAccess();
+  const canViewSession = pluginSupportsSessionView(pluginModalState.plugin);
   pluginModalUpdateConfigEmptyMessage();
   if (startBtn) {
     startBtn.style.display = remoteRestricted ? 'none' : '';
@@ -22812,6 +23001,12 @@ function pluginModalUpdateActionButtons() {
     stopBtn.style.display = remoteRestricted ? 'none' : '';
     stopBtn.disabled = remoteRestricted || blocked || !hasStarted;
     stopBtn.textContent = remoteRestricted ? '远程不可关闭' : '关闭插件';
+  }
+  if (viewSessionBtn) {
+    viewSessionBtn.hidden = !canViewSession;
+    viewSessionBtn.classList.toggle('hidden', !canViewSession);
+    viewSessionBtn.style.display = canViewSession ? '' : 'none';
+    viewSessionBtn.disabled = blocked;
   }
   if (logBtn) logBtn.disabled = remoteRestricted ? false : blocked;
   if (cancelBtn) cancelBtn.disabled = blocked;
@@ -23584,16 +23779,34 @@ async function openPluginModal(plugin) {
   const overlay = document.getElementById('pluginModalOverlay');
   if (!overlay || !plugin || !plugin.name) return;
   const pluginKey = getPluginRuntimeKey(plugin);
-  if (pluginKey) {
-    try {
-      await loadQuickPlugins({ silent: true, force: true });
-      await refreshQuickPluginStatuses({ silent: true });
-      const latestPlugins = Array.isArray(state.quickPlugins) ? state.quickPlugins : [];
-      const matchedPlugin = Array.isArray(latestPlugins)
-        ? latestPlugins.find(item => getPluginRuntimeKey(item) === pluginKey)
-        : null;
-      if (matchedPlugin) plugin = matchedPlugin;
-    } catch {}
+  const pluginName = String(plugin.name || '插件').trim() || '插件';
+  pushQuickFanTransitionLock({
+    title: '正在打开' + pluginName,
+    desc: QUICK_FAN_MODAL_WAIT_HINT
+  });
+  let agents = [];
+  try {
+    const tasks = pluginKey
+      ? [
+          loadQuickPlugins({ silent: true, force: true }),
+          fetchAgentList()
+        ]
+      : [fetchAgentList()];
+    const [pluginsResult, agentsResult] = await Promise.allSettled(tasks);
+    if (pluginKey) {
+      if (pluginsResult.status === 'fulfilled') {
+        const latestPlugins = Array.isArray(pluginsResult.value) ? pluginsResult.value : [];
+        const matchedPlugin = latestPlugins.find(item => getPluginRuntimeKey(item) === pluginKey);
+        if (matchedPlugin) plugin = matchedPlugin;
+      }
+      if (agentsResult.status === 'fulfilled') {
+        agents = Array.isArray(agentsResult.value) ? agentsResult.value : [];
+      }
+    } else if (pluginsResult.status === 'fulfilled') {
+      agents = Array.isArray(pluginsResult.value) ? pluginsResult.value : [];
+    }
+  } finally {
+    popQuickFanTransitionLock();
   }
   const activeChatId = String(state.activeChat || '').trim();
   const preferredAgentId = String((activeChatId && getChatAgentId(activeChatId)) || state.settings.agentId || '').trim();
@@ -23601,7 +23814,6 @@ async function openPluginModal(plugin) {
   const savedModel = normalizeModelName(plugin && plugin.model);
   const savedChatId = String(plugin && plugin.chatId || '').trim();
   const defaultChatId = getPluginDefaultChatId(plugin);
-  const agents = await fetchAgentList();
   const defaultAgentId = resolveAgentSelection('', agents);
   const defaultModel = getFirstSelectableConfiguredModelName(state.settings.models || {});
   const shouldUseContainerDefaults = !pluginHasSavedConfig(plugin);
@@ -23747,6 +23959,10 @@ async function pluginModalAction(action) {
       pluginModalState.submitting = false;
       pluginModalUpdateActionButtons();
     });
+    return;
+  } else if (action === 'view-session') {
+    if (pluginModalState.submitting || pluginModalState.transitionLocked) return;
+    pluginModalOpenViewSession();
     return;
   } else if (action === 'log') {
     if (pluginModalState.submitting || pluginModalState.transitionLocked) return;
@@ -26714,6 +26930,7 @@ function normalizeLoadedChat(chat) {
   chat.skipRestoreAfterAbnormal = !!chat.skipRestoreAfterAbnormal;
   chat.skipRestoreAfterAbnormalScopeKey = String(chat.skipRestoreAfterAbnormalScopeKey || '').trim();
   chat.completedWhileInactive = !!chat.completedWhileInactive;
+  chat.lastCompletionNoticeAt = toChatTimestamp(chat.lastCompletionNoticeAt || '');
   if (chat.completedWhileInactive && !getLastCenterRenderableAssistantMessage(chat)) {
     chat.completedWhileInactive = false;
     changed = true;
@@ -26734,6 +26951,26 @@ function hasHiddenChatCompletionStar() {
   return state.chatOrder.some(chatId => chatId !== state.activeChat && hasChatCompletionStar(chatId));
 }
 
+function getChatCompletionNoticeAt(chat) {
+  return chat ? toChatTimestamp(chat.lastCompletionNoticeAt || '') : '';
+}
+
+function getLatestCompletedCenterAssistantTimestamp(chat) {
+  const lastAssistant = getLastCenterRenderableAssistantMessage(chat);
+  if (!lastAssistant || lastAssistant.cancelMarker || !isAssistantTerminalMessage(lastAssistant)) return '';
+  return toChatTimestamp(lastAssistant.receivedAt || lastAssistant.createdAt || '');
+}
+
+function setChatCompletionNoticeAt(chatId, timeline) {
+  const chat = chatId ? state.chats[chatId] : null;
+  if (!chat) return false;
+  const normalized = toChatTimestamp(timeline);
+  const current = getChatCompletionNoticeAt(chat);
+  if (!normalized || current === normalized) return false;
+  chat.lastCompletionNoticeAt = normalized;
+  return true;
+}
+
 function setChatCompletionStar(chatId, visible) {
   const chat = chatId ? state.chats[chatId] : null;
   if (!chat) return false;
@@ -26747,7 +26984,10 @@ function setChatCompletionStar(chatId, visible) {
 }
 
 function clearChatCompletionStar(chatId) {
-  return setChatCompletionStar(chatId, false);
+  const noticeChanged = setChatCompletionNoticeAt(chatId, getLatestCompletedCenterAssistantTimestamp(state.chats[chatId]));
+  const starChanged = setChatCompletionStar(chatId, false);
+  if (noticeChanged && !starChanged) saveChats();
+  return noticeChanged || starChanged;
 }
 
 function getLastAssistantMessage(chat) {
@@ -26772,12 +27012,21 @@ function getLastCenterRenderableAssistantMessage(chat) {
 }
 
 function markChatCompletionStarIfInactive(chatId) {
-  if (!chatId || chatId === state.activeChat) return false;
+  if (!chatId) return false;
   const chat = state.chats[chatId];
   if (!chat || chat.pendingRequest) return false;
-  const lastAssistant = getLastCenterRenderableAssistantMessage(chat);
-  if (!lastAssistant || lastAssistant.cancelMarker) return false;
-  return setChatCompletionStar(chatId, true);
+  const completedAt = getLatestCompletedCenterAssistantTimestamp(chat);
+  if (!completedAt) return false;
+  if (chatId === state.activeChat) {
+    const noticeChanged = setChatCompletionNoticeAt(chatId, completedAt);
+    if (noticeChanged) saveChats();
+    return noticeChanged;
+  }
+  if (getChatCompletionNoticeAt(chat) && completedAt <= getChatCompletionNoticeAt(chat)) return false;
+  const noticeChanged = setChatCompletionNoticeAt(chatId, completedAt);
+  const starChanged = setChatCompletionStar(chatId, true);
+  if (noticeChanged && !starChanged) saveChats();
+  return noticeChanged || starChanged;
 }
 
 // ===== UUID =====
@@ -26881,7 +27130,7 @@ function createNewChat(preferredId) {
   let id = requestedId || uuid();
   if (requestedId && state.chats[id]) return false;
   while (!requestedId && state.chats[id]) id = uuid();
-  state.chats[id] = { id, messages: [], lastMsg: '新会话' };
+  state.chats[id] = { id, messages: [], lastMsg: '新会话', lastCompletionNoticeAt: '' };
   state.chatOrder.unshift(id);
   // Bind current agent and model to new chat
   if (state.settings.agentId) chatAgents[id] = state.settings.agentId;
@@ -34069,6 +34318,7 @@ function clearChatConversation(chatId) {
   chat.skipRestoreAfterAbnormal = false;
   chat.skipRestoreAfterAbnormalScopeKey = '';
   chat.completedWhileInactive = false;
+  chat.lastCompletionNoticeAt = '';
   chat.rightSidebarUrlPreview = normalizeChatUrlPreviewState(null);
   state.displayedCount = 0;
   document.querySelectorAll('.message-stream-burst').forEach(node => node.remove());
@@ -39732,6 +39982,141 @@ function detectFileType(path) {
   return 'unsupported';
 }
 
+function getCurrentThemeValue(theme) {
+  const resolvedTheme = String(theme != null ? theme : (state && state.theme) || '').trim().toLowerCase();
+  return resolvedTheme === 'dark' ? 'dark' : 'light';
+}
+
+function getFileEditorAppOpenState() {
+  const relPath = String(feAgentRelPath || '').trim().replace(/^\.\//, '');
+  if (feFileType !== 'html' || !/^app\/.+\.html?$/i.test(relPath)) {
+    return {
+      available: false,
+      href: '',
+      reason: '当前文件不是可直接打开的应用 HTML 页面'
+    };
+  }
+  const chatId = String(state && state.activeChat || '').trim();
+  const agentId = String((chatId && getChatAgentId(chatId)) || state && state.settings && state.settings.agentId || '').trim();
+  if (!agentId) {
+    return {
+      available: false,
+      href: '',
+      reason: '当前未绑定 Agent'
+    };
+  }
+  const mappingRelPath = relPath.replace(/^app\//i, '');
+  const encodedPath = mappingRelPath
+    .split('/')
+    .filter(Boolean)
+    .map(seg => encodeURIComponent(seg))
+    .join('/');
+  if (!encodedPath) {
+    return {
+      available: false,
+      href: '',
+      reason: '当前应用页面路径无效'
+    };
+  }
+  try {
+    const url = new URL('/mapping/' + encodeURIComponent(agentId) + '/' + encodedPath, getExecApiBase() || location.href);
+    const themeValue = getCurrentThemeValue();
+    const themeLabel = getCurrentThemeLabel(themeValue);
+    url.searchParams.set('agentId', agentId);
+    url.searchParams.set('agent', agentId);
+    if (chatId) {
+      url.searchParams.set('chatId', chatId);
+      url.searchParams.set('chat', chatId);
+    } else {
+      url.searchParams.delete('chatId');
+      url.searchParams.delete('chat');
+    }
+    url.searchParams.set('themeLabel', themeLabel);
+    url.searchParams.set('theme', themeValue);
+    return {
+      available: true,
+      href: url.href,
+      reason: ''
+    };
+  } catch {
+    return {
+      available: false,
+      href: '',
+      reason: '当前应用页面链接生成失败'
+    };
+  }
+}
+
+function feSyncOpenActions() {
+  const wrap = document.getElementById('fileEditorOpenActions');
+  const insideBtn = document.getElementById('fileEditorOpenInsideBtn');
+  const outsideBtn = document.getElementById('fileEditorOpenOutsideBtn');
+  const copyBtn = document.getElementById('fileEditorCopyLinkBtn');
+  if (!wrap || !insideBtn || !outsideBtn || !copyBtn) return;
+  const actionState = getFileEditorAppOpenState();
+  const hasActiveChat = !!String(state && state.activeChat || '').trim();
+  const shouldShow = actionState.available && feMode === 'view';
+  wrap.style.display = shouldShow ? 'flex' : 'none';
+  insideBtn.disabled = !actionState.available || !hasActiveChat;
+  outsideBtn.disabled = !actionState.available;
+  copyBtn.disabled = !actionState.available;
+  insideBtn.dataset.href = actionState.href || '';
+  outsideBtn.dataset.href = actionState.href || '';
+  copyBtn.dataset.href = actionState.href || '';
+  insideBtn.title = actionState.reason || (hasActiveChat ? '在右侧 iframe 中打开当前应用页面' : '请先进入一个会话后再应用内打开');
+  outsideBtn.title = actionState.reason || '在新页面中打开当前应用页面';
+  copyBtn.title = actionState.reason || '复制当前应用页面链接';
+}
+
+function feOpenCurrentAppOutside() {
+  const actionState = getFileEditorAppOpenState();
+  if (!actionState.available || !actionState.href) {
+    if (actionState.reason) vfsShowUploadToast(actionState.reason, true);
+    return;
+  }
+  try {
+    if (typeof _origOpen === 'function') {
+      _origOpen(actionState.href, '_blank', 'noopener,noreferrer');
+    }
+  } catch {
+    vfsShowUploadToast('应用外打开失败', true);
+  }
+}
+
+async function feCopyCurrentAppLink() {
+  const actionState = getFileEditorAppOpenState();
+  if (!actionState.available || !actionState.href) {
+    if (actionState.reason) vfsShowUploadToast(actionState.reason, true);
+    return;
+  }
+  try {
+    await copyTextToClipboard(actionState.href);
+    feClose();
+    vfsShowUploadToast('已复制到粘贴板', false, { placement: 'vfs' });
+  } catch {
+    vfsShowUploadToast('复制链接失败', true);
+  }
+}
+
+function feOpenCurrentAppInside() {
+  const actionState = getFileEditorAppOpenState();
+  if (!actionState.available || !actionState.href) {
+    if (actionState.reason) vfsShowUploadToast(actionState.reason, true);
+    return;
+  }
+  if (!String(state && state.activeChat || '').trim()) {
+    vfsShowUploadToast('请先进入一个会话后再应用内打开', true);
+    return;
+  }
+  const blockedReason = getRightSidebarUrlPreviewBlockedReason(actionState.href);
+  if (blockedReason) {
+    vfsShowUploadToast(blockedReason, true);
+    return;
+  }
+  feClose();
+  openRightSidebarUrlPreview(actionState.href);
+}
+
 async function feOpen(absPath) {
   cmdClosePanel(true);
   feCurrentPath = absPath;
@@ -39758,6 +40143,7 @@ async function feOpen(absPath) {
   feCancelImageTextEdit();
   document.getElementById('fileEditorPath').textContent = feAgentRelPath;
   feMode = 'view';
+  feSyncOpenActions();
 
   const panel = document.querySelector('.file-editor-panel');
   const tabs = document.querySelector('.file-editor-tabs');
@@ -39884,6 +40270,7 @@ function feSetTab(mode) {
 function feUpdateTabs() {
   document.getElementById('tabView').classList.toggle('active', feMode === 'view');
   document.getElementById('tabEdit').classList.toggle('active', feMode === 'edit');
+  feSyncOpenActions();
 }
 
 function feResolveImageMime(ext) {
@@ -40444,6 +40831,7 @@ function feClose() {
   feImageState.isDrawing = false;
   feImageState.pointerId = null;
   feCancelImageTextEdit();
+  feSyncOpenActions();
 }
 
 async function feSave() {
@@ -43818,7 +44206,8 @@ function tlViewDo() {
     messages: [],
     lastMsg: p.userContent || content || '备忘录会话',
     pendingRequest: true,
-    lastRequestAt: execTs
+    lastRequestAt: execTs,
+    lastCompletionNoticeAt: ''
   };
   state.chatOrder.unshift(id);
   chatAgents[id] = p.agentId;
