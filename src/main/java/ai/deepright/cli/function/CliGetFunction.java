@@ -143,7 +143,7 @@ public class CliGetFunction extends BaseFunction {
         @Value("${cli.get.timeout:15000}")
         protected Integer timeout;
 
-        @Value("${cli.get.display:50}")
+        @Value("${cli.get.display:500}")
         protected Integer display;
 
         @Value("${cli.get.circle:10}")

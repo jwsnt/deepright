@@ -13262,10 +13262,10 @@ func TestIntegrationHandleSandboxPersistsByAgentAndChat(t *testing.T) {
 	cronDB = db
 	defer func() { cronDB = oldCronDB }()
 	oldPrimeSandbox := integrationPrimeSandboxModeFn
-	integrationPrimeSandboxModeFn = func(string) error { return nil }
+	integrationPrimeSandboxModeFn = func(string) (string, error) { return "", nil }
 	defer func() { integrationPrimeSandboxModeFn = oldPrimeSandbox }()
 
-	readReq := httptest.NewRequest(http.MethodGet, "/api/sandbox_status?agentId=agent-a&chatId=chat-1", nil)
+	readReq := httptest.NewRequest(http.MethodGet, "/api/sandbox_status?chatId=chat-1", nil)
 	readRec := httptest.NewRecorder()
 	handleSandboxStatus()(readRec, readReq)
 
@@ -13302,14 +13302,14 @@ func TestIntegrationHandleSandboxPersistsByAgentAndChat(t *testing.T) {
 	}
 
 	var stored string
-	if err := cronDB.QueryRow(`SELECT sandbox_exe FROM cli_sandbox_state WHERE agent_id = ? AND chat_id = ?`, "agent-a", "chat-1").Scan(&stored); err != nil {
+	if err := cronDB.QueryRow(`SELECT sandbox_exe FROM cli_sandbox_state WHERE chat_id = ?`, "chat-1").Scan(&stored); err != nil {
 		t.Fatalf("query sandbox state: %v", err)
 	}
 	if stored != sandboxstate.ModeFilePickNet {
 		t.Fatalf("sandbox_exe = %q, want %q", stored, sandboxstate.ModeFilePickNet)
 	}
 
-	otherReq := httptest.NewRequest(http.MethodGet, "/api/sandbox_status?agentId=agent-a&chatId=chat-2", nil)
+	otherReq := httptest.NewRequest(http.MethodGet, "/api/sandbox_status?chatId=chat-2", nil)
 	otherRec := httptest.NewRecorder()
 	handleSandboxStatus()(otherRec, otherReq)
 
@@ -13341,7 +13341,7 @@ func TestIntegrationHandleSandboxPersistsByAgentAndChat(t *testing.T) {
 		t.Fatalf("unexpected disable payload: %+v", disablePayload)
 	}
 	var count int
-	if err := cronDB.QueryRow(`SELECT COUNT(1) FROM cli_sandbox_state WHERE agent_id = ? AND chat_id = ?`, "agent-a", "chat-1").Scan(&count); err != nil {
+	if err := cronDB.QueryRow(`SELECT COUNT(1) FROM cli_sandbox_state WHERE chat_id = ?`, "chat-1").Scan(&count); err != nil {
 		t.Fatalf("count sandbox state: %v", err)
 	}
 	if count != 0 {
@@ -13369,14 +13369,14 @@ func TestIntegrationHandleSandboxStatusReadsWithoutWriting(t *testing.T) {
 	cronDB = db
 	defer func() { cronDB = nil }()
 	oldPrimeSandbox := integrationPrimeSandboxModeFn
-	integrationPrimeSandboxModeFn = func(string) error { return nil }
+	integrationPrimeSandboxModeFn = func(string) (string, error) { return "", nil }
 	defer func() { integrationPrimeSandboxModeFn = oldPrimeSandbox }()
 
 	writeReq := httptest.NewRequest(http.MethodPost, "/api/sandbox=filepick?agentId=agent-a&chatId=chat-1", nil)
 	writeRec := httptest.NewRecorder()
 	handleSandbox()(writeRec, writeReq)
 
-	statusReq := httptest.NewRequest(http.MethodGet, "/api/sandbox_status?agentId=agent-a&chatId=chat-1", nil)
+	statusReq := httptest.NewRequest(http.MethodGet, "/api/sandbox_status?agentId=agent-b&chatId=chat-1", nil)
 	statusRec := httptest.NewRecorder()
 	handleSandboxStatus()(statusRec, statusReq)
 
@@ -13391,12 +13391,12 @@ func TestIntegrationHandleSandboxStatusReadsWithoutWriting(t *testing.T) {
 	if err := json.NewDecoder(statusRec.Body).Decode(&payload); err != nil {
 		t.Fatalf("decode sandbox_status payload: %v", err)
 	}
-	if payload.Status != 0 || payload.AgentID != "agent-a" || payload.ChatID != "chat-1" || payload.Sandbox != sandboxstate.ModeFilePick || !payload.Recorded || payload.UpdatedAt == "" {
+	if payload.Status != 0 || payload.AgentID != "agent-b" || payload.ChatID != "chat-1" || payload.Sandbox != sandboxstate.ModeFilePick || !payload.Recorded || payload.UpdatedAt == "" {
 		t.Fatalf("unexpected sandbox_status payload: %+v", payload)
 	}
 
 	var stored string
-	if err := cronDB.QueryRow(`SELECT sandbox_exe FROM cli_sandbox_state WHERE agent_id = ? AND chat_id = ?`, "agent-a", "chat-1").Scan(&stored); err != nil {
+	if err := cronDB.QueryRow(`SELECT sandbox_exe FROM cli_sandbox_state WHERE chat_id = ?`, "chat-1").Scan(&stored); err != nil {
 		t.Fatalf("query sandbox state: %v", err)
 	}
 	if stored != sandboxstate.ModeFilePick {
@@ -13425,11 +13425,11 @@ func TestIntegrationHandleSandboxReturnsPrimeError(t *testing.T) {
 	defer func() { cronDB = nil }()
 
 	oldPrimeSandbox := integrationPrimeSandboxModeFn
-	integrationPrimeSandboxModeFn = func(mode string) error {
+	integrationPrimeSandboxModeFn = func(mode string) (string, error) {
 		if mode != sandboxstate.ModeFilePick {
 			t.Fatalf("mode = %q, want %q", mode, sandboxstate.ModeFilePick)
 		}
-		return errors.New("picker unavailable")
+		return "", errors.New("picker unavailable")
 	}
 	defer func() { integrationPrimeSandboxModeFn = oldPrimeSandbox }()
 
@@ -13451,7 +13451,7 @@ func TestIntegrationHandleSandboxReturnsPrimeError(t *testing.T) {
 		t.Fatalf("EnsureSchema: %v", err)
 	}
 	var count int
-	if err := cronDB.QueryRow(`SELECT COUNT(1) FROM cli_sandbox_state WHERE agent_id = ? AND chat_id = ?`, "agent-a", "chat-1").Scan(&count); err != nil {
+	if err := cronDB.QueryRow(`SELECT COUNT(1) FROM cli_sandbox_state WHERE chat_id = ?`, "chat-1").Scan(&count); err != nil {
 		t.Fatalf("count sandbox state: %v", err)
 	}
 	if count != 0 {
@@ -13480,14 +13480,14 @@ func TestIntegrationHandleSandboxUsesManualDirectoryWhitelist(t *testing.T) {
 	defer func() { cronDB = nil }()
 
 	oldPrimeSandboxDir := integrationPrimeSandboxDirectoryFn
-	integrationPrimeSandboxDirectoryFn = func(mode, dir string) error {
+	integrationPrimeSandboxDirectoryFn = func(mode, dir string) (string, error) {
 		if mode != sandboxstate.ModeFilePick {
 			t.Fatalf("mode = %q, want %q", mode, sandboxstate.ModeFilePick)
 		}
 		if dir != "/Users/demo/Desktop" {
 			t.Fatalf("dir = %q, want /Users/demo/Desktop", dir)
 		}
-		return nil
+		return dir, nil
 	}
 	defer func() { integrationPrimeSandboxDirectoryFn = oldPrimeSandboxDir }()
 
@@ -13496,15 +13496,24 @@ func TestIntegrationHandleSandboxUsesManualDirectoryWhitelist(t *testing.T) {
 	handleSandbox()(rec, req)
 
 	var payload struct {
-		Status   int    `json:"status"`
-		Sandbox  string `json:"sandbox"`
-		Recorded bool   `json:"recorded"`
+		Status     int    `json:"status"`
+		Sandbox    string `json:"sandbox"`
+		AllowedDir string `json:"allowedDir"`
+		Recorded   bool   `json:"recorded"`
 	}
 	if err := json.NewDecoder(rec.Body).Decode(&payload); err != nil {
 		t.Fatalf("decode payload: %v", err)
 	}
-	if payload.Status != 0 || payload.Sandbox != sandboxstate.ModeFilePick || !payload.Recorded {
+	if payload.Status != 0 || payload.Sandbox != sandboxstate.ModeFilePick || payload.AllowedDir != "/Users/demo/Desktop" || !payload.Recorded {
 		t.Fatalf("unexpected payload: %+v", payload)
+	}
+
+	var storedDir string
+	if err := cronDB.QueryRow(`SELECT allowed_dir FROM cli_sandbox_state WHERE chat_id = ?`, "chat-1").Scan(&storedDir); err != nil {
+		t.Fatalf("query sandbox allowed_dir: %v", err)
+	}
+	if storedDir != "/Users/demo/Desktop" {
+		t.Fatalf("allowed_dir = %q, want /Users/demo/Desktop", storedDir)
 	}
 }
 
@@ -13529,7 +13538,7 @@ func TestPrimeIntegrationSandboxModeUsesHelperOutsideBundleLayout(t *testing.T) 
 	}
 	defer func() { integrationSandboxCommandPathFn = originalSandboxPathFn }()
 
-	if err := primeIntegrationSandboxMode(sandboxstate.ModeFilePick); err != nil {
+	if _, err := primeIntegrationSandboxMode(sandboxstate.ModeFilePick); err != nil {
 		t.Fatalf("primeIntegrationSandboxMode: %v", err)
 	}
 
@@ -13569,8 +13578,12 @@ func TestPrimeIntegrationSandboxDirectoryUsesHelperOutsideBundleLayout(t *testin
 	}
 	defer func() { integrationSandboxCommandPathFn = originalSandboxPathFn }()
 
-	if err := primeIntegrationSandboxDirectory(sandboxstate.ModeFilePickNet, "/tmp/workspace"); err != nil {
+	allowedDir, err := primeIntegrationSandboxDirectory(sandboxstate.ModeFilePickNet, "/tmp/workspace")
+	if err != nil {
 		t.Fatalf("primeIntegrationSandboxDirectory: %v", err)
+	}
+	if allowedDir != "/tmp/workspace" {
+		t.Fatalf("allowedDir = %q, want /tmp/workspace", allowedDir)
 	}
 
 	argsData, err := os.ReadFile(argsPath)
@@ -13641,7 +13654,7 @@ func TestIntegrationHandleCmdUsesSandboxHelperForEnabledSession(t *testing.T) {
 	cronDB = db
 	defer func() { cronDB = nil }()
 
-	if _, err := sandboxstate.Set(cronDB, "agent-a", "chat-1", sandboxstate.ModeFilePickNet); err != nil {
+	if _, err := sandboxstate.SetWithDirectory(cronDB, "agent-a", "chat-1", sandboxstate.ModeFilePickNet, "/Users/demo/Documents/photos"); err != nil {
 		t.Fatalf("enable sandbox: %v", err)
 	}
 
@@ -13684,6 +13697,7 @@ func TestIntegrationHandleCmdUsesSandboxHelperForEnabledSession(t *testing.T) {
 	body := `{"agentId":"agent-a","chatId":"chat-1","cmd":"ls -la /Users/shenjiawei/Downloads","timeout":4321}`
 	req := httptest.NewRequest(http.MethodPost, "/api/cmd", strings.NewReader(body))
 	req.RemoteAddr = "127.0.0.1:34567"
+	req.Host = "127.0.0.1:8080"
 	rec := httptest.NewRecorder()
 	handleCmd(cfg)(rec, req)
 
@@ -13707,7 +13721,7 @@ func TestIntegrationHandleCmdUsesSandboxHelperForEnabledSession(t *testing.T) {
 		t.Fatalf("read args: %v", err)
 	}
 	gotArgs := strings.Split(strings.TrimSpace(string(argsData)), "\n")
-	wantPrefix := []string{"--cmd", "ls -la /Users/shenjiawei/Downloads", "--shell", sharedutil.DefaultExecShell(), "--timeout", "4321"}
+	wantPrefix := []string{"--cmd", "ls -la /Users/shenjiawei/Downloads", "--allowed-dir", "/Users/demo/Documents/photos", "--shell", sharedutil.DefaultExecShell(), "--timeout", "4321"}
 	if !reflect.DeepEqual(gotArgs, wantPrefix) {
 		t.Fatalf("sandbox args = %#v, want %#v", gotArgs, wantPrefix)
 	}
@@ -13724,7 +13738,7 @@ func TestExecuteTaskUsesSandboxHelperForEnabledSession(t *testing.T) {
 	cronDB = db
 	defer func() { cronDB = nil }()
 
-	if _, err := sandboxstate.Set(cronDB, "agent-a", "chat-1", sandboxstate.ModeFilePickNet); err != nil {
+	if _, err := sandboxstate.SetWithDirectory(cronDB, "agent-a", "chat-1", sandboxstate.ModeFilePickNet, "/Users/demo/Documents/code"); err != nil {
 		t.Fatalf("enable sandbox: %v", err)
 	}
 
@@ -13782,7 +13796,7 @@ func TestExecuteTaskUsesSandboxHelperForEnabledSession(t *testing.T) {
 		t.Fatalf("read args: %v", err)
 	}
 	gotArgs := strings.Split(strings.TrimSpace(string(argsData)), "\n")
-	wantPrefix := []string{"--cmd", "ls -la /Users/shenjiawei/Downloads", "--shell", sharedutil.DefaultExecShell(), "--timeout", "3210"}
+	wantPrefix := []string{"--cmd", "ls -la /Users/shenjiawei/Downloads", "--allowed-dir", "/Users/demo/Documents/code", "--shell", sharedutil.DefaultExecShell(), "--timeout", "3210"}
 	if !reflect.DeepEqual(gotArgs, wantPrefix) {
 		t.Fatalf("sandbox args = %#v, want %#v", gotArgs, wantPrefix)
 	}
@@ -14031,7 +14045,7 @@ func TestIntegrationSandboxCLIReadsAndWritesSessionState(t *testing.T) {
 	defer func() { integrationUserHomeFn = originalHomeFn }()
 
 	stdout := captureIntegrationStdout(t, func() {
-		runIntegrationSandboxCLI([]string{"--agentId", "agent-a", "--chatId", "chat-1"})
+		runIntegrationSandboxCLI([]string{"--chatId", "chat-1"})
 	})
 	var initial struct {
 		Status   int    `json:"status"`
@@ -14068,7 +14082,7 @@ func TestIntegrationSandboxCLIReadsAndWritesSessionState(t *testing.T) {
 	defer db.Close()
 
 	var stored string
-	if err := db.QueryRow(`SELECT sandbox_exe FROM cli_sandbox_state WHERE agent_id = ? AND chat_id = ?`, "agent-a", "chat-1").Scan(&stored); err != nil {
+	if err := db.QueryRow(`SELECT sandbox_exe FROM cli_sandbox_state WHERE chat_id = ?`, "chat-1").Scan(&stored); err != nil {
 		t.Fatalf("query sandbox state: %v", err)
 	}
 	if stored != sandboxstate.ModeNet {

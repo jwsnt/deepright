@@ -12,6 +12,7 @@ import org.apache.commons.lang3.StringUtils;
 @NoArgsConstructor
 public class CliSubData {
 
+    @Builder.Default
     protected Long created = System.currentTimeMillis();
 
     protected CliSubOps subOps;

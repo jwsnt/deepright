@@ -24272,7 +24272,10 @@ function ensureChatSandbox(chatId, agentId) {
   const binding = getSandboxBinding(chatId, agentId);
   if (!binding.chatId) return createSandboxSnapshot('', binding.agentId);
   const existing = chatSandbox[binding.chatId];
-  if (existing && String(existing.agentId || '').trim() === binding.agentId) {
+  if (existing) {
+    if (binding.agentId && String(existing.agentId || '').trim() !== binding.agentId) {
+      existing.agentId = binding.agentId;
+    }
     return existing;
   }
   const next = createSandboxSnapshot(binding.chatId, binding.agentId);
@@ -24284,13 +24287,19 @@ function getChatSandbox(chatId, agentId) {
   const binding = getSandboxBinding(chatId, agentId);
   if (!binding.chatId) return createSandboxSnapshot('', binding.agentId);
   const existing = chatSandbox[binding.chatId];
-  if (existing && String(existing.agentId || '').trim() === binding.agentId) return existing;
+  if (existing) {
+    if (binding.agentId && String(existing.agentId || '').trim() !== binding.agentId) {
+      existing.agentId = binding.agentId;
+    }
+    return existing;
+  }
   return createSandboxSnapshot(binding.chatId, binding.agentId);
 }
 
 function setChatSandbox(chatId, agentId, patch) {
   const current = ensureChatSandbox(chatId, agentId);
-  const next = createSandboxSnapshot(current.chatId, current.agentId, Object.assign({}, current, patch || {}));
+  const nextAgentId = String((patch && patch.agentId) != null ? patch.agentId : current.agentId).trim();
+  const next = createSandboxSnapshot(current.chatId, nextAgentId, Object.assign({}, current, patch || {}));
   chatSandbox[next.chatId] = next;
   return next;
 }
@@ -24374,15 +24383,14 @@ function updateSandboxUI() {
   const button = document.getElementById('inputSandboxToggle');
   const hasChat = !!binding.chatId;
   const hasAgent = !!binding.agentId;
-  if (group) group.classList.toggle('disabled', hasChat && !hasAgent);
+  if (group) group.classList.toggle('disabled', !hasChat);
   if (button) {
-    button.classList.toggle('on', hasAgent && !!snapshot.sandbox);
+    button.classList.toggle('on', !!snapshot.sandbox);
     button.classList.toggle('loading', !!snapshot.loading);
     button.disabled = !hasChat;
     button.setAttribute('aria-pressed', snapshot.sandbox ? 'true' : 'false');
     let title = '当前会话沙盒';
     if (!hasChat) title = '请先选择会话';
-    else if (!hasAgent) title = '请先为当前会话选择 Agent';
     else if (snapshot.loading) title = '正在同步当前会话沙盒状态';
     else if (snapshot.sandbox) title = '当前会话沙盒模式：' + sandboxModeLabel(snapshot.sandbox, snapshot.recorded);
     else title = snapshot.recorded ? '当前会话沙盒已关闭' : '当前会话沙盒默认关闭';
@@ -24406,9 +24414,6 @@ function updateSandboxUI() {
     } else if (snapshot.error) {
       statusEl.classList.add('error');
       statusEl.textContent = sandboxStatusLabelFromError(snapshot.error);
-    } else if (!hasAgent) {
-      statusEl.classList.add('off');
-      statusEl.textContent = '未绑定 Agent';
     } else if (snapshot.sandbox) {
       statusEl.classList.add('on');
       statusEl.textContent = sandboxModeLabel(snapshot.sandbox, snapshot.recorded);
@@ -24429,19 +24434,19 @@ function updateSandboxUI() {
   const actionDisabled = !hasAgent || snapshot.loading || sandboxModalState.saving;
   if (filePickBtn) {
     filePickBtn.disabled = actionDisabled;
-    filePickBtn.classList.toggle('active', hasAgent && snapshot.sandbox === 'filepick');
+    filePickBtn.classList.toggle('active', snapshot.sandbox === 'filepick');
   }
   if (netBtn) {
     netBtn.disabled = actionDisabled;
-    netBtn.classList.toggle('active', hasAgent && snapshot.sandbox === 'net');
+    netBtn.classList.toggle('active', snapshot.sandbox === 'net');
   }
   if (filePickNetBtn) {
     filePickNetBtn.disabled = actionDisabled;
-    filePickNetBtn.classList.toggle('active', hasAgent && snapshot.sandbox === 'filepick_net');
+    filePickNetBtn.classList.toggle('active', snapshot.sandbox === 'filepick_net');
   }
   if (offBtn) {
     offBtn.disabled = actionDisabled;
-    offBtn.classList.toggle('active', hasAgent && !snapshot.sandbox);
+    offBtn.classList.toggle('active', !snapshot.sandbox);
   }
 }
 
@@ -24452,17 +24457,12 @@ async function refreshChatSandboxStatus(chatId, options) {
     updateSandboxUI();
     return null;
   }
-  if (!binding.agentId) {
-    setChatSandbox(binding.chatId, '', { loading: false, error: '', sandbox: '', recorded: false, updatedAt: '' });
-    if (state.activeChat === binding.chatId) updateSandboxUI();
-    return getChatSandbox(binding.chatId, '');
-  }
   const seq = (sandboxRequestSeq[binding.chatId] || 0) + 1;
   sandboxRequestSeq[binding.chatId] = seq;
   setChatSandbox(binding.chatId, binding.agentId, { loading: true, error: '' });
   if (state.activeChat === binding.chatId) updateSandboxUI();
   try {
-    const resp = await fetchExecApi('/api/sandbox_status?agentId=' + encodeURIComponent(binding.agentId) + '&chatId=' + encodeURIComponent(binding.chatId) + '&_=' + Date.now(), { cache: 'no-store' });
+    const resp = await fetchExecApi('/api/sandbox_status?chatId=' + encodeURIComponent(binding.chatId) + '&_=' + Date.now(), { cache: 'no-store' });
     let data = null;
     try { data = await resp.json(); } catch {}
     if (!resp.ok || !data || data.status !== 0) {
@@ -24502,7 +24502,7 @@ function toggleSandboxOverlay(event) {
   updateSandboxUI();
   showExclusiveOverlay(overlay, card);
   const binding = getSandboxBinding();
-  if (binding.chatId && binding.agentId) {
+  if (binding.chatId) {
     refreshChatSandboxStatus(binding.chatId, { agentId: binding.agentId, toastOnError: false }).catch(() => {});
   }
 }
@@ -27631,7 +27631,6 @@ function bindAgentToChat(chatId, agentId) {
   refreshWikiLastUpdate({ silent: true, agentId: resolvedAgentId }).catch(() => {});
   // Check config status for the new agent
   checkAgentConfig(resolvedAgentId);
-  clearChatSandbox(chatId);
   if (state.activeChat === chatId) {
     closeQueuedCenterPanel(true);
     syncQueuedCenterInputUI(chatId, resolvedAgentId);
@@ -38819,7 +38818,6 @@ async function saveSettingsAsync() {
   updateModelIndicator();
   vfsLoadWorkspace();
   if (state.activeChat) {
-    clearChatSandbox(state.activeChat);
     updateSandboxUI();
     refreshChatSandboxStatus(state.activeChat, { agentId, toastOnError: false }).catch(() => {});
   }

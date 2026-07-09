@@ -283,7 +283,11 @@ func ensureSandboxStateSchema(db *sql.DB) error {
 		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultV, &pk); err != nil {
 			return err
 		}
-		cols = append(cols, sandboxStateColumnInfo{Name: name, Type: strings.ToUpper(strings.TrimSpace(columnType))})
+		cols = append(cols, sandboxStateColumnInfo{
+			Name: strings.TrimSpace(name),
+			Type: strings.ToUpper(strings.TrimSpace(columnType)),
+			PK:   pk,
+		})
 	}
 	if err := rows.Err(); err != nil {
 		return err
@@ -295,11 +299,11 @@ func ensureSandboxStateSchema(db *sql.DB) error {
 	}
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS cli_sandbox_state (
-			agent_id TEXT NOT NULL,
 			chat_id TEXT NOT NULL DEFAULT '',
 			sandbox_exe TEXT NOT NULL DEFAULT '',
+			allowed_dir TEXT NOT NULL DEFAULT '',
 			updated_at TEXT NOT NULL,
-			PRIMARY KEY (agent_id, chat_id)
+			PRIMARY KEY (chat_id)
 		);
 		CREATE INDEX IF NOT EXISTS idx_cli_sandbox_state_updated_at
 			ON cli_sandbox_state(updated_at);
@@ -310,18 +314,38 @@ func ensureSandboxStateSchema(db *sql.DB) error {
 type sandboxStateColumnInfo struct {
 	Name string
 	Type string
+	PK   int
+}
+
+type sandboxStateRecord struct {
+	Mode       string
+	AllowedDir string
+	UpdatedAt  string
 }
 
 func needsSandboxStateRebuild(cols []sandboxStateColumnInfo) bool {
 	if len(cols) == 0 {
 		return false
 	}
+	if len(cols) != 4 {
+		return true
+	}
+	expected := map[string]string{
+		"chat_id":     "TEXT",
+		"sandbox_exe": "TEXT",
+		"allowed_dir": "TEXT",
+		"updated_at":  "TEXT",
+	}
 	for _, col := range cols {
-		if col.Name == "sandbox_exe" {
-			return col.Type != "TEXT"
+		wantType, ok := expected[col.Name]
+		if !ok || col.Type != wantType {
+			return true
+		}
+		if col.Name == "chat_id" && col.PK != 1 {
+			return true
 		}
 	}
-	return true
+	return false
 }
 
 func normalizeSandboxMode(value string) string {
@@ -335,6 +359,14 @@ func normalizeSandboxMode(value string) string {
 	default:
 		return ""
 	}
+}
+
+func sandboxModeForLog(value string) string {
+	mode := normalizeSandboxMode(value)
+	if mode == "" {
+		return "off"
+	}
+	return mode
 }
 
 func getAsyncLogger() (*asyncLogger, error) {
@@ -418,10 +450,15 @@ func unregisterActiveCmd(key string) {
 }
 
 func SetSandboxMode(agentID, chatID, mode string) error {
+	return SetSandboxModeWithDirectory(agentID, chatID, mode, "")
+}
+
+func SetSandboxModeWithDirectory(agentID, chatID, mode, allowedDir string) error {
 	agentID = strings.TrimSpace(agentID)
 	chatID = strings.TrimSpace(chatID)
-	if agentID == "" {
-		return fmt.Errorf("agentID is required")
+	allowedDir = strings.TrimSpace(allowedDir)
+	if chatID == "" {
+		return fmt.Errorf("chatID is required")
 	}
 	rawMode := strings.TrimSpace(mode)
 	mode = normalizeSandboxMode(mode)
@@ -432,60 +469,78 @@ func SetSandboxMode(agentID, chatID, mode string) error {
 	if err != nil {
 		return err
 	}
+	currentState, _, err := sandboxStateSetting(chatID)
+	if err != nil {
+		return err
+	}
+	if mode != sandboxModeFilePick && mode != sandboxModeFilePickNet {
+		allowedDir = ""
+	}
 	if mode == "" {
-		_, err = db.Exec(`DELETE FROM cli_sandbox_state WHERE agent_id = ? AND chat_id = ?`, agentID, chatID)
+		_, err = db.Exec(`DELETE FROM cli_sandbox_state WHERE chat_id = ?`, chatID)
+		if err == nil {
+			fmt.Fprintf(os.Stderr, "cli-get: sandbox change agentId=%s chatId=%s from=%s to=off\n",
+				agentID, chatID, sandboxModeForLog(currentState.Mode))
+		}
 		return err
 	}
 	_, err = db.Exec(
-		`INSERT INTO cli_sandbox_state (agent_id, chat_id, sandbox_exe, updated_at)
+		`INSERT INTO cli_sandbox_state (chat_id, sandbox_exe, allowed_dir, updated_at)
 		 VALUES (?,?,?,?)
-		 ON CONFLICT(agent_id, chat_id) DO UPDATE SET sandbox_exe = excluded.sandbox_exe, updated_at = excluded.updated_at`,
-		agentID,
+		 ON CONFLICT(chat_id) DO UPDATE SET sandbox_exe = excluded.sandbox_exe, allowed_dir = excluded.allowed_dir, updated_at = excluded.updated_at`,
 		chatID,
 		mode,
+		allowedDir,
 		time.Now().Format("2006-01-02T15:04:05.000"),
 	)
+	if err == nil {
+		fmt.Fprintf(os.Stderr, "cli-get: sandbox change agentId=%s chatId=%s from=%s to=%s\n",
+			agentID, chatID, sandboxModeForLog(currentState.Mode), sandboxModeForLog(mode))
+	}
 	return err
 }
 
 func SetSandboxExe(agentID, chatID string, enabled bool) error {
 	if enabled {
-		return SetSandboxMode(agentID, chatID, sandboxModeFilePickNet)
+		return SetSandboxModeWithDirectory(agentID, chatID, sandboxModeFilePickNet, "")
 	}
-	return SetSandboxMode(agentID, chatID, "")
+	return SetSandboxModeWithDirectory(agentID, chatID, "", "")
 }
 
-func sandboxModeSetting(agentID, chatID string) (string, bool, error) {
-	agentID = strings.TrimSpace(agentID)
+func sandboxStateSetting(chatID string) (sandboxStateRecord, bool, error) {
 	chatID = strings.TrimSpace(chatID)
-	if agentID == "" {
-		return "", false, nil
+	if chatID == "" {
+		return sandboxStateRecord{}, false, nil
 	}
 	db, err := getDataDB()
 	if err != nil {
-		return "", false, err
+		return sandboxStateRecord{}, false, err
 	}
-	var value string
-	err = db.QueryRow(`SELECT sandbox_exe FROM cli_sandbox_state WHERE agent_id = ? AND chat_id = ?`, agentID, chatID).Scan(&value)
+	var state sandboxStateRecord
+	err = db.QueryRow(
+		`SELECT sandbox_exe, allowed_dir, updated_at FROM cli_sandbox_state WHERE chat_id = ?`,
+		chatID,
+	).Scan(&state.Mode, &state.AllowedDir, &state.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return "", false, nil
+		return sandboxStateRecord{}, false, nil
 	}
 	if err != nil {
-		return "", false, err
+		return sandboxStateRecord{}, false, err
 	}
-	mode := normalizeSandboxMode(value)
-	if mode == "" {
-		return "", false, nil
+	state.Mode = normalizeSandboxMode(state.Mode)
+	if state.Mode == "" {
+		return sandboxStateRecord{}, false, nil
 	}
-	return mode, true, nil
+	state.AllowedDir = strings.TrimSpace(state.AllowedDir)
+	return state, true, nil
 }
 
 func sandboxExeSetting(agentID, chatID string) (bool, bool, error) {
-	mode, found, err := sandboxModeSetting(agentID, chatID)
+	state, found, err := sandboxStateSetting(chatID)
 	if err != nil {
 		return false, false, err
 	}
-	return mode != "", found, nil
+	return state.Mode != "", found, nil
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -785,19 +840,27 @@ func shouldSleepAfterHeartbeat(task *TaskContent, err error) bool {
 	return err != nil
 }
 
-func sandboxModeForTask(metadata *AgentOutput, task *TaskContent) (string, error) {
+func sandboxStateForTask(metadata *AgentOutput, task *TaskContent) (sandboxStateRecord, error) {
 	if taskShouldBypassSandbox(task) {
-		return "", nil
+		return sandboxStateRecord{}, nil
 	}
 	agentID, chatID := extractAgentAndChatIDs(metadata, task)
-	mode, found, err := sandboxModeSetting(agentID, chatID)
+	state, found, err := sandboxStateSetting(chatID)
 	if err != nil {
-		return "", err
+		return sandboxStateRecord{}, err
 	}
 	if found {
-		return mode, nil
+		fmt.Fprintf(
+			os.Stderr,
+			"cli-get: sandbox lookup agentId=%s chatId=%s mode=%s allowedDir=%s\n",
+			strings.TrimSpace(agentID),
+			strings.TrimSpace(chatID),
+			sandboxModeForLog(state.Mode),
+			strings.TrimSpace(state.AllowedDir),
+		)
+		return state, nil
 	}
-	return "", nil
+	return sandboxStateRecord{}, nil
 }
 
 func taskShouldBypassSandbox(task *TaskContent) bool {
@@ -1017,7 +1080,7 @@ func resolveSandboxExecutablePath(raw, mode string) (string, error) {
 	return "", fmt.Errorf("sandbox_app not found for mode=%s: %s", mode, raw)
 }
 
-func ExecuteTaskViaSandboxApp(task *TaskContent, sandboxExecutable string) *ResultPayload {
+func ExecuteTaskViaSandboxApp(task *TaskContent, sandboxExecutable, allowedDir string) *ResultPayload {
 	timeout := defaultTaskTimeout + 5*time.Second
 	if task != nil && task.Timeout > 0 {
 		timeout = time.Duration(task.Timeout)*time.Millisecond + 5*time.Second
@@ -1026,7 +1089,11 @@ func ExecuteTaskViaSandboxApp(task *TaskContent, sandboxExecutable string) *Resu
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	args := []string{"--cmd", task.Cmd, "--timeout", strconv.Itoa(task.Timeout)}
+	args := []string{"--cmd", task.Cmd}
+	if strings.TrimSpace(allowedDir) != "" {
+		args = append(args, "--allowed-dir", strings.TrimSpace(allowedDir))
+	}
+	args = append(args, "--timeout", strconv.Itoa(task.Timeout))
 	cmd := exec.CommandContext(ctx, sandboxExecutable, args...)
 	cmd.Env = os.Environ()
 
@@ -1099,19 +1166,19 @@ func ProcessTask(client *http.Client, host string, task *TaskContent, terminal s
 }
 
 func BuildTaskResult(task *TaskContent, terminal string, metadata *AgentOutput, sandboxExecutable string) (*ResultPayload, error) {
-	mode, err := sandboxModeForTask(metadata, task)
+	state, err := sandboxStateForTask(metadata, task)
 	if err != nil {
 		return nil, err
 	}
-	if mode != "" {
-		resolvedSandboxExecutable, err := resolveSandboxExecutablePath(sandboxExecutable, mode)
+	if state.Mode != "" {
+		resolvedSandboxExecutable, err := resolveSandboxExecutablePath(sandboxExecutable, state.Mode)
 		if err != nil {
 			return nil, err
 		}
 		if strings.TrimSpace(resolvedSandboxExecutable) == "" {
 			return nil, fmt.Errorf("sandbox enabled for agent=%s chat=%s but sandbox_app is not configured", strings.TrimSpace(task.AgentId), strings.TrimSpace(task.Chat))
 		}
-		return ExecuteTaskViaSandboxApp(task, resolvedSandboxExecutable), nil
+		return ExecuteTaskViaSandboxApp(task, resolvedSandboxExecutable, state.AllowedDir), nil
 	}
 	return ExecuteTask(task, terminal), nil
 }

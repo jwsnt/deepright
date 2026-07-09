@@ -1274,10 +1274,9 @@ func syncIntegrationKnowledgeOutput(output *AgentOutput, agentDir string) error 
 	return nil
 }
 
-func readIntegrationSandboxMode(agentID, chatID string) string {
-	agentID = strings.TrimSpace(agentID)
+func readIntegrationSandboxMode(chatID string) string {
 	chatID = strings.TrimSpace(chatID)
-	if agentID == "" || chatID == "" {
+	if chatID == "" {
 		return ""
 	}
 	paths := []string{resolveIntegrationDBPath(), "data"}
@@ -1295,7 +1294,7 @@ func readIntegrationSandboxMode(agentID, chatID string) string {
 		if err != nil {
 			continue
 		}
-		state, recorded, err := sandboxstate.Get(db, agentID, chatID)
+		state, recorded, err := sandboxstate.Get(db, "", chatID)
 		_ = db.Close()
 		if err != nil || !recorded {
 			continue
@@ -1311,13 +1310,10 @@ func hydrateAgentOutput(output *AgentOutput, chatID string) {
 	}
 	chatID = strings.TrimSpace(chatID)
 	seedreamSkill, seedreamEnabled := integrationSeedreamSkillDefinition()
+	mode := readIntegrationSandboxMode(chatID)
 	for i := range output.Agents {
 		output.Agents[i].Skills = integrationApplySeedreamSkill(output.Agents[i].Skills, seedreamSkill, seedreamEnabled)
-		output.Agents[i].Sandbox = ""
-		if chatID == "" {
-			continue
-		}
-		output.Agents[i].Sandbox = readIntegrationSandboxMode(output.Agents[i].AgentID, chatID)
+		output.Agents[i].Sandbox = mode
 	}
 }
 
@@ -2102,9 +2098,16 @@ func heartbeat(client *http.Client, host string, metadata *AgentOutput, cfg *Con
 
 func executeTask(task *TaskContent, terminal string) *ResultPayload {
 	sandboxMode := ""
+	sandboxAllowedDir := ""
 	var err error
 	if task != nil && !integrationTaskShouldBypassSandbox(task) {
-		sandboxMode, err = sandboxModeForSession(task.AgentId, task.Chat)
+		var sandboxState sandboxstate.State
+		var recorded bool
+		sandboxState, recorded, err = sandboxStateForSession(task.Chat)
+		if recorded {
+			sandboxMode = sandboxstate.NormalizeMode(sandboxState.Sandbox)
+			sandboxAllowedDir = sandboxState.AllowedDir
+		}
 	}
 	if err != nil {
 		return &ResultPayload{
@@ -2125,7 +2128,7 @@ func executeTask(task *TaskContent, terminal string) *ResultPayload {
 	var status int
 	var output string
 	if sandboxMode != "" {
-		status, output = executeSandboxCommandLogged("cli-get", task.AgentId, task.Chat, task.Tid, sandboxMode, terminal, task.Cmd, int64(task.Timeout), func(ac *activeCmd) {
+		status, output = executeSandboxCommandLogged("cli-get", task.AgentId, task.Chat, task.Tid, sandboxMode, sandboxAllowedDir, terminal, task.Cmd, int64(task.Timeout), func(ac *activeCmd) {
 			ac.agentID = task.AgentId
 			ac.chatID = task.Chat
 			ac.tid = task.Tid
@@ -2266,14 +2269,14 @@ func sandboxModeRequiresDirectoryPick(mode string) bool {
 	}
 }
 
-func primeIntegrationSandboxMode(mode string) error {
+func primeIntegrationSandboxMode(mode string) (string, error) {
 	mode = sandboxstate.NormalizeMode(mode)
 	if !sandboxModeRequiresDirectoryPick(mode) {
-		return nil
+		return "", nil
 	}
 	helperPath, err := integrationSandboxCommandPathFn(mode)
 	if err != nil {
-		return err
+		return "", err
 	}
 	log.Printf("sandbox prime start mode=%s helper=%s", mode, helperPath)
 	cmd := exec.Command(helperPath)
@@ -2283,33 +2286,33 @@ func primeIntegrationSandboxMode(mode string) error {
 	if err != nil {
 		if text != "" {
 			log.Printf("sandbox prime failed mode=%s helper=%s err=%v output=%q", mode, helperPath, err, text)
-			return errors.New(text)
+			return "", errors.New(text)
 		}
 		log.Printf("sandbox prime failed mode=%s helper=%s err=%v", mode, helperPath, err)
-		return err
+		return "", err
 	}
 	log.Printf("sandbox prime done mode=%s helper=%s", mode, helperPath)
-	return nil
+	return text, nil
 }
 
-func primeIntegrationSandboxDirectory(mode, dir string) error {
+func primeIntegrationSandboxDirectory(mode, dir string) (string, error) {
 	mode = sandboxstate.NormalizeMode(mode)
 	dir = strings.TrimSpace(dir)
 	if !sandboxModeRequiresDirectoryPick(mode) {
 		if dir == "" {
-			return nil
+			return "", nil
 		}
 		if mode == "" {
-			return fmt.Errorf("sandbox off does not support manual directory whitelist")
+			return "", fmt.Errorf("sandbox off does not support manual directory whitelist")
 		}
-		return fmt.Errorf("sandbox mode %s does not support manual directory whitelist", mode)
+		return "", fmt.Errorf("sandbox mode %s does not support manual directory whitelist", mode)
 	}
 	if dir == "" {
 		return integrationPrimeSandboxModeFn(mode)
 	}
 	helperPath, err := integrationSandboxCommandPathFn(mode)
 	if err != nil {
-		return err
+		return "", err
 	}
 	log.Printf("sandbox prime set-dir start mode=%s helper=%s dir=%s", mode, helperPath, dir)
 	cmd := exec.Command(helperPath, "--allowed-dir", dir)
@@ -2318,13 +2321,16 @@ func primeIntegrationSandboxDirectory(mode, dir string) error {
 	if err != nil {
 		if text != "" {
 			log.Printf("sandbox prime set-dir failed mode=%s helper=%s dir=%s err=%v output=%q", mode, helperPath, dir, err, text)
-			return errors.New(text)
+			return "", errors.New(text)
 		}
 		log.Printf("sandbox prime set-dir failed mode=%s helper=%s dir=%s err=%v", mode, helperPath, dir, err)
-		return err
+		return "", err
 	}
 	log.Printf("sandbox prime set-dir done mode=%s helper=%s dir=%s", mode, helperPath, text)
-	return nil
+	if text == "" {
+		text = dir
+	}
+	return text, nil
 }
 
 func publishResult(client *http.Client, host string, result *ResultPayload, metadata *AgentOutput, cfg *Config) error {
@@ -2754,8 +2760,11 @@ func executeShellCommand(shell, rawCmd string, timeoutMs int64, onStart func(*ac
 
 var integrationSandboxCommandPathFn = resolveIntegrationSandboxCommandPath
 
-func executeSandboxCommandWithPath(path, shell, rawCmd string, timeoutMs int64, onStart func(*activeCmd)) (int, string) {
+func executeSandboxCommandWithPath(path, shell, rawCmd string, timeoutMs int64, allowedDir string, onStart func(*activeCmd)) (int, string) {
 	args := []string{"--cmd", rawCmd}
+	if allowedDir = strings.TrimSpace(allowedDir); allowedDir != "" {
+		args = append(args, "--allowed-dir", allowedDir)
+	}
 	shell = strings.TrimSpace(shell)
 	if shell != "" {
 		args = append(args, "--shell", shell)
@@ -2766,15 +2775,15 @@ func executeSandboxCommandWithPath(path, shell, rawCmd string, timeoutMs int64, 
 	return executeExternalCommand(path, args, rawCmd, timeoutMs, onStart)
 }
 
-func executeSandboxCommand(mode, shell, rawCmd string, timeoutMs int64, onStart func(*activeCmd)) (int, string) {
+func executeSandboxCommand(mode, shell, rawCmd string, timeoutMs int64, allowedDir string, onStart func(*activeCmd)) (int, string) {
 	path, err := integrationSandboxCommandPathFn(mode)
 	if err != nil {
 		return 1, err.Error()
 	}
-	return executeSandboxCommandWithPath(path, shell, rawCmd, timeoutMs, onStart)
+	return executeSandboxCommandWithPath(path, shell, rawCmd, timeoutMs, allowedDir, onStart)
 }
 
-func executeSandboxCommandLogged(scope, agentID, chatID, tid, mode, shell, rawCmd string, timeoutMs int64, onStart func(*activeCmd)) (int, string) {
+func executeSandboxCommandLogged(scope, agentID, chatID, tid, mode, allowedDir, shell, rawCmd string, timeoutMs int64, onStart func(*activeCmd)) (int, string) {
 	path, err := integrationSandboxCommandPathFn(mode)
 	if err != nil {
 		log.Printf("%s: sandbox exec prepare failed agentId=%s chatId=%s tid=%s err=%v cmd=%q",
@@ -2789,16 +2798,27 @@ func executeSandboxCommandLogged(scope, agentID, chatID, tid, mode, shell, rawCm
 	}
 	logSandboxExecutionStart(scope, agentID, chatID, tid, path, shell, rawCmd, timeoutMs)
 	startedAt := time.Now()
-	status, output := executeSandboxCommandWithPath(path, shell, rawCmd, timeoutMs, onStart)
+	status, output := executeSandboxCommandWithPath(path, shell, rawCmd, timeoutMs, allowedDir, onStart)
 	logSandboxExecutionDone(scope, agentID, chatID, tid, status, time.Since(startedAt), output)
 	return status, output
 }
 
-func sandboxModeForSession(agentID, chatID string) (string, error) {
+func sandboxStateForSession(chatID string) (sandboxstate.State, bool, error) {
 	if cronDB == nil {
-		return "", nil
+		return sandboxstate.State{}, false, nil
 	}
-	state, recorded, err := sandboxstate.Get(cronDB, agentID, chatID)
+	state, recorded, err := sandboxstate.Get(cronDB, "", chatID)
+	if err != nil {
+		return sandboxstate.State{}, false, err
+	}
+	if !recorded {
+		return sandboxstate.State{}, false, nil
+	}
+	return state, true, nil
+}
+
+func sandboxModeForSession(chatID string) (string, error) {
+	state, recorded, err := sandboxStateForSession(chatID)
 	if err != nil {
 		return "", err
 	}
@@ -2806,6 +2826,23 @@ func sandboxModeForSession(agentID, chatID string) (string, error) {
 		return "", nil
 	}
 	return sandboxstate.NormalizeMode(state.Sandbox), nil
+}
+
+func sandboxModeForLog(value string) string {
+	mode := sandboxstate.NormalizeMode(value)
+	if mode == "" {
+		return "off"
+	}
+	return mode
+}
+
+func logIntegrationSandboxChange(agentID, chatID, fromMode, toMode string) {
+	log.Printf("sandbox change agentId=%s chatId=%s from=%s to=%s",
+		strings.TrimSpace(agentID),
+		strings.TrimSpace(chatID),
+		sandboxModeForLog(fromMode),
+		sandboxModeForLog(toMode),
+	)
 }
 
 func insertCmdLogRecord(agentID, chatID, tid, cmd, receivedAt string) (int64, error) {
@@ -3047,7 +3084,7 @@ func handleCmd(cfg *Config) http.HandlerFunc {
 			log.Printf("api/cmd: insert cmd_log failed: %v", err)
 		}
 
-		sandboxMode, err := sandboxModeForSession(req.AgentID, req.ChatID)
+		sandboxState, recorded, err := sandboxStateForSession(req.ChatID)
 		if err != nil {
 			log.Printf("api/cmd: sandbox lookup failed: agentId=%s chatId=%s err=%v", req.AgentID, req.ChatID, err)
 			sharedutil.WriteCmdResponse(w, http.StatusInternalServerError, CmdResponse{
@@ -3060,12 +3097,18 @@ func handleCmd(cfg *Config) http.HandlerFunc {
 			})
 			return
 		}
+		sandboxMode := ""
+		sandboxAllowedDir := ""
+		if recorded {
+			sandboxMode = sandboxstate.NormalizeMode(sandboxState.Sandbox)
+			sandboxAllowedDir = sandboxState.AllowedDir
+		}
 
 		var activeKey string
 		var status int
 		var output string
 		if sandboxMode != "" {
-			status, output = executeSandboxCommandLogged("api/cmd", req.AgentID, req.ChatID, tid, sandboxMode, sharedutil.DefaultExecShell(), req.Cmd, req.Timeout, func(ac *activeCmd) {
+			status, output = executeSandboxCommandLogged("api/cmd", req.AgentID, req.ChatID, tid, sandboxMode, sandboxAllowedDir, sharedutil.DefaultExecShell(), req.Cmd, req.Timeout, func(ac *activeCmd) {
 				ac.agentID = req.AgentID
 				ac.chatID = req.ChatID
 				ac.tid = tid
@@ -6765,18 +6808,18 @@ func runIntegrationTokenCLI(args []string) {
 
 func printIntegrationSandboxHelp() {
 	fmt.Println("Usage:")
-	fmt.Println("  integration sandbox --agentId ID --chatId ID")
+	fmt.Println("  integration sandbox --chatId ID")
 	fmt.Println("  integration sandbox --agentId ID --chatId ID --sandbox off|filepick|net|filepick_net [--dir DIR]")
 	fmt.Println("")
 	fmt.Println("Options:")
-	fmt.Println("  --agentId ID      当前会话所属 AgentId")
+	fmt.Println("  --agentId ID      当前会话所属 AgentId；查询可省略，写入必填")
 	fmt.Println("  --chatId ID       当前会话所属 ChatId")
 	fmt.Println("  --chat ID         ChatId 别名")
 	fmt.Println("  --sandbox MODE    写入当前会话沙盒模式；off 表示关闭，不传则只查询")
 	fmt.Println("  --dir DIR         filepick/filepick_net 手动指定白名单目录，不弹窗")
 	fmt.Println("")
 	fmt.Println("Examples:")
-	fmt.Println("  integration sandbox --agentId A --chatId chat-001")
+	fmt.Println("  integration sandbox --chatId chat-001")
 	fmt.Println("  integration sandbox --agentId A --chatId chat-001 --sandbox filepick_net")
 	fmt.Println("  integration sandbox --agentId A --chatId chat-001 --sandbox filepick --dir /Users/me/Desktop")
 	fmt.Println("  integration sandbox --agentId A --chatId chat-001 --sandbox off")
@@ -6807,8 +6850,8 @@ func runIntegrationSandboxCLI(args []string) {
 	if targetChatID == "" {
 		targetChatID = strings.TrimSpace(*chatAlias)
 	}
-	if targetAgentID == "" || targetChatID == "" {
-		log.Fatal("agentId and chatId are required")
+	if targetChatID == "" {
+		log.Fatal("chatId is required")
 	}
 
 	dbPath := resolveIntegrationDBPath()
@@ -6826,17 +6869,30 @@ func runIntegrationSandboxCLI(args []string) {
 		recorded bool
 	)
 	if strings.TrimSpace(*sandboxRaw) != "" {
+		if targetAgentID == "" {
+			log.Fatal("agentId is required when setting sandbox")
+		}
 		mode, err := parseSandboxUpdateValue(*sandboxRaw)
 		if err != nil {
 			log.Fatal(err)
 		}
-		if err := integrationPrimeSandboxDirectoryFn(mode, *allowedDir); err != nil {
-			log.Fatal(err)
-		}
-		state, err = sandboxstate.Set(db, targetAgentID, targetChatID, mode)
+		resolvedAllowedDir, err := integrationPrimeSandboxDirectoryFn(mode, *allowedDir)
 		if err != nil {
 			log.Fatal(err)
 		}
+		previous, existed, err := sandboxstate.Get(db, "", targetChatID)
+		if err != nil {
+			log.Fatal(err)
+		}
+		beforeMode := ""
+		if existed {
+			beforeMode = previous.Sandbox
+		}
+		state, err = sandboxstate.SetWithDirectory(db, targetAgentID, targetChatID, mode, resolvedAllowedDir)
+		if err != nil {
+			log.Fatal(err)
+		}
+		logIntegrationSandboxChange(targetAgentID, targetChatID, beforeMode, state.Sandbox)
 		recorded = strings.TrimSpace(state.Sandbox) != ""
 	} else {
 		if strings.TrimSpace(*allowedDir) != "" {
@@ -6852,12 +6908,13 @@ func runIntegrationSandboxCLI(args []string) {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetEscapeHTML(false)
 	if err := encoder.Encode(map[string]interface{}{
-		"status":    0,
-		"agentId":   state.AgentID,
-		"chatId":    state.ChatID,
-		"sandbox":   state.Sandbox,
-		"recorded":  recorded,
-		"updatedAt": state.UpdatedAt,
+		"status":     0,
+		"agentId":    state.AgentID,
+		"chatId":     state.ChatID,
+		"sandbox":    state.Sandbox,
+		"allowedDir": state.AllowedDir,
+		"recorded":   recorded,
+		"updatedAt":  state.UpdatedAt,
 	}); err != nil {
 		log.Fatal(err)
 	}
@@ -7336,8 +7393,8 @@ func sandboxTarget(r *http.Request) (string, string, error) {
 	if chatID == "" {
 		chatID = strings.TrimSpace(r.URL.Query().Get("chat"))
 	}
-	if agentID == "" || chatID == "" {
-		return "", "", fmt.Errorf("agentId and chatId are required")
+	if chatID == "" {
+		return "", "", fmt.Errorf("chatId is required")
 	}
 	return agentID, chatID, nil
 }
@@ -7377,12 +7434,13 @@ func sandboxModeFromRequestPath(r *http.Request) (string, bool, error) {
 func writeSandboxState(w http.ResponseWriter, state sandboxstate.State, recorded bool) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":    0,
-		"agentId":   state.AgentID,
-		"chatId":    state.ChatID,
-		"sandbox":   state.Sandbox,
-		"recorded":  recorded,
-		"updatedAt": state.UpdatedAt,
+		"status":     0,
+		"agentId":    state.AgentID,
+		"chatId":     state.ChatID,
+		"sandbox":    state.Sandbox,
+		"allowedDir": state.AllowedDir,
+		"recorded":   recorded,
+		"updatedAt":  state.UpdatedAt,
 	})
 }
 
@@ -7406,6 +7464,11 @@ func handleSandboxQuery(allowSet bool) http.HandlerFunc {
 		}
 
 		if allowSet {
+			if agentID == "" {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "agentId is required"})
+				return
+			}
 			mode, shouldSet, err := sandboxModeFromRequestPath(r)
 			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
@@ -7422,17 +7485,29 @@ func handleSandboxQuery(allowSet bool) http.HandlerFunc {
 				json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "sandbox mode is required"})
 				return
 			}
-			if err := integrationPrimeSandboxDirectoryFn(mode, r.URL.Query().Get("dir")); err != nil {
+			previous, existed, err := sandboxstate.Get(cronDB, "", chatID)
+			if err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "query error: " + err.Error()})
+				return
+			}
+			beforeMode := ""
+			if existed {
+				beforeMode = previous.Sandbox
+			}
+			allowedDir, err := integrationPrimeSandboxDirectoryFn(mode, r.URL.Query().Get("dir"))
+			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": err.Error()})
 				return
 			}
-			state, err := sandboxstate.Set(cronDB, agentID, chatID, mode)
+			state, err := sandboxstate.SetWithDirectory(cronDB, agentID, chatID, mode, allowedDir)
 			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "save error: " + err.Error()})
 				return
 			}
+			logIntegrationSandboxChange(agentID, chatID, beforeMode, state.Sandbox)
 			writeSandboxState(w, state, strings.TrimSpace(state.Sandbox) != "")
 			return
 		}

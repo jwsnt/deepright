@@ -825,7 +825,7 @@ func TestDetectPluginKeysReturnsConfiguredPluginsFromListMeta(t *testing.T) {
 	}
 }
 
-func TestSandboxModeForTaskReadsSessionStateOnly(t *testing.T) {
+func TestSandboxStateForTaskReadsSessionStateOnly(t *testing.T) {
 	oldwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("getwd: %v", err)
@@ -847,16 +847,47 @@ func TestSandboxModeForTaskReadsSessionStateOnly(t *testing.T) {
 		Chat:    "chat-a",
 	}
 
-	mode, err := sandboxModeForTask(nil, task)
+	state, err := sandboxStateForTask(nil, task)
 	if err != nil {
-		t.Fatalf("sandboxModeForTask: %v", err)
+		t.Fatalf("sandboxStateForTask: %v", err)
 	}
-	if mode != sandboxModeFilePickNet {
-		t.Fatalf("mode = %q, want %q", mode, sandboxModeFilePickNet)
+	if state.Mode != sandboxModeFilePickNet {
+		t.Fatalf("state.Mode = %q, want %q", state.Mode, sandboxModeFilePickNet)
 	}
 }
 
-func TestSandboxModeForTaskSkipsExemptedTask(t *testing.T) {
+func TestSandboxStateForTaskUsesChatScopedStateAcrossAgents(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	resetGlobalStateForTest()
+
+	if err := SetSandboxMode("agent-a", "chat-a", sandboxModeNet); err != nil {
+		t.Fatalf("SetSandboxMode: %v", err)
+	}
+
+	task := &TaskContent{
+		AgentId: "agent-b",
+		Chat:    "chat-a",
+	}
+
+	state, err := sandboxStateForTask(nil, task)
+	if err != nil {
+		t.Fatalf("sandboxStateForTask: %v", err)
+	}
+	if state.Mode != sandboxModeNet {
+		t.Fatalf("state.Mode = %q, want %q", state.Mode, sandboxModeNet)
+	}
+}
+
+func TestSandboxStateForTaskSkipsExemptedTask(t *testing.T) {
 	oldwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("getwd: %v", err)
@@ -879,12 +910,55 @@ func TestSandboxModeForTaskSkipsExemptedTask(t *testing.T) {
 	}
 	task.SubOps.Exempted = true
 
-	mode, err := sandboxModeForTask(nil, task)
+	state, err := sandboxStateForTask(nil, task)
 	if err != nil {
-		t.Fatalf("sandboxModeForTask: %v", err)
+		t.Fatalf("sandboxStateForTask: %v", err)
 	}
-	if mode != "" {
-		t.Fatalf("mode = %q, want empty", mode)
+	if state.Mode != "" || state.AllowedDir != "" {
+		t.Fatalf("state = %+v, want empty", state)
+	}
+}
+
+func TestSandboxStateSettingKeepsAllowedDirPerChat(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	resetGlobalStateForTest()
+
+	if err := SetSandboxModeWithDirectory("agent-a", "chat-a", sandboxModeFilePick, "/Users/demo/Pictures"); err != nil {
+		t.Fatalf("SetSandboxModeWithDirectory chat-a: %v", err)
+	}
+	if err := SetSandboxModeWithDirectory("agent-b", "chat-b", sandboxModeFilePickNet, "/Users/demo/code"); err != nil {
+		t.Fatalf("SetSandboxModeWithDirectory chat-b: %v", err)
+	}
+
+	stateA, foundA, err := sandboxStateSetting("chat-a")
+	if err != nil {
+		t.Fatalf("sandboxStateSetting chat-a: %v", err)
+	}
+	if !foundA {
+		t.Fatal("expected chat-a sandbox state")
+	}
+	if stateA.Mode != sandboxModeFilePick || stateA.AllowedDir != "/Users/demo/Pictures" {
+		t.Fatalf("stateA = %+v", stateA)
+	}
+
+	stateB, foundB, err := sandboxStateSetting("chat-b")
+	if err != nil {
+		t.Fatalf("sandboxStateSetting chat-b: %v", err)
+	}
+	if !foundB {
+		t.Fatal("expected chat-b sandbox state")
+	}
+	if stateB.Mode != sandboxModeFilePickNet || stateB.AllowedDir != "/Users/demo/code" {
+		t.Fatalf("stateB = %+v", stateB)
 	}
 }
 
@@ -1011,8 +1085,8 @@ func TestProcessTaskUsesSandboxAppWhenEnabled(t *testing.T) {
 
 	resetGlobalStateForTest()
 
-	sandboxExec := filepath.Join(tmp, sandboxModeNet, "CLI_SANDBOX.app", "Contents", "MacOS", "CLI_SANDBOX")
-	script := "#!/bin/sh\nif [ \"$1\" = \"--cmd\" ]; then\n  printf 'sandbox:%s\\n' \"$2\"\n  exit 0\nfi\nprintf 'bad args' >&2\nexit 1\n"
+	sandboxExec := filepath.Join(tmp, sandboxModeFilePickNet, "CLI_SANDBOX.app", "Contents", "MacOS", "CLI_SANDBOX")
+	script := "#!/bin/sh\ncmd=''\ndir=''\ntimeout=''\nwhile [ \"$#\" -gt 0 ]; do\n  case \"$1\" in\n    --cmd)\n      shift\n      cmd=\"$1\"\n      ;;\n    --allowed-dir)\n      shift\n      dir=\"$1\"\n      ;;\n    --timeout)\n      shift\n      timeout=\"$1\"\n      ;;\n  esac\n  shift\ndone\nprintf 'sandbox:%s\\ndir:%s\\ntimeout:%s\\n' \"$cmd\" \"$dir\" \"$timeout\"\n"
 	if err := os.MkdirAll(filepath.Dir(sandboxExec), 0o755); err != nil {
 		t.Fatalf("mkdir sandbox dir: %v", err)
 	}
@@ -1020,8 +1094,8 @@ func TestProcessTaskUsesSandboxAppWhenEnabled(t *testing.T) {
 		t.Fatalf("write sandbox script: %v", err)
 	}
 
-	if err := SetSandboxMode("agent-a", "chat-a", sandboxModeNet); err != nil {
-		t.Fatalf("SetSandboxMode: %v", err)
+	if err := SetSandboxModeWithDirectory("agent-a", "chat-a", sandboxModeFilePickNet, "/Users/demo/Pictures"); err != nil {
+		t.Fatalf("SetSandboxModeWithDirectory: %v", err)
 	}
 
 	var captured PubRequest
@@ -1065,8 +1139,8 @@ func TestProcessTaskUsesSandboxAppWhenEnabled(t *testing.T) {
 	if published.Status != 0 || published.Tid != "sandbox-task" {
 		t.Fatalf("published = %#v", published)
 	}
-	if body := decodeGzipBase64(t, published.Cmd); body != "sandbox:echo hello\n" {
-		t.Fatalf("decoded cmd = %q, want sandbox:echo hello\\n", body)
+	if body := decodeGzipBase64(t, published.Cmd); body != "sandbox:echo hello\ndir:/Users/demo/Pictures\ntimeout:5000\n" {
+		t.Fatalf("decoded cmd = %q, want sandbox output with allowed dir", body)
 	}
 }
 
@@ -1160,12 +1234,30 @@ func TestSetSandboxModeEmptyDeletesSessionState(t *testing.T) {
 		t.Fatalf("SetSandboxMode disable: %v", err)
 	}
 
-	mode, found, err := sandboxModeSetting("agent-a", "chat-a")
+	state, found, err := sandboxStateSetting("chat-a")
 	if err != nil {
-		t.Fatalf("sandboxModeSetting: %v", err)
+		t.Fatalf("sandboxStateSetting: %v", err)
 	}
-	if found || mode != "" {
-		t.Fatalf("mode=%q found=%t, want empty false", mode, found)
+	if found || state.Mode != "" || state.AllowedDir != "" {
+		t.Fatalf("state=%+v found=%t, want empty false", state, found)
+	}
+}
+
+func TestSetSandboxModeRequiresChatID(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	resetGlobalStateForTest()
+
+	if err := SetSandboxMode("agent-a", "", sandboxModeNet); err == nil {
+		t.Fatal("SetSandboxMode should require chatId")
 	}
 }
 

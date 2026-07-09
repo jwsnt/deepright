@@ -8704,10 +8704,9 @@ func TestProxyHandleSandboxPersistsByAgentAndChat(t *testing.T) {
 		}
 		sharedDataDB = pooledDB{}
 	}()
-
 	proxy := &ProxyServer{}
 
-	readReq := httptest.NewRequest(http.MethodGet, "/api/sandbox_status?agentId=agent-a&chatId=chat-1", nil)
+	readReq := httptest.NewRequest(http.MethodGet, "/api/sandbox_status?chatId=chat-1", nil)
 	readRec := httptest.NewRecorder()
 	proxy.HandleSandboxStatus(readRec, readReq)
 
@@ -8749,14 +8748,14 @@ func TestProxyHandleSandboxPersistsByAgentAndChat(t *testing.T) {
 	}
 
 	var stored string
-	if err := db.QueryRow(`SELECT sandbox_exe FROM cli_sandbox_state WHERE agent_id = ? AND chat_id = ?`, "agent-a", "chat-1").Scan(&stored); err != nil {
+	if err := db.QueryRow(`SELECT sandbox_exe FROM cli_sandbox_state WHERE chat_id = ?`, "chat-1").Scan(&stored); err != nil {
 		t.Fatalf("query sandbox state: %v", err)
 	}
 	if stored != sandboxstate.ModeFilePickNet {
 		t.Fatalf("sandbox_exe = %q, want %q", stored, sandboxstate.ModeFilePickNet)
 	}
 
-	otherReq := httptest.NewRequest(http.MethodGet, "/api/sandbox_status?agentId=agent-a&chatId=chat-2", nil)
+	otherReq := httptest.NewRequest(http.MethodGet, "/api/sandbox_status?chatId=chat-2", nil)
 	otherRec := httptest.NewRecorder()
 	proxy.HandleSandboxStatus(otherRec, otherReq)
 
@@ -8788,7 +8787,7 @@ func TestProxyHandleSandboxPersistsByAgentAndChat(t *testing.T) {
 		t.Fatalf("unexpected disable payload: %+v", disablePayload)
 	}
 	var count int
-	if err := db.QueryRow(`SELECT COUNT(1) FROM cli_sandbox_state WHERE agent_id = ? AND chat_id = ?`, "agent-a", "chat-1").Scan(&count); err != nil {
+	if err := db.QueryRow(`SELECT COUNT(1) FROM cli_sandbox_state WHERE chat_id = ?`, "chat-1").Scan(&count); err != nil {
 		t.Fatalf("count sandbox state: %v", err)
 	}
 	if count != 0 {
@@ -8814,14 +8813,13 @@ func TestProxyHandleSandboxStatusReadsWithoutWriting(t *testing.T) {
 		}
 		sharedDataDB = pooledDB{}
 	}()
-
 	proxy := &ProxyServer{}
 
 	writeReq := httptest.NewRequest(http.MethodPost, "/api/sandbox=filepick?agentId=agent-a&chatId=chat-1", nil)
 	writeRec := httptest.NewRecorder()
 	proxy.HandleSandbox(writeRec, writeReq)
 
-	statusReq := httptest.NewRequest(http.MethodGet, "/api/sandbox_status?agentId=agent-a&chatId=chat-1", nil)
+	statusReq := httptest.NewRequest(http.MethodGet, "/api/sandbox_status?agentId=agent-b&chatId=chat-1", nil)
 	statusRec := httptest.NewRecorder()
 	proxy.HandleSandboxStatus(statusRec, statusReq)
 
@@ -8836,7 +8834,7 @@ func TestProxyHandleSandboxStatusReadsWithoutWriting(t *testing.T) {
 	if err := json.NewDecoder(statusRec.Body).Decode(&payload); err != nil {
 		t.Fatalf("decode sandbox_status payload: %v", err)
 	}
-	if payload.Status != 0 || payload.AgentID != "agent-a" || payload.ChatID != "chat-1" || payload.Sandbox != sandboxstate.ModeFilePick || !payload.Recorded || payload.UpdatedAt == "" {
+	if payload.Status != 0 || payload.AgentID != "agent-b" || payload.ChatID != "chat-1" || payload.Sandbox != sandboxstate.ModeFilePick || !payload.Recorded || payload.UpdatedAt == "" {
 		t.Fatalf("unexpected sandbox_status payload: %+v", payload)
 	}
 
@@ -8846,7 +8844,7 @@ func TestProxyHandleSandboxStatusReadsWithoutWriting(t *testing.T) {
 	}
 
 	var stored string
-	if err := db.QueryRow(`SELECT sandbox_exe FROM cli_sandbox_state WHERE agent_id = ? AND chat_id = ?`, "agent-a", "chat-1").Scan(&stored); err != nil {
+	if err := db.QueryRow(`SELECT sandbox_exe FROM cli_sandbox_state WHERE chat_id = ?`, "chat-1").Scan(&stored); err != nil {
 		t.Fatalf("query sandbox state: %v", err)
 	}
 	if stored != sandboxstate.ModeFilePick {
@@ -8874,7 +8872,7 @@ func TestProxySandboxCLIReadsAndWritesSessionState(t *testing.T) {
 	}()
 
 	stdout := captureProxyStdout(t, func() {
-		runProxySandboxCLI([]string{"--agentId", "agent-a", "--chatId", "chat-1"})
+		runProxySandboxCLI([]string{"--chatId", "chat-1"})
 	})
 	var initial struct {
 		Status   int    `json:"status"`
@@ -8910,7 +8908,7 @@ func TestProxySandboxCLIReadsAndWritesSessionState(t *testing.T) {
 	}
 
 	var stored string
-	if err := db.QueryRow(`SELECT sandbox_exe FROM cli_sandbox_state WHERE agent_id = ? AND chat_id = ?`, "agent-a", "chat-1").Scan(&stored); err != nil {
+	if err := db.QueryRow(`SELECT sandbox_exe FROM cli_sandbox_state WHERE chat_id = ?`, "chat-1").Scan(&stored); err != nil {
 		t.Fatalf("query sandbox state: %v", err)
 	}
 	if stored != sandboxstate.ModeNet {
@@ -8942,7 +8940,7 @@ func TestHandleCmdUsesSandboxHelperForEnabledSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getDataDB: %v", err)
 	}
-	if _, err := sandboxstate.Set(db, "agent-a", "chat-1", sandboxstate.ModeFilePickNet); err != nil {
+	if _, err := sandboxstate.SetWithDirectory(db, "agent-a", "chat-1", sandboxstate.ModeFilePickNet, "/Users/demo/Documents/code"); err != nil {
 		t.Fatalf("enable sandbox: %v", err)
 	}
 
@@ -9004,7 +9002,7 @@ func TestHandleCmdUsesSandboxHelperForEnabledSession(t *testing.T) {
 		t.Fatalf("read args: %v", err)
 	}
 	gotArgs := strings.Split(strings.TrimSpace(string(argsData)), "\n")
-	wantArgs := []string{"--cmd", "ls -la /tmp/demo", "--shell", sharedutil.DefaultExecShell(), "--timeout", "4567"}
+	wantArgs := []string{"--cmd", "ls -la /tmp/demo", "--allowed-dir", "/Users/demo/Documents/code", "--shell", sharedutil.DefaultExecShell(), "--timeout", "4567"}
 	if !reflect.DeepEqual(gotArgs, wantArgs) {
 		t.Fatalf("sandbox args = %#v, want %#v", gotArgs, wantArgs)
 	}

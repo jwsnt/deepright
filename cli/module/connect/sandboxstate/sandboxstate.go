@@ -16,15 +16,17 @@ const (
 )
 
 type State struct {
-	AgentID   string `json:"agentId"`
-	ChatID    string `json:"chatId"`
-	Sandbox   string `json:"sandbox"`
-	UpdatedAt string `json:"updatedAt"`
+	AgentID    string `json:"agentId"`
+	ChatID     string `json:"chatId"`
+	Sandbox    string `json:"sandbox"`
+	AllowedDir string `json:"allowedDir"`
+	UpdatedAt  string `json:"updatedAt"`
 }
 
 type columnInfo struct {
 	Name string
 	Type string
+	PK   int
 }
 
 func EnsureSchema(db *sql.DB) error {
@@ -53,6 +55,7 @@ func EnsureSchema(db *sql.DB) error {
 		cols = append(cols, columnInfo{
 			Name: strings.TrimSpace(name),
 			Type: strings.ToUpper(strings.TrimSpace(columnType)),
+			PK:   pk,
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -65,11 +68,11 @@ func EnsureSchema(db *sql.DB) error {
 	}
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS cli_sandbox_state (
-			agent_id TEXT NOT NULL,
 			chat_id TEXT NOT NULL DEFAULT '',
 			sandbox_exe TEXT NOT NULL DEFAULT '',
+			allowed_dir TEXT NOT NULL DEFAULT '',
 			updated_at TEXT NOT NULL,
-			PRIMARY KEY (agent_id, chat_id)
+			PRIMARY KEY (chat_id)
 		);
 		CREATE INDEX IF NOT EXISTS idx_cli_sandbox_state_updated_at
 			ON cli_sandbox_state(updated_at);
@@ -81,12 +84,25 @@ func needsRebuild(cols []columnInfo) bool {
 	if len(cols) == 0 {
 		return false
 	}
+	if len(cols) != 4 {
+		return true
+	}
+	expected := map[string]string{
+		"chat_id":     "TEXT",
+		"sandbox_exe": "TEXT",
+		"allowed_dir": "TEXT",
+		"updated_at":  "TEXT",
+	}
 	for _, col := range cols {
-		if col.Name == "sandbox_exe" {
-			return col.Type != "TEXT"
+		wantType, ok := expected[col.Name]
+		if !ok || col.Type != wantType {
+			return true
+		}
+		if col.Name == "chat_id" && col.PK != 1 {
+			return true
 		}
 	}
-	return true
+	return false
 }
 
 func NormalizeMode(value string) string {
@@ -109,20 +125,20 @@ func ValidModes() []string {
 func Get(db *sql.DB, agentID, chatID string) (State, bool, error) {
 	agentID = strings.TrimSpace(agentID)
 	chatID = strings.TrimSpace(chatID)
-	if agentID == "" {
-		return State{}, false, fmt.Errorf("agentId is required")
+	if chatID == "" {
+		return State{}, false, fmt.Errorf("chatId is required")
 	}
 	if err := EnsureSchema(db); err != nil {
 		return State{}, false, err
 	}
 
 	var value string
+	var allowedDir string
 	var updatedAt string
 	err := db.QueryRow(
-		`SELECT sandbox_exe, updated_at FROM cli_sandbox_state WHERE agent_id = ? AND chat_id = ?`,
-		agentID,
+		`SELECT sandbox_exe, allowed_dir, updated_at FROM cli_sandbox_state WHERE chat_id = ?`,
 		chatID,
-	).Scan(&value, &updatedAt)
+	).Scan(&value, &allowedDir, &updatedAt)
 	if err == sql.ErrNoRows {
 		return State{AgentID: agentID, ChatID: chatID}, false, nil
 	}
@@ -134,22 +150,28 @@ func Get(db *sql.DB, agentID, chatID string) (State, bool, error) {
 		return State{AgentID: agentID, ChatID: chatID}, false, nil
 	}
 	return State{
-		AgentID:   agentID,
-		ChatID:    chatID,
-		Sandbox:   mode,
-		UpdatedAt: updatedAt,
+		AgentID:    agentID,
+		ChatID:     chatID,
+		Sandbox:    mode,
+		AllowedDir: strings.TrimSpace(allowedDir),
+		UpdatedAt:  updatedAt,
 	}, true, nil
 }
 
 func Set(db *sql.DB, agentID, chatID, mode string) (State, error) {
-	return setAt(db, agentID, chatID, mode, time.Now())
+	return setAt(db, agentID, chatID, mode, "", time.Now())
 }
 
-func setAt(db *sql.DB, agentID, chatID, mode string, now time.Time) (State, error) {
+func SetWithDirectory(db *sql.DB, agentID, chatID, mode, allowedDir string) (State, error) {
+	return setAt(db, agentID, chatID, mode, allowedDir, time.Now())
+}
+
+func setAt(db *sql.DB, agentID, chatID, mode, allowedDir string, now time.Time) (State, error) {
 	agentID = strings.TrimSpace(agentID)
 	chatID = strings.TrimSpace(chatID)
-	if agentID == "" {
-		return State{}, fmt.Errorf("agentId is required")
+	allowedDir = strings.TrimSpace(allowedDir)
+	if chatID == "" {
+		return State{}, fmt.Errorf("chatId is required")
 	}
 	if err := EnsureSchema(db); err != nil {
 		return State{}, err
@@ -159,6 +181,9 @@ func setAt(db *sql.DB, agentID, chatID, mode string, now time.Time) (State, erro
 	if rawMode != "" && mode == "" {
 		return State{}, fmt.Errorf("sandbox must be one of filepick,net,filepick_net")
 	}
+	if mode != ModeFilePick && mode != ModeFilePickNet {
+		allowedDir = ""
+	}
 	if mode == "" {
 		if err := Delete(db, agentID, chatID); err != nil {
 			return State{}, err
@@ -167,34 +192,34 @@ func setAt(db *sql.DB, agentID, chatID, mode string, now time.Time) (State, erro
 	}
 	updatedAt := now.Format(timeLayout)
 	_, err := db.Exec(
-		`INSERT INTO cli_sandbox_state (agent_id, chat_id, sandbox_exe, updated_at)
+		`INSERT INTO cli_sandbox_state (chat_id, sandbox_exe, allowed_dir, updated_at)
 		 VALUES (?,?,?,?)
-		 ON CONFLICT(agent_id, chat_id) DO UPDATE SET sandbox_exe = excluded.sandbox_exe, updated_at = excluded.updated_at`,
-		agentID,
+		 ON CONFLICT(chat_id) DO UPDATE SET sandbox_exe = excluded.sandbox_exe, allowed_dir = excluded.allowed_dir, updated_at = excluded.updated_at`,
 		chatID,
 		mode,
+		allowedDir,
 		updatedAt,
 	)
 	if err != nil {
 		return State{}, err
 	}
 	return State{
-		AgentID:   agentID,
-		ChatID:    chatID,
-		Sandbox:   mode,
-		UpdatedAt: updatedAt,
+		AgentID:    agentID,
+		ChatID:     chatID,
+		Sandbox:    mode,
+		AllowedDir: allowedDir,
+		UpdatedAt:  updatedAt,
 	}, nil
 }
 
 func Delete(db *sql.DB, agentID, chatID string) error {
-	agentID = strings.TrimSpace(agentID)
 	chatID = strings.TrimSpace(chatID)
-	if agentID == "" {
-		return fmt.Errorf("agentId is required")
+	if chatID == "" {
+		return fmt.Errorf("chatId is required")
 	}
 	if err := EnsureSchema(db); err != nil {
 		return err
 	}
-	_, err := db.Exec(`DELETE FROM cli_sandbox_state WHERE agent_id = ? AND chat_id = ?`, agentID, chatID)
+	_, err := db.Exec(`DELETE FROM cli_sandbox_state WHERE chat_id = ?`, chatID)
 	return err
 }

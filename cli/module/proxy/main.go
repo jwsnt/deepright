@@ -946,16 +946,15 @@ func hydrateAgentOutput(output *AgentOutput, chatID string) {
 	}
 	chatID = strings.TrimSpace(chatID)
 	seedreamSkill, seedreamEnabled := proxySeedreamSkillDefinition()
+	mode := ""
+	if chatID != "" {
+		if value, err := sandboxModeForSession(chatID); err == nil {
+			mode = value
+		}
+	}
 	for i := range output.Agents {
 		output.Agents[i].Skills = proxyApplySeedreamSkill(output.Agents[i].Skills, seedreamSkill, seedreamEnabled)
-		output.Agents[i].Sandbox = ""
-		if chatID == "" {
-			continue
-		}
-		mode, err := sandboxModeForSession(output.Agents[i].AgentID, chatID)
-		if err == nil {
-			output.Agents[i].Sandbox = mode
-		}
+		output.Agents[i].Sandbox = mode
 	}
 }
 
@@ -1850,8 +1849,11 @@ func resolveProxySandboxExecutablePath(mode string) (string, error) {
 	return "", fmt.Errorf("sandbox helper not found for mode=%s", mode)
 }
 
-func executeSandboxCommandWithPath(path, shell, rawCmd string, timeoutMs int64, onStart func(*activeCmd)) (int, string) {
+func executeSandboxCommandWithPath(path, shell, rawCmd string, timeoutMs int64, allowedDir string, onStart func(*activeCmd)) (int, string) {
 	args := []string{"--cmd", rawCmd}
+	if allowedDir = strings.TrimSpace(allowedDir); allowedDir != "" {
+		args = append(args, "--allowed-dir", allowedDir)
+	}
 	if shell = strings.TrimSpace(shell); shell != "" {
 		args = append(args, "--shell", shell)
 	}
@@ -1861,7 +1863,7 @@ func executeSandboxCommandWithPath(path, shell, rawCmd string, timeoutMs int64, 
 	return executeExternalCommand(path, args, rawCmd, timeoutMs, onStart)
 }
 
-func executeSandboxCommandLogged(scope, agentID, chatID, tid, mode, shell, rawCmd string, timeoutMs int64, onStart func(*activeCmd)) (int, string) {
+func executeSandboxCommandLogged(scope, agentID, chatID, tid, mode, allowedDir, shell, rawCmd string, timeoutMs int64, onStart func(*activeCmd)) (int, string) {
 	path, err := proxySandboxExecutablePathFn(mode)
 	if err != nil {
 		log.Printf("%s: sandbox exec prepare failed agentId=%s chatId=%s tid=%s err=%v cmd=%q",
@@ -1886,7 +1888,7 @@ func executeSandboxCommandLogged(scope, agentID, chatID, tid, mode, shell, rawCm
 		rawCmd,
 	)
 	startedAt := time.Now()
-	status, output := executeSandboxCommandWithPath(path, shell, rawCmd, timeoutMs, onStart)
+	status, output := executeSandboxCommandWithPath(path, shell, rawCmd, timeoutMs, allowedDir, onStart)
 	log.Printf("%s: sandbox exec done agentId=%s chatId=%s tid=%s status=%d durationMs=%d mode=%s output=%q",
 		scope,
 		strings.TrimSpace(agentID),
@@ -1900,12 +1902,23 @@ func executeSandboxCommandLogged(scope, agentID, chatID, tid, mode, shell, rawCm
 	return status, output
 }
 
-func sandboxModeForSession(agentID, chatID string) (string, error) {
+func sandboxStateForSession(chatID string) (sandboxstate.State, bool, error) {
 	db, err := getDataDB()
 	if err != nil {
-		return "", err
+		return sandboxstate.State{}, false, err
 	}
-	state, recorded, err := sandboxstate.Get(db, agentID, chatID)
+	state, recorded, err := sandboxstate.Get(db, "", chatID)
+	if err != nil {
+		return sandboxstate.State{}, false, err
+	}
+	if !recorded {
+		return sandboxstate.State{}, false, nil
+	}
+	return state, true, nil
+}
+
+func sandboxModeForSession(chatID string) (string, error) {
+	state, recorded, err := sandboxStateForSession(chatID)
 	if err != nil {
 		return "", err
 	}
@@ -1913,6 +1926,23 @@ func sandboxModeForSession(agentID, chatID string) (string, error) {
 		return "", nil
 	}
 	return sandboxstate.NormalizeMode(state.Sandbox), nil
+}
+
+func sandboxModeForLog(value string) string {
+	mode := sandboxstate.NormalizeMode(value)
+	if mode == "" {
+		return "off"
+	}
+	return mode
+}
+
+func logProxySandboxChange(agentID, chatID, fromMode, toMode string) {
+	log.Printf("sandbox change agentId=%s chatId=%s from=%s to=%s",
+		strings.TrimSpace(agentID),
+		strings.TrimSpace(chatID),
+		sandboxModeForLog(fromMode),
+		sandboxModeForLog(toMode),
+	)
 }
 
 // HandleCmd serves POST /api/cmd, executing a command for an agent chat from localhost only.
@@ -1987,7 +2017,7 @@ func (p *ProxyServer) HandleCmd(w http.ResponseWriter, r *http.Request) {
 		log.Printf("api/cmd: insert cmd_log failed: %v", err)
 	}
 
-	sandboxMode, err := sandboxModeForSession(req.AgentID, req.ChatID)
+	sandboxState, recorded, err := sandboxStateForSession(req.ChatID)
 	if err != nil {
 		log.Printf("api/cmd: sandbox lookup failed: agentId=%s chatId=%s err=%v", req.AgentID, req.ChatID, err)
 		sharedutil.WriteCmdResponse(w, http.StatusInternalServerError, CmdResponse{
@@ -2000,12 +2030,18 @@ func (p *ProxyServer) HandleCmd(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	sandboxMode := ""
+	sandboxAllowedDir := ""
+	if recorded {
+		sandboxMode = sandboxstate.NormalizeMode(sandboxState.Sandbox)
+		sandboxAllowedDir = sandboxState.AllowedDir
+	}
 
 	var activeKey string
 	var status int
 	var output string
 	if sandboxMode != "" {
-		status, output = executeSandboxCommandLogged("api/cmd", req.AgentID, req.ChatID, tid, sandboxMode, sharedutil.DefaultExecShell(), req.Cmd, req.Timeout, func(ac *activeCmd) {
+		status, output = executeSandboxCommandLogged("api/cmd", req.AgentID, req.ChatID, tid, sandboxMode, sandboxAllowedDir, sharedutil.DefaultExecShell(), req.Cmd, req.Timeout, func(ac *activeCmd) {
 			ac.agentID = req.AgentID
 			ac.chatID = req.ChatID
 			ac.tid = tid
@@ -4674,17 +4710,17 @@ func runProxyTokenCLI(args []string) {
 
 func printProxySandboxHelp() {
 	fmt.Println("Usage:")
-	fmt.Println("  proxy sandbox --agentId ID --chatId ID")
+	fmt.Println("  proxy sandbox --chatId ID")
 	fmt.Println("  proxy sandbox --agentId ID --chatId ID --sandbox off|filepick|net|filepick_net")
 	fmt.Println("")
 	fmt.Println("Options:")
-	fmt.Println("  --agentId ID      当前会话所属 AgentId")
+	fmt.Println("  --agentId ID      当前会话所属 AgentId；查询可省略，写入必填")
 	fmt.Println("  --chatId ID       当前会话所属 ChatId")
 	fmt.Println("  --chat ID         ChatId 别名")
 	fmt.Println("  --sandbox MODE    写入当前会话沙盒模式；off 表示关闭，不传则只查询")
 	fmt.Println("")
 	fmt.Println("Examples:")
-	fmt.Println("  proxy sandbox --agentId A --chatId chat-001")
+	fmt.Println("  proxy sandbox --chatId chat-001")
 	fmt.Println("  proxy sandbox --agentId A --chatId chat-001 --sandbox filepick_net")
 	fmt.Println("  proxy sandbox --agentId A --chatId chat-001 --sandbox off")
 }
@@ -4713,8 +4749,8 @@ func runProxySandboxCLI(args []string) {
 	if targetChatID == "" {
 		targetChatID = strings.TrimSpace(*chatAlias)
 	}
-	if targetAgentID == "" || targetChatID == "" {
-		log.Fatal("agentId and chatId are required")
+	if targetChatID == "" {
+		log.Fatal("chatId is required")
 	}
 
 	db, err := getDataDB()
@@ -4727,14 +4763,26 @@ func runProxySandboxCLI(args []string) {
 		recorded bool
 	)
 	if strings.TrimSpace(*sandboxRaw) != "" {
+		if targetAgentID == "" {
+			log.Fatal("agentId is required when setting sandbox")
+		}
 		mode, err := parseSandboxUpdateValue(*sandboxRaw)
 		if err != nil {
 			log.Fatal(err)
+		}
+		previous, existed, err := sandboxstate.Get(db, "", targetChatID)
+		if err != nil {
+			log.Fatal(err)
+		}
+		beforeMode := ""
+		if existed {
+			beforeMode = previous.Sandbox
 		}
 		state, err = sandboxstate.Set(db, targetAgentID, targetChatID, mode)
 		if err != nil {
 			log.Fatal(err)
 		}
+		logProxySandboxChange(targetAgentID, targetChatID, beforeMode, state.Sandbox)
 		recorded = strings.TrimSpace(state.Sandbox) != ""
 	} else {
 		var err error
@@ -4819,8 +4867,8 @@ func proxySandboxTarget(r *http.Request) (string, string, error) {
 	if chatID == "" {
 		chatID = strings.TrimSpace(r.URL.Query().Get("chat"))
 	}
-	if agentID == "" || chatID == "" {
-		return "", "", fmt.Errorf("agentId and chatId are required")
+	if chatID == "" {
+		return "", "", fmt.Errorf("chatId is required")
 	}
 	return agentID, chatID, nil
 }
@@ -4860,12 +4908,13 @@ func proxySandboxModeFromRequestPath(r *http.Request) (string, bool, error) {
 func writeProxySandboxState(w http.ResponseWriter, state sandboxstate.State, recorded bool) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":    0,
-		"agentId":   state.AgentID,
-		"chatId":    state.ChatID,
-		"sandbox":   state.Sandbox,
-		"recorded":  recorded,
-		"updatedAt": state.UpdatedAt,
+		"status":     0,
+		"agentId":    state.AgentID,
+		"chatId":     state.ChatID,
+		"sandbox":    state.Sandbox,
+		"allowedDir": state.AllowedDir,
+		"recorded":   recorded,
+		"updatedAt":  state.UpdatedAt,
 	})
 }
 
@@ -4889,6 +4938,11 @@ func (p *ProxyServer) handleSandboxQuery(w http.ResponseWriter, r *http.Request,
 	}
 
 	if allowSet {
+		if agentID == "" {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "agentId is required"})
+			return
+		}
 		mode, shouldSet, err := proxySandboxModeFromRequestPath(r)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
@@ -4900,12 +4954,23 @@ func (p *ProxyServer) handleSandboxQuery(w http.ResponseWriter, r *http.Request,
 			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "sandbox mode is required"})
 			return
 		}
+		previous, recorded, err := sandboxstate.Get(db, "", chatID)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "query error: " + err.Error()})
+			return
+		}
+		beforeMode := ""
+		if recorded {
+			beforeMode = previous.Sandbox
+		}
 		state, err := sandboxstate.Set(db, agentID, chatID, mode)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "save error: " + err.Error()})
 			return
 		}
+		logProxySandboxChange(agentID, chatID, beforeMode, state.Sandbox)
 		writeProxySandboxState(w, state, strings.TrimSpace(state.Sandbox) != "")
 		return
 	}
