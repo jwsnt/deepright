@@ -4875,6 +4875,211 @@ func TestHandleRestoreUsesChatAcrossAgentSwitches(t *testing.T) {
 	}
 }
 
+func TestHandleRestoreHistoryReturnsLatestCompleteRound(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	sharedDataDB = pooledDB{}
+	sharedEventLogger = struct {
+		mu     sync.Mutex
+		path   string
+		logger *eventlog.Logger
+	}{}
+
+	db, err := sql.Open("sqlite", "data")
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+	initChatTable(db)
+
+	if _, err := db.Exec(`INSERT INTO chat_log (agent_id, chat_id, chat_type, role, response_type, content, created_at) VALUES
+		('a','chat-history','page_session','Q','normal','{"messages":[{"role":"user","content":"round-1"}]}','2026-05-13T10:00:00.000'),
+		('a','chat-history','page_session','A','normal','data: {"choices":[{"delta":{"content":"old"}}]}' || char(10),'2026-05-13T10:00:01.000'),
+		('a','chat-history','page_session','A','normal','data: [DONE]' || char(10),'2026-05-13T10:00:01.100'),
+		('a','chat-history','page_session','Q','normal','{"messages":[{"role":"user","content":"round-2"}]}','2026-05-13T10:00:02.000'),
+		('a','chat-history','page_session','A','normal','data: {"choices":[{"delta":{"content":"new"}}]}' || char(10),'2026-05-13T10:00:03.000'),
+		('a','chat-history','page_session','A','normal','data: [DONE]' || char(10),'2026-05-13T10:00:04.000')`); err != nil {
+		t.Fatalf("seed chat_log: %v", err)
+	}
+
+	logger, err := getEventLogger()
+	if err != nil {
+		t.Fatalf("getEventLogger: %v", err)
+	}
+	logger.Append(eventlog.Entry{
+		AgentID:   "a",
+		ChatID:    "chat-history",
+		Content:   `{"cmd":"echo second-round"}`,
+		Type:      eventlog.TypeCLIGet,
+		CreatedAt: "2026-05-13T10:00:02.500",
+	})
+	logger.Append(eventlog.Entry{
+		AgentID:   "a",
+		ChatID:    "chat-history",
+		Content:   `{"status":0,"content":"ok"}`,
+		Type:      eventlog.TypeCLIPub,
+		CreatedAt: "2026-05-13T10:00:03.500",
+	})
+	time.Sleep(100 * time.Millisecond)
+
+	proxy := &ProxyServer{}
+	req := httptest.NewRequest(http.MethodPost, "/api/restore?chat=chat-history&history=1&limit=2", nil)
+	rec := httptest.NewRecorder()
+	proxy.HandleRestore(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+
+	var resp struct {
+		Status int `json:"status"`
+		Data   []struct {
+			Role      string `json:"role"`
+			Content   string `json:"content"`
+			CreatedAt string `json:"createdAt"`
+		} `json:"data"`
+		History struct {
+			HasMore        bool   `json:"hasMore"`
+			BeforeTimeline string `json:"beforeTimeline"`
+			BeforeID       int    `json:"beforeId"`
+		} `json:"history"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Status != 0 {
+		t.Fatalf("status body = %d, want 0", resp.Status)
+	}
+	if len(resp.Data) != 5 {
+		t.Fatalf("len(data) = %d, want 5", len(resp.Data))
+	}
+	if resp.Data[0].Role != "Q" || !strings.Contains(resp.Data[0].Content, "round-2") {
+		t.Fatalf("first record = %#v, want second round Q", resp.Data[0])
+	}
+	if resp.Data[1].Role != "cli/get" {
+		t.Fatalf("second record role = %q, want cli/get", resp.Data[1].Role)
+	}
+	if resp.Data[2].Role != "A" || !strings.Contains(resp.Data[2].Content, `"new"`) {
+		t.Fatalf("third record = %#v, want second round A", resp.Data[2])
+	}
+	if resp.Data[3].Role != "cli/pub" {
+		t.Fatalf("fourth record role = %q, want cli/pub", resp.Data[3].Role)
+	}
+	if resp.Data[4].Role != "A" || resp.Data[4].Content != "data: [DONE]\n" {
+		t.Fatalf("fifth record = %#v, want done marker", resp.Data[4])
+	}
+	if !resp.History.HasMore {
+		t.Fatal("history.hasMore = false, want true")
+	}
+	if resp.History.BeforeTimeline != "2026-05-13T10:00:02.000" {
+		t.Fatalf("history.beforeTimeline = %q, want second round Q timestamp", resp.History.BeforeTimeline)
+	}
+	if resp.History.BeforeID <= 0 {
+		t.Fatalf("history.beforeId = %d, want positive", resp.History.BeforeID)
+	}
+}
+
+func TestHandleRestoreHistoryBeforeCursorReturnsOlderRounds(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	sharedDataDB = pooledDB{}
+	sharedEventLogger = struct {
+		mu     sync.Mutex
+		path   string
+		logger *eventlog.Logger
+	}{}
+
+	db, err := sql.Open("sqlite", "data")
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+	initChatTable(db)
+
+	if _, err := db.Exec(`INSERT INTO chat_log (agent_id, chat_id, chat_type, role, response_type, content, created_at) VALUES
+		('a','chat-history-page','page_session','Q','normal','{"messages":[{"role":"user","content":"round-1"}]}','2026-05-13T10:00:00.000'),
+		('a','chat-history-page','page_session','A','normal','data: {"choices":[{"delta":{"content":"one"}}]}' || char(10),'2026-05-13T10:00:01.000'),
+		('a','chat-history-page','page_session','A','normal','data: [DONE]' || char(10),'2026-05-13T10:00:01.100'),
+		('a','chat-history-page','page_session','Q','normal','{"messages":[{"role":"user","content":"round-2"}]}','2026-05-13T10:00:02.000'),
+		('a','chat-history-page','page_session','A','normal','data: {"choices":[{"delta":{"content":"two"}}]}' || char(10),'2026-05-13T10:00:03.000'),
+		('a','chat-history-page','page_session','A','normal','data: [DONE]' || char(10),'2026-05-13T10:00:03.100')`); err != nil {
+		t.Fatalf("seed chat_log: %v", err)
+	}
+
+	proxy := &ProxyServer{}
+	firstReq := httptest.NewRequest(http.MethodPost, "/api/restore?chat=chat-history-page&history=1&limit=2", nil)
+	firstRec := httptest.NewRecorder()
+	proxy.HandleRestore(firstRec, firstReq)
+
+	var firstResp struct {
+		Status  int `json:"status"`
+		History struct {
+			HasMore        bool   `json:"hasMore"`
+			BeforeTimeline string `json:"beforeTimeline"`
+			BeforeID       int    `json:"beforeId"`
+		} `json:"history"`
+	}
+	if err := json.NewDecoder(firstRec.Body).Decode(&firstResp); err != nil {
+		t.Fatalf("decode first: %v", err)
+	}
+	if firstResp.Status != 0 {
+		t.Fatalf("first status body = %d, want 0", firstResp.Status)
+	}
+	if !firstResp.History.HasMore {
+		t.Fatal("first history.hasMore = false, want true")
+	}
+
+	secondReq := httptest.NewRequest(http.MethodPost, "/api/restore?chat=chat-history-page&history=1&limit=2&beforeTimeline="+url.QueryEscape(firstResp.History.BeforeTimeline)+"&beforeId="+strconv.Itoa(firstResp.History.BeforeID), nil)
+	secondRec := httptest.NewRecorder()
+	proxy.HandleRestore(secondRec, secondReq)
+
+	if secondRec.Code != http.StatusOK {
+		t.Fatalf("second status = %d, want 200", secondRec.Code)
+	}
+
+	var secondResp struct {
+		Status int `json:"status"`
+		Data   []struct {
+			Role    string `json:"role"`
+			Content string `json:"content"`
+		} `json:"data"`
+		History struct {
+			HasMore bool `json:"hasMore"`
+		} `json:"history"`
+	}
+	if err := json.NewDecoder(secondRec.Body).Decode(&secondResp); err != nil {
+		t.Fatalf("decode second: %v", err)
+	}
+	if secondResp.Status != 0 {
+		t.Fatalf("second status body = %d, want 0", secondResp.Status)
+	}
+	if len(secondResp.Data) != 3 {
+		t.Fatalf("len(second data) = %d, want 3", len(secondResp.Data))
+	}
+	if secondResp.Data[0].Role != "Q" || !strings.Contains(secondResp.Data[0].Content, "round-1") {
+		t.Fatalf("second first record = %#v, want older round Q", secondResp.Data[0])
+	}
+	if secondResp.History.HasMore {
+		t.Fatal("second history.hasMore = true, want false")
+	}
+}
+
 func TestHandleCancelUsesChatAcrossAgentSwitches(t *testing.T) {
 	connMu.Lock()
 	connMap = make(map[string]*activeConn)

@@ -14,6 +14,7 @@ import ai.open.right.workflow.flow.function.impl.BaseFunction;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -43,6 +44,8 @@ public class CliGetFunction extends BaseFunction {
     // 自旋总超时，默认2s
     protected Integer timeout;
 
+    protected Integer display;
+
     // 自旋总次数
     protected Integer circle;
 
@@ -71,7 +74,7 @@ public class CliGetFunction extends BaseFunction {
                         rest = subData;
                     } else if (log.isWarnEnabled()) {
                         // 过期丢弃
-                        log.warn("The cli@get task was expired={}, timeout={}, why={}, key={}", subData.getDdl(), subData.getTimeout(), subData.getWhy(), router.key());
+                        log.warn("The cli@get task was created={}, expired={}, timeout={}, cmd={}, why={}, key={}", subData.getCreated(), subData.getDdl(), subData.getTimeout(), StringUtils.abbreviate(subData.getCmd(), this.display), StringUtils.abbreviate(subData.getWhy(), this.display), router.key());
                         rest = null;
                     }
                 }
@@ -139,6 +142,9 @@ public class CliGetFunction extends BaseFunction {
 
         @Value("${cli.get.timeout:15000}")
         protected Integer timeout;
+
+        @Value("${cli.get.display:50}")
+        protected Integer display;
 
         @Value("${cli.get.circle:10}")
         protected Integer circle;

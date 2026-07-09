@@ -8336,6 +8336,211 @@ func TestHandleRestoreUsesChatAcrossAgentSwitches(t *testing.T) {
 	}
 }
 
+func TestHandleRestoreHistoryReturnsLatestCompleteRound(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	db, err := sql.Open("sqlite", filepath.Join(tmp, "data"))
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	cronDB = db
+	if _, err := cronDB.Exec(`CREATE TABLE IF NOT EXISTS chat_log (id INTEGER PRIMARY KEY AUTOINCREMENT, agent_id TEXT NOT NULL, chat_id TEXT NOT NULL, chat_type TEXT NOT NULL DEFAULT 'page_session', role TEXT NOT NULL, response_type TEXT NOT NULL DEFAULT 'normal', content TEXT NOT NULL, created_at TEXT NOT NULL)`); err != nil {
+		t.Fatalf("create chat_log: %v", err)
+	}
+	if _, err := cronDB.Exec(`CREATE TABLE IF NOT EXISTS agent_message_log (id INTEGER PRIMARY KEY AUTOINCREMENT, agent_id TEXT NOT NULL DEFAULT '', chat_id TEXT NOT NULL DEFAULT '', content TEXT NOT NULL, log_type INTEGER NOT NULL, created_at TEXT NOT NULL)`); err != nil {
+		t.Fatalf("create agent_message_log: %v", err)
+	}
+	defer func() {
+		if cronDB != nil {
+			_ = cronDB.Close()
+			cronDB = nil
+		}
+	}()
+
+	if _, err := cronDB.Exec(`INSERT INTO chat_log (agent_id, chat_id, chat_type, role, response_type, content, created_at) VALUES
+		('a','chat-history','page_session','Q','normal','{"messages":[{"role":"user","content":"round-1"}]}','2026-05-13T10:00:00.000'),
+		('a','chat-history','page_session','A','normal','data: {"choices":[{"delta":{"content":"old"}}]}' || char(10),'2026-05-13T10:00:01.000'),
+		('a','chat-history','page_session','A','normal','data: [DONE]' || char(10),'2026-05-13T10:00:01.100'),
+		('a','chat-history','page_session','Q','normal','{"messages":[{"role":"user","content":"round-2"}]}','2026-05-13T10:00:02.000'),
+		('a','chat-history','page_session','A','normal','data: {"choices":[{"delta":{"content":"new"}}]}' || char(10),'2026-05-13T10:00:03.000'),
+		('a','chat-history','page_session','A','normal','data: [DONE]' || char(10),'2026-05-13T10:00:04.000')`); err != nil {
+		t.Fatalf("seed chat_log: %v", err)
+	}
+	if _, err := cronDB.Exec(`INSERT INTO agent_message_log (agent_id, chat_id, content, log_type, created_at) VALUES
+		('a','chat-history','{"cmd":"echo second-round"}', ?, '2026-05-13T10:00:02.500'),
+		('a','chat-history','{"status":0,"content":"ok"}', ?, '2026-05-13T10:00:03.500')`,
+		logTypeCLIGet, logTypeCLIPub); err != nil {
+		t.Fatalf("seed event logs: %v", err)
+	}
+
+	handler := handleRestore()
+	req := httptest.NewRequest(http.MethodPost, "/api/restore?chat=chat-history&history=1&limit=2", nil)
+	rec := httptest.NewRecorder()
+	handler(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+
+	var resp struct {
+		Status int `json:"status"`
+		Data   []struct {
+			Role      string `json:"role"`
+			Content   string `json:"content"`
+			CreatedAt string `json:"createdAt"`
+		} `json:"data"`
+		History struct {
+			HasMore        bool   `json:"hasMore"`
+			BeforeTimeline string `json:"beforeTimeline"`
+			BeforeID       int    `json:"beforeId"`
+		} `json:"history"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Status != 0 {
+		t.Fatalf("status body = %d, want 0", resp.Status)
+	}
+	if len(resp.Data) != 5 {
+		t.Fatalf("len(data) = %d, want 5", len(resp.Data))
+	}
+	if resp.Data[0].Role != "Q" || !strings.Contains(resp.Data[0].Content, "round-2") {
+		t.Fatalf("first record = %#v, want second round Q", resp.Data[0])
+	}
+	if resp.Data[1].Role != "cli/get" {
+		t.Fatalf("second record role = %q, want cli/get", resp.Data[1].Role)
+	}
+	if resp.Data[2].Role != "A" || !strings.Contains(resp.Data[2].Content, `"new"`) {
+		t.Fatalf("third record = %#v, want second round A", resp.Data[2])
+	}
+	if resp.Data[3].Role != "cli/pub" {
+		t.Fatalf("fourth record role = %q, want cli/pub", resp.Data[3].Role)
+	}
+	if resp.Data[4].Role != "A" || resp.Data[4].Content != "data: [DONE]\n" {
+		t.Fatalf("fifth record = %#v, want done marker", resp.Data[4])
+	}
+	if !resp.History.HasMore {
+		t.Fatal("history.hasMore = false, want true")
+	}
+	if resp.History.BeforeTimeline != "2026-05-13T10:00:02.000" {
+		t.Fatalf("history.beforeTimeline = %q, want second round Q timestamp", resp.History.BeforeTimeline)
+	}
+	if resp.History.BeforeID <= 0 {
+		t.Fatalf("history.beforeId = %d, want positive", resp.History.BeforeID)
+	}
+}
+
+func TestHandleRestoreHistoryBeforeCursorReturnsOlderRounds(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	db, err := sql.Open("sqlite", "data")
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	cronDB = db
+	if _, err := cronDB.Exec(`CREATE TABLE IF NOT EXISTS chat_log (id INTEGER PRIMARY KEY AUTOINCREMENT, agent_id TEXT NOT NULL, chat_id TEXT NOT NULL, chat_type TEXT NOT NULL DEFAULT 'page_session', role TEXT NOT NULL, response_type TEXT NOT NULL DEFAULT 'normal', content TEXT NOT NULL, created_at TEXT NOT NULL)`); err != nil {
+		t.Fatalf("create chat_log: %v", err)
+	}
+	if _, err := cronDB.Exec(`CREATE TABLE IF NOT EXISTS agent_message_log (id INTEGER PRIMARY KEY AUTOINCREMENT, agent_id TEXT NOT NULL DEFAULT '', chat_id TEXT NOT NULL DEFAULT '', content TEXT NOT NULL, log_type INTEGER NOT NULL, created_at TEXT NOT NULL)`); err != nil {
+		t.Fatalf("create agent_message_log: %v", err)
+	}
+	defer func() {
+		if cronDB != nil {
+			_ = cronDB.Close()
+			cronDB = nil
+		}
+	}()
+
+	if _, err := cronDB.Exec(`INSERT INTO chat_log (agent_id, chat_id, chat_type, role, response_type, content, created_at) VALUES
+		('a','chat-history-page','page_session','Q','normal','{"messages":[{"role":"user","content":"round-1"}]}','2026-05-13T10:00:00.000'),
+		('a','chat-history-page','page_session','A','normal','data: {"choices":[{"delta":{"content":"one"}}]}' || char(10),'2026-05-13T10:00:01.000'),
+		('a','chat-history-page','page_session','A','normal','data: [DONE]' || char(10),'2026-05-13T10:00:01.100'),
+		('a','chat-history-page','page_session','Q','normal','{"messages":[{"role":"user","content":"round-2"}]}','2026-05-13T10:00:02.000'),
+		('a','chat-history-page','page_session','A','normal','data: {"choices":[{"delta":{"content":"two"}}]}' || char(10),'2026-05-13T10:00:03.000'),
+		('a','chat-history-page','page_session','A','normal','data: [DONE]' || char(10),'2026-05-13T10:00:03.100')`); err != nil {
+		t.Fatalf("seed chat_log: %v", err)
+	}
+
+	handler := handleRestore()
+	firstReq := httptest.NewRequest(http.MethodPost, "/api/restore?chat=chat-history-page&history=1&limit=2", nil)
+	firstRec := httptest.NewRecorder()
+	handler(firstRec, firstReq)
+
+	var firstResp struct {
+		Status  int `json:"status"`
+		History struct {
+			HasMore        bool   `json:"hasMore"`
+			BeforeTimeline string `json:"beforeTimeline"`
+			BeforeID       int    `json:"beforeId"`
+		} `json:"history"`
+	}
+	if err := json.NewDecoder(firstRec.Body).Decode(&firstResp); err != nil {
+		t.Fatalf("decode first: %v", err)
+	}
+	if firstResp.Status != 0 {
+		t.Fatalf("first status body = %d, want 0", firstResp.Status)
+	}
+	if !firstResp.History.HasMore {
+		t.Fatal("first history.hasMore = false, want true")
+	}
+
+	secondReq := httptest.NewRequest(http.MethodPost, "/api/restore?chat=chat-history-page&history=1&limit=2&beforeTimeline="+url.QueryEscape(firstResp.History.BeforeTimeline)+"&beforeId="+strconv.Itoa(firstResp.History.BeforeID), nil)
+	secondRec := httptest.NewRecorder()
+	handler(secondRec, secondReq)
+
+	if secondRec.Code != http.StatusOK {
+		t.Fatalf("second status = %d, want 200", secondRec.Code)
+	}
+
+	var secondResp struct {
+		Status int `json:"status"`
+		Data   []struct {
+			Role    string `json:"role"`
+			Content string `json:"content"`
+		} `json:"data"`
+		History struct {
+			HasMore bool `json:"hasMore"`
+		} `json:"history"`
+	}
+	if err := json.NewDecoder(secondRec.Body).Decode(&secondResp); err != nil {
+		t.Fatalf("decode second: %v", err)
+	}
+	if secondResp.Status != 0 {
+		t.Fatalf("second status body = %d, want 0", secondResp.Status)
+	}
+	if len(secondResp.Data) != 3 {
+		t.Fatalf("len(second data) = %d, want 3", len(secondResp.Data))
+	}
+	if secondResp.Data[0].Role != "Q" || !strings.Contains(secondResp.Data[0].Content, "round-1") {
+		t.Fatalf("first second-page record = %#v, want first round Q", secondResp.Data[0])
+	}
+	if secondResp.Data[1].Role != "A" || !strings.Contains(secondResp.Data[1].Content, `"one"`) {
+		t.Fatalf("second second-page record = %#v, want first round A", secondResp.Data[1])
+	}
+	if secondResp.Data[2].Role != "A" || secondResp.Data[2].Content != "data: [DONE]\n" {
+		t.Fatalf("third second-page record = %#v, want first round done marker", secondResp.Data[2])
+	}
+	if secondResp.History.HasMore {
+		t.Fatal("second history.hasMore = true, want false")
+	}
+}
+
 func TestHandleCancelUsesChatAcrossAgentSwitches(t *testing.T) {
 	connMu.Lock()
 	connMap = make(map[string]*activeConn)

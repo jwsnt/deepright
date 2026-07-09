@@ -16,7 +16,6 @@ import (
 )
 
 const (
-	appName         = "DeepRight"
 	payloadFileName = "payload.zip"
 	payloadMarker   = ".deepright_payload_sha256"
 	distroName      = "deepright"
@@ -39,31 +38,44 @@ func main() {
 	switch mode {
 	case "extract":
 		fmt.Println(bundleDir)
-	case "start":
-		if err := runBatch(bundleDir, "start.bat"); err != nil {
-			exitWithError(err)
-		}
-	case "auto":
-		if err := runBatch(bundleDir, defaultBatchName()); err != nil {
-			exitWithError(err)
-		}
 	default:
-		if err := runBatch(bundleDir, "install.bat"); err != nil {
+		batchName, err := batchNameForMode(mode)
+		if err != nil {
+			exitWithError(err)
+		}
+		if err := runBatch(bundleDir, batchName); err != nil {
 			exitWithError(err)
 		}
 	}
 }
 
 func parseMode(args []string) (string, error) {
-	mode := "auto"
+	mode := wrapperDefaultMode
+	if strings.TrimSpace(mode) == "" {
+		mode = "auto"
+	}
 	for _, arg := range args {
 		switch arg {
 		case "--auto":
+			if !wrapperSupportsAuto {
+				return "", errors.New("this launcher does not support --auto")
+			}
 			mode = "auto"
 		case "--install":
+			if !wrapperSupportsInstall {
+				return "", errors.New("this launcher does not support --install")
+			}
 			mode = "install"
 		case "--start":
+			if !wrapperSupportsStart {
+				return "", errors.New("this launcher does not support --start")
+			}
 			mode = "start"
+		case "--run", "--uninstall":
+			if !wrapperSupportsRun {
+				return "", fmt.Errorf("this launcher does not support %s", arg)
+			}
+			mode = "run"
 		case "--extract-only":
 			mode = "extract"
 		case "--help", "-h", "/?":
@@ -77,10 +89,23 @@ func parseMode(args []string) (string, error) {
 }
 
 func printUsage() {
-	fmt.Println("DeepRight Windows installer launcher")
-	fmt.Println("  --auto         Extract payload, start directly when healthy, otherwise install (default)")
-	fmt.Println("  --install      Extract payload and run install.bat")
-	fmt.Println("  --start        Extract payload and run start.bat")
+	title := strings.TrimSpace(wrapperLauncherDescription)
+	if title == "" {
+		title = fmt.Sprintf("%s Windows launcher", wrapperAppName)
+	}
+	fmt.Println(title)
+	if wrapperSupportsAuto {
+		fmt.Println("  --auto         Extract payload, start directly when healthy, otherwise install")
+	}
+	if wrapperSupportsInstall {
+		fmt.Printf("  --install      Extract payload and run %s\n", wrapperInstallBatchName)
+	}
+	if wrapperSupportsStart {
+		fmt.Printf("  --start        Extract payload and run %s\n", wrapperStartBatchName)
+	}
+	if wrapperSupportsRun {
+		fmt.Printf("  %s    Extract payload and run %s\n", runFlagName(), wrapperRunBatchName)
+	}
 	fmt.Println("  --extract-only Extract payload and print the extracted directory")
 }
 
@@ -96,7 +121,11 @@ func ensureBundleReady() (string, error) {
 	if err != nil || strings.TrimSpace(cacheRoot) == "" {
 		cacheRoot = os.TempDir()
 	}
-	bundleDir := filepath.Join(cacheRoot, appName, "windows-exe", payloadHashHex[:16])
+	bundleNamespace := strings.TrimSpace(wrapperBundleNamespace)
+	if bundleNamespace == "" {
+		bundleNamespace = wrapperAppName
+	}
+	bundleDir := filepath.Join(cacheRoot, bundleNamespace, "windows-exe", payloadHashHex[:16])
 	markerPath := filepath.Join(bundleDir, payloadMarker)
 
 	if payloadAlreadyExtracted(bundleDir, markerPath, payloadHashHex) {
@@ -127,15 +156,8 @@ func payloadAlreadyExtracted(bundleDir, markerPath, payloadHash string) bool {
 		return false
 	}
 
-	requiredPaths := []string{
-		filepath.Join(bundleDir, "install.bat"),
-		filepath.Join(bundleDir, "install.ps1"),
-		filepath.Join(bundleDir, "start.bat"),
-		filepath.Join(bundleDir, "integration"),
-		filepath.Join(bundleDir, "config"),
-		filepath.Join(bundleDir, "site"),
-	}
-	for _, requiredPath := range requiredPaths {
+	for _, relativePath := range wrapperRequiredPaths {
+		requiredPath := filepath.Join(bundleDir, relativePath)
 		if _, err := os.Stat(requiredPath); err != nil {
 			return false
 		}
@@ -212,6 +234,33 @@ func extractZipEntry(bundleDir string, file *zip.File) error {
 	return nil
 }
 
+func batchNameForMode(mode string) (string, error) {
+	switch mode {
+	case "auto":
+		if !wrapperSupportsAuto {
+			return "", errors.New("this launcher does not support auto mode")
+		}
+		return defaultBatchName(), nil
+	case "install":
+		if !wrapperSupportsInstall {
+			return "", errors.New("this launcher does not support install mode")
+		}
+		return wrapperInstallBatchName, nil
+	case "start":
+		if !wrapperSupportsStart {
+			return "", errors.New("this launcher does not support start mode")
+		}
+		return wrapperStartBatchName, nil
+	case "run":
+		if !wrapperSupportsRun {
+			return "", errors.New("this launcher does not support run mode")
+		}
+		return wrapperRunBatchName, nil
+	default:
+		return "", fmt.Errorf("unsupported mode: %s", mode)
+	}
+}
+
 func runBatch(bundleDir, batchName string) error {
 	batchPath := filepath.Join(bundleDir, batchName)
 	if _, err := os.Stat(batchPath); err != nil {
@@ -230,10 +279,16 @@ func runBatch(bundleDir, batchName string) error {
 }
 
 func defaultBatchName() string {
-	if installLooksHealthy() {
-		return "start.bat"
+	if wrapperDefaultMode == "auto" {
+		if installLooksHealthy() {
+			return wrapperStartBatchName
+		}
+		return wrapperInstallBatchName
 	}
-	return "install.bat"
+	if strings.TrimSpace(wrapperDefaultBatchName) != "" {
+		return wrapperDefaultBatchName
+	}
+	return wrapperRunBatchName
 }
 
 func installLooksHealthy() bool {
@@ -257,7 +312,14 @@ func localSentinelPath() string {
 	return filepath.Join(programData, "deepright", ".deepright_installed")
 }
 
+func runFlagName() string {
+	if strings.EqualFold(wrapperRunBatchName, "uninstall.bat") {
+		return "--uninstall"
+	}
+	return "--run"
+}
+
 func exitWithError(err error) {
-	fmt.Fprintf(os.Stderr, "DeepRight installer failed: %v\n", err)
+	fmt.Fprintf(os.Stderr, "DeepRight launcher failed: %v\n", err)
 	os.Exit(1)
 }

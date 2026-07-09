@@ -5487,7 +5487,7 @@ const MESSAGE_IMAGE_CACHE = 'deepright-message-images-v1';
 const MESSAGE_IMAGE_DB = 'deepright-message-images-db';
 const MESSAGE_IMAGE_STORE = 'images';
 const REMOTE_MASKED_TOKEN_VALUE = '**********';
-const MAX_STORE = 2000, MAX_SHOW = 500, LAZY_PAGE = 20, MAX_CLI_SUB_SHOW = 100;
+const MAX_STORE = 2000, MAX_SHOW = 500, LAZY_PAGE = 20, MAX_CLI_SUB_SHOW = 100, COLD_HISTORY_RECORD_PAGE = 120;
 const MESSAGE_RENDER_CACHE_LIMIT = 240;
 const WIKI_RENDER_CACHE_LIMIT = 40;
 const LOW_POWER_RENDER_MESSAGE_MATH_LIMIT = 12;
@@ -6165,6 +6165,7 @@ let chatConversationMutationTokens = {};
 let restoreNoDataTipKeys = {};
 let switchedChatAutoReloadTimer = 0;
 let switchedChatAutoReloadSeq = 0;
+let switchedChatAutoReloadLockActive = false;
 let pageUnloading = false;
 let allowIntentionalWindowClose = false;
 let shutdownSequenceState = {
@@ -11862,6 +11863,21 @@ function setChatHistoryLock(locked, desc) {
   lockEl.classList.toggle('show', visible);
   lockEl.setAttribute('aria-hidden', visible ? 'false' : 'true');
   refreshOverlayStates();
+}
+
+function releaseSwitchedChatAutoReloadLock() {
+  if (!switchedChatAutoReloadLockActive) return;
+  switchedChatAutoReloadLockActive = false;
+  setChatHistoryLock(false);
+}
+
+function holdSwitchedChatAutoReloadLock(desc) {
+  const normalizedDesc = String(desc || '').trim();
+  if (!normalizedDesc) return false;
+  releaseSwitchedChatAutoReloadLock();
+  switchedChatAutoReloadLockActive = true;
+  setChatHistoryLock(true, normalizedDesc);
+  return true;
 }
 
 function registerOverlayElements() {
@@ -22568,7 +22584,12 @@ function pluginModalCreateViewSessionChat(config) {
   state.chats[chatId] = {
     id: chatId,
     messages: [],
-    lastMsg: (config && config.pluginName ? (config.pluginName + '会话') : '插件会话')
+    lastMsg: (config && config.pluginName ? (config.pluginName + '会话') : '插件会话'),
+    coldHistoryTailAt: '',
+    coldHistoryTailId: 0,
+    historyBeforeAt: '',
+    historyBeforeId: 0,
+    historyHasMore: false
   };
   state.chatOrder.unshift(chatId);
   pluginModalApplyViewSessionChatConfig(chatId, config);
@@ -26927,6 +26948,11 @@ function normalizeLoadedChat(chat) {
     .slice(-MAX_STORE);
   const pending = getPendingRequestState(chat);
   if (!Number.isFinite(Number(chat.lastRestoreId))) chat.lastRestoreId = 0;
+  chat.coldHistoryTailAt = toChatTimestamp(chat.coldHistoryTailAt || '');
+  if (!Number.isFinite(Number(chat.coldHistoryTailId))) chat.coldHistoryTailId = 0;
+  chat.historyBeforeAt = toChatTimestamp(chat.historyBeforeAt || '');
+  if (!Number.isFinite(Number(chat.historyBeforeId))) chat.historyBeforeId = 0;
+  chat.historyHasMore = !!chat.historyHasMore;
   chat.skipRestoreAfterAbnormal = !!chat.skipRestoreAfterAbnormal;
   chat.skipRestoreAfterAbnormalScopeKey = String(chat.skipRestoreAfterAbnormalScopeKey || '').trim();
   chat.completedWhileInactive = !!chat.completedWhileInactive;
@@ -27130,7 +27156,7 @@ function createNewChat(preferredId) {
   let id = requestedId || uuid();
   if (requestedId && state.chats[id]) return false;
   while (!requestedId && state.chats[id]) id = uuid();
-  state.chats[id] = { id, messages: [], lastMsg: '新会话', lastCompletionNoticeAt: '' };
+  state.chats[id] = { id, messages: [], lastMsg: '新会话', lastCompletionNoticeAt: '', coldHistoryTailAt: '', coldHistoryTailId: 0, historyBeforeAt: '', historyBeforeId: 0, historyHasMore: false };
   state.chatOrder.unshift(id);
   // Bind current agent and model to new chat
   if (state.settings.agentId) chatAgents[id] = state.settings.agentId;
@@ -27266,10 +27292,25 @@ function switchChat(id) {
   updateSandboxUI();
   state.displayedCount = 0;
   setTimeout(() => {
+    const useColdHistoryRestore = !!(state.chats[id] && shouldUseColdHistoryRestore(id));
+    const useSessionRestoreLock = !!(state.chats[id] && shouldLockChatRestoreOnSwitch(id));
+    if (useSessionRestoreLock) {
+      holdSwitchedChatAutoReloadLock('正在恢复会话内容');
+    } else {
+      releaseSwitchedChatAutoReloadLock();
+    }
+    if (useColdHistoryRestore) {
+      state.chats[id].cliCommandHistory = [];
+      clearChatTaskBadges(id);
+      clearChatFooterInlineHint(id);
+      clearCliSubPanel();
+    }
     renderMessages({ forceScroll: true });
-    restoreChatTaskBadgesFromPendingAssistant(id);
-    restoreChatFooterInlineHintFromPendingAssistant(id);
-    restoreCliSubPanel(id);
+    if (!useColdHistoryRestore) {
+      restoreChatTaskBadgesFromPendingAssistant(id);
+      restoreChatFooterInlineHintFromPendingAssistant(id);
+      restoreCliSubPanel(id);
+    }
     renderChatList();
     // Restore input draft
     if (input) {
@@ -27308,7 +27349,10 @@ function switchChat(id) {
     updateChatAsyncUI(id);
     if (vfsCurrentPath) vfsRefresh();
     clearRestoreNoDataTip(id);
-    scheduleSwitchedChatAutoReload(id, { delayMs: 120 });
+    scheduleSwitchedChatAutoReload(id, {
+      delayMs: 120,
+      holdUiLockDesc: useSessionRestoreLock ? '正在恢复会话内容' : ''
+    });
     if (state.chats[id] && state.chats[id].pendingRequest) resetChatSkillIndicator(id, { agentId: getChatAgentId(id) });
     else refreshChatSkillIndicator(id, { agentId: getChatAgentId(id) }).catch(() => {});
     if (modelSwitchTourState.pendingStart && !hasModelSwitchTourClickRecord()) {
@@ -30292,6 +30336,16 @@ function restoreCliSubPanel(chatId) {
   scheduleCliSubScrollBottomButtonSync();
 }
 
+function clearCliSubPanel() {
+  const container = document.getElementById('cliSubContainer');
+  if (!container) return;
+  container.innerHTML = '';
+  const cell = document.getElementById('rsCliSubCell');
+  if (cell) cell.scrollTop = 0;
+  updateCliSubEmptyState();
+  scheduleCliSubScrollBottomButtonSync();
+}
+
 function setupCliSubScrollControls() {
   const container = document.getElementById('rsCliSubCell');
   if (!container || container.dataset.scrollControlsBound === '1') return;
@@ -30572,7 +30626,18 @@ function setupScrollLazy() {
       if (!chat) return;
       const visibleMessages = chat.messages.filter(shouldRenderMessageInCenter);
       const total = visibleMessages.length;
-      if (chatLazyLoading || state.displayedCount >= total || state.displayedCount >= MAX_STORE) return;
+      if (chatLazyLoading) return;
+      if (state.displayedCount >= total) {
+        if (!chatHasOlderHistoryCursor(chat) || isChatBusy(state.activeChat) || isChatSendDispatching(state.activeChat) || isChatCancelling(state.activeChat)) return;
+        chatLazyLoading = true;
+        try {
+          await reloadColdHistoryChat(state.activeChat, { silent: true, prepend: true });
+        } finally {
+          chatLazyLoading = false;
+        }
+        return;
+      }
+      if (state.displayedCount >= MAX_STORE) return;
       chatLazyLoading = true;
       setChatHistoryLock(true, '正在加载更早的对话内容并同步毛玻璃效果');
       try {
@@ -34307,6 +34372,7 @@ function clearChatConversation(chatId) {
     clearTimeout(switchedChatAutoReloadTimer);
     switchedChatAutoReloadTimer = 0;
     switchedChatAutoReloadSeq += 1;
+    releaseSwitchedChatAutoReloadLock();
   }
   chat.messages = [];
   chat.cliCommandHistory = [];
@@ -34315,6 +34381,11 @@ function clearChatConversation(chatId) {
   chat.lastRequestAt = '';
   chat.lastRestoreAt = '';
   chat.lastRestoreId = 0;
+  chat.coldHistoryTailAt = '';
+  chat.coldHistoryTailId = 0;
+  chat.historyBeforeAt = '';
+  chat.historyBeforeId = 0;
+  chat.historyHasMore = false;
   chat.skipRestoreAfterAbnormal = false;
   chat.skipRestoreAfterAbnormalScopeKey = '';
   chat.completedWhileInactive = false;
@@ -34327,7 +34398,7 @@ function clearChatConversation(chatId) {
     closeQueuedCenterPanel(true);
     syncRightSidebarUrlPreviewForActiveChat();
     renderMessages({ forceScroll: true });
-    restoreCliSubPanel(resolvedChatId);
+    clearCliSubPanel();
     syncQueuedCenterInputUI(resolvedChatId, getChatAgentId(resolvedChatId));
     syncChatTaskBadgeUI({ animateEnter: false });
     updateChatAsyncUI(resolvedChatId);
@@ -34352,7 +34423,16 @@ async function confirmClearCurrentChat() {
 
 function getChatRestoreTimeline(chat) {
   if (!chat) return '';
-  if (chat.lastRestoreAt) return chat.lastRestoreAt;
+  const restoreTimeline = toChatTimestamp(chat.lastRestoreAt || '');
+  const coldHistoryTailAt = toChatTimestamp(chat.coldHistoryTailAt || '');
+  if (
+    !chat.pendingRequest &&
+    coldHistoryTailAt &&
+    (!restoreTimeline || coldHistoryTailAt > restoreTimeline)
+  ) {
+    return coldHistoryTailAt;
+  }
+  if (restoreTimeline) return restoreTimeline;
   if (chat.lastRequestAt) {
     const requestTs = toChatTimestamp(chat.lastRequestAt);
     if (requestTs) return requestTs;
@@ -34370,8 +34450,90 @@ function getChatRestoreTimeline(chat) {
 
 function getChatRestoreLastId(chat) {
   if (!chat) return 0;
-  const raw = Number(chat.lastRestoreId || 0);
+  const restoreTimeline = toChatTimestamp(chat.lastRestoreAt || '');
+  const restoreId = Number(chat.lastRestoreId || 0);
+  const coldHistoryTailAt = toChatTimestamp(chat.coldHistoryTailAt || '');
+  const coldHistoryTailId = Number(chat.coldHistoryTailId || 0);
+  const normalizedRestoreId = Number.isFinite(restoreId) && restoreId > 0 ? restoreId : 0;
+  const normalizedColdHistoryTailId = Number.isFinite(coldHistoryTailId) && coldHistoryTailId > 0 ? coldHistoryTailId : 0;
+  if (
+    !chat.pendingRequest &&
+    coldHistoryTailAt &&
+    (
+      !restoreTimeline ||
+      coldHistoryTailAt > restoreTimeline ||
+      (coldHistoryTailAt === restoreTimeline && normalizedColdHistoryTailId > normalizedRestoreId)
+    )
+  ) {
+    return normalizedColdHistoryTailId;
+  }
+  return normalizedRestoreId;
+}
+
+function getChatHistoryBeforeTimeline(chat) {
+  if (!chat) return '';
+  return toChatTimestamp(chat.historyBeforeAt || '');
+}
+
+function getChatHistoryBeforeId(chat) {
+  if (!chat) return 0;
+  const raw = Number(chat.historyBeforeId || 0);
   return Number.isFinite(raw) && raw > 0 ? raw : 0;
+}
+
+function updateChatColdHistoryTail(chat, timeline, id) {
+  if (!chat) return;
+  const normalizedTimeline = toChatTimestamp(timeline || '');
+  const normalizedId = Number(id || 0);
+  if (!normalizedTimeline || !Number.isFinite(normalizedId) || normalizedId <= 0) {
+    chat.coldHistoryTailAt = '';
+    chat.coldHistoryTailId = 0;
+    return;
+  }
+  chat.coldHistoryTailAt = normalizedTimeline;
+  chat.coldHistoryTailId = normalizedId;
+}
+
+function chatHasOlderHistoryCursor(chat) {
+  return !!(chat && chat.historyHasMore && getChatHistoryBeforeTimeline(chat) && getChatHistoryBeforeId(chat) > 0);
+}
+
+function updateChatHistoryCursor(chat, timeline, id, hasMore) {
+  if (!chat) return;
+  const normalizedTimeline = toChatTimestamp(timeline || '');
+  const normalizedId = Number(id || 0);
+  chat.historyHasMore = !!hasMore;
+  if (!chat.historyHasMore || !normalizedTimeline || !Number.isFinite(normalizedId) || normalizedId <= 0) {
+    chat.historyBeforeAt = '';
+    chat.historyBeforeId = 0;
+    if (!chat.historyHasMore) chat.historyHasMore = false;
+    return;
+  }
+  chat.historyBeforeAt = normalizedTimeline;
+  chat.historyBeforeId = normalizedId;
+}
+
+function clearChatHistoryCursor(chat) {
+  updateChatHistoryCursor(chat, '', 0, false);
+}
+
+function shouldUseColdHistoryRestore(chatId, options) {
+  const resolvedChatId = String(chatId || '').trim();
+  const chat = resolvedChatId ? state.chats[resolvedChatId] : null;
+  const opts = options || {};
+  if (!chat || chat.pendingRequest) return false;
+  if (opts.memoRecovery || opts.memoViewTimeline) return false;
+  if (chatHasRenderableCenterMessages(chat)) return false;
+  return true;
+}
+
+function shouldLockChatRestoreOnSwitch(chatId) {
+  const resolvedChatId = String(chatId || '').trim();
+  const chat = resolvedChatId ? state.chats[resolvedChatId] : null;
+  if (!chat) return false;
+  if (getMemoViewRecovery(resolvedChatId)) return true;
+  if (chat.pendingRequest) return true;
+  return shouldUseColdHistoryRestore(resolvedChatId);
 }
 
 function extractStructuredAssistantCenterContentFromRaw(raw, options) {
@@ -34620,6 +34782,99 @@ function parseRestoreAssistantRecord(raw) {
     errorText: String(errorText || '').trim(),
     streamPacketType: assistantState.streamPacketType || ''
   };
+}
+
+function parseColdHistoryUserRecord(raw) {
+  const parsedText = parseRestoreUserRecord(raw);
+  if (parsedText) return parsedText;
+  const trimmed = String(raw || '').trim();
+  if (!trimmed) return '';
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (typeof parsed.content === 'string') return parsed.content.trim();
+  } catch {}
+  return trimmed;
+}
+
+function buildColdHistoryCancelledAssistant(ts) {
+  const resolvedTs = toChatTimestamp(ts || new Date()) || toChatTimestamp(new Date());
+  return {
+    role: 'assistant',
+    content: '已取消',
+    receivedAt: resolvedTs,
+    createdAt: resolvedTs,
+    streamStatus: '完成',
+    cancelMarker: true
+  };
+}
+
+function buildColdHistoryAssistantMessage(round) {
+  if (!round) return null;
+  const assistantTs = toChatTimestamp(round.assistantTs || round.userTs || new Date()) || toChatTimestamp(new Date());
+  if (round.errorText) return buildAssistantErrorMessage(round.errorText, assistantTs);
+  if (round.cancelled) return buildColdHistoryCancelledAssistant(assistantTs);
+  const parsed = parseRestoreAssistantRecord(round.assistantRaw || '');
+  if (parsed.error) {
+    return buildAssistantErrorMessage(parsed.errorText || '服务端返回错误', assistantTs);
+  }
+  const content = collapseTrailingAssistantTimingMarkers(String(parsed.content || ''));
+  if (!normalizeMessageText(content)) return null;
+  return {
+    role: 'assistant',
+    content,
+    receivedAt: assistantTs,
+    createdAt: assistantTs,
+    streamStatus: '完成'
+  };
+}
+
+function finalizeColdHistoryRound(round, messages) {
+  if (!round || !Array.isArray(messages) || !normalizeMessageText(round.userContent)) return;
+  messages.push({
+    role: 'user',
+    content: round.userContent,
+    createdAt: round.userTs || toChatTimestamp(new Date())
+  });
+  const assistant = buildColdHistoryAssistantMessage(round);
+  if (assistant) messages.push(assistant);
+}
+
+function buildColdHistoryMessages(records) {
+  if (!Array.isArray(records) || records.length === 0) return [];
+  const messages = [];
+  let current = null;
+  records.forEach(rec => {
+    if (!rec || !rec.role) return;
+    const ts = rec.createdAt || toChatTimestamp(new Date());
+    if (rec.role === 'Q') {
+      finalizeColdHistoryRound(current, messages);
+      current = {
+        userContent: parseColdHistoryUserRecord(rec.content),
+        userTs: ts,
+        assistantRaw: '',
+        assistantTs: '',
+        errorText: '',
+        cancelled: false
+      };
+      return;
+    }
+    if (!current) return;
+    if (rec.role === 'A') {
+      current.assistantTs = ts;
+      if (rec.responseType === 'abnormal') {
+        current.errorText = extractRestoreAbnormalErrorText(rec.content);
+        return;
+      }
+      current.assistantRaw = String(current.assistantRaw || '') + String(rec.content || '');
+      return;
+    }
+    if (rec.role === 'X') {
+      current.cancelled = true;
+      current.assistantTs = ts;
+    }
+  });
+  finalizeColdHistoryRound(current, messages);
+  return messages;
 }
 
 function extractRestoreLogicalPacketId(raw) {
@@ -35708,12 +35963,18 @@ async function performReloadChatRecords(chatId, opts) {
   const noDataTipPlacement = String(options.noDataTipPlacement || toastPlacement || '').trim().toLowerCase();
   const toastOptions = toastPlacement ? { placement: toastPlacement } : undefined;
   const noDataTipOptions = noDataTipPlacement ? { placement: noDataTipPlacement } : undefined;
+  const uiLockDesc = String(options.uiLockDesc || '').trim();
+  const uiLockAlreadyHeld = !!options.uiLockAlreadyHeld;
+  const uiLockShown = !!(uiLockDesc && !uiLockAlreadyHeld);
+  if (uiLockShown) setChatHistoryLock(true, uiLockDesc);
   const chat = state.chats[chatId];
   if (!chat) {
     if (!silent) vfsShowUploadToast('当前会话不存在', true, toastOptions);
+    if (uiLockShown) setChatHistoryLock(false);
     return { ok: false, terminal: false, added: 0 };
   }
   if (isRestoreSkippedAfterAbnormal(chatId, chat)) {
+    if (uiLockShown) setChatHistoryLock(false);
     return { ok: false, terminal: false, added: 0, skipped: true };
   }
   const mutationToken = getChatConversationMutationToken(chatId);
@@ -35734,6 +35995,7 @@ async function performReloadChatRecords(chatId, opts) {
     if (chat.messages.length === 0) timeline = '1970-01-01T00:00:00';
     else {
       if (!silent) vfsShowUploadToast('当前会话缺少可恢复时间', true, toastOptions);
+      if (uiLockShown) setChatHistoryLock(false);
       return { ok: false, terminal: false, added: 0 };
     }
   }
@@ -35814,18 +36076,176 @@ async function performReloadChatRecords(chatId, opts) {
   } catch (e) {
     if (!silent) vfsShowUploadToast('加载失败: ' + e.message, true, toastOptions);
     return { ok: false, terminal: false, added: 0 };
+  } finally {
+    if (uiLockShown) setChatHistoryLock(false);
+  }
+}
+
+function enqueueChatRestoreTask(chatId, factory) {
+  const resolvedChatId = String(chatId || '').trim();
+  const taskFactory = typeof factory === 'function' ? factory : null;
+  if (!resolvedChatId || !taskFactory) return Promise.resolve({ ok: false, added: 0 });
+  const previous = restoreReloadQueue[resolvedChatId] || Promise.resolve();
+  const task = previous
+    .catch(() => {})
+    .then(() => taskFactory());
+  restoreReloadQueue[resolvedChatId] = task.finally(() => {
+    if (restoreReloadQueue[resolvedChatId] === task) delete restoreReloadQueue[resolvedChatId];
+  });
+  return task;
+}
+
+async function fetchColdHistoryRecords(chatId, options) {
+  const resolvedChatId = String(chatId || '').trim();
+  const chat = state.chats[resolvedChatId];
+  if (!resolvedChatId || !chat) return { records: [], history: { hasMore: false, beforeTimeline: '', beforeId: 0 } };
+  const opts = options || {};
+  const limit = Math.max(1, Number(opts.limit) || COLD_HISTORY_RECORD_PAGE);
+  const beforeTimeline = String(opts.beforeTimeline || getChatHistoryBeforeTimeline(chat) || '').trim();
+  const beforeId = Number.isFinite(Number(opts.beforeId)) && Number(opts.beforeId) > 0 ? Number(opts.beforeId) : getChatHistoryBeforeId(chat);
+  const params = new URLSearchParams({
+    chat: resolvedChatId,
+    history: '1',
+    limit: String(limit)
+  });
+  if (beforeTimeline) params.set('beforeTimeline', beforeTimeline);
+  if (beforeId > 0) params.set('beforeId', String(beforeId));
+  const resp = await fetchExecApi('/api/restore?' + params.toString(), { method: 'POST' });
+  const data = await resp.json().catch(() => null);
+  const serverMessage = String(data && (data.content || data.message) || '').trim();
+  if (
+    serverMessage === 'chat and timeline are required' &&
+    params.get('history') === '1'
+  ) {
+    throw new Error('当前页面已切到冷历史恢复协议，但本地服务还是旧版本，请重启 site/proxy 后再试');
+  }
+  if (!resp.ok || !data || data.status !== 0) {
+    const message = serverMessage || ('加载历史失败: HTTP ' + resp.status);
+    throw new Error(message);
+  }
+  const history = data && data.history && typeof data.history === 'object' ? data.history : {};
+  return {
+    records: Array.isArray(data.data) ? data.data : [],
+    history: {
+      hasMore: !!history.hasMore,
+      beforeTimeline: toChatTimestamp(history.beforeTimeline || ''),
+      beforeId: Number.isFinite(Number(history.beforeId)) && Number(history.beforeId) > 0 ? Number(history.beforeId) : 0
+    }
+  };
+}
+
+async function performReloadColdHistoryChat(chatId, opts) {
+  const resolvedChatId = String(chatId || '').trim();
+  const options = opts || {};
+  const silent = !!options.silent;
+  const prepend = !!options.prepend;
+  const requestedLimit = Math.max(1, Number(options.limit) || COLD_HISTORY_RECORD_PAGE);
+  const chat = state.chats[resolvedChatId];
+  if (!resolvedChatId || !chat) return { ok: false, added: 0, hasMore: false };
+  const mutationToken = getChatConversationMutationToken(resolvedChatId);
+  let lockShown = false;
+  const uiLockDesc = String(options.uiLockDesc || '').trim();
+  const uiLockAlreadyHeld = !!options.uiLockAlreadyHeld;
+  if (prepend) {
+    setChatHistoryLock(true, '正在加载更早的对话内容并同步毛玻璃效果');
+    lockShown = true;
+  } else if (uiLockDesc && !uiLockAlreadyHeld) {
+    setChatHistoryLock(true, uiLockDesc);
+    lockShown = true;
+  }
+  try {
+    const payload = await fetchColdHistoryRecords(resolvedChatId, options);
+    if (isChatConversationMutationStale(resolvedChatId, mutationToken)) {
+      return { ok: false, added: 0, hasMore: false, cleared: true };
+    }
+    const records = Array.isArray(payload.records) ? payload.records : [];
+    const historyMessages = buildColdHistoryMessages(records);
+    updateChatHistoryCursor(chat, payload.history.beforeTimeline, payload.history.beforeId, payload.history.hasMore);
+    let added = 0;
+    if (prepend) {
+      if (historyMessages.length > 0) {
+        const container = document.getElementById('chatContainer');
+        const oldHeight = container ? container.scrollHeight : 0;
+        const oldTop = container ? container.scrollTop : 0;
+        chat.messages = historyMessages.concat(Array.isArray(chat.messages) ? chat.messages : []);
+        normalizeLoadedChat(chat);
+        const visibleMessages = historyMessages.filter(shouldRenderMessageInCenter);
+        if (container && state.activeChat === resolvedChatId) {
+          const frag = document.createDocumentFragment();
+          const insertedNodes = [];
+          visibleMessages.forEach(message => {
+            const node = createMessageNode(message, { deferRich: true });
+            if (!node) return;
+            node._messageData = message;
+            insertedNodes.push(node);
+            frag.appendChild(node);
+          });
+          if (frag.childNodes.length) {
+            container.insertBefore(frag, container.firstChild);
+            state.displayedCount += insertedNodes.length;
+            setInstantScrollTop(container, oldTop + (container.scrollHeight - oldHeight));
+            scheduleRichMessageUpgrade(insertedNodes);
+            if (!isLowPowerRenderingEnabled()) {
+              await waitForRichMessageUpgradeFlush();
+              await waitForAnimationFrames(2);
+            }
+            scheduleChatScrollControlsSync();
+          } else {
+            renderMessages();
+          }
+        }
+        added = visibleMessages.length;
+      }
+    } else {
+      chat.messages = historyMessages.slice();
+      chat.cliCommandHistory = [];
+      clearChatTaskBadges(resolvedChatId);
+      clearChatFooterInlineHint(resolvedChatId);
+      clearCliSubPanel();
+      const latestRecord = records.length ? records[records.length - 1] : null;
+      updateChatColdHistoryTail(
+        chat,
+        latestRecord && latestRecord.createdAt,
+        latestRecord && latestRecord.id
+      );
+      normalizeLoadedChat(chat);
+      added = historyMessages.filter(shouldRenderMessageInCenter).length;
+    }
+    const latestUser = [...(Array.isArray(chat.messages) ? chat.messages : [])].reverse().find(msg => msg && msg.role === 'user');
+    if (latestUser && normalizeMessageText(latestUser.content)) chat.lastMsg = latestUser.content;
+    saveChats();
+    if (state.activeChat === resolvedChatId) {
+      if (!prepend) {
+        renderMessages({ forceScroll: true });
+        syncChatTaskBadgeUI({ animateEnter: false });
+      }
+      renderChatList();
+    }
+    if (!silent && !prepend && records.length > 0) {
+      vfsShowUploadToast(`已恢复最近 ${requestedLimit} 条，更早内容向上滚动继续加载`, false, { placement: 'vfs' });
+    }
+    return { ok: true, added, hasMore: !!chat.historyHasMore };
+  } catch (e) {
+    if (!silent) vfsShowUploadToast('加载失败: ' + e.message, true, { placement: 'vfs' });
+    return { ok: false, added: 0, hasMore: false };
+  } finally {
+    if (lockShown) setChatHistoryLock(false);
   }
 }
 
 function reloadChatRecords(chatId, opts) {
-  const previous = restoreReloadQueue[chatId] || Promise.resolve();
-  const task = previous
-    .catch(() => {})
-    .then(() => performReloadChatRecords(chatId, opts));
-  restoreReloadQueue[chatId] = task.finally(() => {
-    if (restoreReloadQueue[chatId] === task) delete restoreReloadQueue[chatId];
-  });
-  return task;
+  return enqueueChatRestoreTask(chatId, () => performReloadChatRecords(chatId, opts));
+}
+
+function reloadColdHistoryChat(chatId, opts) {
+  return enqueueChatRestoreTask(chatId, () => performReloadColdHistoryChat(chatId, opts));
+}
+
+function reloadVisibleChatRecords(chatId, opts) {
+  if (shouldUseColdHistoryRestore(chatId, opts)) {
+    return reloadColdHistoryChat(chatId, opts);
+  }
+  return reloadChatRecords(chatId, opts);
 }
 
 function canAutoReloadChat(chatId) {
@@ -35844,10 +36264,12 @@ function scheduleSwitchedChatAutoReload(chatId, options) {
   const reloadOptions = opts.reloadOptions && typeof opts.reloadOptions === 'object'
     ? { ...opts.reloadOptions }
     : {};
+  const holdUiLockDesc = String(opts.holdUiLockDesc || '').trim();
   if (switchedChatAutoReloadTimer) {
     clearTimeout(switchedChatAutoReloadTimer);
     switchedChatAutoReloadTimer = 0;
   }
+  if (!holdUiLockDesc) releaseSwitchedChatAutoReloadLock();
   if (!resolvedChatId) return;
   const delay = Math.max(0, Number(opts.delayMs) || 120);
   const maxRetries = Math.max(0, Number(opts.maxRetries) || 6);
@@ -35856,25 +36278,38 @@ function scheduleSwitchedChatAutoReload(chatId, options) {
   let attempts = 0;
   const run = async () => {
     if (switchedChatAutoReloadTimer) switchedChatAutoReloadTimer = 0;
-    if (state.activeChat !== resolvedChatId) return;
-    if (seq !== switchedChatAutoReloadSeq) return;
+    if (state.activeChat !== resolvedChatId) {
+      releaseSwitchedChatAutoReloadLock();
+      return;
+    }
+    if (seq !== switchedChatAutoReloadSeq) {
+      releaseSwitchedChatAutoReloadLock();
+      return;
+    }
     if (agentSelectOverlayVisible || isChatBusy(resolvedChatId) || isChatSendDispatching(resolvedChatId) || isChatCancelling(resolvedChatId)) {
       attempts += 1;
       if (attempts > maxRetries) {
+        releaseSwitchedChatAutoReloadLock();
         return;
       }
       switchedChatAutoReloadTimer = window.setTimeout(run, retryDelay);
       return;
     }
-    await reloadChatRecords(resolvedChatId, {
-      silent: false,
-      suppressSuccessToast: true,
-      passiveUi: true,
-      showNoDataTip: true,
-      toastPlacement: 'vfs',
-      noDataTipPlacement: 'vfs',
-      ...reloadOptions
-    });
+    try {
+      await reloadVisibleChatRecords(resolvedChatId, {
+        silent: false,
+        suppressSuccessToast: true,
+        passiveUi: true,
+        showNoDataTip: true,
+        toastPlacement: 'vfs',
+        noDataTipPlacement: 'vfs',
+        uiLockDesc: holdUiLockDesc || reloadOptions.uiLockDesc || '',
+        uiLockAlreadyHeld: !!(holdUiLockDesc && switchedChatAutoReloadLockActive),
+        ...reloadOptions
+      });
+    } finally {
+      releaseSwitchedChatAutoReloadLock();
+    }
   };
   switchedChatAutoReloadTimer = window.setTimeout(run, delay);
 }
@@ -35885,7 +36320,7 @@ async function autoReloadChatIfIdle(chatId, options) {
   if (!resolvedChatId) return { ok: false, skipped: true };
   if (opts.requireVisible && document.visibilityState !== 'visible') return { ok: false, skipped: true };
   if (!canAutoReloadChat(resolvedChatId)) return { ok: false, skipped: true };
-  return reloadChatRecords(resolvedChatId, {
+  return reloadVisibleChatRecords(resolvedChatId, {
     silent: true,
     suppressSuccessToast: true,
     passiveUi: true,
@@ -35949,7 +36384,10 @@ async function confirmReloadChat() {
   const chatId = state.activeChat;
   if (!chatId) { vfsShowUploadToast('请先选择会话', true); return; }
   if (isChatBusy(chatId) || isChatSendDispatching(chatId)) { vfsShowUploadToast('当前会话正在响应中', true); return; }
-  await reloadChatRecords(chatId, { silent: false });
+  await reloadVisibleChatRecords(chatId, {
+    silent: false,
+    uiLockDesc: '正在恢复会话内容'
+  });
 }
 
 function isSettingsCopyTransitionLocked() {
@@ -44187,7 +44625,14 @@ function tlViewDo() {
     switchChat(id);
     renderChatList();
     setTimeout(() => {
-      reloadChatRecords(id, { silent: false, suppressSuccessToast: true, memoViewTimeline: execTs, memoRecovery: getMemoViewRecovery(id) });
+      reloadVisibleChatRecords(id, {
+        silent: false,
+        suppressSuccessToast: true,
+        memoViewTimeline: execTs,
+        memoRecovery: getMemoViewRecovery(id),
+        uiLockDesc: '正在恢复会话内容',
+        uiLockAlreadyHeld: true
+      });
     }, 80);
     return;
   }

@@ -9256,6 +9256,216 @@ func handleCronDetailStatus() http.HandlerFunc {
 	}
 }
 
+type restoreRecord struct {
+	ID           int    `json:"id"`
+	AgentID      string `json:"agentId"`
+	ChatID       string `json:"chatId"`
+	ChatType     string `json:"chatType"`
+	Role         string `json:"role"`
+	ResponseType string `json:"responseType"`
+	Content      string `json:"content"`
+	LogType      int    `json:"logType,omitempty"`
+	CreatedAt    string `json:"createdAt"`
+}
+
+type restoreHistoryMeta struct {
+	HasMore        bool   `json:"hasMore"`
+	BeforeTimeline string `json:"beforeTimeline,omitempty"`
+	BeforeID       int    `json:"beforeId,omitempty"`
+}
+
+func normalizeRestoreRecord(rec *restoreRecord) {
+	if rec == nil {
+		return
+	}
+	rec.ChatType = normalizeChatType(rec.ChatType)
+	rec.ResponseType = normalizeResponseType(rec.ResponseType)
+}
+
+func restoreRecordBeforeCursor(rec restoreRecord, beforeTimeline string, beforeID int) bool {
+	if strings.TrimSpace(beforeTimeline) == "" {
+		return true
+	}
+	if rec.CreatedAt < beforeTimeline {
+		return true
+	}
+	if rec.CreatedAt > beforeTimeline {
+		return false
+	}
+	if beforeID > 0 {
+		return rec.ID < beforeID
+	}
+	return false
+}
+
+func restoreRecordAfterCursor(rec restoreRecord, timeline string, lastID int) bool {
+	if strings.TrimSpace(timeline) == "" {
+		return true
+	}
+	if rec.CreatedAt > timeline {
+		return true
+	}
+	if rec.CreatedAt < timeline {
+		return false
+	}
+	if lastID > 0 {
+		return rec.ID > lastID
+	}
+	return false
+}
+
+func queryRestoreForwardRecords(agentID, chatID, timeline string, lastID int) ([]restoreRecord, error) {
+	if cronDB == nil {
+		return nil, fmt.Errorf("db not ready")
+	}
+	query := `SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at FROM chat_log WHERE chat_id = ? AND created_at > ? ORDER BY id`
+	args := []interface{}{chatID, timeline}
+	if strings.TrimSpace(agentID) != "" {
+		query = `SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at FROM chat_log WHERE agent_id = ? AND chat_id = ? AND created_at > ? ORDER BY id`
+		args = []interface{}{agentID, chatID, timeline}
+	}
+	if lastID > 0 {
+		query = `SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at FROM chat_log WHERE chat_id = ? AND (created_at > ? OR (created_at = ? AND id > ?)) ORDER BY id`
+		args = []interface{}{chatID, timeline, timeline, lastID}
+		if strings.TrimSpace(agentID) != "" {
+			query = `SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at FROM chat_log WHERE agent_id = ? AND chat_id = ? AND (created_at > ? OR (created_at = ? AND id > ?)) ORDER BY id`
+			args = []interface{}{agentID, chatID, timeline, timeline, lastID}
+		}
+	}
+	rows, err := cronDB.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	records := make([]restoreRecord, 0)
+	for rows.Next() {
+		var rec restoreRecord
+		if err := rows.Scan(&rec.ID, &rec.AgentID, &rec.ChatID, &rec.ChatType, &rec.Role, &rec.ResponseType, &rec.Content, &rec.CreatedAt); err != nil {
+			return nil, err
+		}
+		normalizeRestoreRecord(&rec)
+		records = append(records, rec)
+	}
+	return records, rows.Err()
+}
+
+func appendRestoreCLIRecords(records []restoreRecord, entries []eventLogEntry) []restoreRecord {
+	if len(entries) == 0 {
+		return records
+	}
+	for _, item := range entries {
+		rec := restoreRecord{
+			ID:           item.ID,
+			AgentID:      item.AgentID,
+			ChatID:       item.ChatID,
+			ChatType:     chatTypePageSession,
+			ResponseType: "normal",
+			Content:      item.Content,
+			LogType:      item.LogType,
+			CreatedAt:    item.CreatedAt,
+		}
+		if item.LogType == logTypeCLIGet {
+			rec.Role = "cli/get"
+		} else {
+			rec.Role = "cli/pub"
+		}
+		records = append(records, rec)
+	}
+	return records
+}
+
+func sortRestoreRecords(records []restoreRecord) {
+	sort.Slice(records, func(i, j int) bool {
+		if records[i].CreatedAt == records[j].CreatedAt {
+			return records[i].ID < records[j].ID
+		}
+		return records[i].CreatedAt < records[j].CreatedAt
+	})
+}
+
+func queryRestoreHistoryRecords(agentID, chatID, beforeTimeline string, beforeID, limit int) ([]restoreRecord, *restoreHistoryMeta, error) {
+	if cronDB == nil {
+		return nil, nil, fmt.Errorf("db not ready")
+	}
+	if limit <= 0 {
+		limit = 120
+	}
+	trimmedAgentID := strings.TrimSpace(agentID)
+	trimmedChatID := strings.TrimSpace(chatID)
+	trimmedBeforeTimeline := strings.TrimSpace(beforeTimeline)
+
+	query := `SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at FROM chat_log WHERE chat_id = ?`
+	args := []interface{}{trimmedChatID}
+	if trimmedAgentID != "" {
+		query = `SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at FROM chat_log WHERE agent_id = ? AND chat_id = ?`
+		args = []interface{}{trimmedAgentID, trimmedChatID}
+	}
+	if trimmedBeforeTimeline != "" {
+		if beforeID > 0 {
+			query += ` AND (created_at < ? OR (created_at = ? AND id < ?))`
+			args = append(args, trimmedBeforeTimeline, trimmedBeforeTimeline, beforeID)
+		} else {
+			query += ` AND created_at < ?`
+			args = append(args, trimmedBeforeTimeline)
+		}
+	}
+	query += ` ORDER BY created_at, id`
+
+	rows, err := cronDB.Query(query, args...)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+
+	allRecords := make([]restoreRecord, 0)
+	for rows.Next() {
+		var rec restoreRecord
+		if err := rows.Scan(&rec.ID, &rec.AgentID, &rec.ChatID, &rec.ChatType, &rec.Role, &rec.ResponseType, &rec.Content, &rec.CreatedAt); err != nil {
+			return nil, nil, err
+		}
+		normalizeRestoreRecord(&rec)
+		allRecords = append(allRecords, rec)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, err
+	}
+
+	entries, err := queryEventLogs(trimmedAgentID, trimmedChatID, logTypeCLIGet, logTypeCLIPub)
+	if err != nil {
+		return nil, nil, err
+	}
+	filtered := make([]eventLogEntry, 0, len(entries))
+	for _, item := range entries {
+		rec := restoreRecord{ID: item.ID, CreatedAt: item.CreatedAt}
+		if !restoreRecordBeforeCursor(rec, trimmedBeforeTimeline, beforeID) {
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+	allRecords = appendRestoreCLIRecords(allRecords, filtered)
+
+	sortRestoreRecords(allRecords)
+	if len(allRecords) == 0 {
+		return []restoreRecord{}, &restoreHistoryMeta{HasMore: false}, nil
+	}
+
+	start := 0
+	if len(allRecords) > limit {
+		start = len(allRecords) - limit
+	}
+	for start > 0 && allRecords[start].Role != "Q" {
+		start--
+	}
+	records := append([]restoreRecord(nil), allRecords[start:]...)
+	meta := &restoreHistoryMeta{HasMore: start > 0}
+	if meta.HasMore && len(records) > 0 {
+		meta.BeforeTimeline = records[0].CreatedAt
+		meta.BeforeID = records[0].ID
+	}
+	return records, meta, nil
+}
+
 func handleRestore() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -9266,7 +9476,8 @@ func handleRestore() http.HandlerFunc {
 		chatID := r.URL.Query().Get("chat")
 		timeline := r.URL.Query().Get("timeline")
 		lastIDStr := r.URL.Query().Get("lastId")
-		if chatID == "" || timeline == "" {
+		historyMode := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("history")), "1") || strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("history")), "true")
+		if chatID == "" || (!historyMode && timeline == "") {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "chat and timeline are required"})
 			return
@@ -9282,78 +9493,53 @@ func handleRestore() http.HandlerFunc {
 			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "db not ready"})
 			return
 		}
-		query := `SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at FROM chat_log WHERE chat_id = ? AND created_at > ? ORDER BY id`
-		args := []interface{}{chatID, timeline}
-		if strings.TrimSpace(agentID) != "" {
-			query = `SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at FROM chat_log WHERE agent_id = ? AND chat_id = ? AND created_at > ? ORDER BY id`
-			args = []interface{}{agentID, chatID, timeline}
-		}
-		if lastID > 0 {
-			query = `SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at FROM chat_log WHERE chat_id = ? AND (created_at > ? OR (created_at = ? AND id > ?)) ORDER BY id`
-			args = []interface{}{chatID, timeline, timeline, lastID}
-			if strings.TrimSpace(agentID) != "" {
-				query = `SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at FROM chat_log WHERE agent_id = ? AND chat_id = ? AND (created_at > ? OR (created_at = ? AND id > ?)) ORDER BY id`
-				args = []interface{}{agentID, chatID, timeline, timeline, lastID}
+
+		if historyMode {
+			beforeTimeline := r.URL.Query().Get("beforeTimeline")
+			beforeID := 0
+			if raw := strings.TrimSpace(r.URL.Query().Get("beforeId")); raw != "" {
+				if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+					beforeID = parsed
+				}
 			}
+			limit := 120
+			if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+				if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+					limit = parsed
+				}
+			}
+			records, history, err := queryRestoreHistoryRecords(agentID, chatID, beforeTimeline, beforeID, limit)
+			if err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "query error: " + err.Error()})
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 0, "data": records, "history": history})
+			return
 		}
-		rows, err := cronDB.Query(query, args...)
+
+		records, err := queryRestoreForwardRecords(agentID, chatID, timeline, lastID)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "query error: " + err.Error()})
 			return
 		}
-		defer rows.Close()
-		type Record struct {
-			ID           int    `json:"id"`
-			AgentID      string `json:"agentId"`
-			ChatID       string `json:"chatId"`
-			ChatType     string `json:"chatType"`
-			Role         string `json:"role"`
-			ResponseType string `json:"responseType"`
-			Content      string `json:"content"`
-			LogType      int    `json:"logType,omitempty"`
-			CreatedAt    string `json:"createdAt"`
-		}
-		var records []Record
-		for rows.Next() {
-			var rec Record
-			rows.Scan(&rec.ID, &rec.AgentID, &rec.ChatID, &rec.ChatType, &rec.Role, &rec.ResponseType, &rec.Content, &rec.CreatedAt)
-			rec.ChatType = normalizeChatType(rec.ChatType)
-			rec.ResponseType = normalizeResponseType(rec.ResponseType)
-			records = append(records, rec)
-		}
 		entries, err := queryEventLogs(agentID, chatID, logTypeCLIGet, logTypeCLIPub)
 		if err == nil {
+			filtered := make([]eventLogEntry, 0, len(entries))
 			for _, item := range entries {
-				if !(item.CreatedAt > timeline || (lastID <= 0 && item.CreatedAt > timeline)) {
+				rec := restoreRecord{ID: item.ID, CreatedAt: item.CreatedAt}
+				if !restoreRecordAfterCursor(rec, timeline, lastID) {
 					continue
 				}
-				rec := Record{
-					ID:           item.ID,
-					AgentID:      item.AgentID,
-					ChatID:       item.ChatID,
-					ChatType:     chatTypePageSession,
-					ResponseType: "normal",
-					Content:      item.Content,
-					LogType:      item.LogType,
-					CreatedAt:    item.CreatedAt,
-				}
-				if item.LogType == logTypeCLIGet {
-					rec.Role = "cli/get"
-				} else {
-					rec.Role = "cli/pub"
-				}
-				records = append(records, rec)
+				filtered = append(filtered, item)
 			}
+			records = appendRestoreCLIRecords(records, filtered)
 		}
-		sort.Slice(records, func(i, j int) bool {
-			if records[i].CreatedAt == records[j].CreatedAt {
-				return records[i].ID < records[j].ID
-			}
-			return records[i].CreatedAt < records[j].CreatedAt
-		})
+		sortRestoreRecords(records)
 		if records == nil {
-			records = []Record{}
+			records = []restoreRecord{}
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{"status": 0, "data": records})

@@ -1,14 +1,9 @@
 package ai.deepright.cli;
 
-import static org.springframework.util.StringUtils.hasText;
-
-
-
-import ai.open.right.protocol.ProtocolCode;
-
 import ai.open.right.WorkflowException;
-
+import ai.open.right.protocol.ProtocolCode;
 import lombok.*;
+import org.apache.commons.lang3.StringUtils;
 
 @Builder
 @Getter
@@ -16,6 +11,8 @@ import lombok.*;
 @AllArgsConstructor
 @NoArgsConstructor
 public class CliSubData {
+
+    protected Long created = System.currentTimeMillis();
 
     protected CliSubOps subOps;
 
@@ -47,10 +44,10 @@ public class CliSubData {
     protected Long ddl;
 
     public CliSubData check() throws Exception {
+        WorkflowException.check(StringUtils.isEmpty(this.router), "The device can not be empty", ProtocolCode.C400);
         WorkflowException.check(this.subOps == null, "The sub ops can not be empty", ProtocolCode.C400);
-        WorkflowException.check(!hasText(this.router), "The device can not be empty", ProtocolCode.C400);
         WorkflowException.check(this.unwind == null, "The unwind can not be empty", ProtocolCode.C400);
-        WorkflowException.check(!hasText(this.cmd), "The cmd can not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.cmd), "The cmd can not be empty", ProtocolCode.C400);
         WorkflowException.check(this.ddl == null, "The ddl can not be empty", ProtocolCode.C400);
         return this;
     }

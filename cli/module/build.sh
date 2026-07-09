@@ -872,6 +872,8 @@ package_windows_wsl2_launcher() {
   copy_release_asset "$MODULE_DIR/build/install.bat" "$target_release_dir/install.bat"
   copy_release_asset "$MODULE_DIR/build/start.bat" "$target_release_dir/start.bat"
   copy_release_asset "$MODULE_DIR/build/install.ps1" "$target_release_dir/install.ps1"
+  copy_release_asset "$MODULE_DIR/build/uninstall.bat" "$target_release_dir/uninstall.bat"
+  copy_release_asset "$MODULE_DIR/build/uninstall.ps1" "$target_release_dir/uninstall.ps1"
   copy_release_asset "$MODULE_DIR/build/USER_GUIDE.txt" "$target_release_dir/USER_GUIDE.txt"
   build_windows_app_icon "$SITE_DIR/icon_white_bg.png" "$target_release_dir/DeepRight.ico"
   rm -f "$target_release_dir/install-wsl2.ps1" "$target_release_dir/install-wsl2.cmd"

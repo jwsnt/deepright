@@ -8,6 +8,7 @@ The generated `.exe` is meant to be a self-extracting launcher:
 
 - first run: extract payload, run `install.bat`, complete WSL2 installation, then start DeepRight
 - later runs: extract check is reused by payload hash, and the launcher prefers `start.bat` when the local sentinel and WSL distro are healthy
+- a separate uninstaller build extracts a minimal payload and runs `uninstall.bat`
 
 ## Why a new build path
 
@@ -29,8 +30,9 @@ This wrapper keeps that behavior unchanged and adds a separate packaging layer o
 2. copy the selected target payload into a temporary staging directory
 3. zip the staged payload
 4. copy `main.go.tmpl` into a temporary Go package as `main.go`
-5. place `payload.zip` beside it
-6. cross-compile the wrapper as a Windows `.exe`
+5. generate `config.go` with launcher-specific behavior
+6. place `payload.zip` beside it
+7. cross-compile the wrapper as a Windows `.exe`
 
 ## Runtime flow
 
@@ -40,11 +42,11 @@ When the generated `.exe` runs on Windows:
 2. choose a stable extraction directory under the user cache directory
 3. reuse the directory if the payload hash marker matches and required files exist
 4. otherwise remove stale content and extract the payload again
-5. in default auto mode:
-   - run `start.bat` when `C:\ProgramData\deepright\.deepright_installed` exists and `wsl.exe -d deepright -- echo ok` succeeds
-   - otherwise run `install.bat`
+5. launcher-specific default behavior:
+   - installer: run `start.bat` when `C:\ProgramData\deepright\.deepright_installed` exists and `wsl.exe -d deepright -- echo ok` succeeds, otherwise run `install.bat`
+   - uninstaller: run `uninstall.bat`
 
-`install.bat` then keeps using the existing `install.ps1` logic, so WSL installation remains authoritative in one place.
+`install.bat` then keeps using the existing `install.ps1` logic, so WSL installation remains authoritative in one place. `uninstall.bat` similarly delegates to `uninstall.ps1` so the full Windows/WSL cleanup stays in one script.
 
 ## Design constraints
 
