@@ -11,7 +11,7 @@
 - 构建、分发、首次安装与运行时调用链
 - 哪些能力可以等价实现，哪些只能近似实现，哪些无法 1:1 复制
 
-与 `cli/module/cli-get/sandbox/mac/DESIGN.md` 不同，本文档描述的是**目标设计**，不是当前仓库里已经落地的代码。
+与 mac 文档不同，本文档的 **runner/helper 落地部分仍是 WSL 目标设计**；但本文档约束的上层契约已经与当前仓库实现对齐，尤其是 chat 维度的 `mode + allowedDir` 状态模型、prime 语义，以及执行时必须重新注入 `--allowed-dir` 的要求。
 
 建议后续实现优先新增以下文件：
 
@@ -173,7 +173,7 @@ const (
 
 1. **integration 会话控制层**
    - 和 mac 版一致
-   - 负责记录 `agentId + chatId -> sandbox mode`
+   - 负责记录 `chatId -> sandbox mode + allowedDir`
    - 负责 prime 目录授权
 
 2. **cli-get 调度层**
@@ -438,18 +438,20 @@ helper 内部的次级日志建议位于 WSL：
      - `\\wsl$\<distro>\...` UNC 路径
    - 归一化
    - 校验目录存在
-   - 写入缓存
    - 返回
 
 2. 如果没有 `--allowed-dir`
-   - 若未设置 `CLI_SANDBOX_FORCE_PICK`
-     - 优先读取缓存
-   - 如果缓存不存在或要求强制重选
-     - 调用目录选择器
-     - 目录选择窗口最长等待 **60 秒**
-     - 校验目录存在
-     - 归一化
-     - 写入缓存
+   - 直接调用目录选择器
+   - 目录选择窗口最长等待 **60 秒**
+   - 校验目录存在
+   - 归一化
+   - 返回
+
+当前实现已经移除 helper 本地“最后一次目录”回退。
+真正参与执行的目录只能来自：
+
+- 当前 chat 显式透传的 `allowedDir`
+- 当前这一次 picker 交互的返回值
 
 ### 8.5 目录选择器后端
 
@@ -474,6 +476,54 @@ explicit -> cache -> windows picker -> wslg picker -> fail
 ```
 
 当前实现建议把 Windows picker 与 WSLg picker 的单次等待时间统一限制为 **60 秒**，超时后返回目录授权失败，而不是无限阻塞。
+
+### 8.5.1 取消语义与 fallback 终止规则
+
+WSL 目录选择链路在实现上可能由多个进程串起来，例如：
+
+- `CLI_SANDBOX`
+- `CLI_SANDBOX_PICKER_LAUNCHER`
+- `CLI_SANDBOX_PICKER.exe`
+
+这条链路必须把“用户取消”定义成一个**明确且可透传的终止信号**，而不是普通失败。
+
+推荐约定如下：
+
+1. 最内层 picker
+   - 用户点击取消时直接 `exit 1`
+   - 不输出业务错误文本
+
+2. launcher
+   - 如果收到内层 picker 的“取消”，自己也应直接 `exit 1`
+   - 不应把 `canceled`、`picker canceled` 之类文本写到 `stderr`
+   - 不应在原生 picker 取消后再自动切到 PowerShell picker
+
+3. helper
+   - 调用 launcher 时，只要识别到“取消”，就直接返回 `CLI_SANDBOX权限拒绝`
+   - 不再继续 fallback 到 PowerShell 或其他后端
+
+这样做的原因是：
+
+- 用户已经明确点了“取消”，语义上本次授权流程应立即结束
+- 如果继续 fallback 到第二个后端，容易出现“先关闭第一个 picker，随后又弹出第二个 picker”的问题
+- 第二个 picker 可能不在最前台，用户会感知为“窗口消失了但流程还卡着”
+
+因此在 WSL 实现里，**“取消”必须短路整条 picker fallback 链**。
+
+### 8.5.2 mixed-version 兼容
+
+发布过程中可能出现以下短暂状态：
+
+- 只更新了 `CLI_SANDBOX`
+- `CLI_SANDBOX_PICKER_LAUNCHER` 还是旧版本
+- 不同 mode 目录中的 helper / launcher / picker 版本不一致
+
+因此 helper 侧建议额外兼容一层旧输出：
+
+- 如果子进程是 `exit 1` 且输出为空，视为取消
+- 如果子进程是 `exit 1` 且输出为 `canceled` 或 `picker canceled`，也视为取消
+
+这不是为了长期保留多套协议，而是为了避免发布窗口内因为版本不一致，把“取消”误判成普通错误，继而错误触发第二个 fallback picker。
 
 ### 8.6 为什么建议默认用 Windows picker
 
@@ -537,6 +587,8 @@ Windows runner 需要过滤的噪音与 mac 不同，重点应是：
 
 - runner 负责 UI，必须能独立记住上次授权目录
 - helper 也要支持被直接调试运行
+
+但这两层缓存都不是 chat 维度的权威状态。真正的权威状态应继续放在 `cli_sandbox_state`，并由上层在每次执行任务时把当前 chat 的 `allowedDir` 显式重新注入给 runner / helper。
 
 ### 9.2 Windows runner 缓存位置
 
@@ -1016,29 +1068,32 @@ printf "a\nb\n" | CLI_SANDBOX.exe --mode net --cmd "cat - | wc -l"
 
 ### 15.1 会话存储模型
 
-建议继续复用当前 SQLite 表，只记录模式，不记录目录路径：
+上层契约应与当前 mac / integration / proxy / cli-get 的实现保持一致：`cli_sandbox_state` 直接保存 chat 维度的完整状态，而不是只记 mode。
 
 ```sql
 CREATE TABLE cli_sandbox_state (
-    agent_id TEXT NOT NULL,
     chat_id TEXT NOT NULL DEFAULT '',
     sandbox_exe TEXT NOT NULL DEFAULT '',
+    allowed_dir TEXT NOT NULL DEFAULT '',
     updated_at TEXT NOT NULL,
-    PRIMARY KEY (agent_id, chat_id)
+    PRIMARY KEY (chat_id)
 )
 ```
 
-这与 mac 一样：
+这意味着：
 
-- 模式入库
-- 目录授权只保存在本地
+- `chatId` 是唯一键
+- `sandbox_exe` 表示 `filepick` / `net` / `filepick_net`
+- `allowed_dir` 表示当前 chat 最近一次成功确认后的目录
+- runner / helper 的本地缓存只是辅助缓存，不是跨 chat 的真相
 
-### 15.2 为什么目录仍不应入库
+### 15.2 为什么目录也必须入库
 
-原因和 mac 完全一致：
+原因和 mac 完全一致，而且在 WSL 上更明显：
 
-- 模式是业务状态
-- 目录是本机授权状态
+- 用户可能在多个 chat 之间来回切换
+- 每个 chat 可以绑定不同目录
+- helper 本地缓存只能记住“上一次选中的目录”，无法代表“当前这个 chat 应该恢复哪个目录”
 
 尤其在 WSL 下，目录还可能同时有：
 
@@ -1046,7 +1101,7 @@ CREATE TABLE cli_sandbox_state (
 - Linux 路径
 - UNC 路径
 
-更不适合塞进业务数据库。
+如果不把 chat 维度的目录状态落库，串话风险只会更高。建议数据库里保存上层权威目录，runner / helper 自己再维护本地缓存用于少弹窗和直接调试。
 
 ### 15.3 prime 目录授权
 
@@ -1057,16 +1112,17 @@ CREATE TABLE cli_sandbox_state (
 - 有 `dir` 时：
   - 直接写入目录缓存
 
-只有 prime 成功，才把模式写入 SQLite。
+只有 prime 成功，才把 `mode + allowedDir` 一起写入 SQLite。
 
 ### 15.4 执行时机
 
 执行命令时：
 
-1. `cli-get` 查询会话模式
+1. `cli-get` 查询当前 chat 的完整状态
 2. 解析 WSL runner 路径
 3. 调用 Windows `CLI_SANDBOX.exe`
-4. 由它进入目标 WSL 发行版执行 helper
+4. 如果状态里有 `allowedDir`，显式追加 `--allowed-dir <dir>`
+5. 由它进入目标 WSL 发行版执行 helper
 
 ## 16. 目录授权状态机
 
@@ -1084,6 +1140,18 @@ CREATE TABLE cli_sandbox_state (
 7. runner 把 Linux 路径同步给 helper 缓存
 8. helper 使用该目录构造 `bubblewrap` 参数
 9. 后续命令复用缓存目录
+
+其中“取消”分支需要额外满足：
+
+- 一旦用户在首个 picker 中点击取消，本次授权流程立即结束
+- 不再继续 fallback 到 PowerShell picker、WSLg picker 或其他后端
+- 返回语义按权限拒绝处理，而不是“无可用 picker”或普通执行错误
+
+这样可以避免：
+
+- 关闭第一个 picker 后又自动弹第二个 picker
+- 第二个 picker 不在最前台，导致用户误以为窗口丢失
+- 目录授权流程在用户已取消的情况下继续占用 60 秒等待时间
 
 失败分支建议包括：
 
@@ -1168,7 +1236,7 @@ CREATE TABLE cli_sandbox_state (
    - `filepick_net`
 
 2. **会话级开关**
-   - `agentId + chatId -> sandbox mode`
+   - `chatId -> sandbox mode + allowedDir`
 
 3. **命令行执行接口**
    - `--cmd`

@@ -8705,6 +8705,9 @@ func TestProxyHandleSandboxPersistsByAgentAndChat(t *testing.T) {
 		sharedDataDB = pooledDB{}
 	}()
 	proxy := &ProxyServer{}
+	oldPrimeSandbox := proxyPrimeSandboxModeFn
+	proxyPrimeSandboxModeFn = func(string) (string, error) { return "", nil }
+	defer func() { proxyPrimeSandboxModeFn = oldPrimeSandbox }()
 
 	readReq := httptest.NewRequest(http.MethodGet, "/api/sandbox_status?chatId=chat-1", nil)
 	readRec := httptest.NewRecorder()
@@ -8814,6 +8817,9 @@ func TestProxyHandleSandboxStatusReadsWithoutWriting(t *testing.T) {
 		sharedDataDB = pooledDB{}
 	}()
 	proxy := &ProxyServer{}
+	oldPrimeSandbox := proxyPrimeSandboxModeFn
+	proxyPrimeSandboxModeFn = func(string) (string, error) { return "", nil }
+	defer func() { proxyPrimeSandboxModeFn = oldPrimeSandbox }()
 
 	writeReq := httptest.NewRequest(http.MethodPost, "/api/sandbox=filepick?agentId=agent-a&chatId=chat-1", nil)
 	writeRec := httptest.NewRecorder()
@@ -8849,6 +8855,184 @@ func TestProxyHandleSandboxStatusReadsWithoutWriting(t *testing.T) {
 	}
 	if stored != sandboxstate.ModeFilePick {
 		t.Fatalf("sandbox_exe = %q, want %q", stored, sandboxstate.ModeFilePick)
+	}
+}
+
+func TestProxyHandleSandboxUsesManualDirectoryWhitelist(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	sharedDataDB = pooledDB{}
+	defer func() {
+		if sharedDataDB.db != nil {
+			_ = sharedDataDB.db.Close()
+		}
+		sharedDataDB = pooledDB{}
+	}()
+	proxy := &ProxyServer{}
+
+	oldPrimeSandboxDir := proxyPrimeSandboxDirectoryFn
+	proxyPrimeSandboxDirectoryFn = func(mode, dir string) (string, error) {
+		if mode != sandboxstate.ModeFilePick {
+			t.Fatalf("mode = %q, want %q", mode, sandboxstate.ModeFilePick)
+		}
+		if dir != "/Users/demo/Desktop" {
+			t.Fatalf("dir = %q, want /Users/demo/Desktop", dir)
+		}
+		return dir, nil
+	}
+	defer func() { proxyPrimeSandboxDirectoryFn = oldPrimeSandboxDir }()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/sandbox=filepick?agentId=agent-a&chatId=chat-1&dir=%2FUsers%2Fdemo%2FDesktop", nil)
+	rec := httptest.NewRecorder()
+	proxy.HandleSandbox(rec, req)
+
+	var payload struct {
+		Status     int    `json:"status"`
+		Sandbox    string `json:"sandbox"`
+		AllowedDir string `json:"allowedDir"`
+		Recorded   bool   `json:"recorded"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode payload: %v", err)
+	}
+	if payload.Status != 0 || payload.Sandbox != sandboxstate.ModeFilePick || payload.AllowedDir != "/Users/demo/Desktop" || !payload.Recorded {
+		t.Fatalf("unexpected payload: %+v", payload)
+	}
+
+	db, err := getDataDB()
+	if err != nil {
+		t.Fatalf("getDataDB: %v", err)
+	}
+	var storedDir string
+	if err := db.QueryRow(`SELECT allowed_dir FROM cli_sandbox_state WHERE chat_id = ?`, "chat-1").Scan(&storedDir); err != nil {
+		t.Fatalf("query sandbox allowed_dir: %v", err)
+	}
+	if storedDir != "/Users/demo/Desktop" {
+		t.Fatalf("allowed_dir = %q, want /Users/demo/Desktop", storedDir)
+	}
+}
+
+func TestProxyHandleSandboxRejectsDirForNetMode(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	sharedDataDB = pooledDB{}
+	defer func() {
+		if sharedDataDB.db != nil {
+			_ = sharedDataDB.db.Close()
+		}
+		sharedDataDB = pooledDB{}
+	}()
+	proxy := &ProxyServer{}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/sandbox=net?agentId=agent-a&chatId=chat-1&dir=%2FUsers%2Fdemo%2FDesktop", nil)
+	rec := httptest.NewRecorder()
+	proxy.HandleSandbox(rec, req)
+
+	var payload struct {
+		Status  int    `json:"status"`
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode payload: %v", err)
+	}
+	if payload.Status != 1 || !strings.Contains(payload.Content, "does not support manual directory whitelist") {
+		t.Fatalf("unexpected payload: %+v", payload)
+	}
+}
+
+func TestPrimeProxySandboxModeUsesHelperOutsideBundleLayout(t *testing.T) {
+	tmp := t.TempDir()
+	argsPath := filepath.Join(tmp, "sandbox-args.txt")
+	envPath := filepath.Join(tmp, "sandbox-env.txt")
+	helperPath := filepath.Join(tmp, "CLI_SANDBOX")
+	helperScript := "#!/bin/sh\n" +
+		"printf '%s\\n' \"$@\" > \"" + argsPath + "\"\n" +
+		"printf '%s\\n' \"$CLI_SANDBOX_FORCE_PICK\" > \"" + envPath + "\"\n"
+	if err := os.WriteFile(helperPath, []byte(helperScript), 0o755); err != nil {
+		t.Fatalf("write helper: %v", err)
+	}
+
+	originalSandboxPathFn := proxySandboxExecutablePathFn
+	proxySandboxExecutablePathFn = func(mode string) (string, error) {
+		if mode != sandboxstate.ModeFilePick {
+			t.Fatalf("mode = %q, want %q", mode, sandboxstate.ModeFilePick)
+		}
+		return helperPath, nil
+	}
+	defer func() { proxySandboxExecutablePathFn = originalSandboxPathFn }()
+
+	if _, err := primeProxySandboxMode(sandboxstate.ModeFilePick); err != nil {
+		t.Fatalf("primeProxySandboxMode: %v", err)
+	}
+
+	argsData, err := os.ReadFile(argsPath)
+	if err != nil {
+		t.Fatalf("read args: %v", err)
+	}
+	if strings.TrimSpace(string(argsData)) != "" {
+		t.Fatalf("args = %q, want empty for pick-only prime", strings.TrimSpace(string(argsData)))
+	}
+
+	envData, err := os.ReadFile(envPath)
+	if err != nil {
+		t.Fatalf("read env: %v", err)
+	}
+	if strings.TrimSpace(string(envData)) != "1" {
+		t.Fatalf("CLI_SANDBOX_FORCE_PICK = %q, want 1", strings.TrimSpace(string(envData)))
+	}
+}
+
+func TestPrimeProxySandboxDirectoryUsesHelperOutsideBundleLayout(t *testing.T) {
+	tmp := t.TempDir()
+	argsPath := filepath.Join(tmp, "sandbox-args.txt")
+	helperPath := filepath.Join(tmp, "CLI_SANDBOX")
+	helperScript := "#!/bin/sh\n" +
+		"printf '%s\\n' \"$@\" > \"" + argsPath + "\"\n"
+	if err := os.WriteFile(helperPath, []byte(helperScript), 0o755); err != nil {
+		t.Fatalf("write helper: %v", err)
+	}
+
+	originalSandboxPathFn := proxySandboxExecutablePathFn
+	proxySandboxExecutablePathFn = func(mode string) (string, error) {
+		if mode != sandboxstate.ModeFilePickNet {
+			t.Fatalf("mode = %q, want %q", mode, sandboxstate.ModeFilePickNet)
+		}
+		return helperPath, nil
+	}
+	defer func() { proxySandboxExecutablePathFn = originalSandboxPathFn }()
+
+	allowedDir, err := primeProxySandboxDirectory(sandboxstate.ModeFilePickNet, "/tmp/workspace")
+	if err != nil {
+		t.Fatalf("primeProxySandboxDirectory: %v", err)
+	}
+	if allowedDir != "/tmp/workspace" {
+		t.Fatalf("allowedDir = %q, want /tmp/workspace", allowedDir)
+	}
+
+	argsData, err := os.ReadFile(argsPath)
+	if err != nil {
+		t.Fatalf("read args: %v", err)
+	}
+	gotArgs := strings.Split(strings.TrimSpace(string(argsData)), "\n")
+	wantArgs := []string{"--allowed-dir", "/tmp/workspace"}
+	if !reflect.DeepEqual(gotArgs, wantArgs) {
+		t.Fatalf("args = %#v, want %#v", gotArgs, wantArgs)
 	}
 }
 
@@ -8890,15 +9074,16 @@ func TestProxySandboxCLIReadsAndWritesSessionState(t *testing.T) {
 		runProxySandboxCLI([]string{"--agentId", "agent-a", "--chatId", "chat-1", "--sandbox", "net"})
 	})
 	var updated struct {
-		Status    int    `json:"status"`
-		Sandbox   string `json:"sandbox"`
-		Recorded  bool   `json:"recorded"`
-		UpdatedAt string `json:"updatedAt"`
+		Status     int    `json:"status"`
+		Sandbox    string `json:"sandbox"`
+		AllowedDir string `json:"allowedDir"`
+		Recorded   bool   `json:"recorded"`
+		UpdatedAt  string `json:"updatedAt"`
 	}
 	if err := json.Unmarshal([]byte(stdout), &updated); err != nil {
 		t.Fatalf("decode updated stdout: %v, raw=%s", err, stdout)
 	}
-	if updated.Status != 0 || updated.Sandbox != sandboxstate.ModeNet || !updated.Recorded || updated.UpdatedAt == "" {
+	if updated.Status != 0 || updated.Sandbox != sandboxstate.ModeNet || updated.AllowedDir != "" || !updated.Recorded || updated.UpdatedAt == "" {
 		t.Fatalf("unexpected updated stdout: %+v", updated)
 	}
 
@@ -8913,6 +9098,67 @@ func TestProxySandboxCLIReadsAndWritesSessionState(t *testing.T) {
 	}
 	if stored != sandboxstate.ModeNet {
 		t.Fatalf("sandbox_exe = %q, want %q", stored, sandboxstate.ModeNet)
+	}
+}
+
+func TestProxySandboxCLIUsesManualDirectoryWhitelist(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	sharedDataDB = pooledDB{}
+	defer func() {
+		if sharedDataDB.db != nil {
+			_ = sharedDataDB.db.Close()
+		}
+		sharedDataDB = pooledDB{}
+	}()
+
+	oldPrimeSandboxDir := proxyPrimeSandboxDirectoryFn
+	proxyPrimeSandboxDirectoryFn = func(mode, dir string) (string, error) {
+		if mode != sandboxstate.ModeFilePick {
+			t.Fatalf("mode = %q, want %q", mode, sandboxstate.ModeFilePick)
+		}
+		if dir != "/Users/demo/Desktop" {
+			t.Fatalf("dir = %q, want /Users/demo/Desktop", dir)
+		}
+		return dir, nil
+	}
+	defer func() { proxyPrimeSandboxDirectoryFn = oldPrimeSandboxDir }()
+
+	stdout := captureProxyStdout(t, func() {
+		runProxySandboxCLI([]string{"--agentId", "agent-a", "--chatId", "chat-1", "--sandbox", "filepick", "--dir", "/Users/demo/Desktop"})
+	})
+	var updated struct {
+		Status     int    `json:"status"`
+		Sandbox    string `json:"sandbox"`
+		AllowedDir string `json:"allowedDir"`
+		Recorded   bool   `json:"recorded"`
+		UpdatedAt  string `json:"updatedAt"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &updated); err != nil {
+		t.Fatalf("decode updated stdout: %v, raw=%s", err, stdout)
+	}
+	if updated.Status != 0 || updated.Sandbox != sandboxstate.ModeFilePick || updated.AllowedDir != "/Users/demo/Desktop" || !updated.Recorded || updated.UpdatedAt == "" {
+		t.Fatalf("unexpected updated stdout: %+v", updated)
+	}
+
+	db, err := getDataDB()
+	if err != nil {
+		t.Fatalf("getDataDB: %v", err)
+	}
+	var storedDir string
+	if err := db.QueryRow(`SELECT allowed_dir FROM cli_sandbox_state WHERE chat_id = ?`, "chat-1").Scan(&storedDir); err != nil {
+		t.Fatalf("query sandbox allowed_dir: %v", err)
+	}
+	if storedDir != "/Users/demo/Desktop" {
+		t.Fatalf("allowed_dir = %q, want /Users/demo/Desktop", storedDir)
 	}
 }
 

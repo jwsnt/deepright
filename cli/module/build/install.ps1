@@ -372,24 +372,25 @@ L_Step "Step 5/7: Verify mirrored networking"
 L_OK ".wslconfig already configured with networkingMode=mirrored"
 
 # ---- Step 6: Tools ----
-L_Step "Step 6/7: Install tools (git, npm, python3)"
+L_Step "Step 6/7: Install tools (git, npm, python3, bubblewrap)"
 
-$needGit  = -not (Test-WslTool "git")
-$needPy   = -not (Test-WslTool "python3")
-$needNode = -not (Test-WslTool "node")
+$needGit   = -not (Test-WslTool "git")
+$needPy    = -not (Test-WslTool "python3")
+$needNode  = -not (Test-WslTool "node")
+$needBwrap = -not (Test-WslTool "bwrap")
 
-if (-not ($needGit -or $needPy -or $needNode)) {
+if (-not ($needGit -or $needPy -or $needNode -or $needBwrap)) {
     L_OK "All tools already installed"
 } else {
     L_Info "Updating apt..."
     & wsl.exe -d $DISTRO_NAME -- bash -c "sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq" 2>&1 | Out-Null
     L_OK "apt updated"
 
-    if ($needGit -or $needPy) {
-        L_Info "Installing git, python3, pip, curl..."
-        $ar = & wsl.exe -d $DISTRO_NAME -- bash -c "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y git python3 python3-pip curl build-essential 2>&1" | Out-String
+    if ($needGit -or $needPy -or $needBwrap) {
+        L_Info "Installing git, python3, pip, curl, bubblewrap..."
+        $ar = & wsl.exe -d $DISTRO_NAME -- bash -c "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y git python3 python3-pip curl build-essential bubblewrap 2>&1" | Out-String
         Add-Content -Path $LOG_FILE -Value "apt: $ar" -Encoding UTF8
-        if ($LASTEXITCODE -eq 0) { L_OK "git, python3, pip, curl installed" } else { L_Warn "Some packages may have failed" }
+        if ($LASTEXITCODE -eq 0) { L_OK "git, python3, pip, curl, bubblewrap installed" } else { L_Warn "Some packages may have failed" }
     }
 
     if ($needNode) {
@@ -406,15 +407,22 @@ if (-not ($needGit -or $needPy -or $needNode)) {
     }
 }
 
+L_Info "Initializing git identity..."
+$gitInit = & wsl.exe -d $DISTRO_NAME -u deepright -- bash -c "git config --global user.email 'deepright@deepright.com' && git config --global user.name 'deepright' 2>&1" | Out-String
+Add-Content -Path $LOG_FILE -Value "git-init: $gitInit" -Encoding UTF8
+if ($LASTEXITCODE -eq 0) { L_OK "git identity initialized" } else { L_Warn "git identity initialization failed" }
+
 L_Info "Verifying tools..."
 $gitV  = (& wsl.exe -d $DISTRO_NAME -- bash -c "git --version 2>&1" | Out-String).Trim()
 $nodeV = (& wsl.exe -d $DISTRO_NAME -- bash -c "node --version 2>&1" | Out-String).Trim()
 $npmV  = (& wsl.exe -d $DISTRO_NAME -- bash -c "npm --version 2>&1" | Out-String).Trim()
 $pyV   = (& wsl.exe -d $DISTRO_NAME -- bash -c "python3 --version 2>&1" | Out-String).Trim()
+$bwrapV = (& wsl.exe -d $DISTRO_NAME -- bash -c "bwrap --version 2>&1" | Out-String).Trim()
 L_OK "git:      $gitV"
 L_OK "node:     $nodeV"
 L_OK "npm:      $npmV"
 L_OK "python3:  $pyV"
+L_OK "bwrap:    $bwrapV"
 
 # ---- Step 7: Copy app ----
 L_Step "Step 7/7: Copy app dir to WSL /app/"
@@ -539,6 +547,7 @@ if (-not $gitV)  { $gitV  = (& wsl.exe -d $DISTRO_NAME -- bash -c "git --version
 if (-not $nodeV) { $nodeV = (& wsl.exe -d $DISTRO_NAME -- bash -c "node --version 2>&1" | Out-String).Trim() }
 if (-not $npmV)  { $npmV  = (& wsl.exe -d $DISTRO_NAME -- bash -c "npm --version 2>&1" | Out-String).Trim() }
 if (-not $pyV)   { $pyV   = (& wsl.exe -d $DISTRO_NAME -- bash -c "python3 --version 2>&1" | Out-String).Trim() }
+if (-not $bwrapV){ $bwrapV = (& wsl.exe -d $DISTRO_NAME -- bash -c "bwrap --version 2>&1" | Out-String).Trim() }
 
 L_Step "Installation Complete"
 Write-Host ""
@@ -557,6 +566,7 @@ Write-Host "    git:      $gitV" -F Gray
 Write-Host "    node:     $nodeV" -F Gray
 Write-Host "    npm:      $npmV" -F Gray
 Write-Host "    python3:  $pyV" -F Gray
+Write-Host "    bwrap:    $bwrapV" -F Gray
 Write-Host ""
 Write-Host "  Enter WSL: wsl -d $DISTRO_NAME" -F Yellow
 Write-Host "  Log file:  $LOG_FILE" -F Gray

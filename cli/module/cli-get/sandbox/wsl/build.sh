@@ -19,6 +19,8 @@ build_one_arch() {
   for mode in filepick net filepick_net; do
     local mode_output="${target_output}/${mode}"
     local binary_path="${mode_output}/CLI_SANDBOX"
+    local launcher_path="${mode_output}/CLI_SANDBOX_PICKER_LAUNCHER"
+    local picker_path="${mode_output}/CLI_SANDBOX_PICKER.exe"
     mkdir -p "${mode_output}"
     (
       cd "${SCRIPT_DIR}/.."
@@ -26,6 +28,14 @@ build_one_arch() {
         "${GO_BIN}" build -trimpath -ldflags "${GO_RELEASE_LDFLAGS} -X main.defaultMode=${mode}" \
         -o "${binary_path}" \
         ./wsl/helper
+      GOOS=linux GOARCH="${target_goarch}" \
+        "${GO_BIN}" build -trimpath -ldflags "${GO_RELEASE_LDFLAGS}" \
+        -o "${launcher_path}" \
+        ./wsl/picker-launcher
+      GOOS=windows GOARCH="${target_goarch}" \
+        "${GO_BIN}" build -trimpath -ldflags "${GO_RELEASE_LDFLAGS}" \
+        -o "${picker_path}" \
+        ./wsl/picker
     )
   done
 }

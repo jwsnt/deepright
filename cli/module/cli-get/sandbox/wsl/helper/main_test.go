@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -17,7 +19,7 @@ func TestNormalizeSandboxMode(t *testing.T) {
 	}
 }
 
-func TestSetPickedDirectoryWritesCache(t *testing.T) {
+func TestSetPickedDirectoryReturnsNormalizedDirectory(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	allowedDir := filepath.Join(home, "picked")
@@ -32,13 +34,23 @@ func TestSetPickedDirectoryWritesCache(t *testing.T) {
 	if got != filepath.Clean(allowedDir) {
 		t.Fatalf("path = %q, want %q", got, filepath.Clean(allowedDir))
 	}
+}
 
-	cached, ok := readCachedPickedDirectory()
-	if !ok {
-		t.Fatal("readCachedPickedDirectory should return cache hit")
+func TestResolvePickedDirectoryUsesEnvOverride(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	allowedDir := filepath.Join(home, "picked")
+	if err := os.MkdirAll(allowedDir, 0o755); err != nil {
+		t.Fatalf("mkdir picked: %v", err)
 	}
-	if cached != filepath.Clean(allowedDir) {
-		t.Fatalf("cached = %q, want %q", cached, filepath.Clean(allowedDir))
+	t.Setenv(sandboxAllowedDirEnv, allowedDir)
+
+	got, err := resolvePickedDirectory(t.Context(), false)
+	if err != nil {
+		t.Fatalf("resolvePickedDirectory err = %v", err)
+	}
+	if got != filepath.Clean(allowedDir) {
+		t.Fatalf("path = %q, want %q", got, filepath.Clean(allowedDir))
 	}
 }
 
@@ -52,6 +64,85 @@ func TestResolvePickedDirectoryReturnsHelpfulErrorWithoutCache(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "显式传入 --allowed-dir") {
 		t.Fatalf("err = %q, want missing authorization message", err)
+	}
+}
+
+func TestPickDirectoryViaPowerShellFallsBackToKnownWindowsPaths(t *testing.T) {
+	t.Setenv("WSL_DISTRO_NAME", "Ubuntu")
+	tmp := t.TempDir()
+	wslpathPath := filepath.Join(tmp, "wslpath")
+	wslpathScript := "#!/bin/sh\nprintf '/mnt/c/Users/demo/Desktop'\n"
+	if err := os.WriteFile(wslpathPath, []byte(wslpathScript), 0o755); err != nil {
+		t.Fatalf("write wslpath: %v", err)
+	}
+
+	originalLookPathFn := helperLookPathFn
+	helperLookPathFn = func(name string) (string, error) {
+		if name == "wslpath" {
+			return wslpathPath, nil
+		}
+		return "", os.ErrNotExist
+	}
+	defer func() { helperLookPathFn = originalLookPathFn }()
+
+	var invoked string
+	originalCommandContextFn := helperCommandContextFn
+	helperCommandContextFn = func(_ context.Context, name string, args ...string) *exec.Cmd {
+		invoked = name
+		return exec.Command("/bin/sh", "-c", "printf 'C:\\\\Users\\\\demo\\\\Desktop'")
+	}
+	defer func() { helperCommandContextFn = originalCommandContextFn }()
+
+	path, ok, canceled := pickDirectoryViaPowerShell(t.Context())
+	if !ok {
+		t.Fatal("pickDirectoryViaPowerShell should succeed")
+	}
+	if canceled {
+		t.Fatal("pickDirectoryViaPowerShell should not be canceled")
+	}
+	if invoked != "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe" {
+		t.Fatalf("powershell path = %q, want hardcoded Windows PowerShell path", invoked)
+	}
+	if path != "/mnt/c/Users/demo/Desktop" {
+		t.Fatalf("path = %q, want %q", path, "/mnt/c/Users/demo/Desktop")
+	}
+}
+
+func TestHelperWindowsPickerCandidatesPreferSiblingExecutable(t *testing.T) {
+	tmp := t.TempDir()
+	helperPath := filepath.Join(tmp, "CLI_SANDBOX")
+	pickerPath := filepath.Join(tmp, "CLI_SANDBOX_PICKER_LAUNCHER")
+
+	originalExecutableFn := helperExecutableFn
+	helperExecutableFn = func() (string, error) { return helperPath, nil }
+	defer func() { helperExecutableFn = originalExecutableFn }()
+
+	originalLookPathFn := helperLookPathFn
+	helperLookPathFn = func(name string) (string, error) {
+		if name == "CLI_SANDBOX_PICKER_LAUNCHER" {
+			return filepath.Join("/other", "CLI_SANDBOX_PICKER_LAUNCHER"), nil
+		}
+		return "", os.ErrNotExist
+	}
+	defer func() { helperLookPathFn = originalLookPathFn }()
+
+	got := helperWindowsPickerCandidates()
+	want := []string{pickerPath, filepath.Join("/other", "CLI_SANDBOX_PICKER_LAUNCHER")}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("candidates = %#v, want %#v", got, want)
+	}
+}
+
+func TestIsPickerCanceledTreatsCanceledOutputAsCancellation(t *testing.T) {
+	err := exec.Command("/bin/sh", "-c", "exit 1").Run()
+	if !isPickerCanceled(err, []byte("canceled\n")) {
+		t.Fatal("isPickerCanceled should treat canceled output as cancellation")
+	}
+	if !isPickerCanceled(err, []byte("picker canceled\n")) {
+		t.Fatal("isPickerCanceled should treat picker canceled output as cancellation")
+	}
+	if isPickerCanceled(err, []byte("other failure\n")) {
+		t.Fatal("isPickerCanceled should not treat arbitrary output as cancellation")
 	}
 }
 

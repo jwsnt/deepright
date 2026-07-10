@@ -14,11 +14,16 @@ func sandboxChooseFolderWithTimeout(timeout time.Duration) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
+	script := `POSIX path of (choose folder with prompt "CLI_SANDBOX 请选择允许访问的目录"`
+	if initialDir := defaultMacPickerDirectory(); initialDir != "" {
+		script += ` default location (POSIX file ` + appleScriptQuoted(initialDir) + `)`
+	}
+	script += `)`
 	cmd := exec.CommandContext(
 		ctx,
 		"/usr/bin/osascript",
 		"-ss",
-		"-e", `POSIX path of (choose folder with prompt "CLI_SANDBOX 请选择允许访问的目录")`,
+		"-e", script,
 	)
 	out, err := cmd.CombinedOutput()
 	text := stripWrappedQuotes(strings.TrimSpace(string(out)))
@@ -36,4 +41,9 @@ func sandboxChooseFolderWithTimeout(timeout time.Duration) (string, error) {
 		}
 	}
 	return text, nil
+}
+
+func appleScriptQuoted(value string) string {
+	replacer := strings.NewReplacer(`\`, `\\`, `"`, `\"`)
+	return `"` + replacer.Replace(value) + `"`
 }

@@ -1545,6 +1545,8 @@ func executeShellCommand(shell, rawCmd string, timeoutMs int64, onStart func(*ac
 
 var proxyOsExecutable = os.Executable
 var proxySandboxExecutablePathFn = resolveProxySandboxExecutablePath
+var proxyPrimeSandboxModeFn = primeProxySandboxMode
+var proxyPrimeSandboxDirectoryFn = primeProxySandboxDirectory
 
 func proxyConfigPaths() []string {
 	paths := make([]string, 0, 2)
@@ -1847,6 +1849,79 @@ func resolveProxySandboxExecutablePath(mode string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("sandbox helper not found for mode=%s", mode)
+}
+
+func sandboxModeRequiresDirectoryPick(mode string) bool {
+	switch sandboxstate.NormalizeMode(mode) {
+	case sandboxstate.ModeFilePick, sandboxstate.ModeFilePickNet:
+		return true
+	default:
+		return false
+	}
+}
+
+func primeProxySandboxMode(mode string) (string, error) {
+	mode = sandboxstate.NormalizeMode(mode)
+	if !sandboxModeRequiresDirectoryPick(mode) {
+		return "", nil
+	}
+	helperPath, err := proxySandboxExecutablePathFn(mode)
+	if err != nil {
+		return "", err
+	}
+	log.Printf("sandbox prime start mode=%s helper=%s", mode, helperPath)
+	cmd := exec.Command(helperPath)
+	cmd.Env = append(os.Environ(), "CLI_SANDBOX_FORCE_PICK=1")
+	output, err := cmd.CombinedOutput()
+	text := strings.TrimSpace(string(output))
+	if err != nil {
+		if text != "" {
+			log.Printf("sandbox prime failed mode=%s helper=%s err=%v output=%q", mode, helperPath, err, text)
+			return "", errors.New(text)
+		}
+		log.Printf("sandbox prime failed mode=%s helper=%s err=%v", mode, helperPath, err)
+		return "", err
+	}
+	log.Printf("sandbox prime done mode=%s helper=%s", mode, helperPath)
+	return text, nil
+}
+
+func primeProxySandboxDirectory(mode, dir string) (string, error) {
+	mode = sandboxstate.NormalizeMode(mode)
+	dir = strings.TrimSpace(dir)
+	if !sandboxModeRequiresDirectoryPick(mode) {
+		if dir == "" {
+			return "", nil
+		}
+		if mode == "" {
+			return "", fmt.Errorf("sandbox off does not support manual directory whitelist")
+		}
+		return "", fmt.Errorf("sandbox mode %s does not support manual directory whitelist", mode)
+	}
+	if dir == "" {
+		return proxyPrimeSandboxModeFn(mode)
+	}
+	helperPath, err := proxySandboxExecutablePathFn(mode)
+	if err != nil {
+		return "", err
+	}
+	log.Printf("sandbox prime set-dir start mode=%s helper=%s dir=%s", mode, helperPath, dir)
+	cmd := exec.Command(helperPath, "--allowed-dir", dir)
+	output, err := cmd.CombinedOutput()
+	text := strings.TrimSpace(string(output))
+	if err != nil {
+		if text != "" {
+			log.Printf("sandbox prime set-dir failed mode=%s helper=%s dir=%s err=%v output=%q", mode, helperPath, dir, err, text)
+			return "", errors.New(text)
+		}
+		log.Printf("sandbox prime set-dir failed mode=%s helper=%s dir=%s err=%v", mode, helperPath, dir, err)
+		return "", err
+	}
+	log.Printf("sandbox prime set-dir done mode=%s helper=%s dir=%s", mode, helperPath, text)
+	if text == "" {
+		text = dir
+	}
+	return text, nil
 }
 
 func executeSandboxCommandWithPath(path, shell, rawCmd string, timeoutMs int64, allowedDir string, onStart func(*activeCmd)) (int, string) {
@@ -4711,17 +4786,19 @@ func runProxyTokenCLI(args []string) {
 func printProxySandboxHelp() {
 	fmt.Println("Usage:")
 	fmt.Println("  proxy sandbox --chatId ID")
-	fmt.Println("  proxy sandbox --agentId ID --chatId ID --sandbox off|filepick|net|filepick_net")
+	fmt.Println("  proxy sandbox --agentId ID --chatId ID --sandbox off|filepick|net|filepick_net [--dir DIR]")
 	fmt.Println("")
 	fmt.Println("Options:")
 	fmt.Println("  --agentId ID      当前会话所属 AgentId；查询可省略，写入必填")
 	fmt.Println("  --chatId ID       当前会话所属 ChatId")
 	fmt.Println("  --chat ID         ChatId 别名")
 	fmt.Println("  --sandbox MODE    写入当前会话沙盒模式；off 表示关闭，不传则只查询")
+	fmt.Println("  --dir DIR         filepick/filepick_net 手动指定白名单目录，不弹窗")
 	fmt.Println("")
 	fmt.Println("Examples:")
 	fmt.Println("  proxy sandbox --chatId chat-001")
 	fmt.Println("  proxy sandbox --agentId A --chatId chat-001 --sandbox filepick_net")
+	fmt.Println("  proxy sandbox --agentId A --chatId chat-001 --sandbox filepick --dir /Users/me/Desktop")
 	fmt.Println("  proxy sandbox --agentId A --chatId chat-001 --sandbox off")
 }
 
@@ -4737,6 +4814,7 @@ func runProxySandboxCLI(args []string) {
 	chatID := fs.String("chatId", "", "chat id")
 	chatAlias := fs.String("chat", "", "chat id")
 	sandboxRaw := fs.String("sandbox", "", "sandbox mode")
+	allowedDir := fs.String("dir", "", "manual whitelist directory for filepick modes")
 	if err := fs.Parse(args); err != nil {
 		log.Fatal(err)
 	}
@@ -4770,6 +4848,10 @@ func runProxySandboxCLI(args []string) {
 		if err != nil {
 			log.Fatal(err)
 		}
+		resolvedAllowedDir, err := proxyPrimeSandboxDirectoryFn(mode, *allowedDir)
+		if err != nil {
+			log.Fatal(err)
+		}
 		previous, existed, err := sandboxstate.Get(db, "", targetChatID)
 		if err != nil {
 			log.Fatal(err)
@@ -4778,13 +4860,16 @@ func runProxySandboxCLI(args []string) {
 		if existed {
 			beforeMode = previous.Sandbox
 		}
-		state, err = sandboxstate.Set(db, targetAgentID, targetChatID, mode)
+		state, err = sandboxstate.SetWithDirectory(db, targetAgentID, targetChatID, mode, resolvedAllowedDir)
 		if err != nil {
 			log.Fatal(err)
 		}
 		logProxySandboxChange(targetAgentID, targetChatID, beforeMode, state.Sandbox)
 		recorded = strings.TrimSpace(state.Sandbox) != ""
 	} else {
+		if strings.TrimSpace(*allowedDir) != "" {
+			log.Fatal("--dir requires --sandbox filepick or --sandbox filepick_net")
+		}
 		var err error
 		state, recorded, err = sandboxstate.Get(db, targetAgentID, targetChatID)
 		if err != nil {
@@ -4795,12 +4880,13 @@ func runProxySandboxCLI(args []string) {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetEscapeHTML(false)
 	if err := encoder.Encode(map[string]interface{}{
-		"status":    0,
-		"agentId":   state.AgentID,
-		"chatId":    state.ChatID,
-		"sandbox":   state.Sandbox,
-		"recorded":  recorded,
-		"updatedAt": state.UpdatedAt,
+		"status":     0,
+		"agentId":    state.AgentID,
+		"chatId":     state.ChatID,
+		"sandbox":    state.Sandbox,
+		"allowedDir": state.AllowedDir,
+		"recorded":   recorded,
+		"updatedAt":  state.UpdatedAt,
 	}); err != nil {
 		log.Fatal(err)
 	}
@@ -4950,6 +5036,11 @@ func (p *ProxyServer) handleSandboxQuery(w http.ResponseWriter, r *http.Request,
 			return
 		}
 		if !shouldSet {
+			if strings.TrimSpace(r.URL.Query().Get("dir")) != "" {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "dir requires sandbox mode filepick or filepick_net"})
+				return
+			}
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "sandbox mode is required"})
 			return
@@ -4964,7 +5055,13 @@ func (p *ProxyServer) handleSandboxQuery(w http.ResponseWriter, r *http.Request,
 		if recorded {
 			beforeMode = previous.Sandbox
 		}
-		state, err := sandboxstate.Set(db, agentID, chatID, mode)
+		allowedDir, err := proxyPrimeSandboxDirectoryFn(mode, r.URL.Query().Get("dir"))
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": err.Error()})
+			return
+		}
+		state, err := sandboxstate.SetWithDirectory(db, agentID, chatID, mode, allowedDir)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "save error: " + err.Error()})

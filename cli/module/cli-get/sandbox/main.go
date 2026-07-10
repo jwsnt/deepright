@@ -21,7 +21,7 @@ func main() {
 	flag.StringVar(&shell, "shell", service.DefaultShell(), "shell used to execute delegated commands")
 	flag.StringVar(&logFile, "log-file", "sandbox.log", "sandbox log file path")
 	flag.StringVar(&mode, "mode", "", "sandbox mode: filepick, net, filepick_net")
-	flag.StringVar(&allowedDir, "allowed-dir", "", "cache an allowed directory for filepick-based modes")
+	flag.StringVar(&allowedDir, "allowed-dir", "", "provide an allowed directory for filepick-based modes")
 	flag.StringVar(&directCmd, "cmd", "", "execute a single command and print its output")
 	flag.IntVar(&directTimeout, "timeout", 0, "command timeout in ms; 0 uses the default timeout")
 	flag.Parse()
@@ -45,7 +45,11 @@ func main() {
 			fmt.Fprint(os.Stderr, err.Error())
 			os.Exit(1)
 		}
-		logger.Printf("allowed directory cached path=%q", normalized)
+		if err := os.Setenv(service.SandboxAllowedDirEnv, normalized); err != nil {
+			fmt.Fprint(os.Stderr, err.Error())
+			os.Exit(1)
+		}
+		logger.Printf("allowed directory set path=%q", normalized)
 		if strings.TrimSpace(directCmd) == "" {
 			fmt.Fprint(os.Stdout, normalized)
 			return

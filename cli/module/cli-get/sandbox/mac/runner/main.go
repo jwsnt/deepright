@@ -19,7 +19,6 @@ type runnerConfig struct {
 }
 
 const (
-	runnerSandboxStateDirName = "CLI_SANDBOX"
 	runnerSandboxForcePickEnv = "CLI_SANDBOX_FORCE_PICK"
 	runnerChooserTimeout      = 60 * time.Second
 )
@@ -39,7 +38,7 @@ func main() {
 
 	flag.StringVar(&shell, "shell", defaultShell(), "shell used by CLI_SANDBOX")
 	flag.StringVar(&logFile, "log-file", "", "absolute log file path; defaults to the app sandbox container")
-	flag.StringVar(&allowedDir, "allowed-dir", "", "cache an allowed directory for filepick-based modes")
+	flag.StringVar(&allowedDir, "allowed-dir", "", "provide an allowed directory for filepick-based modes")
 	flag.StringVar(&directCmd, "cmd", "", "execute a single command and print its output")
 	flag.IntVar(&directTimeout, "timeout", 0, "command timeout in ms; 0 uses the default timeout")
 	flag.Parse()
@@ -60,7 +59,7 @@ func main() {
 	}
 
 	if requiresPickedDirectory(cfg.Mode) {
-		allowedDir, err = resolveAllowedDirectory(cfg.BundleID, allowedDir)
+		allowedDir, err = resolveAllowedDirectory(allowedDir)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
 			os.Exit(1)
@@ -228,22 +227,9 @@ func requiresPickedDirectory(mode string) bool {
 	}
 }
 
-func resolveAllowedDirectory(bundleID, explicit string) (string, error) {
+func resolveAllowedDirectory(explicit string) (string, error) {
 	if strings.TrimSpace(explicit) != "" {
-		picked, err := normalizeDirectoryPath(explicit)
-		if err != nil {
-			return "", err
-		}
-		if err := writeCachedPickedDirectory(bundleID, picked); err != nil {
-			return "", err
-		}
-		return picked, nil
-	}
-	forcePick := strings.TrimSpace(os.Getenv(runnerSandboxForcePickEnv)) != ""
-	if !forcePick {
-		if cached, ok := readCachedPickedDirectory(bundleID); ok {
-			return cached, nil
-		}
+		return normalizeDirectoryPath(explicit)
 	}
 	picked, err := sandboxChooseFolderWithTimeout(runnerChooserTimeout)
 	if err != nil {
@@ -253,60 +239,7 @@ func resolveAllowedDirectory(bundleID, explicit string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := writeCachedPickedDirectory(bundleID, picked); err != nil {
-		return "", err
-	}
 	return picked, nil
-}
-
-func readCachedPickedDirectory(bundleID string) (string, bool) {
-	statePath, err := sandboxSelectedDirPath(bundleID)
-	if err != nil {
-		return "", false
-	}
-	data, err := os.ReadFile(statePath)
-	if err != nil {
-		return "", false
-	}
-	path, err := normalizeDirectoryPath(string(data))
-	if err != nil {
-		return "", false
-	}
-	return path, true
-}
-
-func writeCachedPickedDirectory(bundleID, path string) error {
-	statePath, err := sandboxSelectedDirPath(bundleID)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(statePath, []byte(path+"\n"), 0o644)
-}
-
-func sandboxSelectedDirPath(bundleID string) (string, error) {
-	stateDir, err := sandboxStateDir(bundleID)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(stateDir, "selected-dir.txt"), nil
-}
-
-func sandboxStateDir(bundleID string) (string, error) {
-	baseDir := containerHomeBase(bundleID)
-	if baseDir == "" {
-		configDir, err := os.UserConfigDir()
-		if err != nil {
-			return "", err
-		}
-		baseDir = configDir
-	} else {
-		baseDir = filepath.Join(baseDir, "Library", "Application Support")
-	}
-	stateDir := filepath.Join(baseDir, runnerSandboxStateDirName)
-	if err := os.MkdirAll(stateDir, 0o755); err != nil {
-		return "", err
-	}
-	return stateDir, nil
 }
 
 func normalizeDirectoryPath(raw string) (string, error) {

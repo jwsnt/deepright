@@ -2448,19 +2448,18 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .center-notice-card.pending-open{cursor:progress}
 .sandbox-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;background:rgba(15,22,36,.18);backdrop-filter:blur(10px) saturate(135%);-webkit-backdrop-filter:blur(10px) saturate(135%);opacity:0;visibility:hidden;transition:opacity .24s ease,visibility 0s linear .24s}
 .sandbox-overlay.show{opacity:1;visibility:visible;transition:opacity .24s ease}
-.sandbox-card{width:min(360px,calc(100vw - 40px));position:relative;display:flex;flex-direction:column;gap:14px;padding:22px 22px 18px;border-radius:26px;border:1px solid color-mix(in srgb,var(--border) 68%,rgba(255,255,255,.4));background:linear-gradient(180deg,rgba(255,255,255,.84),rgba(243,248,255,.76) 58%,rgba(232,239,250,.72));box-shadow:0 28px 74px rgba(10,26,58,.24),0 0 0 1px rgba(255,255,255,.24) inset;backdrop-filter:blur(20px) saturate(150%);-webkit-backdrop-filter:blur(20px) saturate(150%);opacity:0;visibility:hidden;pointer-events:none;transform:translateY(10px) scale(.98);transition:opacity .24s ease,transform .24s cubic-bezier(.22,1,.36,1),visibility 0s linear .24s}
+.sandbox-card{width:min(336px,calc(100vw - 32px));position:relative;display:flex;flex-direction:column;gap:10px;padding:18px 18px 16px;border-radius:24px;border:1px solid color-mix(in srgb,var(--border) 68%,rgba(255,255,255,.4));background:linear-gradient(180deg,rgba(255,255,255,.84),rgba(243,248,255,.76) 58%,rgba(232,239,250,.72));box-shadow:0 24px 60px rgba(10,26,58,.22),0 0 0 1px rgba(255,255,255,.24) inset;backdrop-filter:blur(20px) saturate(150%);-webkit-backdrop-filter:blur(20px) saturate(150%);opacity:0;visibility:hidden;pointer-events:none;transform:translateY(10px) scale(.98);transition:opacity .24s ease,transform .24s cubic-bezier(.22,1,.36,1),visibility 0s linear .24s}
 .sandbox-card.show{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .24s ease,transform .24s cubic-bezier(.22,1,.36,1)}
 .sandbox-overlay.show .sandbox-card.show{transform:translateY(0) scale(1)}
 .sandbox-card::before{content:'';position:absolute;inset:0;border-radius:inherit;background:linear-gradient(180deg,rgba(255,255,255,.44),rgba(255,255,255,.08) 44%,rgba(255,255,255,0) 72%);pointer-events:none}
 .sandbox-card > *{position:relative;z-index:1}
-.sandbox-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
-.sandbox-card-side{display:flex;flex-direction:column;align-items:flex-end;gap:10px;min-width:0}
+.sandbox-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.sandbox-card-side{display:flex;align-items:flex-start;gap:10px;min-width:0}
 .sandbox-card-close{width:34px;height:34px;border:none;border-radius:999px;display:flex;align-items:center;justify-content:center;padding:0;background:rgba(255,255,255,.4);color:var(--text-secondary);cursor:pointer;transition:var(--transition);box-shadow:inset 0 1px 0 rgba(255,255,255,.46)}
 .sandbox-card-close:hover,.sandbox-card-close:focus-visible{background:rgba(255,255,255,.58);color:var(--text-primary);outline:none;transform:translateY(-1px)}
 .sandbox-card-close svg{width:16px;height:16px;stroke:currentColor;stroke-width:2.2;fill:none}
 .sandbox-card-kicker{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#b97800}
-.sandbox-card-title{margin-top:4px;font-size:20px;font-weight:700;color:var(--text-primary)}
-.sandbox-card-status{align-self:flex-start;margin-top:12px;padding:6px 12px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid rgba(201,154,48,.22);background:rgba(255,255,255,.58);color:var(--text-secondary)}
+.sandbox-card-status{display:inline-flex;align-items:center;align-self:flex-start;margin-top:6px;padding:5px 11px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid rgba(201,154,48,.22);background:rgba(255,255,255,.58);color:var(--text-secondary)}
 .sandbox-card-status.on{border-color:rgba(245,158,11,.42);background:rgba(245,158,11,.14);color:#a45d00}
 .sandbox-card-status.off{border-color:rgba(72,99,143,.18);background:rgba(148,163,184,.14);color:var(--text-secondary)}
 .sandbox-card-status.loading{border-color:rgba(245,158,11,.28);background:rgba(255,236,194,.42);color:#a45d00}
@@ -2482,16 +2481,19 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 [data-theme="dark"] .new-chat-id-panel::before{background:linear-gradient(180deg,rgba(255,255,255,.11),rgba(255,255,255,.03) 42%,rgba(255,255,255,0) 72%)}
 [data-theme="dark"] .new-chat-id-kicker{color:#a8c1ff}
 [data-theme="dark"] .new-chat-id-input{background:rgba(255,255,255,.08);border-color:rgba(169,190,227,.18);color:#ecf3ff;box-shadow:none}
-.sandbox-card-binding{display:grid;gap:9px;padding:14px 16px;border-radius:18px;background:rgba(255,255,255,.4);border:1px solid color-mix(in srgb,var(--border) 74%,rgba(255,255,255,.32))}
+.sandbox-card-binding{display:grid;gap:10px;padding:12px 14px;border-radius:16px;background:rgba(255,255,255,.4);border:1px solid color-mix(in srgb,var(--border) 74%,rgba(255,255,255,.32))}
+.sandbox-card-field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.sandbox-card-label{font-size:12px;color:var(--text-secondary)}
+.sandbox-card-value{font-size:12px;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sandbox-card-row{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;color:var(--text-secondary)}
 .sandbox-card-row strong{max-width:62%;font-size:12px;color:var(--text-primary);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sandbox-card-error{position:absolute;top:78px;left:22px;max-width:180px;padding:6px 10px;border-radius:12px;border:1px solid rgba(255,77,79,.26);background:rgba(255,77,79,.12);font-size:12px;line-height:1.4;color:var(--error);text-align:left;opacity:0;transform:translateY(-4px);pointer-events:none;transition:opacity .18s ease,transform .18s ease}
+.sandbox-card-error{position:absolute;top:60px;left:18px;max-width:180px;padding:6px 10px;border-radius:12px;border:1px solid rgba(255,77,79,.26);background:rgba(255,77,79,.12);font-size:12px;line-height:1.4;color:var(--error);text-align:left;opacity:0;transform:translateY(-4px);pointer-events:none;transition:opacity .18s ease,transform .18s ease}
 .sandbox-card-error.show{opacity:1;transform:translateY(0)}
-.sandbox-card-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-.sandbox-choice{min-height:56px;border:1px solid color-mix(in srgb,var(--border) 80%,rgba(255,255,255,.2));border-radius:18px;padding:14px 12px;background:rgba(255,255,255,.34);display:flex;align-items:center;justify-content:center;text-align:center;color:var(--text-secondary);cursor:pointer;transition:var(--transition);box-shadow:inset 0 1px 0 rgba(255,255,255,.46)}
+.sandbox-card-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.sandbox-choice{min-height:50px;border:1px solid color-mix(in srgb,var(--border) 80%,rgba(255,255,255,.2));border-radius:16px;padding:12px 10px;background:rgba(255,255,255,.34);display:flex;align-items:center;justify-content:center;text-align:center;color:var(--text-secondary);cursor:pointer;transition:var(--transition);box-shadow:inset 0 1px 0 rgba(255,255,255,.46)}
 .sandbox-choice:hover:not(:disabled){transform:translateY(-1px);border-color:color-mix(in srgb,var(--accent) 28%,var(--border) 72%);color:var(--text-primary)}
 .sandbox-choice:disabled{cursor:not-allowed;opacity:.62}
-.sandbox-choice-label{font-size:15px;font-weight:700;color:inherit}
+.sandbox-choice-label{font-size:14px;font-weight:700;color:inherit}
 .sandbox-choice.mode-filepick.active{border-color:rgba(245,158,11,.46);background:linear-gradient(180deg,rgba(255,232,184,.82),rgba(245,158,11,.18));color:#8a5200;box-shadow:inset 0 1px 0 rgba(255,255,255,.52),0 14px 28px rgba(245,158,11,.14)}
 .sandbox-choice.mode-net.active{border-color:rgba(77,107,254,.38);background:linear-gradient(180deg,rgba(219,233,255,.86),rgba(77,107,254,.18));color:#2947a8;box-shadow:inset 0 1px 0 rgba(255,255,255,.52),0 14px 28px rgba(77,107,254,.12)}
 .sandbox-choice.mode-filepick-net.active{border-color:rgba(80,168,118,.4);background:linear-gradient(180deg,rgba(223,248,230,.88),rgba(80,168,118,.18));color:#2d7d4d;box-shadow:inset 0 1px 0 rgba(255,255,255,.54),0 14px 28px rgba(80,168,118,.14)}
@@ -2507,6 +2509,7 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 [data-theme="dark"] .sandbox-card-status.off{background:rgba(255,255,255,.06);border-color:rgba(169,190,227,.18);color:#c9d7ef}
 [data-theme="dark"] .sandbox-card-status.loading{background:rgba(245,158,11,.12);border-color:rgba(255,200,106,.26);color:#ffd79b}
 [data-theme="dark"] .sandbox-card-binding{background:rgba(255,255,255,.05);border-color:rgba(169,190,227,.14)}
+[data-theme="dark"] .sandbox-card-value{color:#f4f7ff}
 [data-theme="dark"] .sandbox-card-row strong{color:#f4f7ff}
 [data-theme="dark"] .sandbox-card-error{border-color:rgba(255,124,124,.28);background:rgba(255,77,79,.14);color:#ff8d8d}
 [data-theme="dark"] .sandbox-choice{background:rgba(255,255,255,.05);border-color:rgba(169,190,227,.16);color:#d4def2;box-shadow:none}
@@ -3461,7 +3464,7 @@ body.quick-fan-transition-active{cursor:progress}
 .center-upload-lock-active #settingsOverlay,
 .center-upload-lock-active #settingsOverlay *{pointer-events:none !important}
 .center-upload-lock-active #settingsOverlay .settings-panel{filter:blur(1px);user-select:none}
-.chat-history-lock-local{position:absolute;inset:12px 18px 8px;display:flex;align-items:center;justify-content:center;padding:24px;border-radius:38px;background:rgba(236,242,252,.34);backdrop-filter:blur(14px) saturate(135%);-webkit-backdrop-filter:blur(14px) saturate(135%);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .18s ease,visibility 0s linear .18s;z-index:6;overflow:hidden}
+.chat-history-lock-local{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;border-radius:0;background:rgba(236,242,252,.34);backdrop-filter:blur(14px) saturate(135%);-webkit-backdrop-filter:blur(14px) saturate(135%);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .18s ease,visibility 0s linear .18s;z-index:6;overflow:hidden}
 .chat-history-lock-local.show{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .18s ease}
 .chat-history-lock-local::before{content:'';position:absolute;inset:-24%;background:radial-gradient(circle at 18% 18%,rgba(77,107,254,.22),transparent 42%),radial-gradient(circle at 82% 16%,rgba(94,203,255,.18),transparent 38%),radial-gradient(circle at 50% 84%,rgba(77,107,254,.14),transparent 44%);opacity:.92;animation:pluginModalLockGlow 2.4s ease-in-out infinite}
 .chat-history-lock-local .domain-upload-lock-card{position:relative;z-index:1;width:min(340px,100%);backdrop-filter:blur(24px) saturate(160%);-webkit-backdrop-filter:blur(24px) saturate(160%);box-shadow:0 28px 68px rgba(16,24,40,.22)}
@@ -4483,21 +4486,14 @@ body.quick-fan-transition-active{cursor:progress}
     <div class="sandbox-card-head">
       <div>
         <div class="sandbox-card-kicker">Sandbox</div>
-        <div class="sandbox-card-title">会话沙盒</div>
+        <div class="sandbox-card-status off" id="sandboxCardStatus">默认关闭</div>
       </div>
       <div class="sandbox-card-side">
         <button type="button" class="sandbox-card-close" id="sandboxCloseBtn" onclick="hideSandboxOverlay()" aria-label="关闭会话沙盒" title="关闭会话沙盒">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
         </button>
-        <div class="sandbox-card-status off" id="sandboxCardStatus">默认关闭</div>
       </div>
     </div>
-    <div class="sandbox-card-binding">
-      <div class="sandbox-card-row"><span>Agent</span><strong id="sandboxCardAgent">-</strong></div>
-      <div class="sandbox-card-row"><span>会话</span><strong id="sandboxCardChat">-</strong></div>
-      <div class="sandbox-card-row"><span>更新时间</span><strong id="sandboxCardUpdatedAt">未记录</strong></div>
-    </div>
-    <div class="sandbox-card-error" id="sandboxCardError"></div>
     <div class="sandbox-card-options">
       <button type="button" class="sandbox-choice mode-filepick" id="sandboxFilePickBtn" onclick="setActiveChatSandboxMode('filepick')">
         <span class="sandbox-choice-label">目录权限</span>
@@ -4512,6 +4508,14 @@ body.quick-fan-transition-active{cursor:progress}
         <span class="sandbox-choice-label">关闭沙盒</span>
       </button>
     </div>
+    <div class="sandbox-card-binding">
+      <div class="sandbox-card-field">
+        <div class="sandbox-card-label">目录</div>
+        <div class="sandbox-card-value" id="sandboxCardAllowedDir" title="未授权">未授权</div>
+      </div>
+      <div class="sandbox-card-row"><span>更新时间</span><strong id="sandboxCardUpdatedAt">未记录</strong></div>
+    </div>
+    <div class="sandbox-card-error" id="sandboxCardError"></div>
   </div>
 </div>
 <div class="onboarding-domain-overlay" id="onboardingOverlayLeft" data-overlay-base data-overlay-domain="left" data-overlay-order="96" data-overlay-passive="1" aria-hidden="true">
@@ -24261,6 +24265,7 @@ function createSandboxSnapshot(chatId, agentId, overrides) {
     chatId: String(chatId || '').trim(),
     agentId: String(agentId || '').trim(),
     sandbox: '',
+    allowedDir: '',
     recorded: false,
     updatedAt: '',
     loading: false,
@@ -24314,6 +24319,7 @@ function clearChatSandbox(chatId) {
 function buildSandboxSnapshotFromPayload(payload, chatId, agentId) {
   return createSandboxSnapshot(chatId, agentId, {
     sandbox: String(payload && payload.sandbox || '').trim(),
+    allowedDir: String(payload && payload.allowedDir || '').trim(),
     recorded: !!(payload && payload.recorded),
     updatedAt: String(payload && payload.updatedAt || '').trim(),
     loading: false,
@@ -24341,6 +24347,10 @@ function sandboxStatusLabelFromError(message) {
   if (text.includes('目录授权弹窗超时')) return '已超时';
   if (text.includes('等待10秒后仍未获得授权')) return '授权占用';
   return '读取失败';
+}
+
+function isSandboxSelectionCanceled(message) {
+  return String(message || '').trim().includes('已取消目录授权');
 }
 
 function formatSandboxUpdatedAt(value) {
@@ -24398,8 +24408,7 @@ function updateSandboxUI() {
     button.setAttribute('aria-label', title);
   }
   const statusEl = document.getElementById('sandboxCardStatus');
-  const agentEl = document.getElementById('sandboxCardAgent');
-  const chatEl = document.getElementById('sandboxCardChat');
+  const allowedDirEl = document.getElementById('sandboxCardAllowedDir');
   const updatedEl = document.getElementById('sandboxCardUpdatedAt');
   const errorEl = document.getElementById('sandboxCardError');
   const filePickBtn = document.getElementById('sandboxFilePickBtn');
@@ -24422,8 +24431,11 @@ function updateSandboxUI() {
       statusEl.textContent = sandboxModeLabel(snapshot.sandbox, snapshot.recorded);
     }
   }
-  if (agentEl) agentEl.textContent = binding.agentId || '未选择';
-  if (chatEl) chatEl.textContent = binding.chatId || '未选择';
+  if (allowedDirEl) {
+    const allowedDirText = snapshot.allowedDir || '未授权';
+    allowedDirEl.textContent = allowedDirText;
+    allowedDirEl.title = allowedDirText;
+  }
   if (updatedEl) updatedEl.textContent = formatSandboxUpdatedAt(snapshot.updatedAt);
   if (errorEl) {
     const errorText = String(snapshot.error || '').trim();
@@ -24519,13 +24531,15 @@ async function setActiveChatSandboxMode(mode) {
     updateSandboxUI();
     return;
   }
+  const current = getChatSandbox(binding.chatId, binding.agentId);
+  const previousAllowedDir = String(current.allowedDir || '').trim();
+  const normalizedMode = String(mode || '').trim() || 'off';
   sandboxModalState.saving = true;
   const seq = (sandboxRequestSeq[binding.chatId] || 0) + 1;
   sandboxRequestSeq[binding.chatId] = seq;
   setChatSandbox(binding.chatId, binding.agentId, { loading: true, error: '' });
   updateSandboxUI();
   try {
-    const normalizedMode = String(mode || '').trim() || 'off';
     const path = '/api/sandbox=' + encodeURIComponent(normalizedMode);
     const resp = await fetchExecApi(path + '?agentId=' + encodeURIComponent(binding.agentId) + '&chatId=' + encodeURIComponent(binding.chatId), { cache: 'no-store' });
     let data = null;
@@ -24539,10 +24553,16 @@ async function setActiveChatSandboxMode(mode) {
     const activeMode = String(chatSandbox[binding.chatId] && chatSandbox[binding.chatId].sandbox || '').trim();
     vfsShowUploadToast(activeMode ? ('已切换为沙盒模式：' + sandboxModeLabel(activeMode, true)) : '已关闭当前会话沙盒', false);
   } catch (err) {
+    const errorMessage = err && err.message ? err.message : '更新沙盒状态失败';
+    const canceled = isSandboxSelectionCanceled(errorMessage);
     if (sandboxRequestSeq[binding.chatId] === seq) {
-      setChatSandbox(binding.chatId, binding.agentId, { loading: false, error: err && err.message ? err.message : '更新沙盒状态失败' });
+      setChatSandbox(binding.chatId, binding.agentId, {
+        loading: false,
+        error: canceled ? '' : errorMessage,
+        allowedDir: previousAllowedDir,
+      });
     }
-    vfsShowUploadToast(err && err.message ? err.message : '更新沙盒状态失败', true);
+    if (!canceled) vfsShowUploadToast(errorMessage, true);
   } finally {
     sandboxModalState.saving = false;
     if (state.activeChat === binding.chatId) updateSandboxUI();

@@ -837,12 +837,26 @@ package_linux_sandbox() {
   mkdir -p "$helpers_dir"
   for sandbox_mode in filepick net filepick_net; do
     sandbox_bin="$CLI_GET_SANDBOX_WSL_RELEASE_DIR/$target_name/$sandbox_mode/CLI_SANDBOX"
+    sandbox_picker_launcher="$CLI_GET_SANDBOX_WSL_RELEASE_DIR/$target_name/$sandbox_mode/CLI_SANDBOX_PICKER_LAUNCHER"
+    sandbox_picker="$CLI_GET_SANDBOX_WSL_RELEASE_DIR/$target_name/$sandbox_mode/CLI_SANDBOX_PICKER.exe"
     if [ ! -f "$sandbox_bin" ]; then
       echo "missing sandbox binary for linux/$target_name mode=$sandbox_mode: $sandbox_bin" >&2
       exit 1
     fi
+    if [ ! -f "$sandbox_picker_launcher" ]; then
+      echo "missing sandbox picker launcher for linux/$target_name mode=$sandbox_mode: $sandbox_picker_launcher" >&2
+      exit 1
+    fi
+    if [ ! -f "$sandbox_picker" ]; then
+      echo "missing sandbox picker for linux/$target_name mode=$sandbox_mode: $sandbox_picker" >&2
+      exit 1
+    fi
     copy_release_asset "$sandbox_bin" "$helpers_dir/$sandbox_mode/CLI_SANDBOX"
     chmod 755 "$helpers_dir/$sandbox_mode/CLI_SANDBOX"
+    copy_release_asset "$sandbox_picker_launcher" "$helpers_dir/$sandbox_mode/CLI_SANDBOX_PICKER_LAUNCHER"
+    chmod 755 "$helpers_dir/$sandbox_mode/CLI_SANDBOX_PICKER_LAUNCHER"
+    copy_release_asset "$sandbox_picker" "$helpers_dir/$sandbox_mode/CLI_SANDBOX_PICKER.exe"
+    chmod 755 "$helpers_dir/$sandbox_mode/CLI_SANDBOX_PICKER.exe"
   done
 }
 

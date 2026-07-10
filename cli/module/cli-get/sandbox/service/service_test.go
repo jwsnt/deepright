@@ -134,12 +134,12 @@ func TestBuildSandboxProfileAllowsDeepRightRuntimePath(t *testing.T) {
 	if !strings.Contains(profile, "/Library/Application Support/deepright") {
 		t.Fatalf("profile should allow deepright runtime path, got %q", profile)
 	}
-	if !strings.Contains(profile, "selected-dir.txt") && !strings.Contains(profile, "CLI_SANDBOX") {
+	if !strings.Contains(profile, "CLI_SANDBOX") {
 		t.Fatalf("profile should include sandbox state path, got %q", profile)
 	}
 }
 
-func TestSetPickedDirectoryWritesCache(t *testing.T) {
+func TestSetPickedDirectoryReturnsNormalizedDirectory(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	allowedDir := filepath.Join(home, "picked")
@@ -153,14 +153,6 @@ func TestSetPickedDirectoryWritesCache(t *testing.T) {
 	}
 	if got != filepath.Clean(allowedDir) {
 		t.Fatalf("path = %q, want %q", got, filepath.Clean(allowedDir))
-	}
-
-	cached, ok := readCachedPickedDirectory()
-	if !ok {
-		t.Fatal("readCachedPickedDirectory should return cache hit")
-	}
-	if cached != filepath.Clean(allowedDir) {
-		t.Fatalf("cached = %q, want %q", cached, filepath.Clean(allowedDir))
 	}
 }
 
@@ -181,20 +173,14 @@ func TestSetPickedDirectoryAcceptsQuotedPath(t *testing.T) {
 	}
 }
 
-func TestResolvePickedDirectoryReturnsCachedDirectory(t *testing.T) {
+func TestResolvePickedDirectoryUsesEnvOverride(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	allowedDir := filepath.Join(home, "picked")
 	if err := os.MkdirAll(allowedDir, 0o755); err != nil {
 		t.Fatalf("mkdir picked: %v", err)
 	}
-	statePath, err := sandboxSelectedDirPath()
-	if err != nil {
-		t.Fatalf("sandboxSelectedDirPath: %v", err)
-	}
-	if err := os.WriteFile(statePath, []byte(allowedDir+"\n"), 0o644); err != nil {
-		t.Fatalf("write selected-dir cache: %v", err)
-	}
+	t.Setenv(SandboxAllowedDirEnv, allowedDir)
 
 	got, err := resolvePickedDirectory()
 	if err != nil {
@@ -213,7 +199,7 @@ func TestResolvePickedDirectoryReturnsHelpfulErrorWithoutCache(t *testing.T) {
 	if err == nil {
 		t.Fatal("resolvePickedDirectory err = nil, want authorization error")
 	}
-	if !strings.Contains(err.Error(), "请先通过 CLI_SANDBOX.app 完成目录授权") {
+	if !strings.Contains(err.Error(), "显式传入 --allowed-dir") {
 		t.Fatalf("err = %q, want missing authorization message", err)
 	}
 }
@@ -230,7 +216,7 @@ func TestRunCommandWithModeReturnsMissingAuthorizationMessage(t *testing.T) {
 	if result.Status != 1 {
 		t.Fatalf("status = %d, want 1", result.Status)
 	}
-	if !strings.Contains(result.Output, "请先通过 CLI_SANDBOX.app 完成目录授权") {
+	if !strings.Contains(result.Output, "显式传入 --allowed-dir") {
 		t.Fatalf("output = %q, want missing authorization message", result.Output)
 	}
 }

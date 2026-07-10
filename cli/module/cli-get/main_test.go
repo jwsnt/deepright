@@ -887,6 +887,45 @@ func TestSandboxStateForTaskUsesChatScopedStateAcrossAgents(t *testing.T) {
 	}
 }
 
+func TestBuildTaskResultUsesDirectExecutionWhenChatHasNoSandboxState(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	resetGlobalStateForTest()
+
+	if err := SetSandboxMode("agent-a", "chat-b", sandboxModeNet); err != nil {
+		t.Fatalf("SetSandboxMode: %v", err)
+	}
+
+	task := &TaskContent{
+		Timeout: 5000,
+		Suffix:  "cmd",
+		Type:    "cmd",
+		Tid:     "direct-task",
+		Cmd:     "printf direct-run",
+		AgentId: "agent-a",
+		Chat:    "chat-a",
+	}
+
+	result, err := BuildTaskResult(task, "/bin/sh", nil, filepath.Join(tmp, "unused", "CLI_SANDBOX.app"))
+	if err != nil {
+		t.Fatalf("BuildTaskResult: %v", err)
+	}
+	if result.Status != 0 {
+		t.Fatalf("status = %d, want 0", result.Status)
+	}
+	if body := decodeGzipBase64(t, result.Cmd); body != "direct-run" {
+		t.Fatalf("decoded cmd = %q, want direct-run", body)
+	}
+}
+
 func TestSandboxStateForTaskSkipsExemptedTask(t *testing.T) {
 	oldwd, err := os.Getwd()
 	if err != nil {

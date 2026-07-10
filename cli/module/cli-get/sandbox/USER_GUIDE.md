@@ -52,7 +52,7 @@ cd /path/to/deepright/cli/module/cli-get/sandbox/wsl
 - 执行单条命令并返回原始输出
 - 支持 3 种模式：`filepick`、`net`、`filepick_net`
 - 命中沙盒权限拒绝时尽快终止子进程
-- `filepick` 模式会缓存最近一次已授权目录，避免每次都重新弹窗
+- `filepick` 模式只使用当前执行显式提供的目录或当次选择结果
 - 日志写入 `sandbox.log`
 
 ## 运行
@@ -68,7 +68,7 @@ go run . --cmd "cat hello.txt | wc -l"
 go run . --mode net --cmd "curl http://127.0.0.1:9999"
 ```
 
-为 `filepick` 模式直接写入授权目录缓存：
+为 `filepick` 模式显式提供授权目录：
 
 ```bash
 go run . --mode filepick --allowed-dir /absolute/path/to/workspace
@@ -91,7 +91,7 @@ go run . --mode filepick --allowed-dir /absolute/path/to/workspace
 - 可以配合 `--shell` 指定执行 shell
 - 可以配合 `--timeout` 指定超时毫秒数；传 `0` 时使用默认超时
 - 可以配合 `--log-file` 指定日志文件；默认写入 `sandbox.log`
-- 可以配合 `--allowed-dir` 预先写入已授权目录；如果同时带 `--cmd`，会先更新缓存再执行命令
+- 可以配合 `--allowed-dir` 显式提供已授权目录；如果同时带 `--cmd`，会直接使用该目录执行命令
 
 ## 启动参数
 
@@ -100,16 +100,15 @@ go run . --mode filepick --allowed-dir /absolute/path/to/workspace
 | `--mode` | 空 | 沙盒模式：`filepick` / `net` / `filepick_net` |
 | `--shell` | 当前 `SHELL` 或 `/bin/sh` | 命令执行 Shell |
 | `--log-file` | `sandbox.log` | 沙盒日志文件 |
-| `--allowed-dir` | 空 | 为 `filepick` 类模式写入已授权目录缓存 |
+| `--allowed-dir` | 空 | 为当前执行显式提供授权目录 |
 | `--cmd` | 空 | 要执行的单条命令 |
 | `--timeout` | `0` | 命令超时，毫秒；`0` 表示走默认超时 |
 
-## 目录授权缓存
+## 目录授权来源
 
-- `filepick` / `filepick_net` 会把最近一次选择的目录缓存到用户目录下的 `CLI_SANDBOX` 状态文件
-- 默认会优先复用缓存目录；设置环境变量 `CLI_SANDBOX_FORCE_PICK=1` 可强制重新弹窗
+- `filepick` / `filepick_net` 不再复用本地“最后一次目录”缓存
 - 无界面环境可以通过 `--allowed-dir` 或 `CLI_SANDBOX_ALLOWED_DIR=/absolute/path` 直接提供授权目录
-- 并发授权时会使用文件锁串行化，最多等待约 `10` 秒
+- 图形界面路径由当前这一次目录选择器返回，不会影响其他会话
 
 ## 日志
 

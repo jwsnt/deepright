@@ -98,7 +98,7 @@ const (
 从外到内可以分成五层：
 
 1. **integration 会话控制层**
-   - 负责把某个 `agentId + chatId` 绑定到一个沙盒模式
+   - 负责把某个 `chatId` 绑定到一个沙盒状态：`mode + allowedDir`
    - 负责触发目录授权预热或手动白名单注入
 
 2. **cli-get 调度层**
@@ -354,32 +354,22 @@ runner 通过 `containerHomeBase(bundleID)` 推导容器路径：
 
 1. 如果传入 `--allowed-dir`
    - 直接校验路径存在且为目录
-   - 写入缓存
    - 返回
 2. 如果没有 `--allowed-dir`
-   - 如果未设置 `CLI_SANDBOX_FORCE_PICK`
-     - 先尝试读取缓存
-   - 如果没有缓存或要求强制重选
-     - 弹出目录选择器
-     - 目录选择窗口最长等待 **60 秒**
-     - 校验路径
-     - 写入缓存
+   - 直接弹出目录选择器
+   - 目录选择窗口最长等待 **60 秒**
+   - 校验路径
+   - 返回
+
+当前实现已经移除 runner / helper 本地 `selected-dir.txt` 作为执行回退。
+真正驱动 chat 切换与任务执行的目录来源只剩两种：
+
+- 上层针对当前 chat 显式传入的 `allowedDir`
+- 当前这一次交互里用户刚刚选中的目录
 
 ### 8.5 runner 的目录缓存位置
 
-runner 的缓存路径依赖 bundleId：
-
-- 如果运行在 app 容器里，则使用：
-
-```text
-~/Library/Containers/<bundle-id>/Data/Library/Application Support/CLI_SANDBOX/selected-dir.txt
-```
-
-- 否则回退到：
-
-```text
-os.UserConfigDir()/CLI_SANDBOX/selected-dir.txt
-```
+当前实现不再维护 runner 级目录缓存文件。
 
 ### 8.6 环境变量转发策略
 
@@ -954,34 +944,42 @@ extraEnv = append(extraEnv, "ZDOTDIR="+pickedDir)
 
 ### 14.1 状态存储模型
 
-会话状态只记录模式，不记录目录路径。
+当前实现里，沙盒状态已经是 **chat 维度的完整状态**，同时记录模式和目录。
 
 SQLite 表：
 
 ```sql
 CREATE TABLE cli_sandbox_state (
-    agent_id TEXT NOT NULL,
     chat_id TEXT NOT NULL DEFAULT '',
     sandbox_exe TEXT NOT NULL DEFAULT '',
+    allowed_dir TEXT NOT NULL DEFAULT '',
     updated_at TEXT NOT NULL,
-    PRIMARY KEY (agent_id, chat_id)
+    PRIMARY KEY (chat_id)
 )
 ```
 
 也就是说：
 
-- `agentId + chatId` 决定一个会话是否启用沙盒
-- 启用哪种模式由 `sandbox_exe` 字段表达
-- 目录路径不进库，而是走本地缓存文件
+- `chatId` 决定一个会话是否启用沙盒
+- `sandbox_exe` 表达当前模式
+- `allowed_dir` 表达当前 chat 最近一次确认后的授权目录
+- `updated_at` 用于排查切换时序问题
 
-### 14.2 为什么目录不进库
+### 14.2 为什么目录要进库
 
-当前实现的思路是：
+根因是当前产品语义已经不是“helper 进程本地记住一个目录”这么简单，而是：
 
-- 会话状态属于业务状态，适合入库
-- 已选目录属于本地机器授权状态，适合留在本地文件系统
+- 用户会在多个 chat 之间来回切换
+- 每个 chat 可以选择不同目录
+- 执行命令时必须恢复“这个 chat 自己的目录”，而不是继续沿用 helper 上一次缓存的全局目录
 
-这避免了把本地绝对路径塞进业务数据库。
+因此，目录如果只放在 `selected-dir.txt` 这类 helper 本地缓存里，就会出现“chat A 选了照片，chat B 选了 code，切回 A 却仍然看到 code”的串话问题。
+
+当前修正后的设计是：
+
+- `cli_sandbox_state` 保存 chat 维度的权威目录
+- runner / helper 的本地缓存仍然保留，但只作为单次 prime 或直接调试时的便利缓存
+- integration / proxy / cli-get 每次执行都必须把当前 chat 的 `allowedDir` 再次通过 `--allowed-dir` 传给 `CLI_SANDBOX`
 
 ### 14.3 integration 的模式设置
 
@@ -996,7 +994,7 @@ integration 侧有两种入口：
 
 ### 14.4 目录预热（prime）
 
-当设置 `filepick` 或 `filepick_net` 模式时，integration 会先调用 helper 进行“预热”：
+当设置 `filepick` 或 `filepick_net` 模式时，integration 会先调用 helper 进行“预热”，并把选中的目录写回数据库：
 
 - 无 `dir` 时：触发选目录
 - 有 `dir` 时：直接写入目录缓存
@@ -1004,28 +1002,31 @@ integration 侧有两种入口：
 具体行为：
 
 - `primeIntegrationSandboxMode(mode)`
-  - 通过 helper 执行 `pwd >/dev/null`
+  - 通过 helper 走 pick-only 授权路径
   - 注入 `CLI_SANDBOX_FORCE_PICK=1`
   - 强制弹窗
+  - 返回本次实际选中的目录
 - `primeIntegrationSandboxDirectory(mode, dir)`
   - 直接执行 helper `--allowed-dir <dir>`
+  - 返回规范化后的目录
 
-只有预热成功之后，integration 才会把模式写入 SQLite。
+只有预热成功之后，integration 才会把 `mode + allowedDir` 一起写入 SQLite。
 
 因此，会话模式切换的设计是：
 
 1. 先确认目录授权可用
-2. 再记录该会话已启用沙盒
+2. 再记录该 chat 的完整沙盒状态
 
-这样可以避免数据库里写着 `filepick`，但实际上本地还没拿到目录授权。
+这样可以避免数据库里写着 `filepick`，但实际上本地还没拿到目录授权，或者切回旧 chat 时误用了别的 chat 刚刚写入的 helper 缓存。
 
 ### 14.5 执行时机
 
 后续当 integration / cli-get 真正执行命令时：
 
-- 先查会话模式
+- 先查当前 chat 的完整状态
 - 解析对应 helper 路径
 - 通过 app bundle 的 `Contents/MacOS/CLI_SANDBOX` 启动沙盒执行
+- 如果状态里有 `allowedDir`，则显式追加 `--allowed-dir <dir>`
 
 helper 路径解析支持：
 

@@ -6,7 +6,7 @@
   - `filepick`
   - `net`
   - `filepick_net`
-- 目录授权缓存、`--allowed-dir`、`CLI_SANDBOX_ALLOWED_DIR`、`CLI_SANDBOX_FORCE_PICK` 都保留可用
+- `--allowed-dir`、`CLI_SANDBOX_ALLOWED_DIR`、`CLI_SANDBOX_FORCE_PICK` 都保留可用
 - WSL 下优先尝试通过 `powershell.exe` 拉起 Windows 原生目录选择器；不可用时回退到 `zenity`
 - `net` / `filepick_net` 使用 `bubblewrap` 的 network namespace 做禁网
 
@@ -48,13 +48,13 @@ cd /path/to/deepright/cli/module/cli-get/sandbox/wsl
 - 成功时输出写到 `stdout`，退出码为 `0`
 - 失败时输出写到 `stderr`，退出码为 `1`
 - 未安装 `bubblewrap` 时会返回 `CLI_SANDBOX当前系统未安装bubblewrap`
-- 没有缓存目录且无法拉起目录选择器时，会提示显式传入 `--allowed-dir`
+- 没有显式目录且无法拉起目录选择器时，会提示显式传入 `--allowed-dir`
 
 ## 目录授权
 
-- 缓存位置：`$XDG_CONFIG_HOME/CLI_SANDBOX/selected-dir.txt`
+- 不再复用 helper 本地“最后一次目录”缓存
 - 环境变量 `CLI_SANDBOX_ALLOWED_DIR` 优先级最高
-- 环境变量 `CLI_SANDBOX_FORCE_PICK=1` 会强制重新选择目录
+- 环境变量 `CLI_SANDBOX_FORCE_PICK=1` 会触发一次新的目录选择
 - `--allowed-dir` 支持直接传 WSL 路径，也支持 Windows 路径，helper 会通过 `wslpath` 自动转换
 
 ## 隔离语义

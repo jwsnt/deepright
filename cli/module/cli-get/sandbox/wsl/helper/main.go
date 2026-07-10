@@ -42,6 +42,12 @@ var helperMkdirAllFn = os.MkdirAll
 var helperReadFileFn = os.ReadFile
 var helperWriteFileFn = os.WriteFile
 var helperReadProcVersionFn = func() ([]byte, error) { return os.ReadFile("/proc/version") }
+var helperOpenFileFn = os.OpenFile
+var helperCreateTempFn = os.CreateTemp
+var helperExecutableFn = os.Executable
+
+var helperDebugMu sync.Mutex
+var helperDebugWriter io.WriteCloser
 
 var sandboxPermissionDeniedMarkers = []string{
 	"permission denied",
@@ -66,19 +72,30 @@ func main() {
 	flag.StringVar(&shell, "shell", defaultShell(), "shell used to execute delegated commands")
 	flag.StringVar(&logFile, "log-file", "sandbox.log", "sandbox log file path")
 	flag.StringVar(&mode, "mode", defaultMode, "sandbox mode: filepick, net, filepick_net")
-	flag.StringVar(&allowedDir, "allowed-dir", "", "cache an allowed directory for filepick-based modes")
+	flag.StringVar(&allowedDir, "allowed-dir", "", "provide an allowed directory for filepick-based modes")
 	flag.StringVar(&directCmd, "cmd", "", "execute a single command and print its output")
 	flag.IntVar(&directTimeout, "timeout", 0, "command timeout in ms; 0 uses the default timeout")
 	flag.Parse()
+	if closer := initHelperDebugLog(logFile); closer != nil {
+		defer closer.Close()
+	}
 
 	mode = normalizeSandboxMode(mode)
 	forcePick := envTruthy(sandboxForcePickEnv)
+	helperDebugf("startup mode=%s forcePick=%t hasCmd=%t allowedDir=%t", mode, forcePick, strings.TrimSpace(directCmd) != "", strings.TrimSpace(allowedDir) != "")
 	if strings.TrimSpace(allowedDir) != "" {
 		normalized, err := setPickedDirectory(allowedDir)
 		if err != nil {
+			helperDebugf("set-picked-dir failed path=%q err=%v", allowedDir, err)
 			fmt.Fprint(os.Stderr, err.Error())
 			os.Exit(1)
 		}
+		if err := os.Setenv(sandboxAllowedDirEnv, normalized); err != nil {
+			helperDebugf("set-allowed-dir-env failed err=%v", err)
+			fmt.Fprint(os.Stderr, err.Error())
+			os.Exit(1)
+		}
+		helperDebugf("set-picked-dir ok path=%q normalized=%q", allowedDir, normalized)
 		if strings.TrimSpace(directCmd) == "" {
 			fmt.Fprint(os.Stdout, normalized)
 			return
@@ -90,14 +107,17 @@ func main() {
 		defer cancel()
 		normalized, err := resolvePickedDirectory(ctx, true)
 		if err != nil {
+			helperDebugf("resolve-picked-dir failed err=%v", err)
 			fmt.Fprint(os.Stderr, err.Error())
 			os.Exit(1)
 		}
+		helperDebugf("resolve-picked-dir ok normalized=%q", normalized)
 		fmt.Fprint(os.Stdout, normalized)
 		return
 	}
 
 	if strings.TrimSpace(directCmd) == "" {
+		helperDebugf("startup failed missing cmd/allowed-dir")
 		fmt.Fprintln(os.Stderr, "CLI_SANDBOX requires --cmd or --allowed-dir")
 		os.Exit(1)
 	}
@@ -111,6 +131,37 @@ func main() {
 		}
 	}
 	os.Exit(result.Status)
+}
+
+func initHelperDebugLog(logFile string) io.WriteCloser {
+	logFile = strings.TrimSpace(logFile)
+	if logFile == "" {
+		return nil
+	}
+	if !filepath.IsAbs(logFile) {
+		stateDir, err := sandboxStateDir()
+		if err != nil {
+			return nil
+		}
+		logFile = filepath.Join(stateDir, logFile)
+	}
+	file, err := helperOpenFileFn(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return nil
+	}
+	helperDebugMu.Lock()
+	helperDebugWriter = file
+	helperDebugMu.Unlock()
+	return file
+}
+
+func helperDebugf(format string, args ...interface{}) {
+	helperDebugMu.Lock()
+	defer helperDebugMu.Unlock()
+	if helperDebugWriter == nil {
+		return
+	}
+	fmt.Fprintf(helperDebugWriter, "%s %s\n", time.Now().Format("2006-01-02 15:04:05.000"), fmt.Sprintf(format, args...))
 }
 
 type commandResult struct {
@@ -231,19 +282,18 @@ func resolveShellPath(shell string) (string, error) {
 
 func resolvePickedDirectory(ctx context.Context, forcePick bool) (string, error) {
 	if override := strings.TrimSpace(os.Getenv(sandboxAllowedDirEnv)); override != "" {
+		helperDebugf("resolve-picked-dir use-env path=%q", override)
 		return normalizeDirectoryPath(override)
 	}
-	if !forcePick {
-		if cached, ok := readCachedPickedDirectory(); ok {
-			return cached, nil
-		}
-	}
+	helperDebugf("resolve-picked-dir invoke-picker forcePick=%t", forcePick)
 	pickerCtx, cancel := withPickerTimeout(ctx)
 	defer cancel()
 	picked, err := pickAllowedDirectory(pickerCtx)
 	if err != nil {
+		helperDebugf("resolve-picked-dir picker-failed err=%v", err)
 		return "", err
 	}
+	helperDebugf("resolve-picked-dir picker-returned path=%q", picked)
 	return setPickedDirectory(picked)
 }
 
@@ -263,9 +313,6 @@ func withPickerTimeout(ctx context.Context) (context.Context, context.CancelFunc
 func setPickedDirectory(path string) (string, error) {
 	normalized, err := normalizeDirectoryPath(path)
 	if err != nil {
-		return "", err
-	}
-	if err := writeCachedPickedDirectory(normalized); err != nil {
 		return "", err
 	}
 	return normalized, nil
@@ -335,38 +382,6 @@ func stripWrappedQuotes(path string) string {
 	return path
 }
 
-func readCachedPickedDirectory() (string, bool) {
-	statePath, err := sandboxSelectedDirPath()
-	if err != nil {
-		return "", false
-	}
-	data, err := helperReadFileFn(statePath)
-	if err != nil {
-		return "", false
-	}
-	path, err := normalizeDirectoryPath(string(data))
-	if err != nil {
-		return "", false
-	}
-	return path, true
-}
-
-func writeCachedPickedDirectory(path string) error {
-	statePath, err := sandboxSelectedDirPath()
-	if err != nil {
-		return err
-	}
-	return helperWriteFileFn(statePath, []byte(path+"\n"), 0o644)
-}
-
-func sandboxSelectedDirPath() (string, error) {
-	stateDir, err := sandboxStateDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(stateDir, "selected-dir.txt"), nil
-}
-
 func sandboxStateDir() (string, error) {
 	configDir, err := helperUserConfigDirFn()
 	if err != nil {
@@ -380,78 +395,251 @@ func sandboxStateDir() (string, error) {
 }
 
 func pickAllowedDirectory(ctx context.Context) (string, error) {
-	if path, ok := pickDirectoryViaPowerShell(ctx); ok {
+	helperDebugf("pick-directory start")
+	if helperIsWSL() {
+		if path, ok, canceled := pickDirectoryViaWindowsPicker(ctx); ok {
+			helperDebugf("pick-directory windows-picker-ok path=%q", path)
+			return path, nil
+		} else if canceled {
+			helperDebugf("pick-directory windows-picker-canceled")
+			return "", fmt.Errorf("CLI_SANDBOX权限拒绝")
+		}
+		if path, ok, canceled := pickDirectoryViaPowerShell(ctx); ok {
+			helperDebugf("pick-directory powershell-ok path=%q", path)
+			return path, nil
+		} else if canceled {
+			helperDebugf("pick-directory powershell-canceled")
+			return "", fmt.Errorf("CLI_SANDBOX权限拒绝")
+		}
+	} else if path, ok := pickDirectoryViaZenity(ctx); ok {
+		helperDebugf("pick-directory zenity-ok path=%q", path)
 		return path, nil
 	}
-	if path, ok := pickDirectoryViaZenity(ctx); ok {
-		return path, nil
-	}
-	if _, ok := readCachedPickedDirectory(); ok {
-		return "", fmt.Errorf("CLI_SANDBOX权限拒绝")
-	}
+	helperDebugf("pick-directory failed no-picker")
 	return "", fmt.Errorf("未找到已授权目录，请先通过 CLI_SANDBOX 完成目录授权或显式传入 --allowed-dir")
 }
 
-func pickDirectoryViaPowerShell(ctx context.Context) (string, bool) {
+func pickDirectoryViaWindowsPicker(ctx context.Context) (string, bool, bool) {
 	if !helperIsWSL() {
-		return "", false
+		helperDebugf("windows-picker skipped non-wsl")
+		return "", false, false
 	}
-	powershellPath := ""
-	for _, candidate := range []string{"powershell.exe", "pwsh.exe"} {
-		path, err := helperLookPathFn(candidate)
-		if err == nil && strings.TrimSpace(path) != "" {
-			powershellPath = path
-			break
+	for _, pickerPath := range helperWindowsPickerCandidates() {
+		helperDebugf("windows-picker try candidate=%q", pickerPath)
+		output, err := runCapturedCommand(ctx, pickerPath)
+		if err != nil {
+			if isPickerCanceled(err, output) {
+				helperDebugf("windows-picker candidate-canceled path=%q", pickerPath)
+				return "", false, true
+			}
+			helperDebugf("windows-picker candidate-failed path=%q err=%v output=%q", pickerPath, err, strings.TrimSpace(string(output)))
+			continue
 		}
+		path := strings.TrimSpace(string(output))
+		if path == "" {
+			helperDebugf("windows-picker candidate-empty path=%q", pickerPath)
+			continue
+		}
+		converted, err := maybeConvertWindowsPath(path)
+		if err != nil {
+			helperDebugf("windows-picker candidate-convert-failed path=%q selected=%q err=%v", pickerPath, path, err)
+			continue
+		}
+		if converted == "" {
+			converted = path
+		}
+		helperDebugf("windows-picker candidate-ok path=%q selected=%q converted=%q", pickerPath, path, converted)
+		return converted, true, false
 	}
-	if powershellPath == "" {
-		return "", false
+	helperDebugf("windows-picker no-candidate-succeeded")
+	return "", false, false
+}
+
+func pickDirectoryViaPowerShell(ctx context.Context) (string, bool, bool) {
+	if !helperIsWSL() {
+		helperDebugf("powershell-picker skipped non-wsl")
+		return "", false, false
 	}
 	script := strings.Join([]string{
-		"Add-Type -AssemblyName System.Windows.Forms | Out-Null",
-		"$dialog = New-Object System.Windows.Forms.FolderBrowserDialog",
-		"$dialog.Description = '请选择允许 CLI_SANDBOX 访问的目录'",
-		"$dialog.ShowNewFolderButton = $false",
-		"if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {",
-		"  [Console]::OutputEncoding = [System.Text.Encoding]::UTF8",
-		"  Write-Output $dialog.SelectedPath",
-		"  exit 0",
+		"$shell = New-Object -ComObject Shell.Application",
+		"$folder = $shell.BrowseForFolder(0, '请选择允许 CLI_SANDBOX 访问的目录', 0x0001 + 0x0040 + 0x0200, 0)",
+		"if ($null -ne $folder) {",
+		"    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8",
+		"    Write-Output $folder.Self.Path",
+		"    exit 0",
 		"}",
 		"exit 1",
 	}, "; ")
-	cmd := helperCommandContextFn(ctx, powershellPath, "-NoProfile", "-STA", "-Command", script)
-	output, err := cmd.CombinedOutput()
+	for _, powershellPath := range helperPowerShellCandidates() {
+		helperDebugf("powershell-picker try candidate=%q", powershellPath)
+		cmd := helperCommandContextFn(ctx, powershellPath, "-NoProfile", "-STA", "-Command", script)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			if isPickerCanceled(err, output) {
+				helperDebugf("powershell-picker candidate-canceled path=%q", powershellPath)
+				return "", false, true
+			}
+			helperDebugf("powershell-picker candidate-failed path=%q err=%v output=%q", powershellPath, err, strings.TrimSpace(string(output)))
+			continue
+		}
+		path := strings.TrimSpace(string(output))
+		if path == "" {
+			helperDebugf("powershell-picker candidate-empty path=%q", powershellPath)
+			continue
+		}
+		converted, err := maybeConvertWindowsPath(path)
+		if err != nil {
+			helperDebugf("powershell-picker candidate-convert-failed path=%q selected=%q err=%v", powershellPath, path, err)
+			continue
+		}
+		if converted == "" {
+			converted = path
+		}
+		helperDebugf("powershell-picker candidate-ok path=%q selected=%q converted=%q", powershellPath, path, converted)
+		return converted, true, false
+	}
+	helperDebugf("powershell-picker no-candidate-succeeded")
+	return "", false, false
+}
+
+func helperWindowsPickerCandidates() []string {
+	var candidates []string
+	addCandidate := func(path string) {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			return
+		}
+		for _, existing := range candidates {
+			if existing == path {
+				return
+			}
+		}
+		candidates = append(candidates, path)
+	}
+	if executable, err := helperExecutableFn(); err == nil && strings.TrimSpace(executable) != "" {
+		addCandidate(filepath.Join(filepath.Dir(executable), "CLI_SANDBOX_PICKER_LAUNCHER"))
+	}
+	if path, err := helperLookPathFn("CLI_SANDBOX_PICKER_LAUNCHER"); err == nil {
+		addCandidate(path)
+	}
+	return candidates
+}
+
+func helperPowerShellCandidates() []string {
+	var candidates []string
+	addCandidate := func(path string) {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			return
+		}
+		for _, existing := range candidates {
+			if existing == path {
+				return
+			}
+		}
+		candidates = append(candidates, path)
+	}
+	for _, candidate := range []string{"powershell.exe", "pwsh.exe"} {
+		path, err := helperLookPathFn(candidate)
+		if err == nil {
+			addCandidate(path)
+		}
+	}
+	for _, path := range []string{
+		"/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+		"/mnt/c/Program Files/PowerShell/7/pwsh.exe",
+		"/mnt/c/Program Files (x86)/PowerShell/7/pwsh.exe",
+	} {
+		addCandidate(path)
+	}
+	return candidates
+}
+
+func isPickerCanceled(err error, output []byte) bool {
+	if err == nil {
+		return false
+	}
+	trimmed := strings.TrimSpace(string(output))
+	if trimmed != "" {
+		switch strings.ToLower(trimmed) {
+		case "canceled", "picker canceled":
+			return true
+		default:
+			return false
+		}
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		return false
+	}
+	return exitErr.ExitCode() == 1
+}
+
+func runCapturedCommand(ctx context.Context, name string, args ...string) ([]byte, error) {
+	stdoutFile, err := helperCreateTempFn("", "cli-sandbox-helper-stdout-*")
 	if err != nil {
-		return "", false
+		return nil, err
 	}
-	path := strings.TrimSpace(string(output))
-	if path == "" {
-		return "", false
-	}
-	converted, err := maybeConvertWindowsPath(path)
+	stdoutPath := stdoutFile.Name()
+	defer os.Remove(stdoutPath)
+	defer stdoutFile.Close()
+
+	stderrFile, err := helperCreateTempFn("", "cli-sandbox-helper-stderr-*")
 	if err != nil {
-		return "", false
+		return nil, err
 	}
-	if converted == "" {
-		converted = path
+	stderrPath := stderrFile.Name()
+	defer os.Remove(stderrPath)
+	defer stderrFile.Close()
+
+	cmd := helperCommandContextFn(ctx, name, args...)
+	cmd.Stdout = stdoutFile
+	cmd.Stderr = stderrFile
+	runErr := cmd.Run()
+
+	if syncErr := stdoutFile.Sync(); syncErr != nil && runErr == nil {
+		runErr = syncErr
 	}
-	return converted, true
+	if syncErr := stderrFile.Sync(); syncErr != nil && runErr == nil {
+		runErr = syncErr
+	}
+	stdoutData, stdoutErr := helperReadFileFn(stdoutPath)
+	if stdoutErr != nil {
+		return nil, stdoutErr
+	}
+	stderrData, stderrErr := helperReadFileFn(stderrPath)
+	if stderrErr != nil {
+		return nil, stderrErr
+	}
+	if len(stderrData) > 0 {
+		if len(stdoutData) == 0 {
+			stdoutData = stderrData
+		} else {
+			stdoutData = append(append(stdoutData, '\n'), stderrData...)
+		}
+	}
+	return stdoutData, runErr
 }
 
 func pickDirectoryViaZenity(ctx context.Context) (string, bool) {
 	zenityPath, err := helperLookPathFn("zenity")
 	if err != nil || strings.TrimSpace(zenityPath) == "" {
+		helperDebugf("zenity-picker unavailable err=%v", err)
 		return "", false
 	}
+	helperDebugf("zenity-picker try path=%q", zenityPath)
 	cmd := helperCommandContextFn(ctx, zenityPath, "--file-selection", "--directory", "--title=选择允许 CLI_SANDBOX 访问的目录")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		helperDebugf("zenity-picker failed path=%q err=%v output=%q", zenityPath, err, strings.TrimSpace(string(output)))
 		return "", false
 	}
 	path := strings.TrimSpace(string(output))
 	if path == "" {
+		helperDebugf("zenity-picker empty path=%q", zenityPath)
 		return "", false
 	}
+	helperDebugf("zenity-picker ok path=%q", path)
 	return path, true
 }
 

@@ -9,7 +9,7 @@ package main
 #import <Cocoa/Cocoa.h>
 #import <stdlib.h>
 
-static char* runnerChooseFolderNative(double timeoutSeconds, char **errOut) {
+static char* runnerChooseFolderNative(const char *initialPath, double timeoutSeconds, char **errOut) {
 	@autoreleasepool {
 		[NSApplication sharedApplication];
 		[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
@@ -24,6 +24,15 @@ static char* runnerChooseFolderNative(double timeoutSeconds, char **errOut) {
 		[panel setResolvesAliases:YES];
 		[panel setPrompt:@"允许"];
 		[panel setMessage:@"CLI_SANDBOX 请选择允许访问的目录"];
+		if (initialPath != NULL && initialPath[0] != '\0') {
+			NSString *initialDir = [NSString stringWithUTF8String:initialPath];
+			if (initialDir != nil && [initialDir length] > 0) {
+				NSURL *initialURL = [NSURL fileURLWithPath:initialDir isDirectory:YES];
+				if (initialURL != nil) {
+					[panel setDirectoryURL:initialURL];
+				}
+			}
+		}
 
 		__block BOOL timedOut = NO;
 		if (timeoutSeconds > 0) {
@@ -79,8 +88,14 @@ func sandboxChooseFolderWithTimeout(timeout time.Duration) (string, error) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
+	initialPath := defaultMacPickerDirectory()
+	var initialPathText *C.char
+	if initialPath != "" {
+		initialPathText = C.CString(initialPath)
+		defer C.free(unsafe.Pointer(initialPathText))
+	}
 	var errText *C.char
-	result := C.runnerChooseFolderNative(C.double(timeout.Seconds()), &errText)
+	result := C.runnerChooseFolderNative(initialPathText, C.double(timeout.Seconds()), &errText)
 	if errText != nil {
 		defer C.free(unsafe.Pointer(errText))
 		return "", errors.New(strings.TrimSpace(C.GoString(errText)))

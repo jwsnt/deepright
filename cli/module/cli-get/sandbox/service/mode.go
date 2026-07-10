@@ -14,6 +14,7 @@ const (
 )
 
 const sandboxAllowedDirEnv = "CLI_SANDBOX_ALLOWED_DIR"
+const SandboxAllowedDirEnv = sandboxAllowedDirEnv
 const sandboxStateDirName = "CLI_SANDBOX"
 
 var Debugf func(format string, args ...any)
@@ -45,11 +46,7 @@ func resolvePickedDirectory() (string, error) {
 		debugf("picked directory using override path=%q", override)
 		return normalizeDirectoryPath(override)
 	}
-	if cached, ok := readCachedPickedDirectory(); ok {
-		debugf("picked directory cache hit path=%q", cached)
-		return cached, nil
-	}
-	return "", fmt.Errorf("未找到已授权目录，请先通过 CLI_SANDBOX.app 完成目录授权")
+	return "", fmt.Errorf("未找到当前命令的已授权目录，请显式传入 --allowed-dir")
 }
 
 func SetPickedDirectory(path string) (string, error) {
@@ -57,10 +54,7 @@ func SetPickedDirectory(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := writeCachedPickedDirectory(normalized); err != nil {
-		return "", err
-	}
-	debugf("picked directory set via override path=%q", normalized)
+	debugf("picked directory accepted path=%q", normalized)
 	return normalized, nil
 }
 
@@ -157,38 +151,6 @@ func buildSandboxProfile(mode, pickedDir string) string {
 func quoteSandboxString(value string) string {
 	replacer := strings.NewReplacer(`\`, `\\`, `"`, `\"`)
 	return `"` + replacer.Replace(value) + `"`
-}
-
-func readCachedPickedDirectory() (string, bool) {
-	statePath, err := sandboxSelectedDirPath()
-	if err != nil {
-		return "", false
-	}
-	data, err := os.ReadFile(statePath)
-	if err != nil {
-		return "", false
-	}
-	path, err := normalizeDirectoryPath(string(data))
-	if err != nil {
-		return "", false
-	}
-	return path, true
-}
-
-func writeCachedPickedDirectory(path string) error {
-	statePath, err := sandboxSelectedDirPath()
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(statePath, []byte(path+"\n"), 0o644)
-}
-
-func sandboxSelectedDirPath() (string, error) {
-	stateDir, err := sandboxStateDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(stateDir, "selected-dir.txt"), nil
 }
 
 func sandboxStateDir() (string, error) {
