@@ -1,14 +1,5 @@
 package ai.deepright.task;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
-import static org.springframework.util.StringUtils.hasText;
-
-
-
-
-import ai.open.right.protocol.ProtocolCode;
-
 import ai.deepright.cli.*;
 import ai.deepright.cli.function.CliSubFunction;
 import ai.deepright.feature.FeatureField;
@@ -26,6 +17,7 @@ import ai.deepright.utils.TemplateChecker;
 import ai.deepright.workflow.worktask.HeartbeatWorkTask;
 import ai.open.right.WorkflowException;
 import ai.open.right.context.UserContext;
+import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.resouce.ResourceService;
 import ai.open.right.utils.JsonUtils;
 import ai.open.right.utils.SplitUtils;
@@ -50,6 +42,7 @@ import org.apache.commons.beanutils.PropertyUtils;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -65,6 +58,8 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+
+import static org.springframework.util.StringUtils.hasText;
 
 @Slf4j
 @Getter
@@ -125,12 +120,12 @@ public class TaskFunction extends BaseFunction implements TaskResult {
         this.template4error = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4error).openStream()), StandardCharsets.UTF_8);
         this.template4query = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4query).openStream()), StandardCharsets.UTF_8);
         this.template4async = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4async).openStream()), StandardCharsets.UTF_8);
-        WorkflowException.check(!hasText(this.template4artifact), "The template artifact must not be empty", ProtocolCode.C400);
-        WorkflowException.check(!hasText(this.template4answer), "The template answer must not be empty", ProtocolCode.C400);
-        WorkflowException.check(isEmpty(this.responseSchema), "The response schema can not be empty", ProtocolCode.C400);
-        WorkflowException.check(!hasText(this.template4async), "The template async must not be empty", ProtocolCode.C400);
-        WorkflowException.check(!hasText(this.template4query), "The template query must not be empty", ProtocolCode.C400);
-        WorkflowException.check(!hasText(this.template4error), "The template error must not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4artifact), "The template artifact must not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4answer), "The template answer must not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4async), "The template async must not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4query), "The template query must not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4error), "The template error must not be empty", ProtocolCode.C400);
+        WorkflowException.check(MapUtils.isEmpty(this.responseSchema), "The response schema can not be empty", ProtocolCode.C400);
         this.timeout = (int) TimeUnit.MILLISECONDS.convert(this.timeout, TimeUnit.SECONDS);
     }
 
@@ -138,7 +133,7 @@ public class TaskFunction extends BaseFunction implements TaskResult {
     public Object call(FunctionContext functionContext) throws Exception {
         WorkflowTask workTask = functionContext.getWorkTask().printQuery();
         TaskData[] taskArray = this.buildTaskData(workTask);
-        WorkflowException.check(isEmpty(taskArray), "The assigned task cannot be empty, please check again.", ProtocolCode.C400);
+        WorkflowException.check(ArrayUtils.isEmpty(taskArray), "The assigned task cannot be empty, please check again.", ProtocolCode.C400);
         RouterDevice sourceDevice = new RouterDevice(workTask).printRouter();
         Integer timeout = this.buildTimeout(workTask, taskArray);
         List<TaskSync> syncTasks = this.buildSyncTasks(workTask, sourceDevice, taskArray, timeout);

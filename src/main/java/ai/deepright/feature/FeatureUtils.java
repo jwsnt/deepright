@@ -89,6 +89,10 @@ public class FeatureUtils {
         return MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_PROVIDER, FeatureUtils.buildTargetProvider(workTask));
     }
 
+    public static String buildSandBoxPath(WorkflowTask workTask) throws Exception {
+        return MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_SANDBOX_PATH);
+    }
+
     public static Long buildLastResponse(WorkflowTask workTask) throws Exception {
         return MapUtils.getLong(workTask.getMetadata(), FeatureField.KEY_LAST_RESPONSE);
     }

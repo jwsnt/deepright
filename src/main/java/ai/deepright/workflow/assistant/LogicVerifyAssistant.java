@@ -1,14 +1,5 @@
 package ai.deepright.workflow.assistant;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
-import static org.springframework.util.StringUtils.hasText;
-
-
-
-
-import ai.open.right.protocol.ProtocolCode;
-
 import ai.deepright.cli.CliPrinter;
 import ai.deepright.cli.insert.CliInsertRag;
 import ai.deepright.cli.insert.CliRecall;
@@ -20,6 +11,7 @@ import ai.deepright.skills.SkillsChecker;
 import ai.deepright.utils.TemplateChecker;
 import ai.deepright.workflow.worktask.ResetStateWorkTask;
 import ai.open.right.WorkflowException;
+import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.resouce.ResourceService;
 import ai.open.right.utils.JsonUtils;
 import ai.open.right.workflow.flow.WorkflowQueue;
@@ -82,8 +74,8 @@ public class LogicVerifyAssistant extends DefaultAssistant {
     public void init() throws Exception {
         this.template4verify = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4verify).openStream()), StandardCharsets.UTF_8);
         this.template4query = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4query).openStream()), StandardCharsets.UTF_8);
-        WorkflowException.check(!hasText(this.template4verify), "The template verify must not be empty", ProtocolCode.C400);
-        WorkflowException.check(!hasText(this.template4query), "The template query must not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4verify), "The template verify must not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4query), "The template query must not be empty", ProtocolCode.C400);
     }
 
     @Override

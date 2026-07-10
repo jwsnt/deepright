@@ -119,15 +119,17 @@ http://127.0.0.1:9876/site/
 - 如果本地还没有“点击过沙盒按钮”的记录，第一次点击这里不会立刻切换沙盒，而是会先进入独立的新手引导
 - 这条引导会先高亮 `沙盒按钮`，点击 `知道了` 后自动展开 `会话沙盒` 浮层，再依次讲解 `目录权限`、`离线执行` 与 `双重限制`
 - 在引导完成前，这些入口只用于演示说明，不会立即切换真实沙盒模式；点击最后一步 `完成` 后才恢复正常交互
-- 按钮与当前 `Agent + Chat` 会话绑定；切换会话后会自动请求 `/api/sandbox_status?agentId=xxx&chatId=yyy` 刷新状态
+- 按钮与当前 `Chat` 会话绑定；切换会话后会自动请求 `/api/sandbox_status?chatId=yyy` 刷新状态
+- 即使当前未选中 `agentId`，只要存在 `chatId` 也会恢复当前会话沙盒状态
 - 点击按钮后会在中间会话区弹出居中的模式浮层，支持 4 个操作：
   - `目录权限`：调用 `/api/sandbox=filepick?agentId=xxx&chatId=yyy`
   - `离线执行`：调用 `/api/sandbox=net?agentId=xxx&chatId=yyy`
   - `双重限制`：调用 `/api/sandbox=filepick_net?agentId=xxx&chatId=yyy`
   - `关闭沙盒`：调用 `/api/sandbox=off?agentId=xxx&chatId=yyy`
 - 前端不需要区分平台；后端会自动在 macOS 走原有 `CLI_SANDBOX.app`，在 Windows/WSL 走新的 WSL `bubblewrap` helper
+- 同一 `chatId` 下即使切换不同 `agentId`，沙盒按钮高亮、浮层模式和更新时间也会保持一致
 - 只要当前会话存在有效沙盒模式，按钮就会高亮；关闭后恢复灰色
-- 浮层会显示当前绑定的 Agent、会话 ID、最近更新时间与当前模式名称
+- 浮层会显示当前选中的 Agent、会话 ID、最近更新时间与当前模式名称；其中 Agent 仅用于展示，不参与沙盒状态定位
 - 浮层右上角提供叉按钮关闭，按 `Esc` 也会直接关闭，不再单独保留底部 `取消` 按钮
 - 如果目录授权被取消，会在 `会话沙盒` 标题下方左对齐显示红色提示，但不会把下面的绑定信息和操作按钮挤动
 
@@ -1320,3 +1322,21 @@ Header 中 `Authorization` 为对应模型的密钥。
 - 可用配置要求：`token` 必须真实存在，`__url` 与 `__model_multi_output` 则允许使用系统默认值补全
 - 满足条件后，`__internal_seedream` 才会同时出现在 `/api/skills`、前端 `@技能` 菜单、转发 `/v1/chat/completions` 的 `metadata.agents[].skills` 以及 `cli/get` 的 `metadata.agents[].skills`
 - 如果 Seedream 尚未配置完成，上述所有链路都不会暴露 `__internal_seedream`
+
+---
+
+## 迭代 20260709-2：会话沙盒改为按 `chatId` 恢复
+
+## 本次更新
+
+- 当前会话沙盒的状态查询、缓存、恢复、切换刷新都改为仅按 `chatId`
+- 前端读取状态改为 `/api/sandbox_status?chatId=...`；即使当前没有选中 `agentId`，只要存在 `chatId` 也会恢复当前会话沙盒状态
+- 写入接口仍使用 `/api/sandbox=filepick|net|filepick_net|off?agentId=...&chatId=...`；其中 `agentId` 只作为后端日志输入
+- 同一 `chatId` 下切换不同 `agentId` 时，沙盒按钮高亮、浮层模式与更新时间都会保持一致
+- 前端仍不区分 macOS 与 Windows/WSL；后端会自动选择对应 helper 与目录授权流程
+
+## 用户可见行为
+
+- `目录权限`、`离线执行`、`双重限制`、`关闭沙盒` 四个入口与现有引导、浮层布局保持不变
+- 浮层仍会展示当前选中的 `agentId`，但该展示值不参与沙盒状态查询、缓存命中与恢复判断
+- 如果后端返回 WSL helper / `bubblewrap` 不可用，页面会展示失败提示，但不会影响当前会话其它交互

@@ -2652,24 +2652,112 @@ func (p *ProxyServer) HandleFolder(w http.ResponseWriter, r *http.Request) {
 
 // OpenFolder opens a folder using the system's file manager.
 var openFolderFn = openFolderSystem
+var openFolderSystemGOOS = runtime.GOOS
+var openFolderSystemIsWSLFn = proxyInstallAppIsWSL
+var openFolderSystemExecCommandFn = exec.Command
+var openFolderSystemStartCommandFn = func(name string, args ...string) error {
+	return openFolderSystemExecCommandFn(name, args...).Start()
+}
+var openFolderSystemRunCommandFn = func(name string, args ...string) error {
+	return openFolderSystemExecCommandFn(name, args...).Run()
+}
+var openFolderSystemLookPathFn = exec.LookPath
+var openFolderSystemStatFn = os.Stat
+var openFolderSystemOutputFn = func(name string, args ...string) ([]byte, error) {
+	return exec.Command(name, args...).Output()
+}
 
 func OpenFolder(path string) error {
 	return openFolderFn(path)
 }
 
 func openFolderSystem(path string) error {
-	var cmd string
-	switch runtime.GOOS {
-	case "darwin":
-		cmd = "open"
-	case "linux":
-		cmd = "xdg-open"
-	case "windows":
-		cmd = "explorer"
-	default:
-		return fmt.Errorf("unsupported OS: %s", runtime.GOOS)
+	if openFolderSystemGOOS == "linux" && openFolderSystemIsWSLFn() {
+		if err := openFolderSystemRunCommandFn("xdg-open", path); err == nil {
+			return nil
+		}
 	}
-	return exec.Command(cmd, path).Start()
+	cmd, args, err := openFolderSystemCommand(path)
+	if err != nil {
+		return err
+	}
+	return openFolderSystemStartCommandFn(cmd, args...)
+}
+
+func openFolderSystemCommand(path string) (string, []string, error) {
+	switch openFolderSystemGOOS {
+	case "darwin":
+		return "open", []string{path}, nil
+	case "linux":
+		if openFolderSystemIsWSLFn() {
+			return openFolderSystemCommandWSL(path)
+		}
+		return "xdg-open", []string{path}, nil
+	case "windows":
+		return "explorer", []string{path}, nil
+	default:
+		return "", nil, fmt.Errorf("unsupported OS: %s", openFolderSystemGOOS)
+	}
+}
+
+func openFolderSystemCommandWSL(path string) (string, []string, error) {
+	winPath, err := openFolderSystemWSLPath(path)
+	if err != nil {
+		return "", nil, err
+	}
+	if exePath, ok := openFolderSystemFirstExistingFile("/mnt/c/Windows/explorer.exe"); ok {
+		return exePath, []string{winPath}, nil
+	}
+	if exePath, ok := openFolderSystemFirstLookPath("explorer.exe"); ok {
+		return exePath, []string{winPath}, nil
+	}
+	if exePath, ok := openFolderSystemFirstExistingFile("/mnt/c/Windows/System32/cmd.exe"); ok {
+		return exePath, []string{"/c", "start", "", winPath}, nil
+	}
+	if exePath, ok := openFolderSystemFirstLookPath("cmd.exe"); ok {
+		return exePath, []string{"/c", "start", "", winPath}, nil
+	}
+	return "", nil, errors.New("WSL open folder requires explorer.exe or cmd.exe")
+}
+
+func openFolderSystemWSLPath(path string) (string, error) {
+	out, err := openFolderSystemOutputFn("wslpath", "-w", path)
+	if err != nil {
+		return "", fmt.Errorf("convert WSL path: %w", err)
+	}
+	winPath := strings.TrimSpace(string(out))
+	if winPath == "" {
+		return "", errors.New("convert WSL path: empty result")
+	}
+	return winPath, nil
+}
+
+func openFolderSystemFirstExistingFile(paths ...string) (string, bool) {
+	for _, path := range paths {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			continue
+		}
+		info, err := openFolderSystemStatFn(path)
+		if err == nil && info != nil && !info.IsDir() {
+			return path, true
+		}
+	}
+	return "", false
+}
+
+func openFolderSystemFirstLookPath(names ...string) (string, bool) {
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		path, err := openFolderSystemLookPathFn(name)
+		if err == nil && strings.TrimSpace(path) != "" {
+			return path, true
+		}
+	}
+	return "", false
 }
 
 func proxyBrowserURL(port int) string {

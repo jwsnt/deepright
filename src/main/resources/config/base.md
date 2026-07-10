@@ -3,6 +3,8 @@
 
 ``` 自定义Rag，用于加载CLI上报信息，并替换自身System Prompt中的#占位符（必须放第二位）@see CliRag
 "global": {
+    "file_system": "#file_system",
+    "sandbox_path": "#sandbox_path",
     "workspace": "#workspace",
     "sys": "#sys"
 },
@@ -12,6 +14,8 @@
 ``` 用于加载CLI上报信息，并替换自身System Prompt中的#占位符（必须放第二位）
 {
     "global": {
+        "file_system": "#file_system",
+        "sandbox_path": "#sandbox_path",
         "workspace": "#workspace",
         "terminal": "#terminal",
         "memory": "#memory",
@@ -22,6 +26,9 @@
     "key": "rag_env"
 },
 ```
+
++ `file_system`用于注入工作环境说明模板，普通会话使用`workspace_def.md`，沙箱会话使用`workspace_sandbox.md`
++ `sandbox_path`仅在沙箱会话存在时替换，普通会话可以在`global`中保留该占位符而不报错
 
 ``` 替换占位符#schema为每个配置的response_schema，一般用于强化约束输出
 "replace": "#schema",
@@ -129,4 +136,3 @@
 #### 基础节点
 ###### close
 + 如果链接到该节点（chain）就主动关闭通道（HTTP STREAMING）
-

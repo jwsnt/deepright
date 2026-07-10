@@ -477,8 +477,9 @@ curl 'http://127.0.0.1:8080/file/lastUpdate?agentId=A&file=USER.md'
 - `version/provider` 不会持久化到 sqlite；`version` 只使用当前 `integration` 进程内的 Agent metadata 内存缓存
 - 新建 Agent 与自动补齐出来的 `DEF_AGENT` 默认都会生成空的 `config.json`；如需 `version`、`provider`、`router_disable` 等字段，需要后续显式写入
 - `/v1/chat/completions`、`/cli/get` 与 integration 内部 cron 都通过 `metadata.agents[]` 暴露当前 Agent 的 `version`
-- `sandbox` 不读 `config.json`；会按 `agentId + chatId` 实时读取共享 sqlite 的 `cli_sandbox_state`
-- 当请求包含有效的 `agentId + chatId` 时，对应 `metadata.agents[]` 里的当前 Agent 会带上实时 `sandbox`
+- `sandbox` 不读 `config.json`；会按当前 `chatId` 实时读取共享 sqlite 的 `cli_sandbox_state`
+- 当请求包含有效的 `chatId` 时，对应 `metadata.agent.sandbox` 与当前 Agent 的 `metadata.agents[]` 都会带上实时 `sandbox`
+- `agentId` 不参与沙盒状态命中，仅用于定位当前 Agent metadata 与运行日志
 - 如果当前请求没有有效 `chatId`，或该会话从未写入沙盒状态，则 `sandbox` 输出空字符串
 
 ## Agent 元数据中的 `git`
@@ -1393,8 +1394,8 @@ curl -X POST 'http://127.0.0.1:8080/api/cron/create?agentId=demo-agent' \
 - 仅允许来自 `127.0.0.1`、`::1` 或 `localhost` 的请求执行
 - `agentId`、`chatId`、`cmd` 为必填
 - Agent 必须存在，已删除目录不会通过校验
-- 若当前 `agentId + chatId` 会话未开启沙盒，则由当前进程 Shell 执行 `shell -c <cmd>`
-- 若当前 `agentId + chatId` 会话已配置沙盒模式，则按当前系统改走对应 helper：
+- 若当前 `chatId` 会话未开启沙盒，则由当前进程 Shell 执行 `shell -c <cmd>`
+- 若当前 `chatId` 会话已配置沙盒模式，则按当前系统改走对应 helper：
   - macOS：`integration.app/Contents/Helpers/<mode>/CLI_SANDBOX.app/Contents/MacOS/CLI_SANDBOX --cmd <cmd>`
   - WSL/Linux：`<integration-exec-dir>/helpers/<mode>/CLI_SANDBOX --cmd <cmd>`
 - 若 `cli/get` 返回任务里带有 `subOps.exempted=true`，则即使当前会话已配置沙盒模式，也会直接走原始 Shell 执行链路
@@ -1404,7 +1405,8 @@ curl -X POST 'http://127.0.0.1:8080/api/cron/create?agentId=demo-agent' \
 
 ## 会话沙盒
 
-- 沙盒状态按 `agentId + chatId` 维度保存到共享 SQLite 的 `cli_sandbox_state`
+- 沙盒状态按 `chatId` 维度保存到共享 SQLite 的 `cli_sandbox_state`
+- `chatId` 为空时，`/api/sandbox_status` 与 `/api/sandbox=*` 都会直接报错
 - 仅支持 3 个有效模式：
   - `filepick`
   - `net`
@@ -1412,24 +1414,29 @@ curl -X POST 'http://127.0.0.1:8080/api/cron/create?agentId=demo-agent' \
 - 读取当前会话沙盒模式：
 
 ```text
-GET /api/sandbox_status?agentId=A&chatId=chat-001
+GET /api/sandbox_status?chatId=chat-001
 ```
 
+- 读取接口只按 `chatId` 命中；即使请求里携带 `agentId`，也不会参与状态定位
 - 写入当前会话沙盒模式：
 
 ```text
 POST /api/sandbox=filepick?agentId=A&chatId=chat-001
 POST /api/sandbox=net?agentId=A&chatId=chat-001
 POST /api/sandbox=filepick_net?agentId=A&chatId=chat-001
+POST /api/sandbox=filepick?agentId=A&chatId=chat-001&dir=%2FUsers%2Fme%2FDesktop
 POST /api/sandbox=off?agentId=A&chatId=chat-001
 ```
 
-- `off` 表示关闭沙盒，并直接删除该 `agentId + chatId` 的数据库记录
+- 写接口仍要求 `agentId` 与 `chatId`；其中 `agentId` 只用于日志，`chatId` 用于定位当前会话沙盒状态
+- `filepick` / `filepick_net` 可选传入 `dir`，显式持久化当前 `chatId` 对应的 `allowed_dir`；未传时仍按当前系统走目录选择流程
+- `off` 表示关闭沙盒，并直接删除该 `chatId` 的数据库记录
 - CLI 也使用同一套协议：
 
 ```bash
 ./integration sandbox --agentId A --chatId chat-001
 ./integration sandbox --agentId A --chatId chat-001 --sandbox filepick_net
+./integration sandbox --agentId A --chatId chat-001 --sandbox filepick --dir /Users/me/Desktop
 ./integration sandbox --agentId A --chatId chat-001 --sandbox off
 ```
 
@@ -2812,3 +2819,23 @@ GET /api/files?path=/Users/demo/agent/A/skills&chatId=chat-1
 - Integration 主需求：`/path/to/deepright/cli/module/integration/REQUIREMENT.md`
 - Integration 手册：`/path/to/deepright/cli/module/integration/USER_GUIDE.md`
 - restore 恢复 CLI 子任务历史：`/path/to/deepright/cli/module/integration/iteration/20260705-1/REQUIREMENT.md`
+
+---
+
+## 迭代 20260707-1：会话沙盒改为按 `chatId` 命中
+
+## 本次更新
+
+- 会话沙盒状态从 `agentId + chatId` 改为仅按 `chatId` 保存与命中
+- `/api/sandbox_status` 改为只依赖 `chatId`；即使请求里携带 `agentId`，也不会参与状态定位
+- `/api/sandbox=*` 写接口仍要求 `agentId` 与 `chatId`；其中 `agentId` 仅用于日志，`chatId` 用于写入当前会话沙盒状态
+- `metadata.agent.sandbox` 与 `metadata.agents[].sandbox` 都改为按当前 `chatId` 实时读取共享 sqlite
+- `/api/cmd` 与内部 `cli/get -> exec -> cli/pub` 链路的沙盒命中都改为只看 `chatId`
+- 跨系统 helper 选择保持不变：macOS 继续走 `CLI_SANDBOX.app`，WSL/Linux 继续走 `helpers/<mode>/CLI_SANDBOX`
+
+## 行为说明
+
+- `chatId` 为空时，读写都会直接报错
+- `off` 会删除当前 `chatId` 的记录；无记录视为 `off`
+- `filepick` / `filepick_net` 如显式传入 `dir`，会把 `allowed_dir` 按当前 `chatId` 持久化；未传时继续按当前系统走目录选择流程
+- 写入日志会输出 `agentId`、`chatId` 以及 `from -> to` 的文本变更信息

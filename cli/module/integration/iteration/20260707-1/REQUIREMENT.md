@@ -47,11 +47,22 @@
 + 需要同步更新转发给上游的`metadata.agent.sandbox`与`metadata.agents[].sandbox`
     + 两者都需要按当前`chatId`读取共享沙盒状态
     + 其语义从“看起来像agent级”调整为“当前chat级”
++ 需要保持最新跨系统沙盒方案的执行语义不回退
+    + macOS继续走现有 `CLI_SANDBOX.app`
+    + Windows/WSL继续走 `bubblewrap` helper
+    + 区分系统的 helper 选择、目录选择和参数透传逻辑都需要与 `cli-get` / WSL 沙盒方案保持一致
+    + 严格隔离 macOS 现有实现路径，不允许因为本次`chatId`维度调整破坏既有行为
++ `filepick`与`filepick_net`模式继续保留目录白名单能力
+    + 写接口若携带`dir`，仍需要按当前`chatId`写入/覆盖共享状态中的`allowed_dir`
+    + 未显式传入`dir`时，仍按当前系统走对应的目录选择流程
+    + `net`与`off`不允许复用目录白名单参数语义
 + 需要补充测试
     + `/api/sandbox_status`仅依赖`chatId`查询的测试
     + `/api/sandbox=...`写入后不同`agentId`查询同一`chatId`返回同一状态的测试
     + `/api/cmd`和内部任务执行链路仅按`chatId`命中沙盒的测试
     + `metadata.agent.sandbox`与`metadata.agents[].sandbox`按`chatId`读取的测试
+    + `filepick`/`filepick_net`在`dir`模式下按`chatId`持久化`allowed_dir`的测试
+    + 不同系统继续选择既有沙盒 helper、且 macOS 路径不回退的测试
 
 ### 编写代码
 + 以Golang编写以上代码，要求：

@@ -1422,12 +1422,21 @@ func TestIntegrationChatCompletionsInjectsSelectedAgentVersionAndSandbox(t *test
 		t.Fatalf("write config: %v", err)
 	}
 
-	db, err := sql.Open("sqlite", "data")
-	if err != nil {
-		t.Fatalf("open db: %v", err)
+	if cronDB != nil {
+		_ = cronDB.Close()
+		cronDB = nil
 	}
-	defer db.Close()
-	if _, err := sandboxstate.Set(db, "A", "chat-version", sandboxstate.ModeFilePickNet); err != nil {
+	initCronDB()
+	if cronDB == nil {
+		t.Fatal("cronDB should not be nil")
+	}
+	defer func() {
+		if cronDB != nil {
+			_ = cronDB.Close()
+			cronDB = nil
+		}
+	}()
+	if _, err := sandboxstate.SetWithDirectory(cronDB, "A", "chat-version", sandboxstate.ModeFilePickNet, "/Users/demo/Desktop"); err != nil {
 		t.Fatalf("set sandbox: %v", err)
 	}
 
@@ -1450,7 +1459,7 @@ func TestIntegrationChatCompletionsInjectsSelectedAgentVersionAndSandbox(t *test
 	server := httptest.NewServer(http.HandlerFunc(handleChatCompletions(cfg, proxyClient)))
 	defer server.Close()
 
-	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"HELLO VERSION"}],"metadata":{"agentId":"A","chat":"chat-version"}}`
+	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"HELLO VERSION"}],"metadata":{"agentId":"A","chat":"chat-version","sandbox_path":"/tmp/forged"}}`
 	req, _ := http.NewRequest(http.MethodPost, server.URL, strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 
@@ -1476,6 +1485,96 @@ func TestIntegrationChatCompletionsInjectsSelectedAgentVersionAndSandbox(t *test
 	}
 	if agent["sandbox"] != sandboxstate.ModeFilePickNet {
 		t.Fatalf("metadata.agents[A].sandbox = %#v, want %q", agent["sandbox"], sandboxstate.ModeFilePickNet)
+	}
+	if meta["sandbox_path"] != "/Users/demo/Desktop" {
+		t.Fatalf("metadata.sandbox_path = %#v, want /Users/demo/Desktop", meta["sandbox_path"])
+	}
+}
+
+func TestIntegrationChatCompletionsOmitsSandboxPathWithoutDirectory(t *testing.T) {
+	disableIntegrationNotificationsForTest(t)
+	flushAgentCache()
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	agentRoot := filepath.Join(tmp, "agents")
+	agentDir := filepath.Join(agentRoot, "A")
+	if err := os.MkdirAll(agentDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(agentDir, "SOUL.md"), []byte("soul"), 0o644); err != nil {
+		t.Fatalf("write soul: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(agentDir, "USER.md"), []byte("user"), 0o644); err != nil {
+		t.Fatalf("write user: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(agentDir, "config.json"), []byte(`{"version":"2026.07.07"}`), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	if cronDB != nil {
+		_ = cronDB.Close()
+		cronDB = nil
+	}
+	initCronDB()
+	if cronDB == nil {
+		t.Fatal("cronDB should not be nil")
+	}
+	defer func() {
+		if cronDB != nil {
+			_ = cronDB.Close()
+			cronDB = nil
+		}
+	}()
+	if _, err := sandboxstate.Set(cronDB, "A", "chat-net", sandboxstate.ModeNet); err != nil {
+		t.Fatalf("set sandbox: %v", err)
+	}
+
+	var capturedBody map[string]interface{}
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &capturedBody)
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, "data: [DONE]\n\n")
+	}))
+	defer upstream.Close()
+
+	cfg := &Config{
+		Host:         upstream.URL,
+		AgentDir:     agentRoot,
+		Device:       "test-dev-version",
+		AgentCacheMs: 120000,
+	}
+	proxyClient := &http.Client{Timeout: 10 * time.Second}
+	server := httptest.NewServer(http.HandlerFunc(handleChatCompletions(cfg, proxyClient)))
+	defer server.Close()
+
+	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"HELLO"}],"metadata":{"agentId":"A","chat":"chat-net","sandbox_path":"/tmp/forged"}}`
+	req, _ := http.NewRequest(http.MethodPost, server.URL, strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+
+	meta, ok := capturedBody["metadata"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("metadata missing: %#v", capturedBody["metadata"])
+	}
+	if _, exists := meta["sandbox_path"]; exists {
+		t.Fatalf("metadata.sandbox_path should be absent: %#v", meta["sandbox_path"])
 	}
 }
 
@@ -3295,6 +3394,165 @@ func TestHandleFolderSupportsAbsolutePath(t *testing.T) {
 	}
 	if openedPath != targetDir {
 		t.Fatalf("opened path = %q, want %q", openedPath, targetDir)
+	}
+}
+
+type testOpenSystemTargetFileInfo struct{}
+
+func (testOpenSystemTargetFileInfo) Name() string       { return "explorer.exe" }
+func (testOpenSystemTargetFileInfo) Size() int64        { return 1 }
+func (testOpenSystemTargetFileInfo) Mode() os.FileMode  { return 0o755 }
+func (testOpenSystemTargetFileInfo) ModTime() time.Time { return time.Time{} }
+func (testOpenSystemTargetFileInfo) IsDir() bool        { return false }
+func (testOpenSystemTargetFileInfo) Sys() interface{}   { return nil }
+
+func TestOpenSystemTargetCommandWSLUsesExplorer(t *testing.T) {
+	prevGOOS := openSystemTargetGOOS
+	prevIsWSLFn := openSystemTargetIsWSLFn
+	prevStatFn := openSystemTargetStatFn
+	prevLookPathFn := openSystemTargetLookPathFn
+	prevOutputFn := openSystemTargetOutputFn
+	openSystemTargetGOOS = "linux"
+	openSystemTargetIsWSLFn = func() bool { return true }
+	openSystemTargetStatFn = func(path string) (os.FileInfo, error) {
+		if path == "/mnt/c/Windows/explorer.exe" {
+			return testOpenSystemTargetFileInfo{}, nil
+		}
+		return nil, os.ErrNotExist
+	}
+	openSystemTargetLookPathFn = func(name string) (string, error) {
+		return "", os.ErrNotExist
+	}
+	openSystemTargetOutputFn = func(name string, args ...string) ([]byte, error) {
+		if name != "wslpath" {
+			t.Fatalf("unexpected command = %q", name)
+		}
+		if len(args) != 2 || args[0] != "-w" || args[1] != "/home/deepright" {
+			t.Fatalf("unexpected args = %#v", args)
+		}
+		return []byte("\\\\wsl.localhost\\deepright\\home\\deepright\n"), nil
+	}
+	defer func() {
+		openSystemTargetGOOS = prevGOOS
+		openSystemTargetIsWSLFn = prevIsWSLFn
+		openSystemTargetStatFn = prevStatFn
+		openSystemTargetLookPathFn = prevLookPathFn
+		openSystemTargetOutputFn = prevOutputFn
+	}()
+
+	cmd, args, err := openSystemTargetCommand("/home/deepright")
+	if err != nil {
+		t.Fatalf("openSystemTargetCommand returned error: %v", err)
+	}
+	if cmd != "/mnt/c/Windows/explorer.exe" {
+		t.Fatalf("command = %q, want explorer.exe path", cmd)
+	}
+	if len(args) != 1 || args[0] != "\\\\wsl.localhost\\deepright\\home\\deepright" {
+		t.Fatalf("args = %#v, want converted WSL path", args)
+	}
+}
+
+func TestOpenSystemTargetWSLPrefersXdgOpen(t *testing.T) {
+	prevGOOS := openSystemTargetGOOS
+	prevIsWSLFn := openSystemTargetIsWSLFn
+	prevRunFn := openSystemTargetRunCommandFn
+	prevStartFn := openSystemTargetStartCommandFn
+	openSystemTargetGOOS = "linux"
+	openSystemTargetIsWSLFn = func() bool { return true }
+	runCalls := 0
+	startCalls := 0
+	openSystemTargetRunCommandFn = func(name string, args ...string) error {
+		runCalls++
+		if name != "xdg-open" {
+			t.Fatalf("unexpected run command = %q", name)
+		}
+		if len(args) != 1 || args[0] != "/home/deepright" {
+			t.Fatalf("unexpected run args = %#v", args)
+		}
+		return nil
+	}
+	openSystemTargetStartCommandFn = func(name string, args ...string) error {
+		startCalls++
+		return nil
+	}
+	defer func() {
+		openSystemTargetGOOS = prevGOOS
+		openSystemTargetIsWSLFn = prevIsWSLFn
+		openSystemTargetRunCommandFn = prevRunFn
+		openSystemTargetStartCommandFn = prevStartFn
+	}()
+
+	if err := openSystemTarget("/home/deepright"); err != nil {
+		t.Fatalf("openSystemTarget returned error: %v", err)
+	}
+	if runCalls != 1 {
+		t.Fatalf("runCalls = %d, want 1", runCalls)
+	}
+	if startCalls != 0 {
+		t.Fatalf("startCalls = %d, want 0", startCalls)
+	}
+}
+
+func TestOpenSystemTargetWSLFallsBackWhenXdgOpenFails(t *testing.T) {
+	prevGOOS := openSystemTargetGOOS
+	prevIsWSLFn := openSystemTargetIsWSLFn
+	prevRunFn := openSystemTargetRunCommandFn
+	prevStartFn := openSystemTargetStartCommandFn
+	prevStatFn := openSystemTargetStatFn
+	prevLookPathFn := openSystemTargetLookPathFn
+	prevOutputFn := openSystemTargetOutputFn
+	openSystemTargetGOOS = "linux"
+	openSystemTargetIsWSLFn = func() bool { return true }
+	runCalls := 0
+	startCalls := 0
+	startCmd := ""
+	var startArgs []string
+	openSystemTargetRunCommandFn = func(name string, args ...string) error {
+		runCalls++
+		return errors.New("xdg-open failed")
+	}
+	openSystemTargetStartCommandFn = func(name string, args ...string) error {
+		startCalls++
+		startCmd = name
+		startArgs = append([]string(nil), args...)
+		return nil
+	}
+	openSystemTargetStatFn = func(path string) (os.FileInfo, error) {
+		if path == "/mnt/c/Windows/explorer.exe" {
+			return testOpenSystemTargetFileInfo{}, nil
+		}
+		return nil, os.ErrNotExist
+	}
+	openSystemTargetLookPathFn = func(name string) (string, error) {
+		return "", os.ErrNotExist
+	}
+	openSystemTargetOutputFn = func(name string, args ...string) ([]byte, error) {
+		return []byte("\\\\wsl.localhost\\deepright\\home\\deepright\n"), nil
+	}
+	defer func() {
+		openSystemTargetGOOS = prevGOOS
+		openSystemTargetIsWSLFn = prevIsWSLFn
+		openSystemTargetRunCommandFn = prevRunFn
+		openSystemTargetStartCommandFn = prevStartFn
+		openSystemTargetStatFn = prevStatFn
+		openSystemTargetLookPathFn = prevLookPathFn
+		openSystemTargetOutputFn = prevOutputFn
+	}()
+
+	if err := openSystemTarget("/home/deepright"); err != nil {
+		t.Fatalf("openSystemTarget returned error: %v", err)
+	}
+	if runCalls != 1 {
+		t.Fatalf("runCalls = %d, want 1", runCalls)
+	}
+	if startCalls != 1 {
+		t.Fatalf("startCalls = %d, want 1", startCalls)
+	}
+	if startCmd != "/mnt/c/Windows/explorer.exe" {
+		t.Fatalf("startCmd = %q, want explorer.exe path", startCmd)
+	}
+	if len(startArgs) != 1 || startArgs[0] != "\\\\wsl.localhost\\deepright\\home\\deepright" {
+		t.Fatalf("startArgs = %#v, want converted WSL path", startArgs)
 	}
 }
 
@@ -7112,6 +7370,137 @@ func TestRunIntegrationForegroundWritesStartupFailureStatusOnListenError(t *test
 	}
 }
 
+func TestEnsureIntegrationGitIdentityConfiguredSetsDefaultsWhenMissing(t *testing.T) {
+	prevLookPathFn := integrationGitLookPathFn
+	prevReadConfigFn := integrationGitReadConfigFn
+	prevWriteConfigFn := integrationGitWriteConfigFn
+	t.Cleanup(func() {
+		integrationGitLookPathFn = prevLookPathFn
+		integrationGitReadConfigFn = prevReadConfigFn
+		integrationGitWriteConfigFn = prevWriteConfigFn
+	})
+
+	integrationGitLookPathFn = func(name string) (string, error) {
+		if name != "git" {
+			t.Fatalf("unexpected lookpath name = %q", name)
+		}
+		return "/usr/bin/git", nil
+	}
+	integrationGitReadConfigFn = func(key string) (string, error) {
+		switch key {
+		case "user.name", "user.email":
+			return "", nil
+		default:
+			t.Fatalf("unexpected read key = %q", key)
+			return "", nil
+		}
+	}
+
+	var writes []string
+	integrationGitWriteConfigFn = func(key, value string) error {
+		writes = append(writes, key+"="+value)
+		return nil
+	}
+
+	if err := ensureIntegrationGitIdentityConfigured(); err != nil {
+		t.Fatalf("ensureIntegrationGitIdentityConfigured() error = %v", err)
+	}
+	want := []string{
+		"user.email=" + integrationDefaultGitUserEmail,
+		"user.name=" + integrationDefaultGitUserName,
+	}
+	if !reflect.DeepEqual(writes, want) {
+		t.Fatalf("writes = %#v, want %#v", writes, want)
+	}
+}
+
+func TestEnsureIntegrationGitIdentityConfiguredPreservesExistingValues(t *testing.T) {
+	prevLookPathFn := integrationGitLookPathFn
+	prevReadConfigFn := integrationGitReadConfigFn
+	prevWriteConfigFn := integrationGitWriteConfigFn
+	t.Cleanup(func() {
+		integrationGitLookPathFn = prevLookPathFn
+		integrationGitReadConfigFn = prevReadConfigFn
+		integrationGitWriteConfigFn = prevWriteConfigFn
+	})
+
+	integrationGitLookPathFn = func(name string) (string, error) {
+		if name != "git" {
+			t.Fatalf("unexpected lookpath name = %q", name)
+		}
+		return "/usr/bin/git", nil
+	}
+	integrationGitReadConfigFn = func(key string) (string, error) {
+		switch key {
+		case "user.name":
+			return "existing-user", nil
+		case "user.email":
+			return "existing@example.com", nil
+		default:
+			t.Fatalf("unexpected read key = %q", key)
+			return "", nil
+		}
+	}
+	integrationGitWriteConfigFn = func(key, value string) error {
+		t.Fatalf("unexpected write %s=%s", key, value)
+		return nil
+	}
+
+	if err := ensureIntegrationGitIdentityConfigured(); err != nil {
+		t.Fatalf("ensureIntegrationGitIdentityConfigured() error = %v", err)
+	}
+}
+
+func TestRunIntegrationForegroundInvokesGitIdentityEnsure(t *testing.T) {
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", integrationServicePort))
+	if err != nil {
+		t.Skipf("listen on fixed port %d: %v", integrationServicePort, err)
+	}
+	defer listener.Close()
+
+	prevEnsureFn := integrationEnsureGitIdentityConfiguredFn
+	t.Cleanup(func() {
+		integrationEnsureGitIdentityConfiguredFn = prevEnsureFn
+	})
+
+	calls := 0
+	integrationEnsureGitIdentityConfiguredFn = func() error {
+		calls++
+		return nil
+	}
+
+	tempDir := t.TempDir()
+	startupStatusFile := filepath.Join(tempDir, "startup.json")
+	pidFile := filepath.Join(tempDir, "integration.pid")
+	agentDir := filepath.Join(tempDir, "agent")
+	defaultDir := filepath.Join(tempDir, "config")
+	siteDir := filepath.Join(tempDir, "site")
+	if err := os.MkdirAll(agentDir, 0o755); err != nil {
+		t.Fatalf("mkdir agent dir: %v", err)
+	}
+	writeDefaultAgentTemplate(t, defaultDir)
+	if err := os.MkdirAll(siteDir, 0o755); err != nil {
+		t.Fatalf("mkdir site dir: %v", err)
+	}
+
+	args := []string{
+		"--port", strconv.Itoa(integrationServicePort),
+		"--agent-dir", agentDir,
+		"--default-dir", defaultDir,
+		"--site", siteDir,
+		"--pid-file", pidFile,
+		"--startup-status-file", startupStatusFile,
+	}
+
+	var stderr bytes.Buffer
+	if code := runIntegrationForeground(args, &stderr); code == 0 {
+		t.Fatalf("expected foreground start to fail when port is occupied")
+	}
+	if calls != 1 {
+		t.Fatalf("git identity ensure calls = %d, want 1", calls)
+	}
+}
+
 func TestNormalizeIntegrationLaunchArgsDropsMacProcessSerialNumber(t *testing.T) {
 	args := []string{"-psn_0_12345", "--port", "18080"}
 	got := normalizeIntegrationLaunchArgs(args)
@@ -7462,6 +7851,81 @@ func TestCliGetHeartbeatAndExecute(t *testing.T) {
 	json.Unmarshal([]byte(capturedPub.Messages[0].Content), &pubResult)
 	if pubResult.Tid != "t001" || pubResult.Status != 0 {
 		t.Errorf("pub result: %+v", pubResult)
+	}
+}
+
+func TestHeartbeatInjectsSandboxPathForCurrentPageSession(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	if cronDB != nil {
+		_ = cronDB.Close()
+		cronDB = nil
+	}
+	initCronDB()
+	if cronDB == nil {
+		t.Fatal("cronDB should not be nil")
+	}
+	defer func() {
+		if cronDB != nil {
+			_ = cronDB.Close()
+			cronDB = nil
+		}
+	}()
+
+	createdAt := time.Now().Format(roundLogStorageTimeLayout)
+	if _, err := cronDB.Exec(`INSERT INTO chat_log(agent_id, chat_id, chat_type, role, response_type, content, created_at) VALUES (?,?,?,?,?,?,?)`,
+		"A", "chat-sandbox", chatTypePageSession, "A", "normal", "data: {\"choices\":[{\"delta\":{\"content\":\"ok\"}}]}\n\n", createdAt); err != nil {
+		t.Fatalf("insert chat_log: %v", err)
+	}
+	if _, err := sandboxstate.SetWithDirectory(cronDB, "A", "chat-sandbox", sandboxstate.ModeFilePick, "/Users/demo/Desktop"); err != nil {
+		t.Fatalf("set sandbox: %v", err)
+	}
+
+	var capturedGet map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &capturedGet)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(ResponsePayload{
+			Code: 200,
+			Choices: []struct {
+				Message struct {
+					Role    string      `json:"role"`
+					Content interface{} `json:"content"`
+				} `json:"message"`
+			}{
+				{Message: struct {
+					Role    string      `json:"role"`
+					Content interface{} `json:"content"`
+				}{Role: "assistant", Content: nil}},
+			},
+		})
+	}))
+	defer server.Close()
+
+	metadata := &AgentOutput{
+		DeviceID: "d",
+		Terminal: "/bin/zsh",
+		Agents:   []Agent{{AgentID: "A", Workspace: "/tmp/a", Skills: []Skill{}}},
+	}
+	if _, err := heartbeat(&http.Client{Timeout: 5 * time.Second}, server.URL, metadata, nil); err != nil {
+		t.Fatalf("heartbeat: %v", err)
+	}
+
+	meta, ok := capturedGet["metadata"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("metadata missing: %#v", capturedGet["metadata"])
+	}
+	if meta["sandbox_path"] != "/Users/demo/Desktop" {
+		t.Fatalf("metadata.sandbox_path = %#v, want /Users/demo/Desktop", meta["sandbox_path"])
 	}
 }
 
@@ -10079,7 +10543,7 @@ func TestCronExecuteOnceInjectsMetaIDAndCronTypeIntoRequestMetadata(t *testing.T
 	if err := writeTokenStore(cronDB, map[string]string{"OpenAI": "Bearer scheduled-token"}); err != nil {
 		t.Fatalf("writeTokenStore: %v", err)
 	}
-	if _, err := sandboxstate.Set(cronDB, "A", "chat-a", sandboxstate.ModeNet); err != nil {
+	if _, err := sandboxstate.SetWithDirectory(cronDB, "A", "chat-a", sandboxstate.ModeFilePickNet, "/Users/demo/Documents/feishu"); err != nil {
 		t.Fatalf("set sandbox: %v", err)
 	}
 
@@ -10160,8 +10624,11 @@ func TestCronExecuteOnceInjectsMetaIDAndCronTypeIntoRequestMetadata(t *testing.T
 	if agentMeta["version"] != "cron-v1" {
 		t.Fatalf("metadata.agents[A].version = %v, want cron-v1", agentMeta["version"])
 	}
-	if agentMeta["sandbox"] != sandboxstate.ModeNet {
-		t.Fatalf("metadata.agents[A].sandbox = %v, want %q", agentMeta["sandbox"], sandboxstate.ModeNet)
+	if agentMeta["sandbox"] != sandboxstate.ModeFilePickNet {
+		t.Fatalf("metadata.agents[A].sandbox = %v, want %q", agentMeta["sandbox"], sandboxstate.ModeFilePickNet)
+	}
+	if metadata["sandbox_path"] != "/Users/demo/Documents/feishu" {
+		t.Fatalf("metadata sandbox_path = %v, want /Users/demo/Documents/feishu", metadata["sandbox_path"])
 	}
 	if metadata["META_ID"] != "12" {
 		t.Fatalf("metadata META_ID = %v, want 12", metadata["META_ID"])

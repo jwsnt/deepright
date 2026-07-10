@@ -4,6 +4,8 @@
       "rag": [
         {
           "global": {
+            "sandbox_path": "#sandbox_path",
+            "file_system": "#file_system",
             "workspace": "#workspace",
             "terminal": "#terminal",
             "provider": "#provider",

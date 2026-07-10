@@ -46,7 +46,8 @@
 而是：
 
 - 外层 App 原生目录选择
-- 缓存用户选中的绝对路径
+- 上层按 chat 持久化 `mode + allowedDir`
+- runner / helper 不维护“最后一次目录”的全局缓存
 - 内层命令执行时动态生成 `sandbox-exec` profile
 
 ## 3. 术语说明
@@ -106,7 +107,7 @@ const (
 
 3. **mac app runner 层**
    - `.app/Contents/MacOS/CLI_SANDBOX`
-   - 负责前台 UI、路径缓存、日志路径、helper 参数透传
+   - 负责前台 UI、固定初始目录、日志路径、helper 参数透传
 
 4. **sandbox helper 层**
    - `.app/Contents/Helpers/CLI_SANDBOX`
@@ -310,7 +311,7 @@ runner 不是权限控制器，而是：
 
 - 读取模式配置
 - 处理目录授权
-- 管理缓存
+- 设定固定初始目录
 - 清洗 stderr 噪音
 - 把参数透传给 helper
 
@@ -350,13 +351,19 @@ runner 通过 `containerHomeBase(bundleID)` 推导容器路径：
 
 ### 8.4 目录授权解析逻辑
 
-`resolveAllowedDirectory(bundleID, explicit)` 的行为：
+`resolveAllowedDirectory(explicit)` 的行为：
 
 1. 如果传入 `--allowed-dir`
    - 直接校验路径存在且为目录
    - 返回
 2. 如果没有 `--allowed-dir`
    - 直接弹出目录选择器
+   - 不读取任何 runner / helper 级“最后一次目录”缓存
+   - 不预加载当前 chat 已持久化的 `allowedDir`
+   - 首次未配置或重新授权时，都从固定初始目录开始
+     - `darwin && cgo`：优先使用 `~/Documents`
+     - `darwin && !cgo`：优先使用 `~/Documents`
+     - 若 `~/Documents` 不存在，则退回系统默认起始位置
    - 目录选择窗口最长等待 **60 秒**
    - 校验路径
    - 返回
@@ -385,7 +392,7 @@ forwardedEnvironment(strings.TrimSpace(allowedDir) != "")
 
 另外，当前实现里“强制重新授权”已经改为 **pick-only** 设计：
 
-- runner 先独立完成目录选择并写入缓存
+- runner 先独立完成目录选择
 - 当本次调用只是为了授权而不是执行命令时，runner 直接返回已选择目录
 - 不再通过附带一个短超时的占位命令来间接触发目录弹窗
 
@@ -454,6 +461,8 @@ helper 的 `service` 包也保留了同名实现文件，用于直接执行 help
 - 解析 alias / symlink
 - Prompt 为“允许”
 - Message 为“CLI_SANDBOX 请选择允许访问的目录”
+- 初始目录优先为 `~/Documents`
+- 不会把当前 chat 已保存的 `allowedDir` 作为面板起点
 
 ### 9.4 超时机制
 
@@ -566,52 +575,23 @@ helper 支持两类用法：
 目录来源的优先级如下：
 
 1. `CLI_SANDBOX_ALLOWED_DIR`
-2. 读取缓存
-3. 弹窗重新选择
+2. 否则直接报错
 
-这说明“手动指定目录”和“点选目录”最后都会收敛为同一个 `pickedDir`。
-
-### 10.4 helper 的缓存与锁
-
-helper 使用：
-
-- `selected-dir.txt`
-- `selected-dir.lock`
-
-来保护会话目录状态。
-
-锁实现使用：
-
-- `syscall.Flock`
-- `LOCK_EX | LOCK_NB`
-
-重试参数：
-
-- 每 2 秒重试一次
-- 最长等待 10 秒
-
-超过等待预算后会直接返回：
+错误文案为：
 
 ```text
-目录授权正在进行中，等待10秒后仍未获得授权，请稍后重试
+未找到当前命令的已授权目录，请显式传入 --allowed-dir
 ```
 
-这保证了：
+这意味着当前 helper **不会再读取本地目录缓存，也不会自行再次弹窗**；真正参与命令执行的目录必须由外层 runner / integration / cli-get 按当前 chat 显式重新注入。
 
-- 不会无限阻塞
-- 多个并发目录授权请求有显式错误语义
+### 10.4 helper 的本地目录缓存
 
-### 10.5 helper 的缓存位置
+当前实现中，helper 已不再维护 `selected-dir.txt`、`selected-dir.lock` 之类目录缓存或锁文件。
 
-helper 使用：
+### 10.5 helper 的状态目录
 
-```go
-os.UserConfigDir()/CLI_SANDBOX
-```
-
-作为状态目录。
-
-在 app 容器内执行时，`os.UserConfigDir()` 会落到容器路径，因此它与 runner 的容器路径策略能对齐。
+`os.UserConfigDir()/CLI_SANDBOX` 仍可能作为运行时依赖路径被 profile 放行，但它不再承担“最后一次目录缓存”的职责。
 
 ## 11. 文件访问控制的核心技术手段
 
@@ -719,6 +699,22 @@ profile 由 `buildSandboxProfile(mode, pickedDir)` 动态生成。
 
 其中前两项是**会话相关目录**，后面几项是**运行时依赖目录**。
 
+#### D. 不会额外放开的祖先目录
+
+当前实现**不会**为了改善某些命令表现而额外放开：
+
+- 用户选中目录的父目录
+- 更高层祖先目录
+- 这些祖先目录的 `file-read-metadata`
+
+因此只要命令在运行时显式或隐式触碰：
+
+- `..`
+- 祖先目录的条目枚举
+- 祖先目录的元数据读取
+
+就仍然会被 Seatbelt 拒绝。这是当前严格目录边界的一部分，而不是 bug。
+
 #### B. 当前默认仍可访问的系统目录
 
 由于 profile 顶部使用了：
@@ -802,6 +798,13 @@ profile 由 `buildSandboxProfile(mode, pickedDir)` 动态生成。
 - 任意 shell pipeline
 
 只要最终触发文件读写，就要经过 Seatbelt 规则判断。
+
+这也意味着：
+
+- `ls -l <allowedDir>` 可能成功
+- `ls -la <allowedDir>` 可能因为读取 `..` 而失败
+
+系统不会因为某个命令习惯顺带访问祖先目录，就自动扩大白名单。
 
 ### 11.9 当前策略的实际语义
 
@@ -978,8 +981,8 @@ CREATE TABLE cli_sandbox_state (
 当前修正后的设计是：
 
 - `cli_sandbox_state` 保存 chat 维度的权威目录
-- runner / helper 的本地缓存仍然保留，但只作为单次 prime 或直接调试时的便利缓存
 - integration / proxy / cli-get 每次执行都必须把当前 chat 的 `allowedDir` 再次通过 `--allowed-dir` 传给 `CLI_SANDBOX`
+- runner / helper 不再保留任何可跨 chat 复用的“最后一次目录”回退
 
 ### 14.3 integration 的模式设置
 
@@ -997,7 +1000,7 @@ integration 侧有两种入口：
 当设置 `filepick` 或 `filepick_net` 模式时，integration 会先调用 helper 进行“预热”，并把选中的目录写回数据库：
 
 - 无 `dir` 时：触发选目录
-- 有 `dir` 时：直接写入目录缓存
+- 有 `dir` 时：直接校验并规范化该目录
 
 具体行为：
 
@@ -1040,38 +1043,41 @@ helper 路径解析支持：
 
 1. 请求启用模式
 2. integration 调 helper prime
-3. runner 决定是否读缓存
-4. 如果需要，则弹原生目录面板
+3. runner 判断本次是否已显式传入 `--allowed-dir`
+4. 若没有，则弹原生目录面板
+   - 面板从固定初始目录 `~/Documents` 开始
+   - 不预加载当前 chat 已保存目录
 5. 用户：
    - 允许
    - 取消
    - 超时未处理
-6. runner 把目录写入本地缓存
-7. helper 使用该目录生成 `sandbox-exec` profile
-8. 后续命令执行复用缓存目录
+6. integration 把 `mode + allowedDir` 一起写入 SQLite
+7. 后续命令执行按当前 chat 重新取回该目录
+8. helper 使用该目录生成 `sandbox-exec` profile
 
 失败分支包括：
 
 - 用户取消：`已取消目录授权`
 - 面板超时：`目录授权弹窗超时，请切回桌面确认选择窗口后重试`
-- 授权锁繁忙：`等待10秒后仍未获得授权`
 - 路径非法：`not a directory`
 
-## 16. 当前实现中的双路径缓存模型
+## 16. 当前实现已移除双路径目录缓存模型
 
-当前设计里实际上有两份相似的目录缓存逻辑：
+当前实现不再保留：
 
-1. runner 中的一套
-2. helper/service 中的一套
+1. runner 级“最后一次目录”缓存
+2. helper/service 级“最后一次目录”缓存
 
-它们最终通过容器路径与 `os.UserConfigDir()` 的收敛来对齐。
+目录的唯一权威来源是：
 
-这样设计的原因是：
+1. `cli_sandbox_state` 中当前 chat 的 `allowedDir`
+2. 本次 prime / 显式 `--allowed-dir` 传入的目录
 
-- runner 是独立 Go module，需要自给自足
-- helper 也是独立 Go module，需要支持被直接调用
+因此：
 
-因此代码层面存在一定重复，但运行时目标是一致的：都收敛到 `CLI_SANDBOX/selected-dir.txt`。
+- chat 之间不会再通过本地缓存串话
+- 没有配置沙盒的 chat 不会因为 helper 的历史选择而继承旧目录
+- 重新授权时总是从固定初始目录重新开始
 
 ## 17. 测试覆盖说明
 
@@ -1082,9 +1088,8 @@ helper 路径解析支持：
 - 权限拒绝的快速返回
 - `filepick` 模式只允许访问已选目录
 - profile 中包含 runtime 路径
-- 目录缓存写入
-- 目录锁重试预算
-- 目录锁超时错误
+- chat 维度目录恢复
+- 缺失 `--allowed-dir` 时的显式报错
 - 目录选择错误透传
 - launcher 的构建配置、plist、entitlement 当前状态
 
@@ -1155,7 +1160,7 @@ helper 路径解析支持：
 
 ### 19.3 目录路径未入业务数据库
 
-会话模式是持久化的，但已授权目录只存在本机缓存文件中。
+当前实现中，会话模式和已授权目录都已进入业务数据库；没有任何“仅存在本机缓存文件中”的 chat 级目录状态。
 
 ### 19.4 当前 profile 不是最小可见面模型
 
@@ -1166,18 +1171,20 @@ helper 路径解析支持：
 如果要继续维护这套实现，建议按以下顺序阅读：
 
 1. `sandbox/service/mode.go`
-   - 看模式、目录缓存、profile 生成
+   - 看模式、chat 状态约束、profile 生成
 2. `sandbox/service/service.go`
    - 看实际执行与错误处理
 3. `sandbox/mac/runner/main.go`
-   - 看外层 app 如何做授权 UI 与缓存
+   - 看外层 app 如何做授权 UI 与参数透传
 4. `sandbox/mac/runner/folderpicker_darwin.go`
    - 看原生目录面板
-5. `sandbox/mac/launcher/launcher.go`
+5. `sandbox/mac/runner/picker_defaults.go`
+   - 看固定初始目录策略
+6. `sandbox/mac/launcher/launcher.go`
    - 看打包与签名
-6. `integration/main.go`
+7. `integration/main.go`
    - 看会话状态如何驱动沙盒
-7. `connect/sandboxstate/sandboxstate.go`
+8. `connect/sandboxstate/sandboxstate.go`
    - 看模式持久化
 
 ## 21. 最终总结
@@ -1185,10 +1192,10 @@ helper 路径解析支持：
 DeepRight 当前 macOS 沙盒实现的本质可以概括为：
 
 - **交互上**：通过 `.app` runner 弹原生目录选择器
-- **状态上**：通过本地缓存文件保存已选目录，通过 SQLite 保存会话模式
+- **状态上**：通过 SQLite 按 chat 保存 `mode + allowedDir`，不保留全局最后一次目录缓存
 - **执行上**：通过 helper 动态生成 Seatbelt profile，并用 `sandbox-exec` 执行 shell
 - **限制上**：重点阻断敏感用户目录与网络，而不是走 App Sandbox 原生目录授权白名单
 
 因此，当前版本最准确的技术定义是：
 
-> 它是一个“以 macOS `.app` 交互壳为入口、以 `sandbox-exec`/Seatbelt 为核心约束手段、以会话模式和本地目录缓存为控制面的命令执行沙盒”。
+> 它是一个“以 macOS `.app` 交互壳为入口、以 `sandbox-exec`/Seatbelt 为核心约束手段、以 chat 维度 `mode + allowedDir` 为控制面、且不依赖全局目录缓存的命令执行沙盒”。

@@ -1,14 +1,5 @@
 package ai.deepright.memory.git;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
-import static org.springframework.util.StringUtils.hasText;
-
-
-
-
-import ai.open.right.protocol.ProtocolCode;
-
 import ai.deepright.cli.CliPrinter;
 import ai.deepright.cli.CliPubData;
 import ai.deepright.cli.CliSubFetcher;
@@ -27,6 +18,7 @@ import ai.deepright.utils.SecurityTruncater;
 import ai.deepright.utils.TemplateChecker;
 import ai.deepright.workflow.worktask.HeartbeatWorkTask;
 import ai.open.right.WorkflowException;
+import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.resouce.ResourceService;
 import ai.open.right.utils.BytesUtils;
 import ai.open.right.utils.JsonUtils;
@@ -61,6 +53,8 @@ import org.unix4j.unix.Grep;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+
+import static org.springframework.util.ObjectUtils.isEmpty;
 
 @Slf4j
 @Getter
@@ -125,9 +119,9 @@ public class GitMemoryService extends BaseFunction implements GitPath, MemorySer
         // IOUtils/JsonUtils负责关闭资源
         // 覆盖（rewrite），不需要重入
         // 启动检测，必要资源
-        WorkflowException.check(!hasText(this.template4summaryStore), "The template summary store must not be empty", ProtocolCode.C400);
-        WorkflowException.check(!hasText(this.template4summaryQuery), "The template summary query must not be empty", ProtocolCode.C400);
-        WorkflowException.check(!hasText(this.template4memory), "The template init must not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4summaryStore), "The template summary store must not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4summaryQuery), "The template summary query must not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4memory), "The template init must not be empty", ProtocolCode.C400);
     }
 
     @Override
@@ -388,7 +382,7 @@ public class GitMemoryService extends BaseFunction implements GitPath, MemorySer
                 String digest = null;
                 if (JsonUtils.like(this.buffer.toString())) {
                     Map<String, Object> memory = JsonUtils.read(this.buffer.toString(), Map.class);
-                    WorkflowException.check(isEmpty(memory), "The git memory commit can not be empty", ProtocolCode.C400);
+                    WorkflowException.check(MapUtils.isEmpty(memory), "The git memory commit can not be empty", ProtocolCode.C400);
                     Integer important = MapUtils.getInteger(memory, "important", 0);
                     digest = "[datetime=" + GitMemoryService.DATE_FORMAT.format(this.workTask.getCreated()) + "][important=" + important + "][needs=" + MapUtils.getString(memory, "needs") + "][digest=" + MapUtils.getString(memory, "digest", "") + "]";
                     why = MapUtils.getString(memory, "why_do_this");

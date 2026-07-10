@@ -46,7 +46,7 @@ When the generated `.exe` runs on Windows:
    - installer: run `start.bat` when `C:\ProgramData\deepright\.deepright_installed` exists and `wsl.exe -d deepright -- echo ok` succeeds, otherwise run `install.bat`
    - uninstaller: run `uninstall.bat`
 
-`install.bat` then keeps using the existing `install.ps1` logic, so WSL installation remains authoritative in one place. `uninstall.bat` similarly delegates to `uninstall.ps1` so the full Windows/WSL cleanup stays in one script.
+`install.bat` then keeps using the existing `install.ps1` logic, so WSL installation remains authoritative in one place. `uninstall.bat` similarly delegates to `uninstall.ps1` so the default app-only cleanup and optional full Windows/WSL cleanup both stay in one script.
 
 ## Design constraints
 

@@ -1,20 +1,11 @@
 package ai.deepright.task;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
-import static org.springframework.util.StringUtils.hasText;
-
-
-
-
-import ai.open.right.protocol.ProtocolCode;
-
-import ai.open.right.WorkflowException;
-
 import ai.deepright.feature.FeatureField;
 import ai.deepright.feature.FeatureFlag;
 import ai.deepright.llm.notifier.MultiSourceNotifier;
 import ai.deepright.utils.TemplateChecker;
+import ai.open.right.WorkflowException;
+import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.resouce.ResourceService;
 import ai.open.right.utils.JsonUtils;
 import ai.open.right.utils.SplitUtils;
@@ -42,6 +33,8 @@ import org.springframework.context.annotation.Configuration;
 import java.io.BufferedInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+
+import static org.springframework.util.StringUtils.hasText;
 
 @Slf4j
 @Getter
@@ -89,7 +82,7 @@ public class TaskRag extends RagCondition implements RagService {
             if (FeatureFlag.isTask(ragData.getQuery())) {
                 // @see CliTaskFunction metadata
                 Map<String, Object> output = ragData.getQuery().getMetadata(FeatureField.KEY_OUTPUT, Map.class);
-                WorkflowException.check(isEmpty(output), "The output can not be empty, please check the task.json", ProtocolCode.C400);
+                WorkflowException.check(MapUtils.isEmpty(output), "The output can not be empty, please check the task.json", ProtocolCode.C400);
                 responseSchema = JsonUtils.write(output);
             } else if (FeatureFlag.isResponseSchema(ragData.getQuery())) {
                 responseSchema = this.buildResponseSchema(ragData.getQuery());

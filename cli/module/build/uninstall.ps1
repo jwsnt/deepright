@@ -1,7 +1,8 @@
 #Requires -Version 5.1
 
 param(
-    [switch]$Force
+    [switch]$Force,
+    [switch]$RemoveAll
 )
 
 $DISTRO_NAME = "deepright"
@@ -58,19 +59,69 @@ function Remove-ShortcutIfExists([string]$ShortcutPath, [string]$Label) {
     }
 }
 
-function Unregister-DistroIfExists([string]$DistroName) {
+function Stop-Wsl() {
     L_Info "Shutting down WSL..."
     & wsl.exe --shutdown 2>&1 | Out-Null
     Start-Sleep -Seconds 2
     L_OK "WSL shutdown complete"
+}
 
+function Test-DistroExists([string]$DistroName) {
     L_Info "Checking distro: $DistroName"
     $listOutput = & wsl.exe -l -q 2>&1 | Out-String
     Add-Content -Path $LOG_FILE -Value "wsl -l -q:`n$listOutput" -Encoding UTF8
     $normalized = $listOutput -replace "`0", ""
-    $distroExists = ($normalized -split "[`r`n]+" | ForEach-Object { $_.Trim() }) -contains $DistroName
+    return (($normalized -split "[`r`n]+" | ForEach-Object { $_.Trim() }) -contains $DistroName)
+}
 
-    if (-not $distroExists) {
+function ConvertTo-BashSingleQuoted([string]$Value) {
+    if ($null -eq $Value) {
+        $Value = ""
+    }
+    # Close and reopen the bash single-quoted string around embedded single quotes.
+    return "'" + $Value.Replace("'", "'""'""'") + "'"
+}
+
+function Remove-WslPathIfExists([string]$DistroName, [string]$Path, [string]$Label) {
+    $quotedPath = ConvertTo-BashSingleQuoted $Path
+    $probeOutput = & wsl.exe -d $DistroName -u root -- bash -c "if [ -e $quotedPath ]; then echo exists; else echo missing; fi" 2>&1 | Out-String
+    Add-Content -Path $LOG_FILE -Value "probe ${Path}:`n$probeOutput" -Encoding UTF8
+    if ($LASTEXITCODE -ne 0) {
+        L_Err "$Label probe failed: $Path"
+        throw "failed to probe WSL path: $Path"
+    }
+
+    if ($probeOutput.Trim() -ne "exists") {
+        L_Info "$Label not found: $Path"
+        return
+    }
+
+    $removeOutput = & wsl.exe -d $DistroName -u root -- bash -c "rm -rf -- $quotedPath" 2>&1 | Out-String
+    Add-Content -Path $LOG_FILE -Value "remove ${Path}:`n$removeOutput" -Encoding UTF8
+    if ($LASTEXITCODE -ne 0) {
+        L_Err "$Label remove failed: $Path"
+        throw "failed to remove WSL path: $Path"
+    }
+    L_OK "$Label removed: $Path"
+}
+
+function Clear-DistroAppIfExists([string]$DistroName) {
+    if (-not (Test-DistroExists -DistroName $DistroName)) {
+        L_Info "WSL distro not found: $DistroName"
+        return
+    }
+
+    Stop-Wsl
+    Remove-WslPathIfExists -DistroName $DistroName -Path "/app" -Label "WSL app directory"
+    Remove-WslPathIfExists -DistroName $DistroName -Path "/home/deepright/start-deepright.sh" -Label "WSL start wrapper"
+    Remove-WslPathIfExists -DistroName $DistroName -Path "/home/deepright/.deepright_initialized" -Label "WSL sentinel"
+    Stop-Wsl
+}
+
+function Unregister-DistroIfExists([string]$DistroName) {
+    Stop-Wsl
+
+    if (-not (Test-DistroExists -DistroName $DistroName)) {
         L_Info "WSL distro not found: $DistroName"
         return
     }
@@ -118,7 +169,7 @@ function Test-UninstallConfirmation([string]$InputValue) {
 $runHeader = "`n========================================  NEW RUN: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
 Add-Content -Path $LOG_FILE -Value $runHeader -Encoding UTF8
 
-L_Step "DeepRight Full Uninstall"
+L_Step "DeepRight Uninstall"
 L_Info "Log file: $LOG_FILE"
 
 if (-not (Test-Admin)) {
@@ -128,8 +179,13 @@ if (-not (Test-Admin)) {
 
 if (-not $Force) {
     Write-Host ""
-    Write-Host "This will fully remove DeepRight from Windows and WSL." -ForegroundColor Yellow
-    Write-Host "It will delete shortcuts, local cache, the deepright WSL distro, and C:\WSL\deepright." -ForegroundColor Yellow
+    if ($RemoveAll) {
+        Write-Host "This will fully remove DeepRight from Windows and WSL." -ForegroundColor Yellow
+        Write-Host "It will delete shortcuts, local cache, the deepright WSL distro, C:\WSL\deepright, and all data under that distro." -ForegroundColor Yellow
+    } else {
+        Write-Host "This will remove DeepRight application files and Windows shortcuts, but keep the existing deepright WSL distro and agent-dir contents." -ForegroundColor Yellow
+        Write-Host "Use uninstall.ps1 -RemoveAll if you also want to delete the distro and all WSL data." -ForegroundColor Yellow
+    }
     $confirmation = Read-Host "Type YES or Y to continue"
     if (-not (Test-UninstallConfirmation -InputValue $confirmation)) {
         L_Warn "Uninstall cancelled by user"
@@ -138,19 +194,32 @@ if (-not $Force) {
 }
 
 try {
-    L_Step "Step 1/4: Remove shortcuts"
+    if ($RemoveAll) {
+        L_Step "Step 1/4: Remove shortcuts"
+    } else {
+        L_Step "Step 1/3: Remove shortcuts"
+    }
     Remove-ShortcutIfExists -ShortcutPath (Join-Path ([Environment]::GetFolderPath("DesktopDirectory")) "$SHORTCUT_NAME.lnk") -Label "Desktop"
     Remove-ShortcutIfExists -ShortcutPath (Join-Path ([Environment]::GetFolderPath("Programs")) "$SHORTCUT_NAME.lnk") -Label "Start Menu"
 
-    L_Step "Step 2/4: Remove Windows install state and extracted payload"
+    if ($RemoveAll) {
+        L_Step "Step 2/4: Remove Windows install state and extracted payload"
+    } else {
+        L_Step "Step 2/3: Remove Windows install state and extracted payload"
+    }
     Remove-PathIfExists -Path $LOCAL_SENTINEL_DIR -Label "Install sentinel directory"
     Remove-PathIfExists -Path $LOCAL_CACHE_DIR -Label "Local extracted payload directory"
 
-    L_Step "Step 3/4: Remove WSL distro"
-    Unregister-DistroIfExists -DistroName $DISTRO_NAME
+    if ($RemoveAll) {
+        L_Step "Step 3/4: Remove WSL distro"
+        Unregister-DistroIfExists -DistroName $DISTRO_NAME
 
-    L_Step "Step 4/4: Remove WSL VHD directory"
-    Remove-PathIfExists -Path $WSL_VHD_PATH -Label "WSL VHD directory"
+        L_Step "Step 4/4: Remove WSL VHD directory"
+        Remove-PathIfExists -Path $WSL_VHD_PATH -Label "WSL VHD directory"
+    } else {
+        L_Step "Step 3/3: Remove WSL application files (keep agent-dir)"
+        Clear-DistroAppIfExists -DistroName $DISTRO_NAME
+    }
 
     $launcherBundleRoot = Get-LauncherBundleRoot
     if ($launcherBundleRoot -and ($launcherBundleRoot -ne $LOCAL_CACHE_DIR)) {
@@ -158,7 +227,11 @@ try {
     }
 
     L_Step "Uninstall completed"
-    L_OK "DeepRight has been fully removed"
+    if ($RemoveAll) {
+        L_OK "DeepRight has been fully removed"
+    } else {
+        L_OK "DeepRight application files have been removed; existing agent-dir data was preserved"
+    }
     exit 0
 } catch {
     L_Err "Uninstall failed: $_"

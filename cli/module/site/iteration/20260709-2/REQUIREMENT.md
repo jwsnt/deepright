@@ -30,6 +30,15 @@
 + 浮层中的沙盒状态、更新时间和恢复逻辑都需要以当前`chatId`为唯一作用域
     + 浮层仍可展示当前选中的`agentId`
     + 但该展示信息不允许参与沙盒状态查询、恢复、缓存命中和刷新判断
++ 前端会话沙盒交互协议需要与最新跨系统沙盒方案保持一致
+    + 仍保留 `目录权限` / `离线执行` / `双重限制` / `关闭沙盒` 四个入口
+    + `目录权限`=`filepick`，`离线执行`=`net`，`双重限制`=`filepick_net`，`关闭沙盒`=`off`
+    + 写接口继续使用`/api/sandbox=沙盒模式?agentId=x&chatId=y`
+    + 前端不需要区分 macOS 与 Windows/WSL；后端会自动选择对应沙盒 helper
++ 涉及目录白名单的前端交互需要继续兼容系统差异
+    + `filepick`与`filepick_net`继续复用现有目录授权/目录选择交互
+    + Windows/WSL 下由后端拉起对应的 WSL `bubblewrap` 目录授权与执行流程
+    + 如果后端返回 WSL helper / `bubblewrap` 不可用或目录授权失败，前端需要展示失败提示，但不能破坏当前页面其余会话功能
 + 需要同步更新与proxy / integration最新沙盒接口语义一致的前端逻辑
     + Proxy需求：../../../proxy/iteration/20260709-1/REQUIREMENT.md
     + Integration需求：../../../integration/iteration/20260707-1/REQUIREMENT.md
@@ -37,6 +46,8 @@
     + 切换不同`agentId`但保持同一`chatId`时，沙盒状态需要保持一致
     + 当前未选择`agentId`时，只要存在`chatId`仍可恢复沙盒状态
     + 写入后重新进入同一`chatId`时能够恢复正确的沙盒状态和更新时间
+    + 目录权限/双重限制在不同系统下继续复用同一前端协议与浮层交互的验证
+    + WSL 目录授权失败时能够展示错误提示且不影响当前会话其它交互的验证
 
 ### 编写代码
 + 以现有site页面技术栈编写以上代码，要求：

@@ -372,25 +372,26 @@ L_Step "Step 5/7: Verify mirrored networking"
 L_OK ".wslconfig already configured with networkingMode=mirrored"
 
 # ---- Step 6: Tools ----
-L_Step "Step 6/7: Install tools (git, npm, python3, bubblewrap)"
+L_Step "Step 6/7: Install tools (git, npm, python3, bubblewrap, xdg-open)"
 
 $needGit   = -not (Test-WslTool "git")
 $needPy    = -not (Test-WslTool "python3")
 $needNode  = -not (Test-WslTool "node")
 $needBwrap = -not (Test-WslTool "bwrap")
+$needXdgOpen = -not (Test-WslTool "xdg-open")
 
-if (-not ($needGit -or $needPy -or $needNode -or $needBwrap)) {
+if (-not ($needGit -or $needPy -or $needNode -or $needBwrap -or $needXdgOpen)) {
     L_OK "All tools already installed"
 } else {
     L_Info "Updating apt..."
     & wsl.exe -d $DISTRO_NAME -- bash -c "sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq" 2>&1 | Out-Null
     L_OK "apt updated"
 
-    if ($needGit -or $needPy -or $needBwrap) {
-        L_Info "Installing git, python3, pip, curl, bubblewrap..."
-        $ar = & wsl.exe -d $DISTRO_NAME -- bash -c "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y git python3 python3-pip curl build-essential bubblewrap 2>&1" | Out-String
+    if ($needGit -or $needPy -or $needBwrap -or $needXdgOpen) {
+        L_Info "Installing git, python3, pip, curl, bubblewrap, xdg-open..."
+        $ar = & wsl.exe -d $DISTRO_NAME -- bash -c "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y git python3 python3-pip curl build-essential bubblewrap xdg-utils 2>&1" | Out-String
         Add-Content -Path $LOG_FILE -Value "apt: $ar" -Encoding UTF8
-        if ($LASTEXITCODE -eq 0) { L_OK "git, python3, pip, curl, bubblewrap installed" } else { L_Warn "Some packages may have failed" }
+        if ($LASTEXITCODE -eq 0) { L_OK "git, python3, pip, curl, bubblewrap, xdg-open installed" } else { L_Warn "Some packages may have failed" }
     }
 
     if ($needNode) {

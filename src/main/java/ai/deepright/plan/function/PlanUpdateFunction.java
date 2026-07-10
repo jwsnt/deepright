@@ -38,9 +38,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-import static org.springframework.util.StringUtils.hasText;
-
 @Slf4j
 @Getter
 @Setter
@@ -80,11 +77,11 @@ public class PlanUpdateFunction extends BaseFunction {
         WorkflowTask workTask = functionContext.getWorkTask().printQuery();
         try {
             PlanData planData = this.buildData(workTask).check(this.template4failed);
-            WorkflowException.check(isEmpty(planData.getData()), "The plan update pattern can not be empty", ProtocolCode.C400);
+            WorkflowException.check(CollectionUtils.isEmpty(planData.getData()), "The plan update pattern can not be empty", ProtocolCode.C400);
             this.notify(workTask);
             this.source(workTask, CliPrinter.format(planData.getWhy(), CliPrinter.SIZE_N));
             String plan = PlanUtils.fetchPlan(workTask);
-            WorkflowException.check(!hasText(plan), "The plan can not be empty", ProtocolCode.C400);
+            WorkflowException.check(StringUtils.isEmpty(plan), "The plan can not be empty", ProtocolCode.C400);
             String replace = PlanUtils.replace(workTask, plan, planData.getData());
             PlanUtils.storePlan(workTask, replace);
             return this.buildSuccess(workTask, replace);
@@ -180,7 +177,7 @@ public class PlanUpdateFunction extends BaseFunction {
 
         public PlanUpdate check(String schema) throws Exception {
             this.init();
-            WorkflowException.check(isEmpty(this.pattern), schema, ProtocolCode.C400);
+            WorkflowException.check(CollectionUtils.isEmpty(this.pattern), schema, ProtocolCode.C400);
             return this;
         }
     }
@@ -200,7 +197,7 @@ public class PlanUpdateFunction extends BaseFunction {
 
         public PlanDrawBack check(String schema) throws Exception {
             this.init();
-            WorkflowException.check(isEmpty(this.planData), schema, ProtocolCode.C400);
+            WorkflowException.check(CollectionUtils.isEmpty(this.planData), schema, ProtocolCode.C400);
             return this;
         }
 
@@ -244,7 +241,7 @@ public class PlanUpdateFunction extends BaseFunction {
 
         public PlanDeepDive check(String schema) throws Exception {
             this.init();
-            WorkflowException.check(isEmpty(this.planData), schema, ProtocolCode.C400);
+            WorkflowException.check(CollectionUtils.isEmpty(this.planData), schema, ProtocolCode.C400);
             return this;
         }
 

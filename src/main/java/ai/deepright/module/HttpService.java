@@ -1,16 +1,11 @@
 package ai.deepright.module;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
-
-
-import ai.open.right.protocol.ProtocolCode;
-
 import ai.open.right.WorkflowException;
 import ai.open.right.netty.NettyAlarm;
 import ai.open.right.netty.NettyCloser;
 import ai.open.right.netty.NettyWriter;
 import ai.open.right.netty.chat.server.http.NettyHttpHandler;
+import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.workflow.flow.file.impl.SysStore;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -25,6 +20,7 @@ import io.netty.util.ReferenceCountUtil;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
@@ -118,7 +114,7 @@ public class HttpService extends NettyHttpHandler {
 
     protected void doDownload(ChannelHandlerContext ctx, QueryStringDecoder query) throws Exception {
         List<String> params = List.class.cast(MapUtils.getObject(query.parameters(), "name"));
-        WorkflowException.check(isEmpty(params), "The http server download param can not be empty", ProtocolCode.C400);
+        WorkflowException.check(CollectionUtils.isEmpty(params), "The http server download param can not be empty", ProtocolCode.C400);
         RandomAccessFile random = this.sysStore.access(params.getFirst());
         if (random != null) {
             try {

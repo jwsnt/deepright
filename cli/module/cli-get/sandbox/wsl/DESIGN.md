@@ -7,21 +7,21 @@
 - 如何在 WSL 上完整复刻当前 mac 沙盒的三模式能力
 - Windows 侧交互层与 WSL 侧执行层的分工
 - `bubblewrap` 在文件系统和网络隔离中的作用
-- 目录授权、缓存、会话状态管理方案
+- 目录授权、chat 维度状态管理与执行约束方案
 - 构建、分发、首次安装与运行时调用链
 - 哪些能力可以等价实现，哪些只能近似实现，哪些无法 1:1 复制
 
 与 mac 文档不同，本文档的 **runner/helper 落地部分仍是 WSL 目标设计**；但本文档约束的上层契约已经与当前仓库实现对齐，尤其是 chat 维度的 `mode + allowedDir` 状态模型、prime 语义，以及执行时必须重新注入 `--allowed-dir` 的要求。
 
-建议后续实现优先新增以下文件：
+当前仓库里，目录选择相关实现已经落到以下文件：
 
-- `cli/module/cli-get/sandbox/wsl/launcher/main.go`
-- `cli/module/cli-get/sandbox/wsl/launcher/picker_windows.go`
-- `cli/module/cli-get/sandbox/wsl/launcher/picker_wslg.go`
-- `cli/module/cli-get/sandbox/wsl/launcher/wsl.go`
+- `cli/module/cli-get/sandbox/wsl/picker/main_windows.go`
+- `cli/module/cli-get/sandbox/wsl/picker-launcher/main.go`
+- `cli/module/cli-get/sandbox/wsl/picker-launcher/picker_defaults.go`
+
+同时，helper 落地与上层契约仍继续围绕以下文件演进：
+
 - `cli/module/cli-get/sandbox/wsl/helper/main.go`
-- `cli/module/cli-get/sandbox/wsl/helper/backend_bwrap_linux.go`
-- `cli/module/cli-get/sandbox/wsl/helper/runtime_mounts_linux.go`
 - `cli/module/cli-get/sandbox/wsl/build.sh`
 
 同时会复用现有文件中的模式与集成设计：
@@ -38,8 +38,10 @@
 
 1. **Windows runner 层**
    - 负责目录授权 UI
+   - 负责首次未配置时的固定初始目录
    - 负责路径归一化
-   - 负责本地缓存和日志
+   - 不负责跨 chat 的“最后一次目录”缓存
+   - 负责日志
    - 负责调用 `wsl.exe` 进入指定 WSL 发行版
 
 2. **WSL helper 层**
@@ -93,7 +95,7 @@
 指在 Windows 上运行的 `CLI_SANDBOX.exe`，职责类似当前 mac 版的 `.app/Contents/MacOS/CLI_SANDBOX`：
 
 - 负责 UI
-- 负责缓存
+- 负责固定初始目录与参数透传
 - 负责日志
 - 负责桥接到 WSL
 
@@ -182,7 +184,7 @@ const (
 
 3. **Windows runner 层**
    - `CLI_SANDBOX.exe`
-   - 负责目录选择 UI、缓存、路径转换、日志、helper 安装、参数透传
+   - 负责目录选择 UI、固定初始目录、路径转换、日志、helper 安装、参数透传
 
 4. **WSL bridge 层**
    - 通过 `wsl.exe -d <distro> -- ...`
@@ -384,7 +386,7 @@ WSL 版 runner 的职责与 mac 版 runner 尽量保持一致：
 
 - 读取模式配置
 - 处理目录授权
-- 管理目录缓存
+- 设定固定初始目录
 - 规范化路径
 - 管理日志
 - 安装/升级 helper
@@ -442,6 +444,11 @@ helper 内部的次级日志建议位于 WSL：
 
 2. 如果没有 `--allowed-dir`
    - 直接调用目录选择器
+   - 不读取任何 runner / helper 级“最后一次目录”缓存
+   - 不预加载当前 chat 已持久化的 `allowedDir`
+   - 首次未配置或重新授权时，从固定初始目录开始
+     - Windows 原生 picker：`C:\`
+     - PowerShell `FolderBrowserDialog` fallback：`C:\`
    - 目录选择窗口最长等待 **60 秒**
    - 校验目录存在
    - 归一化
@@ -459,20 +466,22 @@ helper 内部的次级日志建议位于 WSL：
 
 1. **Windows 原生目录选择器**
    - 推荐默认后端
-   - runner 直接使用 PowerShell / Win32 / .NET 的文件夹选择对话框
+   - 当前实现优先使用 `CLI_SANDBOX_PICKER.exe`
+   - 通过 `SHBrowseForFolderW` + `BFFM_SETSELECTIONW` 把初始目录固定到 `C:\`
 
-2. **WSLg Linux 目录选择器**
-   - 当需要选择 WSL Linux 原生目录时可作为补充
-   - 例如通过 `zenity --file-selection --directory`
+2. **PowerShell / .NET fallback**
+   - 当前实现的后备方案
+   - 使用 `System.Windows.Forms.FolderBrowserDialog`
+   - 同样把 `SelectedPath` 设为 `C:\`
 
 3. **纯命令行 fallback**
-   - 如果没有 Windows picker 也没有 WSLg
+   - 如果没有 Windows picker 也没有 PowerShell 可用
    - 明确提示用户必须使用 `--allowed-dir`
 
 推荐优先级：
 
 ```text
-explicit -> cache -> windows picker -> wslg picker -> fail
+explicit -> windows picker -> powershell picker -> fail
 ```
 
 当前实现建议把 Windows picker 与 WSLg picker 的单次等待时间统一限制为 **60 秒**，超时后返回目录授权失败，而不是无限阻塞。
@@ -550,7 +559,7 @@ runner 需要处理 3 类输入路径：
 - `windowsPath`
 - `linuxPath`
 
-双字段缓存模型，例如：
+双字段路径表示，例如：
 
 ```json
 {
@@ -574,60 +583,40 @@ Windows runner 需要过滤的噪音与 mac 不同，重点应是：
 - 不隐藏业务错误
 - 只清洗平台噪音
 
-## 9. 目录授权缓存设计
+## 9. 当前方案不使用本地目录缓存回退
 
-### 9.1 双缓存模型
+### 9.1 权威目录来源
 
-建议沿用 mac 类似的双缓存思路：
+当前方案中，真正参与执行的目录只允许来自两处：
 
-1. **Windows runner 缓存**
-2. **WSL helper 缓存**
+1. `cli_sandbox_state` 中当前 chat 的 `allowedDir`
+2. 本次 prime / 显式 `--allowed-dir` 传入的目录
 
-原因是：
+这意味着：
 
-- runner 负责 UI，必须能独立记住上次授权目录
-- helper 也要支持被直接调试运行
+- 没有 Windows runner 级“最后一次目录”回退
+- 没有 WSL helper 级“最后一次目录”回退
+- 没有跨 chat 共享的目录记忆
 
-但这两层缓存都不是 chat 维度的权威状态。真正的权威状态应继续放在 `cli_sandbox_state`，并由上层在每次执行任务时把当前 chat 的 `allowedDir` 显式重新注入给 runner / helper。
+### 9.2 为什么不保留本地目录缓存
 
-### 9.2 Windows runner 缓存位置
+原因与 mac 当前实现一致：
 
-建议放在：
+- 用户会在多个 chat 之间频繁切换
+- 每个 chat 可能绑定完全不同的目录
+- “上一次选中的目录”不是“当前 chat 应使用的目录”
 
-```text
-%LOCALAPPDATA%\DeepRight\CLI_SANDBOX\<distro>\<mode>\selected-dir.json
-```
+如果保留本地目录缓存作为执行回退，就会重新引入 chat 串话问题。
 
-### 9.3 helper 缓存位置
+### 9.3 并发语义
 
-建议放在：
+当前方案下，并发控制收敛为：
 
-```text
-$XDG_CONFIG_HOME/CLI_SANDBOX/selected-dir.json
-```
+- prime 期间的一次 picker 交互
+- 成功后把 `mode + allowedDir` 一起写入 SQLite
+- 后续执行按 chat 再次显式注入 `--allowed-dir`
 
-未设置 `XDG_CONFIG_HOME` 时回退：
-
-```text
-~/.config/CLI_SANDBOX/selected-dir.json
-```
-
-### 9.4 锁与并发
-
-目录授权缓存必须支持并发保护。
-
-建议：
-
-- Windows runner 使用文件锁或命名 mutex
-- WSL helper 使用 `flock`
-- 重试周期 2 秒
-- 最长等待 10 秒
-
-超过等待预算统一返回：
-
-```text
-目录授权正在进行中，等待10秒后仍未获得授权，请稍后重试
-```
+因此目录授权不再依赖本地缓存文件锁来维持正确性。
 
 ## 10. WSL helper 设计
 
@@ -646,7 +635,7 @@ helper 是最终命令执行器，职责包括：
 
 建议完全兼容当前 helper 的使用方式：
 
-1. 只写入授权目录缓存，不执行命令
+1. 只完成目录授权，不执行命令
    - `--allowed-dir /path`
    - 或者在 `filepick` / `filepick_net` 模式下仅设置 `CLI_SANDBOX_FORCE_PICK=1`，进入 **pick-only** 授权路径
 2. 执行命令
@@ -661,9 +650,8 @@ helper 是最终命令执行器，职责包括：
 
 1. `CLI_SANDBOX_ALLOWED_DIR`
 2. `--allowed-dir`
-3. 读取 helper 缓存
-4. 若启用了 WSLg picker，则弹 Linux 目录选择器
-5. 否则返回错误
+3. 若当前调用被设计成 picker 流程，则拉起目录选择器
+4. 否则返回错误
 
 错误文案建议为：
 
@@ -1085,7 +1073,7 @@ CREATE TABLE cli_sandbox_state (
 - `chatId` 是唯一键
 - `sandbox_exe` 表示 `filepick` / `net` / `filepick_net`
 - `allowed_dir` 表示当前 chat 最近一次成功确认后的目录
-- runner / helper 的本地缓存只是辅助缓存，不是跨 chat 的真相
+- runner / helper 不再维护可作为执行回退的本地目录缓存
 
 ### 15.2 为什么目录也必须入库
 
@@ -1093,7 +1081,7 @@ CREATE TABLE cli_sandbox_state (
 
 - 用户可能在多个 chat 之间来回切换
 - 每个 chat 可以绑定不同目录
-- helper 本地缓存只能记住“上一次选中的目录”，无法代表“当前这个 chat 应该恢复哪个目录”
+- “上一次选中的目录”无法代表“当前这个 chat 应该恢复哪个目录”
 
 尤其在 WSL 下，目录还可能同时有：
 
@@ -1101,7 +1089,7 @@ CREATE TABLE cli_sandbox_state (
 - Linux 路径
 - UNC 路径
 
-如果不把 chat 维度的目录状态落库，串话风险只会更高。建议数据库里保存上层权威目录，runner / helper 自己再维护本地缓存用于少弹窗和直接调试。
+如果不把 chat 维度的目录状态落库，串话风险只会更高。当前方案要求数据库保存上层权威目录，并在每次执行时再次显式注入 `--allowed-dir`。
 
 ### 15.3 prime 目录授权
 
@@ -1109,8 +1097,9 @@ CREATE TABLE cli_sandbox_state (
 
 - 无 `dir` 时：
   - 强制弹目录选择器
+  - 从固定初始目录 `C:\` 开始
 - 有 `dir` 时：
-  - 直接写入目录缓存
+  - 直接校验并规范化该目录
 
 只有 prime 成功，才把 `mode + allowedDir` 一起写入 SQLite。
 
@@ -1130,16 +1119,17 @@ CREATE TABLE cli_sandbox_state (
 
 1. 请求启用模式
 2. integration 调 runner prime
-3. runner 先看缓存
-4. 如需要，则弹 picker
+3. runner 判断本次是否已显式传入 `--allowed-dir`
+4. 如没有，则弹 picker
+   - 首次未配置或重新授权时，从 `C:\` 打开
+   - 不预加载当前 chat 已保存目录
 5. 用户：
    - 允许
    - 取消
    - 超时未处理
-6. runner 写入 Windows 缓存
-7. runner 把 Linux 路径同步给 helper 缓存
-8. helper 使用该目录构造 `bubblewrap` 参数
-9. 后续命令复用缓存目录
+6. integration 把 `mode + allowedDir` 一起写入 SQLite
+7. helper 使用该目录构造 `bubblewrap` 参数
+8. 后续命令按当前 chat 重新取回并传入该目录
 
 其中“取消”分支需要额外满足：
 
@@ -1178,8 +1168,8 @@ CREATE TABLE cli_sandbox_state (
 11. `HOME` / `ZDOTDIR` / `XDG_*` 改写
 12. 权限拒绝快速失败
 13. stdin/stdout 原样透传
-14. helper 缓存写入
-15. runner 缓存写入
+14. 首次未配置时从 `C:\` 打开 picker
+15. 不依赖本地目录缓存回退
 16. prime 成功后才写会话状态
 
 ## 18. 安全性评估
@@ -1247,8 +1237,8 @@ CREATE TABLE cli_sandbox_state (
 4. **目录授权预热**
    - prime 成功后才写会话状态
 
-5. **目录授权缓存**
-   - 复用最近一次已选目录
+5. **chat 独立目录状态**
+   - 每次执行按当前 chat 重新注入 `allowedDir`
 
 6. **标准输入/输出语义**
    - 命令输出直接透传
@@ -1309,6 +1299,14 @@ CREATE TABLE cli_sandbox_state (
    - 实际上常常需要 WSLg picker 或显式 `--allowed-dir`
 
 ## 20. 三类不可 1:1 复制能力的详细替代方案
+
+本节讨论的是**未来增强方案**，不属于当前已落地基线。当前基线仍以：
+
+- chat 维度 `mode + allowedDir`
+- 无本地目录缓存回退
+- picker 首次未配置时从 `C:\` 打开
+
+为准。
 
 这一节不再只给结论，而是给出可直接落地实现的替代设计。
 
@@ -2055,13 +2053,13 @@ runner 收到后统一做：
 DeepRight 的 WSL 沙盒如果要完整复制当前 mac 的用户能力，最合适的实现不是“单纯在 WSL 里跑一个 `bwrap` 命令”，而是：
 
 - **交互上**：用 Windows runner 复制 mac 外层交互壳
-- **状态上**：用本地缓存保存已选目录，用 SQLite 保存会话模式
+- **状态上**：用 SQLite 按 chat 保存 `mode + allowedDir`，不保留本地目录缓存回退
 - **执行上**：在 WSL 发行版中由 helper 动态构造 `bubblewrap` 参数并执行 shell
 - **限制上**：用空根文件系统 + bind mount + network namespace 实现目录白名单与禁网
 
 因此，这套方案最准确的技术定义应是：
 
-> 它是一个“以 Windows runner 为交互控制面、以 WSL helper 为执行入口、以 bubblewrap namespace + bind mount 为核心约束手段、以会话模式和本地目录缓存为状态控制面”的命令执行沙盒。
+> 它是一个“以 Windows runner 为交互控制面、以 WSL helper 为执行入口、以 bubblewrap namespace + bind mount 为核心约束手段、以 chat 维度 `mode + allowedDir` 为状态控制面、且不依赖本地目录缓存回退的命令执行沙盒”。
 
 如果只看用户可见功能，mac 当前三模式能力基本都可以在 WSL 上复刻。
 

@@ -544,6 +544,75 @@ func detectGit() string { return agentcore.DetectGit() }
 
 func detectPython3() string { return agentcore.DetectPython3() }
 
+const (
+	integrationDefaultGitUserEmail = "deepright@deepright.cn"
+	integrationDefaultGitUserName  = "deepright"
+)
+
+var integrationGitLookPathFn = exec.LookPath
+var integrationGitReadConfigFn = func(key string) (string, error) {
+	out, err := exec.Command("git", "config", "--get", key).CombinedOutput()
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+			return "", nil
+		}
+		text := strings.TrimSpace(string(out))
+		if text == "" {
+			return "", fmt.Errorf("git config --get %s: %w", key, err)
+		}
+		return "", fmt.Errorf("git config --get %s: %w: %s", key, err, text)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+var integrationGitWriteConfigFn = func(key, value string) error {
+	out, err := exec.Command("git", "config", "--global", key, value).CombinedOutput()
+	if err != nil {
+		text := strings.TrimSpace(string(out))
+		if text == "" {
+			return fmt.Errorf("git config --global %s: %w", key, err)
+		}
+		return fmt.Errorf("git config --global %s: %w: %s", key, err, text)
+	}
+	return nil
+}
+var integrationEnsureGitIdentityConfiguredFn = ensureIntegrationGitIdentityConfigured
+
+func ensureIntegrationGitIdentityConfigured() error {
+	if _, err := integrationGitLookPathFn("git"); err != nil {
+		return nil
+	}
+
+	userName, err := integrationGitReadConfigFn("user.name")
+	if err != nil {
+		return err
+	}
+	userEmail, err := integrationGitReadConfigFn("user.email")
+	if err != nil {
+		return err
+	}
+
+	missingName := strings.TrimSpace(userName) == ""
+	missingEmail := strings.TrimSpace(userEmail) == ""
+	if !missingName && !missingEmail {
+		return nil
+	}
+
+	if missingEmail {
+		if err := integrationGitWriteConfigFn("user.email", integrationDefaultGitUserEmail); err != nil {
+			return err
+		}
+		log.Printf("integration: git user.email missing, set default global value %q", integrationDefaultGitUserEmail)
+	}
+	if missingName {
+		if err := integrationGitWriteConfigFn("user.name", integrationDefaultGitUserName); err != nil {
+			return err
+		}
+		log.Printf("integration: git user.name missing, set default global value %q", integrationDefaultGitUserName)
+	}
+	return nil
+}
+
 func detectRequiredInstallApps() []string {
 	apps := agentcore.DetectRequiredInstallApps()
 	if detectPython3() == "" {
@@ -1601,6 +1670,49 @@ func injectLastResponseMetadata(metaMap map[string]interface{}, chatID string) {
 	}
 }
 
+func lookupSandboxPath(chatID string) (string, bool) {
+	chatID = strings.TrimSpace(chatID)
+	if chatID == "" {
+		return "", false
+	}
+	db := cronDB
+	shouldClose := false
+	if db == nil {
+		dbPath := resolveIntegrationDBPath()
+		if _, err := os.Stat(dbPath); err != nil {
+			return "", false
+		}
+		var err error
+		db, err = sql.Open("sqlite", dbPath)
+		if err != nil {
+			return "", false
+		}
+		shouldClose = true
+	}
+	if shouldClose {
+		defer db.Close()
+	}
+	state, recorded, err := sandboxstate.Get(db, "", chatID)
+	if err != nil || !recorded {
+		return "", false
+	}
+	allowedDir := strings.TrimSpace(state.AllowedDir)
+	if allowedDir == "" {
+		return "", false
+	}
+	return allowedDir, true
+}
+
+func injectSandboxPathMetadata(metaMap map[string]interface{}, chatID string) {
+	if metaMap == nil {
+		return
+	}
+	delete(metaMap, "sandbox_path")
+	if allowedDir, ok := lookupSandboxPath(chatID); ok {
+		metaMap["sandbox_path"] = allowedDir
+	}
+}
+
 func pruneForwardedKnowledgeCommit(metaMap map[string]interface{}) {
 	if metaMap == nil {
 		return
@@ -2025,7 +2137,9 @@ func integrationHTTPTimeoutError(err error) bool {
 
 func heartbeat(client *http.Client, host string, metadata *AgentOutput, cfg *Config) (*TaskContent, error) {
 	metaMap := buildCLIRequestMetadataMap(metadata)
-	injectLastResponseMetadata(metaMap, resolveCurrentPageSessionChatID())
+	currentChatID := resolveCurrentPageSessionChatID()
+	injectLastResponseMetadata(metaMap, currentChatID)
+	injectSandboxPathMetadata(metaMap, currentChatID)
 	injectLiveAgentKnowledgeIntoAgentList(metaMap)
 	pruneForwardedKnowledgeCommit(metaMap)
 	reqBody, _ := json.Marshal(map[string]interface{}{
@@ -3343,24 +3457,112 @@ func handleDeviceID(cfg *Config) http.HandlerFunc {
 // ═══════════════════════════════════════════════════════════════════════════
 
 var openFolderFn = openSystemTarget
+var openSystemTargetGOOS = runtime.GOOS
+var openSystemTargetIsWSLFn = integrationBrowserIsWSL
+var openSystemTargetExecCommandFn = exec.Command
+var openSystemTargetStartCommandFn = func(name string, args ...string) error {
+	return openSystemTargetExecCommandFn(name, args...).Start()
+}
+var openSystemTargetRunCommandFn = func(name string, args ...string) error {
+	return openSystemTargetExecCommandFn(name, args...).Run()
+}
+var openSystemTargetLookPathFn = exec.LookPath
+var openSystemTargetStatFn = os.Stat
+var openSystemTargetOutputFn = func(name string, args ...string) ([]byte, error) {
+	return exec.Command(name, args...).Output()
+}
 
 func openFolder(path string) error {
 	return openFolderFn(path)
 }
 
 func openSystemTarget(target string) error {
-	var cmd string
-	switch runtime.GOOS {
-	case "darwin":
-		cmd = "open"
-	case "linux":
-		cmd = "xdg-open"
-	case "windows":
-		cmd = "explorer"
-	default:
-		return fmt.Errorf("unsupported OS: %s", runtime.GOOS)
+	if openSystemTargetGOOS == "linux" && openSystemTargetIsWSLFn() {
+		if err := openSystemTargetRunCommandFn("xdg-open", target); err == nil {
+			return nil
+		}
 	}
-	return exec.Command(cmd, target).Start()
+	cmd, args, err := openSystemTargetCommand(target)
+	if err != nil {
+		return err
+	}
+	return openSystemTargetStartCommandFn(cmd, args...)
+}
+
+func openSystemTargetCommand(target string) (string, []string, error) {
+	switch openSystemTargetGOOS {
+	case "darwin":
+		return "open", []string{target}, nil
+	case "linux":
+		if openSystemTargetIsWSLFn() {
+			return openSystemTargetCommandWSL(target)
+		}
+		return "xdg-open", []string{target}, nil
+	case "windows":
+		return "explorer", []string{target}, nil
+	default:
+		return "", nil, fmt.Errorf("unsupported OS: %s", openSystemTargetGOOS)
+	}
+}
+
+func openSystemTargetCommandWSL(target string) (string, []string, error) {
+	winTarget, err := openSystemTargetWSLPath(target)
+	if err != nil {
+		return "", nil, err
+	}
+	if path, ok := openSystemTargetFirstExistingFile("/mnt/c/Windows/explorer.exe"); ok {
+		return path, []string{winTarget}, nil
+	}
+	if path, ok := openSystemTargetFirstLookPath("explorer.exe"); ok {
+		return path, []string{winTarget}, nil
+	}
+	if path, ok := openSystemTargetFirstExistingFile("/mnt/c/Windows/System32/cmd.exe"); ok {
+		return path, []string{"/c", "start", "", winTarget}, nil
+	}
+	if path, ok := openSystemTargetFirstLookPath("cmd.exe"); ok {
+		return path, []string{"/c", "start", "", winTarget}, nil
+	}
+	return "", nil, errors.New("WSL open folder requires explorer.exe or cmd.exe")
+}
+
+func openSystemTargetWSLPath(target string) (string, error) {
+	out, err := openSystemTargetOutputFn("wslpath", "-w", target)
+	if err != nil {
+		return "", fmt.Errorf("convert WSL path: %w", err)
+	}
+	winTarget := strings.TrimSpace(string(out))
+	if winTarget == "" {
+		return "", errors.New("convert WSL path: empty result")
+	}
+	return winTarget, nil
+}
+
+func openSystemTargetFirstExistingFile(paths ...string) (string, bool) {
+	for _, path := range paths {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			continue
+		}
+		info, err := openSystemTargetStatFn(path)
+		if err == nil && info != nil && !info.IsDir() {
+			return path, true
+		}
+	}
+	return "", false
+}
+
+func openSystemTargetFirstLookPath(names ...string) (string, bool) {
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		path, err := openSystemTargetLookPathFn(name)
+		if err == nil && strings.TrimSpace(path) != "" {
+			return path, true
+		}
+	}
+	return "", false
 }
 
 func integrationBrowserURL(port int) string {
@@ -11354,6 +11556,7 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 		injectLiveAgentKnowledgeIntoAgentList(metaMap)
 		_, mergedChatID := requestChatContext(metaMap)
 		injectLastResponseMetadata(metaMap, mergedChatID)
+		injectSandboxPathMetadata(metaMap, mergedChatID)
 		reqData["metadata"] = metaMap
 		syncForwardedChatRequestFlags(reqData, metaMap)
 
@@ -14193,6 +14396,9 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 		fmt.Fprintln(stderr, message)
 		return 1
 	}
+	if err := integrationEnsureGitIdentityConfiguredFn(); err != nil {
+		log.Printf("integration: git identity auto-config skipped: %v", err)
+	}
 	if err := validateIntegrationServicePort(cfg.Port); err != nil {
 		return reportStartupFailure("error: %v", err)
 	}
@@ -16390,6 +16596,7 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 		injectLiveAgentMediaIntoAgentList(metaMap)
 		injectLiveAgentKnowledgeIntoAgentList(metaMap)
 		injectLastResponseMetadata(metaMap, chatID)
+		injectSandboxPathMetadata(metaMap, chatID)
 		if routerRemote := readAgentRouterRemote(cfg.AgentDir, cfg.Device, t.AgentID, agentTTL); len(routerRemote) > 0 {
 			metaMap["router_remote"] = routerRemote
 		}

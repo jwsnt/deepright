@@ -92,7 +92,7 @@ curl 'http://127.0.0.1:8080/api/plugins/exec?key=browser&command=instance%20init
 - 其中 `agents[].version` 来自 `--agent-dir/<agentId>/config.json` 中的 `version`，只在当前 Agent metadata 缓存周期首次扫描时读取一次
 - 如果当前请求能确定 `metadata.agentId + metadata.chat`，则还会额外补出 `metadata.agent`
   - `metadata.agent.version`：当前 Agent 的缓存版本号
-  - `metadata.agent.sandbox`：共享 sqlite 中该 `agentId + chatId` 的实时沙盒模式；未写入时为空字符串
+  - `metadata.agent.sandbox`：共享 sqlite 中该 `chatId` 的实时沙盒模式；未写入时为空字符串
 - metadata 中的 `git` 字段也会在每次请求时实时重新探测，不跟随 `--agent-cache` 一起缓存
 - 当当前应用启动目录下存在 `knowledge` 目录时，metadata 中会额外包含：
 
@@ -193,7 +193,8 @@ curl 'http://127.0.0.1:8080/v1/chat/completions' \
 - `version` 只在当前 Agent metadata 缓存周期首次扫描时读取一次；缓存未失效前不会因为 `--agent-dir/<agentId>/config.json` 中的 `version` 变化而立刻刷新
 - `version/provider` 不会持久化到 sqlite；`version` 只使用当前 `proxy` 进程内的 Agent metadata 内存缓存
 - 对应用内置的 `DEF_AGENT`，`proxy` 启动时会把 bundled `default-dir/config.json.version` 同步写回 `--agent-dir/DEF_AGENT/config.json`，以便应用升级后默认 Agent 的 `version` 跟随更新
-- `metadata.agents[].sandbox` 与 `metadata.agent.sandbox` 都按 `agentId + chatId` 实时读取共享 sqlite 的 `cli_sandbox_state`
+- `metadata.agents[].sandbox` 与 `metadata.agent.sandbox` 都按当前 `chatId` 实时读取共享 sqlite 的 `cli_sandbox_state`
+- `agentId` 不参与沙盒状态命中，仅用于定位当前 Agent metadata 与运行日志
 - 如果当前请求没有有效的 `chatId`，或该会话从未写入沙盒状态，则 `sandbox` 输出空字符串
 
 ### `git` 字段说明
@@ -1608,14 +1609,15 @@ POST /api/plugins/stop?name=feishu&pid-file=../plugins/feishu.pid
 
 - 仅允许本地请求
 - 用于执行本地 Shell 命令
-- 如果当前 `agentId + chatId` 已配置沙盒模式，则改走对应模式的 `CLI_SANDBOX` helper
+- 如果当前 `chatId` 已配置沙盒模式，则改走对应模式的 `CLI_SANDBOX` helper
   - macOS 使用 `.app/Contents/MacOS/CLI_SANDBOX`
   - WSL/Linux 使用 `helpers/<mode>/CLI_SANDBOX`
 - 结果写入共享 `data` SQLite
 
 ### 会话沙盒
 
-- 沙盒状态按 `agentId + chatId` 维度保存到共享 SQLite 的 `cli_sandbox_state`
+- 沙盒状态按 `chatId` 维度保存到共享 SQLite 的 `cli_sandbox_state`
+- `chatId` 为空时，`/api/sandbox_status` 与 `/api/sandbox=*` 都会直接报错
 - 仅支持 3 个有效模式：
   - `filepick`
   - `net`
@@ -1623,24 +1625,29 @@ POST /api/plugins/stop?name=feishu&pid-file=../plugins/feishu.pid
 - 读取当前会话沙盒模式：
 
 ```text
-GET /api/sandbox_status?agentId=A&chatId=chat-001
+GET /api/sandbox_status?chatId=chat-001
 ```
 
+- 读取接口只按 `chatId` 命中；即使请求里携带 `agentId`，也不会参与状态定位
 - 写入当前会话沙盒模式：
 
 ```text
 POST /api/sandbox=filepick?agentId=A&chatId=chat-001
 POST /api/sandbox=net?agentId=A&chatId=chat-001
 POST /api/sandbox=filepick_net?agentId=A&chatId=chat-001
+POST /api/sandbox=filepick?agentId=A&chatId=chat-001&dir=%2FUsers%2Fme%2FDesktop
 POST /api/sandbox=off?agentId=A&chatId=chat-001
 ```
 
-- `off` 表示关闭沙盒，并直接删除该 `agentId + chatId` 的数据库记录
+- 写接口仍要求 `agentId` 与 `chatId`；其中 `agentId` 只用于日志，`chatId` 用于定位当前会话沙盒状态
+- `filepick` / `filepick_net` 可选传入 `dir`，显式持久化当前 `chatId` 对应的 `allowed_dir`；未传时仍按当前系统走目录选择流程
+- `off` 表示关闭沙盒，并直接删除该 `chatId` 的数据库记录
 - CLI 也使用同一套协议：
 
 ```bash
 ./proxy sandbox --agentId A --chatId chat-001
 ./proxy sandbox --agentId A --chatId chat-001 --sandbox filepick_net
+./proxy sandbox --agentId A --chatId chat-001 --sandbox filepick --dir /Users/me/Desktop
 ./proxy sandbox --agentId A --chatId chat-001 --sandbox off
 ```
 
@@ -2041,3 +2048,23 @@ GET /api/skills?agentId=A
   - mac `.app/Contents/MacOS/CLI_SANDBOX`
   - WSL/Linux `helpers/<mode>/CLI_SANDBOX`
 - `proxy/main_test.go` 已补充 WSL/Linux helper 路径解析测试
+
+---
+
+## 迭代 20260709-1：会话沙盒改为按 `chatId` 命中
+
+## 本次更新
+
+- 会话沙盒状态从 `agentId + chatId` 改为仅按 `chatId` 保存与命中
+- `/api/sandbox_status` 改为只依赖 `chatId`；即使请求里携带 `agentId`，也不会参与状态定位
+- `/api/sandbox=*` 写接口仍要求 `agentId` 与 `chatId`；其中 `agentId` 仅用于日志，`chatId` 用于写入当前会话沙盒状态
+- `metadata.agent.sandbox` 与 `metadata.agents[].sandbox` 都改为按当前 `chatId` 实时读取共享 sqlite
+- `/api/cmd` 的沙盒命中改为只看 `chatId`
+- 跨系统 helper 选择保持不变：macOS 继续走 `CLI_SANDBOX.app`，WSL/Linux 继续走 `helpers/<mode>/CLI_SANDBOX`
+
+## 行为说明
+
+- `chatId` 为空时，读写都会直接报错
+- `off` 会删除当前 `chatId` 的记录；无记录视为 `off`
+- `filepick` / `filepick_net` 如显式传入 `dir`，会把 `allowed_dir` 按当前 `chatId` 持久化；未传时继续按当前系统走目录选择流程
+- 写入日志会输出 `agentId`、`chatId` 以及 `from -> to` 的文本变更信息

@@ -60,9 +60,9 @@ installer 会先检查：
 
 推荐方式：
 - 双击 uninstaller.exe
-- 按提示确认后，会自动执行下面这套完整卸载流程
+- 按提示确认后，会自动执行默认卸载流程：删除应用程序并保留现有 agent-dir 数据
 
-如果要手动完整卸载，请按下面顺序操作。
+如果要手动执行默认卸载，请按下面顺序操作。
 
 第一步：删除快捷方式
 - 删除桌面上的 DeepRight 快捷方式
@@ -72,23 +72,34 @@ installer 会先检查：
 - 删除 C:\ProgramData\deepright
 - 删除 %LocalAppData%\DeepRight
 
-第三步：删除 WSL 中的 DeepRight 发行版
+第三步：删除 WSL 中的应用程序文件，但保留现有数据目录
 以管理员身份打开 PowerShell，执行：
+
+wsl --shutdown
+wsl -d deepright -u root -- bash -c "rm -rf /app /home/deepright/start-deepright.sh /home/deepright/.deepright_initialized"
+
+说明：
+- `~/deepright/agent` 会被保留
+- 现有 `deepright` WSL 发行版会被保留
+- 重新双击 installer.exe 后，会把应用程序重新复制到 `/app`
+
+如果需要完整卸载（连同 WSL 发行版和全部数据一起删除），可以额外执行：
 
 wsl --shutdown
 wsl --unregister deepright
 
-第四步：删除 WSL 虚拟磁盘目录
-- 删除 C:\WSL\deepright
+然后再删除：
+- C:\WSL\deepright
 
 
 5. 卸载后的影响
 
-执行完整卸载后：
+执行默认卸载后：
 - DeepRight 的 Windows 快捷方式会消失
 - installer 解压出来的本地目录会被删除
-- WSL 中的 deepright 环境会被删除
-- /app 下的应用文件也会一并消失
+- WSL 中的 deepright 发行版会被保留
+- /app 下的应用文件会被删除
+- `~/deepright/agent` 中的内容会被保留
 
 
 6. 重新安装

@@ -19,6 +19,10 @@ public interface FeatureField {
 
     public static final String KEY_LAST_RESPONSE = "lastResponse";
 
+    public static final String KEY_SANDBOX_PATH = "sandbox_path";
+
+    public static final String KEY_FILE_SYSTEM = "file_system";
+
     public static final String KEY_CRON_TYPE = "cron_type";
 
     public static final String KEY_WORKSPACE = "workspace";

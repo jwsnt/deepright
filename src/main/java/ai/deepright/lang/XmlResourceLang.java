@@ -1,17 +1,14 @@
 package ai.deepright.lang;
 
-import static org.springframework.util.StringUtils.hasText;
-
-
-import ai.open.right.protocol.ProtocolCode;
-
 import ai.open.right.WorkflowException;
-
+import ai.open.right.protocol.ProtocolCode;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.Locale;
 import java.util.ResourceBundle;
+
+import static org.springframework.util.StringUtils.hasText;
 
 @Slf4j
 public final class XmlResourceLang {
@@ -53,10 +50,10 @@ public final class XmlResourceLang {
 
     public static String get(String baseName, String key, Locale locale, ClassLoader loader) {
         try {
-            WorkflowException.check(!hasText(baseName), "The baseName could not find resource: " + baseName, ProtocolCode.C400);
+            WorkflowException.check(StringUtils.isEmpty(baseName), "The baseName could not find resource: " + baseName, ProtocolCode.C400);
             WorkflowException.check(locale == null, "The locale could not find resource: " + locale, ProtocolCode.C400);
             WorkflowException.check(loader == null, "The loader could not find resource: " + loader, ProtocolCode.C400);
-            WorkflowException.check(!hasText(key), "The key could not find resource: " + key, ProtocolCode.C400);
+            WorkflowException.check(StringUtils.isEmpty(key), "The key could not find resource: " + key, ProtocolCode.C400);
             ResourceBundle bundle = ResourceBundle.getBundle(baseName, locale, loader, XmlResourceLang.XML_CONTROL);
             return StringUtils.defaultIfEmpty(bundle.getString(key), "");
         } catch (Exception e) {

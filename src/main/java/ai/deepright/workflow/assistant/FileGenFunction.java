@@ -1,12 +1,5 @@
 package ai.deepright.workflow.assistant;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
-import static org.springframework.util.StringUtils.hasText;
-
-
-
-
 import ai.deepright.cli.CliPubData;
 import ai.deepright.cli.CliPubSub;
 import ai.deepright.cli.CliSubFetcher;
@@ -27,6 +20,7 @@ import ai.open.right.workflow.sync.SyncConfig;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
@@ -39,6 +33,8 @@ import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
 import java.util.Map;
+
+import static org.springframework.util.StringUtils.hasText;
 
 @Slf4j
 @Getter
@@ -98,7 +94,7 @@ public class FileGenFunction extends BaseFunction {
     protected Map<String, Object> buildQuery(WorkflowTask workTask, Map<String, Object> query) throws Exception {
         List<String> refers = List.class.cast(query.remove("refer_uris"));
         // 异常需要抛给模型
-        WorkflowException.check(isEmpty(refers), "The refer_uris can not be empty", ProtocolCode.C400);
+        WorkflowException.check(CollectionUtils.isEmpty(refers), "The refer_uris can not be empty", ProtocolCode.C400);
         for (String refer : refers) {
             WorkflowException.check(!hasText(refer), "The refer_uris cannot contain empty values", ProtocolCode.C400);
         }

@@ -1,16 +1,5 @@
 package ai.deepright.memory.knowledge;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
-import static org.springframework.util.StringUtils.hasText;
-
-
-
-
-import ai.open.right.protocol.ProtocolCode;
-
-import ai.open.right.WorkflowException;
-
 import ai.deepright.cli.CliPrinter;
 import ai.deepright.cli.CliPubData;
 import ai.deepright.cli.CliSubFetcher;
@@ -28,6 +17,8 @@ import ai.deepright.router.RouterService;
 import ai.deepright.utils.SecurityTruncater;
 import ai.deepright.utils.TemplateChecker;
 import ai.deepright.workflow.worktask.HeartbeatWorkTask;
+import ai.open.right.WorkflowException;
+import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.resouce.ResourceService;
 import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.llm.Segment;
@@ -116,10 +107,10 @@ public class KnowledgeService implements MemoryService {
         // IOUtils/JsonUtils负责关闭资源
         // 覆盖（rewrite），不需要重入
         // 启动检测，必要资源
-        WorkflowException.check(!hasText(this.template4prefix), "The template prefix must not be empty", ProtocolCode.C400);
-        WorkflowException.check(!hasText(this.template4recall), "The template recall must not be empty", ProtocolCode.C400);
-        WorkflowException.check(!hasText(this.template4commit), "The template commit must not be empty", ProtocolCode.C400);
-        WorkflowException.check(!hasText(this.template4init), "The template init must not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4prefix), "The template prefix must not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4recall), "The template recall must not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4commit), "The template commit must not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4init), "The template init must not be empty", ProtocolCode.C400);
     }
 
     @Override

@@ -1,21 +1,13 @@
 package ai.deepright.cli;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
-import static org.springframework.util.StringUtils.hasText;
-
-
-
-
-import ai.open.right.protocol.ProtocolCode;
-
-import ai.open.right.WorkflowException;
-
 import ai.deepright.feature.FeatureField;
 import ai.deepright.feature.FeatureFlag;
 import ai.deepright.feature.FeatureUtils;
 import ai.deepright.router.RouterAgent;
 import ai.deepright.utils.SecurityTruncater;
+import ai.open.right.WorkflowException;
+import ai.open.right.protocol.ProtocolCode;
+import ai.open.right.resouce.ResourceService;
 import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.llm.provider.ProviderRequestService;
 import ai.open.right.workflow.flow.llm.rag.RagCondition;
@@ -24,18 +16,23 @@ import ai.open.right.workflow.flow.llm.rag.RagData;
 import ai.open.right.workflow.flow.llm.rag.RagService;
 import ai.open.right.workflow.flow.llm.rag.future.RagAtOnce;
 import ai.open.right.workflow.flow.llm.rag.future.RagFuture;
+import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.MapUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.io.BufferedInputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 
 @Getter
@@ -49,9 +46,24 @@ public class CliRag extends RagCondition implements RagService {
 
     public static final String RAG_KEY = "rag_env";
 
+    protected ResourceService resourceService;
+
+    protected String template4workspace;
+
+    protected String template4sandbox;
+
     protected Integer truncate4soul;
 
     protected Integer truncate4user;
+
+
+    @PostConstruct
+    public void init() throws Exception {
+        this.template4workspace = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4workspace).openStream()), StandardCharsets.UTF_8);
+        this.template4sandbox = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4sandbox).openStream()), StandardCharsets.UTF_8);
+        WorkflowException.check(StringUtils.isEmpty(this.template4workspace), "The template workspace must not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4sandbox), "The template sandbox must not be empty", ProtocolCode.C400);
+    }
 
     @Override
     public RagFuture rag(RagConfig ragConfig, RagData ragData) throws Exception {
@@ -60,9 +72,11 @@ public class CliRag extends RagCondition implements RagService {
         }
         // 从CLi更新上报
         this.fetchAgentFromId(ragConfig, ragData);
+        this.updateFileSystem(ragConfig, ragData);
         this.updateWorkspace(ragConfig, ragData);
         this.updateTerminal(ragConfig, ragData);
         this.updateProvider(ragConfig, ragData);
+        this.updateSandbox(ragConfig, ragData);
         this.updateExtract(ragConfig, ragData);
         this.updateDevice(ragConfig, ragData);
         this.updateAgent(ragConfig, ragData);
@@ -88,12 +102,30 @@ public class CliRag extends RagCondition implements RagService {
         }
     }
 
+    protected void updateFileSystem(RagConfig ragConfig, RagData ragData) throws Exception {
+        String replace = MapUtils.getString(ragConfig.getGlobalConfig(), FeatureField.KEY_FILE_SYSTEM);
+        if (!StringUtils.isEmpty(replace)) {
+            String fileSystem = (FeatureFlag.isSandbox(ragData.getQuery()) ? this.template4sandbox : this.template4workspace);
+            WorkflowException.check(StringUtils.isEmpty(fileSystem), "The cli file system can not be empty", ProtocolCode.C400);
+            RagService.updatePrompt(ragConfig, ragData, replace, fileSystem);
+        }
+    }
+
     protected void updateWorkspace(RagConfig ragConfig, RagData ragData) throws Exception {
         String replace = MapUtils.getString(ragConfig.getGlobalConfig(), FeatureField.KEY_WORKSPACE);
         if (!StringUtils.isEmpty(replace)) {
             String workspace = FeatureUtils.buildWorkspace(ragData.getQuery());
-            WorkflowException.check(!hasText(workspace), "The cli workspace can not be empty", ProtocolCode.C400);
+            WorkflowException.check(StringUtils.isEmpty(workspace), "The cli workspace can not be empty", ProtocolCode.C400);
             RagService.updatePrompt(ragConfig, ragData, replace, workspace);
+        }
+    }
+
+    protected void updateSandbox(RagConfig ragConfig, RagData ragData) throws Exception {
+        String replace = MapUtils.getString(ragConfig.getGlobalConfig(), FeatureField.KEY_SANDBOX_PATH);
+        if (!StringUtils.isEmpty(replace) && FeatureFlag.isSandbox(ragData.getQuery())) {
+            String sandboxPath = FeatureUtils.buildSandBoxPath(ragData.getQuery());
+            WorkflowException.check(StringUtils.isEmpty(sandboxPath), "The cli sandbox path can not be empty", ProtocolCode.C400);
+            RagService.updatePrompt(ragConfig, ragData, replace, sandboxPath);
         }
     }
 
@@ -101,7 +133,7 @@ public class CliRag extends RagCondition implements RagService {
         String replace = MapUtils.getString(ragConfig.getGlobalConfig(), FeatureField.KEY_TERMINAL);
         if (!StringUtils.isEmpty(replace)) {
             String terminal = FeatureUtils.buildTerminal(ragData.getQuery());
-            WorkflowException.check(!hasText(terminal), "The cli terminal can not be empty", ProtocolCode.C400);
+            WorkflowException.check(StringUtils.isEmpty(terminal), "The cli terminal can not be empty", ProtocolCode.C400);
             RagService.updatePrompt(ragConfig, ragData, replace, terminal);
         }
     }
@@ -110,7 +142,7 @@ public class CliRag extends RagCondition implements RagService {
         String replace = MapUtils.getString(ragConfig.getGlobalConfig(), ProviderRequestService.KEY_PROVIDER.replaceFirst(ProviderRequestService.KEY_INTERNAL, ""));
         if (!StringUtils.isEmpty(replace)) {
             String provider = FeatureUtils.buildTargetProvider(ragData.getQuery());
-            WorkflowException.check(!hasText(provider), "The cli provider can not be empty", ProtocolCode.C400);
+            WorkflowException.check(StringUtils.isEmpty(provider), "The cli provider can not be empty", ProtocolCode.C400);
             RagService.updatePrompt(ragConfig, ragData, replace, provider);
         }
     }
@@ -133,7 +165,7 @@ public class CliRag extends RagCondition implements RagService {
         String replace = MapUtils.getString(ragConfig.getGlobalConfig(), FeatureField.KEY_AGENTID);
         if (!StringUtils.isEmpty(replace)) {
             String agent = FeatureUtils.buildAgentId(ragData.getQuery());
-            WorkflowException.check(!hasText(agent), "The cli agent can not be empty", ProtocolCode.C400);
+            WorkflowException.check(StringUtils.isEmpty(agent), "The cli agent can not be empty", ProtocolCode.C400);
             RagService.updatePrompt(ragConfig, ragData, replace, agent);
         }
     }
@@ -170,7 +202,7 @@ public class CliRag extends RagCondition implements RagService {
         if (!StringUtils.isEmpty(replace)) {
             // 系统类型
             String sys = FeatureUtils.buildSys(ragData.getQuery());
-            WorkflowException.check(!hasText(sys), "The cli sys can not be empty", ProtocolCode.C400);
+            WorkflowException.check(StringUtils.isEmpty(sys), "The cli sys can not be empty", ProtocolCode.C400);
             RagService.updatePrompt(ragConfig, ragData, replace, sys);
         }
     }
@@ -179,7 +211,7 @@ public class CliRag extends RagCondition implements RagService {
         String replace = MapUtils.getString(ragConfig.getGlobalConfig(), FeatureField.KEY_APP);
         if (!StringUtils.isEmpty(replace)) {
             String app = FeatureUtils.buildApp(ragData.getQuery());
-            WorkflowException.check(!hasText(app), "The cli app can not be empty", ProtocolCode.C400);
+            WorkflowException.check(StringUtils.isEmpty(app), "The cli app can not be empty", ProtocolCode.C400);
             RagService.updatePrompt(ragConfig, ragData, replace, app);
         }
     }
@@ -213,6 +245,15 @@ public class CliRag extends RagCondition implements RagService {
     @Setter
     @Getter
     public static class InitConfig extends ConditionInitConfig {
+
+        @Autowired
+        protected ResourceService resourceService;
+
+        @Value("${cli.rag.template.workspace:classpath:config/main/workspace_def.md}")
+        protected String template4workspace;
+
+        @Value("${cli.rag.template.sandbox:classpath:config/main/workspace_sandbox.md}")
+        protected String template4sandbox;
 
         @Value("${cli.truncate.soul:5120}")
         protected Integer truncate4soul;

@@ -56,7 +56,8 @@ Double-click the generated `.exe`:
 - uninstaller:
   - extracts a minimal payload to a separate cache namespace
   - runs `uninstall.bat`, which elevates and calls `uninstall.ps1`
-  - `uninstall.ps1` removes shortcuts, Windows cache/sentinel data, unregisters the `deepright` WSL distro, and deletes `C:\WSL\deepright`
+  - `uninstall.ps1` removes shortcuts, Windows cache/sentinel data, and WSL app files under `/app`, while preserving the existing `deepright` distro and `~/deepright/agent` by default
+  - if you need a full cleanup, run `uninstall.ps1 -RemoveAll` manually to also remove the WSL distro and `C:\WSL\deepright`
 
 Because `install.ps1` is already idempotent, running the same `.exe` again does not rebuild the whole environment when the local sentinel and distro are healthy.
 

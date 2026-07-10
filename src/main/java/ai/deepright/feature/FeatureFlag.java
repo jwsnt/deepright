@@ -1,7 +1,5 @@
 package ai.deepright.feature;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
 import ai.open.right.workflow.flow.WorkflowTask;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
@@ -81,8 +79,8 @@ public class FeatureFlag {
         }
     }
 
-    public static Boolean isVerify(WorkflowTask workTask) throws Exception {
-        return MapUtils.getBoolean(workTask.getMetadata(), FeatureField.KEY_VERIFY, false);
+    public static Boolean isSandbox(WorkflowTask workTask) throws Exception {
+        return !StringUtils.isEmpty(FeatureUtils.buildSandBoxPath(workTask));
     }
 
     // 与cli.go/get请求一致，{"sys": runtime.GOOS}，据此判断是否为Windows
@@ -92,6 +90,10 @@ public class FeatureFlag {
 
     public static Boolean isWindows(String sys) throws Exception {
         return StringUtils.containsIgnoreCase(sys, "windows");
+    }
+
+    public static Boolean isVerify(WorkflowTask workTask) throws Exception {
+        return MapUtils.getBoolean(workTask.getMetadata(), FeatureField.KEY_VERIFY, false);
     }
 
     public static Boolean isMacOs(WorkflowTask workTask) throws Exception {

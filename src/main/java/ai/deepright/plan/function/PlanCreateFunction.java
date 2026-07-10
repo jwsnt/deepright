@@ -37,8 +37,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.springframework.util.StringUtils.hasText;
-
 @Slf4j
 @Getter
 @Setter
@@ -93,7 +91,7 @@ public class PlanCreateFunction extends BaseFunction {
             return this.buildDirectly(workTask, workflow);
         }
         String why = MapUtils.getString(data, "why_do_this");
-        WorkflowException.check(!hasText(why), "The why_do_this must not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(why), "The why_do_this must not be empty", ProtocolCode.C400);
         String query = this.buildQuery(workTask, why);
         this.notify(workTask);
         this.source(workTask, CliPrinter.format(why, CliPrinter.SIZE_N));

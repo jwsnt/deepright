@@ -12,6 +12,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"knowledge/knowledgecore"
@@ -4533,6 +4534,165 @@ func TestHandleFolderSupportsAbsolutePath(t *testing.T) {
 	}
 	if openedPath != targetDir {
 		t.Fatalf("opened path = %q, want %q", openedPath, targetDir)
+	}
+}
+
+type testOpenFolderSystemFileInfo struct{}
+
+func (testOpenFolderSystemFileInfo) Name() string       { return "explorer.exe" }
+func (testOpenFolderSystemFileInfo) Size() int64        { return 1 }
+func (testOpenFolderSystemFileInfo) Mode() os.FileMode  { return 0o755 }
+func (testOpenFolderSystemFileInfo) ModTime() time.Time { return time.Time{} }
+func (testOpenFolderSystemFileInfo) IsDir() bool        { return false }
+func (testOpenFolderSystemFileInfo) Sys() interface{}   { return nil }
+
+func TestOpenFolderSystemCommandWSLUsesExplorer(t *testing.T) {
+	prevGOOS := openFolderSystemGOOS
+	prevIsWSLFn := openFolderSystemIsWSLFn
+	prevStatFn := openFolderSystemStatFn
+	prevLookPathFn := openFolderSystemLookPathFn
+	prevOutputFn := openFolderSystemOutputFn
+	openFolderSystemGOOS = "linux"
+	openFolderSystemIsWSLFn = func() bool { return true }
+	openFolderSystemStatFn = func(path string) (os.FileInfo, error) {
+		if path == "/mnt/c/Windows/explorer.exe" {
+			return testOpenFolderSystemFileInfo{}, nil
+		}
+		return nil, os.ErrNotExist
+	}
+	openFolderSystemLookPathFn = func(name string) (string, error) {
+		return "", os.ErrNotExist
+	}
+	openFolderSystemOutputFn = func(name string, args ...string) ([]byte, error) {
+		if name != "wslpath" {
+			t.Fatalf("unexpected command = %q", name)
+		}
+		if len(args) != 2 || args[0] != "-w" || args[1] != "/home/deepright" {
+			t.Fatalf("unexpected args = %#v", args)
+		}
+		return []byte("\\\\wsl.localhost\\deepright\\home\\deepright\n"), nil
+	}
+	defer func() {
+		openFolderSystemGOOS = prevGOOS
+		openFolderSystemIsWSLFn = prevIsWSLFn
+		openFolderSystemStatFn = prevStatFn
+		openFolderSystemLookPathFn = prevLookPathFn
+		openFolderSystemOutputFn = prevOutputFn
+	}()
+
+	cmd, args, err := openFolderSystemCommand("/home/deepright")
+	if err != nil {
+		t.Fatalf("openFolderSystemCommand returned error: %v", err)
+	}
+	if cmd != "/mnt/c/Windows/explorer.exe" {
+		t.Fatalf("command = %q, want explorer.exe path", cmd)
+	}
+	if len(args) != 1 || args[0] != "\\\\wsl.localhost\\deepright\\home\\deepright" {
+		t.Fatalf("args = %#v, want converted WSL path", args)
+	}
+}
+
+func TestOpenFolderSystemWSLPrefersXdgOpen(t *testing.T) {
+	prevGOOS := openFolderSystemGOOS
+	prevIsWSLFn := openFolderSystemIsWSLFn
+	prevRunFn := openFolderSystemRunCommandFn
+	prevStartFn := openFolderSystemStartCommandFn
+	openFolderSystemGOOS = "linux"
+	openFolderSystemIsWSLFn = func() bool { return true }
+	runCalls := 0
+	startCalls := 0
+	openFolderSystemRunCommandFn = func(name string, args ...string) error {
+		runCalls++
+		if name != "xdg-open" {
+			t.Fatalf("unexpected run command = %q", name)
+		}
+		if len(args) != 1 || args[0] != "/home/deepright" {
+			t.Fatalf("unexpected run args = %#v", args)
+		}
+		return nil
+	}
+	openFolderSystemStartCommandFn = func(name string, args ...string) error {
+		startCalls++
+		return nil
+	}
+	defer func() {
+		openFolderSystemGOOS = prevGOOS
+		openFolderSystemIsWSLFn = prevIsWSLFn
+		openFolderSystemRunCommandFn = prevRunFn
+		openFolderSystemStartCommandFn = prevStartFn
+	}()
+
+	if err := openFolderSystem("/home/deepright"); err != nil {
+		t.Fatalf("openFolderSystem returned error: %v", err)
+	}
+	if runCalls != 1 {
+		t.Fatalf("runCalls = %d, want 1", runCalls)
+	}
+	if startCalls != 0 {
+		t.Fatalf("startCalls = %d, want 0", startCalls)
+	}
+}
+
+func TestOpenFolderSystemWSLFallsBackWhenXdgOpenFails(t *testing.T) {
+	prevGOOS := openFolderSystemGOOS
+	prevIsWSLFn := openFolderSystemIsWSLFn
+	prevRunFn := openFolderSystemRunCommandFn
+	prevStartFn := openFolderSystemStartCommandFn
+	prevStatFn := openFolderSystemStatFn
+	prevLookPathFn := openFolderSystemLookPathFn
+	prevOutputFn := openFolderSystemOutputFn
+	openFolderSystemGOOS = "linux"
+	openFolderSystemIsWSLFn = func() bool { return true }
+	runCalls := 0
+	startCalls := 0
+	startCmd := ""
+	var startArgs []string
+	openFolderSystemRunCommandFn = func(name string, args ...string) error {
+		runCalls++
+		return errors.New("xdg-open failed")
+	}
+	openFolderSystemStartCommandFn = func(name string, args ...string) error {
+		startCalls++
+		startCmd = name
+		startArgs = append([]string(nil), args...)
+		return nil
+	}
+	openFolderSystemStatFn = func(path string) (os.FileInfo, error) {
+		if path == "/mnt/c/Windows/explorer.exe" {
+			return testOpenFolderSystemFileInfo{}, nil
+		}
+		return nil, os.ErrNotExist
+	}
+	openFolderSystemLookPathFn = func(name string) (string, error) {
+		return "", os.ErrNotExist
+	}
+	openFolderSystemOutputFn = func(name string, args ...string) ([]byte, error) {
+		return []byte("\\\\wsl.localhost\\deepright\\home\\deepright\n"), nil
+	}
+	defer func() {
+		openFolderSystemGOOS = prevGOOS
+		openFolderSystemIsWSLFn = prevIsWSLFn
+		openFolderSystemRunCommandFn = prevRunFn
+		openFolderSystemStartCommandFn = prevStartFn
+		openFolderSystemStatFn = prevStatFn
+		openFolderSystemLookPathFn = prevLookPathFn
+		openFolderSystemOutputFn = prevOutputFn
+	}()
+
+	if err := openFolderSystem("/home/deepright"); err != nil {
+		t.Fatalf("openFolderSystem returned error: %v", err)
+	}
+	if runCalls != 1 {
+		t.Fatalf("runCalls = %d, want 1", runCalls)
+	}
+	if startCalls != 1 {
+		t.Fatalf("startCalls = %d, want 1", startCalls)
+	}
+	if startCmd != "/mnt/c/Windows/explorer.exe" {
+		t.Fatalf("startCmd = %q, want explorer.exe path", startCmd)
+	}
+	if len(startArgs) != 1 || startArgs[0] != "\\\\wsl.localhost\\deepright\\home\\deepright" {
+		t.Fatalf("startArgs = %#v, want converted WSL path", startArgs)
 	}
 }
 

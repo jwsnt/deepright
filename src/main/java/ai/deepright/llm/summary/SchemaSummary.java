@@ -1,13 +1,8 @@
 package ai.deepright.llm.summary;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
-
-
-import ai.open.right.protocol.ProtocolCode;
-
+import ai.deepright.llm.provider.RequestProviderUtils;
 import ai.open.right.WorkflowException;
-
+import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.utils.BytesUtils;
 import ai.open.right.utils.JsonUtils;
 import ai.open.right.workflow.flow.WorkflowTask;
@@ -16,7 +11,6 @@ import ai.open.right.workflow.flow.llm.store.history.HistoryPair;
 import ai.open.right.workflow.flow.llm.store.history.HistoryTruncate;
 import ai.open.right.workflow.flow.summary.SummaryConfig;
 import ai.open.right.workflow.flow.summary.impl.SummaryServiceImpl;
-import ai.deepright.llm.provider.RequestProviderUtils;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
@@ -138,7 +132,7 @@ public class SchemaSummary extends SummaryServiceImpl {
         }
 
         public static HistoryPair[] toPairs(Summary[] summaries, WorkflowTask workTask) {
-            WorkflowException.check(isEmpty(summaries), "The history summaries must not be empty", ProtocolCode.C400);
+            WorkflowException.check(ArrayUtils.isEmpty(summaries), "The history summaries must not be empty", ProtocolCode.C400);
             HistoryPair[] pairs = new HistoryPair[summaries.length];
             for (int i = 0; i < summaries.length; i++) {
                 pairs[i] = summaries[i].toPair();
