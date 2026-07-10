@@ -2778,17 +2778,53 @@ func openFolderSystemPowerShellArgs(winPath string) []string {
 func openFolderSystemBuildForegroundScript(winPath string) string {
 	escapedPath := strings.ReplaceAll(winPath, "'", "''")
 	return fmt.Sprintf(`$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Windows.Forms | Out-Null
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public static class DeepRightWin32 {
+  [DllImport("user32.dll")]
+  public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+  [DllImport("user32.dll")]
+  public static extern bool SetForegroundWindow(IntPtr hWnd);
+}
+"@ | Out-Null
 $path = '%s'
-$title = Split-Path -Leaf $path
-if ([string]::IsNullOrWhiteSpace($title)) { $title = $path }
+$normalizedPath = [System.IO.Path]::GetFullPath($path)
+$shell = New-Object -ComObject Shell.Application
 $ws = New-Object -ComObject WScript.Shell
 Start-Process explorer.exe -ArgumentList $path | Out-Null
-$activated = $false
-for ($i = 0; $i -lt 20 -and -not $activated; $i++) {
+$windowRef = $null
+for ($i = 0; $i -lt 40 -and -not $windowRef; $i++) {
   Start-Sleep -Milliseconds 250
-  try { $activated = $ws.AppActivate($title) } catch {}
+  foreach ($window in @($shell.Windows())) {
+    try {
+      $folderPath = $window.Document.Folder.Self.Path
+      if ([string]::IsNullOrWhiteSpace($folderPath)) { continue }
+      $candidatePath = [System.IO.Path]::GetFullPath($folderPath)
+      if ([string]::Equals($candidatePath, $normalizedPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+        $windowRef = $window
+        break
+      }
+    } catch {}
+  }
 }
-if (-not $activated) { exit 7 }
+if (-not $windowRef) { exit 7 }
+$hwnd = [IntPtr]::new([int64]$windowRef.HWND)
+if ($hwnd -eq [IntPtr]::Zero) { exit 8 }
+[System.Windows.Forms.SendKeys]::SendWait('%%')
+Start-Sleep -Milliseconds 100
+[DeepRightWin32]::ShowWindowAsync($hwnd, 9) | Out-Null
+Start-Sleep -Milliseconds 100
+$activated = $false
+for ($i = 0; $i -lt 10 -and -not $activated; $i++) {
+  try { $null = $ws.AppActivate($windowRef.LocationName) } catch {}
+  $activated = [DeepRightWin32]::SetForegroundWindow($hwnd)
+  if (-not $activated) {
+    Start-Sleep -Milliseconds 150
+  }
+}
+if (-not $activated) { exit 9 }
 `, escapedPath)
 }
 

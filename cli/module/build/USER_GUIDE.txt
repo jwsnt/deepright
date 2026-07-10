@@ -51,7 +51,7 @@ installer 会先检查：
 如果两者都正常，就不会重新完整安装，而是直接启动。
 
 以下情况会重新安装：
-- 你删除了 C:\ProgramData\deepright
+- 你删除了 C:\ProgramData\deepright\.deepright_installed
 - 你删除了 WSL 的 deepright 发行版
 - WSL 环境已经损坏，无法正常启动
 
@@ -69,7 +69,8 @@ installer 会先检查：
 - 删除开始菜单中的 DeepRight 快捷方式
 
 第二步：删除 Windows 安装标记和解压目录
-- 删除 C:\ProgramData\deepright
+- 删除 C:\ProgramData\deepright\.deepright_installed
+- 保留 C:\ProgramData\deepright 目录本身
 - 删除 %LocalAppData%\DeepRight
 
 第三步：删除 WSL 中的应用程序文件，但保留现有数据目录
@@ -97,6 +98,7 @@ wsl --unregister deepright
 执行默认卸载后：
 - DeepRight 的 Windows 快捷方式会消失
 - installer 解压出来的本地目录会被删除
+- C:\ProgramData\deepright 目录会被保留，但其中的安装标记文件会被删除
 - WSL 中的 deepright 发行版会被保留
 - /app 下的应用文件会被删除
 - `~/deepright/agent` 中的内容会被保留

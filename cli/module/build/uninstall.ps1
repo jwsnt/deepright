@@ -8,6 +8,7 @@ param(
 $DISTRO_NAME = "deepright"
 $WSL_VHD_PATH = "C:\WSL\deepright"
 $LOCAL_SENTINEL_DIR = "C:\ProgramData\deepright"
+$LOCAL_SENTINEL_FILE = Join-Path $LOCAL_SENTINEL_DIR ".deepright_installed"
 $LOCAL_CACHE_DIR = Join-Path $env:LOCALAPPDATA "DeepRight"
 $SHORTCUT_NAME = "DeepRight"
 $LOG_FILE = Join-Path $env:TEMP "deepright-uninstall.log"
@@ -32,6 +33,26 @@ function Remove-PathIfExists([string]$Path, [string]$Label) {
 
     try {
         Remove-Item -Path $Path -Recurse -Force -ErrorAction Stop
+        L_OK "$Label removed: $Path"
+    } catch {
+        L_Err "$Label remove failed: $Path"
+        throw
+    }
+}
+
+function Remove-FileIfExists([string]$Path, [string]$Label) {
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        L_Warn "$Label path is empty"
+        return
+    }
+
+    if (-not (Test-Path $Path)) {
+        L_Info "$Label not found: $Path"
+        return
+    }
+
+    try {
+        Remove-Item -Path $Path -Force -ErrorAction Stop
         L_OK "$Label removed: $Path"
     } catch {
         L_Err "$Label remove failed: $Path"
@@ -207,7 +228,7 @@ try {
     } else {
         L_Step "Step 2/3: Remove Windows install state and extracted payload"
     }
-    Remove-PathIfExists -Path $LOCAL_SENTINEL_DIR -Label "Install sentinel directory"
+    Remove-FileIfExists -Path $LOCAL_SENTINEL_FILE -Label "Install sentinel file"
     Remove-PathIfExists -Path $LOCAL_CACHE_DIR -Label "Local extracted payload directory"
 
     if ($RemoveAll) {

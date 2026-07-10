@@ -32026,9 +32026,16 @@ function extractSseChoiceMessage(payload, fallbackMessage) {
   return extractResponseMessage(payload, fallbackMessage);
 }
 
+function mapProviderErrorText(code, fallbackMessage) {
+  const resolvedCode = Number.parseInt(String(code == null ? '' : code).trim(), 10);
+  if (resolvedCode === 401) return '模型服务商拒绝访问，请核对API KEY。';
+  return String(fallbackMessage || '').trim();
+}
+
 function buildTerminalAssistantErrorText(payload, fallbackMessage) {
+  const resolvedCode = extractResponseCode(payload, 0);
   const text = extractSseChoiceMessage(payload, fallbackMessage);
-  return text || '服务端返回错误';
+  return mapProviderErrorText(resolvedCode, text) || '服务端返回错误';
 }
 
 function buildAssistantErrorMessage(content, createdAt, extraFields) {
@@ -32071,6 +32078,8 @@ async function readResponseErrorPayload(resp) {
 
 function buildResponseErrorText(code, message, fallbackStatus) {
   const resolvedCode = extractResponseCode({ code }, fallbackStatus);
+  const mappedText = mapProviderErrorText(resolvedCode, message);
+  if (mappedText) return mappedText;
   const detail = String(message || '').trim();
   if (resolvedCode && detail) return `请求失败: HTTP ${resolvedCode}\n${detail}`;
   if (resolvedCode) return `请求失败: HTTP ${resolvedCode}`;
@@ -33555,7 +33564,7 @@ async function sendCenterMessage(rawText, options) {
     } else if (isUnloadDisconnect) {
       removeEmptyStreamingEntries();
     } else {
-      renderAssistantErrorState(`网络错误: ${err.message}`, fallbackEntry);
+      renderAssistantErrorState('网络异常，请重试', fallbackEntry);
     }
     if (!isCancelling && !isUnloadDisconnect) finishStreamingFor(chatId);
     saveChats();

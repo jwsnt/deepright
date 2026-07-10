@@ -4760,6 +4760,15 @@ func TestOpenFolderSystemWSLForegroundOpenPreventsFallback(t *testing.T) {
 	}
 }
 
+func TestOpenFolderSystemBuildForegroundScriptUsesWindowHandleActivation(t *testing.T) {
+	script := openFolderSystemBuildForegroundScript(`\\wsl.localhost\deepright\home\deepright`)
+	for _, needle := range []string{"Shell.Application", "SetForegroundWindow", "ShowWindowAsync", "Document.Folder.Self.Path"} {
+		if !strings.Contains(script, needle) {
+			t.Fatalf("script missing %q", needle)
+		}
+	}
+}
+
 func TestHandleFolderMissing(t *testing.T) {
 	proxy := &ProxyServer{
 		AgentDir: "../agent/test-case",

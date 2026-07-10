@@ -154,11 +154,11 @@ if (Test-Path $LOCAL_SENTINEL_FILE) {
     if (Test-DistroExists -Name $DISTRO_NAME) {
         $needsFullInstall = $false
         L_OK "Sentinel found + distro alive -- skipping installation"
-        L_OK "To force re-install, delete: $LOCAL_SENTINEL_DIR"
+        L_OK "To force re-install, delete: $LOCAL_SENTINEL_FILE"
     } else {
         L_Warn "Sentinel found but distro is missing (unregistered/deleted)"
         L_Warn "Deleting stale sentinel, re-installing..."
-        Remove-Item $LOCAL_SENTINEL_DIR -Recurse -Force -EA SilentlyContinue
+        Remove-Item $LOCAL_SENTINEL_FILE -Force -EA SilentlyContinue
     }
 }
 

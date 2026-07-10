@@ -290,7 +290,7 @@ module/release/
 - `integration` 收口后的 `/v1/chat/completions` 会把请求体中的 `metadata` 与共享 Agent 元数据合并后一起转发到上游
 - 发往上游 `/cli/get` 的心跳请求统一为 `{ "messages": [{"role":"user","content":""}], "metadata": ... }`
 - 这条链路不再依赖 URL Query 传递业务开关
-- 如果请求体中原本已经传了同名 `metadata` 字段，则保留请求体传入值
+- 如果请求体中原本已经传了同名 `metadata` 字段，则默认保留请求体传入值；但 `lastResponse`、`sandbox_path` 等运行时收口字段仍会由 integration 按当前会话重新计算后覆盖
 - 当请求体中的 `model` 命中 `token_store` 中保存的模型配置时，还会把当前模型下已配置且非空的 `__url`、`__model`、`__model_fast`、`__model_thinking`、`__model_multi_input`、`__model_multi_output` 一并补充到转发 `metadata`
 - 这些 `__*` 字段只读取当前请求 `model` 命中的那一条配置；未配置或为空字符串的字段不会出现在转发 `metadata` 中
 - 如果某个 Agent 工作目录下的 `config.json.media` 非空，则会把同一份对象补充到 `metadata.agents[].media`
@@ -304,6 +304,10 @@ module/release/
 - `/v1/chat/completions` 会按当前请求里的 `metadata.chat` 查询该会话最近一次 SSE 响应时间，并写成 Unix 毫秒时间戳
 - `/cli/get` 当前没有显式 `chat` 字段，因此会从本地 `chat_log` 中取最近一次活跃的 `page_session` 会话，作为“当前 Chat”去查询最近一次 SSE 响应时间
 - integration 内部 cron 执行请求也会按自身 `chatId` 补充同样的 `metadata.lastResponse`
+- 在真正发送 `/v1/chat/completions`、`/cli/get`，以及 integration 内部 `memo`、`email`、`feishu` 等最终转发到上游 `/v1/chat/completions` 的请求前，还会按最终生效的 `chatId` 重新计算顶层 `metadata.sandbox_path`
+- `sandbox_path` 与 `knowledge` 同层，只表示“当前会话可访问的目录白名单路径”；不会挂到 `metadata.agent`、`metadata.agents[]` 或其他 Agent 维度字段下
+- 只有当前会话沙盒模式为 `filepick` 或 `filepick_net`，且共享 sqlite 中该 `chatId` 的 `allowed_dir` 在 `trim` 后非空时，才会补充 `metadata.sandbox_path`
+- 当当前会话为 `net`、`off`、无沙盒记录，或 `allowed_dir` 为空字符串时，最终报文不会携带 `metadata.sandbox_path`；如果外部请求体里手工传了旧值，也会在转发前被 integration 删除或覆盖
 - 发往上游的最终报文会统一收口为：
 - `/v1/chat/completions`：`{ "messages": [...], "stream": ..., "metadata": ..., "model": ... }`
 - `/cli/get`：`{ "messages": [{"role":"user","content":""}], "metadata": ... }`
@@ -481,6 +485,8 @@ curl 'http://127.0.0.1:8080/file/lastUpdate?agentId=A&file=USER.md'
 - 当请求包含有效的 `chatId` 时，对应 `metadata.agent.sandbox` 与当前 Agent 的 `metadata.agents[]` 都会带上实时 `sandbox`
 - `agentId` 不参与沙盒状态命中，仅用于定位当前 Agent metadata 与运行日志
 - 如果当前请求没有有效 `chatId`，或该会话从未写入沙盒状态，则 `sandbox` 输出空字符串
+- `metadata.agent.sandbox` 与 `metadata.agents[].sandbox` 继续只表达沙盒模式，如 `filepick`、`filepick_net`、`net`
+- 顶层 `metadata.sandbox_path` 则单独表达当前会话的目录白名单路径；同一 `chatId` 下即使切换不同 `agentId`，只要会话 `allowed_dir` 未变化，最终 `sandbox_path` 也保持一致
 
 ## Agent 元数据中的 `git`
 
@@ -1285,6 +1291,11 @@ curl -X POST 'http://127.0.0.1:8080/api/cron/create?agentId=demo-agent' \
 - 其中 `/api/plugins/meta` 会返回脱敏后的插件列表
 - 远程请求会被拒绝访问 `/api/plugins/config`、`/api/plugins/start`、`/api/plugins/stop`、`/api/plugins/exec`
 - 这里的“远程请求”以访问入口 Host 为准；通过非 `localhost` / `127.0.0.1` / `::1` 的域名、别名、LAN IP 或反代入口访问时，也会按远程模式处理
+- `/api/folder` 在 WSL 场景下会优先尝试 `xdg-open`
+- 如果 `xdg-open` 无法把目录窗口带到前台，integration 会继续尝试通过 PowerShell 拉起 Explorer，并按目标目录匹配实际窗口后执行置前
+- 如果前台化分支失败，仍会回退到既有 `explorer.exe` / `cmd.exe` 打开链路，避免目录完全打不开
+- 站点里的消息路径浮层和左侧虚拟文件系统都复用 `/api/folder`
+- 当前端收到 `/api/folder` 成功响应时，会补一个轻提示：`目录已尝试置前打开，若仍未看到请查看任务栏`
 
 如果当前 Agent 工作目录下的 `config.json.router_remote` 已保存有效值，则右侧备忘录生成的任务明细和插件桥接生成的任务明细在真正执行 `/v1/chat/completions` 时，也会额外注入：
 
@@ -1430,6 +1441,8 @@ POST /api/sandbox=off?agentId=A&chatId=chat-001
 
 - 写接口仍要求 `agentId` 与 `chatId`；其中 `agentId` 只用于日志，`chatId` 用于定位当前会话沙盒状态
 - `filepick` / `filepick_net` 可选传入 `dir`，显式持久化当前 `chatId` 对应的 `allowed_dir`；未传时仍按当前系统走目录选择流程
+- `allowed_dir` 表示当前会话的目录白名单路径；只有 `filepick` / `filepick_net` 且该值在 `trim` 后非空时，转发 `/v1/chat/completions`、上报 `cli/get`，以及 integration 内部 `memo`、`email`、`feishu` 等最终聊天请求才会附带顶层 `metadata.sandbox_path`
+- `net`、`off`、无记录，或空白 `allowed_dir` 都不会上报 `metadata.sandbox_path`
 - `off` 表示关闭沙盒，并直接删除该 `chatId` 的数据库记录
 - CLI 也使用同一套协议：
 
@@ -2839,3 +2852,20 @@ GET /api/files?path=/Users/demo/agent/A/skills&chatId=chat-1
 - `off` 会删除当前 `chatId` 的记录；无记录视为 `off`
 - `filepick` / `filepick_net` 如显式传入 `dir`，会把 `allowed_dir` 按当前 `chatId` 持久化；未传时继续按当前系统走目录选择流程
 - 写入日志会输出 `agentId`、`chatId` 以及 `from -> to` 的文本变更信息
+
+---
+
+## 迭代 20260707-2：顶层 `metadata.sandbox_path` 收口
+
+## 本次更新
+
+- `integration` 在转发 `/v1/chat/completions`、上报 `/cli/get`，以及内部 `memo`、`email`、`feishu` 等最终转发到上游 `/v1/chat/completions` 的请求前，会统一按当前 `chatId` 注入顶层 `metadata.sandbox_path`
+- `sandbox_path` 与 `knowledge` 同层，只表示当前会话目录白名单路径；不替代 `metadata.agent.sandbox` 或 `metadata.agents[].sandbox` 的模式语义
+- 字段值固定来自共享 sqlite 中当前会话的 `allowed_dir`；读取后会先做 `trim`，并按最终生效的 `chatId` 重新计算，不信任外部请求体手工传入的旧值
+- 只有 `filepick` / `filepick_net` 且 `allowed_dir` 非空时才会上报；`net`、`off`、无记录、空字符串都会直接不传该字段，并清理残留旧值
+
+## 行为说明
+
+- `sandbox_path` 是会话维度字段，不与 `agentId` 绑定；同一 `chatId` 下切换不同 Agent 时，只要会话目录未变，最终值保持一致
+- 该字段只新增在顶层 `metadata`；现有 `metadata.agent.sandbox`、`metadata.agents[].sandbox` 等字段继续保留，避免破坏兼容性
+- 外部请求体即使显式传入错误的 `metadata.sandbox_path`，integration 也会在最终转发前按当前会话真实状态覆盖
