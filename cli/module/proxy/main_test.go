@@ -4596,6 +4596,7 @@ func TestOpenFolderSystemWSLPrefersXdgOpen(t *testing.T) {
 	prevGOOS := openFolderSystemGOOS
 	prevIsWSLFn := openFolderSystemIsWSLFn
 	prevRunFn := openFolderSystemRunCommandFn
+	prevForegroundFn := openFolderSystemForegroundWSLFn
 	prevStartFn := openFolderSystemStartCommandFn
 	openFolderSystemGOOS = "linux"
 	openFolderSystemIsWSLFn = func() bool { return true }
@@ -4615,10 +4616,15 @@ func TestOpenFolderSystemWSLPrefersXdgOpen(t *testing.T) {
 		startCalls++
 		return nil
 	}
+	openFolderSystemForegroundWSLFn = func(path string) error {
+		t.Fatalf("foreground fallback should not run when xdg-open succeeds")
+		return nil
+	}
 	defer func() {
 		openFolderSystemGOOS = prevGOOS
 		openFolderSystemIsWSLFn = prevIsWSLFn
 		openFolderSystemRunCommandFn = prevRunFn
+		openFolderSystemForegroundWSLFn = prevForegroundFn
 		openFolderSystemStartCommandFn = prevStartFn
 	}()
 
@@ -4637,6 +4643,7 @@ func TestOpenFolderSystemWSLFallsBackWhenXdgOpenFails(t *testing.T) {
 	prevGOOS := openFolderSystemGOOS
 	prevIsWSLFn := openFolderSystemIsWSLFn
 	prevRunFn := openFolderSystemRunCommandFn
+	prevForegroundFn := openFolderSystemForegroundWSLFn
 	prevStartFn := openFolderSystemStartCommandFn
 	prevStatFn := openFolderSystemStatFn
 	prevLookPathFn := openFolderSystemLookPathFn
@@ -4644,12 +4651,17 @@ func TestOpenFolderSystemWSLFallsBackWhenXdgOpenFails(t *testing.T) {
 	openFolderSystemGOOS = "linux"
 	openFolderSystemIsWSLFn = func() bool { return true }
 	runCalls := 0
+	foregroundCalls := 0
 	startCalls := 0
 	startCmd := ""
 	var startArgs []string
 	openFolderSystemRunCommandFn = func(name string, args ...string) error {
 		runCalls++
 		return errors.New("xdg-open failed")
+	}
+	openFolderSystemForegroundWSLFn = func(path string) error {
+		foregroundCalls++
+		return errors.New("foreground failed")
 	}
 	openFolderSystemStartCommandFn = func(name string, args ...string) error {
 		startCalls++
@@ -4673,6 +4685,7 @@ func TestOpenFolderSystemWSLFallsBackWhenXdgOpenFails(t *testing.T) {
 		openFolderSystemGOOS = prevGOOS
 		openFolderSystemIsWSLFn = prevIsWSLFn
 		openFolderSystemRunCommandFn = prevRunFn
+		openFolderSystemForegroundWSLFn = prevForegroundFn
 		openFolderSystemStartCommandFn = prevStartFn
 		openFolderSystemStatFn = prevStatFn
 		openFolderSystemLookPathFn = prevLookPathFn
@@ -4685,6 +4698,9 @@ func TestOpenFolderSystemWSLFallsBackWhenXdgOpenFails(t *testing.T) {
 	if runCalls != 1 {
 		t.Fatalf("runCalls = %d, want 1", runCalls)
 	}
+	if foregroundCalls != 1 {
+		t.Fatalf("foregroundCalls = %d, want 1", foregroundCalls)
+	}
 	if startCalls != 1 {
 		t.Fatalf("startCalls = %d, want 1", startCalls)
 	}
@@ -4693,6 +4709,54 @@ func TestOpenFolderSystemWSLFallsBackWhenXdgOpenFails(t *testing.T) {
 	}
 	if len(startArgs) != 1 || startArgs[0] != "\\\\wsl.localhost\\deepright\\home\\deepright" {
 		t.Fatalf("startArgs = %#v, want converted WSL path", startArgs)
+	}
+}
+
+func TestOpenFolderSystemWSLForegroundOpenPreventsFallback(t *testing.T) {
+	prevGOOS := openFolderSystemGOOS
+	prevIsWSLFn := openFolderSystemIsWSLFn
+	prevRunFn := openFolderSystemRunCommandFn
+	prevForegroundFn := openFolderSystemForegroundWSLFn
+	prevStartFn := openFolderSystemStartCommandFn
+	openFolderSystemGOOS = "linux"
+	openFolderSystemIsWSLFn = func() bool { return true }
+	runCalls := 0
+	foregroundCalls := 0
+	startCalls := 0
+	openFolderSystemRunCommandFn = func(name string, args ...string) error {
+		runCalls++
+		return errors.New("xdg-open failed")
+	}
+	openFolderSystemForegroundWSLFn = func(path string) error {
+		foregroundCalls++
+		if path != "/home/deepright" {
+			t.Fatalf("path = %q, want /home/deepright", path)
+		}
+		return nil
+	}
+	openFolderSystemStartCommandFn = func(name string, args ...string) error {
+		startCalls++
+		return nil
+	}
+	defer func() {
+		openFolderSystemGOOS = prevGOOS
+		openFolderSystemIsWSLFn = prevIsWSLFn
+		openFolderSystemRunCommandFn = prevRunFn
+		openFolderSystemForegroundWSLFn = prevForegroundFn
+		openFolderSystemStartCommandFn = prevStartFn
+	}()
+
+	if err := openFolderSystem("/home/deepright"); err != nil {
+		t.Fatalf("openFolderSystem returned error: %v", err)
+	}
+	if runCalls != 1 {
+		t.Fatalf("runCalls = %d, want 1", runCalls)
+	}
+	if foregroundCalls != 1 {
+		t.Fatalf("foregroundCalls = %d, want 1", foregroundCalls)
+	}
+	if startCalls != 0 {
+		t.Fatalf("startCalls = %d, want 0", startCalls)
 	}
 }
 

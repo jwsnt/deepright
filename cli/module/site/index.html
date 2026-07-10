@@ -39933,7 +39933,9 @@ function vfsOpenCurrent() {
   const relDir = vfsCurrentPath.replace(vfsWorkspace, '').replace(/^\//, '');
   let url = '/api/folder?agentId=' + encodeURIComponent(agentId);
   if (relDir) url += '&dir=' + encodeURIComponent(relDir);
-  fetch(url).catch(() => {});
+  fetch(url).then(resp => {
+    if (resp && resp.ok) showOpenDirectoryHint();
+  }).catch(() => {});
 }
 
 // ===== VFS Upload =====
@@ -43226,6 +43228,7 @@ async function openResolvedFileDirectory(dirPath) {
   if (isTildePath || (targetDir.startsWith('/') && !isWorkspacePath)) {
     const resp = await fetch('/api/folder?path=' + encodeURIComponent(targetDir));
     if (!resp.ok) throw new Error('打开目录失败');
+    showOpenDirectoryHint();
     return;
   }
   if (agentId && workspaceRoot) {
@@ -43236,9 +43239,14 @@ async function openResolvedFileDirectory(dirPath) {
     }
     const resp = await fetch(url);
     if (!resp.ok) throw new Error('打开目录失败');
+    showOpenDirectoryHint();
     return;
   }
   _origOpen('file://' + targetDir, '_blank', 'noopener,noreferrer');
+}
+
+function showOpenDirectoryHint() {
+  vfsShowUploadToast('目录已尝试置前打开，若仍未看到请查看任务栏', false, { placement: 'center-top' });
 }
 
 function isPluginLogTarget(target) {

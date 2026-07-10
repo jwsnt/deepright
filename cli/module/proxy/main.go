@@ -31,6 +31,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"unicode/utf16"
 	"unicode/utf8"
 
 	"database/sql"
@@ -2655,6 +2656,7 @@ var openFolderFn = openFolderSystem
 var openFolderSystemGOOS = runtime.GOOS
 var openFolderSystemIsWSLFn = proxyInstallAppIsWSL
 var openFolderSystemExecCommandFn = exec.Command
+var openFolderSystemForegroundWSLFn = openFolderSystemForegroundWSL
 var openFolderSystemStartCommandFn = func(name string, args ...string) error {
 	return openFolderSystemExecCommandFn(name, args...).Start()
 }
@@ -2674,6 +2676,9 @@ func OpenFolder(path string) error {
 func openFolderSystem(path string) error {
 	if openFolderSystemGOOS == "linux" && openFolderSystemIsWSLFn() {
 		if err := openFolderSystemRunCommandFn("xdg-open", path); err == nil {
+			return nil
+		}
+		if err := openFolderSystemForegroundWSLFn(path); err == nil {
 			return nil
 		}
 	}
@@ -2730,6 +2735,70 @@ func openFolderSystemWSLPath(path string) (string, error) {
 		return "", errors.New("convert WSL path: empty result")
 	}
 	return winPath, nil
+}
+
+func openFolderSystemForegroundWSL(path string) error {
+	winPath, err := openFolderSystemWSLPath(path)
+	if err != nil {
+		return err
+	}
+	executable, ok := openFolderSystemPowerShellExecutable()
+	if !ok {
+		return errors.New("WSL foreground open requires PowerShell")
+	}
+	return openFolderSystemRunCommandFn(executable, openFolderSystemPowerShellArgs(winPath)...)
+}
+
+func openFolderSystemPowerShellExecutable() (string, bool) {
+	if path, ok := openFolderSystemFirstExistingFile(
+		"/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+		"/mnt/c/Program Files/PowerShell/7/pwsh.exe",
+	); ok {
+		return path, true
+	}
+	if path, ok := openFolderSystemFirstLookPath("powershell.exe", "pwsh.exe", "powershell", "pwsh"); ok {
+		return path, true
+	}
+	return "", false
+}
+
+func openFolderSystemPowerShellArgs(winPath string) []string {
+	return []string{
+		"-NoProfile",
+		"-NonInteractive",
+		"-WindowStyle",
+		"Hidden",
+		"-ExecutionPolicy",
+		"Bypass",
+		"-EncodedCommand",
+		openFolderSystemEncodePowerShellCommand(openFolderSystemBuildForegroundScript(winPath)),
+	}
+}
+
+func openFolderSystemBuildForegroundScript(winPath string) string {
+	escapedPath := strings.ReplaceAll(winPath, "'", "''")
+	return fmt.Sprintf(`$ErrorActionPreference = 'Stop'
+$path = '%s'
+$title = Split-Path -Leaf $path
+if ([string]::IsNullOrWhiteSpace($title)) { $title = $path }
+$ws = New-Object -ComObject WScript.Shell
+Start-Process explorer.exe -ArgumentList $path | Out-Null
+$activated = $false
+for ($i = 0; $i -lt 20 -and -not $activated; $i++) {
+  Start-Sleep -Milliseconds 250
+  try { $activated = $ws.AppActivate($title) } catch {}
+}
+if (-not $activated) { exit 7 }
+`, escapedPath)
+}
+
+func openFolderSystemEncodePowerShellCommand(script string) string {
+	runes := utf16.Encode([]rune(script))
+	encoded := make([]byte, 0, len(runes)*2)
+	for _, r := range runes {
+		encoded = append(encoded, byte(r), byte(r>>8))
+	}
+	return base64.StdEncoding.EncodeToString(encoded)
 }
 
 func openFolderSystemFirstExistingFile(paths ...string) (string, bool) {

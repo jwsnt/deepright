@@ -3456,6 +3456,7 @@ func TestOpenSystemTargetWSLPrefersXdgOpen(t *testing.T) {
 	prevGOOS := openSystemTargetGOOS
 	prevIsWSLFn := openSystemTargetIsWSLFn
 	prevRunFn := openSystemTargetRunCommandFn
+	prevForegroundFn := openSystemTargetForegroundWSLFn
 	prevStartFn := openSystemTargetStartCommandFn
 	openSystemTargetGOOS = "linux"
 	openSystemTargetIsWSLFn = func() bool { return true }
@@ -3475,10 +3476,15 @@ func TestOpenSystemTargetWSLPrefersXdgOpen(t *testing.T) {
 		startCalls++
 		return nil
 	}
+	openSystemTargetForegroundWSLFn = func(target string) error {
+		t.Fatalf("foreground fallback should not run when xdg-open succeeds")
+		return nil
+	}
 	defer func() {
 		openSystemTargetGOOS = prevGOOS
 		openSystemTargetIsWSLFn = prevIsWSLFn
 		openSystemTargetRunCommandFn = prevRunFn
+		openSystemTargetForegroundWSLFn = prevForegroundFn
 		openSystemTargetStartCommandFn = prevStartFn
 	}()
 
@@ -3497,6 +3503,7 @@ func TestOpenSystemTargetWSLFallsBackWhenXdgOpenFails(t *testing.T) {
 	prevGOOS := openSystemTargetGOOS
 	prevIsWSLFn := openSystemTargetIsWSLFn
 	prevRunFn := openSystemTargetRunCommandFn
+	prevForegroundFn := openSystemTargetForegroundWSLFn
 	prevStartFn := openSystemTargetStartCommandFn
 	prevStatFn := openSystemTargetStatFn
 	prevLookPathFn := openSystemTargetLookPathFn
@@ -3504,12 +3511,17 @@ func TestOpenSystemTargetWSLFallsBackWhenXdgOpenFails(t *testing.T) {
 	openSystemTargetGOOS = "linux"
 	openSystemTargetIsWSLFn = func() bool { return true }
 	runCalls := 0
+	foregroundCalls := 0
 	startCalls := 0
 	startCmd := ""
 	var startArgs []string
 	openSystemTargetRunCommandFn = func(name string, args ...string) error {
 		runCalls++
 		return errors.New("xdg-open failed")
+	}
+	openSystemTargetForegroundWSLFn = func(target string) error {
+		foregroundCalls++
+		return errors.New("foreground failed")
 	}
 	openSystemTargetStartCommandFn = func(name string, args ...string) error {
 		startCalls++
@@ -3533,6 +3545,7 @@ func TestOpenSystemTargetWSLFallsBackWhenXdgOpenFails(t *testing.T) {
 		openSystemTargetGOOS = prevGOOS
 		openSystemTargetIsWSLFn = prevIsWSLFn
 		openSystemTargetRunCommandFn = prevRunFn
+		openSystemTargetForegroundWSLFn = prevForegroundFn
 		openSystemTargetStartCommandFn = prevStartFn
 		openSystemTargetStatFn = prevStatFn
 		openSystemTargetLookPathFn = prevLookPathFn
@@ -3545,6 +3558,9 @@ func TestOpenSystemTargetWSLFallsBackWhenXdgOpenFails(t *testing.T) {
 	if runCalls != 1 {
 		t.Fatalf("runCalls = %d, want 1", runCalls)
 	}
+	if foregroundCalls != 1 {
+		t.Fatalf("foregroundCalls = %d, want 1", foregroundCalls)
+	}
 	if startCalls != 1 {
 		t.Fatalf("startCalls = %d, want 1", startCalls)
 	}
@@ -3553,6 +3569,54 @@ func TestOpenSystemTargetWSLFallsBackWhenXdgOpenFails(t *testing.T) {
 	}
 	if len(startArgs) != 1 || startArgs[0] != "\\\\wsl.localhost\\deepright\\home\\deepright" {
 		t.Fatalf("startArgs = %#v, want converted WSL path", startArgs)
+	}
+}
+
+func TestOpenSystemTargetWSLForegroundOpenPreventsFallback(t *testing.T) {
+	prevGOOS := openSystemTargetGOOS
+	prevIsWSLFn := openSystemTargetIsWSLFn
+	prevRunFn := openSystemTargetRunCommandFn
+	prevForegroundFn := openSystemTargetForegroundWSLFn
+	prevStartFn := openSystemTargetStartCommandFn
+	openSystemTargetGOOS = "linux"
+	openSystemTargetIsWSLFn = func() bool { return true }
+	runCalls := 0
+	foregroundCalls := 0
+	startCalls := 0
+	openSystemTargetRunCommandFn = func(name string, args ...string) error {
+		runCalls++
+		return errors.New("xdg-open failed")
+	}
+	openSystemTargetForegroundWSLFn = func(target string) error {
+		foregroundCalls++
+		if target != "/home/deepright" {
+			t.Fatalf("target = %q, want /home/deepright", target)
+		}
+		return nil
+	}
+	openSystemTargetStartCommandFn = func(name string, args ...string) error {
+		startCalls++
+		return nil
+	}
+	defer func() {
+		openSystemTargetGOOS = prevGOOS
+		openSystemTargetIsWSLFn = prevIsWSLFn
+		openSystemTargetRunCommandFn = prevRunFn
+		openSystemTargetForegroundWSLFn = prevForegroundFn
+		openSystemTargetStartCommandFn = prevStartFn
+	}()
+
+	if err := openSystemTarget("/home/deepright"); err != nil {
+		t.Fatalf("openSystemTarget returned error: %v", err)
+	}
+	if runCalls != 1 {
+		t.Fatalf("runCalls = %d, want 1", runCalls)
+	}
+	if foregroundCalls != 1 {
+		t.Fatalf("foregroundCalls = %d, want 1", foregroundCalls)
+	}
+	if startCalls != 0 {
+		t.Fatalf("startCalls = %d, want 0", startCalls)
 	}
 }
 
