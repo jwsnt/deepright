@@ -25727,6 +25727,11 @@ function isAssistantCancelledMessage(msg) {
   return !!(msg && msg.role === 'assistant' && !msg.error && (msg.cancelMarker || normalizeMessageText(msg.content) === '已取消'));
 }
 
+function getMessageAgentId(message) {
+  if (!message || typeof message !== 'object') return '';
+  return String(message.agentId || '').trim();
+}
+
 function markAssistantCancelled(msg, ts) {
   if (!msg || msg.role !== 'assistant' || msg.error) return;
   const normalized = normalizeMessageText(msg.content);
@@ -29491,7 +29496,7 @@ function flushStreamingMessage(streamKey) {
   const metaHtml = assistantMetaHtml(assistantMsg);
   if (metaHtml) {
     if (metaEl) {
-      metaEl.textContent = formatMessageTime(assistantMsg.receivedAt) + ' ' + (assistantMsg.streamStatus || '等待');
+      metaEl.textContent = buildAssistantMetaText(assistantMsg);
     } else {
       msgEl.insertAdjacentHTML('beforeend', metaHtml);
       metaEl = msgEl.querySelector('.message-meta');
@@ -29553,7 +29558,7 @@ function finalizeActiveStreamingMessageNode(chatId) {
   let metaEl = targetEl.querySelector('.message-meta');
   const metaHtml = assistantMetaHtml(finalMsg);
   if (metaHtml) {
-    if (metaEl) metaEl.textContent = formatMessageTime(finalMsg.receivedAt) + ' ' + (finalMsg.cancelMarker ? '已取消' : (finalMsg.streamStatus || '完成'));
+    if (metaEl) metaEl.textContent = buildAssistantMetaText(finalMsg);
     else targetEl.insertAdjacentHTML('beforeend', metaHtml);
   }
   const wrap = targetEl.closest('.message-wrap');
@@ -30186,8 +30191,18 @@ function getAssistantExplosionSnapshotBoundaryOverlap(leftText, rightText) {
 
 function assistantMetaHtml(m) {
   if (!m || !m.receivedAt) return '';
-  const statusText = m.cancelMarker ? '已取消' : (m.streamStatus || '等待');
-  return `<div class="message-meta">${esc(formatMessageTime(m.receivedAt))} ${esc(statusText)}</div>`;
+  const metaText = buildAssistantMetaText(m);
+  return metaText ? `<div class="message-meta">${esc(metaText)}</div>` : '';
+}
+
+function buildAssistantMetaText(message) {
+  if (!message || !message.receivedAt) return '';
+  const timeText = formatMessageTime(message.receivedAt);
+  if (message.cancelMarker) return `${timeText} 已取消`;
+  const statusText = String(message.streamStatus || '等待').trim() || '等待';
+  const agentId = getMessageAgentId(message);
+  if (statusText === '完成' && agentId) return `${timeText} 由 ${agentId} 完成`;
+  return `${timeText} ${statusText}`;
 }
 
 function clearChatFooterInlineHintTimer(stateItem) {
@@ -33899,6 +33914,12 @@ async function sendCenterMessage(rawText, options) {
     return entry;
   }
 
+  function syncAssistantAgentIdFromPacket(assistantMsg, payload) {
+    if (!assistantMsg || !payload) return;
+    const agentId = extractResponseAgentId(payload);
+    if (agentId) assistantMsg.agentId = agentId;
+  }
+
   function getCenterStreamingAssistantEntry(createIfMissing) {
     if (!centerAssistantEntry && createIfMissing) {
       centerAssistantEntry = createStreamingAssistantEntry('');
@@ -34306,6 +34327,7 @@ async function sendCenterMessage(rawText, options) {
             : (!isClosePacket && !controlOnlyPacket && (hasLogicalPacketId || hasDeltaContent));
           const streamEntry = resolveStreamingAssistantEntry(parsed, shouldCreateStreamEntry);
           const assistantMsg = streamEntry && streamEntry.assistantMsg;
+          if (assistantMsg) syncAssistantAgentIdFromPacket(assistantMsg, parsed);
           if (hasResetKey && assistantMsg && !isCliSub && !isClosePacket) {
             const stagedResetExplosion = stageAssistantExplosionSnapshotFromCurrentContent(assistantMsg, packetLogicalId, {
               markCurrentLogicalExploded: false
@@ -35692,6 +35714,7 @@ function parseRestoreAssistantRecord(raw) {
   let cliSubContent = '';
   let error = false;
   let errorText = '';
+  let agentId = '';
   String(raw || '').split(/\r?\n/).forEach(line => {
     const trimmed = line.trim();
     if (!trimmed || !trimmed.startsWith('data:')) return;
@@ -35699,6 +35722,8 @@ function parseRestoreAssistantRecord(raw) {
     if (!data || data === '[DONE]') return;
     try {
       const parsed = JSON.parse(data);
+      const packetAgentId = extractResponseAgentId(parsed);
+      if (packetAgentId) agentId = packetAgentId;
       const isTerminalErrorPacket = isResponseTerminalErrorPacket(parsed);
       if (isTerminalErrorPacket) {
         error = true;
@@ -35785,6 +35810,7 @@ function parseRestoreAssistantRecord(raw) {
   return {
     content: collapseTrailingAssistantTimingMarkers(assistantState.content),
     cliSubContent,
+    agentId,
     streamLogicalId: normalizeStreamLogicalId(assistantState.streamLogicalId),
     explodedLogicalIds: getAssistantExplodedLogicalIds(assistantState).slice(),
     explodedSnapshots: getAssistantExplosionSnapshots(assistantState).map(item => ({ ...item })),
@@ -35829,13 +35855,15 @@ function buildColdHistoryAssistantMessage(round) {
   }
   const content = collapseTrailingAssistantTimingMarkers(String(parsed.content || ''));
   if (!normalizeMessageText(content)) return null;
-  return {
+  const message = {
     role: 'assistant',
     content,
     receivedAt: assistantTs,
     createdAt: assistantTs,
     streamStatus: '完成'
   };
+  if (parsed.agentId) message.agentId = parsed.agentId;
+  return message;
 }
 
 function finalizeColdHistoryRound(round, messages) {
@@ -36021,6 +36049,9 @@ function applyParsedAssistantSnapshot(msg, parsed) {
   const parsedLogicalId = normalizeStreamLogicalId(parsed.streamLogicalId);
   if (parsedLogicalId) {
     msg.streamLogicalId = parsedLogicalId;
+  }
+  if (parsed.agentId) {
+    msg.agentId = parsed.agentId;
   }
   if (Array.isArray(parsed.explodedLogicalIds) && parsed.explodedLogicalIds.length) {
     msg.explodedLogicalIds = normalizeAssistantExplodedLogicalIds(

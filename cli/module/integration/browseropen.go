@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -292,8 +293,10 @@ func integrationBrowserListProcesses() ([]integrationBrowserProcessInfo, error) 
 }
 
 func integrationBrowserChromeAppleScript(target string) string {
+	exactURLs, prefixURLs := integrationBrowserChromeTabMatchURLs(target)
 	return fmt.Sprintf(`
-set targetUrl to %s
+set exactUrls to %s
+set prefixUrls to %s
 
 tell application "Google Chrome"
 	if it is not running then
@@ -304,7 +307,11 @@ tell application "Google Chrome"
 		set tabIndex to 0
 		repeat with t in tabs of w
 			set tabIndex to tabIndex + 1
-			if (URL of t) is targetUrl then
+			set currentUrl to ""
+			try
+				set currentUrl to (URL of t) as text
+			end try
+			if my deeprightUrlMatches(currentUrl, exactUrls, prefixUrls) then
 				set active tab index of w to tabIndex
 				set index of w to 1
 				activate
@@ -315,5 +322,146 @@ tell application "Google Chrome"
 
 	return "miss"
 end tell
-`, strconv.Quote(target))
+
+on deeprightUrlMatches(currentUrl, exactUrls, prefixUrls)
+	if currentUrl is missing value then
+		return false
+	end if
+	set normalizedUrl to currentUrl as text
+	repeat with candidate in exactUrls
+		if normalizedUrl is (candidate as text) then
+			return true
+		end if
+	end repeat
+	repeat with prefixValue in prefixUrls
+		if normalizedUrl starts with (prefixValue as text) then
+			return true
+		end if
+	end repeat
+	return false
+end deeprightUrlMatches
+`, integrationBrowserAppleScriptStringList(exactURLs), integrationBrowserAppleScriptStringList(prefixURLs))
+}
+
+func integrationBrowserChromeTabMatchURLs(target string) ([]string, []string) {
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return nil, nil
+	}
+
+	exactURLs := []string{target}
+	parsed, err := url.Parse(target)
+	if err != nil {
+		return dedupeStrings(exactURLs), nil
+	}
+
+	scheme := strings.TrimSpace(parsed.Scheme)
+	host := strings.TrimSpace(parsed.Hostname())
+	if scheme == "" || host == "" || !integrationBrowserIsLoopbackHost(host) {
+		return dedupeStrings(exactURLs), nil
+	}
+
+	port := strings.TrimSpace(parsed.Port())
+	path := strings.TrimSpace(parsed.EscapedPath())
+	if path == "" {
+		path = "/"
+	}
+	rawQuery := strings.TrimSpace(parsed.RawQuery)
+	fragment := strings.TrimSpace(parsed.Fragment)
+
+	hosts := integrationBrowserLoopbackHostVariants(host)
+	for _, candidateHost := range hosts {
+		exactURLs = append(exactURLs, integrationBrowserBuildURLVariant(scheme, candidateHost, port, path, rawQuery, fragment))
+	}
+
+	var prefixURLs []string
+	if integrationBrowserShouldMatchSitePrefix(path) {
+		for _, candidateHost := range hosts {
+			prefixURLs = append(prefixURLs, integrationBrowserBuildURLVariant(scheme, candidateHost, port, "/site/", "", ""))
+		}
+	}
+
+	return dedupeStrings(exactURLs), dedupeStrings(prefixURLs)
+}
+
+func integrationBrowserShouldMatchSitePrefix(path string) bool {
+	path = strings.TrimSpace(path)
+	switch {
+	case path == "/launch":
+		return true
+	case path == "/site", path == "/site/":
+		return true
+	case strings.HasPrefix(path, "/site/"):
+		return true
+	default:
+		return false
+	}
+}
+
+func integrationBrowserIsLoopbackHost(host string) bool {
+	switch strings.ToLower(strings.TrimSpace(host)) {
+	case "localhost", "127.0.0.1", "::1", "[::1]":
+		return true
+	default:
+		return false
+	}
+}
+
+func integrationBrowserLoopbackHostVariants(host string) []string {
+	host = strings.ToLower(strings.TrimSpace(host))
+	hosts := []string{host}
+	switch host {
+	case "localhost":
+		hosts = append(hosts, "127.0.0.1")
+	case "127.0.0.1":
+		hosts = append(hosts, "localhost")
+	case "::1", "[::1]":
+		hosts = append(hosts, "localhost", "127.0.0.1")
+	}
+	return dedupeStrings(hosts)
+}
+
+func integrationBrowserBuildURLVariant(scheme, host, port, path, rawQuery, fragment string) string {
+	u := url.URL{
+		Scheme: scheme,
+		Host:   host,
+		Path:   path,
+	}
+	if strings.TrimSpace(port) != "" {
+		u.Host = host + ":" + port
+	}
+	u.RawQuery = rawQuery
+	u.Fragment = fragment
+	return u.String()
+}
+
+func integrationBrowserAppleScriptStringList(values []string) string {
+	if len(values) == 0 {
+		return "{}"
+	}
+	quoted := make([]string, 0, len(values))
+	for _, value := range values {
+		quoted = append(quoted, strconv.Quote(value))
+	}
+	return "{" + strings.Join(quoted, ", ") + "}"
+}
+
+func dedupeStrings(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out
 }

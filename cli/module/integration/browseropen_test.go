@@ -214,14 +214,37 @@ func TestOpenIntegrationBrowserMaximizedDarwinActivatesExistingChromeTab(t *test
 	if !handled {
 		t.Fatal("expected helper to handle Chrome activation path")
 	}
-	if !strings.Contains(gotScript, `set targetUrl to "http://localhost:8080/site/#app"`) {
-		t.Fatalf("script missing target URL: %q", gotScript)
+	if !strings.Contains(gotScript, `set exactUrls to {"http://localhost:8080/site/#app", "http://127.0.0.1:8080/site/#app"}`) {
+		t.Fatalf("script missing exact URL candidates: %q", gotScript)
 	}
-	if !strings.Contains(gotScript, `if (URL of t) is targetUrl then`) {
-		t.Fatalf("script does not scan existing tabs: %q", gotScript)
+	if !strings.Contains(gotScript, `set prefixUrls to {"http://localhost:8080/site/", "http://127.0.0.1:8080/site/"}`) {
+		t.Fatalf("script missing site prefix candidates: %q", gotScript)
+	}
+	if !strings.Contains(gotScript, `if my deeprightUrlMatches(currentUrl, exactUrls, prefixUrls) then`) {
+		t.Fatalf("script does not use grouped match helper: %q", gotScript)
 	}
 	if strings.Contains(gotScript, `open location targetUrl`) {
 		t.Fatalf("script should not open new locations directly: %q", gotScript)
+	}
+}
+
+func TestIntegrationBrowserChromeTabMatchURLsLaunchMatchesExistingSiteTab(t *testing.T) {
+	exactURLs, prefixURLs := integrationBrowserChromeTabMatchURLs("http://localhost:8080/launch")
+	if got := strings.Join(exactURLs, "|"); got != "http://localhost:8080/launch|http://127.0.0.1:8080/launch" {
+		t.Fatalf("exact URLs = %q", got)
+	}
+	if got := strings.Join(prefixURLs, "|"); got != "http://localhost:8080/site/|http://127.0.0.1:8080/site/" {
+		t.Fatalf("prefix URLs = %q", got)
+	}
+}
+
+func TestIntegrationBrowserChromeTabMatchURLsNonLoopbackStaysExactOnly(t *testing.T) {
+	exactURLs, prefixURLs := integrationBrowserChromeTabMatchURLs("https://example.com/site/#app")
+	if got := strings.Join(exactURLs, "|"); got != "https://example.com/site/#app" {
+		t.Fatalf("exact URLs = %q", got)
+	}
+	if len(prefixURLs) != 0 {
+		t.Fatalf("prefix URLs = %#v, want none", prefixURLs)
 	}
 }
 

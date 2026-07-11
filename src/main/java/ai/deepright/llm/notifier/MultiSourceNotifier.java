@@ -1,5 +1,6 @@
 package ai.deepright.llm.notifier;
 
+import ai.deepright.feature.FeatureField;
 import ai.open.right.context.RedirectContext;
 import ai.open.right.workflow.flow.llm.Segment;
 import ai.open.right.workflow.flow.media.MediaContext;
@@ -41,6 +42,7 @@ public class MultiSourceNotifier extends SourceNotifier {
             metadata.put(MultiSourceFlag.DELAY, MapUtils.getObject(withOutMeta.getMetadata(), MultiSourceFlag.DELAY));
             metadata.put(MultiSourceFlag.WARN, MapUtils.getInteger(withOutMeta.getMetadata(), MultiSourceFlag.WARN));
             metadata.put(MultiSourceFlag.TID, MapUtils.getString(withOutMeta.getMetadata(), MultiSourceFlag.TID));
+            metadata.put(FeatureField.KEY_AGENTID, MapUtils.getString(segment.getMetadata(), FeatureField.KEY_AGENTID));
             metadata.values().removeIf(Objects::isNull);
             withOutMeta.putMetadata(metadata);
             return withOutMeta;
