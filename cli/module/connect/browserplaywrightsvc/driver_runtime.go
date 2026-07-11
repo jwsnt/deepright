@@ -39,7 +39,6 @@ func playwrightDriverReady(driverDir string) (bool, error) {
 		return false, nil
 	}
 	requiredFiles := []string{
-		filepath.Join(driverDir, playwrightDriverNodeFileName()),
 		filepath.Join(driverDir, "package", "cli.js"),
 		filepath.Join(driverDir, "package", "package.json"),
 	}
@@ -55,7 +54,11 @@ func playwrightDriverReady(driverDir string) (bool, error) {
 			return false, nil
 		}
 	}
-	if !playwrightDriverExecutableUsableFn(requiredFiles[0]) {
+	nodePath, err := resolvePlaywrightNodePath(driverDir)
+	if err != nil {
+		return false, nil
+	}
+	if !playwrightDriverExecutableUsableFn(nodePath) {
 		return false, nil
 	}
 	return true, nil

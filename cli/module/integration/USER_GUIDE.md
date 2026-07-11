@@ -616,6 +616,18 @@ curl http://127.0.0.1:8080/install_app
   - `/v1/chat/completions` SSE 响应日志
   - `cli/get` 日志
   - `cli/pub` 日志
+- 当前会话消息主链路继续写入共享 sqlite 的 `chat_log`
+- `chat_log` 字段为：
+  - `agent_id`
+  - `chat_id`
+  - `chat_type`
+  - `role`
+  - `response_type`
+  - `content`
+  - `created_at`
+- `chat_log` 索引为：
+  - `agent_id + chat_id`
+  - `agent_id + chat_id + created_at`
 - 统一日志表为当前应用目录 `data` SQLite 中的 `agent_message_log`
 - 表字段：
   - `agent_id`
@@ -635,6 +647,11 @@ curl http://127.0.0.1:8080/install_app
 - `/api/restore` 现在会额外合并返回同一 `agentId + chat` 下的 `cli/get` 与 `cli/pub` 记录，并继续保持统一 `data[]` 时间线输出
 - 合并返回的 CLI 记录会保留原始 `content`，不在 restore 链路中提前裁剪成摘要，便于 site 直接恢复右侧 `CMD` 子任务历史
 - 合并排序固定为先按 `createdAt` 升序，再按 `id` 升序，保证前端可以按单一时间线消费消息与 CLI 事件
+- `chat_log` 与 `agent_message_log` 都增加了统一的 30 天保留策略
+- `integration` 与 `proxy` 在启动完成数据库初始化后，都会使用独立 sqlite 连接异步执行一次过期清理
+- 清理条件固定为 `created_at < 当前时间 - 30天`，超过窗口的数据会被物理删除
+- 该清理不会复用首屏主链路的共享 sqlite 连接，避免启动阶段阻塞页面初始化与主查询请求
+- `GET /api/log_cleanup_status` 可返回本次启动阶段日志清理状态，包括是否已检查、是否仍在清理、cutoff 与实际删除条数
 
 ### `http.debug` 明细日志
 
@@ -2869,3 +2886,30 @@ GET /api/files?path=/Users/demo/agent/A/skills&chatId=chat-1
 - `sandbox_path` 是会话维度字段，不与 `agentId` 绑定；同一 `chatId` 下切换不同 Agent 时，只要会话目录未变，最终值保持一致
 - 该字段只新增在顶层 `metadata`；现有 `metadata.agent.sandbox`、`metadata.agents[].sandbox` 等字段继续保留，避免破坏兼容性
 - 外部请求体即使显式传入错误的 `metadata.sandbox_path`，integration 也会在最终转发前按当前会话真实状态覆盖
+
+---
+
+## 迭代 20260711-1：日志表30天保留与启动异步清理
+
+## 本次更新
+
+- 共享 sqlite 中的 `agent_message_log` 与 `chat_log` 新增了统一的 30 天保留策略
+- `integration` 与 `proxy` 在启动完成数据库初始化后，都会自动执行一次过期日志检查与物理删除
+- 清理任务改为使用独立 sqlite 连接异步执行，不阻塞首屏服务、页面初始化请求和主查询链路
+- 新增 `GET /api/log_cleanup_status`，用于查询当前启动阶段日志清理状态
+- Site 在检测到清理仍在进行时，会显示统一中心浮层并锁定界面，提示用户稍后再操作
+
+## 行为说明
+
+- 清理范围固定为：
+  - `agent_message_log`
+  - `chat_log`
+- 过期判断字段统一为 `created_at`
+- 删除条件固定为 `created_at < 当前时间 - 30天`
+- 清理失败不会阻塞主服务启动，但会写入状态接口与标准日志，便于排查
+
+## 相关需求目录
+
+- Integration 主需求：`/path/to/deepright/cli/module/integration/REQUIREMENT.md`
+- Integration 手册：`/path/to/deepright/cli/module/integration/USER_GUIDE.md`
+- 日志表30天保留与启动异步清理：`/path/to/deepright/cli/module/integration/iteration/20260711-1/REQUIREMENT.md`

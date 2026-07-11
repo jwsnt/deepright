@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"connect/connectsvc"
+	"connect/logretention"
 	"connect/sandboxstate"
 	"connect/skillstate"
 	"context"
@@ -5613,6 +5614,30 @@ func handleHeartbeat() http.HandlerFunc {
 		hbMu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
+	}
+}
+
+func handleLogCleanupStatus() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		snapshot := integrationLogRetentionManager.Snapshot()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"status":                 0,
+			"checked":                snapshot.Checked,
+			"running":                snapshot.Running,
+			"message":                firstNonEmpty(snapshot.Message, logretention.DefaultMessage),
+			"retentionDays":          snapshot.RetentionDays,
+			"cutoff":                 snapshot.Cutoff,
+			"startedAt":              snapshot.StartedAt,
+			"finishedAt":             snapshot.FinishedAt,
+			"deletedAgentMessageLog": snapshot.DeletedAgentMessageLog,
+			"deletedChatLog":         snapshot.DeletedChatLog,
+			"error":                  snapshot.Error,
+		})
 	}
 }
 
@@ -14626,6 +14651,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/raw", handleRaw(&cfg))
 	mux.HandleFunc("/file/lastUpdate", handleFileLastUpdate(&cfg))
 	mux.HandleFunc("/api/heartbeat", handleHeartbeat())
+	mux.HandleFunc("/api/log_cleanup_status", handleLogCleanupStatus())
 	mux.HandleFunc("/api/host", handleRuntimeHost(&cfg))
 	mux.HandleFunc("/api/standalone", handleRuntimeStandalone(&cfg))
 	mux.HandleFunc("/api/standalone=true", handleRuntimeStandalone(&cfg))
@@ -14711,6 +14737,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 
 	startCliGet(ctx, &cfg)
 	initCronDB()
+	startIntegrationLogRetentionCleanup(ctx)
 	startCronCheck(ctx, &cfg)
 	startCronExecutor(ctx, &cfg, proxyClient, connectSvc)
 	startConnectPendingRequestSync(ctx, &cfg, connectSvc)
@@ -16784,6 +16811,7 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 
 var cronLastCheck time.Time
 var cronDB *sql.DB
+var integrationLogRetentionManager = logretention.NewManager()
 
 func initCronDB() {
 	var err error
@@ -16797,6 +16825,9 @@ func initCronDB() {
 		log.Printf("[cron] failed to open data: %v", err)
 		return
 	}
+	cronDB.SetMaxOpenConns(1)
+	cronDB.SetMaxIdleConns(1)
+	cronDB.SetConnMaxLifetime(0)
 	cronDB.Exec(`PRAGMA journal_mode=WAL`)
 	ensureCronSchema(cronDB)
 	if err := ensureTokenStore(cronDB); err != nil {
@@ -16814,6 +16845,28 @@ func initCronDB() {
 	cronDB.Exec(`CREATE TABLE IF NOT EXISTS cmd_log (id INTEGER PRIMARY KEY AUTOINCREMENT, agent_id TEXT NOT NULL, chat_id TEXT NOT NULL, tid TEXT NOT NULL, cmd TEXT NOT NULL, result TEXT NOT NULL DEFAULT '', status INTEGER NOT NULL DEFAULT -1, received_at TEXT NOT NULL, completed_at TEXT NOT NULL DEFAULT '')`)
 	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_cmd_agent_chat ON cmd_log(agent_id, chat_id)`)
 	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_cmd_agent_chat_time ON cmd_log(agent_id, chat_id, received_at)`)
+}
+
+func startIntegrationLogRetentionCleanup(ctx context.Context) {
+	if cronDB == nil {
+		integrationLogRetentionManager.MarkChecked(fmt.Errorf("log retention db not ready"))
+		return
+	}
+	dbPath := resolveIntegrationDBPath()
+	integrationLogRetentionManager.StartAsyncWithDBOpener(ctx, logretention.DefaultRetentionDays, func() (*sql.DB, error) {
+		db, err := sql.Open("sqlite", dbPath)
+		if err != nil {
+			return nil, err
+		}
+		db.SetMaxOpenConns(1)
+		db.SetMaxIdleConns(1)
+		db.SetConnMaxLifetime(0)
+		if _, err := db.Exec(`PRAGMA journal_mode=WAL`); err != nil {
+			_ = db.Close()
+			return nil, err
+		}
+		return db, nil
+	}, log.Printf)
 }
 
 func cronCheckOnce(cfg *Config) {

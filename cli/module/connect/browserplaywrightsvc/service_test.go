@@ -902,16 +902,27 @@ func TestEnsurePlaywrightSkipsInstallWhenDriverReady(t *testing.T) {
 func TestEnsurePlaywrightInstallsOnlyWhenDriverMissing(t *testing.T) {
 	originalRunFn := playwrightRunFn
 	originalInstallFn := playwrightInstallFn
+	originalLookupEnvFn := playwrightDriverLookupEnvFn
+	originalLookPathFn := playwrightDriverLookPathFn
 	originalDriverUsableFn := playwrightDriverExecutableUsableFn
 	defer func() {
 		playwrightRunFn = originalRunFn
 		playwrightInstallFn = originalInstallFn
+		playwrightDriverLookupEnvFn = originalLookupEnvFn
+		playwrightDriverLookPathFn = originalLookPathFn
 		playwrightDriverExecutableUsableFn = originalDriverUsableFn
 	}()
 
 	driverDir := filepath.Join(t.TempDir(), "playwright", "driver")
+	playwrightDriverLookupEnvFn = func(string) (string, bool) { return "", false }
+	playwrightDriverLookPathFn = func(file string) (string, error) {
+		if file != "node" {
+			t.Fatalf("unexpected lookpath %q", file)
+		}
+		return "/usr/local/bin/node", nil
+	}
 	playwrightDriverExecutableUsableFn = func(path string) bool {
-		return false
+		return strings.TrimSpace(path) == "/usr/local/bin/node"
 	}
 	installCalls := 0
 	runCalls := 0

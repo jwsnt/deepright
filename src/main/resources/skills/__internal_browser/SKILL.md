@@ -44,7 +44,7 @@ browser --session #agentId@#chat eval 'document.body ? document.body.innerText.s
 
 ### 执行代码
 + 优先browser命令包装的Playwright
-+ 如果browser命令多次尝试无法完成任务，使用原生Playwright
++ 如果browser命令多次尝试无法完成任务，使用原生Playwright，并自行安装驱动
 
 ### 任务完成
 + 需要使用shutdown销毁CDP实例，释放资源

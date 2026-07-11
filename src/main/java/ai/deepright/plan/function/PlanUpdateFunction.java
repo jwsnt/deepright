@@ -132,7 +132,14 @@ public class PlanUpdateFunction extends BaseFunction {
                 if (log.isDebugEnabled()) {
                     log.debug(e.getMessage(), e);
                 }
-                return workTask.getObjectQuery(PlanDeepDive.class);
+                try {
+                    return workTask.getObjectQuery(PlanDeepDive.class);
+                } catch (JsonParseException | MismatchedInputException ix) {
+                    if (log.isDebugEnabled()) {
+                        log.debug(e.getMessage(), e);
+                    }
+                    throw WorkflowException.create(ix, ProtocolCode.C915).needSilent();
+                }
             }
         }
     }

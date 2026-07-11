@@ -342,15 +342,15 @@ PRAGMA journal_mode=WAL
 
 - 同一路径复用同一份 `*sql.DB`
 - 新路径关闭旧连接后再打开新连接
-- `MaxOpenConns = 4`
-- `MaxIdleConns = 4`
+- `MaxOpenConns = 1`
+- `MaxIdleConns = 1`
 
 `OpenExistingDB(appDir)` 用于只读探测：
 
 - 不复用共享单例
 - 只有 sqlite 文件真实存在时才打开
-- `MaxOpenConns = 2`
-- `MaxIdleConns = 2`
+- `MaxOpenConns = 1`
+- `MaxIdleConns = 1`
 
 ## 9. 核心 API 设计
 

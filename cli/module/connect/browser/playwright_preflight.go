@@ -6,15 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"connect/browserplaywrightsvc"
-
-	"github.com/playwright-community/playwright-go"
 )
 
 const browserPlaywrightDriverPreflightTimeout = 90 * time.Second
@@ -28,9 +24,6 @@ type browserPlaywrightDriverPreflightResult struct {
 }
 
 var (
-	browserPlaywrightInstallFn = func(opts *playwright.RunOptions) error {
-		return playwright.Install(opts)
-	}
 	browserPlaywrightInstallCommandContextFn = exec.CommandContext
 	browserEnsurePlaywrightDriverForStartFn  = browserEnsurePlaywrightDriverForStart
 )
@@ -119,32 +112,7 @@ func browserInstallPlaywrightDriver(driverDir string) error {
 	if driverDir == "" {
 		return fmt.Errorf("playwright driver directory is empty")
 	}
-	absDriverDir, err := filepath.Abs(driverDir)
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(absDriverDir, 0o755); err != nil {
-		return err
-	}
-	if ready, err := browserplaywrightsvc.PlaywrightDriverReady(absDriverDir); err != nil {
-		return err
-	} else if ready {
-		return nil
-	}
-	if err := browserPlaywrightInstallFn(&playwright.RunOptions{
-		DriverDirectory:     absDriverDir,
-		SkipInstallBrowsers: true,
-	}); err != nil {
-		return err
-	}
-	ready, err := browserplaywrightsvc.PlaywrightDriverReady(absDriverDir)
-	if err != nil {
-		return err
-	}
-	if !ready {
-		return fmt.Errorf("playwright driver install incomplete: %s", absDriverDir)
-	}
-	return nil
+	return browserplaywrightsvc.InstallPlaywrightDriver(driverDir)
 }
 
 func browserLogPlaywrightDriverPreflightEvent(result browserPlaywrightDriverPreflightResult) {

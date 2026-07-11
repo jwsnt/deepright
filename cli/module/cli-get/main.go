@@ -223,7 +223,7 @@ func getDataDB() (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	db.SetMaxOpenConns(4)
+	db.SetMaxOpenConns(10)
 	db.SetMaxIdleConns(2)
 	db.SetConnMaxLifetime(0)
 	if err := ensureLogSchema(db); err != nil {

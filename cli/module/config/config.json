@@ -6,6 +6,7 @@
     "__internal_token"
   ],
   "http": {
+    "heartbeat": 10,
     "debug": false
   },
   "install_app": {

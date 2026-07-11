@@ -8907,6 +8907,19 @@ func TestProxyCLIHelpIncludesSandbox(t *testing.T) {
 	}
 }
 
+func TestProxyMainRoutesSandboxHelp(t *testing.T) {
+	oldArgs := os.Args
+	os.Args = []string{"proxy", "sandbox", "--help"}
+	defer func() { os.Args = oldArgs }()
+
+	stdout := captureProxyStdout(t, func() {
+		main()
+	})
+	if !strings.Contains(stdout, "proxy sandbox --agentId ID --chatId ID --sandbox off|filepick|net|filepick_net [--dir DIR]") {
+		t.Fatalf("missing sandbox help usage: %s", stdout)
+	}
+}
+
 func TestProxyConnectHelpUsesConnectPrefix(t *testing.T) {
 	stdout := captureProxyStdout(t, func() {
 		printProxyConnectHelp()

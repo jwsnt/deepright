@@ -49,6 +49,8 @@ public class CliGetFunction extends BaseFunction {
     // 自旋总次数
     protected Integer circle;
 
+    protected Boolean debug;
+
     public Object call(FunctionContext functionContext) throws Exception {
         try {
             CliPubSub.checkValid(functionContext.getWorkTask());
@@ -56,14 +58,12 @@ public class CliGetFunction extends BaseFunction {
             if (log.isInfoEnabled()) {
                 log.info("The cli@get router key={}", router.key());
             }
-            // 同步心跳（堵塞）
-            this.heartbeat(functionContext.getWorkTask());
             // 没有获取到可以用Result或超时则返回
             Object rest = null;
             long start = System.currentTimeMillis();
             long close = 0;
             while (rest == null && ((this.timeout - this.interval) > close)) {
-                rest = new CliGetExec(this.redis4event, this.interval, this.timeout, this.circle, router.getDevice()).exec();
+                rest = new CliGetExec(this.redis4event, this.interval, this.timeout, this.circle, router.getDevice(), this.debug).exec();
                 if (rest != null) {
                     // CMD + TID
                     CliSubData subData = JsonUtils.read((byte[]) rest, CliSubData.class).check();
@@ -88,6 +88,9 @@ public class CliGetFunction extends BaseFunction {
         } catch (Exception e) {
             WorkflowException.dolog(e);
             return null;
+        } finally {
+            // 最后同步心跳
+            this.heartbeat(functionContext.getWorkTask());
         }
     }
 
@@ -99,13 +102,15 @@ public class CliGetFunction extends BaseFunction {
     public static class CliGetExec extends SpinExec {
 
         // Event专用Redis
-        private final RedisTemplate<String, Object> redis4event;
+        protected final RedisTemplate<String, Object> redis4event;
 
-        private final Integer interval;
+        protected final Integer interval;
 
-        private final String device;
+        protected final String device;
 
-        public CliGetExec(RedisTemplate<String, Object> redis4event, Integer interval, Integer timeout, Integer circle, String device) throws Exception {
+        protected final Boolean debug;
+
+        public CliGetExec(RedisTemplate<String, Object> redis4event, Integer interval, Integer timeout, Integer circle, String device, Boolean debug) throws Exception {
             // Timeout内尝试Circle次
             super(timeout, circle);
             // Pub/Sub使用Device对齐
@@ -113,6 +118,7 @@ public class CliGetFunction extends BaseFunction {
             this.redis4event = redis4event;
             // 如果通道为空，堵塞的时间
             this.interval = interval;
+            this.debug = debug;
         }
 
         @Override
@@ -120,7 +126,9 @@ public class CliGetFunction extends BaseFunction {
             try {
                 return this.redis4event.opsForList().leftPop(this.device, this.interval, TimeUnit.MILLISECONDS);
             } catch (Exception e) {
-                log.error(e.getMessage(), e);
+                if (this.debug) {
+                    log.error(e.getMessage(), e);
+                }
                 return null;
             }
         }
@@ -137,7 +145,7 @@ public class CliGetFunction extends BaseFunction {
         @Autowired
         protected RouterService routerService;
 
-        @Value("${cli.get.interval:1500}")
+        @Value("${cli.get.interval:1000}")
         protected Integer interval;
 
         @Value("${cli.get.timeout:15000}")
@@ -148,6 +156,9 @@ public class CliGetFunction extends BaseFunction {
 
         @Value("${cli.get.circle:10}")
         protected Integer circle;
+
+        @Value("${debug:false}")
+        protected Boolean debug;
 
         // 从Redis获取指定设备任务，每interval取一次，直到timeout，循环尝试timeout/circle次
         @Bean(CliGetFunction.NAME)

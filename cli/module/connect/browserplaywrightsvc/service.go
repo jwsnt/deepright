@@ -98,9 +98,12 @@ func (d *daemonService) ensurePlaywright() error {
 		if d.logger != nil {
 			d.logger.Printf("用参数：驱动目录=%s，做了：发现浏览器驱动缺失，开始自动安装", strings.TrimSpace(d.opts.DriverDir))
 		}
-		if err := playwrightInstallFn(runOptions); err != nil {
+		if err := InstallPlaywrightDriver(strings.TrimSpace(d.opts.DriverDir)); err != nil {
 			return err
 		}
+	}
+	if _, err := ensurePlaywrightNodeEnvironment(strings.TrimSpace(d.opts.DriverDir)); err != nil {
+		return err
 	}
 	pw, err := playwrightRunFn(runOptions)
 	if err != nil {

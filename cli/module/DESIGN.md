@@ -249,3 +249,15 @@
 + site/DESIGN.md
 + skills/DESIGN.md
 + static/DESIGN.md
+
+##### 数据库设计
+- integration 与 proxy 统一复用应用运行目录下的共享 sqlite；integration 通过 `resolveIntegrationDBPath()` 打开 `data`，proxy 通过 `getDataDBPath()` 打开同一份库，避免日志、会话、定时任务状态分裂为多份本地库。
+- 日志时间统一写入文本格式 `2006-01-02T15:04:05.000`，所有按时间范围读取与过期删除都依赖该格式的字典序与时间序一致。
+- `chat_log` 用于保存会话消息主链路，字段为 `agent_id / chat_id / chat_type / role / response_type / content / created_at`；其中 `chat_type` 当前覆盖 `page_session` 与 `scheduled_task`，用于区分普通页面会话与定时任务会话。
+- `chat_log` 当前索引为 `idx_chat_agent_chat(agent_id, chat_id)` 与 `idx_chat_agent_chat_time(agent_id, chat_id, created_at)`，对应代码里按会话读取、按会话增量拉取、按时间续传的主查询路径。
+- `agent_message_log` 用于保存 Agent 侧结构化消息日志，字段为 `agent_id / chat_id / content / log_type / created_at`；写入入口来自 `cli-get`、integration 以及 proxy 的 eventlog，读取入口以按 `chat_id`、`agent_id + chat_id`、`log_type`、时间范围查询为主。
+- `agent_message_log` 当前索引为 `idx_agent_message_log_chat_type_time(chat_id, log_type, created_at)`、`idx_agent_message_log_agent_chat_type_time(agent_id, chat_id, log_type, created_at)` 与 `idx_agent_message_log_agent_chat_time(agent_id, chat_id, created_at)`，与现有查询条件保持一致，不额外引入只覆盖低频写路径的冗余索引。
+- `connect/logretention` 是日志保留策略的共享实现；integration 与 proxy 在启动完成数据库初始化后都会使用独立 sqlite 连接异步执行一次清理，不阻塞首屏服务与主查询连接，并在同一事务内物理删除 `agent_message_log` 与 `chat_log` 中 `created_at < cutoff` 且超过最近 30 天的数据。
+- 启动阶段的过期日志清理必须是非阻塞设计：禁止在 HTTP 服务监听、首屏接口响应或主共享 sqlite 连接上同步执行大批量删除，避免首次打开出现空白页或长时间无响应。
+- 日志清理状态通过 `/api/log_cleanup_status` 暴露给站点页面；返回 `checked / running / message / cutoff / deletedAgentMessageLog / deletedChatLog / error` 等字段，便于前端轮询并在启动阶段给出确定反馈。
+- 站点在检测到清理运行中时，使用统一中心域浮层锁定界面并提示“正在清理过期日志，请稍后”；清理结束后自动解除锁定，不要求人工确认。

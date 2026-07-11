@@ -22,6 +22,7 @@
   --toast-center-top:24px;
   --chat-frame-side-gap:72px;--chat-content-max-width:780px;--chat-shell-max-width:1040px;--chat-greeting-card-max-width:780px;--chat-greeting-text-max-width:560px;
   --plugin-log-delay-ms:2000ms;
+  --rs-url-preview-expanded-inset:50px;
   --overlay-z-left:120;--overlay-z-center:180;--overlay-z-right:240;
   --modal-overlay-bg:rgba(19,24,36,.18);--modal-overlay-blur:5px;
   --modal-panel-bg:#eef4ff;--modal-panel-bg-strong:#ffffff;--modal-panel-border:rgba(72,99,143,.24);
@@ -158,6 +159,14 @@ a{color:var(--accent);text-decoration:none}
 @keyframes heartbeatAlertScan{0%{transform:translateY(-8%)}100%{transform:translateY(8%)}}
 @keyframes heartbeatAlertBeacon{0%,100%{transform:scale(.86);opacity:.58}50%{transform:scale(1.18);opacity:1}}
 @media (max-width:720px){.heartbeat-alert-overlay{padding:18px}.heartbeat-alert-panel{padding:28px 20px;border-radius:22px}.heartbeat-alert-badge{font-size:11px;letter-spacing:.28em}}
+.log-cleanup-lock{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;background:linear-gradient(180deg,rgba(236,243,255,.64),rgba(223,234,255,.82));backdrop-filter:blur(18px) saturate(155%);-webkit-backdrop-filter:blur(18px) saturate(155%);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .22s ease,visibility 0s linear .22s}
+.log-cleanup-lock.show{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .22s ease}
+.log-cleanup-lock::before{content:"";position:absolute;inset:-20%;background:radial-gradient(circle at 18% 18%,rgba(77,107,254,.24),transparent 40%),radial-gradient(circle at 82% 16%,rgba(94,203,255,.22),transparent 38%),radial-gradient(circle at 50% 84%,rgba(77,107,254,.18),transparent 44%);opacity:.95;animation:pluginModalLockGlow 2.4s ease-in-out infinite}
+.log-cleanup-lock-card{position:relative;z-index:1;width:min(360px,calc(100vw - 40px));padding:24px 22px 20px;border-radius:24px;border:1px solid color-mix(in srgb,var(--border) 70%,var(--accent) 30%);background:linear-gradient(180deg,rgba(255,255,255,.88),rgba(240,247,255,.8));box-shadow:0 28px 72px rgba(16,24,40,.18);display:flex;flex-direction:column;align-items:center;text-align:center}
+.log-cleanup-lock-title{margin-top:14px;font-size:19px;font-weight:700;color:var(--text-primary);letter-spacing:.04em}
+.log-cleanup-lock-desc{margin-top:8px;font-size:12px;line-height:1.7;color:var(--text-secondary)}
+[data-theme="dark"] .log-cleanup-lock{background:linear-gradient(180deg,rgba(7,14,26,.66),rgba(7,14,26,.84))}
+[data-theme="dark"] .log-cleanup-lock-card{background:linear-gradient(180deg,rgba(14,26,47,.88),rgba(10,20,38,.82));box-shadow:0 30px 78px rgba(0,0,0,.34)}
 .sidebar-toggle,.right-sidebar-toggle{margin-left:auto;width:28px;height:28px;border-radius:6px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:var(--transition);flex-shrink:0}
 .sidebar-toggle:hover,.right-sidebar-toggle:hover,.right-sidebar-toggle:focus-visible{background:var(--bg-card);color:var(--text-primary);outline:none}
 .sidebar-toggle svg,.right-sidebar-toggle svg{width:18px;height:18px;display:block}
@@ -1057,7 +1066,9 @@ animation:queuedInsertExplosion .62s ease-out both}
 .right-sidebar.collapsed .right-sidebar-header{top:12px;left:auto;right:10px}
 .right-sidebar.collapsed .right-sidebar-toggle{margin-left:0}
 .right-sidebar.previewing-url,.right-sidebar.previewing-url-closing{overflow:hidden}
+.right-sidebar.previewing-url-expanded{overflow:visible}
 .right-sidebar.previewing-url .right-sidebar-body,.right-sidebar.previewing-url-closing .right-sidebar-body{padding-top:0;overflow:visible;position:static}
+.right-sidebar.previewing-url-expanded .right-sidebar-body{overflow:visible;position:static}
 .right-sidebar.previewing-url .right-sidebar-header,.right-sidebar.previewing-url-closing .right-sidebar-header{top:10px;left:auto;right:10px}
 .right-sidebar.previewing-url .rs-top,.right-sidebar.previewing-url .rs-bottom{display:none}
 .right-sidebar.previewing-url-closing .rs-top,.right-sidebar.previewing-url-closing .rs-bottom{pointer-events:none;user-select:none}
@@ -1076,6 +1087,9 @@ animation:queuedInsertExplosion .62s ease-out both}
 .rs-url-preview.is-closing{opacity:0;pointer-events:none;transform:translateY(14px) scale(.982);filter:blur(12px)}
 .rs-url-preview.is-closing::before{opacity:0}
 .rs-url-preview.is-closing::after{opacity:.92;backdrop-filter:blur(18px) saturate(135%);-webkit-backdrop-filter:blur(18px) saturate(135%)}
+.rs-url-preview.is-expanded{position:fixed;inset:var(--rs-url-preview-expanded-inset);width:auto;height:auto;min-height:0;z-index:280;transform:none;filter:none;overflow:hidden;border-radius:34px;border:1px solid rgba(214,230,255,.18);box-shadow:0 34px 110px rgba(12,23,48,.3),0 0 0 1px rgba(255,255,255,.08) inset}
+.rs-url-preview.is-expanded::before{background:linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,.04) 24%,rgba(255,255,255,.02) 56%,rgba(255,255,255,.06))}
+.rs-url-preview.is-expanded::after{opacity:1;background:linear-gradient(180deg,color-mix(in srgb,var(--bg-main) 84%,rgba(255,255,255,.18) 16%),color-mix(in srgb,var(--bg-main) 92%,rgba(255,255,255,.06) 8%));backdrop-filter:blur(18px) saturate(132%);-webkit-backdrop-filter:blur(18px) saturate(132%)}
 .rs-url-preview-toolbar{display:none}
 .rs-url-preview-switch{pointer-events:auto;position:relative;z-index:25;width:18px;height:18px;border:1px solid rgba(255,190,76,.52);border-radius:6px;background:linear-gradient(180deg,rgba(255,251,235,.84),rgba(255,237,179,.58));color:#b97200;display:inline-flex;align-items:center;justify-content:center;padding:0;backdrop-filter:blur(10px) saturate(148%);-webkit-backdrop-filter:blur(10px) saturate(148%);box-shadow:0 10px 24px rgba(39,65,128,.14),0 0 0 1px rgba(255,248,224,.42) inset,0 0 10px rgba(255,196,61,.16);cursor:pointer;transition:transform .22s ease,box-shadow .22s ease,filter .22s ease,border-color .22s ease,color .22s ease,background .22s ease;flex-shrink:0;animation:urlPreviewSwitchPulse 1.9s ease-in-out infinite}
 .rs-url-preview-switch::after{content:'';position:absolute;inset:-4px;border-radius:9px;background:radial-gradient(circle,rgba(255,225,122,.32),rgba(255,196,61,.12) 56%,rgba(255,196,61,0) 78%);opacity:.8;pointer-events:none;z-index:-1;animation:urlPreviewSwitchHalo 1.9s ease-in-out infinite}
@@ -1090,6 +1104,9 @@ body.rs-url-preview-toolbar-closing .rs-url-preview-floating-switch{opacity:0;fi
 body.meta-preview-focus .rs-url-preview-floating-switch{filter:blur(8px) saturate(.86);opacity:.34;pointer-events:none}
 body.center-overlay-focus .rs-url-preview-floating-switch{filter:blur(8px) saturate(.86);opacity:.34;pointer-events:none}
 body.center-overlay-focus .rs-url-preview-floating-switch.onboarding-url-preview-tour-target{filter:none;opacity:1;pointer-events:auto}
+body.rs-url-preview-expanded .rs-url-preview-floating-switch{top:calc(var(--rs-url-preview-expanded-inset) + 8px);right:calc(var(--rs-url-preview-expanded-inset) + 8px);left:auto;z-index:320;opacity:1;visibility:visible;pointer-events:auto;filter:none}
+body.rs-url-preview-expanded.meta-preview-focus .rs-url-preview-floating-switch,
+body.rs-url-preview-expanded.center-overlay-focus .rs-url-preview-floating-switch{filter:none;opacity:1;pointer-events:auto}
 #app.shutdown-sequence ~ .rs-url-preview-floating-switch{filter:blur(14px) saturate(.8) brightness(.78);opacity:.34;pointer-events:none}
 @keyframes urlPreviewSwitchPulse{0%,100%{transform:translateY(0) scale(1);box-shadow:0 0 0 1px rgba(255,248,224,.38) inset,0 6px 12px rgba(255,179,0,.16),0 0 9px rgba(255,196,61,.12)}50%{transform:translateY(-1px) scale(1.04);box-shadow:0 0 0 1px rgba(255,248,224,.54) inset,0 8px 16px rgba(255,179,0,.22),0 0 14px rgba(255,196,61,.2)}}
 @keyframes urlPreviewSwitchHalo{0%,100%{opacity:.48;transform:scale(.92)}50%{opacity:1;transform:scale(1.22)}}
@@ -1099,9 +1116,18 @@ body.center-overlay-focus .rs-url-preview-floating-switch.onboarding-url-preview
 .rs-url-preview-frame-shell{position:absolute;inset:0;width:100%;height:100%;min-height:100%;padding:0;box-sizing:border-box;display:block;overflow:auto;background:#f7fbff;z-index:1;opacity:0;transform:translateY(18px) scale(.988);filter:blur(8px);transition:opacity .34s ease,transform .42s cubic-bezier(.22,1,.36,1),filter .42s ease;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y}
 .rs-url-preview.is-active .rs-url-preview-frame-shell{opacity:1;transform:translateY(0) scale(1);filter:blur(0);transition-delay:.08s}
 .rs-url-preview.is-closing .rs-url-preview-frame-shell{opacity:0;transform:translateY(16px) scale(.986);filter:blur(10px);transition-delay:0s}
+.rs-url-preview.is-expanded .rs-url-preview-frame-shell{opacity:1;transform:none;filter:none}
 .rs-url-preview-frame{position:absolute;inset:0;z-index:1;display:block;width:100%;height:100%;min-height:100%;border:none;border-radius:0;background:#fff;box-shadow:none;opacity:.88;filter:blur(6px);transition:opacity .34s ease,filter .42s ease;pointer-events:auto;touch-action:auto;overscroll-behavior:contain}
 .rs-url-preview.is-active .rs-url-preview-frame{opacity:1;filter:none;transition-delay:.08s}
 .rs-url-preview.is-closing .rs-url-preview-frame{opacity:.62;filter:blur(6px);transition-delay:0s}
+.rs-url-preview.is-expanded .rs-url-preview-frame{opacity:1;filter:none}
+.rs-url-preview-expand-btn{position:fixed;top:calc(var(--rs-url-preview-toolbar-top,18px) + 34px);left:calc(var(--rs-url-preview-boundary-left,0px) - 10px);z-index:260;width:20px;height:20px;border-radius:7px;border:1px solid rgba(96,142,255,.42);background:linear-gradient(180deg,rgba(250,253,255,.98),rgba(225,238,255,.96));box-shadow:0 12px 28px rgba(39,65,128,.22),0 0 0 1px rgba(255,255,255,.72) inset;color:#2f5fca;opacity:0;visibility:hidden;pointer-events:none;animation:none;transition:opacity .24s ease,filter .24s ease,visibility 0s linear .24s,transform .22s ease,box-shadow .22s ease}
+.rs-url-preview-expand-btn::after{display:none}
+.rs-url-preview-expand-btn svg{width:11px;height:11px;display:block;overflow:visible}
+body.rs-url-preview-toolbar-visible .rs-url-preview-expand-btn{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .24s ease,filter .24s ease,visibility 0s linear 0s,transform .22s ease,box-shadow .22s ease}
+.rs-url-preview-toolbar-closing .rs-url-preview-expand-btn{opacity:0;filter:blur(8px);pointer-events:none}
+.rs-url-preview-expand-btn:hover,.rs-url-preview-expand-btn:focus-visible{border-color:rgba(107,149,255,.44);box-shadow:0 0 0 1px rgba(255,255,255,.58) inset,0 10px 24px rgba(77,107,254,.22);color:#234fbf;filter:brightness(1.04)}
+body.rs-url-preview-expanded .rs-url-preview-expand-btn{opacity:0;visibility:hidden;pointer-events:none}
 .rs-url-preview-loading{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;padding:24px;pointer-events:none;opacity:0;visibility:hidden;transition:opacity .26s ease,filter .34s ease,visibility 0s linear .26s}
 .rs-url-preview-loading::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(244,249,255,.84),rgba(236,244,255,.72) 38%,rgba(227,238,255,.58));backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.48)}
 .rs-url-preview-loading::after{content:'';position:absolute;inset:10% 8%;border-radius:28px;background:radial-gradient(circle at center,rgba(132,211,255,.2),rgba(132,211,255,0) 62%);filter:blur(22px);opacity:.92;animation:rsUrlPreviewLoadingGlow 2.4s ease-in-out infinite}
@@ -1126,6 +1152,13 @@ body.center-overlay-focus .rs-url-preview-floating-switch.onboarding-url-preview
 [data-theme="dark"] .rs-url-preview-loading-badge{background:linear-gradient(180deg,rgba(84,64,16,.92),rgba(54,39,7,.82));border-color:rgba(255,209,89,.3);box-shadow:0 14px 30px rgba(255,180,0,.16),inset 0 1px 0 rgba(255,255,255,.06)}
 [data-theme="dark"] .rs-url-preview-loading-badge::before{background:linear-gradient(135deg,rgba(255,210,93,.7),rgba(255,247,217,.18))}
 [data-theme="dark"] .rs-url-preview-loading-badge svg{color:#ffd45a}
+[data-theme="dark"] .rs-url-preview.is-expanded::after{background:linear-gradient(180deg,rgba(4,10,20,.72),rgba(6,14,28,.88));backdrop-filter:blur(22px) saturate(126%);-webkit-backdrop-filter:blur(22px) saturate(126%)}
+[data-theme="dark"] .rs-url-preview-expand-btn{background:linear-gradient(180deg,rgba(20,34,60,.98),rgba(10,19,35,.96));border-color:rgba(132,170,255,.34);color:#dcebff;box-shadow:0 12px 28px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.08)}
+[data-theme="dark"] .rs-url-preview-expand-btn:hover,[data-theme="dark"] .rs-url-preview-expand-btn:focus-visible{border-color:rgba(142,180,255,.44);color:#eef4ff;box-shadow:0 0 0 1px rgba(255,255,255,.08) inset,0 12px 26px rgba(0,0,0,.34)}
+.rs-url-preview-expanded-backdrop{position:fixed;inset:0;z-index:270;opacity:0;visibility:hidden;pointer-events:none;background:linear-gradient(180deg,rgba(235,244,255,.18),rgba(207,222,248,.28));backdrop-filter:blur(14px) saturate(126%);-webkit-backdrop-filter:blur(14px) saturate(126%);transition:opacity .24s ease,visibility 0s linear .24s}
+.rs-url-preview-expanded-backdrop::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 18% 18%,rgba(255,255,255,.32),transparent 28%),radial-gradient(circle at 82% 14%,rgba(117,171,255,.18),transparent 30%),radial-gradient(circle at 50% 84%,rgba(120,231,255,.14),transparent 28%)}
+body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .24s ease,visibility 0s linear 0s}
+[data-theme="dark"] .rs-url-preview-expanded-backdrop{background:linear-gradient(180deg,rgba(6,12,24,.28),rgba(6,12,24,.4))}
 [data-energy-saver="on"] .rs-url-preview,
 [data-low-power-rendering="on"] .rs-url-preview{transform:none;filter:none;transition-duration:.16s}
 [data-energy-saver="on"] .rs-url-preview::before,
@@ -3494,13 +3527,59 @@ body.quick-fan-transition-active{cursor:progress}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 ::-webkit-scrollbar-thumb:hover{background:var(--text-muted)}
+body.boot-loading{overflow:hidden}
+body.boot-loading #app{visibility:hidden}
+body.boot-ready #app{visibility:visible}
+.boot-loading-overlay{position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:24px;background:linear-gradient(180deg,rgba(238,244,255,.82),rgba(225,236,255,.9));backdrop-filter:blur(14px) saturate(145%);-webkit-backdrop-filter:blur(14px) saturate(145%);opacity:1;visibility:visible;pointer-events:auto;transition:opacity .24s ease,visibility 0s linear 0s}
+body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .24s ease,visibility 0s linear .24s}
+.boot-loading-overlay::before{content:"";position:absolute;inset:-20%;background:radial-gradient(circle at 18% 18%,rgba(77,107,254,.18),transparent 36%),radial-gradient(circle at 82% 16%,rgba(94,203,255,.16),transparent 34%),radial-gradient(circle at 52% 84%,rgba(77,107,254,.12),transparent 40%);opacity:.92;animation:pluginModalLockGlow 2.6s ease-in-out infinite}
+.boot-loading-card{position:relative;z-index:1;width:min(360px,calc(100vw - 40px));padding:24px 22px 20px;border-radius:24px;border:1px solid color-mix(in srgb,var(--border) 72%,var(--accent) 28%);background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(240,247,255,.82));box-shadow:0 28px 72px rgba(16,24,40,.16);display:flex;flex-direction:column;align-items:center;text-align:center}
+.boot-loading-badge{position:relative;display:flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:16px;background:linear-gradient(180deg,rgba(255,254,250,.96),rgba(255,241,197,.84));border:1px solid rgba(255,194,79,.34);box-shadow:0 14px 30px rgba(255,191,0,.14),inset 0 1px 0 rgba(255,255,255,.82);overflow:hidden}
+.boot-loading-badge::before{content:"";position:absolute;inset:8px;border-radius:11px;background:linear-gradient(135deg,rgba(255,222,116,.88),rgba(255,247,217,.54));opacity:.92}
+.boot-loading-badge::after{content:"";position:absolute;inset:-40%;background:linear-gradient(120deg,rgba(255,255,255,0),rgba(255,255,255,.8),rgba(255,255,255,0));transform:translateX(-70%) rotate(12deg);animation:bootLoadingShimmer 1.8s ease-in-out infinite}
+.boot-loading-spinner{position:relative;z-index:1;width:20px;height:20px;border-radius:50%;border:2px solid rgba(199,134,0,.18);border-top-color:#c78600;border-right-color:#e0a125;animation:vfsSpin .85s linear infinite}
+.boot-loading-title{margin-top:14px;font-size:18px;font-weight:700;color:var(--text-primary);letter-spacing:.04em}
+.boot-loading-desc{margin-top:8px;font-size:11px;line-height:1.7;color:var(--text-secondary);max-width:280px}
+.boot-loading-overlay[data-state="slow"] .boot-loading-badge{background:linear-gradient(180deg,rgba(255,248,244,.96),rgba(255,230,214,.86));border-color:rgba(255,161,89,.34);box-shadow:0 14px 30px rgba(255,161,89,.16),inset 0 1px 0 rgba(255,255,255,.82)}
+.boot-loading-overlay[data-state="slow"] .boot-loading-badge::before{background:linear-gradient(135deg,rgba(255,176,105,.78),rgba(255,247,217,.38))}
+.boot-loading-overlay[data-state="slow"] .boot-loading-spinner{border-color:rgba(197,106,29,.16);border-top-color:#c56a1d;border-right-color:#dd8845}
+.boot-loading-overlay[data-state="error"] .boot-loading-badge{background:linear-gradient(180deg,rgba(255,246,248,.96),rgba(255,232,236,.88));border-color:rgba(255,90,107,.28);box-shadow:0 14px 30px rgba(255,90,107,.14),inset 0 1px 0 rgba(255,255,255,.82)}
+.boot-loading-overlay[data-state="error"] .boot-loading-badge::before{background:linear-gradient(135deg,rgba(255,146,162,.7),rgba(255,255,255,.42))}
+.boot-loading-overlay[data-state="error"] .boot-loading-spinner{border-color:rgba(255,90,107,.14);border-top-color:#ff5a6b;border-right-color:#ff8a96}
+@keyframes bootLoadingShimmer{0%{transform:translateX(-78%) rotate(12deg)}100%{transform:translateX(82%) rotate(12deg)}}
+[data-theme="dark"] .boot-loading-overlay{background:linear-gradient(180deg,rgba(7,14,26,.76),rgba(7,14,26,.88))}
+[data-theme="dark"] .boot-loading-card{background:linear-gradient(180deg,rgba(14,26,47,.9),rgba(10,20,38,.84));box-shadow:0 30px 78px rgba(0,0,0,.34)}
+[data-theme="dark"] .boot-loading-badge{background:linear-gradient(180deg,rgba(84,64,16,.94),rgba(54,39,7,.84));border-color:rgba(255,209,89,.3);box-shadow:0 14px 30px rgba(255,180,0,.16),inset 0 1px 0 rgba(255,255,255,.06)}
+[data-theme="dark"] .boot-loading-badge::before{background:linear-gradient(135deg,rgba(255,210,93,.7),rgba(255,247,217,.18))}
+[data-theme="dark"] .boot-loading-spinner{border-color:rgba(255,212,90,.12);border-top-color:#ffd45a;border-right-color:#ffe29d}
+[data-theme="dark"] .boot-loading-overlay[data-state="slow"] .boot-loading-badge{background:linear-gradient(180deg,rgba(92,55,18,.94),rgba(63,36,10,.86));border-color:rgba(255,190,132,.24)}
+[data-theme="dark"] .boot-loading-overlay[data-state="error"] .boot-loading-badge{background:linear-gradient(180deg,rgba(72,28,38,.94),rgba(48,17,24,.88));border-color:rgba(255,138,158,.24)}
+[data-energy-saver="on"] .boot-loading-overlay::before,[data-low-power-rendering="on"] .boot-loading-overlay::before{animation:none}
+[data-energy-saver="on"] .boot-loading-badge::after,[data-low-power-rendering="on"] .boot-loading-badge::after{animation:none;opacity:.42}
 </style>
 </head>
-<body>
+<body class="boot-loading">
+<div id="bootLoadingOverlay" class="boot-loading-overlay" data-state="loading" aria-live="polite" aria-atomic="true">
+  <div class="boot-loading-card" role="status">
+    <div class="boot-loading-badge" aria-hidden="true">
+      <div class="boot-loading-spinner"></div>
+    </div>
+    <div class="boot-loading-title" id="bootLoadingTitle">正在加载中</div>
+    <div class="boot-loading-desc" id="bootLoadingDesc">请稍后</div>
+  </div>
+</div>
 <div id="heartbeatAlertOverlay" class="heartbeat-alert-overlay" aria-hidden="true">
   <div class="heartbeat-alert-panel" role="alert" aria-live="assertive" aria-atomic="true">
     <div class="heartbeat-alert-badge"><span class="heartbeat-alert-dot" aria-hidden="true"></span>Remote Service Alert</div>
     <h1 class="heartbeat-alert-title">Heartbeat Error</h1>
+  </div>
+</div>
+<div id="logCleanupLock" class="log-cleanup-lock" data-overlay-base data-overlay-domain="center" data-overlay-order="58" data-overlay-type="lock" aria-hidden="true" onclick="handleLogCleanupOverlayClick(event)">
+  <div class="log-cleanup-lock-card" role="dialog" aria-modal="true" aria-live="polite" aria-atomic="true" aria-labelledby="logCleanupLockTitle" aria-describedby="logCleanupLockDesc" tabindex="-1" onclick="event.stopPropagation()">
+    <div class="domain-upload-lock-spinner" aria-hidden="true"></div>
+    <div class="log-cleanup-lock-title" id="logCleanupLockTitle">日志清理中</div>
+    <div class="log-cleanup-lock-desc" id="logCleanupLockDesc">正在清理过期日志，请稍后</div>
+    <div class="domain-upload-lock-progress"><span></span></div>
   </div>
 </div>
 <div class="app" id="app">
@@ -3992,7 +4071,7 @@ body.quick-fan-transition-active{cursor:progress}
     </div>
     <div class="rs-url-preview" id="rsUrlPreview" aria-hidden="true">
       <div class="rs-url-preview-toolbar">
-        <button type="button" class="rs-url-preview-switch" id="rsUrlPreviewSwitch" title="切换回右侧栏原布局" aria-label="切换回右侧栏原布局" onclick="closeRightSidebarUrlPreview()">
+        <button type="button" class="rs-url-preview-switch" id="rsUrlPreviewSwitch" title="切换回右侧栏原布局" aria-label="切换回右侧栏原布局" onclick="handleRightSidebarUrlPreviewFloatingSwitch(event)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 5.5v13"></path><path d="M17 7H12.8"></path><path d="M17 12h-5.6"></path><path d="M14.6 17H12"></path><path d="m10.2 9.2-2.7 2.8 2.7 2.8"></path></svg>
         </button>
         <div class="rs-url-preview-meta">
@@ -4063,7 +4142,11 @@ body.quick-fan-transition-active{cursor:progress}
     </div>
   </div>
 </div>
-<button type="button" class="rs-url-preview-switch rs-url-preview-floating-switch" id="rsUrlPreviewFloatingSwitch" title="切换回右侧栏原布局" aria-label="切换回右侧栏原布局" onclick="closeRightSidebarUrlPreview()">
+<div class="rs-url-preview-expanded-backdrop" id="rsUrlPreviewExpandedBackdrop" aria-hidden="true"></div>
+<button type="button" class="rs-url-preview-switch rs-url-preview-expand-btn" id="rsUrlPreviewExpandBtn" title="展开网站浏览" aria-label="展开网站浏览" onclick="expandRightSidebarUrlPreview(event)">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"></path><path d="M16 3h3a2 2 0 0 1 2 2v3"></path><path d="M8 21H5a2 2 0 0 1-2-2v-3"></path><path d="M16 21h3a2 2 0 0 0 2-2v-3"></path></svg>
+</button>
+<button type="button" class="rs-url-preview-switch rs-url-preview-floating-switch" id="rsUrlPreviewFloatingSwitch" title="切换回右侧栏原布局" aria-label="切换回右侧栏原布局" onclick="handleRightSidebarUrlPreviewFloatingSwitch(event)">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 5.5v13"></path><path d="M17 7H12.8"></path><path d="M17 12h-5.6"></path><path d="M14.6 17H12"></path><path d="m10.2 9.2-2.7 2.8 2.7 2.8"></path></svg>
 </button>
 
@@ -5381,9 +5464,19 @@ const rightSidebarUrlPreviewState = {
   chatId: '',
   requestKey: ''
 };
+const rightSidebarUrlPreviewExpandedState = {
+  active: false,
+  chatId: ''
+};
+const rightSidebarUrlPreviewMountState = {
+  inlineParent: null,
+  inlineNextSibling: null
+};
 const RIGHT_SIDEBAR_URL_PREVIEW_FADE_MS = 360;
 const RIGHT_SIDEBAR_URL_PREVIEW_MIN_LOADING_MS = 1000;
 const RIGHT_SIDEBAR_URL_PREVIEW_LOAD_TIMEOUT_MS = 12000;
+const RIGHT_SIDEBAR_URL_PREVIEW_CLOSE_ICON_HTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 5.5v13"></path><path d="M17 7H12.8"></path><path d="M17 12h-5.6"></path><path d="M14.6 17H12"></path><path d="m10.2 9.2-2.7 2.8 2.7 2.8"></path></svg>';
+const RIGHT_SIDEBAR_URL_PREVIEW_RESTORE_ICON_HTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 9V5H5"></path><path d="m5 5 6 6"></path><path d="M15 9h4V5"></path><path d="m19 5-6 6"></path><path d="M9 15v4H5"></path><path d="m5 19 6-6"></path><path d="M15 15h4v4"></path><path d="m19 19-6-6"></path></svg>';
 let rightSidebarUrlPreviewCleanupTimer = 0;
 let rightSidebarUrlPreviewWatchToken = 0;
 let rightSidebarUrlPreviewWatchKey = '';
@@ -5916,6 +6009,8 @@ async function detectBrowserPerfProfile() {
 }
 
 const BOOT_BROWSER_PERF_PROFILE = detectBrowserPerfProfileSync();
+const BOOT_LOADING_MIN_VISIBLE_MS = 700;
+const BOOT_LOADING_SLOW_HINT_MS = 2400;
 
 let state = {
   theme: localStorage.getItem(THEME_KEY) || 'light',
@@ -6280,9 +6375,23 @@ let modelDropdownGuideTimer = null;
 let chatLazyLoading = false;
 let chatScrollPerfTimer = null;
 let historyLazyLockState = { count: 0, desc: '' };
+let logCleanupStatusState = {
+  timer: 0,
+  checked: false,
+  running: false,
+  visible: false
+};
 let richMessageUpgradeQueue = [];
 let richMessageUpgradeFrame = null;
 let richMessageUpgradeWaiters = [];
+let bootLoadingState = {
+  active: true,
+  released: false,
+  startedAt: Date.now(),
+  slowTimer: 0,
+  releaseTimer: 0,
+  state: 'loading'
+};
 let streamRenderQueue = {};
 const STREAM_TYPE_SWAP_TIMING_NORMAL = Object.freeze({ holdMs: 2000, incomingMs: 900, cleanupMs: 2000 });
 const STREAM_TYPE_SWAP_TIMING_SAVER = Object.freeze({ holdMs: 320, incomingMs: 220, cleanupMs: 420 });
@@ -8280,6 +8389,10 @@ function isOnboardingActive() {
 }
 
 function isOnboardingStartLocked() {
+  if (isRightSidebarUrlPreviewExpanded()) {
+    clearRightSidebarUrlPreviewExpandedOnboardingPendings();
+    return true;
+  }
   return !!(onboardingState && (onboardingState.starting || (onboardingState.active && onboardingState.step)));
 }
 
@@ -11021,6 +11134,122 @@ function isRightSidebarUrlPreviewLoadingRequestActive(href, requestKey) {
   );
 }
 
+function isRightSidebarUrlPreviewExpanded() {
+  return !!(rightSidebarUrlPreviewExpandedState && rightSidebarUrlPreviewExpandedState.active);
+}
+
+function ensureRightSidebarUrlPreviewInlineMount(preview) {
+  if (!(preview instanceof HTMLElement) || rightSidebarUrlPreviewMountState.inlineParent) return;
+  rightSidebarUrlPreviewMountState.inlineParent = preview.parentNode instanceof Node ? preview.parentNode : null;
+  rightSidebarUrlPreviewMountState.inlineNextSibling = preview.nextSibling instanceof Node ? preview.nextSibling : null;
+}
+
+function syncRightSidebarUrlPreviewMount(expanded) {
+  const preview = document.getElementById('rsUrlPreview');
+  if (!(preview instanceof HTMLElement)) return;
+  ensureRightSidebarUrlPreviewInlineMount(preview);
+  if (!!expanded) {
+    if (preview.parentNode === document.body) return;
+    document.body.appendChild(preview);
+    return;
+  }
+  const inlineParent = rightSidebarUrlPreviewMountState.inlineParent;
+  if (!(inlineParent instanceof Node) || preview.parentNode === inlineParent) return;
+  const inlineNextSibling = rightSidebarUrlPreviewMountState.inlineNextSibling;
+  if (inlineNextSibling instanceof Node && inlineNextSibling.parentNode === inlineParent) {
+    inlineParent.insertBefore(preview, inlineNextSibling);
+    return;
+  }
+  inlineParent.appendChild(preview);
+}
+
+function clearRightSidebarUrlPreviewExpandedOnboardingPendings() {
+  if (rightSidebarUrlPreviewTourState) rightSidebarUrlPreviewTourState.pendingStart = false;
+  if (messageUrlTourState) messageUrlTourState.pendingStart = false;
+  if (chatCompletionTourState) chatCompletionTourState.pendingStart = false;
+  if (memoRecurringTourState) memoRecurringTourState.pendingStart = false;
+  if (memoCompletionTourState) memoCompletionTourState.pendingStart = false;
+  if (pluginSuccessTourState) pluginSuccessTourState.pendingStart = false;
+  if (skillDisableTourState) skillDisableTourState.pendingStart = false;
+  if (queuedCenterTourState) queuedCenterTourState.pendingStart = false;
+  if (taskStartTourState) taskStartTourState.pendingStart = false;
+  if (modelSwitchTourState) modelSwitchTourState.pendingStart = false;
+  if (browserPluginHoverTourState) browserPluginHoverTourState.pendingStart = false;
+  if (cronSkillTourState) cronSkillTourState.pendingStart = false;
+  if (tokenSkillTourState) tokenSkillTourState.pendingStart = false;
+  if (browserSkillTourState) browserSkillTourState.pendingStart = false;
+  if (swarmSaveSuccessTourState) swarmSaveSuccessTourState.pendingStart = false;
+  if (sse503TourState) sse503TourState.pendingStart = false;
+}
+
+function focusRightSidebarUrlPreviewRestoreButton() {
+  const button = document.getElementById('rsUrlPreviewFloatingSwitch');
+  if (!(button instanceof HTMLButtonElement)) return;
+  window.setTimeout(() => {
+    if (!isRightSidebarUrlPreviewExpanded()) return;
+    try {
+      button.focus({ preventScroll: true });
+    } catch {
+      button.focus();
+    }
+  }, 0);
+}
+
+function setRightSidebarUrlPreviewExpanded(nextExpanded) {
+  const next = !!nextExpanded;
+  const activeHref = rightSidebarUrlPreviewState.active
+    ? normalizeRightSidebarUrlPreviewHref(rightSidebarUrlPreviewState.href)
+    : '';
+  const activeChatId = String(rightSidebarUrlPreviewState.chatId || state.activeChat || '').trim();
+  if (next && (!activeHref || !activeChatId)) return false;
+  const changed =
+    rightSidebarUrlPreviewExpandedState.active !== next ||
+    String(rightSidebarUrlPreviewExpandedState.chatId || '').trim() !== (next ? activeChatId : '');
+  if (!changed) return true;
+  rightSidebarUrlPreviewExpandedState.active = next;
+  rightSidebarUrlPreviewExpandedState.chatId = next ? activeChatId : '';
+  if (next) {
+    clearRightSidebarUrlPreviewExpandedOnboardingPendings();
+    if (isOnboardingActive()) stopOnboarding(false);
+  }
+  renderRightSidebarUrlPreview();
+  if (next) focusRightSidebarUrlPreviewRestoreButton();
+  return true;
+}
+
+function expandRightSidebarUrlPreview(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  return setRightSidebarUrlPreviewExpanded(true);
+}
+
+function restoreRightSidebarUrlPreviewExpanded(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  return setRightSidebarUrlPreviewExpanded(false);
+}
+
+function handleRightSidebarUrlPreviewFloatingSwitch(event) {
+  if (isRightSidebarUrlPreviewExpanded()) return restoreRightSidebarUrlPreviewExpanded(event);
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  return closeRightSidebarUrlPreview();
+}
+
+function syncRightSidebarUrlPreviewExpandedEscape(event) {
+  if (!isRightSidebarUrlPreviewExpanded() || !event || event.key !== 'Escape') return;
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  event.preventDefault();
+  event.stopPropagation();
+  restoreRightSidebarUrlPreviewExpanded();
+}
+
 function finishRightSidebarUrlPreviewLoading(href, requestKey, onSettled) {
   if (!isRightSidebarUrlPreviewLoadingRequestActive(href, requestKey)) return false;
   const elapsed = Math.max(0, Date.now() - Number(rightSidebarUrlPreviewRuntimeState.loadingStartedAt || 0));
@@ -11083,7 +11312,7 @@ function bindRightSidebarUrlPreviewFrameEvents() {
     const activeRequestKey = String((frame.dataset && frame.dataset.requestKey) || rightSidebarUrlPreviewState.requestKey || '').trim();
     finishRightSidebarUrlPreviewLoading(activeHref, activeRequestKey, () => {
       renderRightSidebarUrlPreview();
-      focusPreviewFrame();
+      if (!isRightSidebarUrlPreviewExpanded()) focusPreviewFrame();
       queueRightSidebarUrlPreviewTourOnSuccessfulLoad(activeChatId, activeHref);
     });
   });
@@ -11223,20 +11452,27 @@ function syncRightSidebarUrlPreviewRuntimeWatch() {
 function renderRightSidebarUrlPreview() {
   const rightSidebar = document.getElementById('rightSidebar');
   const preview = document.getElementById('rsUrlPreview');
+  const expandedBackdrop = document.getElementById('rsUrlPreviewExpandedBackdrop');
   const body = document.body;
   const titleEl = document.getElementById('rsUrlPreviewTitle');
   const subtitleEl = document.getElementById('rsUrlPreviewSubtitle');
+  const expandBtn = document.getElementById('rsUrlPreviewExpandBtn');
+  const floatingSwitch = document.getElementById('rsUrlPreviewFloatingSwitch');
   const frame = document.getElementById('rsUrlPreviewFrame');
   const loadingEl = document.getElementById('rsUrlPreviewLoading');
   const empty = document.getElementById('rsUrlPreviewEmpty');
-  if (!rightSidebar || !preview || !titleEl || !subtitleEl || !frame || !loadingEl || !empty || !body) return;
+  if (!rightSidebar || !preview || !expandedBackdrop || !titleEl || !subtitleEl || !expandBtn || !floatingSwitch || !frame || !loadingEl || !empty || !body) return;
   bindRightSidebarUrlPreviewFrameEvents();
   const finalizeInactivePreview = () => {
     rightSidebar.classList.remove('previewing-url-closing');
+    rightSidebar.classList.remove('previewing-url-expanded');
     body.classList.remove('rs-url-preview-toolbar-closing');
     body.classList.remove('rs-url-preview-toolbar-visible');
+    body.classList.remove('rs-url-preview-expanded');
     preview.classList.remove('is-closing');
     preview.classList.remove('is-loading');
+    preview.classList.remove('is-expanded');
+    expandedBackdrop.setAttribute('aria-hidden', 'true');
     preview.setAttribute('aria-hidden', 'true');
     loadingEl.setAttribute('aria-hidden', 'true');
     titleEl.textContent = 'URL 预览';
@@ -11253,6 +11489,15 @@ function renderRightSidebarUrlPreview() {
     ? normalizeRightSidebarUrlPreviewHref(rightSidebarUrlPreviewState.href)
     : '';
   const active = !!activeHref;
+  const activeChatId = String(rightSidebarUrlPreviewState.chatId || state.activeChat || '').trim();
+  if (
+    rightSidebarUrlPreviewExpandedState.active &&
+    (!active || !activeChatId || (rightSidebarUrlPreviewExpandedState.chatId && rightSidebarUrlPreviewExpandedState.chatId !== activeChatId))
+  ) {
+    rightSidebarUrlPreviewExpandedState.active = false;
+    rightSidebarUrlPreviewExpandedState.chatId = '';
+  }
+  const expanded = !!(active && rightSidebarUrlPreviewExpandedState.active);
   const activeRequestKey = active
     ? String(rightSidebarUrlPreviewState.requestKey || '').trim()
     : '';
@@ -11266,17 +11511,31 @@ function renderRightSidebarUrlPreview() {
   const wasVisible =
     preview.classList.contains('is-active') ||
     preview.classList.contains('is-closing');
+  const wasExpanded =
+    preview.classList.contains('is-expanded') ||
+    body.classList.contains('rs-url-preview-expanded');
+  syncRightSidebarUrlPreviewMount(expanded);
   if (rightSidebarUrlPreviewCleanupTimer) {
     window.clearTimeout(rightSidebarUrlPreviewCleanupTimer);
     rightSidebarUrlPreviewCleanupTimer = 0;
   }
+  expandBtn.setAttribute('aria-hidden', active && !expanded ? 'false' : 'true');
+  floatingSwitch.innerHTML = expanded
+    ? RIGHT_SIDEBAR_URL_PREVIEW_RESTORE_ICON_HTML
+    : RIGHT_SIDEBAR_URL_PREVIEW_CLOSE_ICON_HTML;
+  floatingSwitch.title = expanded ? '还原网站浏览尺寸' : '切换回右侧栏原布局';
+  floatingSwitch.setAttribute('aria-label', expanded ? '还原网站浏览尺寸' : '切换回右侧栏原布局');
   if (active) {
     rightSidebar.classList.remove('previewing-url-closing');
+    rightSidebar.classList.toggle('previewing-url-expanded', expanded);
     body.classList.remove('rs-url-preview-toolbar-closing');
     body.classList.add('rs-url-preview-toolbar-visible');
+    body.classList.toggle('rs-url-preview-expanded', expanded);
     rightSidebar.classList.add('previewing-url');
     preview.classList.remove('is-closing');
     preview.classList.add('is-active');
+    preview.classList.toggle('is-expanded', expanded);
+    expandedBackdrop.setAttribute('aria-hidden', expanded ? 'false' : 'true');
     preview.setAttribute('aria-hidden', 'false');
     preview.classList.toggle('is-loading', loadingActive);
     loadingEl.setAttribute('aria-hidden', loadingActive ? 'false' : 'true');
@@ -11297,13 +11556,17 @@ function renderRightSidebarUrlPreview() {
     }
   } else {
     rightSidebar.classList.remove('previewing-url');
+    rightSidebar.classList.remove('previewing-url-expanded');
     if (wasVisible) rightSidebar.classList.add('previewing-url-closing');
     preview.classList.remove('is-active');
+    preview.classList.remove('is-expanded');
     preview.classList.remove('is-loading');
+    expandedBackdrop.setAttribute('aria-hidden', 'true');
     loadingEl.setAttribute('aria-hidden', 'true');
+    body.classList.remove('rs-url-preview-expanded');
     if (wasVisible) {
-      body.classList.add('rs-url-preview-toolbar-closing');
-      body.classList.add('rs-url-preview-toolbar-visible');
+      body.classList.toggle('rs-url-preview-toolbar-closing', !wasExpanded);
+      body.classList.toggle('rs-url-preview-toolbar-visible', !wasExpanded);
       preview.classList.add('is-closing');
       preview.setAttribute('aria-hidden', 'true');
       rightSidebarUrlPreviewCleanupTimer = window.setTimeout(() => {
@@ -11386,6 +11649,8 @@ function closeRightSidebarUrlPreview() {
   if (activeChatId && state.chats && state.chats[activeChatId]) {
     setChatUrlPreviewState(activeChatId, { active: false, href: '', title: '', subtitle: '' });
   }
+  rightSidebarUrlPreviewExpandedState.active = false;
+  rightSidebarUrlPreviewExpandedState.chatId = '';
   rightSidebarUrlPreviewState.active = false;
   rightSidebarUrlPreviewState.href = '';
   rightSidebarUrlPreviewState.title = '';
@@ -11678,6 +11943,17 @@ function showExclusiveOverlay(overlay, panel) {
   setOverlayVisible(overlay, true, panel);
 }
 
+function focusLogCleanupLockCard() {
+  const lockEl = document.getElementById('logCleanupLock');
+  const cardEl = lockEl ? lockEl.querySelector('.log-cleanup-lock-card') : null;
+  if (!(cardEl instanceof HTMLElement)) return;
+  try {
+    cardEl.focus({ preventScroll: true });
+  } catch {
+    cardEl.focus();
+  }
+}
+
 function refreshOverlayStates() {
   const domainTopRank = { left: -Infinity, center: -Infinity, right: -Infinity };
   overlayRegistry.forEach(el => {
@@ -11868,6 +12144,82 @@ function setChatHistoryLock(locked, desc) {
   lockEl.setAttribute('aria-hidden', visible ? 'false' : 'true');
   refreshOverlayStates();
 }
+
+function setLogCleanupLock(locked, desc) {
+  const lockEl = document.getElementById('logCleanupLock');
+  const descEl = document.getElementById('logCleanupLockDesc');
+  const cardEl = lockEl ? lockEl.querySelector('.log-cleanup-lock-card') : null;
+  const detail = String(desc || '').trim() || '正在清理过期日志，请稍后';
+  const wasVisible = overlayShowState(lockEl);
+  logCleanupStatusState.visible = !!locked;
+  if (descEl) descEl.textContent = detail;
+  if (!lockEl) return;
+  if (locked) {
+    if (!wasVisible) showExclusiveOverlay(lockEl, cardEl);
+    if (document.activeElement instanceof HTMLElement) {
+      try {
+        document.activeElement.blur();
+      } catch {}
+    }
+    focusLogCleanupLockCard();
+    return;
+  }
+  if (wasVisible) setOverlayVisible(lockEl, false, cardEl);
+}
+
+function handleLogCleanupOverlayClick(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  focusLogCleanupLockCard();
+}
+
+function stopLogCleanupStatusPolling() {
+  if (!logCleanupStatusState.timer) return;
+  clearInterval(logCleanupStatusState.timer);
+  logCleanupStatusState.timer = 0;
+}
+
+async function refreshLogCleanupStatus() {
+  try {
+    const resp = await fetchExecApi('/api/log_cleanup_status?_=' + Date.now(), { cache: 'no-store' });
+    const payload = await resp.json().catch(() => null);
+    if (!resp.ok || !payload || payload.status !== 0) {
+      throw new Error(String(payload && (payload.content || payload.message) || ('HTTP ' + resp.status)));
+    }
+    const checked = !!payload.checked;
+    const running = !!payload.running;
+    const message = String(payload.message || '').trim() || '正在清理过期日志，请稍后';
+    logCleanupStatusState.checked = checked;
+    logCleanupStatusState.running = running;
+    setLogCleanupLock(running, message);
+    if (checked && !running) stopLogCleanupStatusPolling();
+    return { checked, running };
+  } catch {
+    if (logCleanupStatusState.checked && !logCleanupStatusState.running) {
+      stopLogCleanupStatusPolling();
+    }
+    return { checked: logCleanupStatusState.checked, running: logCleanupStatusState.running };
+  }
+}
+
+function startLogCleanupStatusPolling() {
+  if (logCleanupStatusState.timer) return;
+  void refreshLogCleanupStatus();
+  logCleanupStatusState.timer = window.setInterval(() => {
+    void refreshLogCleanupStatus();
+  }, 1000);
+}
+
+document.addEventListener('focusin', event => {
+  if (!logCleanupStatusState.visible) return;
+  const lockEl = document.getElementById('logCleanupLock');
+  const target = event && event.target instanceof Element ? event.target : null;
+  if (!lockEl || (target && lockEl.contains(target))) return;
+  focusLogCleanupLockCard();
+}, true);
+document.addEventListener('keydown', syncRightSidebarUrlPreviewExpandedEscape, true);
 
 function releaseSwitchedChatAutoReloadLock() {
   if (!switchedChatAutoReloadLockActive) return;
@@ -17440,6 +17792,14 @@ function syncOnboardingOverlays() {
 
 function setOnboardingStep(step) {
   const next = String(step || '').trim();
+  if (next && isRightSidebarUrlPreviewExpanded()) {
+    clearRightSidebarUrlPreviewExpandedOnboardingPendings();
+    onboardingState.step = '';
+    onboardingState.active = false;
+    updateBeeIcons();
+    scheduleOnboardingSync();
+    return;
+  }
   const previousStep = String(onboardingState.step || '').trim();
   onboardingState.step = next;
   onboardingState.active = !!next;
@@ -21165,10 +21525,109 @@ async function refreshChatSkillIndicator(chatId, options) {
   }
 }
 
+function getBootLoadingElements() {
+  return {
+    overlay: document.getElementById('bootLoadingOverlay'),
+    title: document.getElementById('bootLoadingTitle'),
+    desc: document.getElementById('bootLoadingDesc')
+  };
+}
+
+function setBootLoadingCopy(title, desc, stateName) {
+  const { overlay, title: titleEl, desc: descEl } = getBootLoadingElements();
+  if (titleEl) titleEl.textContent = title || '正在加载中';
+  if (descEl) descEl.textContent = desc || '请稍后';
+  if (overlay) overlay.setAttribute('data-state', stateName || 'loading');
+  bootLoadingState.state = stateName || 'loading';
+}
+
+function clearBootLoadingTimers() {
+  if (bootLoadingState.slowTimer) {
+    clearTimeout(bootLoadingState.slowTimer);
+    bootLoadingState.slowTimer = 0;
+  }
+  if (bootLoadingState.releaseTimer) {
+    clearTimeout(bootLoadingState.releaseTimer);
+    bootLoadingState.releaseTimer = 0;
+  }
+}
+
+function startBootLoadingTimers() {
+  clearBootLoadingTimers();
+  bootLoadingState.slowTimer = window.setTimeout(() => {
+    if (!bootLoadingState.active || bootLoadingState.released) return;
+    setBootLoadingCopy('仍在加载，请稍候', '页面主体即将显示，后台初始化会继续补齐。', 'slow');
+  }, BOOT_LOADING_SLOW_HINT_MS);
+}
+
+function hideBootLoadingOverlay() {
+  const { overlay } = getBootLoadingElements();
+  const body = document.body;
+  bootLoadingState.active = false;
+  bootLoadingState.released = true;
+  clearBootLoadingTimers();
+  if (body) {
+    body.classList.remove('boot-loading');
+    body.classList.add('boot-ready');
+  }
+  if (!overlay) return;
+  window.setTimeout(() => {
+    if (bootLoadingState.active) return;
+    overlay.remove();
+  }, 260);
+}
+
+function releaseBootLoadingOverlay() {
+  if (bootLoadingState.released) return;
+  const elapsed = Date.now() - bootLoadingState.startedAt;
+  const waitMs = Math.max(0, BOOT_LOADING_MIN_VISIBLE_MS - elapsed);
+  clearBootLoadingTimers();
+  bootLoadingState.releaseTimer = window.setTimeout(() => {
+    bootLoadingState.releaseTimer = 0;
+    requestAnimationFrame(() => hideBootLoadingOverlay());
+  }, waitMs);
+}
+
+function failBootLoadingOverlay(err) {
+  const message = err && err.message ? String(err.message).trim() : '';
+  setBootLoadingCopy('加载失败，请刷新重试', message || '页面初始化没有完成，请稍后刷新页面再试。', 'error');
+  bootLoadingState.active = true;
+  bootLoadingState.released = false;
+  clearBootLoadingTimers();
+  const body = document.body;
+  if (body) {
+    body.classList.remove('boot-ready');
+    body.classList.add('boot-loading');
+  }
+}
+
+function finalizeBootShell() {
+  loadChats();
+  applyTheme();
+  bindLayoutObservers();
+  applyLeftSidebarState(getInitialLeftSidebarCollapsed());
+  applyRightSidebarState(getInitialRightSidebarCollapsed());
+  scheduleLayoutSync();
+  state.chatOrder.forEach(id => chatAnimPlayed.add(id));
+  if (state.chatOrder.length === 0) createNewChat();
+  else switchChat(state.chatOrder[0]);
+  renderChatList();
+  setupScrollLazy();
+  setupCliSubScrollControls();
+  updateModelIndicator();
+  syncFullscreenToggleUI();
+  renderWikiPanel();
+  renderRightSidebarUrlPreview();
+  bindWikiPanelInteractions();
+}
+
 // ===== Init =====
 async function init() {
+  setBootLoadingCopy('正在加载中', '请稍后', 'loading');
+  startBootLoadingTimers();
   registerMessageImageCache();
   registerOverlayElements();
+  startLogCleanupStatusPolling();
   bindScreenSaverEvents();
   bindConsumeOverlayEvents();
   bindOnboardingEvents();
@@ -21177,6 +21636,8 @@ async function init() {
   startInstallAppPolling();
   renderQuickFanMenu();
   updateStandaloneButton();
+  finalizeBootShell();
+  releaseBootLoadingOverlay();
   await loadSettings();
   await loadStandaloneModeStatus({ silent: true });
   const perfProfile = await detectBrowserPerfProfile();
@@ -21191,29 +21652,17 @@ async function init() {
   onboardingState.eligible = !hasLocalBrowserRecords();
   await loadQuickPlugins({ silent: true });
   await refreshQuickPluginStatuses({ silent: true });
-  loadChats();
   applyTheme();
   applyEnergySaverMode({ restartScheduler: true });
-  bindLayoutObservers();
-  applyLeftSidebarState(getInitialLeftSidebarCollapsed());
-  applyRightSidebarState(getInitialRightSidebarCollapsed());
-  scheduleLayoutSync();
-  // Mark all existing chats as animation already played
-  state.chatOrder.forEach(id => chatAnimPlayed.add(id));
-  if (state.chatOrder.length === 0) createNewChat();
-  else switchChat(state.chatOrder[0]);
   renderChatList();
+  updateModelIndicator();
   queueChatCompletionTourAutoStart();
   if (onboardingState.eligible) startFirstRunOnboarding();
   else maybeStartPendingModelSaveVerifyTour();
-  setupScrollLazy();
-  setupCliSubScrollControls();
   vfsInit();
-  updateModelIndicator();
   syncFullscreenToggleUI();
   renderWikiPanel();
   renderRightSidebarUrlPreview();
-  bindWikiPanelInteractions();
   startWikiAutoRefresh();
   const initialWikiDoc = String((state.wikiPanel && state.wikiPanel.currentDoc) || '').trim();
   const initialWikiAgentId = getCurrentWikiAgentId();
@@ -41634,6 +42083,12 @@ function handleOverlayKeyboardShortcuts(event) {
   const scope = getFrontKeyboardOverlay();
   if (!scope) return false;
   const scopeId = String(scope.id || '').trim();
+  if (scopeId === 'logCleanupLock') {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.key === 'Tab') focusLogCleanupLockCard();
+    return true;
+  }
   if (scopeId === 'pluginModalOverlay' && pluginModalState.browserRestartConfirmVisible) {
     if (event.key === 'Escape') {
       const cancelBtn = document.getElementById('pluginModalBrowserRestartCancelBtn');
@@ -43905,6 +44360,7 @@ function startStarAnim() {
 
 // ===== Heartbeat Monitor =====
 const HEARTBEAT_ALERT_DURATION_MS = 10000;
+const HEARTBEAT_FAILURE_THRESHOLD_DEFAULT = 10;
 let heartbeatFailCount = 0;
 let heartbeatAlertHideTimer = 0;
 let heartbeatAlertActiveUntil = 0;
@@ -43959,6 +44415,29 @@ function handleHeartbeatFailureAlert() {
 
 function clearHeartbeatFailureAlert() {
   hideHeartbeatAlert();
+}
+
+function normalizeHeartbeatFailureThreshold(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) return HEARTBEAT_FAILURE_THRESHOLD_DEFAULT;
+  return Math.floor(num);
+}
+
+function resolveHeartbeatFailureThreshold(config) {
+  const httpConfig = config && typeof config === 'object' && !Array.isArray(config) ? config.http : null;
+  if (!httpConfig || typeof httpConfig !== 'object' || Array.isArray(httpConfig)) {
+    return HEARTBEAT_FAILURE_THRESHOLD_DEFAULT;
+  }
+  return normalizeHeartbeatFailureThreshold(httpConfig.heartbeat);
+}
+
+async function readHeartbeatFailureThreshold() {
+  try {
+    const config = await readRuntimeConfig(true);
+    return resolveHeartbeatFailureThreshold(config);
+  } catch {
+    return HEARTBEAT_FAILURE_THRESHOLD_DEFAULT;
+  }
 }
 
 function getCliGetQueueStatusElement() {
@@ -44034,13 +44513,16 @@ function syncCliGetQueueStatusPolling(options) {
 async function checkHeartbeat() {
   const svg = document.getElementById('logoSvg');
   if (!svg) return;
+  const heartbeatFailureThreshold = await readHeartbeatFailureThreshold();
   try {
     const resp = await fetchExecApi('/api/heartbeat', { cache: 'no-store' });
     if (!resp.ok) {
       heartbeatFailCount += 1;
-      handleHeartbeatFailureAlert(`本地心跳状态接口异常：HTTP ${resp.status}`);
-      if (heartbeatFailCount >= 5) {
+      if (heartbeatFailCount >= heartbeatFailureThreshold) {
+        handleHeartbeatFailureAlert(`本地心跳状态接口异常：HTTP ${resp.status}`);
         setLogoVisualState(logoVisualMode, 'hb-fail');
+      } else {
+        clearHeartbeatFailureAlert();
       }
       return;
     }
@@ -44053,9 +44535,11 @@ async function checkHeartbeat() {
     }
     if (data.status === 1) {
       heartbeatFailCount += 1;
-      handleHeartbeatFailureAlert();
-      if (heartbeatFailCount >= 5) {
+      if (heartbeatFailCount >= heartbeatFailureThreshold) {
+        handleHeartbeatFailureAlert();
         setLogoVisualState(logoVisualMode, 'hb-fail');
+      } else {
+        clearHeartbeatFailureAlert();
       }
       return;
     }
@@ -44065,9 +44549,11 @@ async function checkHeartbeat() {
     else setLogoVisualState('report', 'hb-ok');
   } catch {
     heartbeatFailCount += 1;
-    handleHeartbeatFailureAlert('本地心跳状态接口不可达，请检查页面服务是否仍在运行。');
-    if (heartbeatFailCount >= 5) {
+    if (heartbeatFailCount >= heartbeatFailureThreshold) {
+      handleHeartbeatFailureAlert('本地心跳状态接口不可达，请检查页面服务是否仍在运行。');
       setLogoVisualState(logoVisualMode, 'hb-fail');
+    } else {
+      clearHeartbeatFailureAlert();
     }
   }
 }

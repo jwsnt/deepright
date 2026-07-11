@@ -75,6 +75,17 @@
 - 活跃 SSE 连接表
 - 活跃命令表
 
+### sqlite 连接策略
+
+`integration` 的主状态库是全局 `cronDB`。
+
+- `cronDB` 进程内只维护一份共享 `*sql.DB`
+- `SetMaxOpenConns(1)`
+- `SetMaxIdleConns(1)`
+- `SetConnMaxLifetime(0)`
+
+这样会把 `task_meta / task_detail / token_store / chat_log / agent_message_log / cmd_log / kill_log` 等共享状态收敛到单连接访问模型，降低同一 `data` sqlite 的并发句柄数量。
+
 ### 分层关系
 
 可以把当前实现理解为 6 层：

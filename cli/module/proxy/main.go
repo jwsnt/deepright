@@ -6,6 +6,7 @@ import (
 	"bytes"
 
 	"connect/connectsvc"
+	"connect/logretention"
 	"connect/sandboxstate"
 	"connect/skillstate"
 	"context"
@@ -523,6 +524,7 @@ var sharedEventLogger struct {
 	path   string
 	logger *eventlog.Logger
 }
+var proxyLogRetentionManager = logretention.NewManager()
 
 const defaultTaskType = sharedutil.DefaultTaskType
 
@@ -588,6 +590,25 @@ func getEventLogger() (*eventlog.Logger, error) {
 	sharedEventLogger.path = path
 	sharedEventLogger.logger = logger
 	return logger, nil
+}
+
+func startProxyLogRetentionCleanup(ctx context.Context) {
+	path, err := getDataDBPath()
+	if err != nil {
+		proxyLogRetentionManager.MarkChecked(err)
+		return
+	}
+	proxyLogRetentionManager.StartAsyncWithDBOpener(ctx, logretention.DefaultRetentionDays, func() (*sql.DB, error) {
+		db, err := sql.Open("sqlite", path)
+		if err != nil {
+			return nil, err
+		}
+		db.SetMaxOpenConns(1)
+		db.SetMaxIdleConns(1)
+		db.SetConnMaxLifetime(0)
+		initChatTable(db)
+		return db, nil
+	}, log.Printf)
 }
 
 func agentExists(agentDir, deviceID, agentID string, ttl time.Duration) bool {
@@ -4186,6 +4207,28 @@ func (p *ProxyServer) HandleHeartbeat(w http.ResponseWriter, r *http.Request) {
 	hbStatus.mu.Unlock()
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+func handleProxyLogCleanupStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	snapshot := proxyLogRetentionManager.Snapshot()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"status":                 0,
+		"checked":                snapshot.Checked,
+		"running":                snapshot.Running,
+		"message":                firstNonEmpty(snapshot.Message, logretention.DefaultMessage),
+		"retentionDays":          snapshot.RetentionDays,
+		"cutoff":                 snapshot.Cutoff,
+		"startedAt":              snapshot.StartedAt,
+		"finishedAt":             snapshot.FinishedAt,
+		"deletedAgentMessageLog": snapshot.DeletedAgentMessageLog,
+		"deletedChatLog":         snapshot.DeletedChatLog,
+		"error":                  snapshot.Error,
+	})
 }
 
 // copyDir recursively copies a directory.
@@ -10197,6 +10240,7 @@ func runServe(opts serveOptions) {
 	mux.HandleFunc("/api/del", proxy.HandleDel)
 	mux.HandleFunc("/api/raw", proxy.HandleRaw)
 	mux.HandleFunc("/api/heartbeat", proxy.HandleHeartbeat)
+	mux.HandleFunc("/api/log_cleanup_status", handleProxyLogCleanupStatus)
 	mux.HandleFunc("/api/agent/init", proxy.HandleAgentInit)
 	mux.HandleFunc("/api/agent/delete", proxy.HandleAgentDelete)
 	mux.HandleFunc("/api/agent/create", proxy.HandleAgentCreate)
@@ -10237,6 +10281,7 @@ func runServe(opts serveOptions) {
 	log.Printf("proxy started on %s → %s", addr, opts.host)
 	log.Printf("site: %s", proxyBrowserURL(opts.port))
 	log.Printf("agent-dir: %s, device: %s", opts.agentDir, opts.device)
+	startProxyLogRetentionCleanup(context.Background())
 	go func() {
 		time.Sleep(200 * time.Millisecond)
 		browserURL := proxyBrowserURL(opts.port)
@@ -11449,6 +11494,9 @@ func main() {
 		return
 	case "log-skill":
 		runProxyLogSkillCLI(os.Args[2:])
+		return
+	case "sandbox":
+		runProxySandboxCLI(os.Args[2:])
 		return
 	case "token":
 		runProxyTokenCLI(os.Args[2:])

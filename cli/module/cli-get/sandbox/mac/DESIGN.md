@@ -200,6 +200,16 @@ CLI_SANDBOX.app
 - `codesignHelper(...)`
 - `codesignApp(...)`
 
+### 6.4 构建日志落库
+
+`launcher/buildlog.go` 会把打包/验签结果写入模块目录下共享 `data` sqlite 的 `mac_build_log` 表。
+
+- 仅用于记录构建动作与结果，不参与会话级沙盒状态读写
+- 连接策略保持保守：
+  - `SetMaxOpenConns(1)`
+  - `SetMaxIdleConns(1)`
+  - `SetConnMaxLifetime(0)`
+
 ### 6.3.1 双架构构建与 x86 交叉编译差异
 
 `build.sh` 内部固定调用两次：

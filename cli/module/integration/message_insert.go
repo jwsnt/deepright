@@ -42,8 +42,8 @@ func openIntegrationMessageInsertDB() (*sql.DB, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	db.SetMaxOpenConns(4)
-	db.SetMaxIdleConns(2)
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
 	db.SetConnMaxLifetime(0)
 	if err := messageinsert.EnsureSchema(db); err != nil {
 		_ = db.Close()
