@@ -13,8 +13,8 @@
 + 保持高度归纳，禁止逐条堆砌
 ### 工具使用
 + 使用工具`[cli]`局部更新（sed/cat >>）禁止覆盖写入（echo >/cat >）
-    + USER.md："#workspace/USER.md"
-    + SOUL.md："#workspace/SOUL.md"
+    + USER.md：`#workspace/USER.md`
+    + SOUL.md：`#workspace/SOUL.md`
 + 更新前需要在"#workspace/bak"下以时间戳备份原文件
 ### 输出规范
 + 交付后说明更新了什么，或为什么未更新

@@ -563,6 +563,67 @@ a{color:var(--accent);text-decoration:none}
 [data-low-power-rendering="on"] .skill-extract-onboarding-layer .onboarding-blocker{
   background-color:color-mix(in srgb,var(--modal-panel-bg) 88%,#000 12%) !important;
 }
+html[data-global-streaming="1"] .center-notice-overlay,
+html[data-global-streaming="1"] .center-notice-card,
+html[data-global-streaming="1"] .rs-meta-center-card,
+html[data-global-streaming="1"] .plugin-modal-overlay,
+html[data-global-streaming="1"] .plugin-modal-panel,
+html[data-global-streaming="1"] .plugin-modal-email-warning,
+html[data-global-streaming="1"] .plugin-modal-browser-restart-confirm,
+html[data-global-streaming="1"] .plugin-modal-transition-lock,
+html[data-global-streaming="1"] .browser-instance-init-lock,
+html[data-global-streaming="1"] .browser-instance-init-card,
+html[data-global-streaming="1"] .consume-overlay,
+html[data-global-streaming="1"] .consume-card,
+html[data-global-streaming="1"] .consume-lock,
+html[data-global-streaming="1"] .delete-confirm.delete-confirm-centered,
+html[data-global-streaming="1"] .delete-confirm-overlay,
+html[data-global-streaming="1"] .vfs-repair-overlay,
+html[data-global-streaming="1"] .vfs-repair-popover,
+html[data-global-streaming="1"] .skill-extract-overlay,
+html[data-global-streaming="1"] .skill-extract-popover,
+html[data-global-streaming="1"] .file-editor-overlay,
+html[data-global-streaming="1"] .file-editor-panel,
+html[data-global-streaming="1"] .fe-image-text-editor,
+html[data-global-streaming="1"] .sel-file-bubble,
+html[data-global-streaming="1"] .domain-upload-lock,
+html[data-global-streaming="1"] .domain-upload-lock-card,
+html[data-global-streaming="1"] .chat-history-lock-local,
+html[data-global-streaming="1"] .chat-history-lock-local .domain-upload-lock-card{
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+}
+html[data-global-streaming="1"] .center-notice-card,
+html[data-global-streaming="1"] .rs-meta-center-card,
+html[data-global-streaming="1"] .plugin-modal-panel,
+html[data-global-streaming="1"] .browser-instance-init-card,
+html[data-global-streaming="1"] .consume-card,
+html[data-global-streaming="1"] .delete-confirm,
+html[data-global-streaming="1"] .vfs-repair-popover,
+html[data-global-streaming="1"] .skill-extract-popover,
+html[data-global-streaming="1"] .file-editor-panel,
+html[data-global-streaming="1"] .fe-image-text-editor,
+html[data-global-streaming="1"] .sel-file-bubble,
+html[data-global-streaming="1"] .domain-upload-lock-card,
+html[data-global-streaming="1"] .chat-history-lock-local .domain-upload-lock-card{
+  background-color:var(--modal-panel-bg) !important;
+}
+html[data-global-streaming="1"] .center-notice-overlay,
+html[data-global-streaming="1"] .plugin-modal-overlay,
+html[data-global-streaming="1"] .plugin-modal-email-warning,
+html[data-global-streaming="1"] .plugin-modal-browser-restart-confirm,
+html[data-global-streaming="1"] .plugin-modal-transition-lock,
+html[data-global-streaming="1"] .browser-instance-init-lock,
+html[data-global-streaming="1"] .consume-overlay,
+html[data-global-streaming="1"] .consume-lock,
+html[data-global-streaming="1"] .delete-confirm-overlay,
+html[data-global-streaming="1"] .vfs-repair-overlay,
+html[data-global-streaming="1"] .skill-extract-overlay,
+html[data-global-streaming="1"] .file-editor-overlay,
+html[data-global-streaming="1"] .domain-upload-lock,
+html[data-global-streaming="1"] .chat-history-lock-local{
+  background-color:color-mix(in srgb,var(--modal-panel-bg) 88%,#000 12%) !important;
+}
 [data-low-power-rendering="on"] .sidebar,
 [data-low-power-rendering="on"] .right-sidebar,
 [data-low-power-rendering="on"] .chat-container,
@@ -1076,7 +1137,7 @@ animation:queuedInsertExplosion .62s ease-out both}
 .right-sidebar.collapsed .right-sidebar-toggle.has-memo-completion-beacon svg{filter:drop-shadow(0 0 6px var(--completion-beacon-glow-strong))}
 .rs-row-divider .rs-row-actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0}
 @keyframes rightSidebarBeacon{0%,100%{box-shadow:0 0 0 1px var(--completion-beacon-bg),0 0 0 rgba(0,0,0,0);filter:brightness(.96)}50%{box-shadow:0 0 0 1px var(--completion-beacon-ring),0 0 22px var(--completion-beacon-glow-strong),0 0 34px var(--completion-beacon-glow);filter:brightness(1.22)}}
-.rs-url-preview{position:absolute;inset:0;display:flex;flex-direction:column;width:100%;height:100%;min-height:100%;overflow:hidden;isolation:isolate;background:transparent;opacity:0;visibility:hidden;pointer-events:none;transform:translateY(14px) scale(.982);filter:blur(10px);transition:opacity .36s ease,transform .4s cubic-bezier(.22,1,.36,1),filter .4s ease,visibility 0s linear .4s}
+.rs-url-preview{position:fixed;left:var(--rs-url-preview-inline-left,0px);top:var(--rs-url-preview-inline-top,0px);width:var(--rs-url-preview-inline-width,0px);height:var(--rs-url-preview-inline-height,0px);min-height:var(--rs-url-preview-inline-height,0px);display:flex;flex-direction:column;overflow:hidden;isolation:isolate;background:transparent;z-index:250;opacity:0;visibility:hidden;pointer-events:none;transform:translateY(14px) scale(.982);filter:blur(10px);transition:opacity .36s ease,transform .4s cubic-bezier(.22,1,.36,1),filter .4s ease,visibility 0s linear .4s}
 .rs-url-preview::before,.rs-url-preview::after{content:'';position:absolute;inset:0;pointer-events:none}
 .rs-url-preview::before{background:linear-gradient(180deg,rgba(255,255,255,.28),rgba(255,255,255,.16) 22%,rgba(255,255,255,.08) 52%,rgba(255,255,255,.1));opacity:0;transition:opacity .36s ease}
 .rs-url-preview::after{background:linear-gradient(180deg,color-mix(in srgb,var(--bg-sidebar) 86%,rgba(255,255,255,.28) 14%),color-mix(in srgb,var(--bg-sidebar) 72%,rgba(255,255,255,.1) 28%));backdrop-filter:blur(0px) saturate(105%);-webkit-backdrop-filter:blur(0px) saturate(105%);box-shadow:inset 0 1px 0 rgba(255,255,255,.26);opacity:0;transition:opacity .36s ease,backdrop-filter .4s ease,-webkit-backdrop-filter .4s ease}
@@ -3328,12 +3389,15 @@ body.quick-fan-transition-active{cursor:progress}
 .vfs-item .vfs-skill-toggle{width:18px;height:18px;border:none;background:transparent;border-radius:6px;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;flex-shrink:0;color:#c56a1d;transition:background-color .16s ease,color .16s ease,transform .16s ease,opacity .16s ease,box-shadow .16s ease}
 .vfs-item .vfs-skill-toggle:hover{background:linear-gradient(180deg,rgba(255,248,239,.92),rgba(255,236,214,.94));color:#a65210;box-shadow:0 8px 18px rgba(255,161,89,.12),inset 0 1px 0 rgba(255,255,255,.9);transform:translateY(-1px)}
 .vfs-item .vfs-skill-toggle svg{width:16px;height:16px;color:currentColor}
-.vfs-item .vfs-skill-toggle.disabled{color:#c53a30}
+.vfs-item .vfs-skill-toggle.disabled{color:var(--error)}
 .vfs-item .vfs-skill-toggle.disabled:hover{background:rgba(217,48,37,.1);color:#d93025}
 .vfs-item .vfs-skill-toggle.inherited{opacity:.86}
 .vfs-item .vfs-skill-toggle:focus-visible{outline:none;box-shadow:0 0 0 2px rgba(255,161,89,.18)}
 [data-theme="dark"] .vfs-item .vfs-skill-toggle{color:#ffd7af}
 [data-theme="dark"] .vfs-item .vfs-skill-toggle:hover{background:linear-gradient(180deg,rgba(86,48,13,.96),rgba(55,30,8,.94));color:#ffe4c8;box-shadow:0 10px 20px rgba(0,0,0,.26),inset 0 1px 0 rgba(255,255,255,.04)}
+[data-theme="dark"] .vfs-item .vfs-skill-toggle.disabled{color:var(--error)}
+[data-theme="dark"] .vfs-item .vfs-skill-toggle.disabled:hover{background:rgba(255,90,107,.16);color:#ff7c8a;box-shadow:0 10px 20px rgba(0,0,0,.22)}
+[data-theme="dark"] .vfs-item .vfs-skill-toggle.disabled:focus-visible{box-shadow:0 0 0 2px rgba(255,90,107,.22)}
 [data-theme="dark"] .vfs-item .vfs-skill-toggle:focus-visible{box-shadow:0 0 0 2px rgba(255,190,132,.16)}
 .vfs-item .vfs-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .vfs-item .vfs-actions{display:flex;align-items:center;justify-content:flex-end;gap:4px;flex:0 0 auto;min-width:78px}
@@ -3712,7 +3776,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
       <div class="domain-upload-lock-card">
         <div class="domain-upload-lock-spinner"></div>
         <div class="domain-upload-lock-title">加载历史中</div>
-        <div class="domain-upload-lock-desc" id="chatHistoryLockDesc">正在加载更早的对话内容并同步毛玻璃效果</div>
+        <div class="domain-upload-lock-desc" id="chatHistoryLockDesc">正在加载更早的对话内容</div>
         <div class="domain-upload-lock-progress"><span></span></div>
       </div>
     </div>
@@ -5466,10 +5530,6 @@ const rightSidebarUrlPreviewExpandedState = {
   active: false,
   chatId: ''
 };
-const rightSidebarUrlPreviewMountState = {
-  inlineParent: null,
-  inlineNextSibling: null
-};
 const RIGHT_SIDEBAR_URL_PREVIEW_FADE_MS = 360;
 const RIGHT_SIDEBAR_URL_PREVIEW_MIN_LOADING_MS = 1000;
 const RIGHT_SIDEBAR_URL_PREVIEW_LOAD_TIMEOUT_MS = 12000;
@@ -5582,7 +5642,7 @@ const MESSAGE_IMAGE_CACHE = 'deepright-message-images-v1';
 const MESSAGE_IMAGE_DB = 'deepright-message-images-db';
 const MESSAGE_IMAGE_STORE = 'images';
 const REMOTE_MASKED_TOKEN_VALUE = '**********';
-const MAX_STORE = 2000, MAX_SHOW = 500, LAZY_PAGE = 20, MAX_CLI_SUB_SHOW = 100, COLD_HISTORY_RECORD_PAGE = 120;
+const MAX_STORE = 2000, MAX_SHOW = 500, LAZY_PAGE = 20, MAX_CLI_SUB_SHOW = 30, MAX_CLI_COMMAND_HISTORY = 30, COLD_HISTORY_RECORD_PAGE = 120;
 const MESSAGE_RENDER_CACHE_LIMIT = 240;
 const WIKI_RENDER_CACHE_LIMIT = 40;
 const LOW_POWER_RENDER_MESSAGE_MATH_LIMIT = 12;
@@ -10737,6 +10797,8 @@ function syncLayoutVars() {
   root.style.setProperty('--chat-greeting-card-max-width', greetingCardMaxWidth + 'px');
   root.style.setProperty('--chat-greeting-text-max-width', greetingTextMaxWidth + 'px');
   const rightSidebarRect = rightSidebar ? rightSidebar.getBoundingClientRect() : null;
+  const rightSidebarBody = rightSidebar ? rightSidebar.querySelector('.right-sidebar-body') : null;
+  const rightSidebarBodyRect = rightSidebarBody ? rightSidebarBody.getBoundingClientRect() : null;
   const mainRect = main ? main.getBoundingClientRect() : null;
   const copyBtnRect = chatSessionCopyBtn ? chatSessionCopyBtn.getBoundingClientRect() : null;
   const previewBoundaryLeft = mainRect && mainRect.width > 0
@@ -10745,8 +10807,15 @@ function syncLayoutVars() {
   const previewToolbarTop = copyBtnRect && copyBtnRect.height > 0
     ? Math.round(copyBtnRect.top)
     : (rightSidebarRect ? Math.round(rightSidebarRect.top + 18) : 18);
+  const previewInlineRect = rightSidebarBodyRect && rightSidebarBodyRect.width > 0 && rightSidebarBodyRect.height > 0
+    ? rightSidebarBodyRect
+    : rightSidebarRect;
   root.style.setProperty('--rs-url-preview-boundary-left', previewBoundaryLeft + 'px');
   root.style.setProperty('--rs-url-preview-toolbar-top', previewToolbarTop + 'px');
+  root.style.setProperty('--rs-url-preview-inline-left', Math.max(0, Math.round(previewInlineRect ? previewInlineRect.left : previewBoundaryLeft)) + 'px');
+  root.style.setProperty('--rs-url-preview-inline-top', Math.max(0, Math.round(previewInlineRect ? previewInlineRect.top : 0)) + 'px');
+  root.style.setProperty('--rs-url-preview-inline-width', Math.max(0, Math.round(previewInlineRect ? previewInlineRect.width : rightWidth)) + 'px');
+  root.style.setProperty('--rs-url-preview-inline-height', Math.max(0, Math.round(previewInlineRect ? previewInlineRect.height : viewportHeight)) + 'px');
   if (inputArea && !lowPowerRendering) {
     const rect = inputArea.getBoundingClientRect();
     const centerToastInset = 24;
@@ -11136,29 +11205,11 @@ function isRightSidebarUrlPreviewExpanded() {
   return !!(rightSidebarUrlPreviewExpandedState && rightSidebarUrlPreviewExpandedState.active);
 }
 
-function ensureRightSidebarUrlPreviewInlineMount(preview) {
-  if (!(preview instanceof HTMLElement) || rightSidebarUrlPreviewMountState.inlineParent) return;
-  rightSidebarUrlPreviewMountState.inlineParent = preview.parentNode instanceof Node ? preview.parentNode : null;
-  rightSidebarUrlPreviewMountState.inlineNextSibling = preview.nextSibling instanceof Node ? preview.nextSibling : null;
-}
-
-function syncRightSidebarUrlPreviewMount(expanded) {
+function syncRightSidebarUrlPreviewMount() {
   const preview = document.getElementById('rsUrlPreview');
   if (!(preview instanceof HTMLElement)) return;
-  ensureRightSidebarUrlPreviewInlineMount(preview);
-  if (!!expanded) {
-    if (preview.parentNode === document.body) return;
-    document.body.appendChild(preview);
-    return;
-  }
-  const inlineParent = rightSidebarUrlPreviewMountState.inlineParent;
-  if (!(inlineParent instanceof Node) || preview.parentNode === inlineParent) return;
-  const inlineNextSibling = rightSidebarUrlPreviewMountState.inlineNextSibling;
-  if (inlineNextSibling instanceof Node && inlineNextSibling.parentNode === inlineParent) {
-    inlineParent.insertBefore(preview, inlineNextSibling);
-    return;
-  }
-  inlineParent.appendChild(preview);
+  if (preview.parentNode === document.body) return;
+  document.body.appendChild(preview);
 }
 
 function clearRightSidebarUrlPreviewExpandedOnboardingPendings() {
@@ -11512,7 +11563,7 @@ function renderRightSidebarUrlPreview() {
   const wasExpanded =
     preview.classList.contains('is-expanded') ||
     body.classList.contains('rs-url-preview-expanded');
-  syncRightSidebarUrlPreviewMount(expanded);
+  syncRightSidebarUrlPreviewMount();
   if (rightSidebarUrlPreviewCleanupTimer) {
     window.clearTimeout(rightSidebarUrlPreviewCleanupTimer);
     rightSidebarUrlPreviewCleanupTimer = 0;
@@ -12134,7 +12185,7 @@ function setChatHistoryLock(locked, desc) {
     if (historyLazyLockState.count === 0 && typeof desc === 'string') historyLazyLockState.desc = desc.trim();
   }
   if (descEl) {
-    descEl.textContent = historyLazyLockState.desc || '正在加载更早的对话内容并同步毛玻璃效果';
+    descEl.textContent = historyLazyLockState.desc || '正在加载更早的对话内容';
   }
   if (!lockEl) return;
   const visible = historyLazyLockState.count > 0;
@@ -21939,6 +21990,147 @@ function getWikiFetchPath(path) {
   return normalized === '.' ? '/knowledge' : '/knowledge/' + normalized.split('/').map(seg => encodeURIComponent(seg)).join('/');
 }
 
+function createWikiPreviewRequestKey(requestSeq) {
+  return String(Date.now()) + '-' + String(requestSeq || 0);
+}
+
+function appendPreviewCacheParam(rawUrl, previewKey, paramName) {
+  const normalizedUrl = String(rawUrl || '').trim();
+  const normalizedKey = String(previewKey || '').trim();
+  const cacheParam = String(paramName || '_dr_preview_ts').trim() || '_dr_preview_ts';
+  const origin = typeof window !== 'undefined' && window.location ? window.location.origin : '';
+  if (!normalizedUrl || !normalizedKey || !origin) return normalizedUrl;
+  if (normalizedUrl.startsWith('#') || /^(?:data:|blob:|mailto:|tel:|javascript:|about:)/i.test(normalizedUrl)) return normalizedUrl;
+  try {
+    const isAbsolute = /^(?:https?:)?\/\//i.test(normalizedUrl);
+    const url = new URL(normalizedUrl, origin);
+    if (isAbsolute && url.origin !== origin) return normalizedUrl;
+    url.searchParams.set(cacheParam, normalizedKey);
+    return isAbsolute ? url.href : (url.pathname + url.search + url.hash);
+  } catch {
+    return normalizedUrl;
+  }
+}
+
+function getWikiPreviewFetchPath(path, previewKey) {
+  return appendPreviewCacheParam(getWikiFetchPath(path), previewKey);
+}
+
+function splitWikiPreviewUrl(rawUrl) {
+  const value = String(rawUrl || '');
+  const queryIndex = value.indexOf('?');
+  const hashIndex = value.indexOf('#');
+  let cutIndex = value.length;
+  if (queryIndex >= 0) cutIndex = Math.min(cutIndex, queryIndex);
+  if (hashIndex >= 0) cutIndex = Math.min(cutIndex, hashIndex);
+  return {
+    path: value.slice(0, cutIndex),
+    suffix: value.slice(cutIndex)
+  };
+}
+
+function buildWikiPreviewAssetUrl(rawUrl, basePath, previewKey) {
+  const source = String(rawUrl || '').trim();
+  if (!source) return source;
+  if (source.startsWith('#') || /^(?:data:|blob:|mailto:|tel:|javascript:|about:)/i.test(source)) return source;
+  if (/^(?:https?:)?\/\//i.test(source) || source.startsWith('/')) {
+    return appendPreviewCacheParam(source, previewKey);
+  }
+  const parts = splitWikiPreviewUrl(source);
+  const resolvedPath = resolveWikiDocPath(parts.path, basePath);
+  return appendPreviewCacheParam(getWikiFetchPath(resolvedPath) + (parts.suffix || ''), previewKey);
+}
+
+function rewriteWikiPreviewSrcset(srcsetValue, basePath, previewKey) {
+  const source = String(srcsetValue || '').trim();
+  if (!source || !previewKey || /(^|[,\s])data:/i.test(source)) return source;
+  return source.split(',').map(entry => {
+    const trimmed = entry.trim();
+    if (!trimmed) return '';
+    const match = trimmed.match(/^(\S+)(\s+.+)?$/);
+    if (!match) return trimmed;
+    const nextUrl = buildWikiPreviewAssetUrl(match[1], basePath, previewKey);
+    return nextUrl + (match[2] || '');
+  }).filter(Boolean).join(', ');
+}
+
+function rewriteWikiPreviewCssUrls(cssText, basePath, previewKey) {
+  const source = String(cssText || '');
+  if (!source || !previewKey) return source;
+  return source
+    .replace(/url\(\s*(['"]?)([^'"()]+)\1\s*\)/gi, (match, quote, urlValue) => {
+      const nextUrl = buildWikiPreviewAssetUrl(urlValue, basePath, previewKey);
+      if (!nextUrl || nextUrl === urlValue) return match;
+      const wrappedQuote = quote || '';
+      return 'url(' + wrappedQuote + nextUrl + wrappedQuote + ')';
+    })
+    .replace(/@import\s+(['"])([^'"]+)\1/gi, (match, quote, urlValue) => {
+      const nextUrl = buildWikiPreviewAssetUrl(urlValue, basePath, previewKey);
+      if (!nextUrl || nextUrl === urlValue) return match;
+      return '@import ' + quote + nextUrl + quote;
+    });
+}
+
+function rewriteWikiHtmlPreviewDocument(htmlText, currentPath, previewKey) {
+  const source = String(htmlText || '');
+  if (!source.trim() || !previewKey || typeof DOMParser === 'undefined' || typeof document === 'undefined') return source;
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(source, 'text/html');
+    if (!doc || !doc.documentElement) return source;
+    const baseHref = getWikiFetchPath(currentPath);
+    const head = doc.head || doc.documentElement;
+    if (head) {
+      let baseEl = doc.querySelector('base');
+      if (!baseEl) {
+        baseEl = doc.createElement('base');
+        head.insertBefore(baseEl, head.firstChild || null);
+      }
+      baseEl.setAttribute('href', baseHref);
+    }
+    Array.from(doc.querySelectorAll('img[src],script[src],iframe[src],audio[src],video[src],source[src],track[src],embed[src],input[src]')).forEach(el => {
+      el.setAttribute('src', buildWikiPreviewAssetUrl(el.getAttribute('src'), currentPath, previewKey));
+    });
+    Array.from(doc.querySelectorAll('img[srcset],source[srcset]')).forEach(el => {
+      el.setAttribute('srcset', rewriteWikiPreviewSrcset(el.getAttribute('srcset'), currentPath, previewKey));
+    });
+    Array.from(doc.querySelectorAll('link[href],image[href],use[href]')).forEach(el => {
+      el.setAttribute('href', buildWikiPreviewAssetUrl(el.getAttribute('href'), currentPath, previewKey));
+    });
+    Array.from(doc.querySelectorAll('image[xlink\\:href],use[xlink\\:href]')).forEach(el => {
+      el.setAttribute('xlink:href', buildWikiPreviewAssetUrl(el.getAttribute('xlink:href'), currentPath, previewKey));
+    });
+    Array.from(doc.querySelectorAll('object[data]')).forEach(el => {
+      el.setAttribute('data', buildWikiPreviewAssetUrl(el.getAttribute('data'), currentPath, previewKey));
+    });
+    Array.from(doc.querySelectorAll('[poster]')).forEach(el => {
+      el.setAttribute('poster', buildWikiPreviewAssetUrl(el.getAttribute('poster'), currentPath, previewKey));
+    });
+    Array.from(doc.querySelectorAll('[style]')).forEach(el => {
+      el.setAttribute('style', rewriteWikiPreviewCssUrls(el.getAttribute('style'), currentPath, previewKey));
+    });
+    Array.from(doc.querySelectorAll('style')).forEach(el => {
+      el.textContent = rewriteWikiPreviewCssUrls(el.textContent, currentPath, previewKey);
+    });
+    return '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+  } catch (err) {
+    console.warn('wiki html preview rewrite failed:', err);
+    return source;
+  }
+}
+
+function hydrateWikiHtmlPreview(contentEl, htmlText, currentPath, previewKey) {
+  if (!contentEl) return;
+  const iframe = contentEl.querySelector('.wiki-file-frame[data-wiki-html-preview="1"]');
+  if (!iframe) return;
+  try {
+    iframe.srcdoc = rewriteWikiHtmlPreviewDocument(htmlText, currentPath, previewKey);
+  } catch (err) {
+    console.warn('wiki html preview hydrate failed:', err);
+    iframe.src = getWikiPreviewFetchPath(currentPath, previewKey);
+  }
+}
+
 function guessWikiFileType(path, contentType) {
   const normalized = normalizeWikiDocPath(path);
   const lowerPath = normalized.toLowerCase();
@@ -21951,10 +22143,10 @@ function guessWikiFileType(path, contentType) {
   return 'download';
 }
 
-function renderWikiMarkdown(text, basePath) {
+function renderWikiMarkdown(text, basePath, previewKey) {
   const source = String(text || '');
   if (!source.trim()) return renderWikiEmptyState();
-  const cacheKey = String(basePath || '') + '\n' + source;
+  const cacheKey = String(basePath || '') + '\n' + String(previewKey || '') + '\n' + source;
   const render = () => {
     if (typeof marked === 'undefined') return '<div class="md-content">' + esc(source).replace(/\n/g, '<br>') + '</div>';
     const renderer = new marked.Renderer();
@@ -21969,6 +22161,11 @@ function renderWikiMarkdown(text, basePath) {
       }
       const resolvedPath = resolveWikiDocPath(rawHref, basePath);
       return `<a href="#" data-wiki-link="${esc(resolvedPath)}">${textValue || esc(rawHref)}</a>`;
+    };
+    renderer.image = function(href, title, textValue) {
+      if (typeof href === 'object') { title = href.title; textValue = href.text; href = href.href; }
+      const imageHref = buildWikiPreviewAssetUrl(href, basePath, previewKey);
+      return `<img src="${imageHref}" alt="${textValue || ''}" title="${title || ''}" style="max-width:100%"/>`;
     };
     return '<div class="md-content">' + sanitizeHtmlFragment(marked.parse(source, { renderer, breaks: true, gfm: true })) + '</div>';
   };
@@ -22013,12 +22210,12 @@ function renderWikiTree(text, currentPath) {
   return '<div class="wiki-tree">' + rows.join('') + '</div>';
 }
 
-function renderWikiFileContent(text, fileType, currentPath) {
+function renderWikiFileContent(text, fileType, currentPath, previewKey) {
   const path = normalizeWikiDocPath(currentPath);
-  const fetchPath = getWikiFetchPath(path);
+  const fetchPath = getWikiPreviewFetchPath(path, previewKey);
   if (fileType === 'tree') return renderWikiTree(text, path);
-  if (fileType === 'markdown') return renderWikiMarkdown(text, path);
-  if (fileType === 'html') return '<div class="md-content"><iframe class="wiki-file-frame" src="' + esc(fetchPath) + '" loading="lazy"></iframe></div>';
+  if (fileType === 'markdown') return renderWikiMarkdown(text, path, previewKey);
+  if (fileType === 'html') return '<div class="md-content"><iframe class="wiki-file-frame" data-wiki-html-preview="1" data-wiki-preview-key="' + esc(String(previewKey || '')) + '" loading="lazy"></iframe></div>';
   if (fileType === 'image') return '<div class="md-content"><img class="wiki-file-image" src="' + esc(fetchPath) + '" alt="' + esc(path) + '"></div>';
   if (fileType === 'download') {
     return '<div class="md-content"><p>当前文件类型不支持内联展示。</p><a class="wiki-file-download" href="' + esc(fetchPath) + '" target="_blank" rel="noopener noreferrer">打开原始文件</a></div>';
@@ -22163,8 +22360,10 @@ async function loadWikiDoc(docPath, options = {}) {
     const text = await resp.text();
     const contentType = resp.headers.get('content-type') || '';
     const fileType = nextDoc === '.' || /(^|\n)\S+\/\n(?:[\s\S]*)$/.test(text) ? 'tree' : guessWikiFileType(nextDoc, contentType);
-    const nextHtml = renderWikiFileContent(text, fileType, nextDoc);
+    const previewRequestKey = createWikiPreviewRequestKey(requestSeq);
+    const nextHtml = renderWikiFileContent(text, fileType, nextDoc, previewRequestKey);
     wikiState.currentType = fileType;
+    wikiState.previewRequestKey = previewRequestKey;
     wikiState.refreshCount = (wikiState.refreshCount || 0) + 1;
     const needsRender =
       !contentEl ||
@@ -22174,6 +22373,7 @@ async function loadWikiDoc(docPath, options = {}) {
       wikiState.lastRenderedHtml !== nextHtml;
     if (contentEl && needsRender) {
       contentEl.innerHTML = nextHtml;
+      if (fileType === 'html') hydrateWikiHtmlPreview(contentEl, text, nextDoc, previewRequestKey);
       if (scrollSnapshot) restoreWikiScrollSnapshot(contentEl, scrollSnapshot);
     }
     wikiState.lastRenderedDoc = nextDoc;
@@ -24563,10 +24763,7 @@ function cloneChatForStorage(chat) {
   if (!chat || typeof chat !== 'object') return chat;
   const next = { ...chat };
   next.messages = Array.isArray(chat.messages) ? chat.messages.map(cloneMessageForStorage) : [];
-  next.cliCommandHistory = (Array.isArray(chat.cliCommandHistory) ? chat.cliCommandHistory : [])
-    .map(normalizeCliCommandHistoryEntry)
-    .filter(Boolean)
-    .slice(-MAX_STORE);
+  next.cliCommandHistory = normalizeCliCommandHistoryList(chat.cliCommandHistory);
   return next;
 }
 
@@ -25233,9 +25430,16 @@ function normalizeCliCommandHistoryEntry(entry) {
   };
 }
 
+function normalizeCliCommandHistoryList(entries) {
+  return (Array.isArray(entries) ? entries : [])
+    .map(normalizeCliCommandHistoryEntry)
+    .filter(Boolean)
+    .slice(-MAX_CLI_COMMAND_HISTORY);
+}
+
 function ensureChatCliCommandHistory(chat) {
   if (!chat) return [];
-  if (!Array.isArray(chat.cliCommandHistory)) chat.cliCommandHistory = [];
+  chat.cliCommandHistory = normalizeCliCommandHistoryList(chat.cliCommandHistory);
   return chat.cliCommandHistory;
 }
 
@@ -25463,6 +25667,12 @@ function hasGlobalPendingSseResponse() {
     if (pollState && pollState.active) return true;
   }
   return false;
+}
+
+function syncGlobalStreamingVisualState() {
+  const root = document.documentElement;
+  if (!root) return;
+  root.setAttribute('data-global-streaming', hasGlobalPendingSseResponse() ? '1' : '0');
 }
 
 function isChatCancelling(chatId) {
@@ -27331,6 +27541,7 @@ function syncActiveChatAsyncControls() {
 }
 
 function updateChatAsyncUI(chatId) {
+  syncGlobalStreamingVisualState();
   if (state.activeChat !== chatId) return;
   const busy = syncActiveChatAsyncControls();
   if (busy && soulTidyState.popoverOpen) closeSoulTidyPopover();
@@ -27355,6 +27566,7 @@ function stopChatRestorePolling(chatId) {
   if (!poll) return;
   if (poll.timer) clearTimeout(poll.timer);
   delete restorePolling[chatId];
+  syncGlobalStreamingVisualState();
   syncCliGetQueueStatusPolling({ refreshNow: false });
   updateChatAsyncUI(chatId);
 }
@@ -27412,10 +27624,9 @@ function normalizeLoadedChat(chat) {
   });
   if (mergeTimingOnlyAssistantMessages(chat.messages)) changed = true;
   if (collapseMultiAssistantRequests(chat.messages)) changed = true;
-  chat.cliCommandHistory = (Array.isArray(chat.cliCommandHistory) ? chat.cliCommandHistory : [])
-    .map(normalizeCliCommandHistoryEntry)
-    .filter(Boolean)
-    .slice(-MAX_STORE);
+  const cliHistoryBefore = JSON.stringify(Array.isArray(chat.cliCommandHistory) ? chat.cliCommandHistory : []);
+  chat.cliCommandHistory = normalizeCliCommandHistoryList(chat.cliCommandHistory);
+  if (cliHistoryBefore !== JSON.stringify(chat.cliCommandHistory)) changed = true;
   const pending = getPendingRequestState(chat);
   if (!Number.isFinite(Number(chat.lastRestoreId))) chat.lastRestoreId = 0;
   chat.coldHistoryTailAt = toChatTimestamp(chat.coldHistoryTailAt || '');
@@ -31108,7 +31319,7 @@ function setupScrollLazy() {
       }
       if (state.displayedCount >= MAX_STORE) return;
       chatLazyLoading = true;
-      setChatHistoryLock(true, '正在加载更早的对话内容并同步毛玻璃效果');
+      setChatHistoryLock(true, '正在加载更早的对话内容');
       try {
         await nextPaintFrame();
         const loadMore = Math.min(LAZY_PAGE, total - state.displayedCount);
@@ -31954,7 +32165,7 @@ function upsertManualCmdCliHistory(chatId, entry, flash) {
   const idx = history.findIndex(item => item && item.id === normalized.id);
   if (idx >= 0) history[idx] = normalized;
   else history.push(normalized);
-  if (history.length > MAX_STORE) chat.cliCommandHistory = history.slice(-MAX_STORE);
+  if (history.length > MAX_CLI_COMMAND_HISTORY) chat.cliCommandHistory = history.slice(-MAX_CLI_COMMAND_HISTORY);
   saveChats();
   if (state.activeChat === chatId) {
     restoreCliSubPanel(chatId);
@@ -33369,6 +33580,7 @@ async function sendCenterMessage(rawText, options) {
       sawTarget: false,
       sessionToken: streamSessionToken
     };
+    syncGlobalStreamingVisualState();
     syncCliGetQueueStatusPolling();
     // Once the chat enters the async lifecycle, busy/streaming should own the UI.
     // Keeping dispatching=true for the whole SSE session incorrectly locks input
@@ -35824,7 +36036,7 @@ function upsertRestoreCliHistoryEntry(chat, entry) {
     || prevNormalized.updatedAt !== next.updatedAt;
   if (idx >= 0) history[idx] = next;
   else history.push(next);
-  if (history.length > MAX_STORE) chat.cliCommandHistory = history.slice(-MAX_STORE);
+  if (history.length > MAX_CLI_COMMAND_HISTORY) chat.cliCommandHistory = history.slice(-MAX_CLI_COMMAND_HISTORY);
   return { entry: next, changed };
 }
 
@@ -36625,7 +36837,7 @@ async function performReloadColdHistoryChat(chatId, opts) {
   const uiLockDesc = String(options.uiLockDesc || '').trim();
   const uiLockAlreadyHeld = !!options.uiLockAlreadyHeld;
   if (prepend) {
-    setChatHistoryLock(true, '正在加载更早的对话内容并同步毛玻璃效果');
+    setChatHistoryLock(true, '正在加载更早的对话内容');
     lockShown = true;
   } else if (uiLockDesc && !uiLockAlreadyHeld) {
     setChatHistoryLock(true, uiLockDesc);
@@ -36819,6 +37031,7 @@ async function ensureChatRestorePolling(chatId) {
   } else {
     poll.active = true;
   }
+  syncGlobalStreamingVisualState();
   syncCliGetQueueStatusPolling();
   updateChatAsyncUI(chatId);
   if (poll.running || poll.timer) return;

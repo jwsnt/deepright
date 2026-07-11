@@ -187,7 +187,7 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
                 // 等待通道结果
                 Object subResponse = new CliSubResponseExec(this.redis4event, this.interval, timeout, subData.getTid()).exec();
                 byte[] result = byte[].class.cast(subResponse);
-                this.checkResponse(workTask, timeout, result);
+                this.checkResponse(workTask, subData, timeout, result);
                 // GZIP+BASE64后的CMD
                 String content = new String(GzipUtils.decompressAsBase64(new String(result, StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
                 CliPubData pubData = JsonUtils.read(content, CliPubData.class);
@@ -463,10 +463,10 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
         }
     }
 
-    protected void checkResponse(WorkflowTask workTask, Integer timeout, byte[] result) throws Exception {
+    protected void checkResponse(WorkflowTask workTask, CliSubData subData, Integer timeout, byte[] result) throws Exception {
         // 用于提示模型的错误
         if (ArrayUtils.isEmpty(result)) {
-            throw new WorkflowException("The cli sub has timed out after " + timeout + " ms, please ensure the command is valid.", this.debug ? ProtocolCode.C500 : ProtocolCode.C915).needSilent();
+            throw new WorkflowException("The cli cmd (" + subData.getCmd() + ") has timed out after " + timeout + " ms, please ensure the command is valid.", this.debug ? ProtocolCode.C500 : ProtocolCode.C915).needSilent();
         }
     }
 
