@@ -1921,7 +1921,11 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 [data-theme="dark"] .onboarding-domain-overlay .onboarding-card{background:linear-gradient(180deg,rgba(15,27,49,.96),rgba(10,20,38,.92));border-color:rgba(169,190,227,.2);box-shadow:0 22px 46px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.08)}
 .onboarding-domain-overlay.has-card .onboarding-card{opacity:1;transform:translateY(0) scale(1)}
 .onboarding-domain-overlay .onboarding-card.compact-only-action{min-width:0;padding:12px 12px 10px;border-radius:18px}
+.onboarding-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .onboarding-card-kicker{font-size:10px;line-height:1.2;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);opacity:.9}
+.onboarding-card-close{width:22px;height:22px;border:none;border-radius:999px;background:rgba(77,107,254,.1);color:var(--text-secondary);display:inline-flex;align-items:center;justify-content:center;padding:0;cursor:pointer;transition:var(--transition);flex:0 0 auto;font-size:14px;line-height:1;box-shadow:inset 0 0 0 1px rgba(124,152,214,.2)}
+.onboarding-card-close:hover,.onboarding-card-close:focus-visible{background:rgba(77,107,254,.16);color:var(--text-primary);outline:none;transform:translateY(-1px)}
+.onboarding-card-close.hidden{display:none}
 .onboarding-card-text{margin-top:8px;font-size:13px;line-height:1.6;color:var(--text-primary);overflow-wrap:anywhere}
 .onboarding-card-text.hidden{display:none}
 .onboarding-card-text a{color:inherit;text-decoration:none}
@@ -2332,7 +2336,15 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .settings-media-error{min-height:18px;font-size:12px;line-height:1.45;color:var(--error)}
 .settings-media-footer{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-top:4px;flex-shrink:0}
 .settings-media-actions{display:flex;justify-content:flex-end;align-items:flex-start;gap:8px;flex-shrink:0}
-.settings-actions{display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);background:linear-gradient(180deg,rgba(255,255,255,0),color-mix(in srgb,var(--modal-panel-bg) 92%,transparent) 40%)}
+.settings-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;flex-shrink:0;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);background:linear-gradient(180deg,rgba(255,255,255,0),color-mix(in srgb,var(--modal-panel-bg) 92%,transparent) 40%)}
+.settings-actions-left,.settings-actions-right{display:flex;align-items:center;gap:8px}
+.settings-actions-right{margin-left:auto}
+.settings-onboarding-toggle{display:inline-flex;align-items:center;gap:10px;padding:0;border:none;background:none;color:var(--text-secondary);cursor:pointer;transition:var(--transition)}
+.settings-onboarding-toggle:hover,.settings-onboarding-toggle:focus-visible{color:var(--text-primary);outline:none}
+.settings-onboarding-toggle-label{font-size:12px;font-weight:600;letter-spacing:.01em}
+.settings-onboarding-toggle-box{width:22px;height:22px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;background:rgba(77,107,254,.1);box-shadow:inset 0 0 0 1px rgba(124,152,214,.22);color:#4d6bfe;font-size:14px;font-weight:800;line-height:1;transition:var(--transition)}
+.settings-onboarding-toggle.off .settings-onboarding-toggle-box{background:rgba(255,90,107,.1);box-shadow:inset 0 0 0 1px rgba(255,90,107,.22);color:#ff5a6b}
+.settings-onboarding-toggle:hover .settings-onboarding-toggle-box,.settings-onboarding-toggle:focus-visible .settings-onboarding-toggle-box{transform:translateY(-1px)}
 .btn{padding:8px 18px;border-radius:14px;border:none;font-size:13px;cursor:pointer;transition:var(--transition)}
 .btn-primary{background:linear-gradient(135deg,#6d95ff,#7fa5ff);color:#fff;box-shadow:0 12px 28px rgba(109,149,255,.24)}
 .btn-primary:hover{background:var(--accent-hover)}
@@ -2358,6 +2370,10 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 [data-theme="dark"] .settings-media-kicker{color:#78d9ff}
 [data-theme="dark"] .settings-media-close{background:rgba(255,255,255,.08);color:#d4def2;box-shadow:none}
 [data-theme="dark"] .settings-media-close:hover,[data-theme="dark"] .settings-media-close:focus-visible{background:rgba(255,255,255,.14);color:#f4f7ff}
+[data-theme="dark"] .onboarding-card-close{background:rgba(255,255,255,.08);color:#d4def2;box-shadow:inset 0 0 0 1px rgba(169,190,227,.16)}
+[data-theme="dark"] .onboarding-card-close:hover,[data-theme="dark"] .onboarding-card-close:focus-visible{background:rgba(255,255,255,.14);color:#f4f7ff}
+[data-theme="dark"] .settings-onboarding-toggle-box{background:rgba(109,149,255,.16);box-shadow:inset 0 0 0 1px rgba(169,190,227,.18);color:#a8c1ff}
+[data-theme="dark"] .settings-onboarding-toggle.off .settings-onboarding-toggle-box{background:rgba(255,90,107,.14);box-shadow:inset 0 0 0 1px rgba(255,122,142,.2);color:#ffb5bf}
 [data-theme="dark"] .settings-media-input{background:rgba(255,255,255,.08);border-color:rgba(169,190,227,.18);color:#ecf3ff;box-shadow:none}
 [data-theme="dark"] .settings-media-row-del{background:rgba(255,255,255,.08);color:#ffb5bf;box-shadow:none}
 [data-theme="dark"] .settings-media-row-del:hover,[data-theme="dark"] .settings-media-row-del:focus-visible{background:rgba(255,90,107,.14)}
@@ -4689,7 +4705,10 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     </div>
   </div>
   <div class="onboarding-card">
-    <div class="onboarding-card-kicker">新手引导</div>
+    <div class="onboarding-card-head">
+      <div class="onboarding-card-kicker">新手引导</div>
+      <button class="onboarding-card-close hidden" type="button" onclick="handleOnboardingDismiss(event)" title="跳过当前引导" aria-label="跳过当前引导">×</button>
+    </div>
     <div class="onboarding-card-text"></div>
     <div class="onboarding-card-actions">
       <button class="onboarding-card-btn secondary onboarding-card-btn-secondary hidden" type="button" data-onboarding-action="secondary" onclick="handleOnboardingAction(event)"></button>
@@ -4716,7 +4735,10 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
   </div>
   <div class="vfs-edit-tour-ghost" id="vfsEditTourGhost" aria-hidden="true">config.json</div>
   <div class="onboarding-card">
-    <div class="onboarding-card-kicker">新手引导</div>
+    <div class="onboarding-card-head">
+      <div class="onboarding-card-kicker">新手引导</div>
+      <button class="onboarding-card-close hidden" type="button" onclick="handleOnboardingDismiss(event)" title="跳过当前引导" aria-label="跳过当前引导">×</button>
+    </div>
     <div class="onboarding-card-text"></div>
     <div class="onboarding-card-actions">
       <button class="onboarding-card-btn secondary onboarding-card-btn-secondary hidden" type="button" data-onboarding-action="secondary" onclick="handleOnboardingAction(event)"></button>
@@ -4743,7 +4765,10 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     <div class="memo-task-tour-demo-note" id="memoTaskTourNote" aria-hidden="true"></div>
   </div>
   <div class="onboarding-card">
-    <div class="onboarding-card-kicker">新手引导</div>
+    <div class="onboarding-card-head">
+      <div class="onboarding-card-kicker">新手引导</div>
+      <button class="onboarding-card-close hidden" type="button" onclick="handleOnboardingDismiss(event)" title="跳过当前引导" aria-label="跳过当前引导">×</button>
+    </div>
     <div class="onboarding-card-text"></div>
     <div class="onboarding-card-actions">
       <button class="onboarding-card-btn secondary onboarding-card-btn-secondary hidden" type="button" data-onboarding-action="secondary" onclick="handleOnboardingAction(event)"></button>
@@ -5038,7 +5063,10 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
       <div class="onboarding-blocker onboarding-blocker-bottom"></div>
       <div class="onboarding-spotlight"></div>
       <div class="onboarding-card">
-        <div class="onboarding-card-kicker">新手引导</div>
+        <div class="onboarding-card-head">
+          <div class="onboarding-card-kicker">新手引导</div>
+          <button class="onboarding-card-close hidden" type="button" onclick="handleOnboardingDismiss(event)" title="跳过当前引导" aria-label="跳过当前引导">×</button>
+        </div>
         <div class="onboarding-card-text"></div>
         <div class="onboarding-card-actions">
           <button class="onboarding-card-btn secondary onboarding-card-btn-secondary hidden" type="button" data-onboarding-action="secondary" onclick="handleOnboardingAction(event)"></button>
@@ -5140,8 +5168,16 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
         </div>
       </div>
       <div class="settings-actions">
-        <button class="btn btn-secondary" onclick="closeSettings()">取消</button>
-        <button class="btn btn-primary" id="settingsSaveBtn" onclick="saveSettings()">保存</button>
+        <div class="settings-actions-left">
+          <button class="settings-onboarding-toggle" id="settingsOnboardingToggle" type="button" onclick="toggleSettingsOnboardingEnabled()" aria-pressed="true" title="修改后需保存才会生效">
+            <span class="settings-onboarding-toggle-box" id="settingsOnboardingToggleBox">✓</span>
+            <span class="settings-onboarding-toggle-label">新手引导</span>
+          </button>
+        </div>
+        <div class="settings-actions-right">
+          <button class="btn btn-secondary" onclick="closeSettings()">取消</button>
+          <button class="btn btn-primary" id="settingsSaveBtn" onclick="saveSettings()">保存</button>
+        </div>
       </div>
     </form>
     <div class="settings-media-overlay" id="mediaConfigOverlay" aria-hidden="true" onclick="handleMediaConfigOverlayClick(event)">
@@ -5244,7 +5280,10 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     <div class="onboarding-blocker onboarding-blocker-bottom"></div>
     <div class="onboarding-spotlight"></div>
       <div class="onboarding-card">
-        <div class="onboarding-card-kicker">新手引导</div>
+        <div class="onboarding-card-head">
+          <div class="onboarding-card-kicker">新手引导</div>
+          <button class="onboarding-card-close hidden" type="button" onclick="handleOnboardingDismiss(event)" title="跳过当前引导" aria-label="跳过当前引导">×</button>
+        </div>
         <div class="onboarding-card-text"></div>
         <div class="onboarding-card-actions">
           <button class="onboarding-card-btn secondary onboarding-card-btn-secondary hidden" type="button" data-onboarding-action="secondary" onclick="handleOnboardingAction(event)"></button>
@@ -5306,7 +5345,10 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
         </div>
       </div>
       <div class="onboarding-card">
-        <div class="onboarding-card-kicker">新手引导</div>
+        <div class="onboarding-card-head">
+          <div class="onboarding-card-kicker">新手引导</div>
+          <button class="onboarding-card-close hidden" type="button" onclick="handleOnboardingDismiss(event)" title="跳过当前引导" aria-label="跳过当前引导">×</button>
+        </div>
         <div class="onboarding-card-text"></div>
         <div class="onboarding-card-actions">
           <button class="onboarding-card-btn secondary onboarding-card-btn-secondary hidden" type="button" data-onboarding-action="secondary" onclick="handleOnboardingAction(event)"></button>
@@ -5555,6 +5597,7 @@ const CHATS_KEY = 'deepright_chats';
 const THEME_KEY = 'theme';
 const ENERGY_SAVER_KEY = 'deepright_energy_saver';
 const ONBOARDING_COMPLETE_KEY = 'deepright_onboarding_complete';
+const ONBOARDING_ENABLED_KEY = 'deepright_onboarding_enabled';
 const INPUT_TOUR_CLICK_KEY = 'deepright_input_tour_clicked';
 const CLEAR_RELOAD_TOUR_CLICK_KEY = 'deepright_clear_reload_tour_clicked';
 const QUEUED_CENTER_TOUR_CLICK_KEY = 'deepright_queued_center_tour_clicked';
@@ -5654,6 +5697,14 @@ const MINIMAX_LEGACY_MODEL = 'MiniMax-M2.7';
 const MINIMAX_LATEST_MODEL = 'MiniMax-M3';
 const LOCAL_STORAGE_SIZE_ENCODER = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
 let runtimeModelTokenCache = Object.create(null);
+
+function getStoredOnboardingEnabled() {
+  try {
+    return localStorage.getItem(ONBOARDING_ENABLED_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
 
 function normalizeModelName(value) {
   const raw = String(value || '').trim();
@@ -6107,10 +6158,8 @@ let state = {
     lastRenderedHtml: ''
   }
 };
-document.documentElement.setAttribute('data-energy-saver', 'off');
-document.documentElement.setAttribute('data-energy-saver-source', 'none');
-document.documentElement.setAttribute('data-low-power-rendering', 'off');
 let onboardingState = {
+  enabled: getStoredOnboardingEnabled(),
   eligible: false,
   active: false,
   starting: false,
@@ -6121,6 +6170,11 @@ let onboardingState = {
   energySaverSuspended: false,
   energySaverSnapshot: null
 };
+let settingsOnboardingDraftEnabled = null;
+document.documentElement.setAttribute('data-energy-saver', 'off');
+document.documentElement.setAttribute('data-energy-saver-source', 'none');
+document.documentElement.setAttribute('data-low-power-rendering', 'off');
+document.documentElement.setAttribute('data-onboarding-enabled', onboardingState.enabled ? '1' : '0');
 let fullscreenTourState = {
   autoAdvanceTimer: 0
 };
@@ -8451,7 +8505,12 @@ function isOnboardingActive() {
   return !!(onboardingState && onboardingState.active && onboardingState.step);
 }
 
+function isOnboardingEnabled() {
+  return !!(!onboardingState || onboardingState.enabled !== false);
+}
+
 function isOnboardingStartLocked() {
+  if (!isOnboardingEnabled()) return true;
   if (isRightSidebarUrlPreviewExpanded()) {
     clearRightSidebarUrlPreviewExpandedOnboardingPendings();
     return true;
@@ -11217,7 +11276,8 @@ function syncRightSidebarUrlPreviewMount() {
   document.body.appendChild(preview);
 }
 
-function clearRightSidebarUrlPreviewExpandedOnboardingPendings() {
+function clearDeferredOnboardingStarts(options = {}) {
+  const clearPersistent = options.clearPersistent === true;
   if (rightSidebarUrlPreviewTourState) rightSidebarUrlPreviewTourState.pendingStart = false;
   if (messageUrlTourState) messageUrlTourState.pendingStart = false;
   if (chatCompletionTourState) chatCompletionTourState.pendingStart = false;
@@ -11234,6 +11294,14 @@ function clearRightSidebarUrlPreviewExpandedOnboardingPendings() {
   if (browserSkillTourState) browserSkillTourState.pendingStart = false;
   if (swarmSaveSuccessTourState) swarmSaveSuccessTourState.pendingStart = false;
   if (sse503TourState) sse503TourState.pendingStart = false;
+  if (clearPersistent) {
+    clearBrowserPluginHoverTourPendingRecord();
+    clearPendingModelSaveVerifyTourRecord();
+  }
+}
+
+function clearRightSidebarUrlPreviewExpandedOnboardingPendings() {
+  clearDeferredOnboardingStarts();
 }
 
 function focusRightSidebarUrlPreviewRestoreButton() {
@@ -11752,6 +11820,7 @@ function startRightSidebarUrlPreviewTourOnboarding() {
 }
 
 function queueRightSidebarUrlPreviewTourOnboarding() {
+  if (!isOnboardingEnabled()) return false;
   if (hasRightSidebarUrlPreviewTourClickRecord()) {
     rightSidebarUrlPreviewTourState.pendingStart = false;
     return false;
@@ -12637,6 +12706,10 @@ function isAgentTransferTourOnboardingStep(step) {
 
 function isStandaloneModeTourOnboardingStep(step) {
   return ['standalone-mode-tour-toggle'].includes(String(step || '').trim());
+}
+
+function isFirstRunOnboardingStep(step) {
+  return ['select-agent', 'open-settings', 'models-intro', 'new-agent', 'vfs-intro', 'vfs-create', 'vfs-upload'].includes(String(step || '').trim());
 }
 
 function isModelSwitchTourOnboardingStep(step) {
@@ -14782,6 +14855,7 @@ async function syncMemoCompletionTourStep(step) {
 }
 
 function queueMemoRecurringTourAutoStart() {
+  if (!isOnboardingEnabled()) return;
   if (hasMemoRecurringTourClickRecord() || !memoRecurringTourState.metaId) return;
   if (isOnboardingStartLocked() || memoRecurringTourState.starting) {
     memoRecurringTourState.pendingStart = true;
@@ -14794,6 +14868,10 @@ async function startMemoRecurringTourOnboarding() {
   if (isOnboardingStartLocked() || memoRecurringTourState.starting || hasMemoRecurringTourClickRecord() || !memoRecurringTourState.metaId) return false;
   memoRecurringTourState.starting = true;
   try {
+    if (!isOnboardingEnabled()) {
+      memoRecurringTourState.pendingStart = false;
+      return false;
+    }
     markMemoRecurringTourClickRecord();
     memoRecurringTourState.pendingStart = false;
     onboardingState.active = true;
@@ -14806,6 +14884,7 @@ async function startMemoRecurringTourOnboarding() {
 }
 
 function queueMemoCompletionTourAutoStart() {
+  if (!isOnboardingEnabled()) return;
   if (hasMemoCompletionTourClickRecord() || !memoCompletionTourState.detailId || memoCompletionTourState.detailCount !== 1) return;
   if (isOnboardingStartLocked() || memoCompletionTourState.starting) {
     memoCompletionTourState.pendingStart = true;
@@ -14826,6 +14905,10 @@ async function startMemoCompletionTourOnboarding() {
       renderCalendar();
       renderTimeline();
       await new Promise(resolve => window.setTimeout(resolve, 260));
+    }
+    if (!isOnboardingEnabled()) {
+      memoCompletionTourState.pendingStart = false;
+      return false;
     }
     if (!ensureMemoCompletionTourTargetsVisible()) return false;
     markMemoCompletionTourClickRecord();
@@ -16235,7 +16318,7 @@ function syncMessageUrlTourStep(step) {
 }
 
 async function startMessageUrlTourOnboarding() {
-  if (hasMessageUrlTourClickRecord() || messageUrlTourState.starting) return false;
+  if (!isOnboardingEnabled() || hasMessageUrlTourClickRecord() || messageUrlTourState.starting) return false;
   return withOnboardingStartLockAsync(async () => {
     if (hasMessageUrlTourClickRecord() || messageUrlTourState.starting) return false;
     messageUrlTourState.starting = true;
@@ -16250,6 +16333,11 @@ async function startMessageUrlTourOnboarding() {
       const actions = buildMessageFileActionItems(actionState);
       const rect = getSelectionActionRect(anchor);
       if (!actionState || !actionState.fileExists || !actions.length || !rect || (!rect.width && !rect.height)) {
+        messageUrlTourState.pendingStart = false;
+        clearMessageUrlTourTargetData();
+        return false;
+      }
+      if (!isOnboardingEnabled()) {
         messageUrlTourState.pendingStart = false;
         clearMessageUrlTourTargetData();
         return false;
@@ -16270,6 +16358,7 @@ async function startMessageUrlTourOnboarding() {
 }
 
 function queueMessageUrlTourOnboarding() {
+  if (!isOnboardingEnabled()) return false;
   if (hasMessageUrlTourClickRecord()) return false;
   if (isOnboardingStartLocked() || messageUrlTourState.starting) {
     messageUrlTourState.pendingStart = true;
@@ -16580,6 +16669,7 @@ function startBrowserPluginHoverTourOnboarding() {
 }
 
 function queueBrowserPluginHoverTourOnboarding() {
+  if (!isOnboardingEnabled()) return false;
   if (hasBrowserPluginHoverTourClickRecord() || !hasBrowserPluginHoverTourPendingRecord()) return false;
   if (isOnboardingStartLocked()) {
     browserPluginHoverTourState.pendingStart = true;
@@ -16727,7 +16817,7 @@ function startBrowserSkillTourOnboarding() {
 
 function queueBrowserSkillTourOnboarding(model) {
   const normalizedModel = normalizeModelName(model);
-  if (hasBrowserSkillTourClickRecord() || !normalizedModel) return false;
+  if (!isOnboardingEnabled() || hasBrowserSkillTourClickRecord() || !normalizedModel) return false;
   browserSkillTourState.selectedModel = normalizedModel;
   if (isOnboardingStartLocked()) {
     browserSkillTourState.pendingStart = true;
@@ -16930,7 +17020,7 @@ function startTokenSkillTourOnboarding() {
 
 function queueTokenSkillTourOnboarding(model) {
   const normalizedModel = normalizeModelName(model);
-  if (hasTokenSkillTourClickRecord() || !normalizedModel) return false;
+  if (!isOnboardingEnabled() || hasTokenSkillTourClickRecord() || !normalizedModel) return false;
   tokenSkillTourState.selectedModel = normalizedModel;
   if (isOnboardingStartLocked()) {
     tokenSkillTourState.pendingStart = true;
@@ -17051,7 +17141,7 @@ function startCronSkillTourOnboarding() {
 
 function queueCronSkillTourOnboarding(model) {
   const normalizedModel = normalizeModelName(model);
-  if (hasCronSkillTourClickRecord() || !normalizedModel) return false;
+  if (!isOnboardingEnabled() || hasCronSkillTourClickRecord() || !normalizedModel) return false;
   cronSkillTourState.selectedModel = normalizedModel;
   if (isOnboardingStartLocked()) {
     cronSkillTourState.pendingStart = true;
@@ -17473,13 +17563,21 @@ function getOnboardingCardButtons(scope) {
   };
 }
 
+function shouldShowOnboardingDismiss(config) {
+  if (!config) return false;
+  if (config.hideDismiss) return false;
+  return String(config.actionLabel || '').trim() !== '完成';
+}
+
 function syncOnboardingCardContent(scope, config) {
   if (!scope) return { hasAction: false };
   const text = scope.querySelector('.onboarding-card-text');
   const card = scope.querySelector('.onboarding-card');
+  const closeBtn = scope.querySelector('.onboarding-card-close');
   const buttons = getOnboardingCardButtons(scope);
   const messageText = String(config && config.message || '').trim();
   const hasMessage = !!((config && config.messageHtml) || messageText);
+  if (closeBtn) closeBtn.classList.toggle('hidden', !shouldShowOnboardingDismiss(config));
   if (text) {
     text.innerHTML = config && config.messageHtml ? config.messageHtml : esc(messageText).replace(/\n/g, '<br>');
     text.style.whiteSpace = config && config.cardNoWrap ? 'nowrap' : '';
@@ -18403,6 +18501,9 @@ function stopOnboarding(markComplete) {
     try { localStorage.setItem(ONBOARDING_COMPLETE_KEY, '1'); } catch {}
     onboardingState.eligible = false;
   }
+  if (lastStep === 'select-agent') {
+    hideAgentSelectOverlay();
+  }
   onboardingState.active = false;
   onboardingState.step = '';
   setOnboardingTarget(null, null);
@@ -18670,8 +18771,9 @@ function promoteOnboardingToModelsIntro() {
 }
 
 async function startFirstRunOnboarding() {
-  if (!onboardingState.eligible || isOnboardingActive()) return;
+  if (!isOnboardingEnabled() || !onboardingState.eligible || isOnboardingActive()) return;
   const agents = await fetchAgentList();
+  if (!isOnboardingEnabled() || !onboardingState.eligible || isOnboardingActive()) return;
   if (!agents.length) return;
   onboardingState.active = true;
   showAgentSelectOverlay(agents);
@@ -18679,7 +18781,7 @@ async function startFirstRunOnboarding() {
 }
 
 function startSandboxTourOnboarding() {
-  if (isOnboardingActive() || hasSandboxTourClickRecord()) return false;
+  if (!isOnboardingEnabled() || isOnboardingActive() || hasSandboxTourClickRecord()) return false;
   markSandboxTourClickRecord();
   onboardingState.active = true;
   closeCenterInputTransientUi();
@@ -18703,7 +18805,7 @@ function scheduleFullscreenTourAutoAdvance() {
 }
 
 function startFullscreenTourOnboarding() {
-  if (isOnboardingActive() || hasFullscreenTourClickRecord() || !getFullscreenElement()) return false;
+  if (!isOnboardingEnabled() || isOnboardingActive() || hasFullscreenTourClickRecord() || !getFullscreenElement()) return false;
   markFullscreenTourClickRecord();
   onboardingState.active = true;
   closeCenterInputTransientUi();
@@ -18762,6 +18864,7 @@ async function startStandaloneModeTourOnboarding() {
     } catch {
       standaloneModeTourState.collaborationUrl = getStandaloneModeTourFallbackUrl();
     }
+    if (!isOnboardingEnabled() || isOnboardingActive()) return false;
     onboardingState.active = true;
     closeCenterInputTransientUi();
     setOnboardingStep('standalone-mode-tour-toggle');
@@ -18828,6 +18931,7 @@ function startSwarmSaveSuccessTourOnboarding() {
 }
 
 function queueSwarmSaveSuccessTourOnboarding(agentId) {
+  if (!isOnboardingEnabled()) return false;
   swarmSaveSuccessTourState.agentId = String(agentId || swarmSaveSuccessTourState.agentId || state.settings.agentId || '').trim();
   swarmSaveSuccessTourState.agentName = resolveSwarmSaveSuccessTourAgentName(swarmSaveSuccessTourState.agentId);
   swarmSaveSuccessTourState.pendingStart = !!swarmSaveSuccessTourState.agentName;
@@ -18841,7 +18945,7 @@ function queueSwarmSaveSuccessTourOnboarding(agentId) {
 }
 
 function queueModelSwitchTourOnboarding(chatId) {
-  if (hasModelSwitchTourClickRecord()) return false;
+  if (!isOnboardingEnabled() || hasModelSwitchTourClickRecord()) return false;
   const targetChatId = resolveModelSwitchTourStartChatId(chatId || state.activeChat || '');
   if (!targetChatId) {
     modelSwitchTourState.pendingStart = false;
@@ -18857,7 +18961,7 @@ function queueModelSwitchTourOnboarding(chatId) {
 }
 
 function startInputTourOnboarding() {
-  if (isOnboardingActive() || hasInputTourClickRecord()) return false;
+  if (!isOnboardingEnabled() || isOnboardingActive() || hasInputTourClickRecord()) return false;
   markInputTourClickRecord();
   onboardingState.active = true;
   closeCenterInputTransientUi();
@@ -18878,7 +18982,7 @@ function startClearReloadTourOnboarding() {
 }
 
 function startSwarmTourOnboarding() {
-  if (isOnboardingActive() || hasSwarmTourClickRecord() || !isSettingsOpen()) return false;
+  if (!isOnboardingEnabled() || isOnboardingActive() || hasSwarmTourClickRecord() || !isSettingsOpen()) return false;
   markSwarmTourClickRecord();
   onboardingState.active = true;
   setOnboardingStep('swarm-tour-toggle');
@@ -18886,9 +18990,10 @@ function startSwarmTourOnboarding() {
 }
 
 async function startPluginTourOnboarding() {
-  if (isOnboardingActive() || hasPluginTourClickRecord()) return false;
+  if (!isOnboardingEnabled() || isOnboardingActive() || hasPluginTourClickRecord()) return false;
   applyLeftSidebarState(false);
   const plugins = await loadQuickPlugins({ silent: true, force: !state.quickPluginsLoaded || !state.quickPlugins.length });
+  if (!isOnboardingEnabled() || isOnboardingActive() || hasPluginTourClickRecord()) return false;
   if (!Array.isArray(plugins) || !plugins.length) return false;
   markPluginTourClickRecord();
   onboardingState.active = true;
@@ -18906,6 +19011,10 @@ async function startPluginSuccessTourOnboarding() {
       await loadQuickPlugins({ silent: true, force: !state.quickPluginsLoaded || !state.quickPlugins.length });
     }
     await refreshQuickPluginStatuses({ silent: true });
+    if (!isOnboardingEnabled() || isOnboardingActive() || hasPluginSuccessTourClickRecord()) {
+      pluginSuccessTourState.pendingStart = false;
+      return false;
+    }
     if (!hasStartedQuickPlugin(state.quickPlugins)) {
       pluginSuccessTourState.pendingStart = false;
       return false;
@@ -18921,6 +19030,7 @@ async function startPluginSuccessTourOnboarding() {
 }
 
 function queuePluginSuccessTourOnboarding() {
+  if (!isOnboardingEnabled()) return false;
   if (hasPluginSuccessTourClickRecord()) return false;
   if (isOnboardingStartLocked() || pluginSuccessTourState.starting) {
     pluginSuccessTourState.pendingStart = true;
@@ -18931,8 +19041,9 @@ function queuePluginSuccessTourOnboarding() {
 }
 
 async function startDocTidyTourOnboarding() {
-  if (isOnboardingActive() || hasDocTidyTourClickRecord()) return false;
+  if (!isOnboardingEnabled() || isOnboardingActive() || hasDocTidyTourClickRecord()) return false;
   const visible = await ensureDocTidyTourTargetsVisible();
+  if (!isOnboardingEnabled() || isOnboardingActive() || hasDocTidyTourClickRecord()) return false;
   if (!visible) return false;
   const availability = getDocTidyTourAvailability();
   const firstStep = availability.hasSoul ? 'doc-tidy-soul-file' : (availability.hasUser ? 'doc-tidy-user-file' : '');
@@ -18944,9 +19055,13 @@ async function startDocTidyTourOnboarding() {
 }
 
 async function startKnowledgeFileTourOnboarding(fileName) {
-  if (isOnboardingActive() || hasKnowledgeFileTourClickRecord()) return false;
+  if (!isOnboardingEnabled() || isOnboardingActive() || hasKnowledgeFileTourClickRecord()) return false;
   knowledgeFileTourState.fileName = String(fileName || '').trim();
   const visible = await ensureKnowledgeFileTourTargetsVisible();
+  if (!isOnboardingEnabled() || isOnboardingActive() || hasKnowledgeFileTourClickRecord()) {
+    knowledgeFileTourState.fileName = '';
+    return false;
+  }
   if (!visible) {
     knowledgeFileTourState.fileName = '';
     return false;
@@ -18964,7 +19079,7 @@ async function startKnowledgeFileTourOnboarding(fileName) {
 }
 
 async function startMemoTourOnboarding() {
-  if (isOnboardingActive() || hasMemoTourClickRecord() || memoTourState.starting) return false;
+  if (!isOnboardingEnabled() || isOnboardingActive() || hasMemoTourClickRecord() || memoTourState.starting) return false;
   memoTourState.starting = true;
   try {
     markMemoTourClickRecord();
@@ -18978,7 +19093,7 @@ async function startMemoTourOnboarding() {
 }
 
 async function startMemoTaskTourOnboarding() {
-  if (isOnboardingActive() || hasMemoTaskTourClickRecord() || !hasMemoTourClickRecord() || !hasConfiguredModels() || memoTaskTourState.starting) return false;
+  if (!isOnboardingEnabled() || isOnboardingActive() || hasMemoTaskTourClickRecord() || !hasMemoTourClickRecord() || !hasConfiguredModels() || memoTaskTourState.starting) return false;
   memoTaskTourState.starting = true;
   try {
     markMemoTaskTourClickRecord();
@@ -18995,10 +19110,11 @@ async function startMemoTaskTourOnboarding() {
 }
 
 async function startSkillTourOnboarding() {
-  if (isOnboardingActive() || hasSkillTourClickRecord() || skillTourState.starting) return false;
+  if (!isOnboardingEnabled() || isOnboardingActive() || hasSkillTourClickRecord() || skillTourState.starting) return false;
   skillTourState.starting = true;
   try {
     const visible = await ensureSkillTourTargetsVisible();
+    if (!isOnboardingEnabled() || isOnboardingActive() || hasSkillTourClickRecord()) return false;
     if (!visible) return false;
     const availability = getSkillTourAvailability();
     const firstStep = availability.hasSkillsDir ? 'skill-tour-skills-dir' : (availability.hasCreateBtn ? 'skill-tour-create-btn' : '');
@@ -19030,6 +19146,11 @@ async function startSkillDisableTourOnboarding() {
       setSkillDisableTourTargetPath('');
       return false;
     }
+    if (!isOnboardingEnabled() || isOnboardingActive()) {
+      skillDisableTourState.pendingStart = false;
+      setSkillDisableTourTargetPath('');
+      return false;
+    }
     markSkillDisableTourClickRecord();
     skillDisableTourState.pendingStart = false;
     onboardingState.active = true;
@@ -19039,6 +19160,7 @@ async function startSkillDisableTourOnboarding() {
 }
 
 function queueSkillDisableTourOnboarding(path) {
+  if (!isOnboardingEnabled()) return false;
   if (hasSkillDisableTourClickRecord()) return false;
   const normalizedPath = normalizeFsPath(path);
   if (!normalizedPath) return false;
@@ -19071,7 +19193,7 @@ async function startChatCompletionTourOnboarding() {
 }
 
 function queueChatCompletionTourAutoStart(chatId) {
-  if (hasChatCompletionTourClickRecord()) return false;
+  if (!isOnboardingEnabled() || hasChatCompletionTourClickRecord()) return false;
   const targetChatId = resolveChatCompletionTourStartChatId(chatId || chatCompletionTourState.chatId);
   if (!targetChatId) {
     chatCompletionTourState.pendingStart = false;
@@ -19088,7 +19210,7 @@ function queueChatCompletionTourAutoStart(chatId) {
 }
 
 function startCliTourOnboarding() {
-  if (isOnboardingActive() || hasCliTourClickRecord()) return false;
+  if (!isOnboardingEnabled() || isOnboardingActive() || hasCliTourClickRecord()) return false;
   markCliTourClickRecord();
   onboardingState.active = true;
   setOnboardingStep('cli-tour-command');
@@ -19096,7 +19218,7 @@ function startCliTourOnboarding() {
 }
 
 function startWikiTourOnboarding() {
-  if (isOnboardingActive() || hasWikiTourClickRecord()) return false;
+  if (!isOnboardingEnabled() || isOnboardingActive() || hasWikiTourClickRecord()) return false;
   wikiTourState.restoreExpanded = !!ensureWikiPanelState().expanded;
   markWikiTourClickRecord();
   onboardingState.active = true;
@@ -19106,7 +19228,7 @@ function startWikiTourOnboarding() {
 }
 
 function startWikiAutoTourOnboarding() {
-  if (isOnboardingActive() || hasWikiAutoTourClickRecord()) return false;
+  if (!isOnboardingEnabled() || isOnboardingActive() || hasWikiAutoTourClickRecord()) return false;
   markWikiAutoTourClickRecord();
   onboardingState.active = true;
   applyRightSidebarState(false);
@@ -19115,7 +19237,7 @@ function startWikiAutoTourOnboarding() {
 }
 
 function startVfsDragTourOnboarding() {
-  if (isOnboardingActive() || hasVfsDragTourClickRecord()) return false;
+  if (!isOnboardingEnabled() || isOnboardingActive() || hasVfsDragTourClickRecord()) return false;
   const ok = syncVfsDragTourStep('vfs-drag-tour-intro');
   if (!ok) return false;
   markVfsDragTourClickRecord();
@@ -19125,7 +19247,7 @@ function startVfsDragTourOnboarding() {
 }
 
 function startModelCustomTourOnboarding(entry) {
-  if (isOnboardingActive() || hasModelCustomTourClickRecord() || !isSettingsOpen()) return false;
+  if (!isOnboardingEnabled() || isOnboardingActive() || hasModelCustomTourClickRecord() || !isSettingsOpen()) return false;
   const resolvedEntry = entry && entry.closest ? entry.closest('.model-entry') : null;
   if (!resolvedEntry) return false;
   const panel = resolvedEntry.querySelector('.model-config-panel');
@@ -19162,7 +19284,7 @@ function startMediaConfigTourOnboarding(entry, trigger) {
 }
 
 function startModelConfigGlowTourOnboarding() {
-  if (isOnboardingActive() || hasModelConfigGlowTourSeenRecord() || !isSettingsOpen()) return false;
+  if (!isOnboardingEnabled() || isOnboardingActive() || hasModelConfigGlowTourSeenRecord() || !isSettingsOpen()) return false;
   const entry = resolveModelConfigGlowTourEntry();
   if (!entry) return false;
   const toggle = entry.querySelector('.model-config-toggle');
@@ -19178,7 +19300,7 @@ function startModelConfigGlowTourOnboarding() {
 }
 
 function startModelUrlSafetyTourOnboarding(entry) {
-  if (isOnboardingActive() || hasModelUrlSafetyTourClickRecord() || !isSettingsOpen()) return false;
+  if (!isOnboardingEnabled() || isOnboardingActive() || hasModelUrlSafetyTourClickRecord() || !isSettingsOpen()) return false;
   const resolvedEntry = entry && entry.closest ? entry.closest('.model-entry') : null;
   if (resolvedEntry) ensureOnboardingModelConfigOpen(resolvedEntry);
   markModelUrlSafetyTourClickRecord();
@@ -19189,7 +19311,7 @@ function startModelUrlSafetyTourOnboarding(entry) {
 }
 
 function startModelSaveVerifyTourOnboarding() {
-  if (isOnboardingActive() || hasModelSaveVerifyTourClickRecord()) return false;
+  if (!isOnboardingEnabled() || isOnboardingActive() || hasModelSaveVerifyTourClickRecord()) return false;
   clearPendingModelSaveVerifyTourRecord();
   onboardingState.active = true;
   setOnboardingStep('model-save-verify-confirm');
@@ -19203,7 +19325,7 @@ function maybeStartPendingModelSaveVerifyTour() {
 }
 
 function queueModelSaveVerifyTourOnboarding() {
-  if (hasModelSaveVerifyTourClickRecord()) return false;
+  if (!isOnboardingEnabled() || hasModelSaveVerifyTourClickRecord()) return false;
   markPendingModelSaveVerifyTourRecord();
   window.setTimeout(() => {
     maybeStartPendingModelSaveVerifyTour();
@@ -19233,6 +19355,7 @@ function startSse503TourOnboarding() {
 }
 
 function queueSse503TourOnboarding(payload) {
+  if (!isOnboardingEnabled()) return false;
   if (hasSse503TourClickRecord()) {
     sse503TourState.pendingStart = false;
     return false;
@@ -19299,7 +19422,7 @@ async function startModelSaveVerifyDemo() {
 }
 
 function startRemoteAgentTourOnboarding() {
-  if (isOnboardingActive() || hasRemoteAgentTourClickRecord() || !isSettingsOpen()) return false;
+  if (!isOnboardingEnabled() || isOnboardingActive() || hasRemoteAgentTourClickRecord() || !isSettingsOpen()) return false;
   markRemoteAgentTourClickRecord();
   onboardingState.active = true;
   setOnboardingStep('remote-agent-tour-toggle');
@@ -19396,7 +19519,7 @@ function syncBrowserInstanceInitTourStep(step) {
 }
 
 function startBrowserInstanceInitTourOnboarding() {
-  if (isRemoteReadonlySiteAccess() || isOnboardingActive() || hasBrowserInstanceInitTourClickRecord() || !isBrowserQuickPluginStarted()) return false;
+  if (!isOnboardingEnabled() || isRemoteReadonlySiteAccess() || isOnboardingActive() || hasBrowserInstanceInitTourClickRecord() || !isBrowserQuickPluginStarted()) return false;
   markBrowserInstanceInitTourClickRecord();
   onboardingState.active = true;
   closeQuickFanMenu();
@@ -19405,7 +19528,7 @@ function startBrowserInstanceInitTourOnboarding() {
 }
 
 function startBrowserPluginRestartTourOnboarding() {
-  if (isOnboardingActive() || hasBrowserPluginRestartTourClickRecord()) return false;
+  if (!isOnboardingEnabled() || isOnboardingActive() || hasBrowserPluginRestartTourClickRecord()) return false;
   if (!pluginModalState.visible || !isBrowserPlugin(pluginModalState.plugin)) return false;
   markBrowserPluginRestartTourClickRecord();
   onboardingState.active = true;
@@ -19414,7 +19537,7 @@ function startBrowserPluginRestartTourOnboarding() {
 }
 
 function startRemotePluginRestartTourOnboarding() {
-  if (isOnboardingActive() || hasRemotePluginRestartTourClickRecord()) return false;
+  if (!isOnboardingEnabled() || isOnboardingActive() || hasRemotePluginRestartTourClickRecord()) return false;
   if (!pluginModalState.visible || !isRemotePlugin(pluginModalState.plugin)) return false;
   markRemotePluginRestartTourClickRecord();
   onboardingState.active = true;
@@ -19439,7 +19562,7 @@ function syncBrowserPluginRestartTourStep(step) {
 
 function startInstallAppTourOnboarding() {
   const indicator = document.getElementById('installAppIndicator');
-  if (isOnboardingActive() || hasInstallAppTourClickRecord()) return false;
+  if (!isOnboardingEnabled() || isOnboardingActive() || hasInstallAppTourClickRecord()) return false;
   if (!indicator || !indicator.classList.contains('show') || indicator.disabled) return false;
   markInstallAppTourClickRecord();
   onboardingState.active = true;
@@ -19523,6 +19646,26 @@ function handleOnboardingSettingsOpened() {
     }
     startModelConfigGlowTourOnboarding();
   }, 220);
+}
+
+function handleOnboardingDismiss(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  if (!isOnboardingActive()) return;
+  const step = String(onboardingState.step || '').trim();
+  if (!step) return;
+  let markComplete = false;
+  if (isFirstRunOnboardingStep(step)) {
+    markComplete = true;
+  } else if (isStandaloneModeTourOnboardingStep(step)) {
+    standaloneModeTourState.completedWithoutSwitch = true;
+  } else if (isModelSaveVerifyTourOnboardingStep(step)) {
+    markModelSaveVerifyTourClickRecord();
+    clearPendingModelSaveVerifyTourRecord();
+  }
+  stopOnboarding(markComplete);
 }
 
 function handleOnboardingAction(event) {
@@ -22521,6 +22664,7 @@ function openShutdownConfirm() {
   if (!localAdminControlIsAvailable()) return;
   if (shutdownSequenceState.active) return;
   closeQuickFanMenu();
+  closeRightSidebarUrlPreview();
   const overlay = document.getElementById('shutdownConfirmOverlay');
   const panel = document.getElementById('shutdownConfirmPanel');
   if (overlay) showExclusiveOverlay(overlay, panel);
@@ -22545,6 +22689,7 @@ function startShutdownSequence() {
   allowIntentionalWindowClose = true;
   pageUnloading = true;
   closeQuickFanMenu();
+  closeRightSidebarUrlPreview();
   cancelShutdownConfirm({ restoreFocus: false });
   updateShutdownOverlayText();
   document.getElementById('app')?.classList.add('shutdown-sequence');
@@ -26914,6 +27059,7 @@ function startQueuedCenterTourOnboarding() {
 }
 
 function queueQueuedCenterTourOnboarding(chatId, agentId, itemId) {
+  if (!isOnboardingEnabled()) return false;
   if (hasQueuedCenterTourClickRecord()) return false;
   queuedCenterTourState.chatId = String(chatId || '').trim();
   queuedCenterTourState.agentId = String(agentId || getChatAgentId(chatId)).trim();
@@ -30510,7 +30656,7 @@ function startTaskStartTourOnboarding() {
 }
 
 function queueTaskStartTourAutoStart(chatId, taskKey) {
-  if (hasTaskStartTourClickRecord()) return false;
+  if (!isOnboardingEnabled() || hasTaskStartTourClickRecord()) return false;
   taskStartTourState.chatId = String(chatId || '').trim();
   taskStartTourState.taskKey = normalizeTaskBadgeKey(taskKey);
   taskStartTourState.pendingStart = !!(taskStartTourState.chatId && taskStartTourState.taskKey);
@@ -34930,6 +35076,50 @@ function renderSettingsAccessNote() {
     : '';
 }
 
+function getSettingsOnboardingDraftEnabled() {
+  return typeof settingsOnboardingDraftEnabled === 'boolean'
+    ? settingsOnboardingDraftEnabled
+    : isOnboardingEnabled();
+}
+
+function initSettingsOnboardingDraft() {
+  settingsOnboardingDraftEnabled = isOnboardingEnabled();
+}
+
+function resetSettingsOnboardingDraft() {
+  settingsOnboardingDraftEnabled = null;
+}
+
+function renderSettingsOnboardingToggle() {
+  const toggle = document.getElementById('settingsOnboardingToggle');
+  const box = document.getElementById('settingsOnboardingToggleBox');
+  if (!toggle || !box) return;
+  const enabled = getSettingsOnboardingDraftEnabled();
+  toggle.classList.toggle('off', !enabled);
+  toggle.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+  toggle.title = enabled ? '点击关闭新手引导，保存后生效' : '点击开启新手引导，保存后生效';
+  box.textContent = enabled ? '✓' : '×';
+}
+
+function setOnboardingEnabled(enabled) {
+  const nextEnabled = !!enabled;
+  if (onboardingState) onboardingState.enabled = nextEnabled;
+  try {
+    localStorage.setItem(ONBOARDING_ENABLED_KEY, nextEnabled ? '1' : '0');
+  } catch {}
+  document.documentElement.setAttribute('data-onboarding-enabled', nextEnabled ? '1' : '0');
+  if (!nextEnabled) {
+    clearDeferredOnboardingStarts({ clearPersistent: true });
+    if (isOnboardingActive()) stopOnboarding(false);
+  }
+  renderSettingsOnboardingToggle();
+}
+
+function toggleSettingsOnboardingEnabled() {
+  settingsOnboardingDraftEnabled = !getSettingsOnboardingDraftEnabled();
+  renderSettingsOnboardingToggle();
+}
+
 function updateSettingsFooterActions() {
   const saveBtn = document.getElementById('settingsSaveBtn');
   if (!saveBtn) return;
@@ -34942,6 +35132,7 @@ async function openSettings() {
   closePluginModal();
   closeSoulTidyPopover();
   closeInstallAppPopover();
+  closeRightSidebarUrlPreview();
   cmdClosePanel(true);
   hideModelKeyHintPreview();
   hideModelConfigOverflowPreview();
@@ -34955,6 +35146,7 @@ async function openSettings() {
   showExclusiveOverlay(document.getElementById('settingsOverlay'), getSettingsPanel());
   promoteOnboardingToModelsIntro();
   clearSettingsErrorState();
+  initSettingsOnboardingDraft();
   closeMediaConfigPanel({ force: true, restoreEntry: false, preserveDraft: false });
   clearPendingSwarmConfigSave();
   clearPendingRemoteConfigSave();
@@ -34984,6 +35176,7 @@ async function openSettings() {
   await loadTokenSettings();
   renderModelEntries();
   renderSettingsAccessNote();
+  renderSettingsOnboardingToggle();
   updateSettingsFooterActions();
   promoteOnboardingToModelsIntro();
   // Update bee icon, thinking UI and load config
@@ -35014,6 +35207,7 @@ function closeSettings(force) {
   hideAgentImportChooser();
   resetAgentImportInputs();
   setOverlayVisible(document.getElementById('settingsOverlay'), false, getSettingsPanel());
+  resetSettingsOnboardingDraft();
   hideSwarmPanel();
   hideRemotePanel();
   _swarmConfigLoadSeq++;
@@ -39450,6 +39644,7 @@ function saveSettings() {
 async function saveSettingsAsync() {
   if (isRemoteReadonlySiteAccess()) return;
   const agentId = document.getElementById('agentSelect').value;
+  const nextOnboardingEnabled = getSettingsOnboardingDraftEnabled();
   if (!agentId) { setSettingsErrorMessage('Agent 为必填项'); return; }
   clearSettingsErrorState();
   const entries = document.querySelectorAll('#modelEntries .model-entry');
@@ -39588,8 +39783,10 @@ async function saveSettingsAsync() {
   }
   // Check if agent changed and memo has input — reset memo
   const agentChanged = agentId !== state.settings.agentId;
+  const onboardingChanged = nextOnboardingEnabled !== isOnboardingEnabled();
   state.settings.agentId = agentId;
   saveSettingsToStorage();
+  if (onboardingChanged) setOnboardingEnabled(nextOnboardingEnabled);
   renderWikiAutoTidyToggle();
   refreshWikiLastUpdate({ silent: true, agentId }).catch(() => {});
   if (state.activeChat) chatAgents[state.activeChat] = agentId;

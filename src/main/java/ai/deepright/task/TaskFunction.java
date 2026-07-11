@@ -352,7 +352,7 @@ public class TaskFunction extends BaseFunction implements TaskResult {
     }
 
     protected Map<String, Object> buildModelAndToken(WorkflowTask workTask, RouterDevice routerDevice, Map<String, Object> metadata) throws Exception {
-        WorkflowException.check(!hasText(routerDevice.getProvider()), "The router provider can not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(routerDevice.getProvider()), "The router provider can not be empty", ProtocolCode.C400);
         String app = FeatureUtils.buildApp(routerDevice.getMetadata());
         String path = FeatureUtils.escapePath(FeatureFlag.isWindows(routerDevice.getSys()), app + " token --provider " + routerDevice.getProvider());
         CliPubData pubData = this.cliSubFetcher.command(workTask, routerDevice, CliSubOps.builder()
@@ -369,7 +369,7 @@ public class TaskFunction extends BaseFunction implements TaskResult {
         String fast = MapUtils.getString(provider, RequestModelSelect.KEY_MODEL_FAST);
         String token = MapUtils.getString(provider, "token");
         String url = MapUtils.getString(provider, "__url");
-        WorkflowException.check(!hasText(token), "The router provider token can not be empty: " + routerDevice.getProvider(), ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(token), "The router provider token can not be empty: " + routerDevice.getProvider(), ProtocolCode.C400);
         metadata.put(ProviderRequestService.KEY_INTERNAL + ProviderRequestService.KEY_TOKEN, token);
         metadata.put(ProviderRequestService.KEY_PROVIDER, routerDevice.getProvider());
         if (!StringUtils.isEmpty(multiOutput)) {

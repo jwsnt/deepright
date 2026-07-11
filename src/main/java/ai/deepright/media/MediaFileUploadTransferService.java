@@ -1,10 +1,5 @@
 package ai.deepright.media;
 
-import static org.springframework.util.StringUtils.hasText;
-
-
-import ai.open.right.protocol.ProtocolCode;
-
 import ai.deepright.cli.CliPrinter;
 import ai.deepright.cli.CliPubData;
 import ai.deepright.cli.CliSubFetcher;
@@ -12,6 +7,7 @@ import ai.deepright.feature.FeatureFlag;
 import ai.deepright.lang.XmlResourceLang;
 import ai.deepright.router.RouterDevice;
 import ai.open.right.WorkflowException;
+import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.file.impl.SysStore;
 import ai.open.right.workflow.flow.llm.Segment;
@@ -131,7 +127,7 @@ public class MediaFileUploadTransferService extends MediaTransferServiceImpl {
                 this.mediaContext.setData(pubData.forceText(this.resource, this.sysStore, this.timeout, true).getCmd());
             }
             // 错误模型需要使用
-            WorkflowException.check(!hasText(this.mediaContext.getData()), pubData.getCmd(), ProtocolCode.C400);
+            WorkflowException.check(StringUtils.isEmpty(this.mediaContext.getData()), pubData.getCmd(), ProtocolCode.C915);
             // 重写Mime Type
             this.mediaContext.setType(MediaContext.PREFIX_INLINE + this.mediaContext.getType());
         }

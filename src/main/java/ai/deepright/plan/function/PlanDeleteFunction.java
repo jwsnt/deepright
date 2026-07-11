@@ -55,7 +55,7 @@ public class PlanDeleteFunction extends BaseFunction {
         this.template4delete = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4delete).openStream()), StandardCharsets.UTF_8);
         // 覆盖（rewrite），不需要重入
         // 启动检测，必要资源
-        WorkflowException.check(!hasText(this.template4delete), "The template delete must not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4delete), "The template delete must not be empty", ProtocolCode.C400);
     }
 
     @Override

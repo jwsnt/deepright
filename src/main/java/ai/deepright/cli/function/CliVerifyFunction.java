@@ -1,20 +1,12 @@
 package ai.deepright.cli.function;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
-import static org.springframework.util.StringUtils.hasText;
-
-
-
-
-import ai.open.right.protocol.ProtocolCode;
-
 import ai.deepright.cli.CliPubData;
 import ai.deepright.cli.CliSubFetcher;
 import ai.deepright.cli.CliSubOps;
 import ai.deepright.feature.FeatureUtils;
 import ai.deepright.utils.TemplateChecker;
 import ai.open.right.WorkflowException;
+import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.resouce.ResourceService;
 import ai.open.right.utils.JsonUtils;
 import ai.open.right.workflow.flow.WorkflowTask;
@@ -69,13 +61,15 @@ public class CliVerifyFunction extends BaseFunction {
 
     protected Integer timeout;
 
+    protected Boolean debug;
+
     @PostConstruct
     public void init() throws Exception {
         // IOUtils/JsonUtils负责关闭资源
         this.template = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template).openStream()), StandardCharsets.UTF_8);
         // 覆盖（rewrite），不需要重入
         // 启动检测，必要资源
-        WorkflowException.check(!hasText(this.template), "The template must not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template), "The template must not be empty", ProtocolCode.C400);
     }
 
 
@@ -112,8 +106,10 @@ public class CliVerifyFunction extends BaseFunction {
                     }
                 } catch (Exception e) {
                     buffer.append(resource).append(": ").append(e.getMessage()).append(System.lineSeparator());
-                    WorkflowException.dolog(e);
                     future.cancel(true);
+                    if (this.debug) {
+                        WorkflowException.dolog(e);
+                    }
                 }
             }
             if (!StringUtils.isEmpty(buffer)) {
@@ -222,6 +218,9 @@ public class CliVerifyFunction extends BaseFunction {
 
         @Value("${cli.verify.timeout:30000}")
         protected Integer timeout;
+
+        @Value("${debug:false}")
+        protected Boolean debug;
 
         @Bean(CliVerifyFunction.NAME)
         @ConditionalOnMissingBean(name = CliVerifyFunction.NAME)

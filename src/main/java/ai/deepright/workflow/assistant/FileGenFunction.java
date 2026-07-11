@@ -34,8 +34,6 @@ import org.springframework.context.annotation.Configuration;
 import java.util.List;
 import java.util.Map;
 
-import static org.springframework.util.StringUtils.hasText;
-
 @Slf4j
 @Getter
 @Setter
@@ -96,7 +94,7 @@ public class FileGenFunction extends BaseFunction {
         // 异常需要抛给模型
         WorkflowException.check(CollectionUtils.isEmpty(refers), "The refer_uris can not be empty", ProtocolCode.C400);
         for (String refer : refers) {
-            WorkflowException.check(!hasText(refer), "The refer_uris cannot contain empty values", ProtocolCode.C400);
+            WorkflowException.check(StringUtils.isEmpty(refer), "The refer_uris cannot contain empty values", ProtocolCode.C400);
         }
         if (!refers.isEmpty()) {
             // 禁止exempted=true豁免

@@ -1,18 +1,9 @@
 package ai.deepright.plan;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
-import static org.springframework.util.StringUtils.hasText;
-
-
-
-
-import ai.open.right.protocol.ProtocolCode;
-
-import ai.open.right.WorkflowException;
-
 import ai.deepright.feature.FeatureFlag;
 import ai.deepright.llm.provider.RequestContextBuilder;
+import ai.open.right.WorkflowException;
+import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.resouce.ResourceService;
 import ai.open.right.workflow.flow.llm.rag.RagCondition;
 import ai.open.right.workflow.flow.llm.rag.RagConfig;
@@ -64,11 +55,11 @@ public class PlanRag extends RagCondition implements RagService {
         this.template4appendShort = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4appendShort).openStream()), StandardCharsets.UTF_8);
         this.template4create = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4create).openStream()), StandardCharsets.UTF_8);
         this.template4update = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4update).openStream()), StandardCharsets.UTF_8);
-        WorkflowException.check(!hasText(this.template4updateVerify), "The plan update verify template can not be empty", ProtocolCode.C400);
-        WorkflowException.check(!hasText(this.template4appendVerify), "The plan append verify template can not be empty", ProtocolCode.C400);
-        WorkflowException.check(!hasText(this.template4appendShort), "The plan append short template can not be empty", ProtocolCode.C400);
-        WorkflowException.check(!hasText(this.template4create), "The plan create template can not be empty", ProtocolCode.C400);
-        WorkflowException.check(!hasText(this.template4update), "The plan update template can not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4updateVerify), "The plan update verify template can not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4appendVerify), "The plan append verify template can not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4appendShort), "The plan append short template can not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4create), "The plan create template can not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4update), "The plan update template can not be empty", ProtocolCode.C400);
     }
 
     @Override

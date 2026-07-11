@@ -1,22 +1,13 @@
 package ai.deepright.module;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
-import static org.springframework.util.StringUtils.hasText;
-
-
-
-
-import ai.open.right.protocol.ProtocolCode;
-
+import ai.deepright.auth.AuthService;
+import ai.deepright.feature.FeatureUtils;
 import ai.open.right.WorkflowException;
-
+import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.workflow.config.TokenEntry;
 import ai.open.right.workflow.config.TokenMapping;
 import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.llm.provider.ProviderRequestService;
-import ai.deepright.auth.AuthService;
-import ai.deepright.feature.FeatureUtils;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -45,13 +36,13 @@ public class HttpAuthority implements TokenMapping {
             return HttpAuthority.TOKEN;
         }
         String provider = FeatureUtils.buildTargetProvider(workTask);
-        WorkflowException.check(!hasText(provider), "The provider can not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(provider), "The provider can not be empty", ProtocolCode.C400);
         if (this.authService.support(provider)) {
             // 验证
             this.authService.auth(workTask, provider, token);
         } else {
             // 其他服务商检查Token
-            WorkflowException.check(!hasText(token), "The token can not be empty", ProtocolCode.C400);
+            WorkflowException.check(StringUtils.isEmpty(token), "The token can not be empty", ProtocolCode.C400);
             workTask.putMetadata(ProviderRequestService.KEY_INTERNAL + ProviderRequestService.KEY_TOKEN, StringUtils.trim(token));
         }
         return HttpAuthority.TOKEN;

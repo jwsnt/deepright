@@ -60,9 +60,9 @@ public class TaskRag extends RagCondition implements RagService {
         this.template4schemaHtml = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4schemaHtml).openStream()), StandardCharsets.UTF_8);
         this.template4schemaJson = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4schemaJson).openStream()), StandardCharsets.UTF_8);
         this.template4schemaDef = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4schemaDef).openStream()), StandardCharsets.UTF_8);
-        WorkflowException.check(!hasText(this.template4schemaJson), "The template json schema must not be empty", ProtocolCode.C400);
-        WorkflowException.check(!hasText(this.template4schemaHtml), "The template html schema must not be empty", ProtocolCode.C400);
-        WorkflowException.check(!hasText(this.template4schemaDef), "The template def schema must not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4schemaJson), "The template json schema must not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4schemaHtml), "The template html schema must not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.template4schemaDef), "The template def schema must not be empty", ProtocolCode.C400);
     }
 
     @Override
@@ -88,7 +88,7 @@ public class TaskRag extends RagCondition implements RagService {
                 responseSchema = this.buildResponseSchema(ragData.getQuery());
             }
             // 精确匹配
-            WorkflowException.check(!hasText(responseSchema), "The schema template can not be empty", ProtocolCode.C400);
+            WorkflowException.check(StringUtils.isEmpty(responseSchema), "The schema template can not be empty", ProtocolCode.C400);
             String schema = this.buildPlugin(ragData, this.template4schemaJson.replace("#schema", StringUtils.defaultIfEmpty(responseSchema, "")));
             if (log.isWarnEnabled() && !TemplateChecker.check(schema)) {
                 log.warn("The schema template contains unexpected characters, please check: {}", schema);

@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>视频调色工具</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0d0f13;
+      --panel: #141820;
+      --panel-2: #1a1f28;
+      --panel-3: #202632;
+      --border: #2d3440;
+      --text: #edf2f7;
+      --muted: #96a0af;
+      --accent: #1ec8b1;
+      --accent-2: #0ea5e9;
+      --danger: #ef4444;
+      --shadow: 0 20px 40px rgba(0,0,0,.35);
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Helvetica Neue",Arial,sans-serif;
+      background: linear-gradient(180deg, #0c0f14, #10141a 45%, #0a0c10);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .app {
+      display: grid;
+      grid-template-columns: 240px 1fr 360px;
+      grid-template-rows: 64px 1fr 168px;
+      gap: 12px;
+      padding: 12px;
+      min-height: 100vh;
+    }
+    .topbar,.left,.preview-wrap,.right,.timeline {
+      background: rgba(20,24,32,.92);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .topbar {
+      grid-column: 1 / 4;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+    }
+    .brand { font-weight: 700; letter-spacing: .04em; }
+    .tagline { color: var(--muted); font-size: 13px; }
+    .left { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+    .panel-title { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+    .media-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    button, .file-btn {
+      background: var(--panel-3);
+      border: 1px solid #3a4352;
+      color: var(--text);
+      border-radius: 12px;
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: .2s ease;
+      font-size: 13px;
+    }
+    button:hover, .file-btn:hover { border-color: var(--accent); }
+    button.primary { background: linear-gradient(135deg, rgba(30,200,177,.18), rgba(14,165,233,.15)); }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    input[type="file"] { display: none; }
+    .hint, .meta, .empty { color: var(--muted); font-size: 12px; line-height: 1.55; }
+    .media-list { display: grid; gap: 10px; }
+    .media-item {
+      padding: 10px;
+      border-radius: 12px;
+      background: #11151c;
+      border: 1px solid #27303c;
+    }
+    .preview-wrap {
+      padding: 14px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 12px;
+    }
+    .header-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .tabs, .subtabs, .ranges { display: flex; gap: 8px; flex-wrap: wrap; }
+    .tab, .subtab, .range-chip {
+      padding: 8px 12px;
+      background: #10151c;
+      border: 1px solid #2c3440;
+      border-radius: 999px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .active { color: white; border-color: rgba(30,200,177,.6); box-shadow: inset 0 0 0 1px rgba(30,200,177,.25); }
+    .preview-stage {
+      position: relative;
+      background: #090b0e;
+      border: 1px solid #232a35;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      min-height: 360px;
+    }
+    video {
+      max-width: 100%;
+      max-height: 100%;
+      border-radius: 12px;
+      background: black;
+      filter: var(--video-filter, none);
+    }
+    .preview-empty {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      text-align: center; padding: 32px;
+      color: var(--muted);
+      background: radial-gradient(circle at center, rgba(30,200,177,.06), transparent 45%);
+    }
+    .player-bar {
+      display: grid;
+      grid-template-columns: auto 1fr auto auto;
+      gap: 10px;
+      align-items: center;
+    }
+    .seek { width: 100%; }
+    .timecode { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; }
+    .right {
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      padding: 14px;
+      gap: 12px;
+    }
+    .range-editor {
+      background: #11161d;
+      border: 1px solid #27303c;
+      border-radius: 14px;
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    label { display: grid; gap: 6px; font-size: 12px; color: var(--muted); }
+    input[type="number"], input[type="text"] {
+      width: 100%;
+      background: #0d1117;
+      color: var(--text);
+      border: 1px solid #303947;
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .sliders { overflow: auto; padding-right: 4px; }
+    .slider-row {
+      display: grid;
+      grid-template-columns: 78px 1fr 58px;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .slider-row span { font-size: 12px; color: #d9e1ea; }
+    .slider-row output {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .timeline {
+      grid-column: 1 / 4;
+      padding: 14px;
+      display: grid;
+      grid-template-rows: auto auto auto;
+      gap: 10px;
+    }
+    .timeline-track {
+      position: relative;
+      height: 52px;
+      border-radius: 14px;
+      background: linear-gradient(90deg, #1b2330, #202b38);
+      border: 1px solid #2e3845;
+      overflow: hidden;
+    }
+    .track-grid {
+      position: absolute; inset: 0;
+      background-image: repeating-linear-gradient(90deg, rgba(255,255,255,.08) 0 1px, transparent 1px 48px);
+      opacity: .5;
+    }
+    .range-block {
+      position: absolute; top: 8px; bottom: 8px;
+      border-radius: 10px;
+      background: linear-gradient(90deg, rgba(30,200,177,.35), rgba(14,165,233,.35));
+      border: 1px solid rgba(30,200,177,.8);
+      min-width: 6px;
+    }
+    .playhead {
+      position: absolute; top: 0; bottom: 0; width: 2px; background: #fff;
+      box-shadow: 0 0 0 1px rgba(255,255,255,.15), 0 0 12px rgba(255,255,255,.3);
+    }
+    .scale { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; }
+    .status { color: var(--muted); font-size: 12px; min-height: 18px; }
+    @media (max-width: 1200px) {
+      .app { grid-template-columns: 220px 1fr; grid-template-rows: 64px auto auto auto; }
+      .right { grid-column: 2; }
+      .timeline { grid-column: 1 / 3; }
+    }
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; }
+      .left,.preview-wrap,.right,.timeline,.topbar { grid-column: auto; }
+      .grid2,.player-bar,.slider-row { grid-template-columns: 1fr; }
+      .slider-row output { text-align: left; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div>
+        <div class="brand">视频调色工具</div>
+        <div class="tagline">仿参考视频的深色三栏调色界面，支持秒范围生效</div>
+      </div>
+      <div class="tabs">
+        <div class="tab">画面</div>
+        <div class="tab">变速</div>
+        <div class="tab">动画</div>
+        <div class="tab active">调色</div>
+        <div class="tab">AI效果</div>
+      </div>
+    </div>
+
+    <aside class="left">
+      <div>
+        <div class="panel-title">素材</div>
+        <div class="media-actions">
+          <label class="file-btn primary">加载视频<input id="videoFile" type="file" accept="video/*"></label>
+          <button id="loadDemo">载入参考视频</button>
+        </div>
+      </div>
+      <div class="media-item">
+        <div>当前素材</div>
+        <div id="fileName" class="meta">未加载视频</div>
+      </div>
+      <div class="media-item">
+        <div>说明</div>
+        <div class="hint">可设置开始秒和结束秒，播放头进入该区间时自动应用调色；离开区间恢复默认画面。当前版本按单一区间工作，避免重叠优先级混乱。</div>
+      </div>
+      <div class="media-item">
+        <div>已支持参数</div>
+        <div class="hint">色温、色调、饱和度、自然饱和度、亮度、对比度、高光、阴影、白色、黑色、光感</div>
+      </div>
+    </aside>
+
+    <main class="preview-wrap">
+      <div class="header-row">
+        <div class="subtabs">
+          <div class="subtab active">基础</div>
+          <div class="subtab">HSL</div>
+          <div class="subtab">曲线</div>
+          <div class="subtab">色轮</div>
+        </div>
+        <div id="activeRangeLabel" class="status">当前区间：未设置</div>
+      </div>
+
+      <div class="preview-stage">
+        <video id="video" crossorigin="anonymous"></video>
+        <div id="previewEmpty" class="preview-empty">请选择本地视频，或直接载入参考视频。拖动参数和时间范围后，预览将按秒区间实时生效。</div>
+      </div>
+
+      <div class="player-bar">
+        <div class="actions">
+          <button id="togglePlay" disabled>播放</button>
+          <button id="resetAll" disabled>重置参数</button>
+        </div>
+        <input id="seek" class="seek" type="range" min="0" max="0" step="0.01" value="0" disabled>
+        <div id="timecode" class="timecode">00:00 / 00:00</div>
+        <button>16:9</button>
+      </div>
+    </main>
+
+    <aside class="right">
+      <div class="panel-title">调色</div>
+      <div class="range-editor">
+        <div class="ranges"><div class="range-chip active">单区间调色</div></div>
+        <div class="grid2">
+          <label>开始秒
+            <input id="startSec" type="number" min="0" step="0.01" placeholder="例如 2.5" disabled>
+          </label>
+          <label>结束秒
+            <input id="endSec" type="number" min="0" step="0.01" placeholder="例如 8.0" disabled>
+          </label>
+        </div>
+        <div class="actions">
+          <button id="applyRange" class="primary" disabled>应用区间</button>
+          <button id="clearRange" disabled>清空区间</button>
+        </div>
+        <div id="rangeStatus" class="status">未加载视频</div>
+      </div>
+
+      <div id="sliders" class="sliders"></div>
+
+      <div class="actions">
+        <button id="savePreset" disabled>保存预设</button>
+        <button id="applyAll" disabled>应用全部</button>
+      </div>
+    </aside>
+
+    <section class="timeline">
+      <div class="panel-title">时间轴</div>
+      <div class="timeline-track" id="timelineTrack">
+        <div class="track-grid"></div>
+        <div id="rangeBlock" class="range-block" style="display:none"></div>
+        <div id="playhead" class="playhead" style="left:0"></div>
+      </div>
+      <div id="scale" class="scale"></div>
+      <div class="hint">当播放头进入高亮区间时，自动套用右侧调色参数；离开区间则恢复未调色状态。</div>
+    </section>
+  </div>
+
+  <script>
+    const params = [
+      { key: 'temperature', label: '色温', min: -100, max: 100, value: 0 },
+      { key: 'tint', label: '色调', min: -100, max: 100, value: 0 },
+      { key: 'saturation', label: '饱和度', min: -100, max: 100, value: 0 },
+      { key: 'vibrance', label: '自然饱和度', min: -100, max: 100, value: 0 },
+      { key: 'brightness', label: '亮度', min: -100, max: 100, value: 0 },
+      { key: 'contrast', label: '对比度', min: -100, max: 100, value: 0 },
+      { key: 'highlights', label: '高光', min: -100, max: 100, value: 0 },
+      { key: 'shadows', label: '阴影', min: -100, max: 100, value: 0 },
+      { key: 'whites', label: '白色', min: -100, max: 100, value: 0 },
+      { key: 'blacks', label: '黑色', min: -100, max: 100, value: 0 },
+      { key: 'clarity', label: '光感', min: -100, max: 100, value: 0 }
+    ];
+
+    const state = {
+      duration: 0,
+      currentSrc: '',
+      range: null,
+      sliders: Object.fromEntries(params.map(p => [p.key, p.value]))
+    };
+
+    const video = document.getElementById('video');
+    const fileInput = document.getElementById('videoFile');
+    const previewEmpty = document.getElementById('previewEmpty');
+    const fileName = document.getElementById('fileName');
+    const togglePlay = document.getElementById('togglePlay');
+    const seek = document.getElementById('seek');
+    const timecode = document.getElementById('timecode');
+    const startSec = document.getElementById('startSec');
+    const endSec = document.getElementById('endSec');
+    const applyRange = document.getElementById('applyRange');
+    const clearRange = document.getElementById('clearRange');
+    const rangeStatus = document.getElementById('rangeStatus');
+    const activeRangeLabel = document.getElementById('activeRangeLabel');
+    const slidersWrap = document.getElementById('sliders');
+    const playhead = document.getElementById('playhead');
+    const rangeBlock = document.getElementById('rangeBlock');
+    const timelineTrack = document.getElementById('timelineTrack');
+    const scale = document.getElementById('scale');
+    const resetAll = document.getElementById('resetAll');
+    const savePreset = document.getElementById('savePreset');
+    const applyAll = document.getElementById('applyAll');
+    const loadDemo = document.getElementById('loadDemo');
+
+    function renderSliders() {
+      slidersWrap.innerHTML = params.map(p => `
+        <div class="slider-row">
+          <span>${p.label}</span>
+          <input type="range" min="${p.min}" max="${p.max}" step="1" value="${state.sliders[p.key]}" data-key="${p.key}">
+          <output id="out-${p.key}">${state.sliders[p.key]}</output>
+        </div>
+      `).join('');
+      slidersWrap.querySelectorAll('input[type="range"]').forEach(input => {
+        input.disabled = !state.duration;
+        input.addEventListener('input', e => {
+          state.sliders[e.target.dataset.key] = Number(e.target.value);
+          document.getElementById(`out-${e.target.dataset.key}`).textContent = e.target.value;
+          syncPreview();
+        });
+      });
+    }
+
+    function fmt(sec) {
+      sec = Math.max(0, Number(sec) || 0);
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    }
+
+    function updateScale() {
+      if (!state.duration) {
+        scale.innerHTML = '<span>0s</span><span>--</span><span>0s</span>';
+        return;
+      }
+      const marks = 6;
+      scale.innerHTML = Array.from({ length: marks + 1 }, (_, i) => {
+        const t = (state.duration * i) / marks;
+        return `<span>${t.toFixed(1)}s</span>`;
+      }).join('');
+    }
+
+    function setControlsEnabled(enabled) {
+      [togglePlay, seek, startSec, endSec, applyRange, clearRange, resetAll, savePreset, applyAll].forEach(el => el.disabled = !enabled);
+      slidersWrap.querySelectorAll('input[type="range"]').forEach(el => el.disabled = !enabled);
+    }
+
+    function loadVideo(src, name) {
+      state.currentSrc = src;
+      video.src = src;
+      fileName.textContent = name;
+      previewEmpty.style.display = 'none';
+      rangeStatus.textContent = '请设置开始秒和结束秒';
+    }
+
+    function validateRange() {
+      const start = Number(startSec.value);
+      const end = Number(endSec.value);
+      if (!Number.isFinite(start) || !Number.isFinite(end)) return { ok: false, msg: '开始秒和结束秒必须为数字' };
+      if (start < 0 || end < 0) return { ok: false, msg: '秒数不能为负数' };
+      if (start >= end) return { ok: false, msg: '开始秒必须小于结束秒' };
+      if (!state.duration) return { ok: false, msg: '视频时长未就绪' };
+      if (end > state.duration) return { ok: false, msg: `结束秒不能超过视频总时长 ${state.duration.toFixed(2)}s` };
+      return { ok: true, start, end };
+    }
+
+    function updateRangeUI() {
+      if (!state.range || !state.duration) {
+        rangeBlock.style.display = 'none';
+        activeRangeLabel.textContent = '当前区间：未设置';
+        return;
+      }
+      const left = (state.range.start / state.duration) * 100;
+      const width = ((state.range.end - state.range.start) / state.duration) * 100;
+      rangeBlock.style.display = 'block';
+      rangeBlock.style.left = `${left}%`;
+      rangeBlock.style.width = `${Math.max(width, 0.3)}%`;
+      activeRangeLabel.textContent = `当前区间：${state.range.start.toFixed(2)}s - ${state.range.end.toFixed(2)}s`;
+    }
+
+    function buildFilter() {
+      const v = state.sliders;
+      const active = state.range && video.currentTime >= state.range.start && video.currentTime <= state.range.end;
+      if (!active) return 'none';
+      const sat = 100 + v.saturation;
+      const bright = 100 + v.brightness;
+      const contrast = 100 + v.contrast;
+      const temp = v.temperature;
+      const tint = v.tint;
+      const highlights = v.highlights;
+      const shadows = v.shadows;
+      const whites = v.whites;
+      const blacks = v.blacks;
+      const clarity = v.clarity;
+      const vibrance = v.vibrance;
+      const sepia = Math.max(0, temp) * 0.003;
+      const hue = tint * 0.35;
+      const drop = clarity * 0.045;
+      const highPart = highlights * 0.18 + whites * 0.14;
+      const lowPart = shadows * 0.16 + blacks * 0.14;
+      const extraBrightness = highPart + lowPart + vibrance * 0.05;
+      return [
+        `saturate(${Math.max(0, sat + vibrance * 0.6)}%)`,
+        `brightness(${Math.max(0, bright + extraBrightness)}%)`,
+        `contrast(${Math.max(0, contrast + clarity * 0.35)}%)`,
+        `sepia(${Math.max(0, sepia)})`,
+        `hue-rotate(${hue}deg)`,
+        `drop-shadow(0 0 ${Math.max(0, drop)}px rgba(255,255,255,.22))`
+      ].join(' ');
+    }
+
+    function syncPreview() {
+      video.style.setProperty('--video-filter', buildFilter());
+      timecode.textContent = `${fmt(video.currentTime)} / ${fmt(state.duration)}`;
+      if (state.duration) seek.value = video.currentTime;
+      const rect = timelineTrack.getBoundingClientRect();
+      const ratio = state.duration ? video.currentTime / state.duration : 0;
+      playhead.style.left = `calc(${Math.min(100, Math.max(0, ratio * 100))}% - 1px)`;
+    }
+
+    fileInput.addEventListener('change', e => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      loadVideo(url, file.name);
+    });
+
+    loadDemo.addEventListener('click', () => {
+      loadVideo('../tmp/1.mp4', '1.mp4（参考视频）');
+    });
+
+    video.addEventListener('loadedmetadata', () => {
+      state.duration = video.duration || 0;
+      seek.max = state.duration;
+      updateScale();
+      setControlsEnabled(Boolean(state.duration));
+      renderSliders();
+      syncPreview();
+      rangeStatus.textContent = state.duration ? `视频时长 ${state.duration.toFixed(2)}s，可设置调色区间` : '无法读取视频时长';
+    });
+
+    video.addEventListener('timeupdate', syncPreview);
+    video.addEventListener('play', () => { togglePlay.textContent = '暂停'; });
+    video.addEventListener('pause', () => { togglePlay.textContent = '播放'; });
+    video.addEventListener('ended', () => { togglePlay.textContent = '播放'; });
+    video.addEventListener('error', () => {
+      rangeStatus.textContent = '视频加载失败，请重新选择文件';
+      previewEmpty.style.display = 'flex';
+      setControlsEnabled(false);
+    });
+
+    togglePlay.addEventListener('click', () => {
+      if (video.paused) video.play(); else video.pause();
+    });
+
+    seek.addEventListener('input', () => {
+      video.currentTime = Number(seek.value);
+      syncPreview();
+    });
+
+    applyRange.addEventListener('click', () => {
+      const result = validateRange();
+      if (!result.ok) {
+        rangeStatus.textContent = result.msg;
+        return;
+      }
+      state.range = { start: result.start, end: result.end };
+      updateRangeUI();
+      rangeStatus.textContent = `已应用区间 ${result.start.toFixed(2)}s - ${result.end.toFixed(2)}s`;
+      syncPreview();
+    });
+
+    clearRange.addEventListener('click', () => {
+      state.range = null;
+      startSec.value = '';
+      endSec.value = '';
+      rangeStatus.textContent = '已清空区间';
+      updateRangeUI();
+      syncPreview();
+    });
+
+    resetAll.addEventListener('click', () => {
+      params.forEach(p => state.sliders[p.key] = 0);
+      renderSliders();
+      syncPreview();
+    });
+
+    savePreset.addEventListener('click', () => {
+      localStorage.setItem('video-color-grader-preset', JSON.stringify({ sliders: state.sliders, range: state.range }));
+      rangeStatus.textContent = '预设已保存到本地浏览器';
+    });
+
+    applyAll.addEventListener('click', () => {
+      const saved = localStorage.getItem('video-color-grader-preset');
+      if (!saved) {
+        rangeStatus.textContent = '没有可用预设';
+        return;
+      }
+      try {
+        const parsed = JSON.parse(saved);
+        Object.assign(state.sliders, parsed.sliders || {});
+        if (parsed.range) {
+          state.range = parsed.range;
+          startSec.value = parsed.range.start;
+          endSec.value = parsed.range.end;
+        }
+        renderSliders();
+        updateRangeUI();
+        syncPreview();
+        rangeStatus.textContent = '已应用本地预设';
+      } catch {
+        rangeStatus.textContent = '预设解析失败';
+      }
+    });
+
+    renderSliders();
+    updateScale();
+    setControlsEnabled(false);
+  </script>
+</body>
+</html>

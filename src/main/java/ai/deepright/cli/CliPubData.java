@@ -1,15 +1,7 @@
 package ai.deepright.cli;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
-import static org.springframework.util.StringUtils.hasText;
-
-
-
-
-import ai.open.right.WorkflowException;
-
 import ai.deepright.cli.insert.CliInsert;
+import ai.open.right.WorkflowException;
 import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.file.FileStore;
@@ -122,8 +114,8 @@ public class CliPubData {
     public CliPubData check() throws Exception {
         WorkflowException.check(this.suffix == null, "The cli@pub suffix can not be empty", ProtocolCode.C400);
         WorkflowException.check(this.status == null, "The cli@pub status can not be empty", ProtocolCode.C400);
-        WorkflowException.check(!hasText(this.cmd), "The cli@pub cmd can not be empty", ProtocolCode.C400);
-        WorkflowException.check(!hasText(this.tid), "The cli@pub tid can not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.cmd), "The cli@pub cmd can not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(this.tid), "The cli@pub tid can not be empty", ProtocolCode.C400);
         return this;
     }
 

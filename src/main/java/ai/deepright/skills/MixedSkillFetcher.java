@@ -1,16 +1,5 @@
 package ai.deepright.skills;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
-import static org.springframework.util.StringUtils.hasText;
-
-
-
-
-import ai.open.right.protocol.ProtocolCode;
-
-import ai.open.right.WorkflowException;
-
 import ai.deepright.cli.CliPubData;
 import ai.deepright.cli.CliPubSub;
 import ai.deepright.cli.CliSubFetcher;
@@ -20,6 +9,8 @@ import ai.deepright.feature.FeatureFlag;
 import ai.deepright.feature.FeatureUtils;
 import ai.deepright.router.RouterDevice;
 import ai.deepright.utils.TemplateChecker;
+import ai.open.right.WorkflowException;
+import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.config.AllowedConfig;
 import ai.open.right.workflow.flow.file.DefStore;
@@ -140,7 +131,7 @@ public class MixedSkillFetcher extends FileSystemFetcher {
     protected String buildPath(WorkflowTask workTask, String name, String path) throws Exception {
         // @See CliRag
         String workspace = FeatureUtils.buildWorkspace(workTask);
-        WorkflowException.check(!hasText(workspace), "The workspace can not be empty", ProtocolCode.C400);
+        WorkflowException.check(StringUtils.isEmpty(workspace), "The workspace can not be empty", ProtocolCode.C400);
         return this.buildSkills(workTask) + File.separator + name + File.separator + path;
     }
 
