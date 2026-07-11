@@ -368,8 +368,8 @@ CREATE TABLE IF NOT EXISTS skills_warning (
 
 - 相同绝对路径的数据库只会打开一次，并复用同一个 `WarningStore`。
 - `sql.DB` 配置为：
-  - `SetMaxOpenConns(1)`
-  - `SetMaxIdleConns(1)`
+  - `SetMaxOpenConns(10)`
+  - `SetMaxIdleConns(10)`
   - `SetConnMaxLifetime(0)`
 
 这个缓存只存在于当前进程内，进程退出后不会保留。

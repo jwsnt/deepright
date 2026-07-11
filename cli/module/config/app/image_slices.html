@@ -46,47 +46,14 @@
     .field.count-field {
       flex: 1 1 0;
       min-width: 0;
+      border-left: 2px solid rgba(255,255,255,0.08);
+      padding-left: 14px;
+      margin-left: 2px;
     }
     .crop-panel {
-      margin: 0 0 10px;
+      margin: 0 0 6px;
     }
-    .crop-toggle-row {
-      display: flex;
-      justify-content: flex-end;
-      margin: -14px 0 2px;
-      padding-right: 0;
-      position: relative;
-      z-index: 2;
-    }
-    .crop-toggle {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 16px;
-      height: 16px;
-      padding: 0;
-      margin-right: 0;
-      background: transparent;
-      color: #8d8d8d;
-      border: 0;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 10px;
-      line-height: 1;
-    }
-    .crop-toggle:hover {
-      background: transparent;
-      color: #b5b5b5;
-    }
-    .crop-toggle-icon {
-      color: currentColor;
-      transition: transform 0.18s ease;
-      flex: 0 0 auto;
-      transform-origin: center;
-    }
-    .crop-panel.expanded .crop-toggle-icon {
-      transform: rotate(180deg);
-    }
+
     .crop-fields {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -361,6 +328,35 @@
       pointer-events: none;
       z-index: 2;
     }
+
+    .export-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 14px;
+      height: 40px;
+      border-radius: 10px;
+      border: 1px solid #444;
+      background: #1e2a1e;
+      color: #7ecf7e;
+      font-size: 14px;
+      cursor: pointer;
+      white-space: nowrap;
+      flex: 0 0 auto;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .export-btn:hover { background: #243024; border-color: #5aa85a; }
+    .export-btn:disabled { opacity: 0.38; cursor: not-allowed; }
+    .export-toast {
+      display: inline-block;
+      margin-left: 8px;
+      font-size: 13px;
+      color: #7ecf7e;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+    .export-toast.show { opacity: 1; }
     @media (max-width: 600px) {
       body { padding: 14px; }
       .toolbar { gap: 6px; padding: 8px 10px; }
@@ -384,15 +380,15 @@
         <label for="verticalCount">垂直</label>
         <input id="verticalCount" type="number" min="1" step="1" value="1" inputmode="numeric" />
       </div>
+      <div class="field" style="flex:0 0 auto;min-width:0;border-left:2px solid rgba(255,255,255,0.08);padding-left:14px;margin-left:2px;justify-content:flex-end;">
+        <label style="opacity:0;pointer-events:none;user-select:none;">导出</label>
+        <button class="export-btn" id="exportBtn" type="button" disabled>导出</button>
+        <span class="export-toast" id="exportToast">已复制</span>
+      </div>
     </div>
 
     <div class="crop-panel" id="cropPanel">
-      <div class="crop-toggle-row">
-        <button class="crop-toggle" id="cropToggle" type="button" aria-expanded="false" aria-controls="cropFields" aria-label="展开缩进设置">
-          <span class="crop-toggle-icon" aria-hidden="true">▾</span>
-        </button>
-      </div>
-      <div class="crop-fields" id="cropFields" hidden>
+      <div class="crop-fields" id="cropFields">
         <div class="field crop-field">
           <label for="cropTop">上缩进</label>
           <input id="cropTop" type="number" min="0" step="1" value="0" inputmode="numeric" />
@@ -453,7 +449,6 @@
     const horizontalCountInput = document.getElementById('horizontalCount');
     const verticalCountInput = document.getElementById('verticalCount');
     const cropPanel = document.getElementById('cropPanel');
-    const cropToggle = document.getElementById('cropToggle');
     const cropFields = document.getElementById('cropFields');
     const cropTopInput = document.getElementById('cropTop');
     const cropBottomInput = document.getElementById('cropBottom');
@@ -467,6 +462,8 @@
     const overlay = document.getElementById('overlay');
     const topLabelLayer = document.getElementById('topLabelLayer');
     const viewerWrap = document.getElementById('viewerWrap');
+    const exportBtn = document.getElementById('exportBtn');
+    const exportToast = document.getElementById('exportToast');
 
     let objectUrl = null;
     let verticalLinePositions = [];
@@ -736,7 +733,6 @@
 
     function syncCropPanelState(expanded) {
       cropPanel.classList.toggle('expanded', expanded);
-      cropToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
       cropFields.hidden = !expanded;
     }
 
@@ -1007,11 +1003,7 @@
       if (image.src) initializeLines();
     }
 
-    syncCropPanelState(false);
-    cropToggle.addEventListener('click', () => {
-      const expanded = cropToggle.getAttribute('aria-expanded') !== 'true';
-      syncCropPanelState(expanded);
-    });
+    syncCropPanelState(true);
 
     horizontalCountInput.addEventListener('input', handleCountInput);
     verticalCountInput.addEventListener('input', handleCountInput);
@@ -1019,6 +1011,121 @@
     cropBottomInput.addEventListener('input', handleCropInput);
     cropLeftInput.addEventListener('input', handleCropInput);
     cropRightInput.addEventListener('input', handleCropInput);
+
+
+    function exportRects() {
+      if (!image.src || !image.naturalWidth) {
+        alert('请先加载图片');
+        return;
+      }
+      const dispW = getDisplayWidth();
+      const dispH = getDisplayHeight();
+      const natW = image.naturalWidth;
+      const natH = image.naturalHeight;
+      const scaleX = natW / dispW;
+      const scaleY = natH / dispH;
+
+      const bounds = getGridBounds();
+      if (!bounds) { alert('请先加载图片'); return; }
+
+      const xEdges = [bounds.left, ...verticalLinePositions, bounds.right].map(v => Math.round(v));
+      const yEdges = [bounds.top, ...horizontalLinePositions, bounds.bottom].map(v => Math.round(v));
+
+      const cols = xEdges.length - 1;
+      const rows = yEdges.length - 1;
+      const total = cols * rows;
+      if (total === 0) { alert('暂无矩形数据可导出'); return; }
+
+      // 转为原图坐标，Y轴翻转（原点左下角）
+      function toNatX(dispX) { return Math.round(dispX * scaleX); }
+      function toNatY(dispY) {
+        // dispY是从顶部向下，natH - dispY*scaleY 转为左下角原点
+        return Math.round(natH - dispY * scaleY);
+      }
+
+      const rectStrs = [];
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          const dispLeft  = xEdges[col];
+          const dispRight = xEdges[col + 1];
+          const dispTop   = yEdges[row];
+          const dispBot   = yEdges[row + 1];
+
+          const x1 = toNatX(dispLeft);
+          const x2 = toNatX(dispRight);
+          const y1 = toNatY(dispBot);   // 左下/右下的 Y（较小 dispBot -> 较大 natY）
+          const y2 = toNatY(dispTop);   // 左上/右上的 Y（较大 dispTop -> 较小 natY? 实际 dispTop<dispBot so toNatY(dispTop)>toNatY(dispBot) ✓)
+
+          // 左下(x1,y1)，左上(x1,y2)，右上(x2,y2)，右下(x2,y1)
+          const coords = `(${x1},${y1}),(${x1},${y2}),(${x2},${y2}),(${x2},${y1})`;
+          rectStrs.push(`(${coords})`);
+        }
+      }
+
+      const coordSet = `[${rectStrs.join(',')}]`;
+      const line2 = `共${total}个矩形，以(左下,左上,右上,右下)坐标标记为${coordSet}，原图大小为${natW}x${natH}`;
+      const intro = `坐标取值顺序为(左下,左上,右上,右下)`;
+      const content = intro + '\n' + coordSet + '\n' + line2;
+
+      exportBtn.disabled = true;
+      navigator.clipboard.writeText(content).then(() => {
+        exportToast.classList.add('show');
+        setTimeout(() => { exportToast.classList.remove('show'); exportBtn.disabled = false; }, 2000);
+      }).catch(() => {
+        // 降级：execCommand
+        const ta = document.createElement('textarea');
+        ta.value = content;
+        ta.style.cssText = 'position:fixed;opacity:0;pointer-events:none;';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); exportToast.classList.add('show'); setTimeout(() => { exportToast.classList.remove('show'); exportBtn.disabled = false; }, 2000); }
+        catch(e) { alert('复制失败，请手动复制:\n' + content); exportBtn.disabled = false; }
+        document.body.removeChild(ta);
+      });
+    }
+
+    exportBtn.addEventListener('click', exportRects);
+
+    // URL param: file — 自动加载指定路径的图片
+    (function() {
+      const params = new URLSearchParams(window.location.search);
+      const fileParam = params.get('file');
+      if (!fileParam) return;
+      const url = decodeURIComponent(fileParam);
+      clearError();
+      fetch("/api/download?path=" + encodeURIComponent(url))
+        .then(res => {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.blob();
+        })
+        .then(blob => {
+          if (!blob.type.startsWith('image/')) throw new Error('非图片文件');
+          if (objectUrl) URL.revokeObjectURL(objectUrl);
+          objectUrl = URL.createObjectURL(blob);
+          image.onload = () => {
+            viewerWrap.hidden = false;
+            emptyState.hidden = true;
+            stage.hidden = false;
+            updateStageSize();
+            refreshTheme();
+            initializeLines();
+            exportBtn.disabled = false;
+          };
+          image.onerror = () => {
+            setError('图片加载失败：文件可能损坏或格式不受支持。');
+            viewerWrap.hidden = false;
+            stage.hidden = true;
+            emptyState.hidden = false;
+            overlay.innerHTML = '';
+            topLabelLayer.innerHTML = '';
+            widthBar.innerHTML = '<span class="badge">图片加载失败</span>';
+          };
+          image.src = objectUrl;
+        })
+        .catch(err => {
+          setError('自动加载失败：' + err.message + '（路径：' + url + '）');
+        });
+    })();
 
     imageInput.addEventListener('change', () => {
       clearError();
@@ -1038,6 +1145,7 @@
         updateStageSize();
         refreshTheme();
         initializeLines();
+        exportBtn.disabled = false;
       };
       image.onerror = () => {
         setError('图片加载失败：文件可能损坏或格式不受支持。');

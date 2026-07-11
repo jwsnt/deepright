@@ -21,19 +21,21 @@ var (
 	integrationBrowserStartFn         = func(cmdPath string, args ...string) error {
 		return exec.Command(cmdPath, args...).Start()
 	}
-	integrationBrowserAppleScriptFn = func(script string) error {
+	integrationBrowserAppleScriptFn = func(script string) (string, error) {
 		cmd := exec.Command("osascript")
 		cmd.Stdin = strings.NewReader(script)
+		var stdout bytes.Buffer
 		var stderr bytes.Buffer
+		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
 		if err := cmd.Run(); err != nil {
 			message := strings.TrimSpace(stderr.String())
 			if message != "" {
-				return fmt.Errorf("run osascript: %w: %s", err, message)
+				return "", fmt.Errorf("run osascript: %w: %s", err, message)
 			}
-			return fmt.Errorf("run osascript: %w", err)
+			return "", fmt.Errorf("run osascript: %w", err)
 		}
-		return nil
+		return strings.TrimSpace(stdout.String()), nil
 	}
 )
 
@@ -215,10 +217,17 @@ func integrationBrowserOpenOrActivateChromeTab(target string) (bool, error) {
 	if integrationBrowserHasRemoteDebuggingChromeProcess() {
 		return false, nil
 	}
-	if err := integrationBrowserAppleScriptFn(integrationBrowserChromeAppleScript(target)); err != nil {
+	if !integrationBrowserHasRunningChromeProcess() {
 		return false, nil
 	}
-	return true, nil
+	result, err := integrationBrowserAppleScriptFn(integrationBrowserChromeAppleScript(target))
+	if err != nil {
+		return false, nil
+	}
+	if strings.EqualFold(strings.TrimSpace(result), "activated") {
+		return true, nil
+	}
+	return false, nil
 }
 
 func integrationBrowserHasRemoteDebuggingChromeProcess() bool {
@@ -228,6 +237,23 @@ func integrationBrowserHasRemoteDebuggingChromeProcess() bool {
 	}
 	for _, process := range processes {
 		if integrationBrowserProcessHasRemoteDebuggingChrome(process.CommandLine) {
+			return true
+		}
+	}
+	return false
+}
+
+func integrationBrowserHasRunningChromeProcess() bool {
+	processes, err := integrationBrowserListProcessesFn()
+	if err != nil {
+		return false
+	}
+	for _, process := range processes {
+		commandLine := strings.ToLower(strings.TrimSpace(process.CommandLine))
+		if commandLine == "" {
+			continue
+		}
+		if strings.Contains(commandLine, "google chrome.app/contents/macos/google chrome") {
 			return true
 		}
 	}
@@ -271,9 +297,7 @@ set targetUrl to %s
 
 tell application "Google Chrome"
 	if it is not running then
-		activate
-		open location targetUrl
-		return "opened"
+		return "miss"
 	end if
 
 	repeat with w in windows
@@ -289,9 +313,7 @@ tell application "Google Chrome"
 		end repeat
 	end repeat
 
-	activate
-	open location targetUrl
-	return "opened"
+	return "miss"
 end tell
 `, strconv.Quote(target))
 }

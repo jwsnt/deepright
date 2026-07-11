@@ -192,8 +192,8 @@ func OpenSharedDB(appDir string) (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(1)
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(10)
 	db.SetConnMaxLifetime(0)
 
 	if err := EnsureSchema(db); err != nil {
@@ -225,8 +225,8 @@ func OpenExistingDB(appDir string) (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open existing sqlite: %w", err)
 	}
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(1)
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(10)
 	db.SetConnMaxLifetime(0)
 	return db, nil
 }

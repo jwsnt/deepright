@@ -58,8 +58,8 @@ func getBuildLogDB(baseDir string) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(1)
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(10)
 	db.SetConnMaxLifetime(0)
 	if err := ensureBuildLogSchema(db); err != nil {
 		_ = db.Close()

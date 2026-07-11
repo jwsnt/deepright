@@ -121,10 +121,11 @@ integration service cancel --chat chat-001
 | POST | `/v1/chat/completions` | 聊天补全代理 | `integration api chat-completions` |
 | GET | `/api/heartbeat` | 查看心跳状态 | `integration api heartbeat` |
 | POST | `/api/cancel` | 取消会话流 | `integration api cancel` |
-| POST | `/api/restore` | 恢复会话日志 | `integration api restore` |
+| POST | `/api/restore` | 恢复会话日志 / 历史分页回溯 | `integration api restore` |
 | GET | `/api/chat_session_log` | 查询会话日志 | `integration api chat-session-log` |
 | POST | `/api/cmd` | 执行命令 | `integration api cmd` |
 | POST | `/api/kill` | 停止命令 | `integration api kill` |
+| GET | `/api/log_cleanup_status` | 查询启动期日志清理状态 | `integration api log-cleanup-status` |
 | GET, POST | `/api/shutdown` | 延迟关闭 integration | 无 CLI 包装 |
 
 ### Agent / 文件接口
@@ -158,7 +159,7 @@ integration service cancel --chat chat-001
 
 | 方法 | 路径 | 功能 | CLI |
 |---|---|---|---|
-| POST | `/api/config` | 更新 Agent 配置 | `integration api config` |
+| POST | `/api/config` | 更新 Agent 配置 / 删除共享模型 | `integration api config` |
 | GET, POST | `/api/token` | 读取/保存模型配置 | `integration api token get/set` |
 | GET | `/api/consume` | 查询 token 消费 | `integration api consume` |
 | POST | `/api/message_insert/add` | 新增插入消息 | `integration api message-insert add` |
@@ -211,6 +212,7 @@ integration service cancel --chat chat-001
 | GET | `/knowledge/...` | knowledge 子路径 | `integration api knowledge --path ...` |
 | GET | `/knowledge_lastUpdate` | knowledge 更新时间文本 | `integration api knowledge-last-update` |
 | GET | `/knowledge_path` | knowledge 目录路径 | `integration api knowledge-path` |
+| GET, HEAD | `/launch` | 浏览器启动跳转页 | 无 CLI 包装 |
 | GET, HEAD | `/mapping/...` | app 静态资源 | 无 CLI 包装 |
 | 多方法 | `server.Register(mux, cfg.Site)` | site 静态文件服务 | 无 CLI 包装 |
 
@@ -263,7 +265,7 @@ integration api cancel --chat chat-001
 
 ### 4. `POST /api/restore`
 
-用途：按时间线恢复会话日志。
+用途：按时间线恢复会话日志，或按历史分页向前翻页。
 
 HTTP：
 
@@ -280,6 +282,37 @@ integration api restore \
   --timeline 2026-07-06T10:00:00 \
   --lastId 100
 ```
+
+历史分页模式：
+
+```bash
+curl -X POST 'http://127.0.0.1:8080/api/restore?agentId=demo-agent&chat=chat-001&history=1&limit=120'
+
+integration api restore \
+  --agentId demo-agent \
+  --chat chat-001 \
+  --history true \
+  --limit 120
+```
+
+继续翻上一页时，可继续携带上一页响应中的 `history.beforeTimeline` 和 `history.beforeId`：
+
+```bash
+curl -X POST 'http://127.0.0.1:8080/api/restore?agentId=demo-agent&chat=chat-001&history=1&beforeTimeline=2026-07-06T10:00:00&beforeId=321&limit=120'
+
+integration api restore \
+  --agentId demo-agent \
+  --chat chat-001 \
+  --history true \
+  --beforeTimeline 2026-07-06T10:00:00 \
+  --beforeId 321 \
+  --limit 120
+```
+
+说明：
+
+- 前向恢复仍使用 `timeline` + `lastId`
+- 历史分页模式下，响应会额外返回 `history.hasMore`、`history.beforeTimeline`、`history.beforeId`
 
 ### 5. `GET /api/chat_session_log`
 
@@ -509,6 +542,21 @@ CLI：
 integration api config --agentId demo-agent --body-file ./agent-config.json
 ```
 
+删除共享模型配置：
+
+```bash
+curl -X POST 'http://127.0.0.1:8080/api/config' \
+  -H 'Content-Type: application/json' \
+  -d '{"action":"delete_model","model":"OpenAI"}'
+
+integration api config --body '{"action":"delete_model","model":"OpenAI"}'
+```
+
+说明：
+
+- 更新 Agent `config.json` 时需要传 `agentId`
+- 执行 `delete_model` 动作时不需要 `agentId`
+
 ### 26. `GET/POST /api/token`
 
 读取：
@@ -730,19 +778,21 @@ curl -X POST 'http://127.0.0.1:8080/api/cron/detail/status?agentId=demo-agent&de
 integration api cron detail-status --agentId demo-agent --detailId detail_1 --status 3
 ```
 
-### 35-40. 辅助查询快速示例
+### 辅助查询与页面路由快速示例
 
 - `/skills_warning`：`curl 'http://127.0.0.1:8080/skills_warning'` ｜ `integration api skills-warning`
 - `/install_app`：`curl 'http://127.0.0.1:8080/install_app'` ｜ `integration api install-app`
 - `/log_round`：`curl 'http://127.0.0.1:8080/log_round?chatId=chat-001&round=3'` ｜ `integration api log-round --chatId chat-001 --round 3`
 - `/log_skill`：`curl 'http://127.0.0.1:8080/log_skill?chatId=chat-001&round=3'` ｜ `integration api log-skill --chatId chat-001 --round 3`
 - `/log_skill_status`：`curl 'http://127.0.0.1:8080/log_skill_status?agentId=demo-agent&chatId=chat-001&round=3'` ｜ `integration api log-skill-status --agentId demo-agent --chatId chat-001 --round 3`
+- `/api/log_cleanup_status`：`curl 'http://127.0.0.1:8080/api/log_cleanup_status'` ｜ `integration api log-cleanup-status`
 - `knowledge`：目录树 `curl 'http://127.0.0.1:8080/knowledge'` ｜ `integration api knowledge`
 - `knowledge` 子路径：`curl 'http://127.0.0.1:8080/knowledge/demo-agent'` ｜ `integration api knowledge --path demo-agent`
 - `knowledge_lastUpdate`：`curl 'http://127.0.0.1:8080/knowledge_lastUpdate?agentId=demo-agent'` ｜ `integration api knowledge-last-update --agentId demo-agent`
 - `knowledge_path`：`curl 'http://127.0.0.1:8080/knowledge_path?agentId=demo-agent'` ｜ `integration api knowledge-path --agentId demo-agent`
+- `/launch`：浏览器启动跳转页，常用于本机拉起后等待 `/site/` 准备完成；示例：直接访问 `http://127.0.0.1:8080/launch`
 
-### 41. `/api/shutdown`
+### `/api/shutdown`
 
 按需求，不提供 CLI 包装。
 

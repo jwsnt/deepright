@@ -76,6 +76,7 @@ func printIntegrationAPIHelp() {
 	fmt.Println("Commands:")
 	fmt.Println("  chat-completions      Call POST /v1/chat/completions")
 	fmt.Println("  heartbeat             Call GET /api/heartbeat")
+	fmt.Println("  log-cleanup-status    Call GET /api/log_cleanup_status")
 	fmt.Println("  agent-id              Call GET /api/agentId")
 	fmt.Println("  swarm-agent           Call GET /api/swarm_agent")
 	fmt.Println("  device-id             Call GET /api/deviceId")
@@ -120,6 +121,7 @@ func printIntegrationAPIHelp() {
 	fmt.Println("")
 	fmt.Println("Examples:")
 	fmt.Println("  integration api heartbeat")
+	fmt.Println("  integration api log-cleanup-status")
 	fmt.Println("  integration api agent-id")
 	fmt.Println("  integration api edit --agentId demo --path USER.md --content '# hello'")
 	fmt.Println("  integration api token get")
@@ -1017,6 +1019,13 @@ func integrationAPICommonSimpleSpecs() map[string]integrationAPIGenericRequestSp
 			Path:        "/api/heartbeat",
 		},
 		{
+			Command:     "log-cleanup-status",
+			Usage:       "integration api log-cleanup-status [--addr URL] [--port 8080]",
+			Description: "Call GET /api/log_cleanup_status.",
+			Method:      http.MethodGet,
+			Path:        "/api/log_cleanup_status",
+		},
+		{
 			Command:     "agent-id",
 			Usage:       "integration api agent-id [--addr URL] [--port 8080]",
 			Description: "Call GET /api/agentId.",
@@ -1167,8 +1176,8 @@ func integrationAPICommonSimpleSpecs() map[string]integrationAPIGenericRequestSp
 		},
 		{
 			Command:     "restore",
-			Usage:       "integration api restore --chat ID --timeline RFC3339 [--agentId ID] [--lastId N] [--addr URL] [--port 8080]",
-			Description: "Call POST /api/restore.",
+			Usage:       "integration api restore --chat ID (--timeline RFC3339 [--lastId N] | --history true [--beforeTimeline RFC3339] [--beforeId N] [--limit N]) [--agentId ID] [--addr URL] [--port 8080]",
+			Description: "Call POST /api/restore for forward replay or backward history pagination.",
 			Method:      http.MethodPost,
 			Path:        "/api/restore",
 			QueryFlags: []integrationAPIQueryFlag{
@@ -1176,6 +1185,10 @@ func integrationAPICommonSimpleSpecs() map[string]integrationAPIGenericRequestSp
 				{QueryKey: "chat", Names: []string{"chat", "chatId"}, Usage: "chat id"},
 				{QueryKey: "timeline", Names: []string{"timeline"}, Usage: "lower time bound"},
 				{QueryKey: "lastId", Names: []string{"lastId"}, Usage: "optional last seen record id"},
+				{QueryKey: "history", Names: []string{"history"}, Usage: "set true/1 to fetch paged history"},
+				{QueryKey: "beforeTimeline", Names: []string{"beforeTimeline"}, Usage: "history cursor timeline"},
+				{QueryKey: "beforeId", Names: []string{"beforeId"}, Usage: "history cursor record id"},
+				{QueryKey: "limit", Names: []string{"limit"}, Usage: "history page size"},
 			},
 		},
 		{
@@ -1315,8 +1328,8 @@ func runIntegrationAPICLI(args []string, stdout, stderr io.Writer) int {
 	case "config":
 		return runIntegrationAPIRawBodyCLI(
 			"config",
-			"integration api config --agentId ID --body-file PATH [--addr URL] [--port 8080]",
-			"Call POST /api/config. Use --agentId in query and provide the same JSON body as the HTTP API.",
+			"integration api config [--agentId ID] --body-file PATH [--addr URL] [--port 8080]",
+			"Call POST /api/config. Use --agentId when updating one agent config.json; omit it for action payloads such as delete_model.",
 			http.MethodPost,
 			"/api/config",
 			[]integrationAPIQueryFlag{

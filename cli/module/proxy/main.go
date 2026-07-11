@@ -549,8 +549,8 @@ func getDataDB() (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(1)
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(10)
 	db.SetConnMaxLifetime(0)
 
 	sharedDataDB.db = db
@@ -603,8 +603,8 @@ func startProxyLogRetentionCleanup(ctx context.Context) {
 		if err != nil {
 			return nil, err
 		}
-		db.SetMaxOpenConns(1)
-		db.SetMaxIdleConns(1)
+		db.SetMaxOpenConns(10)
+		db.SetMaxIdleConns(10)
 		db.SetConnMaxLifetime(0)
 		initChatTable(db)
 		return db, nil

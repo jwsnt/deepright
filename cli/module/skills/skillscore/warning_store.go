@@ -44,8 +44,8 @@ func OpenWarningStore(dbPath string) (*WarningStore, error) {
 	if err != nil {
 		return nil, fmt.Errorf("打开 sqlite 失败: %w", err)
 	}
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(1)
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(10)
 	db.SetConnMaxLifetime(0)
 
 	if _, err := db.Exec(warningTableDDL); err != nil {

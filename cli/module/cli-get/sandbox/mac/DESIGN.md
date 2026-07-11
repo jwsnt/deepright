@@ -206,8 +206,8 @@ CLI_SANDBOX.app
 
 - 仅用于记录构建动作与结果，不参与会话级沙盒状态读写
 - 连接策略保持保守：
-  - `SetMaxOpenConns(1)`
-  - `SetMaxIdleConns(1)`
+  - `SetMaxOpenConns(10)`
+  - `SetMaxIdleConns(10)`
   - `SetConnMaxLifetime(0)`
 
 ### 6.3.1 双架构构建与 x86 交叉编译差异

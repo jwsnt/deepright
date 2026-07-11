@@ -220,8 +220,8 @@ map[string]*sharedDBEntry
 
 连接池参数：
 
-+ `SetMaxOpenConns(1)`
-+ `SetMaxIdleConns(1)`
++ `SetMaxOpenConns(10)`
++ `SetMaxIdleConns(10)`
 + `SetConnMaxLifetime(30 * time.Minute)`
 
 设计目标：

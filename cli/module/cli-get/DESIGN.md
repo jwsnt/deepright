@@ -550,8 +550,8 @@ CREATE INDEX IF NOT EXISTS idx_agent_message_log_agent_chat_type_time
 
 + 连接键是 `knowledgecore.DBPath(".")` 返回的路径。
 + 缓存 `*sql.DB`，避免每次新建连接。
-+ `SetMaxOpenConns(10)`
-+ `SetMaxIdleConns(2)`
++ `SetMaxOpenConns(50)`
++ `SetMaxIdleConns(50)`
 + `SetConnMaxLifetime(0)`
 
 初始化时统一执行：

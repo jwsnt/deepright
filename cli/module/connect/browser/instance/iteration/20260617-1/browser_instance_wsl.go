@@ -223,8 +223,8 @@ func browserInstanceWSLOpenDB() (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open browser_data: %w", err)
 	}
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(1)
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(10)
 
 	if _, err := db.Exec(`PRAGMA busy_timeout = 5000`); err != nil {
 		_ = db.Close()

@@ -5005,7 +5005,7 @@ func TestStartIntegrationProcessOpensBrowserWhenAlreadyRunning(t *testing.T) {
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
-	if opened != integrationBrowserURL(8080) {
+	if opened != integrationBrowserOpenURL(8080) {
 		t.Fatalf("opened = %q, want browser url", opened)
 	}
 
@@ -5059,7 +5059,7 @@ func TestStartIntegrationProcessOpensBrowserWhenServiceReadyWithoutPIDFile(t *te
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
-	if opened != integrationBrowserURL(8080) {
+	if opened != integrationBrowserOpenURL(8080) {
 		t.Fatalf("opened = %q, want browser url", opened)
 	}
 
@@ -5109,7 +5109,7 @@ func TestOpenExistingIntegrationBrowserIfReadyWaitsForBrowserEntry(t *testing.T)
 	if ok := openExistingIntegrationBrowserIfReady(18084, nil, &stderr, ""); !ok {
 		t.Fatal("openExistingIntegrationBrowserIfReady() = false, want true")
 	}
-	if opened != integrationBrowserURL(18084) {
+	if opened != integrationBrowserOpenURL(18084) {
 		t.Fatalf("opened = %q, want browser url", opened)
 	}
 	if entryChecks < 3 {
@@ -5156,7 +5156,7 @@ func TestOpenExistingIntegrationBrowserIfReadyOpensWhenBrowserEntryWaitTimesOut(
 	if ok := openExistingIntegrationBrowserIfReady(18085, nil, &stderr, ""); !ok {
 		t.Fatal("openExistingIntegrationBrowserIfReady() = false, want true")
 	}
-	if opened != integrationBrowserURL(18085) {
+	if opened != integrationBrowserOpenURL(18085) {
 		t.Fatalf("opened = %q, want browser url", opened)
 	}
 	if entryChecks == 0 {
@@ -5214,7 +5214,7 @@ func TestStartIntegrationProcessOpensBrowserWhenAlreadyRunningEvenIfBrowserEntry
 	if code != 0 {
 		t.Fatalf("code = %d, stderr=%s", code, stderr.String())
 	}
-	if opened != integrationBrowserURL(8080) {
+	if opened != integrationBrowserOpenURL(8080) {
 		t.Fatalf("opened = %q, want browser url", opened)
 	}
 	if stderr.Len() != 0 {
@@ -5307,7 +5307,7 @@ func TestStartIntegrationProcessOpensBrowserAfterFreshLaunch(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("code = %d, stderr=%s", code, stderr.String())
 	}
-	if opened != integrationBrowserURL(8080) {
+	if opened != integrationBrowserOpenURL(8080) {
 		t.Fatalf("opened = %q, want browser url", opened)
 	}
 	if entryChecks < 3 {
@@ -7574,6 +7574,43 @@ func TestRunIntegrationForegroundInvokesGitIdentityEnsure(t *testing.T) {
 	}
 }
 
+func TestOpenIntegrationBrowserAfterEntryReady(t *testing.T) {
+	oldOpenBrowser := integrationOpenBrowserFn
+	oldBrowserEntryReadyCheck := integrationBrowserEntryReadyCheck
+	oldBrowserEntryWait := integrationBrowserEntryWait
+	oldBrowserEntryPollInterval := integrationBrowserEntryPollInterval
+	t.Cleanup(func() {
+		integrationOpenBrowserFn = oldOpenBrowser
+		integrationBrowserEntryReadyCheck = oldBrowserEntryReadyCheck
+		integrationBrowserEntryWait = oldBrowserEntryWait
+		integrationBrowserEntryPollInterval = oldBrowserEntryPollInterval
+	})
+	port := 18086
+
+	entryChecks := 0
+	integrationBrowserEntryReadyCheck = func(int) bool {
+		entryChecks++
+		return entryChecks >= 3
+	}
+	integrationBrowserEntryWait = 200 * time.Millisecond
+	integrationBrowserEntryPollInterval = 5 * time.Millisecond
+
+	var opened string
+	integrationOpenBrowserFn = func(target string) error {
+		opened = target
+		return nil
+	}
+
+	openIntegrationBrowserAfterEntryReady(port, nil)
+
+	if opened != integrationBrowserOpenURL(port) {
+		t.Fatalf("opened = %q, want %q", opened, integrationBrowserOpenURL(port))
+	}
+	if entryChecks < 3 {
+		t.Fatalf("entryChecks = %d, want at least 3", entryChecks)
+	}
+}
+
 func TestNormalizeIntegrationLaunchArgsDropsMacProcessSerialNumber(t *testing.T) {
 	args := []string{"-psn_0_12345", "--port", "18080"}
 	got := normalizeIntegrationLaunchArgs(args)
@@ -7682,6 +7719,40 @@ func TestIntegrationBrowserURL(t *testing.T) {
 	}
 	if got := integrationBrowserURL(0); got != "http://localhost:8080/site/?v=site-version-token#app" {
 		t.Fatalf("default browser url = %q", got)
+	}
+}
+
+func TestIntegrationBrowserOpenURL(t *testing.T) {
+	if got := integrationBrowserOpenURL(8080); got != "http://localhost:8080/launch" {
+		t.Fatalf("browser open url = %q", got)
+	}
+	if got := integrationBrowserOpenURL(0); got != "http://localhost:8080/launch" {
+		t.Fatalf("default browser open url = %q", got)
+	}
+}
+
+func TestHandleIntegrationBrowserLaunch(t *testing.T) {
+	oldTokenFn := integrationSiteVersionTokenFn
+	integrationSiteVersionTokenFn = func() string { return "site-version-token" }
+	defer func() { integrationSiteVersionTokenFn = oldTokenFn }()
+
+	req := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:18080/launch", nil)
+	rec := httptest.NewRecorder()
+
+	handleIntegrationBrowserLaunch().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if got := rec.Header().Get("Cache-Control"); got != "no-store, no-cache, must-revalidate" {
+		t.Fatalf("Cache-Control = %q", got)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "window.location.replace(target)") {
+		t.Fatalf("launch body missing redirect script: %q", body)
+	}
+	if !strings.Contains(body, "http://127.0.0.1:18080/site/?v=site-version-token#app") {
+		t.Fatalf("launch body missing target site url: %q", body)
 	}
 }
 

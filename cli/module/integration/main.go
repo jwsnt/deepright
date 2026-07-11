@@ -3675,6 +3675,10 @@ func integrationBrowserURL(port int) string {
 	return integrationBuildBrowserURL("localhost", port)
 }
 
+func integrationBrowserOpenURL(port int) string {
+	return integrationBuildBrowserOpenURL("localhost", port)
+}
+
 var integrationSiteVersionTokenFn = integrationSiteVersionToken
 
 func integrationSiteVersionToken() string {
@@ -3708,6 +3712,17 @@ func integrationBuildBrowserURL(host string, port int) string {
 		return base + "#app"
 	}
 	return base + "?v=" + url.QueryEscape(versionToken) + "#app"
+}
+
+func integrationBuildBrowserOpenURL(host string, port int) string {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		host = "localhost"
+	}
+	if port <= 0 {
+		port = 8080
+	}
+	return fmt.Sprintf("http://%s:%d/launch", host, port)
 }
 
 type lanAccessCandidate struct {
@@ -3899,6 +3914,22 @@ func startIntegrationLaunchSplash() error {
 
 func integrationShouldOpenBrowser() bool {
 	return !queryBool(os.Getenv(integrationSkipBrowserEnv))
+}
+
+func openIntegrationBrowserAfterEntryReady(port int, logf func(string, ...interface{})) {
+	if !waitIntegrationBrowserEntryReady(port) && logf != nil {
+		logf("browser entry not ready yet, opening browser anyway addr=%s", fmt.Sprintf("127.0.0.1:%d", port))
+	}
+	browserURL := integrationBrowserOpenURL(port)
+	if err := integrationOpenBrowserFn(browserURL); err != nil {
+		if logf != nil {
+			logf("open browser failed: %v", err)
+		}
+		return
+	}
+	if logf != nil {
+		logf("browser opened maximized: %s", browserURL)
+	}
 }
 
 func handleFolder(cfg *Config) http.HandlerFunc {
@@ -11981,6 +12012,89 @@ func handleInstallApp() http.HandlerFunc {
 	}
 }
 
+func handleIntegrationBrowserLaunch() http.HandlerFunc {
+	launchHTML := func(target string) string {
+		return fmt.Sprintf(`<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepRight</title>
+<style>
+html,body{height:100%%;margin:0;font-family:"SF Pro Display","PingFang SC","Segoe UI",sans-serif;background:radial-gradient(circle at top,#eff6ff,#dbeafe 42%%,#bfdbfe 100%%);color:#10203f}
+body{display:flex;align-items:center;justify-content:center;padding:24px}
+.card{width:min(460px,calc(100vw - 32px));padding:30px 26px;border-radius:24px;background:rgba(255,255,255,.86);border:1px solid rgba(148,163,184,.28);box-shadow:0 24px 80px rgba(15,23,42,.12);backdrop-filter:blur(18px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.badge{width:48px;height:48px;border-radius:16px;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#fff7d6,#ffe28a);box-shadow:0 12px 24px rgba(255,191,0,.18)}
+.spinner{width:20px;height:20px;border-radius:50%%;border:2px solid rgba(184,134,11,.22);border-top-color:#c78600;border-right-color:#e0a125;animation:spin .8s linear infinite}
+h1{margin:16px 0 0;font-size:20px;line-height:1.2;white-space:nowrap}
+p{margin:8px 0 0;font-size:13px;line-height:1.4;color:#465b84;white-space:nowrap}
+.retry{margin-top:18px;padding:10px 14px;border:none;border-radius:999px;background:#2563eb;color:#fff;font-size:13px;cursor:pointer;box-shadow:0 12px 22px rgba(37,99,235,.22)}
+@media (max-width:520px){.card{width:min(460px,calc(100vw - 24px));padding:26px 18px}h1,p{white-space:normal}}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<main class="card" role="status" aria-live="polite">
+  <div class="badge"><div class="spinner" aria-hidden="true"></div></div>
+  <h1>正在启动</h1>
+  <p id="launchDesc">等待完成</p>
+  <button id="launchRetry" class="retry" type="button">立即重试</button>
+</main>
+<script>
+const target=%s;
+const entry='/site/';
+const desc=document.getElementById('launchDesc');
+const retry=document.getElementById('launchRetry');
+let tries=0;
+let done=false;
+function openTarget(){if(done)return;done=true;window.location.replace(target);}
+function schedule(delay){window.setTimeout(probe,delay);}
+async function probe(){
+  if(done)return;
+  tries+=1;
+  if(desc&&tries>=8)desc.textContent='首次打开新安装包时，页面资源可能还在准备';
+  try{
+    const resp=await fetch(entry,{cache:'no-store',credentials:'same-origin'});
+    if(resp&&resp.ok){openTarget();return;}
+  }catch(_){}
+  schedule(Math.min(1200,150+tries*120));
+}
+retry&&retry.addEventListener('click',()=>{done=false;probe();});
+probe();
+</script>
+</body>
+</html>`, strconv.Quote(target))
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		host := "localhost"
+		port := integrationServicePort
+		if requestHost := strings.TrimSpace(r.Host); requestHost != "" {
+			if parsedHost, parsedPort, err := net.SplitHostPort(requestHost); err == nil {
+				if strings.TrimSpace(parsedHost) != "" {
+					host = parsedHost
+				}
+				if value, err := strconv.Atoi(parsedPort); err == nil && value > 0 {
+					port = value
+				}
+			} else {
+				host = requestHost
+			}
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+		if r.Method == http.MethodHead {
+			return
+		}
+		_, _ = io.WriteString(w, launchHTML(integrationBuildBrowserURL(host, port)))
+	}
+}
+
 func cfgRuntimeInstallApps() string {
 	apps := integrationConfiguredInstallApps()
 	return strings.Join(apps, ",")
@@ -12093,8 +12207,9 @@ const (
 
 var integrationStartWait = 5 * time.Second
 var integrationShutdownDelay = 5 * time.Second
-var integrationBrowserEntryWait = 2 * time.Second
+var integrationBrowserEntryWait = 8 * time.Second
 var integrationBrowserEntryPollInterval = 100 * time.Millisecond
+var integrationBrowserEntryProbeTimeout = 1500 * time.Millisecond
 var integrationReadyCheck = integrationReady
 var integrationBrowserEntryReadyCheck = integrationBrowserEntryReady
 var integrationOpenBrowserFn = openIntegrationBrowserMaximized
@@ -14706,6 +14821,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/knowledge/", handleKnowledge(&cfg))
 	mux.HandleFunc("/knowledge_lastUpdate", handleKnowledgeLastUpdate())
 	mux.HandleFunc("/knowledge_path", handleKnowledgePath(&cfg))
+	mux.HandleFunc("/launch", handleIntegrationBrowserLaunch())
 	if err := server.Register(mux, cfg.Site); err != nil {
 		log.Printf("static register failed: %v", err)
 	}
@@ -14757,15 +14873,9 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	log.Printf("plugin-dir: %s", strings.TrimSpace(os.Getenv(integrationPluginDirEnv)))
 	log.Printf("pid-file: %s", pidFile)
 
-	browserURL := integrationBrowserURL(cfg.Port)
 	if integrationShouldOpenBrowser() {
 		go func() {
-			time.Sleep(200 * time.Millisecond)
-			if err := openIntegrationBrowserMaximized(browserURL); err != nil {
-				log.Printf("open browser failed: %v", err)
-				return
-			}
-			log.Printf("browser opened maximized: %s", browserURL)
+			openIntegrationBrowserAfterEntryReady(cfg.Port, log.Printf)
 		}()
 	}
 
@@ -16446,7 +16556,7 @@ func integrationReady(port string) bool {
 }
 
 func integrationBrowserEntryReady(port int) bool {
-	client := http11client.NewClient(http11client.Options{Timeout: 300 * time.Millisecond})
+	client := http11client.NewClient(http11client.Options{Timeout: integrationBrowserEntryProbeTimeout})
 	resp, err := client.Get(integrationBrowserEntryURL(port))
 	if err != nil {
 		return false
@@ -16825,8 +16935,8 @@ func initCronDB() {
 		log.Printf("[cron] failed to open data: %v", err)
 		return
 	}
-	cronDB.SetMaxOpenConns(1)
-	cronDB.SetMaxIdleConns(1)
+	cronDB.SetMaxOpenConns(10)
+	cronDB.SetMaxIdleConns(10)
 	cronDB.SetConnMaxLifetime(0)
 	cronDB.Exec(`PRAGMA journal_mode=WAL`)
 	ensureCronSchema(cronDB)
@@ -16858,8 +16968,8 @@ func startIntegrationLogRetentionCleanup(ctx context.Context) {
 		if err != nil {
 			return nil, err
 		}
-		db.SetMaxOpenConns(1)
-		db.SetMaxIdleConns(1)
+		db.SetMaxOpenConns(10)
+		db.SetMaxIdleConns(10)
 		db.SetConnMaxLifetime(0)
 		if _, err := db.Exec(`PRAGMA journal_mode=WAL`); err != nil {
 			_ = db.Close()
@@ -17154,7 +17264,7 @@ func openExistingIntegrationBrowserIfReady(port int, logWriter io.Writer, stderr
 	if logWriter != nil && strings.TrimSpace(successLogFormat) != "" {
 		integrationLifecycleLog(logWriter, successLogFormat, args...)
 	}
-	if err := integrationOpenBrowserFn(integrationBrowserURL(port)); err != nil {
+	if err := integrationOpenBrowserFn(integrationBrowserOpenURL(port)); err != nil {
 		if logWriter != nil {
 			integrationLifecycleLog(logWriter, "open browser failed: %v", err)
 		}
