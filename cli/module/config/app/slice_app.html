@@ -1,0 +1,1055 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>切图工具</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #111;
+      color: #eee;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .app {
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    .desc { margin: 0 0 14px; color: #bbb; }
+    .toolbar {
+      display: flex;
+      align-items: stretch;
+      flex-wrap: nowrap;
+      gap: 8px;
+      margin-bottom: 10px;
+      padding: 8px 12px;
+      background: #1b1b1b;
+      border: 1px solid #333;
+      border-radius: 12px;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      align-self: stretch;
+      flex: 1 1 0;
+      min-height: 74px;
+    }
+    .field.import-field {
+      flex: 1.4 1 0;
+      min-width: 0;
+    }
+    .field.count-field {
+      flex: 1 1 0;
+      min-width: 0;
+    }
+    .crop-panel {
+      margin: 0 0 10px;
+    }
+    .crop-toggle-row {
+      display: flex;
+      justify-content: flex-end;
+      margin: -14px 0 2px;
+      padding-right: 0;
+      position: relative;
+      z-index: 2;
+    }
+    .crop-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      padding: 0;
+      margin-right: 0;
+      background: transparent;
+      color: #8d8d8d;
+      border: 0;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 10px;
+      line-height: 1;
+    }
+    .crop-toggle:hover {
+      background: transparent;
+      color: #b5b5b5;
+    }
+    .crop-toggle-icon {
+      color: currentColor;
+      transition: transform 0.18s ease;
+      flex: 0 0 auto;
+      transform-origin: center;
+    }
+    .crop-panel.expanded .crop-toggle-icon {
+      transform: rotate(180deg);
+    }
+    .crop-fields {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      padding: 10px 12px 12px;
+      background: #1b1b1b;
+      border: 1px solid #333;
+      border-radius: 12px;
+    }
+    .crop-fields[hidden] {
+      display: none !important;
+    }
+    .field.crop-field {
+      min-height: 74px;
+    }
+    .field label {
+      font-size: 13px;
+      color: #bbb;
+      line-height: 1.25;
+      min-height: 16px;
+      display: flex;
+      align-items: center;
+    }
+    .field input[type="number"], .field input[type="file"] {
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid #444;
+      background: #0f0f0f;
+      color: #eee;
+      font-size: 14px;
+      width: 100%;
+      min-height: 40px;
+      height: 40px;
+      line-height: 1.2;
+      flex: 0 0 40px;
+    }
+    .error {
+      margin: 0 0 8px;
+      font-size: 13px;
+      color: #ff9696;
+      min-height: 18px;
+    }
+    .width-bar {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 5px;
+      align-items: center;
+      margin-bottom: 10px;
+      padding: 7px 9px;
+      background: #181818;
+      border: 1px solid #333;
+      border-radius: 12px;
+      min-height: 38px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      white-space: nowrap;
+      scrollbar-gutter: stable both-edges;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+    }
+    .badge {
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.1);
+      font-size: 11px;
+      line-height: 1.15;
+      white-space: nowrap;
+      flex: 0 0 auto;
+      max-width: none;
+    }
+    .width-bar::-webkit-scrollbar {
+      height: 10px;
+    }
+    .viewer-wrap {
+      overflow: auto;
+      border: 1px solid #333;
+      border-radius: 12px;
+      background: #151515;
+      padding: 16px;
+      min-height: 0;
+    }
+    .empty {
+      display: grid;
+      place-items: center;
+      color: #888;
+      border: 1px dashed #444;
+      border-radius: 10px;
+      text-align: center;
+      padding: 20px;
+      aspect-ratio: 16 / 9;
+      min-height: min(380px, 56vw);
+    }
+    .empty[hidden] { display: none !important; }
+    .stage[hidden] { display: none !important; }
+    .stage {
+      position: relative;
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      line-height: 0;
+      background:
+        linear-gradient(45deg, #2a2a2a 25%, transparent 25%) -8px 0/16px 16px,
+        linear-gradient(-45deg, #2a2a2a 25%, transparent 25%) -8px 0/16px 16px,
+        linear-gradient(45deg, transparent 75%, #2a2a2a 75%) -8px 0/16px 16px,
+        linear-gradient(-45deg, transparent 75%, #2a2a2a 75%) -8px 0/16px 16px,
+        #1a1a1a;
+      border: 1px solid #2e2e2e;
+      overflow: visible;
+    }
+    #image {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+    .overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      --line-vertical-color: rgba(255,218,106,0.95);
+      --line-horizontal-color: rgba(106,217,255,0.95);
+      --line-text-color: #111;
+      --top-label-bg: rgba(255,255,255,0.92);
+      --top-label-color: #111;
+      --top-label-border: rgba(0,0,0,0.08);
+      --measure-line-color: rgba(255,255,255,0.96);
+      --measure-line-outline: rgba(0,0,0,0.62);
+      --measure-text-color: var(--measure-text-color);
+      --measure-text-shadow: var(--measure-text-shadow);
+      --measure-label-bg: rgba(0,0,0,0.74);
+      --measure-label-border: rgba(255,255,255,0.42);
+      --midline-color: rgba(255,255,255,0.92);
+      --midline-outline: rgba(0,0,0,0.56);
+      --center-point-fill: rgba(255,255,255,0.98);
+      --center-point-border: rgba(0,0,0,0.82);
+      --center-point-ring: rgba(255,255,255,0.35);
+      --center-point-shadow: rgba(0,0,0,0.45);
+    }
+    .cut-line {
+      position: absolute;
+      pointer-events: auto;
+      touch-action: none;
+    }
+    .cut-line.vertical {
+      top: 0; bottom: 0; width: 0;
+      border-left: 2px solid var(--line-vertical-color);
+      transform: translateX(-1px);
+      cursor: ew-resize;
+    }
+    .cut-line.vertical::before {
+      content: "";
+      position: absolute;
+      top: -12px; bottom: -12px; left: -12px; right: -12px;
+    }
+    .cut-line.vertical::after {
+      content: attr(data-index);
+      position: absolute;
+      top: 8px; left: 8px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: var(--line-vertical-color);
+      color: var(--line-text-color);
+      font-size: 12px; line-height: 1.2;
+      white-space: nowrap;
+    }
+    .cut-line.horizontal {
+      left: 0; right: 0; height: 0;
+      border-top: 2px solid var(--line-horizontal-color);
+      transform: translateY(-1px);
+      cursor: ns-resize;
+    }
+    .cut-line.horizontal::before {
+      content: "";
+      position: absolute;
+      top: -12px; bottom: -12px; left: -12px; right: -12px;
+    }
+    .cut-line.horizontal::after {
+      content: attr(data-index);
+      position: absolute;
+      top: 8px; right: 8px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: var(--line-horizontal-color);
+      color: var(--line-text-color);
+      font-size: 12px; line-height: 1.2;
+      white-space: nowrap;
+    }
+    .top-label-layer {
+      position: absolute;
+      left: 0; right: 0; top: -34px;
+      height: 28px;
+      pointer-events: none;
+      overflow: visible;
+    }
+    .top-width-label {
+      position: absolute;
+      transform: translateX(-50%);
+      top: 0;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: var(--top-label-bg);
+      color: var(--top-label-color);
+      font-size: 12px; line-height: 1;
+      white-space: nowrap;
+      border: 1px solid var(--top-label-border);
+    }
+    .segment-measure {
+      position: absolute;
+      pointer-events: none;
+      color: var(--measure-text-color);
+      font-size: 11px;
+      line-height: 1;
+      text-shadow: var(--measure-text-shadow);
+      z-index: 1;
+    }
+    .segment-measure.horizontal {
+      height: 0;
+      border-top: 1px dashed var(--measure-line-color);
+      box-shadow: 0 0 0 1px var(--measure-line-outline);
+    }
+    .segment-measure.vertical {
+      width: 0;
+      border-left: 1px dashed var(--measure-line-color);
+      box-shadow: 0 0 0 1px var(--measure-line-outline);
+    }
+    .segment-measure .measure-label {
+      position: absolute;
+      padding: 2px 5px;
+      border-radius: 999px;
+      background: var(--measure-label-bg);
+      border: 1px solid var(--measure-label-border);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.35);
+      white-space: nowrap;
+    }
+    .segment-measure.horizontal .measure-label {
+      left: 50%;
+      top: -18px;
+      transform: translateX(-50%);
+    }
+    .segment-measure.vertical .measure-label {
+      left: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    .segment-midline {
+      position: absolute;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .segment-midline.horizontal {
+      height: 0;
+      border-top: 1px dashed var(--midline-color);
+      box-shadow: 0 0 0 1px var(--midline-outline);
+    }
+    .segment-midline.vertical {
+      width: 0;
+      border-left: 1px dashed var(--midline-color);
+      box-shadow: 0 0 0 1px var(--midline-outline);
+    }
+    .segment-center-point {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--center-point-fill);
+      border: 1px solid var(--center-point-border);
+      box-shadow: 0 0 0 1px var(--center-point-ring), 0 1px 2px var(--center-point-shadow);
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 2;
+    }
+    @media (max-width: 600px) {
+      body { padding: 14px; }
+      .toolbar { gap: 6px; padding: 8px 10px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>切图工具</h1>
+
+    <div class="toolbar">
+      <div class="field import-field">
+        <label for="imageInput">导入</label>
+        <input id="imageInput" type="file" accept="image/*" />
+      </div>
+      <div class="field count-field">
+        <label for="horizontalCount">水平</label>
+        <input id="horizontalCount" type="number" min="1" step="1" value="1" inputmode="numeric" />
+      </div>
+      <div class="field count-field">
+        <label for="verticalCount">垂直</label>
+        <input id="verticalCount" type="number" min="1" step="1" value="1" inputmode="numeric" />
+      </div>
+    </div>
+
+    <div class="crop-panel" id="cropPanel">
+      <div class="crop-toggle-row">
+        <button class="crop-toggle" id="cropToggle" type="button" aria-expanded="false" aria-controls="cropFields" aria-label="展开缩进设置">
+          <span class="crop-toggle-icon" aria-hidden="true">▾</span>
+        </button>
+      </div>
+      <div class="crop-fields" id="cropFields" hidden>
+        <div class="field crop-field">
+          <label for="cropTop">上缩进</label>
+          <input id="cropTop" type="number" min="0" step="1" value="0" inputmode="numeric" />
+        </div>
+        <div class="field crop-field">
+          <label for="cropBottom">下缩进</label>
+          <input id="cropBottom" type="number" min="0" step="1" value="0" inputmode="numeric" />
+        </div>
+        <div class="field crop-field">
+          <label for="cropLeft">左缩进</label>
+          <input id="cropLeft" type="number" min="0" step="1" value="0" inputmode="numeric" />
+        </div>
+        <div class="field crop-field">
+          <label for="cropRight">右缩进</label>
+          <input id="cropRight" type="number" min="0" step="1" value="0" inputmode="numeric" />
+        </div>
+      </div>
+    </div>
+
+    <p class="error" id="error"></p>
+
+    <div class="width-bar" id="widthBar"></div>
+
+    <div class="viewer-wrap" id="viewerWrap" hidden>
+      <div class="empty" id="emptyState">请先导入一张图片。<br />导入后这里会显示图片、切分线和切片尺寸。</div>
+      <div class="stage" id="stage" hidden>
+        <div class="top-label-layer" id="topLabelLayer" aria-hidden="true"></div>
+        <img id="image" alt="导入预览图" />
+        <div class="overlay" id="overlay" aria-hidden="false"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.__layoutMetrics = function () {
+      const fields = Array.from(document.querySelectorAll('.toolbar > .field')).map((el, idx) => {
+        const r = el.getBoundingClientRect();
+        return { idx, className: el.className, height: r.height, width: r.width, top: r.top, left: r.left };
+      });
+      const widthBar = document.getElementById('widthBar');
+      const s = getComputedStyle(widthBar);
+      return {
+        fieldCount: fields.length,
+        fields,
+        widthBar: {
+          clientWidth: widthBar.clientWidth,
+          scrollWidth: widthBar.scrollWidth,
+          overflowX: s.overflowX,
+          overflowY: s.overflowY,
+          whiteSpace: s.whiteSpace,
+          flexWrap: s.flexWrap
+        }
+      };
+    };
+  </script>
+  <script>
+    const imageInput = document.getElementById('imageInput');
+    const horizontalCountInput = document.getElementById('horizontalCount');
+    const verticalCountInput = document.getElementById('verticalCount');
+    const cropPanel = document.getElementById('cropPanel');
+    const cropToggle = document.getElementById('cropToggle');
+    const cropFields = document.getElementById('cropFields');
+    const cropTopInput = document.getElementById('cropTop');
+    const cropBottomInput = document.getElementById('cropBottom');
+    const cropLeftInput = document.getElementById('cropLeft');
+    const cropRightInput = document.getElementById('cropRight');
+    const errorEl = document.getElementById('error');
+    const widthBar = document.getElementById('widthBar');
+    const emptyState = document.getElementById('emptyState');
+    const stage = document.getElementById('stage');
+    const image = document.getElementById('image');
+    const overlay = document.getElementById('overlay');
+    const topLabelLayer = document.getElementById('topLabelLayer');
+    const viewerWrap = document.getElementById('viewerWrap');
+
+    let objectUrl = null;
+    let verticalLinePositions = [];
+    let horizontalLinePositions = [];
+    let activeLine = null;
+    let cropState = { top: 0, right: 0, bottom: 0, left: 0 };
+
+    const FALLBACK_THEME = {
+      lineVerticalColor: 'rgba(255,218,106,0.95)',
+      lineHorizontalColor: 'rgba(106,217,255,0.95)',
+      lineTextColor: '#111111',
+      topLabelBg: 'rgba(255,255,255,0.92)',
+      topLabelColor: '#111111',
+      topLabelBorder: 'rgba(0,0,0,0.08)',
+      measureLineColor: 'rgba(255,255,255,0.96)',
+      measureLineOutline: 'rgba(0,0,0,0.62)',
+      measureTextColor: 'rgba(255,255,255,0.98)',
+      measureTextShadow: '0 1px 2px rgba(0,0,0,0.85), 0 0 1px rgba(0,0,0,0.9)',
+      measureLabelBg: 'rgba(0,0,0,0.74)',
+      measureLabelBorder: 'rgba(255,255,255,0.42)',
+      midlineColor: 'rgba(255,255,255,0.92)',
+      midlineOutline: 'rgba(0,0,0,0.56)',
+      centerPointFill: 'rgba(255,255,255,0.98)',
+      centerPointBorder: 'rgba(0,0,0,0.82)',
+      centerPointRing: 'rgba(255,255,255,0.35)',
+      centerPointShadow: 'rgba(0,0,0,0.45)'
+    };
+
+    function setOverlayTheme(theme = FALLBACK_THEME) {
+      overlay.style.setProperty('--line-vertical-color', theme.lineVerticalColor);
+      overlay.style.setProperty('--line-horizontal-color', theme.lineHorizontalColor);
+      overlay.style.setProperty('--line-text-color', theme.lineTextColor);
+      overlay.style.setProperty('--top-label-bg', theme.topLabelBg);
+      overlay.style.setProperty('--top-label-color', theme.topLabelColor);
+      overlay.style.setProperty('--top-label-border', theme.topLabelBorder);
+      overlay.style.setProperty('--measure-line-color', theme.measureLineColor);
+      overlay.style.setProperty('--measure-line-outline', theme.measureLineOutline);
+      overlay.style.setProperty('--measure-text-color', theme.measureTextColor);
+      overlay.style.setProperty('--measure-text-shadow', theme.measureTextShadow);
+      overlay.style.setProperty('--measure-label-bg', theme.measureLabelBg);
+      overlay.style.setProperty('--measure-label-border', theme.measureLabelBorder);
+      overlay.style.setProperty('--midline-color', theme.midlineColor);
+      overlay.style.setProperty('--midline-outline', theme.midlineOutline);
+      overlay.style.setProperty('--center-point-fill', theme.centerPointFill);
+      overlay.style.setProperty('--center-point-border', theme.centerPointBorder);
+      overlay.style.setProperty('--center-point-ring', theme.centerPointRing);
+      overlay.style.setProperty('--center-point-shadow', theme.centerPointShadow);
+    }
+
+    function hslToRgb(h, s, l) {
+      const hue = ((h % 360) + 360) % 360;
+      const sat = Math.max(0, Math.min(100, s)) / 100;
+      const light = Math.max(0, Math.min(100, l)) / 100;
+      const c = (1 - Math.abs(2 * light - 1)) * sat;
+      const hp = hue / 60;
+      const x = c * (1 - Math.abs((hp % 2) - 1));
+      let r1 = 0;
+      let g1 = 0;
+      let b1 = 0;
+      if (hp >= 0 && hp < 1) [r1, g1, b1] = [c, x, 0];
+      else if (hp < 2) [r1, g1, b1] = [x, c, 0];
+      else if (hp < 3) [r1, g1, b1] = [0, c, x];
+      else if (hp < 4) [r1, g1, b1] = [0, x, c];
+      else if (hp < 5) [r1, g1, b1] = [x, 0, c];
+      else [r1, g1, b1] = [c, 0, x];
+      const m = light - c / 2;
+      return [
+        Math.round((r1 + m) * 255),
+        Math.round((g1 + m) * 255),
+        Math.round((b1 + m) * 255)
+      ];
+    }
+
+    function rgbaFromHsl(h, s, l, a = 1) {
+      const [r, g, b] = hslToRgb(h, s, l);
+      return `rgba(${r}, ${g}, ${b}, ${a})`;
+    }
+
+    function analyzeImageTheme() {
+      if (!image.naturalWidth || !image.naturalHeight || !image.src) return FALLBACK_THEME;
+      try {
+        const canvas = document.createElement('canvas');
+        const maxSample = 48;
+        const scale = Math.max(image.naturalWidth, image.naturalHeight) / maxSample;
+        const sampleWidth = Math.max(1, Math.min(maxSample, Math.round(image.naturalWidth / Math.max(1, scale))));
+        const sampleHeight = Math.max(1, Math.min(maxSample, Math.round(image.naturalHeight / Math.max(1, scale))));
+        canvas.width = sampleWidth;
+        canvas.height = sampleHeight;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return FALLBACK_THEME;
+        ctx.drawImage(image, 0, 0, sampleWidth, sampleHeight);
+        const { data } = ctx.getImageData(0, 0, sampleWidth, sampleHeight);
+        let totalWeight = 0;
+        let brightnessSum = 0;
+        let satSum = 0;
+        let x = 0;
+        let y = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          const alpha = data[i + 3] / 255;
+          if (alpha <= 0.05) continue;
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          const max = Math.max(r, g, b);
+          const min = Math.min(r, g, b);
+          const delta = max - min;
+          const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+          const saturation = max === 0 ? 0 : delta / max;
+          const angle = ((Math.atan2(Math.sqrt(3) * (g - b), 2 * r - g - b) * 180) / Math.PI + 360) % 360;
+          const weight = alpha * (0.35 + saturation * 0.65);
+          brightnessSum += brightness * alpha;
+          satSum += saturation * alpha;
+          x += Math.cos(angle * Math.PI / 180) * weight;
+          y += Math.sin(angle * Math.PI / 180) * weight;
+          totalWeight += alpha;
+        }
+        if (!totalWeight) return FALLBACK_THEME;
+        const avgBrightness = brightnessSum / totalWeight;
+        const avgSaturation = satSum / totalWeight;
+        const baseHue = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+        const useDarkTheme = avgBrightness > 168;
+        const accentSat = Math.max(58, Math.min(88, Math.round(62 + avgSaturation * 24)));
+        const verticalHue = (baseHue + 150) % 360;
+        const horizontalHue = (baseHue + 210) % 360;
+        return useDarkTheme ? {
+          lineVerticalColor: rgbaFromHsl(verticalHue, accentSat, 28, 0.96),
+          lineHorizontalColor: rgbaFromHsl(horizontalHue, accentSat, 26, 0.96),
+          lineTextColor: '#f7f7f7',
+          topLabelBg: 'rgba(17,17,17,0.88)',
+          topLabelColor: '#f7f7f7',
+          topLabelBorder: 'rgba(255,255,255,0.22)',
+          measureLineColor: 'rgba(18,18,18,0.94)',
+          measureLineOutline: 'rgba(255,255,255,0.5)',
+          measureTextColor: '#f8f8f8',
+          measureTextShadow: '0 1px 2px rgba(0,0,0,0.72)',
+          measureLabelBg: 'rgba(16,16,16,0.82)',
+          measureLabelBorder: 'rgba(255,255,255,0.28)',
+          midlineColor: 'rgba(20,20,20,0.84)',
+          midlineOutline: 'rgba(255,255,255,0.42)',
+          centerPointFill: 'rgba(18,18,18,0.98)',
+          centerPointBorder: 'rgba(255,255,255,0.72)',
+          centerPointRing: 'rgba(0,0,0,0.22)',
+          centerPointShadow: 'rgba(255,255,255,0.18)'
+        } : {
+          lineVerticalColor: rgbaFromHsl(verticalHue, accentSat, 74, 0.96),
+          lineHorizontalColor: rgbaFromHsl(horizontalHue, accentSat, 72, 0.96),
+          lineTextColor: '#111111',
+          topLabelBg: 'rgba(255,255,255,0.92)',
+          topLabelColor: '#111111',
+          topLabelBorder: 'rgba(0,0,0,0.14)',
+          measureLineColor: 'rgba(255,255,255,0.96)',
+          measureLineOutline: 'rgba(0,0,0,0.64)',
+          measureTextColor: '#ffffff',
+          measureTextShadow: '0 1px 2px rgba(0,0,0,0.88), 0 0 1px rgba(0,0,0,0.92)',
+          measureLabelBg: 'rgba(0,0,0,0.74)',
+          measureLabelBorder: 'rgba(255,255,255,0.42)',
+          midlineColor: 'rgba(255,255,255,0.92)',
+          midlineOutline: 'rgba(0,0,0,0.56)',
+          centerPointFill: 'rgba(255,255,255,0.98)',
+          centerPointBorder: 'rgba(0,0,0,0.82)',
+          centerPointRing: 'rgba(255,255,255,0.35)',
+          centerPointShadow: 'rgba(0,0,0,0.45)'
+        };
+      } catch (error) {
+        return FALLBACK_THEME;
+      }
+    }
+
+    function refreshTheme() {
+      setOverlayTheme(analyzeImageTheme());
+    }
+
+    function clearError() { errorEl.textContent = ''; }
+    function setError(msg) { errorEl.textContent = msg; }
+    function getDisplayWidth() { return Math.round(image.clientWidth || image.getBoundingClientRect().width || 0); }
+    function getDisplayHeight() { return Math.round(image.clientHeight || image.getBoundingClientRect().height || 0); }
+
+    setOverlayTheme(FALLBACK_THEME);
+
+    function syncStageToImage() {
+      if (!image.src) return false;
+      const naturalWidth = image.naturalWidth || 0;
+      const naturalHeight = image.naturalHeight || 0;
+      if (!naturalWidth || !naturalHeight) return false;
+      const viewerWrap = stage.parentElement;
+      const wrapStyle = window.getComputedStyle(viewerWrap);
+      const horizontalPadding = (parseFloat(wrapStyle.paddingLeft) || 0) + (parseFloat(wrapStyle.paddingRight) || 0);
+      const parentWidth = viewerWrap.clientWidth - horizontalPadding;
+      const maxWidth = Math.min(window.innerWidth * 0.92, 1100);
+      const availableWidth = Math.max(160, Math.min(maxWidth, parentWidth));
+      const displayWidth = Math.round(availableWidth);
+      const displayHeight = Math.round((displayWidth * naturalHeight) / naturalWidth);
+      image.style.width = `${displayWidth}px`;
+      image.style.height = `${displayHeight}px`;
+      stage.style.width = `${displayWidth}px`;
+      stage.style.height = `${displayHeight}px`;
+      overlay.style.width = `${displayWidth}px`;
+      overlay.style.height = `${displayHeight}px`;
+      topLabelLayer.style.width = `${displayWidth}px`;
+      return true;
+    }
+
+    function parseCutCount(inputEl) {
+      const raw = String(inputEl.value).trim();
+      if (raw === '') return null;
+      if (!/^\d+$/.test(raw)) return null;
+      const value = Number(raw);
+      if (!Number.isInteger(value) || value < 1) return null;
+      return value;
+    }
+
+    function parseCropValue(inputEl) {
+      const raw = String(inputEl.value).trim();
+      if (raw === '') return 0;
+      if (!/^\d+$/.test(raw)) return null;
+      const value = Number(raw);
+      if (!Number.isInteger(value) || value < 0) return null;
+      return value;
+    }
+
+    function sanitizeCropInput(inputEl) {
+      const parsed = parseCropValue(inputEl);
+      if (parsed === null) return false;
+      inputEl.value = String(parsed);
+      return true;
+    }
+
+    function readCropState(displayWidth, displayHeight) {
+      const rawTop = parseCropValue(cropTopInput);
+      const rawRight = parseCropValue(cropRightInput);
+      const rawBottom = parseCropValue(cropBottomInput);
+      const rawLeft = parseCropValue(cropLeftInput);
+      if ([rawTop, rawRight, rawBottom, rawLeft].some((v) => v === null)) {
+        return null;
+      }
+      const safeWidth = Math.max(1, Math.round(displayWidth || 0));
+      const safeHeight = Math.max(1, Math.round(displayHeight || 0));
+      const top = Math.min(rawTop, safeHeight - 1);
+      const bottom = Math.min(rawBottom, Math.max(0, safeHeight - top - 1));
+      const left = Math.min(rawLeft, safeWidth - 1);
+      const right = Math.min(rawRight, Math.max(0, safeWidth - left - 1));
+      cropTopInput.value = String(top);
+      cropRightInput.value = String(right);
+      cropBottomInput.value = String(bottom);
+      cropLeftInput.value = String(left);
+      return { top, right, bottom, left };
+    }
+
+    function getGridBounds() {
+      const width = getDisplayWidth();
+      const height = getDisplayHeight();
+      const crop = readCropState(width, height);
+      if (!width || !height || !crop) return null;
+      const left = crop.left;
+      const top = crop.top;
+      const right = Math.max(left + 1, width - crop.right);
+      const bottom = Math.max(top + 1, height - crop.bottom);
+      return {
+        left,
+        top,
+        right,
+        bottom,
+        width: Math.max(1, right - left),
+        height: Math.max(1, bottom - top),
+      };
+    }
+
+    function syncCropPanelState(expanded) {
+      cropPanel.classList.toggle('expanded', expanded);
+      cropToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      cropFields.hidden = !expanded;
+    }
+
+    function updateStageSize() {
+      if (!syncStageToImage()) return;
+      overlay.style.width = `${getDisplayWidth()}px`;
+      overlay.style.height = `${getDisplayHeight()}px`;
+      topLabelLayer.style.width = `${getDisplayWidth()}px`;
+    }
+
+    function buildSegments(totalSize, positions, offsetStart = 0, offsetEnd = 0) {
+      const rounded = positions.map((v) => Math.round(v));
+      const edges = [Math.round(offsetStart), ...rounded, Math.round(totalSize - offsetEnd)];
+      const segments = [];
+      for (let i = 0; i < edges.length - 1; i++) {
+        segments.push(Math.max(0, edges[i + 1] - edges[i]));
+      }
+      return segments;
+    }
+
+    function updateWidthBadges() {
+      widthBar.innerHTML = '';
+      const width = getDisplayWidth();
+      const height = getDisplayHeight();
+      if (!width || !height || !image.src) {
+        widthBar.innerHTML = '';
+        return;
+      }
+      const widthSegments = buildSegments(width, verticalLinePositions, cropState.left, cropState.right);
+      const heightSegments = buildSegments(height, horizontalLinePositions, cropState.top, cropState.bottom);
+      let index = 1;
+      heightSegments.forEach((segHeight) => {
+        widthSegments.forEach((segWidth) => {
+          const badge = document.createElement('span');
+          badge.className = 'badge';
+          badge.textContent = `${index},${segWidth}/${segHeight}px`;
+          widthBar.appendChild(badge);
+          index++;
+        });
+      });
+    }
+
+    function updateTopLabels() {
+      topLabelLayer.innerHTML = '';
+      const width = getDisplayWidth();
+      if (!width || !image.src) return;
+      const edges = [cropState.left, ...verticalLinePositions, width - cropState.right];
+      edges.forEach((left, index) => {
+        if (index === edges.length - 1) return;
+        const right = edges[index + 1];
+        const segWidth = Math.round(right - left);
+        const center = left + (right - left) / 2;
+        const label = document.createElement('div');
+        label.className = 'top-width-label';
+        label.textContent = `${segWidth}px`;
+        label.style.left = `${center}px`;
+        topLabelLayer.appendChild(label);
+      });
+    }
+
+    function drawSegmentMeasures() {
+      const bounds = getGridBounds();
+      if (!bounds || !image.src) return;
+      const xEdges = [bounds.left, ...verticalLinePositions, bounds.right].map((v) => Math.round(v));
+      const yEdges = [bounds.top, ...horizontalLinePositions, bounds.bottom].map((v) => Math.round(v));
+      const inset = 10;
+      const horizontalLabelOffset = 8;
+      const verticalLabelOffset = 8;
+      for (let row = 0; row < yEdges.length - 1; row++) {
+        const top = yEdges[row];
+        const bottom = yEdges[row + 1];
+        const segHeight = Math.max(0, bottom - top);
+        if (!segHeight) continue;
+        for (let col = 0; col < xEdges.length - 1; col++) {
+          const left = xEdges[col];
+          const right = xEdges[col + 1];
+          const segWidth = Math.max(0, right - left);
+          if (!segWidth) continue;
+
+          const innerWidth = Math.max(0, segWidth - inset * 2);
+          const innerHeight = Math.max(0, segHeight - inset * 2);
+          const centerX = left + segWidth / 2;
+          const centerY = top + segHeight / 2;
+
+          const horizontalLine = document.createElement('div');
+          horizontalLine.className = 'segment-measure horizontal';
+          horizontalLine.style.left = `${left + inset}px`;
+          horizontalLine.style.top = `${top + inset}px`;
+          horizontalLine.style.width = `${innerWidth}px`;
+          const horizontalLabel = document.createElement('span');
+          horizontalLabel.className = 'measure-label';
+          horizontalLabel.textContent = `${segWidth}px`;
+          horizontalLabel.style.top = `${-horizontalLabelOffset}px`;
+          horizontalLine.appendChild(horizontalLabel);
+          overlay.appendChild(horizontalLine);
+
+          const verticalLine = document.createElement('div');
+          verticalLine.className = 'segment-measure vertical';
+          verticalLine.style.left = `${left + inset}px`;
+          verticalLine.style.top = `${top + inset}px`;
+          verticalLine.style.height = `${innerHeight}px`;
+          const verticalLabel = document.createElement('span');
+          verticalLabel.className = 'measure-label';
+          verticalLabel.textContent = `${segHeight}px`;
+          verticalLabel.style.left = `${verticalLabelOffset}px`;
+          verticalLine.appendChild(verticalLabel);
+          overlay.appendChild(verticalLine);
+
+          const middleHorizontal = document.createElement('div');
+          middleHorizontal.className = 'segment-midline horizontal';
+          middleHorizontal.style.left = `${left}px`;
+          middleHorizontal.style.top = `${centerY}px`;
+          middleHorizontal.style.width = `${segWidth}px`;
+          overlay.appendChild(middleHorizontal);
+
+          const middleVertical = document.createElement('div');
+          middleVertical.className = 'segment-midline vertical';
+          middleVertical.style.left = `${centerX}px`;
+          middleVertical.style.top = `${top}px`;
+          middleVertical.style.height = `${segHeight}px`;
+          overlay.appendChild(middleVertical);
+
+          const centerPoint = document.createElement('div');
+          centerPoint.className = 'segment-center-point';
+          centerPoint.style.left = `${centerX}px`;
+          centerPoint.style.top = `${centerY}px`;
+          overlay.appendChild(centerPoint);
+        }
+      }
+    }
+
+    function renderLines() {
+      overlay.innerHTML = '';
+      refreshTheme();
+      drawSegmentMeasures();
+      verticalLinePositions.forEach((x, index) => {
+        const line = document.createElement('div');
+        line.className = 'cut-line vertical';
+        line.dataset.index = `H${index + 1}`;
+        line.dataset.lineIndex = String(index);
+        line.dataset.orientation = 'vertical';
+        line.style.left = `${x}px`;
+        line.addEventListener('pointerdown', onPointerDown);
+        overlay.appendChild(line);
+      });
+      horizontalLinePositions.forEach((y, index) => {
+        const line = document.createElement('div');
+        line.className = 'cut-line horizontal';
+        line.dataset.index = `V${index + 1}`;
+        line.dataset.lineIndex = String(index);
+        line.dataset.orientation = 'horizontal';
+        line.style.top = `${y}px`;
+        line.addEventListener('pointerdown', onPointerDown);
+        overlay.appendChild(line);
+      });
+      updateWidthBadges();
+      updateTopLabels();
+    }
+
+    function createEvenPositions(totalSize, count) {
+      if (count <= 1) return [];
+      const positions = [];
+      for (let i = 1; i < count; i++) {
+        positions.push((totalSize * i) / count);
+      }
+      return positions;
+    }
+
+    function initializeLines() {
+      clearError();
+      const horizontalCount = parseCutCount(horizontalCountInput);
+      const verticalCount = parseCutCount(verticalCountInput);
+      if (!image.src) {
+        widthBar.innerHTML = '';
+        topLabelLayer.innerHTML = '';
+        overlay.innerHTML = '';
+        image.style.clipPath = '';
+        return;
+      }
+      if (horizontalCount === null || verticalCount === null) {
+        overlay.innerHTML = '';
+        topLabelLayer.innerHTML = '';
+        widthBar.innerHTML = '<span class="badge">请输入大于等于 1 的整数</span>';
+        image.style.clipPath = '';
+        setError('水平和垂直切片数量必须是大于等于 1 的整数。');
+        return;
+      }
+      const width = getDisplayWidth();
+      const height = getDisplayHeight();
+      if (!width || !height) return;
+      const crop = readCropState(width, height);
+      if (!crop) {
+        overlay.innerHTML = '';
+        topLabelLayer.innerHTML = '';
+        widthBar.innerHTML = '<span class="badge">缩进请输入大于等于 0 的整数</span>';
+        image.style.clipPath = '';
+        setError('上下左右缩进值必须是大于等于 0 的整数。');
+        return;
+      }
+      cropState = crop;
+      const croppedWidth = Math.max(1, width - crop.left - crop.right);
+      const croppedHeight = Math.max(1, height - crop.top - crop.bottom);
+      verticalLinePositions = createEvenPositions(croppedWidth, horizontalCount).map((v) => v + crop.left);
+      horizontalLinePositions = createEvenPositions(croppedHeight, verticalCount).map((v) => v + crop.top);
+      image.style.clipPath = "";
+      renderLines();
+    }
+
+    function clampLinePosition(positions, index, value, totalSize) {
+      const minGap = Math.max(8, Math.round(totalSize * 0.01));
+      const leftBound = index === 0 ? minGap : positions[index - 1] + minGap;
+      const rightBound = index === positions.length - 1 ? totalSize - minGap : positions[index + 1] - minGap;
+      return Math.min(rightBound, Math.max(leftBound, value));
+    }
+
+    function onPointerDown(event) {
+      event.preventDefault();
+      const index = Number(event.currentTarget.dataset.lineIndex);
+      activeLine = { index, pointerId: event.pointerId, orientation: event.currentTarget.dataset.orientation };
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+
+    function onPointerMove(event) {
+      if (!activeLine || event.pointerId !== activeLine.pointerId) return;
+      const rect = overlay.getBoundingClientRect();
+      if (activeLine.orientation === 'vertical') {
+        const x = event.clientX - rect.left;
+        verticalLinePositions[activeLine.index] = clampLinePosition(verticalLinePositions, activeLine.index, x, getDisplayWidth());
+      } else {
+        const y = event.clientY - rect.top;
+        horizontalLinePositions[activeLine.index] = clampLinePosition(horizontalLinePositions, activeLine.index, y, getDisplayHeight());
+      }
+      renderLines();
+    }
+
+    function onPointerUp(event) {
+      if (!activeLine || event.pointerId !== activeLine.pointerId) return;
+      activeLine = null;
+    }
+
+    overlay.addEventListener('pointermove', onPointerMove);
+    overlay.addEventListener('pointerup', onPointerUp);
+    overlay.addEventListener('pointercancel', onPointerUp);
+    window.addEventListener('resize', () => {
+      if (!image.src) return;
+      updateStageSize();
+      initializeLines();
+    });
+
+    function handleCountInput() {
+      if (!image.src) {
+        clearError();
+        if (parseCutCount(horizontalCountInput) === null || parseCutCount(verticalCountInput) === null) {
+          setError('水平和垂直切片数量必须是大于等于 1 的整数。');
+        }
+        return;
+      }
+      initializeLines();
+    }
+
+    function handleCropInput(event) {
+      const inputEl = event.currentTarget;
+      if (!sanitizeCropInput(inputEl)) {
+        setError('上下左右缩进值必须是大于等于 0 的整数。');
+        return;
+      }
+      clearError();
+      if (image.src) initializeLines();
+    }
+
+    syncCropPanelState(false);
+    cropToggle.addEventListener('click', () => {
+      const expanded = cropToggle.getAttribute('aria-expanded') !== 'true';
+      syncCropPanelState(expanded);
+    });
+
+    horizontalCountInput.addEventListener('input', handleCountInput);
+    verticalCountInput.addEventListener('input', handleCountInput);
+    cropTopInput.addEventListener('input', handleCropInput);
+    cropBottomInput.addEventListener('input', handleCropInput);
+    cropLeftInput.addEventListener('input', handleCropInput);
+    cropRightInput.addEventListener('input', handleCropInput);
+
+    imageInput.addEventListener('change', () => {
+      clearError();
+      const [file] = imageInput.files || [];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        setError('导入失败：请选择图片文件。');
+        imageInput.value = '';
+        return;
+      }
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      objectUrl = URL.createObjectURL(file);
+      image.onload = () => {
+        viewerWrap.hidden = false;
+        emptyState.hidden = true;
+        stage.hidden = false;
+        updateStageSize();
+        refreshTheme();
+        initializeLines();
+      };
+      image.onerror = () => {
+        setError('图片加载失败：文件可能损坏或格式不受支持。');
+        viewerWrap.hidden = false;
+        stage.hidden = true;
+        emptyState.hidden = false;
+        overlay.innerHTML = '';
+        topLabelLayer.innerHTML = '';
+        widthBar.innerHTML = '<span class="badge">图片加载失败</span>';
+      };
+      image.src = objectUrl;
+    });
+  </script>
+</body>
+</html>

@@ -96,6 +96,10 @@
           "type": "string",
           "description": "Primary file extension involved in the command (e.g. \"jpg\"). Empty string if none."
         },
+        "is_key_step": {
+          "type": "boolean",
+          "description": "Is this step a decision based on significant reasoning, or is it just a standard operating procedure? Significant reasoning is True and standard operating procedure is False."
+        },
         "why_do_this": {
           "type": "string",
           "description": "Brief reasoning for executing this command. Must retain granular data and operational logs for process summarization. The more granular, the better."
@@ -105,6 +109,7 @@
         "cmd",
         "suffix",
         "sub_ops",
+        "is_key_step",
         "why_do_this",
         "timeout_seconds"
       ]

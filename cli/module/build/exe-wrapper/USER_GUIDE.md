@@ -50,7 +50,7 @@ Double-click the generated `.exe`:
 
 - installer:
   - extracts the embedded payload to a stable cache directory
-  - if the existing local sentinel and `deepright` WSL distro are healthy, it runs `start.bat`
+  - if the existing local sentinel is present, the `deepright` WSL distro is healthy, and the WSL app files still exist, it runs `start.bat`
   - otherwise it runs `install.bat`
   - `install.bat` continues into the existing WSL2 install/start flow
 - uninstaller:

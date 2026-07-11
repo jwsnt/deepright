@@ -1,7 +1,5 @@
 package ai.deepright.llm.provider;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
 import ai.open.right.utils.JsonUtils;
 import ai.open.right.utils.SplitUtils;
 import ai.open.right.workflow.config.NamesService;
@@ -28,9 +26,10 @@ public class RequestFunCallStore {
         if (StringUtils.equalsIgnoreCase(RequestFunCallStore.SOURCE, SplitUtils.join(namesService.decode(funCallRequest.getName())))) {
             // 去掉无法解析的Reason
             String r = !StringUtils.equalsIgnoreCase(ProviderRequest.REQUEST_GOOGLE, request.getApi()) ? funCallRequest.getReason() : "";
-            String w = StringUtils.defaultIfEmpty(MapUtils.getString(JsonUtils.transfer(funCallRequest.getArgs(), Map.class), "why_do_this"), "");
+            Map<String, Object> subData = JsonUtils.transfer(funCallRequest.getArgs(), Map.class);
+            String w = StringUtils.defaultIfEmpty(MapUtils.getString(subData, "why_do_this"), "");
             // R和W任一不为空
-            if (!StringUtils.isEmpty(r) || !StringUtils.isEmpty(w)) {
+            if (MapUtils.getBoolean(subData, "is_key_step", true) && !StringUtils.isEmpty(r) || !StringUtils.isEmpty(w)) {
                 History history = new History(request.getMessage());
                 history.setContent(new StringBuffer().append(w).append(System.lineSeparator()).append(r).toString());
                 history.setCreated(funCallRequest.getCreated());

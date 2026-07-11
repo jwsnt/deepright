@@ -296,7 +296,7 @@ func installLooksHealthy() bool {
 		return false
 	}
 
-	cmd := exec.Command("wsl.exe", "-d", distroName, "--", "echo", "ok")
+	cmd := exec.Command("wsl.exe", "-d", distroName, "--", "bash", "-c", "if [ -x /app/integration ] && [ -x /home/deepright/start-deepright.sh ]; then echo ok; fi")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return false

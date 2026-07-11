@@ -45,6 +45,11 @@ function Test-DistroExists([string]$N) {
     return $false
 }
 
+function Test-WslAppHealthy() {
+    $out = & wsl.exe -d $DISTRO_NAME -- bash -c "if [ -x /app/integration ] && [ -x /home/deepright/start-deepright.sh ]; then echo ok; fi" 2>&1 | Out-String
+    return ($LASTEXITCODE -eq 0 -and $out -match "ok")
+}
+
 function WslPath([string]$P) {
     $d = $P.Substring(0,1).ToLower()
     $r = $P.Substring(2) -replace '\\', '/'
@@ -151,14 +156,13 @@ L_Info "Log file: $LOG_FILE"
 $needsFullInstall = $true
 
 if (Test-Path $LOCAL_SENTINEL_FILE) {
-    if (Test-DistroExists -Name $DISTRO_NAME) {
+    if ((Test-DistroExists -Name $DISTRO_NAME) -and (Test-WslAppHealthy)) {
         $needsFullInstall = $false
-        L_OK "Sentinel found + distro alive -- skipping installation"
-        L_OK "To force re-install, delete: $LOCAL_SENTINEL_FILE"
+        L_OK "Sentinel found + distro alive + WSL app healthy -- skipping installation"
+        L_OK "To force re-install, delete WSL app files or rerun the installer after cleanup"
     } else {
-        L_Warn "Sentinel found but distro is missing (unregistered/deleted)"
-        L_Warn "Deleting stale sentinel, re-installing..."
-        Remove-Item $LOCAL_SENTINEL_FILE -Force -EA SilentlyContinue
+        L_Warn "Sentinel found but WSL app is incomplete or distro is missing"
+        L_Warn "Keeping ProgramData contents and re-installing app files..."
     }
 }
 

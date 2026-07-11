@@ -7,8 +7,8 @@ param(
 
 $DISTRO_NAME = "deepright"
 $WSL_VHD_PATH = "C:\WSL\deepright"
-$LOCAL_SENTINEL_DIR = "C:\ProgramData\deepright"
-$LOCAL_SENTINEL_FILE = Join-Path $LOCAL_SENTINEL_DIR ".deepright_installed"
+$PROGRAM_DATA_DIR = if ([string]::IsNullOrWhiteSpace($env:ProgramData)) { "C:\ProgramData" } else { $env:ProgramData }
+$LOCAL_SENTINEL_FILE = Join-Path (Join-Path $PROGRAM_DATA_DIR "deepright") ".deepright_installed"
 $LOCAL_CACHE_DIR = Join-Path $env:LOCALAPPDATA "DeepRight"
 $SHORTCUT_NAME = "DeepRight"
 $LOG_FILE = Join-Path $env:TEMP "deepright-uninstall.log"
@@ -18,6 +18,7 @@ function L_OK($m)   { Write-Host "  [OK] $m" -ForegroundColor Green; Add-Content
 function L_Warn($m) { Write-Host "  [!] $m" -ForegroundColor Yellow; Add-Content -Path $LOG_FILE -Value "  [WARN] $m" -Encoding UTF8 }
 function L_Err($m)  { Write-Host "  [X] $m" -ForegroundColor Red; Add-Content -Path $LOG_FILE -Value "  [ERROR] $m" -Encoding UTF8 }
 function L_Info($m) { Write-Host "  [i] $m" -ForegroundColor Gray; Add-Content -Path $LOG_FILE -Value "  [INFO] $m" -Encoding UTF8 }
+function L_Detail($m) { Write-Host "      $m" -ForegroundColor DarkGray; Add-Content -Path $LOG_FILE -Value "      $m" -Encoding UTF8 }
 
 function Test-Admin {
     $id = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -25,34 +26,40 @@ function Test-Admin {
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
-function Remove-PathIfExists([string]$Path, [string]$Label) {
-    if (-not (Test-Path $Path)) {
-        L_Info "$Label not found: $Path"
+function Write-RemovalPreview([string]$Path, [string]$Label) {
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        L_Warn "$Label preview path is empty"
         return
     }
 
+    if (-not (Test-Path -LiteralPath $Path)) {
+        L_Info "$Label preview target not found: $Path"
+        return
+    }
+
+    L_Info "$Label removal preview:"
     try {
-        Remove-Item -Path $Path -Recurse -Force -ErrorAction Stop
-        L_OK "$Label removed: $Path"
+        $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+        L_Detail $item.FullName
+        if ($item.PSIsContainer) {
+            Get-ChildItem -LiteralPath $Path -Recurse -Force -ErrorAction SilentlyContinue |
+                Sort-Object FullName |
+                ForEach-Object { L_Detail $_.FullName }
+        }
     } catch {
-        L_Err "$Label remove failed: $Path"
-        throw
+        L_Warn "$Label preview failed: $Path"
     }
 }
 
-function Remove-FileIfExists([string]$Path, [string]$Label) {
-    if ([string]::IsNullOrWhiteSpace($Path)) {
-        L_Warn "$Label path is empty"
-        return
-    }
-
-    if (-not (Test-Path $Path)) {
+function Remove-PathIfExists([string]$Path, [string]$Label) {
+    if (-not (Test-Path -LiteralPath $Path)) {
         L_Info "$Label not found: $Path"
         return
     }
 
     try {
-        Remove-Item -Path $Path -Force -ErrorAction Stop
+        Write-RemovalPreview -Path $Path -Label $Label
+        Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
         L_OK "$Label removed: $Path"
     } catch {
         L_Err "$Label remove failed: $Path"
@@ -66,13 +73,14 @@ function Remove-ShortcutIfExists([string]$ShortcutPath, [string]$Label) {
         return
     }
 
-    if (-not (Test-Path $ShortcutPath)) {
+    if (-not (Test-Path -LiteralPath $ShortcutPath)) {
         L_Info "$Label shortcut not found: $ShortcutPath"
         return
     }
 
     try {
-        Remove-Item -Path $ShortcutPath -Force -ErrorAction Stop
+        Write-RemovalPreview -Path $ShortcutPath -Label "$Label shortcut"
+        Remove-Item -LiteralPath $ShortcutPath -Force -ErrorAction Stop
         L_OK "$Label shortcut removed: $ShortcutPath"
     } catch {
         L_Err "$Label shortcut remove failed: $ShortcutPath"
@@ -117,6 +125,20 @@ function Remove-WslPathIfExists([string]$DistroName, [string]$Path, [string]$Lab
         return
     }
 
+    $previewOutput = & wsl.exe -d $DistroName -u root -- bash -c "if [ -d $quotedPath ]; then find $quotedPath -print | LC_ALL=C sort; elif [ -e $quotedPath ]; then printf '%s\n' $quotedPath; fi" 2>&1 | Out-String
+    Add-Content -Path $LOG_FILE -Value "preview ${Path}:`n$previewOutput" -Encoding UTF8
+    if ($LASTEXITCODE -eq 0) {
+        L_Info "$Label removal preview:"
+        foreach ($line in ($previewOutput -split "[`r`n]+")) {
+            $trimmed = $line.Trim()
+            if ($trimmed -ne "") {
+                L_Detail "[WSL] $trimmed"
+            }
+        }
+    } else {
+        L_Warn "$Label preview failed: $Path"
+    }
+
     $removeOutput = & wsl.exe -d $DistroName -u root -- bash -c "rm -rf -- $quotedPath" 2>&1 | Out-String
     Add-Content -Path $LOG_FILE -Value "remove ${Path}:`n$removeOutput" -Encoding UTF8
     if ($LASTEXITCODE -ne 0) {
@@ -158,11 +180,12 @@ function Unregister-DistroIfExists([string]$DistroName) {
 }
 
 function Start-DelayedDelete([string]$Path) {
-    if ([string]::IsNullOrWhiteSpace($Path) -or -not (Test-Path $Path)) {
+    if ([string]::IsNullOrWhiteSpace($Path) -or -not (Test-Path -LiteralPath $Path)) {
         return
     }
 
     try {
+        Write-RemovalPreview -Path $Path -Label "Delayed cleanup target"
         Start-Process -FilePath "cmd.exe" -WindowStyle Hidden -ArgumentList "/c", "ping 127.0.0.1 -n 4 >nul && rmdir /s /q `"$Path`""
         L_Info "Scheduled cleanup: $Path"
     } catch {
@@ -228,7 +251,7 @@ try {
     } else {
         L_Step "Step 2/3: Remove Windows install state and extracted payload"
     }
-    Remove-FileIfExists -Path $LOCAL_SENTINEL_FILE -Label "Install sentinel file"
+    Remove-PathIfExists -Path $LOCAL_SENTINEL_FILE -Label "Install sentinel file"
     Remove-PathIfExists -Path $LOCAL_CACHE_DIR -Label "Local extracted payload directory"
 
     if ($RemoveAll) {

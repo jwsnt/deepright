@@ -16,6 +16,17 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+:: Check if the WSL app files still exist
+wsl -d deepright -- bash -c "test -x /app/integration && test -x /home/deepright/start-deepright.sh" 2>nul >nul
+if %errorlevel% neq 0 (
+    echo [X] DeepRight app files are missing inside WSL.
+    echo.
+    echo Please run install.bat first to restore the application files.
+    echo ============================================
+    pause
+    exit /b 1
+)
+
 echo [i] Starting integration in deepright...
 echo.
 

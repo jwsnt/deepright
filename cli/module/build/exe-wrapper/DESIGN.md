@@ -8,6 +8,7 @@ The generated `.exe` is meant to be a self-extracting launcher:
 
 - first run: extract payload, run `install.bat`, complete WSL2 installation, then start DeepRight
 - later runs: extract check is reused by payload hash, and the launcher prefers `start.bat` when the local sentinel and WSL distro are healthy
+  and the WSL app files still exist
 - a separate uninstaller build extracts a minimal payload and runs `uninstall.bat`
 
 ## Why a new build path
@@ -43,7 +44,7 @@ When the generated `.exe` runs on Windows:
 3. reuse the directory if the payload hash marker matches and required files exist
 4. otherwise remove stale content and extract the payload again
 5. launcher-specific default behavior:
-   - installer: run `start.bat` when `C:\ProgramData\deepright\.deepright_installed` exists and `wsl.exe -d deepright -- echo ok` succeeds, otherwise run `install.bat`
+   - installer: run `start.bat` when `C:\ProgramData\deepright\.deepright_installed` exists, the `deepright` distro responds, and `/app/integration` plus `/home/deepright/start-deepright.sh` still exist inside WSL; otherwise run `install.bat`
    - uninstaller: run `uninstall.bat`
 
 `install.bat` then keeps using the existing `install.ps1` logic, so WSL installation remains authoritative in one place. `uninstall.bat` similarly delegates to `uninstall.ps1` so the default app-only cleanup and optional full Windows/WSL cleanup both stay in one script.
