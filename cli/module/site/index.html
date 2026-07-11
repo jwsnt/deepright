@@ -1547,7 +1547,7 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 .rs-wiki-content .wiki-tree-link{border:none;background:none;padding:0;cursor:pointer;color:var(--accent);text-align:left;text-decoration:underline;width:100%}
 .rs-wiki-content .wiki-tree-link:hover,.rs-wiki-content .wiki-tree-link:focus-visible{color:var(--accent-hover);outline:none}
 .rs-wiki-content .wiki-file-frame{width:100%;min-height:260px;border:1px solid rgba(77,107,254,.16);border-radius:var(--radius-xs);background:var(--bg-card)}
-.rs-wiki-content .wiki-file-image{display:block;max-width:100%;height:auto;border-radius:var(--radius-xs);border:1px solid rgba(77,107,254,.16);background:var(--bg-card)}
+.rs-wiki-content .wiki-file-image,.rs-wiki-content .wiki-file-video{display:block;max-width:100%;height:auto;border-radius:var(--radius-xs);border:1px solid rgba(77,107,254,.16);background:var(--bg-card)}
 .rs-wiki-content .wiki-file-download{display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:inherit}
 .rs-wiki-empty{flex:1;min-height:0;display:flex;align-items:flex-start;justify-content:flex-start;text-align:left;font-size:10px;line-height:1.6;color:var(--text-muted);padding:2px 0 0}
 .rs-meta-view{display:none;flex-direction:column;width:100%;flex:1;opacity:0;transition:opacity .3s;min-height:0;overflow:hidden}
@@ -3439,6 +3439,7 @@ body.quick-fan-transition-active{cursor:progress}
 .file-editor-content iframe{width:100%;height:100%;border:none;background:#fff;border-radius:10px}
 [data-theme="dark"] .file-editor-content iframe{background:#0b1220}
 .file-editor-content .fe-image{max-width:100%;max-height:70vh;display:block;margin:0 auto}
+.file-editor-content .fe-video{display:block;width:min(960px,100%);max-width:100%;max-height:70vh;margin:0 auto;border-radius:12px;background:#000}
 .fe-image-editor{display:flex;flex-direction:column;gap:12px;padding:12px}
 .fe-image-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .fe-image-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -5643,11 +5644,15 @@ const MESSAGE_IMAGE_DB = 'deepright-message-images-db';
 const MESSAGE_IMAGE_STORE = 'images';
 const REMOTE_MASKED_TOKEN_VALUE = '**********';
 const MAX_STORE = 2000, MAX_SHOW = 500, LAZY_PAGE = 20, MAX_CLI_SUB_SHOW = 30, MAX_CLI_COMMAND_HISTORY = 30, COLD_HISTORY_RECORD_PAGE = 120;
+const LOCAL_STORAGE_SOFT_LIMIT_BYTES = Math.round(2.5 * 1024 * 1024);
+const LOCAL_STORAGE_COMPACT_TARGET_BYTES = Math.round(1.5 * 1024 * 1024);
+const LOCAL_STORAGE_MAINTENANCE_INTERVAL_MS = 30000;
 const MESSAGE_RENDER_CACHE_LIMIT = 240;
 const WIKI_RENDER_CACHE_LIMIT = 40;
 const LOW_POWER_RENDER_MESSAGE_MATH_LIMIT = 12;
 const MINIMAX_LEGACY_MODEL = 'MiniMax-M2.7';
 const MINIMAX_LATEST_MODEL = 'MiniMax-M3';
+const LOCAL_STORAGE_SIZE_ENCODER = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
 let runtimeModelTokenCache = Object.create(null);
 
 function normalizeModelName(value) {
@@ -21690,6 +21695,8 @@ async function init() {
   updateStandaloneButton();
   finalizeBootShell();
   releaseBootLoadingOverlay();
+  startLocalStorageMaintenance();
+  maintainLocalStorageBudget({ showNotice: false });
   await loadSettings();
   await loadStandaloneModeStatus({ silent: true });
   const perfProfile = await detectBrowserPerfProfile();
@@ -21724,7 +21731,10 @@ async function init() {
     loadWikiDoc(getWikiHomeDoc(initialWikiAgentId), { silent: true, agentId: initialWikiAgentId });
   }
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) loadStandaloneModeStatus({ silent: true });
+    if (!document.hidden) {
+      loadStandaloneModeStatus({ silent: true });
+      maintainLocalStorageBudget({ showNotice: false });
+    }
   });
   document.addEventListener('click', e => {
     if (!e.target.closest('#inputSandboxGroup') && !e.target.closest('#sandboxOverlay')) hideSandboxOverlay();
@@ -22137,6 +22147,7 @@ function guessWikiFileType(path, contentType) {
   const lowerType = String(contentType || '').toLowerCase();
   if (normalized === '.' || lowerPath.endsWith('/')) return 'tree';
   if (lowerType.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg|bmp|ico)$/i.test(lowerPath)) return 'image';
+  if ((lowerType.startsWith('video/') && feCanPreviewVideoMime(lowerType.split(';')[0])) || feCanPreviewVideoPath(lowerPath)) return 'video';
   if (lowerType.includes('text/html') || /\.html?$/i.test(lowerPath)) return 'html';
   if (lowerType.startsWith('text/markdown') || lowerType.startsWith('text/x-markdown') || /\.(md|markdown)$/i.test(lowerPath)) return 'markdown';
   if (lowerType.startsWith('text/') || lowerType.includes('json') || lowerType.includes('xml') || lowerType.includes('javascript')) return 'text';
@@ -22202,7 +22213,7 @@ function renderWikiTree(text, currentPath) {
     }
     const prefix = line.slice(0, Math.max(0, line.length - (match ? match[2].length : label.length)));
     const safeLabel = esc(isDir ? label + '/' : label);
-    if (isDir || /\.(md|markdown|txt|json|xml|ya?ml|html?|png|jpe?g|gif|webp|svg|bmp|ico)$/i.test(label)) {
+    if (isDir || /\.(md|markdown|txt|json|xml|ya?ml|html?|png|jpe?g|gif|webp|svg|bmp|ico)$/i.test(label) || feCanPreviewVideoPath(label)) {
       return '<div class="wiki-tree-row"><span class="wiki-tree-prefix">' + esc(prefix) + '</span><button type="button" class="wiki-tree-link" data-wiki-link="' + esc(targetPath) + '">' + safeLabel + '</button></div>';
     }
     return '<div class="wiki-tree-row"><span class="wiki-tree-prefix">' + esc(prefix) + '</span><span class="wiki-tree-label">' + safeLabel + '</span></div>';
@@ -22217,6 +22228,7 @@ function renderWikiFileContent(text, fileType, currentPath, previewKey) {
   if (fileType === 'markdown') return renderWikiMarkdown(text, path, previewKey);
   if (fileType === 'html') return '<div class="md-content"><iframe class="wiki-file-frame" data-wiki-html-preview="1" data-wiki-preview-key="' + esc(String(previewKey || '')) + '" loading="lazy"></iframe></div>';
   if (fileType === 'image') return '<div class="md-content"><img class="wiki-file-image" src="' + esc(fetchPath) + '" alt="' + esc(path) + '"></div>';
+  if (fileType === 'video') return '<div class="md-content"><video class="wiki-file-video" controls preload="metadata" playsinline src="' + esc(fetchPath) + '"></video></div>';
   if (fileType === 'download') {
     return '<div class="md-content"><p>当前文件类型不支持内联展示。</p><a class="wiki-file-download" href="' + esc(fetchPath) + '" target="_blank" rel="noopener noreferrer">打开原始文件</a></div>';
   }
@@ -24704,18 +24716,24 @@ async function loadTokenSettings() {
     }
   }
 }
+
+function applyChatsStoragePayload(payload) {
+  const source = payload && typeof payload === 'object' ? payload : {};
+  state.chats = source.chats && typeof source.chats === 'object' ? source.chats : {};
+  state.chatOrder = Array.isArray(source.order) ? source.order : [];
+  chatAgents = source.agents && typeof source.agents === 'object' ? source.agents : {};
+  chatModels = normalizeChatModelMap(source.models || {});
+  chatThinking = source.thinking && typeof source.thinking === 'object' ? source.thinking : {};
+  chatVerify = source.verify && typeof source.verify === 'object' ? source.verify : {};
+  chatHtmlOutput = source.htmlOutput && typeof source.htmlOutput === 'object' ? source.htmlOutput : {};
+  chatSwarm = source.swarm && typeof source.swarm === 'object' ? source.swarm : {};
+}
+
 function loadChats() {
   try {
     const d = JSON.parse(localStorage.getItem(CHATS_KEY));
     if (d) {
-      state.chats = d.chats || {};
-      state.chatOrder = d.order || [];
-      chatAgents = d.agents || {};
-      chatModels = normalizeChatModelMap(d.models || {});
-      chatThinking = d.thinking && typeof d.thinking === 'object' ? d.thinking : {};
-      chatVerify = d.verify && typeof d.verify === 'object' ? d.verify : {};
-      chatHtmlOutput = d.htmlOutput && typeof d.htmlOutput === 'object' ? d.htmlOutput : {};
-      chatSwarm = d.swarm && typeof d.swarm === 'object' ? d.swarm : {};
+      applyChatsStoragePayload(d);
       let normalizedChanged = false;
       Object.values(state.chats).forEach(chat => {
         if (normalizeLoadedChat(chat)) normalizedChanged = true;
@@ -24726,6 +24744,118 @@ function loadChats() {
 }
 let chatStoragePressureNoticeShown = false;
 let chatStorageFailureNoticeShown = false;
+let localStorageMaintenanceTimer = 0;
+let localStorageMaintenanceRunning = false;
+let localStorageMaintenanceNoticeShown = false;
+
+const CHAT_STORAGE_COMPACTION_CONFIGS = [
+  { stripCompletedRawSse: true, inactiveCliLimit: 30, activeCliLimit: 30, inactiveMessageLimit: 240, activeMessageLimit: Infinity },
+  { stripCompletedRawSse: true, inactiveCliLimit: 20, activeCliLimit: 30, inactiveMessageLimit: 120, activeMessageLimit: Infinity },
+  { stripRawSse: true, inactiveCliLimit: 10, activeCliLimit: 30, inactiveMessageLimit: 60, activeMessageLimit: 160 },
+  { stripRawSse: true, inactiveCliLimit: 0, activeCliLimit: 20, inactiveMessageLimit: 24, activeMessageLimit: 80 },
+  { stripRawSse: true, inactiveCliLimit: 0, activeCliLimit: 10, inactiveMessageLimit: 12, activeMessageLimit: 60 },
+  { stripRawSse: true, inactiveCliLimit: 0, activeCliLimit: 0, inactiveMessageLimit: 0, activeMessageLimit: 40 }
+];
+
+function estimateLocalStorageTextBytes(value) {
+  const text = String(value ?? '');
+  if (LOCAL_STORAGE_SIZE_ENCODER) return LOCAL_STORAGE_SIZE_ENCODER.encode(text).length;
+  return text.length * 2;
+}
+
+function estimateLocalStorageUsageBytes() {
+  let total = 0;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      total += estimateLocalStorageTextBytes(key);
+      total += estimateLocalStorageTextBytes(localStorage.getItem(key));
+    }
+  } catch {
+    return 0;
+  }
+  return total;
+}
+
+function estimateLocalStorageUsageWithChatsPayload(payload) {
+  const nextPayload = payload && typeof payload === 'object' ? payload : {};
+  let total = estimateLocalStorageUsageBytes();
+  try {
+    total -= estimateLocalStorageTextBytes(CHATS_KEY);
+    total -= estimateLocalStorageTextBytes(localStorage.getItem(CHATS_KEY));
+  } catch {}
+  total += estimateLocalStorageTextBytes(CHATS_KEY);
+  total += estimateLocalStorageTextBytes(JSON.stringify(nextPayload));
+  return total;
+}
+
+function findCompactedChatsPayloadForBudget(basePayload, targetBytes) {
+  const sourcePayload = basePayload && typeof basePayload === 'object' ? basePayload : buildChatsStoragePayload();
+  let bestPayload = null;
+  let bestBytes = estimateLocalStorageUsageWithChatsPayload(sourcePayload);
+  for (const config of CHAT_STORAGE_COMPACTION_CONFIGS) {
+    const compactedPayload = createQuotaCompactedChatsPayload(sourcePayload, config);
+    if (!compactedPayload) continue;
+    const bytes = estimateLocalStorageUsageWithChatsPayload(compactedPayload);
+    if (!bestPayload || bytes < bestBytes) {
+      bestPayload = compactedPayload;
+      bestBytes = bytes;
+    }
+    if (bytes <= targetBytes) return { payload: compactedPayload, bytes };
+  }
+  return bestPayload ? { payload: bestPayload, bytes: bestBytes } : null;
+}
+
+function syncChatsPayloadToRuntime(payload) {
+  applyChatsStoragePayload(payload);
+  const activeChatId = String(state.activeChat || '').trim();
+  if (activeChatId && !state.chats[activeChatId]) {
+    state.activeChat = state.chatOrder[0] || '';
+  }
+  if (state.activeChat) {
+    renderMessages();
+    restoreCliSubPanel(state.activeChat);
+    syncRightSidebarUrlPreviewForActiveChat();
+    updateChatAsyncUI(state.activeChat);
+  } else {
+    clearCliSubPanel();
+  }
+  renderChatList();
+}
+
+function maintainLocalStorageBudget(options) {
+  const opts = options && typeof options === 'object' ? options : {};
+  if (localStorageMaintenanceRunning || hasGlobalPendingSseResponse()) return false;
+  const totalBytes = estimateLocalStorageUsageBytes();
+  if (totalBytes <= LOCAL_STORAGE_SOFT_LIMIT_BYTES) return false;
+  const basePayload = buildChatsStoragePayload();
+  const baseBytes = estimateLocalStorageUsageWithChatsPayload(basePayload);
+  const result = findCompactedChatsPayloadForBudget(basePayload, LOCAL_STORAGE_COMPACT_TARGET_BYTES);
+  if (!result || !result.payload || result.bytes >= baseBytes || result.bytes >= totalBytes) return false;
+  localStorageMaintenanceRunning = true;
+  try {
+    tryPersistChatsPayload(result.payload);
+    syncChatsPayloadToRuntime(result.payload);
+    if (opts.showNotice !== false && !localStorageMaintenanceNoticeShown) {
+      localStorageMaintenanceNoticeShown = true;
+      maybeShowChatStorageNotice('本地存储超过 2.5 MB，已自动压缩本地历史', false);
+    }
+    return true;
+  } catch (err) {
+    if (!isStorageQuotaError(err)) throw err;
+    return false;
+  } finally {
+    localStorageMaintenanceRunning = false;
+  }
+}
+
+function startLocalStorageMaintenance() {
+  if (localStorageMaintenanceTimer) return;
+  localStorageMaintenanceTimer = window.setInterval(() => {
+    if (document.hidden) return;
+    maintainLocalStorageBudget();
+  }, LOCAL_STORAGE_MAINTENANCE_INTERVAL_MS);
+}
 
 function shouldPersistAssistantRawSse(msg) {
   return !!(msg && msg.role === 'assistant' && !msg.error && !isAssistantTerminalMessage(msg));
@@ -24869,21 +24999,17 @@ function saveChats() {
   try {
     chatStorageFailureNoticeShown = false;
     tryPersistChatsPayload(basePayload);
+    maintainLocalStorageBudget({ showNotice: false });
     return true;
   } catch (err) {
     if (!isStorageQuotaError(err)) throw err;
   }
-  const fallbackConfigs = [
-    { stripCompletedRawSse: true, inactiveCliLimit: 40, activeCliLimit: 120, inactiveMessageLimit: 240, activeMessageLimit: Infinity },
-    { stripCompletedRawSse: true, inactiveCliLimit: 20, activeCliLimit: 80, inactiveMessageLimit: 120, activeMessageLimit: Infinity },
-    { stripRawSse: true, inactiveCliLimit: 0, activeCliLimit: 40, inactiveMessageLimit: 60, activeMessageLimit: 160 },
-    { stripRawSse: true, inactiveCliLimit: 0, activeCliLimit: 20, inactiveMessageLimit: 24, activeMessageLimit: 80 }
-  ];
-  for (const config of fallbackConfigs) {
+  for (const config of CHAT_STORAGE_COMPACTION_CONFIGS) {
     const compactedPayload = createQuotaCompactedChatsPayload(basePayload, config);
     if (!compactedPayload) continue;
     try {
       tryPersistChatsPayload(compactedPayload);
+      syncChatsPayloadToRuntime(compactedPayload);
       if (!chatStoragePressureNoticeShown) {
         chatStoragePressureNoticeShown = true;
         maybeShowChatStorageNotice('本地存储空间不足，已仅保存最近部分会话历史', false);
@@ -41051,7 +41177,7 @@ let feCurrentPath = '';
 let feCurrentContent = '';
 let feMode = 'view'; // 'view' or 'edit'
 let feAgentRelPath = '';
-let feFileType = 'text'; // 'text', 'html', 'image', 'pdf', 'unsupported'
+let feFileType = 'text'; // 'text', 'html', 'image', 'video', 'pdf', 'unsupported'
 let feImageMime = '';
 let feImageExt = '';
 let feImageState = {
@@ -41096,7 +41222,49 @@ function feBuildTimestampedPath(relPath, overrideExt) {
 
 const TEXT_EXTS = ['md','txt','xml','json','yaml','yml','toml','ini','cfg','conf','log','csv','sh','bash','zsh','go','js','ts','py','java','c','cpp','h','hpp','css','scss','less','sql','rb','rs','swift','kt','lua','pl','r','m','mm'];
 const IMAGE_EXTS = ['png','jpg','jpeg','gif','bmp','webp','svg','ico','tiff','tif'];
+const VIDEO_EXT_MIME_MAP = {
+  mp4: 'video/mp4',
+  m4v: 'video/mp4',
+  webm: 'video/webm',
+  ogv: 'video/ogg',
+  ogg: 'video/ogg',
+  mov: 'video/quicktime',
+  mkv: 'video/x-matroska',
+  avi: 'video/x-msvideo',
+  mpg: 'video/mpeg',
+  mpeg: 'video/mpeg'
+};
 const BINARY_EXTS = ['zip','tar','gz','rar','7z','bz2','exe','dll','so','dylib','bin','doc','docx','xls','xlsx','ppt','pptx','ttf','otf','woff','woff2','eot','mp3','mp4','avi','mov','wmv','flv','mkv','webm','wav','flac','aac','ogg'];
+
+function feResolveVideoMime(ext) {
+  return VIDEO_EXT_MIME_MAP[String(ext || '').toLowerCase()] || '';
+}
+
+function feCanPreviewVideoMime(mime) {
+  const normalizedMime = String(mime || '').trim().toLowerCase();
+  if (!normalizedMime || typeof document === 'undefined' || !document.createElement) return false;
+  try {
+    const video = document.createElement('video');
+    return !!(video && typeof video.canPlayType === 'function' && String(video.canPlayType(normalizedMime)).trim());
+  } catch {
+    return false;
+  }
+}
+
+function feCanPreviewVideoExt(ext) {
+  const normalizedExt = String(ext || '').toLowerCase();
+  const mime = feResolveVideoMime(normalizedExt);
+  if (!mime || typeof document === 'undefined' || !document.createElement) return false;
+  return feCanPreviewVideoMime(mime);
+}
+
+function feCanPreviewVideoPath(path) {
+  const raw = String(path || '').trim();
+  const filename = raw.split('/').pop() || raw;
+  const dotIndex = filename.lastIndexOf('.');
+  if (dotIndex <= 0 || dotIndex === filename.length - 1) return false;
+  return feCanPreviewVideoExt(filename.slice(dotIndex + 1));
+}
 
 function detectFileType(path) {
   const raw = String(path || '').trim();
@@ -41106,6 +41274,7 @@ function detectFileType(path) {
   const ext = filename.slice(dotIndex + 1).toLowerCase();
   if (ext === 'html' || ext === 'htm') return 'html';
   if (IMAGE_EXTS.includes(ext)) return 'image';
+  if (feCanPreviewVideoExt(ext)) return 'video';
   if (ext === 'pdf') return 'pdf';
   if (TEXT_EXTS.includes(ext)) return 'text';
   if (BINARY_EXTS.includes(ext)) return 'unsupported';
@@ -41279,6 +41448,7 @@ async function feOpen(absPath) {
   const tabs = document.querySelector('.file-editor-tabs');
   const actions = document.querySelector('.file-editor-actions');
   const content = document.getElementById('fileEditorContent');
+  feRevokePreviewBlobUrls(content);
 
   // Unsupported: show message only
   if (feFileType === 'unsupported') {
@@ -41332,6 +41502,28 @@ async function feOpen(absPath) {
       await renderPdf(data.content);
     } catch (err) {
       content.innerHTML = '<div style="color:var(--error);padding:12px">PDF 加载失败: ' + esc(err.message) + '</div>';
+    }
+    return;
+  }
+
+  // Video: load via /api/raw base64, preview via local Blob URL, no edit
+  if (feFileType === 'video') {
+    panel.classList.add('auto-size');
+    tabs.style.display = 'none';
+    actions.style.display = 'none';
+    content.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px">加载中...</div>';
+    showExclusiveOverlay(document.getElementById('fileEditorOverlay'));
+    try {
+      const agentId = state.settings.agentId;
+      const resp = await fetch('/api/raw?agentId=' + encodeURIComponent(agentId) + '&path=' + encodeURIComponent(feAgentRelPath));
+      const data = await resp.json();
+      if (data.status !== 0) {
+        content.innerHTML = '<div style="color:var(--error);padding:12px">' + esc(data.content) + '</div>';
+        return;
+      }
+      await renderVideo(data.content, feResolveVideoMime(feImageExt));
+    } catch (err) {
+      content.innerHTML = '<div style="color:var(--error);padding:12px">视频加载失败: ' + esc(err.message) + '</div>';
     }
     return;
   }
@@ -41931,10 +42123,7 @@ function feClearImageEdits() {
 
 function feClose() {
   const content = document.getElementById('fileEditorContent');
-  if (content && content.dataset.pdfBlobUrl) {
-    try { URL.revokeObjectURL(content.dataset.pdfBlobUrl); } catch {}
-    delete content.dataset.pdfBlobUrl;
-  }
+  feRevokePreviewBlobUrls(content);
   setOverlayVisible(document.getElementById('fileEditorOverlay'), false);
   const panel = document.querySelector('.file-editor-panel');
   panel.classList.remove('auto-size');
@@ -42402,17 +42591,33 @@ document.addEventListener('dragstart', pluginModalDismissFromExternalEvent, true
 document.addEventListener('wheel', pluginModalDismissFromExternalEvent, { capture: true, passive: true });
 
 // ===== PDF Rendering =====
+function feRevokePreviewBlobUrls(container) {
+  if (!container || !container.dataset) return;
+  ['pdfBlobUrl', 'videoBlobUrl'].forEach(key => {
+    if (!container.dataset[key]) return;
+    try { URL.revokeObjectURL(container.dataset[key]); } catch {}
+    delete container.dataset[key];
+  });
+}
+
 async function renderPdf(base64Data) {
   const container = document.getElementById('fileEditorContent');
   if (!container) return;
-  if (container.dataset.pdfBlobUrl) {
-    try { URL.revokeObjectURL(container.dataset.pdfBlobUrl); } catch {}
-    delete container.dataset.pdfBlobUrl;
-  }
+  feRevokePreviewBlobUrls(container);
   const blob = new Blob([base64ToUint8Array(base64Data)], { type: 'application/pdf' });
   const blobUrl = URL.createObjectURL(blob);
   container.dataset.pdfBlobUrl = blobUrl;
   container.innerHTML = '<iframe class="wiki-file-frame" title="PDF 预览" loading="lazy" style="width:min(960px,100%);min-height:70vh;background:#fff" src="' + blobUrl + '"></iframe>';
+}
+
+async function renderVideo(base64Data, mimeType) {
+  const container = document.getElementById('fileEditorContent');
+  if (!container) return;
+  feRevokePreviewBlobUrls(container);
+  const blob = new Blob([base64ToUint8Array(base64Data)], { type: mimeType || 'video/mp4' });
+  const blobUrl = URL.createObjectURL(blob);
+  container.dataset.videoBlobUrl = blobUrl;
+  container.innerHTML = '<video class="fe-video" controls preload="metadata" playsinline src="' + blobUrl + '"></video>';
 }
 
 // ===== Selection File Preview =====

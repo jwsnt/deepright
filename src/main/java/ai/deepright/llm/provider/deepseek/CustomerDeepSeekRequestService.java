@@ -49,8 +49,8 @@ public class CustomerDeepSeekRequestService extends DeepSeekRequestService {
     }
 
     @Override
-    protected void extra(OpenAiRequest request) throws Exception {
-        super.extra(request);
+    protected void extra(OpenAiRequest request, LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
+        super.extra(request, llmConfig, llmQuery);
         ComplexityMode lastResult = ComplexityUtils.result(request.getMessage());
         if (lastResult.is(ComplexityMode.DEEP_THINKING, ComplexityMode.TASK_PLANNING)) {
             Map<String, Object> extra = request.getExtraBody();
