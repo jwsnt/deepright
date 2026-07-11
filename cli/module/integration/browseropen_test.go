@@ -207,9 +207,9 @@ func TestOpenIntegrationBrowserMaximizedDarwinActivatesExistingChromeTab(t *test
 		return "activated", nil
 	}
 
-	handled, err := integrationBrowserOpenOrActivateChromeTab("http://localhost:8080/site/#app")
+	handled, err := integrationBrowserOpenOrActivateExistingMacTab("http://localhost:8080/site/#app")
 	if err != nil {
-		t.Fatalf("integrationBrowserOpenOrActivateChromeTab: %v", err)
+		t.Fatalf("integrationBrowserOpenOrActivateExistingMacTab: %v", err)
 	}
 	if !handled {
 		t.Fatal("expected helper to handle Chrome activation path")
@@ -225,6 +225,54 @@ func TestOpenIntegrationBrowserMaximizedDarwinActivatesExistingChromeTab(t *test
 	}
 	if strings.Contains(gotScript, `open location targetUrl`) {
 		t.Fatalf("script should not open new locations directly: %q", gotScript)
+	}
+}
+
+func TestOpenIntegrationBrowserMaximizedDarwinActivatesExistingEdgeTab(t *testing.T) {
+	oldStat := integrationBrowserStatFn
+	oldAppleScript := integrationBrowserAppleScriptFn
+	oldListProcesses := integrationBrowserListProcessesFn
+	defer func() {
+		integrationBrowserStatFn = oldStat
+		integrationBrowserAppleScriptFn = oldAppleScript
+		integrationBrowserListProcessesFn = oldListProcesses
+	}()
+
+	root := t.TempDir()
+	edgeApp := filepath.Join(root, "Microsoft Edge.app")
+	if err := os.MkdirAll(edgeApp, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var gotScript string
+	integrationBrowserStatFn = func(path string) (os.FileInfo, error) {
+		if path == "/Applications/Microsoft Edge.app" {
+			return os.Stat(edgeApp)
+		}
+		return nil, os.ErrNotExist
+	}
+	integrationBrowserListProcessesFn = func() ([]integrationBrowserProcessInfo, error) {
+		return []integrationBrowserProcessInfo{{
+			CommandLine: "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+		}}, nil
+	}
+	integrationBrowserAppleScriptFn = func(script string) (string, error) {
+		gotScript = script
+		return "activated", nil
+	}
+
+	handled, err := integrationBrowserOpenOrActivateExistingMacTab("http://localhost:8080/launch")
+	if err != nil {
+		t.Fatalf("integrationBrowserOpenOrActivateExistingMacTab: %v", err)
+	}
+	if !handled {
+		t.Fatal("expected helper to activate existing Edge tab")
+	}
+	if !strings.Contains(gotScript, `tell application "Microsoft Edge"`) {
+		t.Fatalf("script missing Edge target: %q", gotScript)
+	}
+	if !strings.Contains(gotScript, `set prefixUrls to {"http://localhost:8080/site/", "http://127.0.0.1:8080/site/"}`) {
+		t.Fatalf("script missing site prefix candidates: %q", gotScript)
 	}
 }
 
@@ -248,7 +296,7 @@ func TestIntegrationBrowserChromeTabMatchURLsNonLoopbackStaysExactOnly(t *testin
 	}
 }
 
-func TestOpenIntegrationBrowserMaximizedDarwinSkipsChromeTabRestoreForCDPProcess(t *testing.T) {
+func TestOpenIntegrationBrowserMaximizedDarwinFallsBackForHeadlessChromeOnly(t *testing.T) {
 	oldStat := integrationBrowserStatFn
 	oldAppleScript := integrationBrowserAppleScriptFn
 	oldListProcesses := integrationBrowserListProcessesFn
@@ -272,20 +320,68 @@ func TestOpenIntegrationBrowserMaximizedDarwinSkipsChromeTabRestoreForCDPProcess
 	}
 	integrationBrowserListProcessesFn = func() ([]integrationBrowserProcessInfo, error) {
 		return []integrationBrowserProcessInfo{{
-			CommandLine: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --remote-debugging-port=20001 --user-data-dir=/tmp/chrome_20001",
+			CommandLine: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --headless=new --remote-debugging-port=20001 --user-data-dir=/tmp/chrome_20001 about:blank",
 		}}, nil
 	}
 	integrationBrowserAppleScriptFn = func(string) (string, error) {
-		t.Fatal("AppleScript should be skipped when a Chrome CDP process is running")
+		t.Fatal("AppleScript should be skipped when only a headless Chrome process is running")
 		return "", nil
 	}
 
-	handled, err := integrationBrowserOpenOrActivateChromeTab("http://localhost:8080/site/#app")
+	handled, err := integrationBrowserOpenOrActivateExistingMacTab("http://localhost:8080/site/#app")
 	if err != nil {
-		t.Fatalf("integrationBrowserOpenOrActivateChromeTab: %v", err)
+		t.Fatalf("integrationBrowserOpenOrActivateExistingMacTab: %v", err)
 	}
 	if handled {
-		t.Fatal("expected helper to fall back when Chrome CDP process is running")
+		t.Fatal("expected helper to fall back when only headless Chrome is running")
+	}
+}
+
+func TestOpenIntegrationBrowserMaximizedDarwinActivatesChromeWhenHeadlessAndInteractiveProcessesCoexist(t *testing.T) {
+	oldStat := integrationBrowserStatFn
+	oldAppleScript := integrationBrowserAppleScriptFn
+	oldListProcesses := integrationBrowserListProcessesFn
+	defer func() {
+		integrationBrowserStatFn = oldStat
+		integrationBrowserAppleScriptFn = oldAppleScript
+		integrationBrowserListProcessesFn = oldListProcesses
+	}()
+
+	root := t.TempDir()
+	chromeApp := filepath.Join(root, "Google Chrome.app")
+	if err := os.MkdirAll(chromeApp, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	integrationBrowserStatFn = func(path string) (os.FileInfo, error) {
+		if path == "/Applications/Google Chrome.app" {
+			return os.Stat(chromeApp)
+		}
+		return nil, os.ErrNotExist
+	}
+	integrationBrowserListProcessesFn = func() ([]integrationBrowserProcessInfo, error) {
+		return []integrationBrowserProcessInfo{
+			{
+				CommandLine: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --headless=new --remote-debugging-port=20001 --user-data-dir=/tmp/chrome_20001 about:blank",
+			},
+			{
+				CommandLine: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+			},
+		}, nil
+	}
+	integrationBrowserAppleScriptFn = func(script string) (string, error) {
+		if !strings.Contains(script, `tell application "Google Chrome"`) {
+			t.Fatalf("script missing Chrome target: %q", script)
+		}
+		return "activated", nil
+	}
+
+	handled, err := integrationBrowserOpenOrActivateExistingMacTab("http://localhost:8080/launch")
+	if err != nil {
+		t.Fatalf("integrationBrowserOpenOrActivateExistingMacTab: %v", err)
+	}
+	if !handled {
+		t.Fatal("expected helper to activate existing interactive Chrome tab")
 	}
 }
 
@@ -299,9 +395,9 @@ func TestOpenIntegrationBrowserMaximizedDarwinFallsBackWhenChromeMissing(t *test
 		return nil, os.ErrNotExist
 	}
 
-	handled, err := integrationBrowserOpenOrActivateChromeTab("http://localhost:8080/site/#app")
+	handled, err := integrationBrowserOpenOrActivateExistingMacTab("http://localhost:8080/site/#app")
 	if err != nil {
-		t.Fatalf("integrationBrowserOpenOrActivateChromeTab: %v", err)
+		t.Fatalf("integrationBrowserOpenOrActivateExistingMacTab: %v", err)
 	}
 	if handled {
 		t.Fatal("expected helper to fall back when Chrome app is missing")
@@ -338,9 +434,9 @@ func TestOpenIntegrationBrowserMaximizedDarwinFallsBackWhenChromeNotRunning(t *t
 		return "", nil
 	}
 
-	handled, err := integrationBrowserOpenOrActivateChromeTab("http://localhost:8080/site/#app")
+	handled, err := integrationBrowserOpenOrActivateExistingMacTab("http://localhost:8080/site/#app")
 	if err != nil {
-		t.Fatalf("integrationBrowserOpenOrActivateChromeTab: %v", err)
+		t.Fatalf("integrationBrowserOpenOrActivateExistingMacTab: %v", err)
 	}
 	if handled {
 		t.Fatal("expected helper to fall back when Chrome is not running")
@@ -378,9 +474,9 @@ func TestOpenIntegrationBrowserMaximizedDarwinFallsBackWhenMatchingTabMissing(t 
 		return "miss", nil
 	}
 
-	handled, err := integrationBrowserOpenOrActivateChromeTab("http://localhost:8080/site/#app")
+	handled, err := integrationBrowserOpenOrActivateExistingMacTab("http://localhost:8080/site/#app")
 	if err != nil {
-		t.Fatalf("integrationBrowserOpenOrActivateChromeTab: %v", err)
+		t.Fatalf("integrationBrowserOpenOrActivateExistingMacTab: %v", err)
 	}
 	if handled {
 		t.Fatal("expected helper to fall back when matching tab is missing")

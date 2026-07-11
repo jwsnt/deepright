@@ -44,13 +44,61 @@ type integrationBrowserProcessInfo struct {
 	CommandLine string
 }
 
+type integrationMacBrowserSpec struct {
+	AppPath                string
+	AppleScriptName        string
+	ProcessMatch           string
+	SupportsRemoteDebugCDP bool
+}
+
+func integrationMacBrowserSpecs() []integrationMacBrowserSpec {
+	return []integrationMacBrowserSpec{
+		{
+			AppPath:                "/Applications/Google Chrome.app",
+			AppleScriptName:        "Google Chrome",
+			ProcessMatch:           "google chrome.app/contents/macos/google chrome",
+			SupportsRemoteDebugCDP: true,
+		},
+		{
+			AppPath:                "/Applications/Google Chrome for Testing.app",
+			AppleScriptName:        "Google Chrome for Testing",
+			ProcessMatch:           "google chrome for testing.app/contents/macos/google chrome for testing",
+			SupportsRemoteDebugCDP: true,
+		},
+		{
+			AppPath:                "/Applications/Microsoft Edge.app",
+			AppleScriptName:        "Microsoft Edge",
+			ProcessMatch:           "microsoft edge.app/contents/macos/microsoft edge",
+			SupportsRemoteDebugCDP: true,
+		},
+		{
+			AppPath:                "/Applications/Brave Browser.app",
+			AppleScriptName:        "Brave Browser",
+			ProcessMatch:           "brave browser.app/contents/macos/brave browser",
+			SupportsRemoteDebugCDP: true,
+		},
+		{
+			AppPath:                "/Applications/Chromium.app",
+			AppleScriptName:        "Chromium",
+			ProcessMatch:           "chromium.app/contents/macos/chromium",
+			SupportsRemoteDebugCDP: true,
+		},
+		{
+			AppPath:                "/Applications/Safari.app",
+			AppleScriptName:        "Safari",
+			ProcessMatch:           "/applications/safari.app/contents/macos/safari",
+			SupportsRemoteDebugCDP: false,
+		},
+	}
+}
+
 func openIntegrationBrowserMaximized(target string) error {
 	target = strings.TrimSpace(target)
 	if target == "" {
 		return errors.New("browser target is empty")
 	}
 	if runtime.GOOS == "darwin" {
-		handled, err := integrationBrowserOpenOrActivateChromeTab(target)
+		handled, err := integrationBrowserOpenOrActivateExistingMacTab(target)
 		if handled {
 			return err
 		}
@@ -71,13 +119,7 @@ func integrationBrowserOpenCommand(goos, target string) (string, []string, error
 	goos = strings.TrimSpace(goos)
 	switch goos {
 	case "darwin":
-		if appPath, ok := integrationBrowserFirstExistingApp(
-			"/Applications/Google Chrome.app",
-			"/Applications/Google Chrome for Testing.app",
-			"/Applications/Microsoft Edge.app",
-			"/Applications/Brave Browser.app",
-			"/Applications/Chromium.app",
-		); ok {
+		if appPath, ok := integrationBrowserFirstExistingApp(integrationMacPreferredAppPaths()...); ok {
 			return "open", []string{"-a", appPath, target}, nil
 		}
 		return "open", []string{target}, nil
@@ -211,17 +253,24 @@ func integrationBrowserFirstExistingApp(paths ...string) (string, bool) {
 	return "", false
 }
 
-func integrationBrowserOpenOrActivateChromeTab(target string) (bool, error) {
-	if _, ok := integrationBrowserFirstExistingApp("/Applications/Google Chrome.app"); !ok {
+func integrationMacPreferredAppPaths() []string {
+	specs := integrationMacBrowserSpecs()
+	paths := make([]string, 0, len(specs)-1)
+	for _, spec := range specs {
+		if strings.EqualFold(strings.TrimSpace(spec.AppleScriptName), "Safari") {
+			continue
+		}
+		paths = append(paths, spec.AppPath)
+	}
+	return paths
+}
+
+func integrationBrowserOpenOrActivateExistingMacTab(target string) (bool, error) {
+	spec, ok := integrationBrowserResolveRunningMacBrowser()
+	if !ok {
 		return false, nil
 	}
-	if integrationBrowserHasRemoteDebuggingChromeProcess() {
-		return false, nil
-	}
-	if !integrationBrowserHasRunningChromeProcess() {
-		return false, nil
-	}
-	result, err := integrationBrowserAppleScriptFn(integrationBrowserChromeAppleScript(target))
+	result, err := integrationBrowserAppleScriptFn(integrationBrowserMacAppleScript(spec, target))
 	if err != nil {
 		return false, nil
 	}
@@ -231,22 +280,25 @@ func integrationBrowserOpenOrActivateChromeTab(target string) (bool, error) {
 	return false, nil
 }
 
-func integrationBrowserHasRemoteDebuggingChromeProcess() bool {
+func integrationBrowserResolveRunningMacBrowser() (integrationMacBrowserSpec, bool) {
 	processes, err := integrationBrowserListProcessesFn()
 	if err != nil {
-		return false
+		return integrationMacBrowserSpec{}, false
 	}
-	for _, process := range processes {
-		if integrationBrowserProcessHasRemoteDebuggingChrome(process.CommandLine) {
-			return true
+	for _, spec := range integrationMacBrowserSpecs() {
+		if _, ok := integrationBrowserFirstExistingApp(spec.AppPath); !ok {
+			continue
+		}
+		if integrationBrowserProcessesContainInteractiveApp(processes, spec.ProcessMatch) {
+			return spec, true
 		}
 	}
-	return false
+	return integrationMacBrowserSpec{}, false
 }
 
-func integrationBrowserHasRunningChromeProcess() bool {
-	processes, err := integrationBrowserListProcessesFn()
-	if err != nil {
+func integrationBrowserProcessesContainRemoteDebug(processes []integrationBrowserProcessInfo, processMatch string) bool {
+	processMatch = strings.ToLower(strings.TrimSpace(processMatch))
+	if processMatch == "" {
 		return false
 	}
 	for _, process := range processes {
@@ -254,22 +306,49 @@ func integrationBrowserHasRunningChromeProcess() bool {
 		if commandLine == "" {
 			continue
 		}
-		if strings.Contains(commandLine, "google chrome.app/contents/macos/google chrome") {
+		if strings.Contains(commandLine, processMatch) && strings.Contains(commandLine, "--remote-debugging-port=") {
 			return true
 		}
 	}
 	return false
 }
 
-func integrationBrowserProcessHasRemoteDebuggingChrome(commandLine string) bool {
-	commandLine = strings.ToLower(strings.TrimSpace(commandLine))
-	if commandLine == "" {
+func integrationBrowserProcessesContainApp(processes []integrationBrowserProcessInfo, processMatch string) bool {
+	processMatch = strings.ToLower(strings.TrimSpace(processMatch))
+	if processMatch == "" {
 		return false
 	}
-	if !strings.Contains(commandLine, "--remote-debugging-port=") {
+	for _, process := range processes {
+		commandLine := strings.ToLower(strings.TrimSpace(process.CommandLine))
+		if commandLine == "" {
+			continue
+		}
+		if strings.Contains(commandLine, processMatch) {
+			return true
+		}
+	}
+	return false
+}
+
+func integrationBrowserProcessesContainInteractiveApp(processes []integrationBrowserProcessInfo, processMatch string) bool {
+	processMatch = strings.ToLower(strings.TrimSpace(processMatch))
+	if processMatch == "" {
 		return false
 	}
-	return strings.Contains(commandLine, "google chrome.app/contents/macos/google chrome")
+	for _, process := range processes {
+		commandLine := strings.ToLower(strings.TrimSpace(process.CommandLine))
+		if commandLine == "" {
+			continue
+		}
+		if !strings.Contains(commandLine, processMatch) {
+			continue
+		}
+		if strings.Contains(commandLine, "--headless") {
+			continue
+		}
+		return true
+	}
+	return false
 }
 
 func integrationBrowserListProcesses() ([]integrationBrowserProcessInfo, error) {
@@ -292,13 +371,60 @@ func integrationBrowserListProcesses() ([]integrationBrowserProcessInfo, error) 
 	return processes, nil
 }
 
-func integrationBrowserChromeAppleScript(target string) string {
+func integrationBrowserMacAppleScript(spec integrationMacBrowserSpec, target string) string {
 	exactURLs, prefixURLs := integrationBrowserChromeTabMatchURLs(target)
+	if strings.EqualFold(strings.TrimSpace(spec.AppleScriptName), "Safari") {
+		return fmt.Sprintf(`
+set exactUrls to %s
+set prefixUrls to %s
+
+tell application %s
+	if it is not running then
+		return "miss"
+	end if
+
+	repeat with w in windows
+		repeat with t in tabs of w
+			set currentUrl to ""
+			try
+				set currentUrl to (URL of t) as text
+			end try
+			if my deeprightUrlMatches(currentUrl, exactUrls, prefixUrls) then
+				set current tab of w to t
+				set index of w to 1
+				activate
+				return "activated"
+			end if
+		end repeat
+	end repeat
+
+	return "miss"
+end tell
+
+on deeprightUrlMatches(currentUrl, exactUrls, prefixUrls)
+	if currentUrl is missing value then
+		return false
+	end if
+	set normalizedUrl to currentUrl as text
+	repeat with candidate in exactUrls
+		if normalizedUrl is (candidate as text) then
+			return true
+		end if
+	end repeat
+	repeat with prefixValue in prefixUrls
+		if normalizedUrl starts with (prefixValue as text) then
+			return true
+		end if
+	end repeat
+	return false
+end deeprightUrlMatches
+`, integrationBrowserAppleScriptStringList(exactURLs), integrationBrowserAppleScriptStringList(prefixURLs), strconv.Quote(spec.AppleScriptName))
+	}
 	return fmt.Sprintf(`
 set exactUrls to %s
 set prefixUrls to %s
 
-tell application "Google Chrome"
+tell application %s
 	if it is not running then
 		return "miss"
 	end if
@@ -340,7 +466,7 @@ on deeprightUrlMatches(currentUrl, exactUrls, prefixUrls)
 	end repeat
 	return false
 end deeprightUrlMatches
-`, integrationBrowserAppleScriptStringList(exactURLs), integrationBrowserAppleScriptStringList(prefixURLs))
+`, integrationBrowserAppleScriptStringList(exactURLs), integrationBrowserAppleScriptStringList(prefixURLs), strconv.Quote(spec.AppleScriptName))
 }
 
 func integrationBrowserChromeTabMatchURLs(target string) ([]string, []string) {
