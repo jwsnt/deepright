@@ -523,8 +523,34 @@ a{color:var(--accent);text-decoration:none}
 [data-energy-saver="on"] .working-indicator-chip{
   box-shadow:none !important;
 }
+[data-energy-saver="on"] .chat-container,
+[data-low-power-rendering="on"] .chat-container{
+  background-clip:padding-box;
+}
 [data-energy-saver="on"] .chat-container{
   scroll-behavior:auto;
+}
+[data-energy-saver="on"] .chat-container,
+[data-low-power-rendering="on"] .chat-container{
+  background-image:none !important;
+  background-color:rgba(255,246,239,.92) !important;
+}
+[data-theme="dark"][data-energy-saver="on"] .chat-container,
+[data-theme="dark"][data-low-power-rendering="on"] .chat-container{
+  background-color:rgba(34,37,47,.92) !important;
+  border-color:rgba(0,212,255,.14) !important;
+}
+[data-energy-saver="on"] .chat-container,
+[data-low-power-rendering="on"] .chat-container{
+  padding-top:10px;
+}
+[data-energy-saver="on"] .chat-container > .greeting,
+[data-low-power-rendering="on"] .chat-container > .greeting{
+  padding-top:0;
+}
+[data-energy-saver="on"] .chat-container > .greeting .greeting-shell,
+[data-low-power-rendering="on"] .chat-container > .greeting .greeting-shell{
+  padding-top:0;
 }
 [data-energy-saver="on"] .logo-svg,
 [data-energy-saver="on"] .quick-fan-trigger.started,
@@ -557,6 +583,7 @@ a{color:var(--accent);text-decoration:none}
 [data-low-power-rendering="on"] body::after,
 [data-low-power-rendering="on"] .app::before,
 [data-low-power-rendering="on"] .app::after,
+[data-low-power-rendering="on"] .main::before,
 [data-low-power-rendering="on"] .main::after{
   display:none !important;
 }
@@ -753,10 +780,9 @@ html[data-chat-scrolling="1"] #chatContainer .message-stream-burst-particle{
 [data-theme="dark"] .chat-container{background:
   linear-gradient(180deg,rgba(41,44,55,.9),rgba(34,37,47,.84) 46%,rgba(25,28,36,.78) 100%);
   border-color:rgba(0,212,255,.14);
-  box-shadow:0 26px 80px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.08),inset 0 -28px 42px rgba(0,212,255,.05)}
+  box-shadow:0 26px 80px rgba(0,0,0,.34),inset 0 -28px 42px rgba(0,212,255,.05)}
 [data-theme="dark"] .chat-container::before{background:
-  linear-gradient(180deg,rgba(255,255,255,.08) 0%,rgba(255,255,255,.03) 12%,rgba(255,255,255,0) 26%),
-  radial-gradient(circle at 50% 0%,rgba(0,212,255,.1),rgba(0,212,255,0) 42%)}
+  radial-gradient(circle at 50% 0%,rgba(0,212,255,.08),rgba(0,212,255,0) 42%)}
 .chat-container.fade-enter{opacity:0;transform:translateY(10px)}
 .chat-container.fade-active{opacity:1;transform:translateY(0);transition:opacity .5s,transform .5s}
 .chat-session-toolbar{position:absolute;top:18px;left:22px;display:flex;align-items:flex-start;gap:6px;z-index:4}
