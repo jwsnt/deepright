@@ -74,7 +74,7 @@ POST /v1/chat/completions
 
 ## 兼容说明
 
-- 不修改 `/v1/chat/completions` 的路径、SSE 转发方式和响应格式
+- 不修改 `/v1/chat/completions` 的路径、SSE 转发方式和输出格式
 - 不改变已有 `metadata` 合并策略
 - 不新增新的数据库表或额外配置项
 - `plugins` 仅表示当前 Agent 元数据里识别到的已配置且已启动插件 `key` 列表；单个插件详细状态仍可继续通过 `/api/plugins/status` 查看
