@@ -1799,6 +1799,15 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .shutdown-panel{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;width:min(420px,calc(100vw - 40px));padding:34px 28px;border-radius:32px;background:linear-gradient(180deg,rgba(248,250,255,.9),rgba(233,241,255,.82));border:1px solid rgba(255,255,255,.58);box-shadow:0 32px 84px rgba(7,12,24,.26),inset 0 1px 0 rgba(255,255,255,.94);transform:translateY(16px) scale(.94);transition:transform .36s cubic-bezier(.22,1,.36,1),opacity .24s ease;overflow:hidden;text-align:center}
 .shutdown-panel::after{content:'';position:absolute;right:-16%;bottom:-24%;width:52%;height:52%;background:radial-gradient(circle at 35% 35%,rgba(255,90,107,.26),rgba(255,90,107,0) 68%);pointer-events:none;filter:blur(8px)}
 .overlay.show .shutdown-panel{transform:translateY(0) scale(1)}
+.input-agent-change-overlay{left:var(--center-domain-left);right:var(--center-domain-right);padding:24px;background:rgba(238,244,252,.28);backdrop-filter:blur(10px) saturate(132%);-webkit-backdrop-filter:blur(10px) saturate(132%)}
+.input-agent-change-panel{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;width:min(320px,calc(100% - 24px));padding:24px 24px 18px;border-radius:24px;background:linear-gradient(180deg,rgba(248,251,255,.96),rgba(233,240,252,.92));border:1px solid rgba(92,120,173,.28);box-shadow:0 28px 64px rgba(27,49,101,.18),inset 0 1px 0 rgba(255,255,255,.78);transform:translateY(14px) scale(.96);transition:transform .28s cubic-bezier(.22,1,.36,1),opacity .24s ease;text-align:center;backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%)}
+.overlay.show .input-agent-change-panel{transform:translateY(0) scale(1)}
+.input-agent-change-panel .reload-title{margin-bottom:0;font-size:15px;line-height:1.45;font-weight:600}
+.input-agent-change-panel .agent-change-countdown{font-size:12px;line-height:1.6;color:var(--text-secondary);text-align:center}
+.input-agent-change-panel .reload-actions{width:100%;justify-content:center;gap:10px;margin-top:4px}
+.input-agent-change-panel .reload-actions button{min-width:96px;padding:6px 18px}
+[data-theme="dark"] .input-agent-change-overlay{background:rgba(6,12,24,.28)}
+[data-theme="dark"] .input-agent-change-panel{background:linear-gradient(180deg,rgba(15,27,49,.96),rgba(10,20,38,.92));border-color:rgba(169,190,227,.24);box-shadow:0 30px 68px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.08)}
 .shutdown-core,.shutdown-copy{position:relative;z-index:1}
 .shutdown-core{display:grid;place-items:center;width:116px;height:116px;border-radius:50%;background:radial-gradient(circle at 50% 45%,rgba(255,255,255,.98),rgba(255,241,243,.9) 44%,rgba(255,201,210,.66) 72%,rgba(255,156,171,.18) 100%);box-shadow:0 22px 48px rgba(255,90,107,.2),0 0 0 12px rgba(255,255,255,.16);animation:shutdownCorePulse 1.25s ease-in-out infinite}
 .shutdown-core::before{content:'';position:absolute;inset:-10px;border-radius:inherit;border:1px solid rgba(255,90,107,.22);opacity:.8;animation:shutdownRingPulse 1.8s ease-out infinite}
@@ -4325,6 +4334,16 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     </div>
   </div>
 </div>
+<div class="overlay input-agent-change-overlay" id="inputAgentChangeConfirm" data-overlay-base data-overlay-domain="center" data-overlay-order="23" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="inputAgentChangeConfirmTitle" onclick="if(event.target===this)cancelAgentChangeConfirm()">
+  <div class="input-agent-change-panel" id="inputAgentChangeConfirmPanel" onclick="event.stopPropagation()">
+    <div class="reload-title" id="inputAgentChangeConfirmTitle">Agent已变更，请确认</div>
+    <div class="agent-change-countdown" id="inputAgentChangeConfirmCountdown">10 秒后自动确认</div>
+    <div class="reload-actions">
+      <button class="reload-cancel-btn" type="button" onclick="cancelAgentChangeConfirm()">取消</button>
+      <button class="reload-confirm-btn" id="inputAgentChangeConfirmConfirmBtn" type="button" onclick="confirmAgentChangeConfirm()">确认</button>
+    </div>
+  </div>
+</div>
 <div class="vfs-repair-overlay" id="vfsRepairPopover" data-overlay-base data-overlay-domain="center" data-overlay-order="41" onclick="handleVfsRepairOverlayClick(event)" aria-hidden="true">
   <div class="vfs-repair-popover" id="vfsRepairPopoverPanel" tabindex="-1" onclick="event.stopPropagation()">
     <div class="vfs-repair-popover-title">是否需要修复SKILL.md</div>
@@ -6412,6 +6431,16 @@ let centerMessageEditState = {
   triggerButton: null,
   submitting: false
 };
+let agentChangeConfirmState = {
+  resolve: null,
+  chatId: '',
+  previousAgentId: '',
+  nextAgentId: '',
+  deadline: 0,
+  timer: 0,
+  tickTimer: 0
+};
+const AGENT_CHANGE_CONFIRM_TIMEOUT_MS = 10000;
 const QUEUED_CENTER_REQUEST_LIMIT = 10;
 const MESSAGE_INSERT_ACTIVE_LIMIT = 5;
 // Per-chat queued next sends captured from the center composer while the current request is still running.
@@ -12028,6 +12057,9 @@ function hideExclusiveOverlayById(id) {
       return true;
     case 'inputClearConfirm':
       hideInputClearConfirm();
+      return true;
+    case 'inputAgentChangeConfirm':
+      cancelAgentChangeConfirm({ restoreFocus: false });
       return true;
     case 'swarmPanel':
       hideSwarmPanel();
@@ -25735,6 +25767,20 @@ function getMessageAgentId(message) {
   return String(message.agentId || '').trim();
 }
 
+function getLastChatResponseAgentId(chatId) {
+  const resolvedChatId = String(chatId || '').trim();
+  const chat = resolvedChatId ? state.chats[resolvedChatId] : null;
+  if (!chat || !Array.isArray(chat.messages)) return '';
+  for (let i = chat.messages.length - 1; i >= 0; i--) {
+    const msg = chat.messages[i];
+    if (!msg || msg.role !== 'assistant') continue;
+    if (!shouldRenderAssistantCenterMessage(msg) || msg.cancelMarker) continue;
+    if (String(msg.streamStatus || '').trim() !== '完成') return '';
+    return getMessageAgentId(msg);
+  }
+  return '';
+}
+
 function markAssistantCancelled(msg, ts) {
   if (!msg || msg.role !== 'assistant' || msg.error) return;
   const normalized = normalizeMessageText(msg.content);
@@ -28226,6 +28272,7 @@ function switchChat(id) {
   cancelDelete();
   hideInputClearConfirm();
   hideInputReloadConfirm();
+  cancelAgentChangeConfirm({ restoreFocus: false });
   cancelThinkingVerifyPrompt();
   closeQueuedCenterPanel(true);
   cmdClosePanel(true);
@@ -33574,6 +33621,10 @@ async function handleSend(event) {
   const chatId = String(state.activeChat || '').trim();
   if (chatId && isChatSendDispatching(chatId)) return false;
   const text = getInputText();
+  if (event) {
+    const confirmed = await maybePromptChatAgentChangeConfirm(chatId, text);
+    if (!confirmed) return false;
+  }
   if (chatId && isChatBusy(chatId)) {
     const btn = document.getElementById('sendBtn');
     const isStopMode = !!(btn && btn.classList.contains('stop'));
@@ -35458,6 +35509,95 @@ function toggleInputReloadConfirm(event) {
 function hideInputReloadConfirm() {
   const panel = document.getElementById('inputReloadConfirm');
   if (panel) setOverlayVisible(panel, false);
+}
+
+function clearAgentChangeConfirmTimers() {
+  if (agentChangeConfirmState.timer) {
+    clearTimeout(agentChangeConfirmState.timer);
+    agentChangeConfirmState.timer = 0;
+  }
+  if (agentChangeConfirmState.tickTimer) {
+    clearInterval(agentChangeConfirmState.tickTimer);
+    agentChangeConfirmState.tickTimer = 0;
+  }
+}
+
+function updateAgentChangeConfirmCountdown() {
+  const countdownEl = document.getElementById('inputAgentChangeConfirmCountdown');
+  if (!countdownEl) return;
+  const remainingMs = Math.max(0, Number(agentChangeConfirmState.deadline || 0) - Date.now());
+  const remainingSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+  countdownEl.textContent = remainingSeconds > 0 ? (String(remainingSeconds) + ' 秒后自动确认') : '正在确认...';
+}
+
+function resolveAgentChangeConfirm(confirmed, options) {
+  const opts = options || {};
+  const resolver = agentChangeConfirmState.resolve;
+  const restoreFocus = opts.restoreFocus !== false;
+  clearAgentChangeConfirmTimers();
+  agentChangeConfirmState.resolve = null;
+  agentChangeConfirmState.chatId = '';
+  agentChangeConfirmState.previousAgentId = '';
+  agentChangeConfirmState.nextAgentId = '';
+  agentChangeConfirmState.deadline = 0;
+  const overlay = document.getElementById('inputAgentChangeConfirm');
+  const panel = document.getElementById('inputAgentChangeConfirmPanel');
+  if (overlay) setOverlayVisible(overlay, false, panel);
+  if (restoreFocus) {
+    const input = document.getElementById('msgInput');
+    if (input) setTimeout(() => focusEditableInput(input), 30);
+  }
+  if (typeof resolver === 'function') resolver(!!confirmed);
+}
+
+function cancelAgentChangeConfirm(options) {
+  resolveAgentChangeConfirm(false, options);
+}
+
+function confirmAgentChangeConfirm(options) {
+  resolveAgentChangeConfirm(true, options);
+}
+
+function promptAgentChangeConfirm(chatId, previousAgentId, nextAgentId) {
+  const overlay = document.getElementById('inputAgentChangeConfirm');
+  const panel = document.getElementById('inputAgentChangeConfirmPanel');
+  const confirmBtn = document.getElementById('inputAgentChangeConfirmConfirmBtn');
+  if (!overlay) return Promise.resolve(true);
+  if (typeof agentChangeConfirmState.resolve === 'function') {
+    resolveAgentChangeConfirm(false, { restoreFocus: false });
+  }
+  agentChangeConfirmState.chatId = String(chatId || '').trim();
+  agentChangeConfirmState.previousAgentId = String(previousAgentId || '').trim();
+  agentChangeConfirmState.nextAgentId = String(nextAgentId || '').trim();
+  agentChangeConfirmState.deadline = Date.now() + AGENT_CHANGE_CONFIRM_TIMEOUT_MS;
+  updateAgentChangeConfirmCountdown();
+  showExclusiveOverlay(overlay, panel);
+  if (confirmBtn) {
+    setTimeout(() => {
+      try {
+        confirmBtn.focus({ preventScroll: true });
+      } catch {
+        confirmBtn.focus();
+      }
+    }, 30);
+  }
+  agentChangeConfirmState.tickTimer = setInterval(updateAgentChangeConfirmCountdown, 250);
+  return new Promise(resolve => {
+    agentChangeConfirmState.resolve = resolve;
+    agentChangeConfirmState.timer = setTimeout(() => {
+      confirmAgentChangeConfirm({ restoreFocus: false });
+    }, AGENT_CHANGE_CONFIRM_TIMEOUT_MS);
+  });
+}
+
+async function maybePromptChatAgentChangeConfirm(chatId, text) {
+  const resolvedChatId = String(chatId || '').trim();
+  const normalizedText = String(text || '').trim();
+  if (!resolvedChatId || !normalizedText) return true;
+  const nextAgentId = String(getChatAgentId(resolvedChatId) || '').trim();
+  const previousAgentId = getLastChatResponseAgentId(resolvedChatId);
+  if (!previousAgentId || !nextAgentId || previousAgentId === nextAgentId) return true;
+  return promptAgentChangeConfirm(resolvedChatId, previousAgentId, nextAgentId);
 }
 
 function getThinkingVerifyPromptPanel(scope) {
@@ -42701,6 +42841,8 @@ function resolveOverlayCancelButton(scope) {
       return findVisibleButton(scope, ['.reload-cancel-btn']) || findVisibleButtonByText(scope, ['取消']);
     case 'inputClearConfirm':
       return findVisibleButton(scope, ['.reload-cancel-btn']) || findVisibleButtonByText(scope, ['取消']);
+    case 'inputAgentChangeConfirm':
+      return findVisibleButton(scope, ['.reload-cancel-btn']) || findVisibleButtonByText(scope, ['取消']);
     case 'inputThinkingVerifyConfirm':
     case 'rsThinkingVerifyConfirm':
     case 'pluginModalThinkingVerifyConfirm':
@@ -42748,6 +42890,8 @@ function resolveOverlayConfirmButton(scope, target) {
     case 'inputReloadConfirm':
       return findVisibleButton(scope, ['.reload-confirm-btn']) || findVisibleButtonByText(scope, ['确认']);
     case 'inputClearConfirm':
+      return findVisibleButton(scope, ['.reload-confirm-btn']) || findVisibleButtonByText(scope, ['确认']);
+    case 'inputAgentChangeConfirm':
       return findVisibleButton(scope, ['.reload-confirm-btn']) || findVisibleButtonByText(scope, ['确认']);
     case 'inputThinkingVerifyConfirm':
     case 'rsThinkingVerifyConfirm':
