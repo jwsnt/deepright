@@ -3,7 +3,9 @@ package feishusvc
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -23,9 +25,26 @@ import (
 	"unsafe"
 
 	"connect/connectsvc"
+	ws "github.com/gorilla/websocket"
+	lark "github.com/larksuite/oapi-sdk-go/v3"
 	larkcore "github.com/larksuite/oapi-sdk-go/v3/core"
 	larkim "github.com/larksuite/oapi-sdk-go/v3/service/im/v1"
 )
+
+type fakeFileInfo struct{}
+
+func (fakeFileInfo) Name() string       { return "keychain" }
+func (fakeFileInfo) Size() int64        { return 0 }
+func (fakeFileInfo) Mode() os.FileMode  { return 0 }
+func (fakeFileInfo) ModTime() time.Time { return time.Time{} }
+func (fakeFileInfo) IsDir() bool        { return false }
+func (fakeFileInfo) Sys() any           { return nil }
+
+func pemEncodeCertificate(t *testing.T, der []byte) []byte {
+	t.Helper()
+	block := &pem.Block{Type: "CERTIFICATE", Bytes: der}
+	return pem.EncodeToMemory(block)
+}
 
 func TestServicePushesMockMessagesAndReconnects(t *testing.T) {
 	messageAtMS := time.Now().Add(-time.Minute).UnixMilli()
@@ -217,6 +236,153 @@ func TestRunCLIReturnsFixedParamAndName(t *testing.T) {
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("unexpected name stderr: %s", stderr.String())
+	}
+}
+
+func TestValidateConfigReturnsCompatSetupError(t *testing.T) {
+	originalBuilder := newFeishuLarkClient
+	defer func() { newFeishuLarkClient = originalBuilder }()
+
+	newFeishuLarkClient = func(cfg Config) (*lark.Client, error) {
+		return nil, errors.New("tls compat failed")
+	}
+
+	err := ValidateConfig(context.Background(), Config{AppID: "app", AppSecret: "secret"})
+	if err == nil || !strings.Contains(err.Error(), "tls compat failed") {
+		t.Fatalf("ValidateConfig error = %v, want tls compat failure", err)
+	}
+}
+
+func TestNewLarkMessageDownloaderReturnsCompatError(t *testing.T) {
+	originalBuilder := newFeishuLarkClient
+	defer func() { newFeishuLarkClient = originalBuilder }()
+
+	newFeishuLarkClient = func(cfg Config) (*lark.Client, error) {
+		return nil, errors.New("tls compat failed")
+	}
+
+	downloader := newLarkMessageDownloader(Config{AppID: "app", AppSecret: "secret"})
+	if downloader == nil {
+		t.Fatal("downloader is nil")
+	}
+	_, _, err := downloader.DownloadImage(context.Background(), "m", "img")
+	if err == nil || !strings.Contains(err.Error(), "tls compat failed") {
+		t.Fatalf("DownloadImage error = %v, want tls compat failure", err)
+	}
+}
+
+func TestInstallFeishuNetworkCompatLoadsDarwinRoots(t *testing.T) {
+	originalGOOS := currentGOOS
+	originalGOARCH := currentGOARCH
+	originalHomeDir := userHomeDirFn
+	originalStat := keychainStatFn
+	originalExport := exportKeychainCertificatesFn
+	originalDefaultTransport := http.DefaultTransport
+	originalDefaultDialer := ws.DefaultDialer
+	defer func() {
+		currentGOOS = originalGOOS
+		currentGOARCH = originalGOARCH
+		userHomeDirFn = originalHomeDir
+		keychainStatFn = originalStat
+		exportKeychainCertificatesFn = originalExport
+		http.DefaultTransport = originalDefaultTransport
+		ws.DefaultDialer = originalDefaultDialer
+		feishuNetworkCompatOnce = sync.Once{}
+		feishuNetworkCompatErr = nil
+		feishuTLSConfigOnce = sync.Once{}
+		feishuTLSConfigValue = nil
+		feishuTLSConfigErr = nil
+	}()
+
+	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer ts.Close()
+	if len(ts.TLS.Certificates) == 0 || len(ts.TLS.Certificates[0].Certificate) == 0 {
+		t.Fatal("missing test certificate")
+	}
+	testPEM := pemEncodeCertificate(t, ts.TLS.Certificates[0].Certificate[0])
+
+	currentGOOS = "darwin"
+	currentGOARCH = "amd64"
+	userHomeDirFn = func() (string, error) { return "/Users/test", nil }
+	keychainStatFn = func(path string) (os.FileInfo, error) { return fakeFileInfo{}, nil }
+	exportKeychainCertificatesFn = func(ctx context.Context, keychainPath string) ([]byte, error) {
+		return testPEM, nil
+	}
+	http.DefaultTransport = &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}}
+	ws.DefaultDialer = &ws.Dialer{}
+	feishuNetworkCompatOnce = sync.Once{}
+	feishuNetworkCompatErr = nil
+	feishuTLSConfigOnce = sync.Once{}
+	feishuTLSConfigValue = nil
+	feishuTLSConfigErr = nil
+
+	if err := installFeishuNetworkCompat(); err != nil {
+		t.Fatal(err)
+	}
+
+	transport, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		t.Fatalf("default transport type = %T", http.DefaultTransport)
+	}
+	if transport.TLSClientConfig == nil || transport.TLSClientConfig.RootCAs == nil {
+		t.Fatalf("default transport TLS config = %+v", transport.TLSClientConfig)
+	}
+	if ws.DefaultDialer == nil || ws.DefaultDialer.TLSClientConfig == nil || ws.DefaultDialer.TLSClientConfig.RootCAs == nil {
+		t.Fatalf("websocket dialer TLS config = %+v", ws.DefaultDialer)
+	}
+}
+
+func TestInstallFeishuNetworkCompatNoopOutsideDarwinAMD64(t *testing.T) {
+	cases := []struct {
+		name   string
+		goos   string
+		goarch string
+	}{
+		{name: "windows-amd64", goos: "windows", goarch: "amd64"},
+		{name: "linux-amd64", goos: "linux", goarch: "amd64"},
+		{name: "darwin-arm64", goos: "darwin", goarch: "arm64"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			originalGOOS := currentGOOS
+			originalGOARCH := currentGOARCH
+			originalDefaultTransport := http.DefaultTransport
+			originalDefaultDialer := ws.DefaultDialer
+			defer func() {
+				currentGOOS = originalGOOS
+				currentGOARCH = originalGOARCH
+				http.DefaultTransport = originalDefaultTransport
+				ws.DefaultDialer = originalDefaultDialer
+				feishuNetworkCompatOnce = sync.Once{}
+				feishuNetworkCompatErr = nil
+				feishuTLSConfigOnce = sync.Once{}
+				feishuTLSConfigValue = nil
+				feishuTLSConfigErr = nil
+			}()
+
+			currentGOOS = tc.goos
+			currentGOARCH = tc.goarch
+			http.DefaultTransport = &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}}
+			ws.DefaultDialer = &ws.Dialer{}
+			feishuNetworkCompatOnce = sync.Once{}
+			feishuNetworkCompatErr = nil
+			feishuTLSConfigOnce = sync.Once{}
+			feishuTLSConfigValue = nil
+			feishuTLSConfigErr = nil
+
+			transportBefore := http.DefaultTransport
+			dialerBefore := ws.DefaultDialer
+			if err := installFeishuNetworkCompat(); err != nil {
+				t.Fatal(err)
+			}
+			if http.DefaultTransport != transportBefore {
+				t.Fatal("default transport changed unexpectedly")
+			}
+			if ws.DefaultDialer != dialerBefore {
+				t.Fatal("websocket dialer changed unexpectedly")
+			}
+		})
 	}
 }
 

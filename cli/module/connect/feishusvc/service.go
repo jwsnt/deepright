@@ -263,7 +263,10 @@ var validateFeishuConfigFn = func(ctx context.Context, cfg Config) error {
 	if strings.EqualFold(strings.TrimSpace(cfg.Mode), "mock") {
 		return nil
 	}
-	client := lark.NewClient(cfg.AppID, cfg.AppSecret)
+	client, err := newFeishuLarkClient(cfg)
+	if err != nil {
+		return err
+	}
 	resp, err := client.GetTenantAccessTokenBySelfBuiltApp(ctx, &larkcore.SelfBuiltTenantAccessTokenReq{
 		AppID:     strings.TrimSpace(cfg.AppID),
 		AppSecret: strings.TrimSpace(cfg.AppSecret),
@@ -664,6 +667,9 @@ func (s *FeishuSession) Run(ctx context.Context) error {
 
 	if s.downloader == nil {
 		s.downloader = newLarkMessageDownloader(s.cfg)
+	}
+	if err := installFeishuNetworkCompat(); err != nil {
+		return err
 	}
 	wsLogger := newWSBridgeLogger(s.events, s.logger)
 	handler := dispatcher.NewEventDispatcher("", "").
@@ -1089,18 +1095,21 @@ func NewSender(loader MetaLoader, logger *log.Logger, messageLog io.Writer) *Sen
 	return sender
 }
 
-var defaultLarkAPIs = func(cfg Config) LarkAPISet {
-	client := lark.NewClient(cfg.AppID, cfg.AppSecret)
+var defaultLarkAPIs = func(cfg Config) (LarkAPISet, error) {
+	client, err := newFeishuLarkClient(cfg)
+	if err != nil {
+		return LarkAPISet{}, err
+	}
 	return LarkAPISet{
 		Message: client.Im.Message,
 		Image:   client.Im.Image,
 		File:    client.Im.File,
-	}
+	}, nil
 }
 
-func (s *Sender) ensureAPIs(cfg Config) LarkAPISet {
+func (s *Sender) ensureAPIs(cfg Config) (LarkAPISet, error) {
 	if s.apis.Message != nil && s.apis.Image != nil && s.apis.File != nil {
-		return s.apis
+		return s.apis, nil
 	}
 	return defaultLarkAPIs(cfg)
 }
@@ -1143,7 +1152,11 @@ func (s *Sender) Send(ctx context.Context, input SendInput) (*SendResult, error)
 		return nil, err
 	}
 
-	apis := s.ensureAPIs(cfg)
+	apis, err := s.ensureAPIs(cfg)
+	if err != nil {
+		s.writeMessageLog(at, formatSendFailureLog(action, "build-api", nil, err))
+		return nil, err
+	}
 	if apis.Message == nil || apis.Image == nil || apis.File == nil {
 		err := errors.New("feishu api client is required")
 		s.writeMessageLog(at, formatSendFailureLog(action, "build-api", nil, err))
@@ -2250,18 +2263,26 @@ func (l *wsBridgeLogger) capture(level string, args ...interface{}) {
 
 type larkMessageDownloader struct {
 	client *lark.Client
+	err    error
 }
 
 func newLarkMessageDownloader(cfg Config) MessageDownloader {
 	if strings.TrimSpace(cfg.AppID) == "" || strings.TrimSpace(cfg.AppSecret) == "" {
 		return nil
 	}
+	client, err := newFeishuLarkClient(cfg)
+	if err != nil {
+		return &larkMessageDownloader{err: err}
+	}
 	return &larkMessageDownloader{
-		client: lark.NewClient(cfg.AppID, cfg.AppSecret),
+		client: client,
 	}
 }
 
 func (d *larkMessageDownloader) DownloadImage(ctx context.Context, messageID, imageKey string) ([]byte, string, error) {
+	if d != nil && d.err != nil {
+		return nil, "", d.err
+	}
 	if d == nil || d.client == nil {
 		return nil, "", errors.New("lark client is required")
 	}
@@ -2292,6 +2313,9 @@ func (d *larkMessageDownloader) DownloadImage(ctx context.Context, messageID, im
 }
 
 func (d *larkMessageDownloader) DownloadFile(ctx context.Context, messageID, fileKey string) ([]byte, string, error) {
+	if d != nil && d.err != nil {
+		return nil, "", d.err
+	}
 	if d == nil || d.client == nil {
 		return nil, "", errors.New("lark client is required")
 	}
