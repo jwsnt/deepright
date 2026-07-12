@@ -108,7 +108,7 @@ public class RequestCheckRag extends RagCondition implements RagService {
     @Getter
     public static class InitConfig extends ConditionInitConfig {
 
-        @Value("${debug:false}")
+        @Value("${sys.debug:false}")
         protected Boolean debug;
 
         @Bean(RequestCheckRag.RAG_KEY)

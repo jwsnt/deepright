@@ -54,8 +54,6 @@ import org.unix4j.unix.Grep;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
 @Slf4j
 @Getter
 @Setter
@@ -146,7 +144,7 @@ public class GitMemoryService extends BaseFunction implements GitPath, MemorySer
         if (log.isInfoEnabled()) {
             log.info("The recalled memory={}, device={}", StringUtils.length(pubData.getCmd()), workTask.getDevice());
         }
-        WorkflowException.check(!(pubData.isOk()), pubData.getCmd(), ProtocolCode.C400);
+        WorkflowException.check(!(pubData.isOk()), pubData.getCmd(), StringUtils.containsIgnoreCase(pubData.getCmd(), XmlResourceLang.get(MemoryService.LANG_KEY_MEMORY_INIT_FILE)) ? ProtocolCode.C915 : ProtocolCode.C500);
         return SecurityTruncater.truncate(this.buildRecallCompress(workTask, recall, pubData.getCmd()), this.truncate);
     }
 

@@ -157,7 +157,7 @@ public class CliGetFunction extends BaseFunction {
         @Value("${cli.get.circle:10}")
         protected Integer circle;
 
-        @Value("${debug:false}")
+        @Value("${sys.debug:false}")
         protected Boolean debug;
 
         // 从Redis获取指定设备任务，每interval取一次，直到timeout，循环尝试timeout/circle次

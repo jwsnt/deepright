@@ -219,7 +219,7 @@ public class CliVerifyFunction extends BaseFunction {
         @Value("${cli.verify.timeout:30000}")
         protected Integer timeout;
 
-        @Value("${debug:false}")
+        @Value("${sys.debug:false}")
         protected Boolean debug;
 
         @Bean(CliVerifyFunction.NAME)

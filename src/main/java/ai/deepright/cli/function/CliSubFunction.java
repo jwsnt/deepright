@@ -651,7 +651,7 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
         @Value("${cli.safety:false}")
         protected Boolean safety;
 
-        @Value("${debug:false}")
+        @Value("${sys.debug:false}")
         protected Boolean debug;
 
         // 不等待结果时的返回
