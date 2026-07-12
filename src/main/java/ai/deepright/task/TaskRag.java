@@ -1,5 +1,6 @@
 package ai.deepright.task;
 
+import ai.deepright.complex.ComplexityUtils;
 import ai.deepright.feature.FeatureField;
 import ai.deepright.feature.FeatureFlag;
 import ai.deepright.llm.notifier.MultiSourceNotifier;
@@ -34,8 +35,6 @@ import java.io.BufferedInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
-import static org.springframework.util.StringUtils.hasText;
-
 @Slf4j
 @Getter
 @Setter
@@ -44,6 +43,8 @@ public class TaskRag extends RagCondition implements RagService {
     public static final String RAG_KEY = "rag_output";
 
     protected ResourceService resourceService;
+
+    protected String template4schemaThinking;
 
     protected String template4schemaPlugin;
 
@@ -56,6 +57,7 @@ public class TaskRag extends RagCondition implements RagService {
     @PostConstruct
     public void init() throws Exception {
         // 由IOUtils关闭资源
+        this.template4schemaThinking = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4schemaThinking).openStream()), StandardCharsets.UTF_8);
         this.template4schemaPlugin = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4schemaPlugin).openStream()), StandardCharsets.UTF_8);
         this.template4schemaHtml = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4schemaHtml).openStream()), StandardCharsets.UTF_8);
         this.template4schemaJson = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4schemaJson).openStream()), StandardCharsets.UTF_8);
@@ -100,7 +102,8 @@ public class TaskRag extends RagCondition implements RagService {
     }
 
     protected String buildTemplate(RagConfig ragConfig, RagData ragData) throws Exception {
-        return FeatureFlag.isHtml(ragData.getQuery()) ? this.template4schemaHtml : this.template4schemaDef;
+        // 追加Thinking
+        return (FeatureFlag.isHtml(ragData.getQuery()) ? this.template4schemaHtml : this.template4schemaDef).replace("#thinking", ComplexityUtils.isThinking(ragData.getQuery()) ? this.template4schemaThinking : "");
     }
 
     protected String buildPlugin(RagData ragData, String responseSchema) throws Exception {
@@ -129,6 +132,9 @@ public class TaskRag extends RagCondition implements RagService {
 
         @Autowired
         protected ResourceService resourceService;
+
+        @Value("${task.rag.schema.thinking:classpath:config/task/schema_thinking.md}")
+        protected String template4schemaThinking;
 
         @Value("${task.rag.schema.html:classpath:config/task/schema_plugin.md}")
         protected String template4schemaPlugin;
