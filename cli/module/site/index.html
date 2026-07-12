@@ -6365,6 +6365,7 @@ const TASK_BADGE_LEAVE_MS = 220;
 // Per-chat streaming state: { chatId: { streaming: bool, abortCtrl: AbortController|null } }
 let chatStreaming = {};
 let chatFooterInlineHints = {};
+let chatRequestFooterNotices = {};
 let chatTaskBadges = {};
 let workingIndicatorState = {
   text: WORKING_INDICATOR_DEFAULT_TEXT,
@@ -22954,6 +22955,7 @@ async function handleBrowserInstanceInitBadgeClick(event) {
   scheduleBrowserInstanceDoneReveal();
   renderBrowserInstanceInitBadge();
   closeQuickFanMenu();
+  closeRightSidebarUrlPreview();
   renderBrowserInstanceInitLock();
   try {
     await execBrowserInstanceCommand('instance init', binding);
@@ -24501,6 +24503,7 @@ async function pluginModalStartPluginFlow(options) {
     });
 
     if (browserPluginStartOverlay) {
+      closeRightSidebarUrlPreview();
       browserInstanceInitState.loading = true;
       browserInstanceInitState.phase = 'plugin-start';
       browserInstanceInitState.binding = {
@@ -30205,6 +30208,107 @@ function buildAssistantMetaText(message) {
   return `${timeText} ${statusText}`;
 }
 
+function clearChatRequestFooterNoticeTimer(stateItem) {
+  if (!stateItem || !stateItem.timer) return;
+  clearTimeout(stateItem.timer);
+  stateItem.timer = 0;
+}
+
+function createChatRequestFooterNoticeState() {
+  return {
+    text: '',
+    agentId: '',
+    requestTs: '',
+    durationMs: 0,
+    expiresAt: 0,
+    timer: 0
+  };
+}
+
+function ensureChatRequestFooterNoticeState(chatId) {
+  const resolvedChatId = String(chatId || '').trim();
+  if (!resolvedChatId) return null;
+  let stateItem = chatRequestFooterNotices[resolvedChatId];
+  if (!stateItem) {
+    stateItem = chatRequestFooterNotices[resolvedChatId] = createChatRequestFooterNoticeState();
+  }
+  return stateItem;
+}
+
+function resetChatRequestFooterNoticeCurrent(stateItem) {
+  if (!stateItem) return;
+  stateItem.text = '';
+  stateItem.agentId = '';
+  stateItem.requestTs = '';
+  stateItem.durationMs = 0;
+  stateItem.expiresAt = 0;
+}
+
+function hasChatRequestFooterNoticeState(stateItem) {
+  return !!(stateItem && String(stateItem.text || '').trim());
+}
+
+function scheduleChatRequestFooterNoticeReset(chatId, requestTs) {
+  const resolvedChatId = String(chatId || '').trim();
+  if (!resolvedChatId) return;
+  const stateItem = chatRequestFooterNotices[resolvedChatId];
+  if (!stateItem) return;
+  const targetRequestTs = String(requestTs || stateItem.requestTs || '').trim();
+  if (!targetRequestTs) return;
+  clearChatRequestFooterNoticeTimer(stateItem);
+  const delay = Math.max(1, Number(stateItem.expiresAt || 0) - Date.now());
+  stateItem.timer = setTimeout(() => {
+    const activeState = chatRequestFooterNotices[resolvedChatId];
+    if (!activeState) return;
+    if (String(activeState.requestTs || '').trim() !== targetRequestTs) return;
+    activeState.timer = 0;
+    clearChatRequestFooterNotice(resolvedChatId);
+  }, delay);
+}
+
+function clearChatRequestFooterNotice(chatId) {
+  const resolvedChatId = String(chatId || '').trim();
+  if (!resolvedChatId) return;
+  const stateItem = chatRequestFooterNotices[resolvedChatId];
+  if (!stateItem) return;
+  const hadNotice = hasChatRequestFooterNoticeState(stateItem) || !!stateItem.timer;
+  clearChatRequestFooterNoticeTimer(stateItem);
+  resetChatRequestFooterNoticeCurrent(stateItem);
+  if (hadNotice && state.activeChat === resolvedChatId) syncChatFooterInlineHintUI();
+}
+
+function setChatRequestFooterNotice(chatId, rawText, options) {
+  const resolvedChatId = String(chatId || '').trim();
+  if (!resolvedChatId) return;
+  const opts = options || {};
+  const requestTs = toChatTimestamp(opts.requestTs || '');
+  const agentId = String(opts.agentId || '').trim();
+  const text = normalizeWorkingIndicatorPacketText(rawText);
+  if (!requestTs || !agentId || !text) {
+    clearChatRequestFooterNotice(resolvedChatId);
+    return;
+  }
+  const stateItem = ensureChatRequestFooterNoticeState(resolvedChatId);
+  if (!stateItem) return;
+  clearChatRequestFooterNoticeTimer(stateItem);
+  stateItem.text = text;
+  stateItem.agentId = agentId;
+  stateItem.requestTs = requestTs;
+  stateItem.durationMs = resolveChatFooterInlineHintDurationMs('process', 'outside', opts.durationMs);
+  stateItem.expiresAt = Date.now() + stateItem.durationMs;
+  scheduleChatRequestFooterNoticeReset(resolvedChatId, requestTs);
+  if (state.activeChat === resolvedChatId) syncChatFooterInlineHintUI();
+}
+
+function getActiveChatRequestFooterNotice() {
+  const activeChatId = String(state.activeChat || '').trim();
+  if (!activeChatId) return null;
+  const notice = chatRequestFooterNotices[activeChatId];
+  if (!hasChatRequestFooterNoticeState(notice)) return null;
+  if (Number(notice.expiresAt || 0) <= Date.now()) return null;
+  return notice;
+}
+
 function clearChatFooterInlineHintTimer(stateItem) {
   if (!stateItem || !stateItem.timer) return;
   clearTimeout(stateItem.timer);
@@ -30337,6 +30441,31 @@ function findRenderedAssistantWrap(container, chat, targetMsg) {
   return assistantWraps[domIndex];
 }
 
+function findRenderedUserWrap(container, chat, targetMsg) {
+  if (!container || !chat || !targetMsg || !Array.isArray(chat.messages)) return null;
+  const userWraps = Array.from(container.querySelectorAll('.message-wrap.user'));
+  if (!userWraps.length) return null;
+  const userMessages = chat.messages.filter(msg => msg && msg.role === 'user' && shouldRenderMessageInCenter(msg));
+  const targetIndex = userMessages.indexOf(targetMsg);
+  if (targetIndex < 0) return null;
+  const startIndex = Math.max(0, userMessages.length - userWraps.length);
+  const domIndex = targetIndex - startIndex;
+  if (domIndex < 0 || domIndex >= userWraps.length) return null;
+  return userWraps[domIndex];
+}
+
+function findChatUserMessageByCreatedAt(chat, requestTs) {
+  if (!chat || !Array.isArray(chat.messages)) return null;
+  const normalizedRequestTs = toChatTimestamp(requestTs || '');
+  if (!normalizedRequestTs) return null;
+  for (let i = chat.messages.length - 1; i >= 0; i--) {
+    const msg = chat.messages[i];
+    if (!msg || msg.role !== 'user') continue;
+    if (toChatTimestamp(msg.createdAt) === normalizedRequestTs) return msg;
+  }
+  return null;
+}
+
 function getPendingRequestUiAssistant(chat) {
   if (!chat) return null;
   const pending = getPendingRequestState(chat);
@@ -30395,6 +30524,20 @@ function findTargetAssistantWrapForFooterInlineHint(container, activeChat) {
   return findLatestRenderedAssistantWrap(container);
 }
 
+function findTargetUserWrapForRequestFooterNotice(container, activeChat, notice) {
+  if (!container || !activeChat || !notice) return null;
+  const requestTs = toChatTimestamp(notice.requestTs || '');
+  if (!requestTs) return null;
+  const pending = getPendingRequestState(activeChat);
+  if (pending && pending.user && toChatTimestamp(pending.user.createdAt) === requestTs) {
+    const pendingWrap = findRenderedUserWrap(container, activeChat, pending.user);
+    if (pendingWrap) return pendingWrap;
+  }
+  const targetUser = findChatUserMessageByCreatedAt(activeChat, requestTs);
+  if (!targetUser) return null;
+  return findRenderedUserWrap(container, activeChat, targetUser);
+}
+
 function createAssistantInlineHintElement(hint) {
   const hintEl = document.createElement('div');
   hintEl.className = 'assistant-process-inline-hint';
@@ -30415,49 +30558,52 @@ function syncChatFooterInlineHintUI() {
   if (!container) return;
   container.querySelectorAll('.assistant-process-inline-hint').forEach(node => node.remove());
   restoreAssistantInlineHintRows(container);
-  const hint = getActiveChatFooterInlineHint();
-  if (!hint) {
-    scheduleChatScrollControlsSync();
-    return;
-  }
   const activeChatId = String(state.activeChat || '').trim();
   const activeChat = activeChatId ? state.chats[activeChatId] : null;
-  const placement = normalizeChatFooterInlineHintPlacement(hint.placement);
-  let effectivePlacement = placement;
-  let targetWrap = placement === 'inside'
-    ? findTargetAssistantWrapForPendingRequestUi(container, activeChat)
-    : findTargetAssistantWrapForFooterInlineHint(container, activeChat);
-  if (!targetWrap && placement === 'inside') {
-    targetWrap = findTargetAssistantWrapForFooterInlineHint(container, activeChat);
-    if (targetWrap) effectivePlacement = 'outside';
-  }
-  if (!targetWrap) {
-    scheduleChatScrollControlsSync();
-    return;
-  }
-  const hintEl = createAssistantInlineHintElement(hint);
-  if (effectivePlacement === 'inside') {
-    const messageEl = targetWrap.querySelector('.message.assistant');
-    if (!messageEl) {
-      scheduleChatScrollControlsSync();
-      return;
+  const hint = getActiveChatFooterInlineHint();
+  if (hint) {
+    const placement = normalizeChatFooterInlineHintPlacement(hint.placement);
+    let effectivePlacement = placement;
+    let targetWrap = placement === 'inside'
+      ? findTargetAssistantWrapForPendingRequestUi(container, activeChat)
+      : findTargetAssistantWrapForFooterInlineHint(container, activeChat);
+    if (!targetWrap && placement === 'inside') {
+      targetWrap = findTargetAssistantWrapForFooterInlineHint(container, activeChat);
+      if (targetWrap) effectivePlacement = 'outside';
     }
-    const row = document.createElement('div');
-    row.className = 'message-inline-hint-row';
-    const metaEl = messageEl.querySelector('.message-meta');
-    row.appendChild(hintEl);
-    if (metaEl) row.appendChild(metaEl);
-    messageEl.classList.add('has-inline-hint-inside');
-    messageEl.appendChild(row);
-    scheduleChatScrollControlsSync();
-    return;
+    if (targetWrap) {
+      const hintEl = createAssistantInlineHintElement(hint);
+      if (effectivePlacement === 'inside') {
+        const messageEl = targetWrap.querySelector('.message.assistant');
+        if (messageEl) {
+          const row = document.createElement('div');
+          row.className = 'message-inline-hint-row';
+          const metaEl = messageEl.querySelector('.message-meta');
+          row.appendChild(hintEl);
+          if (metaEl) row.appendChild(metaEl);
+          messageEl.classList.add('has-inline-hint-inside');
+          messageEl.appendChild(row);
+        }
+      } else {
+        const slot = targetWrap.querySelector('.message-footer-process-slot');
+        if (slot) slot.appendChild(hintEl);
+      }
+    }
   }
-  const slot = targetWrap.querySelector('.message-footer-process-slot');
-  if (!slot) {
-    scheduleChatScrollControlsSync();
-    return;
+  const requestNotice = getActiveChatRequestFooterNotice();
+  if (requestNotice) {
+    const targetWrap = findTargetUserWrapForRequestFooterNotice(container, activeChat, requestNotice);
+    const slot = targetWrap ? targetWrap.querySelector('.message-footer-process-slot') : null;
+    if (slot) {
+      const hintEl = createAssistantInlineHintElement({
+        kind: 'process',
+        text: requestNotice.text,
+        placement: 'outside'
+      });
+      hintEl.dataset.requestFooterNotice = '1';
+      slot.appendChild(hintEl);
+    }
   }
-  slot.appendChild(hintEl);
   scheduleChatScrollControlsSync();
 }
 
@@ -34043,6 +34189,16 @@ async function sendCenterMessage(rawText, options) {
     }
   }
 
+  function showRequestAgentExecutionFooterHint(requestTs) {
+    const requestAgentId = String(chatAgentId || '').trim();
+    if (!requestAgentId) return;
+    setChatRequestFooterNotice(chatId, '当前任务将由 ' + requestAgentId + ' 执行', {
+      agentId: requestAgentId,
+      requestTs,
+      durationMs: 5000
+    });
+  }
+
   function renderAssistantErrorState(content, entry) {
     const targetEntry = entry || lastAssistantEntry || createStreamingAssistantEntry('');
     const assistantMsg = targetEntry.assistantMsg;
@@ -34256,12 +34412,14 @@ async function sendCenterMessage(rawText, options) {
       if (queryString) chatCompletionsUrl += '?' + queryString;
     }
 
-    const resp = await fetch(chatCompletionsUrl, {
+    const responsePromise = fetch(chatCompletionsUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': key },
       body: JSON.stringify(body),
       signal: abortCtrl.signal
     });
+    showRequestAgentExecutionFooterHint(requestTs);
+    const resp = await responsePromise;
 
     if (!resp.ok) {
       const errorPayload = await readResponseErrorPayload(resp);
@@ -35399,6 +35557,7 @@ function clearChatConversation(chatId) {
   clearMemoViewRecovery(resolvedChatId);
   clearChatTaskBadges(resolvedChatId);
   clearChatFooterInlineHint(resolvedChatId);
+  clearChatRequestFooterNotice(resolvedChatId);
   clearQueuedCenterQueuesForChat(resolvedChatId);
   if (state.activeChat === resolvedChatId && switchedChatAutoReloadTimer) {
     clearTimeout(switchedChatAutoReloadTimer);
@@ -37027,6 +37186,7 @@ async function performReloadChatRecords(chatId, opts) {
     resetLatestRequestForRestoreReplay(chat, replayPlan.start);
     clearChatTaskBadges(chatId);
     clearChatFooterInlineHint(chatId);
+    clearChatRequestFooterNotice(chatId);
     timeline = replayPlan.timeline;
     lastId = 0;
   }
@@ -37242,6 +37402,7 @@ async function performReloadColdHistoryChat(chatId, opts) {
       chat.cliCommandHistory = [];
       clearChatTaskBadges(resolvedChatId);
       clearChatFooterInlineHint(resolvedChatId);
+      clearChatRequestFooterNotice(resolvedChatId);
       clearCliSubPanel();
       const latestRecord = records.length ? records[records.length - 1] : null;
       updateChatColdHistoryTail(
@@ -41646,6 +41807,7 @@ function feOpenCurrentAppInside() {
 
 async function feOpen(absPath) {
   cmdClosePanel(true);
+  closeRightSidebarUrlPreview();
   feCurrentPath = absPath;
   feAgentRelPath = absPath.replace(vfsWorkspace + '/', '');
   feFileType = detectFileType(absPath);
