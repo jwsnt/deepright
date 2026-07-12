@@ -740,23 +740,23 @@ html[data-chat-scrolling="1"] #chatContainer .message-stream-burst-particle{
 }
 
 /* Chat area */
-.chat-container{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;padding:40px 24px 5px;margin:10px 18px 0;display:flex;flex-direction:column;scroll-behavior:smooth;position:relative;z-index:1;min-height:0;border-radius:40px;background:
+.chat-container{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;padding:30px 24px 5px;margin:10px 18px 0;display:flex;flex-direction:column;scroll-behavior:smooth;position:relative;z-index:1;min-height:0;border-radius:40px;background:
   linear-gradient(180deg,rgba(255,252,249,.9),rgba(255,244,236,.8) 46%,rgba(255,229,212,.58) 100%);
   border:1px solid rgba(18,18,18,.1);
   box-shadow:0 24px 72px rgba(18,18,18,.09),inset 0 1px 0 rgba(255,255,255,.84),inset 0 -28px 40px rgba(255,69,0,.05);
   backdrop-filter:blur(14px) saturate(145%);
   -webkit-backdrop-filter:blur(14px) saturate(145%)}
-.chat-container::before{content:'';position:absolute;inset:1px 1px auto;height:138px;border-radius:inherit;background:
-  linear-gradient(180deg,rgba(255,255,255,.42),rgba(255,255,255,0)),
-  linear-gradient(90deg,rgba(18,18,18,.08),rgba(255,69,0,0));
-  pointer-events:none;opacity:.8}
+.chat-container::before{content:'';position:absolute;inset:0;border-radius:inherit;background:
+  linear-gradient(180deg,rgba(255,255,255,.18) 0%,rgba(255,255,255,.08) 12%,rgba(255,255,255,0) 26%),
+  radial-gradient(circle at 50% 0%,rgba(var(--accent-rgb),.08),rgba(var(--accent-rgb),0) 40%);
+  pointer-events:none;opacity:.52}
 [data-theme="dark"] .chat-container{background:
   linear-gradient(180deg,rgba(41,44,55,.9),rgba(34,37,47,.84) 46%,rgba(25,28,36,.78) 100%);
   border-color:rgba(0,212,255,.14);
   box-shadow:0 26px 80px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.08),inset 0 -28px 42px rgba(0,212,255,.05)}
 [data-theme="dark"] .chat-container::before{background:
-  linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,0)),
-  linear-gradient(90deg,rgba(0,212,255,.14),rgba(0,212,255,0))}
+  linear-gradient(180deg,rgba(255,255,255,.08) 0%,rgba(255,255,255,.03) 12%,rgba(255,255,255,0) 26%),
+  radial-gradient(circle at 50% 0%,rgba(0,212,255,.1),rgba(0,212,255,0) 42%)}
 .chat-container.fade-enter{opacity:0;transform:translateY(10px)}
 .chat-container.fade-active{opacity:1;transform:translateY(0);transition:opacity .5s,transform .5s}
 .chat-session-toolbar{position:absolute;top:18px;left:22px;display:flex;align-items:flex-start;gap:6px;z-index:4}
@@ -941,6 +941,11 @@ animation:queuedInsertExplosion .62s ease-out both}
 .message.user .md-content code{background:rgba(255,255,255,.15);padding:2px 6px;border-radius:8px;font-size:13px;white-space:break-spaces;overflow-wrap:anywhere;word-break:break-word}
 .message.user .md-content pre code{display:block;min-width:max-content;background:none;padding:0;white-space:pre;overflow-wrap:normal;word-break:normal}
 .message.user .md-content a{color:#fff;text-decoration:underline}
+.message.user .md-content a.message-path-link,.message.user .md-content .message-inline-token-bubble{text-decoration:none;box-shadow:0 10px 24px rgba(16,24,40,.12),inset 0 1px 0 rgba(255,255,255,.68)}
+.message.user .md-content a.message-http-link{background:linear-gradient(180deg,rgba(255,244,237,.96),rgba(255,232,220,.9));border-color:rgba(255,168,116,.36);color:#a65316}
+.message.user .md-content a.message-file-link,.message.user .md-content .message-inline-token-bubble.token-file{background:linear-gradient(180deg,rgba(255,247,240,.96),rgba(255,236,223,.92));border-color:rgba(255,186,128,.42);color:#9a5e00}
+.message.user .md-content .message-inline-token-bubble.token-skill{background:linear-gradient(180deg,rgba(240,252,248,.96),rgba(222,246,238,.92));border-color:rgba(15,118,110,.24);color:#0f766e}
+.message.user .md-content .message-inline-token-bubble.token-team{background:linear-gradient(180deg,rgba(255,245,236,.96),rgba(255,229,213,.92));border-color:rgba(234,88,12,.26);color:#c2410c}
 .message.assistant{background:linear-gradient(160deg,color-mix(in srgb,var(--glass-surface-strong) 88%,transparent),color-mix(in srgb,var(--glass-surface) 72%,transparent));border:1px solid color-mix(in srgb,var(--glass-edge-strong) 58%,transparent);align-self:flex-start;border-bottom-left-radius:10px}
 .message.assistant.message-structured-result{backdrop-filter:none;-webkit-backdrop-filter:none;background:linear-gradient(180deg,rgba(255,251,247,.98),rgba(255,243,235,.94));border-color:rgba(18,18,18,.12);box-shadow:0 22px 48px rgba(18,18,18,.08),inset 0 1px 0 rgba(255,255,255,.84)}
 .message.assistant.message-structured-result::before{display:none}
@@ -965,6 +970,11 @@ animation:queuedInsertExplosion .62s ease-out both}
 [data-theme="dark"] .message.user{background:linear-gradient(160deg,rgba(0,212,255,.96),rgba(84,236,255,.88) 56%,rgba(255,255,255,.16));color:#11161c;border-color:rgba(144,244,255,.22);box-shadow:0 22px 56px rgba(0,212,255,.18),0 0 0 1px rgba(0,212,255,.08),inset 0 1px 0 rgba(230,253,255,.26)}
 [data-theme="dark"] .message.user .md-content,[data-theme="dark"] .message.user .md-content a,[data-theme="dark"] .message.user .md-content .katex,[data-theme="dark"] .message.user .md-content .katex *{color:#11161c}
 [data-theme="dark"] .message.user .message-meta{color:rgba(17,22,28,.6)}
+[data-theme="dark"] .message.user .md-content a.message-path-link,[data-theme="dark"] .message.user .md-content .message-inline-token-bubble{box-shadow:0 12px 26px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.08)}
+[data-theme="dark"] .message.user .md-content a.message-http-link{background:linear-gradient(180deg,rgba(24,42,82,.94),rgba(14,28,58,.9));border-color:rgba(128,166,255,.28);color:#aecdff}
+[data-theme="dark"] .message.user .md-content a.message-file-link,[data-theme="dark"] .message.user .md-content .message-inline-token-bubble.token-file{background:linear-gradient(180deg,rgba(39,87,189,.82),rgba(20,56,133,.68));border-color:rgba(123,165,255,.4);color:#b8d4ff}
+[data-theme="dark"] .message.user .md-content .message-inline-token-bubble.token-skill{background:linear-gradient(180deg,rgba(17,94,89,.72),rgba(11,68,64,.54));border-color:rgba(94,234,212,.24);color:#99f6e4}
+[data-theme="dark"] .message.user .md-content .message-inline-token-bubble.token-team{background:linear-gradient(180deg,rgba(39,87,189,.82),rgba(20,56,133,.68));border-color:rgba(123,165,255,.4);color:#b8d4ff}
 [data-theme="dark"] .message.user .md-content pre,[data-theme="dark"] .message.user .md-content blockquote,[data-theme="dark"] .message.user .md-content details,[data-theme="dark"] .message.user .md-content th{background:rgba(17,22,28,.1);color:#11161c;border-color:rgba(17,22,28,.14)}
 [data-theme="dark"] .message.user .md-content code{background:rgba(17,22,28,.1);color:#11161c}
 [data-theme="dark"] .message.user .md-content hr,[data-theme="dark"] .message.user .md-content th,[data-theme="dark"] .message.user .md-content td{border-color:rgba(17,22,28,.14)}
@@ -1134,11 +1144,11 @@ animation:queuedInsertExplosion .62s ease-out both}
 .cli-sub-scroll-bottom-btn:hover,.cli-sub-scroll-bottom-btn:focus-visible{opacity:1;color:#7b4300;background:linear-gradient(180deg,rgba(255,250,244,.99),rgba(255,178,79,.98));box-shadow:0 9px 19px rgba(189,51,48,.24),0 0 0 1px rgba(255,227,193,.7),0 0 0 4px rgba(255,192,58,.16),inset 0 1px 0 rgba(255,255,255,.98)}
 [data-theme="dark"] .cli-sub-scroll-bottom-btn{background:linear-gradient(180deg,rgba(198,224,250,.98),rgba(103,149,214,.96));color:#133d73;box-shadow:0 8px 17px rgba(86,137,207,.32),0 0 0 1px rgba(180,217,255,.46),0 0 0 3px rgba(83,142,218,.14),inset 0 1px 0 rgba(255,255,255,.76)}
 [data-theme="dark"] .cli-sub-scroll-bottom-btn:hover,[data-theme="dark"] .cli-sub-scroll-bottom-btn:focus-visible{background:linear-gradient(180deg,rgba(216,234,253,.99),rgba(122,167,228,.98));color:#0f3566;box-shadow:0 9px 20px rgba(86,137,207,.38),0 0 0 1px rgba(198,228,255,.56),0 0 0 4px rgba(83,142,218,.2),inset 0 1px 0 rgba(255,255,255,.84)}
-.greeting{text-align:center;padding:0;color:var(--accent);font-size:18px;max-width:100%;margin:auto;position:relative;width:100%;height:100%;min-height:560px;display:flex;align-items:center;justify-content:center;isolation:isolate}
+.greeting{text-align:center;padding:12px 0 24px;color:var(--accent);font-size:18px;max-width:100%;margin:0;position:relative;width:100%;height:auto;min-height:0;display:flex;align-items:flex-start;justify-content:center;isolation:isolate}
 .greeting::before,.greeting::after{content:'';position:absolute;pointer-events:none;filter:blur(10px);opacity:.9}
 .greeting::before{width:min(38vw,460px);height:min(38vw,460px);left:10%;top:10%;border-radius:45% 55% 62% 38%/40% 42% 58% 60%;background:radial-gradient(circle at 35% 35%,rgba(255,255,255,.72),rgba(255,69,0,.18) 50%,transparent 74%);animation:liquidBlobFloat 14s ease-in-out infinite}
 .greeting::after{width:min(30vw,340px);height:min(30vw,340px);right:12%;bottom:6%;border-radius:58% 42% 34% 66%/47% 67% 33% 53%;background:radial-gradient(circle at 30% 35%,rgba(18,18,18,.12),rgba(var(--accent-soft-rgb),.14) 48%,transparent 72%);animation:liquidBlobFloat 11s ease-in-out infinite reverse}
-.greeting-shell{position:relative;width:min(100%,var(--chat-shell-max-width));min-height:520px;padding:28px;display:grid;place-items:center}
+.greeting-shell{position:relative;width:min(100%,var(--chat-shell-max-width));min-height:0;padding:12px 28px 28px;display:flex;align-items:flex-start;justify-content:center}
 .greeting-orb{position:absolute;border-radius:50%;pointer-events:none;mix-blend-mode:screen;opacity:.9;filter:blur(1px)}
 .greeting-orb.orb-a{width:138px;height:138px;top:16%;right:17%;background:radial-gradient(circle at 35% 35%,rgba(255,255,255,.96),rgba(var(--accent-rgb),.22) 46%,transparent 72%);animation:orbDriftA 10s ease-in-out infinite}
 .greeting-orb.orb-b{width:86px;height:86px;left:17%;bottom:18%;background:radial-gradient(circle at 35% 35%,rgba(255,255,255,.74),rgba(var(--accent-soft-rgb),.28) 52%,transparent 76%);animation:orbDriftB 8s ease-in-out infinite}
@@ -3181,12 +3191,12 @@ body.quick-fan-transition-active{cursor:progress}
 [data-theme="dark"] .chat-session-log-content{background:rgba(9,18,34,.92);border-color:rgba(169,190,227,.14);color:#f3f9fd}
 
 @media (max-width:760px){
-  .chat-container{padding:24px 12px 14px;margin:8px 8px 0;border-radius:28px}
+  .chat-container{padding:20px 12px 14px;margin:8px 8px 0;border-radius:28px}
   .chat-session-toolbar{top:16px;left:18px}
   .chat-queue-badge{right:56px}
   .message-wrap,.message{width:100%;max-width:100%}
-  .greeting{min-height:480px}
-  .greeting-shell{padding:10px}
+  .greeting{padding:8px 0 16px;min-height:0}
+  .greeting-shell{padding:8px 10px 18px}
   .greeting-card{padding:24px 20px 20px;border-radius:28px}
   .greeting-card.clean{padding:34px 24px}
   .greeting h2{font-size:clamp(34px,12vw,52px)}
@@ -6303,7 +6313,7 @@ function buildBrowserPerfProfile(archHints) {
   const isMacX86 = isMac && !isArm && hasX86Hint;
   return {
     isMacX86,
-    autoEnableEnergySaver: isMacX86
+    autoEnableEnergySaver: true
   };
 }
 
@@ -12141,6 +12151,17 @@ function maybeCollapseRightSidebarForOnboardingFloatingStep(step) {
   return targets.some(target => maybeCollapseRightSidebarForOnboardingFloatingElement(target, { requireVisible: true }));
 }
 
+function shouldAutoCollapseLeftSidebarForFloatingOverlay(target) {
+  if (!(target instanceof Element)) return false;
+  return !!target.closest('#mediaConfigOverlay,#pluginModalTransitionLock,#browserInstanceInitLock,#quickFanTransitionLock,#settingsCopyTransitionLock,#centerUploadLock,#logCleanupLock');
+}
+
+function maybeCollapseLeftSidebarForFloatingOverlay(target) {
+  if (!shouldAutoCollapseLeftSidebarForFloatingOverlay(target)) return false;
+  if (!isLeftSidebarCollapsed()) applyLeftSidebarState(true);
+  return true;
+}
+
 function overlayShowState(el) {
   if (!el) return false;
   if (el.classList.contains('show')) return true;
@@ -12412,6 +12433,7 @@ function syncDomainUploadLock(key) {
     cancelBtn.disabled = !visible || stateItem.controllers.size === 0 || stateItem.cancelling;
   }
   if (lockEl) {
+    if (visible) maybeCollapseLeftSidebarForFloatingOverlay(lockEl);
     lockEl.classList.toggle('show', visible);
     lockEl.setAttribute('aria-hidden', visible ? 'false' : 'true');
   }
@@ -12477,6 +12499,7 @@ function setChatHistoryLock(locked, desc) {
   }
   if (!lockEl) return;
   const visible = historyLazyLockState.count > 0;
+  if (visible) maybeCollapseLeftSidebarForFloatingOverlay(lockEl);
   lockEl.classList.toggle('show', visible);
   lockEl.setAttribute('aria-hidden', visible ? 'false' : 'true');
   refreshOverlayStates();
@@ -12492,6 +12515,7 @@ function setLogCleanupLock(locked, desc) {
   if (descEl) descEl.textContent = detail;
   if (!lockEl) return;
   if (locked) {
+    maybeCollapseLeftSidebarForFloatingOverlay(lockEl);
     if (isRightSidebarUrlPreviewExpanded()) {
       setRightSidebarUrlPreviewExpanded(false);
     }
@@ -17475,6 +17499,7 @@ function syncQuickFanTransitionLock(visible, options) {
   if (titleEl) titleEl.textContent = titleText;
   if (descEl) descEl.textContent = descText;
   if (overlay) {
+    if (active) maybeCollapseLeftSidebarForFloatingOverlay(overlay);
     overlay.classList.toggle('show', active);
     overlay.setAttribute('aria-hidden', active ? 'false' : 'true');
   }
@@ -22170,7 +22195,7 @@ function updateEnergySaverControl() {
   toggle.setAttribute('aria-pressed', enabled ? 'true' : 'false');
   toggle.title = onboardingSuspended
     ? '新手引导期间已临时关闭节能模式，结束后会自动恢复'
-    : (autoEnabled ? '当前已为 Mac x86 默认开启节能模式，点击可手动关闭' : (enabled ? '关闭节能模式' : '开启节能模式'));
+    : (autoEnabled ? '当前默认开启节能模式，点击可手动关闭' : (enabled ? '关闭节能模式' : '开启节能模式'));
 }
 
 function clearOnboardingEnergySaverOverride() {
@@ -23083,6 +23108,7 @@ function renderBrowserInstanceInitLock() {
   const pluginStart = phase === 'plugin-start';
   const ready = phase === 'ready';
   const show = phase !== 'idle' || guidePreview;
+  if (show) maybeCollapseLeftSidebarForFloatingOverlay(overlay);
   overlay.classList.toggle('show', show);
   overlay.setAttribute('aria-hidden', show ? 'false' : 'true');
   overlay.dataset.tone = 'progress';
@@ -23998,6 +24024,7 @@ function pluginModalSyncTransitionLock() {
     panel.setAttribute('aria-busy', pluginModalState.submitting || locked ? 'true' : 'false');
   }
   if (overlay) {
+    if (locked) maybeCollapseLeftSidebarForFloatingOverlay(overlay);
     overlay.classList.toggle('show', locked);
     overlay.setAttribute('aria-hidden', locked ? 'false' : 'true');
     overlay.setAttribute('data-tone', failed ? 'error' : (pending ? 'progress' : 'success'));
@@ -37934,6 +37961,7 @@ function syncSettingsCopyTransitionLock(locked, detail) {
     settingsOverlay.setAttribute('aria-busy', visible ? 'true' : 'false');
   }
   if (overlay) {
+    if (visible) maybeCollapseLeftSidebarForFloatingOverlay(overlay);
     overlay.classList.toggle('show', visible);
     overlay.setAttribute('aria-hidden', visible ? 'false' : 'true');
   }
@@ -38823,6 +38851,7 @@ function openMediaConfigPanel(entry, trigger) {
   renderMediaConfigRows(buildMediaConfigDraftRows(getDraftMediaConfigForModel(mediaConfigPanelState.model)));
   setModelConfigEntryOpen(entry, false);
   settingsPanel.classList.add('media-config-active');
+  maybeCollapseLeftSidebarForFloatingOverlay(overlay);
   overlay.classList.add('show');
   overlay.setAttribute('aria-hidden', 'false');
   maybeCollapseRightSidebarForOnboardingFloatingElement(overlay);
