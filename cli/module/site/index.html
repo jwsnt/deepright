@@ -159,13 +159,11 @@ a{color:var(--accent);text-decoration:none}
 
 /* Sidebar */
 .sidebar-header,.right-sidebar-header{padding:16px 20px;display:flex;align-items:center;gap:10px}
-.logo{position:relative;display:inline-flex;align-items:baseline;gap:0;font-size:20px;font-weight:800;letter-spacing:-.02em;line-height:1;isolation:isolate}
+.logo{position:relative;display:inline-block;font-size:20px;font-weight:800;letter-spacing:-.02em;background:linear-gradient(124deg,var(--brand-cyan-soft) 0%,var(--brand-cyan) 14%,#68eeff 26%,var(--brand-sky) 48%,var(--brand-sky-strong) 68%,var(--brand-blue) 86%,var(--brand-blue-deep) 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;text-shadow:0 0 24px rgba(65,214,255,.18);filter:drop-shadow(0 2px 12px rgba(24,137,255,.18))}
 .logo::after{content:"";position:absolute;left:0;right:-4px;bottom:-5px;height:11px;border-radius:999px;background:linear-gradient(90deg,var(--logo-brand-underline-1),var(--logo-brand-underline-2) 18%,var(--logo-brand-underline-3) 46%,var(--logo-brand-underline-4) 72%,var(--logo-brand-underline-5));filter:blur(8px);opacity:.96;pointer-events:none}
-.logo-lead,.logo-rest{display:inline-block;position:relative;z-index:1;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
-.logo-lead{background:linear-gradient(126deg,var(--brand-cyan-soft) 0%,var(--brand-cyan) 24%,var(--brand-sky) 58%,var(--brand-blue-deep) 100%);text-shadow:0 0 16px rgba(65,214,255,.14)}
-.logo-rest{background:linear-gradient(124deg,var(--logo-brand-text-1) 0%,var(--logo-brand-text-2) 14%,var(--logo-brand-text-3) 26%,var(--logo-brand-text-4) 48%,var(--logo-brand-text-5) 68%,var(--logo-brand-text-6) 100%);text-shadow:0 0 22px var(--logo-brand-text-glow);filter:drop-shadow(0 2px 10px var(--logo-brand-text-shadow))}
-[data-theme="light"] .logo-rest{background:linear-gradient(124deg,#ffd9c4 0%,#ffc8a6 14%,#ffb686 28%,#ff9a66 48%,#ff7438 74%,#ff5b24 100%);text-shadow:0 0 16px rgba(255,160,120,.13);filter:drop-shadow(0 2px 8px rgba(255,91,36,.12))}
-[data-theme="light"] .logo-lead{background:linear-gradient(126deg,#d7fdff 0%,#9af8ff 24%,#41d6ff 58%,#1376ff 100%);text-shadow:0 0 12px rgba(65,214,255,.12)}
+[data-theme="dark"] .logo::before{content:"D";position:absolute;left:0;top:0;font:inherit;letter-spacing:inherit;line-height:inherit;background:linear-gradient(124deg,#ffe4d1 0%,#ffcaa7 16%,#ffb486 30%,#ff9d68 50%,#ff7d42 74%,#ff6228 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;text-shadow:0 0 18px rgba(255,160,120,.18);filter:drop-shadow(0 2px 10px rgba(255,91,36,.16));pointer-events:none;z-index:1}
+[data-theme="light"] .logo{background:linear-gradient(124deg,#ffe4d1 0%,#ffcaa7 16%,#ffb486 30%,#ff9d68 50%,#ff7d42 74%,#ff6228 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;text-shadow:0 0 18px rgba(255,160,120,.14);filter:drop-shadow(0 2px 10px rgba(255,91,36,.12))}
+[data-theme="light"] .logo::before{content:"D";position:absolute;left:0;top:0;font:inherit;letter-spacing:inherit;line-height:inherit;background:linear-gradient(124deg,var(--brand-cyan-soft) 0%,var(--brand-cyan) 14%,#68eeff 26%,var(--brand-sky) 48%,var(--brand-sky-strong) 68%,var(--brand-blue) 86%,var(--brand-blue-deep) 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;text-shadow:0 0 18px rgba(65,214,255,.16);filter:drop-shadow(0 2px 10px rgba(24,137,255,.14));pointer-events:none;z-index:1}
 .cli-get-queue-status{display:none;align-items:center;justify-content:center;flex:0 0 auto;min-width:58px;height:28px;padding:0 10px;border-radius:999px;border:1px solid color-mix(in srgb,var(--border) 88%,var(--accent) 12%);background:linear-gradient(180deg,rgba(255,255,255,.84),rgba(255,238,229,.9));box-shadow:0 8px 18px rgba(var(--accent-rgb),.08),inset 0 1px 0 rgba(255,255,255,.88);color:var(--text-secondary);font-size:11px;font-weight:800;letter-spacing:.04em;line-height:1;white-space:nowrap;user-select:none;position:relative}
 .cli-get-queue-status.show{display:inline-flex}
 .cli-get-queue-status::before,.cli-get-queue-status::after{position:absolute;left:50%;pointer-events:none;opacity:0;transition:opacity .06s ease,transform .06s ease}
@@ -284,6 +282,8 @@ a{color:var(--accent);text-decoration:none}
 .new-chat-btn{margin:0;padding:10px 48px 10px 16px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-card);color:var(--text-primary);cursor:pointer;font-size:14px;display:flex;align-items:center;gap:8px;transition:var(--transition);flex:1 1 auto;min-width:0;width:100%}
 .new-chat-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
 .new-chat-btn svg{width:18px;height:18px}
+[data-theme="dark"] .new-chat-btn{border-color:rgba(84,220,255,.3);background:linear-gradient(180deg,rgba(11,53,82,.98),rgba(8,35,58,.96));color:#ecfcff;box-shadow:0 16px 34px rgba(0,0,0,.28),0 0 0 1px rgba(84,220,255,.08),inset 0 1px 0 rgba(214,252,255,.1)}
+[data-theme="dark"] .new-chat-btn:hover,[data-theme="dark"] .new-chat-btn:focus-visible{background:linear-gradient(180deg,rgba(16,69,104,.98),rgba(10,43,72,.96));color:#f4feff;border-color:rgba(126,244,255,.48);box-shadow:0 18px 38px rgba(0,0,0,.3),0 0 0 1px rgba(126,244,255,.14),0 0 20px rgba(0,212,255,.14),inset 0 1px 0 rgba(230,253,255,.14);outline:none}
 .new-chat-edit-btn{position:absolute;right:12px;top:50%;transform:translateY(-50%) scale(.84);width:22px;height:22px;padding:0;border-radius:999px;border:1px solid rgba(var(--accent-rgb),.18);background:linear-gradient(180deg,rgba(255,255,255,.82),rgba(255,238,229,.92));color:var(--text-secondary);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 8px 18px rgba(var(--accent-rgb),.12),inset 0 1px 0 rgba(255,255,255,.82);opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease,color .18s ease,border-color .18s ease,background .18s ease,box-shadow .18s ease;z-index:1}
 .new-chat-btn-wrap:hover .new-chat-edit-btn,.new-chat-btn-wrap:focus-within .new-chat-edit-btn{opacity:1;pointer-events:auto;transform:translateY(-50%) scale(1)}
 .new-chat-edit-btn:hover,.new-chat-edit-btn:focus-visible{border-color:rgba(var(--accent-rgb),.4);background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(255,228,208,.98));color:var(--accent);box-shadow:0 12px 26px rgba(var(--accent-rgb),.18),inset 0 1px 0 rgba(255,255,255,.92);outline:none}
@@ -389,6 +389,10 @@ a{color:var(--accent);text-decoration:none}
 .energy-toggle.active .energy-toggle-switch{background:linear-gradient(180deg,var(--accent-hover),var(--accent));box-shadow:0 0 0 1px rgba(var(--accent-soft-rgb),.24),0 10px 24px rgba(var(--accent-rgb),.18)}
 .energy-toggle.active .energy-toggle-switch::after{left:21px}
 [data-theme="dark"] .energy-toggle-switch{background:rgba(214,229,255,.16);box-shadow:inset 0 0 0 1px rgba(214,229,255,.14)}
+[data-theme="dark"] .energy-toggle:hover{background:rgba(84,220,255,.08);color:#dffcff}
+[data-theme="dark"] .energy-toggle.active{color:#eafcff}
+[data-theme="dark"] .energy-toggle.active .energy-toggle-switch{background:linear-gradient(180deg,#56e7ff,#1699ff);box-shadow:0 0 0 1px rgba(122,241,255,.34),0 10px 24px rgba(0,212,255,.22),inset 0 1px 0 rgba(255,255,255,.18)}
+[data-theme="dark"] .energy-toggle.active .energy-toggle-switch::after{background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(222,247,255,.94));box-shadow:0 6px 18px rgba(5,18,32,.3),0 0 0 1px rgba(255,255,255,.22)}
 [data-energy-saver="on"] body::before,
 [data-energy-saver="on"] .main::after,
 [data-energy-saver="on"] .greeting::before,
@@ -3865,7 +3869,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
           <path class="report-line" d="M8.35 10.45l2.45-.85 1.95-2 2.95.95" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"/>
         </g>
       </svg>
-      <span class="logo"><span class="logo-lead">D</span><span class="logo-rest">eepRight</span></span>
+      <span class="logo">DeepRight</span>
       <span id="cliGetQueueStatus" class="cli-get-queue-status" data-tooltip="等待回传 0 / 正在执行 0 / 等待执行 0" aria-label="等待回传 0 / 正在执行 0 / 等待执行 0" aria-hidden="true">0/0/0</span>
       <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="展开菜单" aria-label="展开菜单">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
