@@ -96,8 +96,8 @@ public class ClientTokenNotifier implements TokenNotifier, TokenSource {
                 String agentId = FeatureUtils.buildAgentId(this.providerRequest.getMessage());
                 String function = this.tokenSource.source(this.providerRequest.getMessage());
                 String app = FeatureUtils.buildApp(this.providerRequest.getMessage());
-                String model = this.providerRequest.getModel();
                 Integer thinking = this.tokenData.getThinking();
+                String model = this.providerRequest.getModel();
                 Integer cache = this.tokenData.getCache();
                 Integer input = this.tokenData.getInput();
                 Integer total = this.tokenData.getTotal();
