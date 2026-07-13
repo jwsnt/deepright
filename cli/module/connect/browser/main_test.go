@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"runtimepaths"
 	"strings"
 	"testing"
 	"time"
@@ -262,7 +263,7 @@ func TestBrowserRuntimeRootUsesBundledRuntimePluginDir(t *testing.T) {
 
 	bundleRoot := filepath.Join(t.TempDir(), "DeepRight.app")
 	macOSDir := filepath.Join(bundleRoot, "Contents", "MacOS")
-	runtimeDir := filepath.Join(homeDir, "Library", "Application Support", "deepright", "config")
+	runtimeDir := filepath.Join(runtimepaths.MacAppRuntimeBaseDir(homeDir, runtimepaths.DeepRightMacBundleIdentifier, runtimepaths.DeepRightAppName), "config")
 	if err := os.MkdirAll(macOSDir, 0o755); err != nil {
 		t.Fatal(err)
 	}

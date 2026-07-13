@@ -22,6 +22,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"runtimepaths"
 	"strconv"
 	"strings"
 	"sync"
@@ -956,7 +957,7 @@ func cliGetRuntimeBaseDir() string {
 	if home == "" {
 		return ""
 	}
-	return filepath.Join(home, "Library", "Application Support", "deepright")
+	return runtimepaths.MacAppRuntimeBaseDir(home, runtimepaths.DeepRightMacBundleIdentifier, runtimepaths.DeepRightAppName)
 }
 
 func isRelativeToBase(path, base string) bool {

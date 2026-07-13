@@ -8,6 +8,7 @@ require (
 	github.com/glebarez/go-sqlite v1.21.2
 	github.com/panjf2000/ants/v2 v2.12.0
 	knowledge v0.0.0
+	runtimepaths v0.0.0
 )
 
 require (
@@ -30,5 +31,7 @@ replace agent-scanner => ../agent
 replace connect => ../connect
 
 replace knowledge => ../knowledge
+
+replace runtimepaths => ../runtimepaths
 
 replace skill-scanner => ../skills

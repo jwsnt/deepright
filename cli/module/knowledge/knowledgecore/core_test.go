@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtimepaths"
 	"testing"
 )
 
@@ -243,7 +244,7 @@ func TestDBPathUsesMacRuntimeDirectoryForCurrentWorkingDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DBPath(.) error = %v", err)
 	}
-	want := filepath.Join(home, "Library", "Application Support", defaultRuntimeAppName, defaultSQLiteFileName)
+	want := filepath.Join(runtimepaths.MacAppRuntimeBaseDir(home, defaultRuntimeBundleID, defaultRuntimeAppName), defaultSQLiteFileName)
 	if got != want {
 		t.Fatalf("DBPath(.) = %q, want %q", got, want)
 	}

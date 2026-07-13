@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtimepaths"
 	"strconv"
 	"strings"
 	"testing"
@@ -1357,7 +1358,7 @@ func TestBrowserCleanupStopUserDataRemovesManagedChromeDirsUnderAgentRoot(t *tes
 	homeDir := filepath.Join(root, "home")
 	t.Setenv("HOME", homeDir)
 	t.Setenv("USERPROFILE", homeDir)
-	runtimeDir := filepath.Join(homeDir, "Library", "Application Support", "deepright", "config")
+	runtimeDir := filepath.Join(runtimepaths.MacAppRuntimeBaseDir(homeDir, runtimepaths.DeepRightMacBundleIdentifier, runtimepaths.DeepRightAppName), "config")
 	if err := os.MkdirAll(runtimeDir, 0o755); err != nil {
 		t.Fatal(err)
 	}

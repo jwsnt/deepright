@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtimepaths"
 	"strings"
 	"sync"
 
@@ -18,6 +19,7 @@ const (
 	defaultKnowledgeDirName = "knowledge"
 	defaultSQLiteFileName   = "data"
 	defaultRuntimeAppName   = "deepright"
+	defaultRuntimeBundleID  = "cn.deepright.integration"
 )
 
 var (
@@ -79,7 +81,7 @@ func knowledgeMacRuntimeBaseDir() string {
 	if home == "" {
 		return ""
 	}
-	return filepath.Join(home, "Library", "Application Support", defaultRuntimeAppName)
+	return runtimepaths.MacAppRuntimeBaseDir(home, defaultRuntimeBundleID, defaultRuntimeAppName)
 }
 
 func shouldUseKnowledgeRuntimeBase(absAppDir string) bool {

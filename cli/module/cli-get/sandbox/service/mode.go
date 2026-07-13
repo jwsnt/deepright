@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtimepaths"
 	"strings"
 )
 
@@ -176,7 +177,7 @@ func sandboxAlwaysAllowedUserPaths() []string {
 	}
 
 	paths := []string{
-		filepath.Join(home, "Library", "Application Support", "deepright"),
+		runtimepaths.MacAppRuntimeBaseDir(home, runtimepaths.DeepRightMacBundleIdentifier, runtimepaths.DeepRightAppName),
 	}
 	if stateDir, err := sandboxStateDir(); err == nil {
 		paths = append(paths, stateDir)

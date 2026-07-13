@@ -39,9 +39,6 @@ func prepareIntegrationRuntimeBaseDir() (string, error) {
 	if err := os.MkdirAll(runtimeDir, 0o755); err != nil {
 		return "", fmt.Errorf("prepare runtime dir: %w", err)
 	}
-	if err := migrateLegacyIntegrationDB(runtimeDir); err != nil {
-		return "", fmt.Errorf("migrate runtime db: %w", err)
-	}
 	return runtimeDir, nil
 }
 

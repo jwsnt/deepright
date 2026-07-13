@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtimepaths"
 	"testing"
 )
 
@@ -14,7 +15,7 @@ func TestResolveIntegrationRuntimePathPrefersBundledConfigDirectory(t *testing.T
 
 	bundleRoot := filepath.Join(t.TempDir(), "DeepRight.app")
 	macOSDir := filepath.Join(bundleRoot, "Contents", "MacOS")
-	runtimeDir := filepath.Join(homeDir, "Library", "Application Support", "deepright", "config")
+	runtimeDir := filepath.Join(runtimepaths.MacAppRuntimeBaseDir(homeDir, runtimepaths.DeepRightMacBundleIdentifier, runtimepaths.DeepRightAppName), "config")
 	if err := os.MkdirAll(macOSDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +47,7 @@ func TestRuntimePathsUseBundledRuntimePluginDir(t *testing.T) {
 
 	bundleRoot := filepath.Join(t.TempDir(), "DeepRight.app")
 	macOSDir := filepath.Join(bundleRoot, "Contents", "MacOS")
-	runtimeDir := filepath.Join(homeDir, "Library", "Application Support", "deepright", "config")
+	runtimeDir := filepath.Join(runtimepaths.MacAppRuntimeBaseDir(homeDir, runtimepaths.DeepRightMacBundleIdentifier, runtimepaths.DeepRightAppName), "config")
 	selfPath := filepath.Join(t.TempDir(), "remote")
 	if err := os.MkdirAll(macOSDir, 0o755); err != nil {
 		t.Fatal(err)

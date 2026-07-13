@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtimepaths"
 	"strings"
 	"testing"
 	"time"
@@ -130,8 +131,11 @@ func TestRunCommandWithModeFilePickUsesSelectedDirectory(t *testing.T) {
 }
 
 func TestBuildSandboxProfileAllowsDeepRightRuntimePath(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
 	profile := buildSandboxProfile(SandboxModeFilePick, "/tmp/picked")
-	if !strings.Contains(profile, "/Library/Application Support/deepright") {
+	want := runtimepaths.MacAppRuntimeBaseDir(home, runtimepaths.DeepRightMacBundleIdentifier, runtimepaths.DeepRightAppName)
+	if !strings.Contains(profile, want) {
 		t.Fatalf("profile should allow deepright runtime path, got %q", profile)
 	}
 	if !strings.Contains(profile, "CLI_SANDBOX") {

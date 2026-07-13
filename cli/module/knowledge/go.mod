@@ -2,7 +2,10 @@ module knowledge
 
 go 1.22
 
-require github.com/glebarez/go-sqlite v1.21.2
+require (
+	github.com/glebarez/go-sqlite v1.21.2
+	runtimepaths v0.0.0
+)
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -15,3 +18,5 @@ require (
 	modernc.org/memory v1.5.0 // indirect
 	modernc.org/sqlite v1.23.1 // indirect
 )
+
+replace runtimepaths => ../runtimepaths

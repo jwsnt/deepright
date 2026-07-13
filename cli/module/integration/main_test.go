@@ -31,6 +31,7 @@ import (
 	"reflect"
 	"regexp"
 	"runtime"
+	"runtimepaths"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -70,6 +71,10 @@ func pluginParamFields(keys ...string) connectsvc.PluginParamFields {
 		fields = append(fields, connectsvc.PluginParamField{Key: key})
 	}
 	return fields
+}
+
+func integrationTestMacRuntimeBaseDir(home string) string {
+	return runtimepaths.MacAppRuntimeBaseDir(home, integrationBundleID, integrationRuntimeAppDir)
 }
 
 func copyTestDir(src, dst string) error {
@@ -4224,7 +4229,7 @@ func TestIntegrationBundleRuntimeBaseDirUsesFixedAppSupportDirectory(t *testing.
 	}
 
 	got := integrationBundleRuntimeBaseDir()
-	want := filepath.Join(home, "Library", "Application Support", integrationRuntimeAppDir)
+	want := integrationTestMacRuntimeBaseDir(home)
 	if got != want {
 		t.Fatalf("integrationBundleRuntimeBaseDir() = %q, want %q", got, want)
 	}
@@ -4316,7 +4321,7 @@ func TestPrepareIntegrationRuntimeLayoutUsesBundledPluginsDir(t *testing.T) {
 	}
 
 	homeDir := t.TempDir()
-	runtimeDir := filepath.Join(homeDir, "Library", "Application Support", integrationRuntimeAppDir)
+	runtimeDir := integrationTestMacRuntimeBaseDir(homeDir)
 
 	originalExecutable := integrationExecutableFn
 	originalHomeFn := integrationUserHomeFn
@@ -4461,47 +4466,9 @@ func TestResolveIntegrationDBPathUsesFixedBundledRuntimeDirectoryBeforeRuntimeCo
 	}
 
 	got := resolveIntegrationDBPath()
-	want := filepath.Join(home, "Library", "Application Support", integrationRuntimeAppDir, "data")
+	want := filepath.Join(integrationTestMacRuntimeBaseDir(home), "data")
 	if got != want {
 		t.Fatalf("resolveIntegrationDBPath() = %q, want %q", got, want)
-	}
-}
-
-func TestMigrateLegacyIntegrationDBCopiesExecutableDataToRuntimeDir(t *testing.T) {
-	runtimeDir := t.TempDir()
-	exeDir := t.TempDir()
-	t.Setenv("HOME", t.TempDir())
-	useIntegrationExecutableDir(t, exeDir)
-	t.Setenv(integrationRuntimeDirEnv, runtimeDir)
-
-	db, err := sql.Open("sqlite", filepath.Join(exeDir, "data"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := writeTokenStore(db, map[string]string{"deepright": "Bearer migrated-token"}); err != nil {
-		_ = db.Close()
-		t.Fatal(err)
-	}
-	if err := db.Close(); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := migrateLegacyIntegrationDB(runtimeDir); err != nil {
-		t.Fatalf("migrateLegacyIntegrationDB: %v", err)
-	}
-
-	runtimeDB, err := sql.Open("sqlite", filepath.Join(runtimeDir, "data"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer runtimeDB.Close()
-
-	var token string
-	if err := runtimeDB.QueryRow(`SELECT token FROM token_store WHERE model = ?`, "deepright").Scan(&token); err != nil {
-		t.Fatalf("query migrated token: %v", err)
-	}
-	if token != "Bearer migrated-token" {
-		t.Fatalf("token = %q, want Bearer migrated-token", token)
 	}
 }
 
@@ -5329,7 +5296,7 @@ func TestStartIntegrationProcessUsesAbsoluteRuntimePIDFileForBundledApp(t *testi
 
 	tempDir := t.TempDir()
 	homeDir := filepath.Join(tempDir, "home")
-	appSupportDir := filepath.Join(homeDir, "Library", "Application Support", integrationRuntimeAppDir)
+	appSupportDir := integrationTestMacRuntimeBaseDir(homeDir)
 	if err := os.MkdirAll(appSupportDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -6652,7 +6619,7 @@ func TestResolveServeAgentDirDefaultsAndCreatesDirectory(t *testing.T) {
 	}
 	want := filepath.Join(cwd, "agent")
 	if runtime.GOOS == "darwin" {
-		want = filepath.Join(tmp, "Library", "Application Support", "deepright", "agent")
+		want = filepath.Join(integrationTestMacRuntimeBaseDir(tmp), "agent")
 	}
 	if want, err = filepath.Abs(want); err != nil {
 		t.Fatalf("abs agent dir: %v", err)
@@ -6688,7 +6655,7 @@ func TestDefaultIntegrationStartupOptionsUsesMacAgentDir(t *testing.T) {
 	t.Setenv("AGENT_DIR", "")
 
 	defaults := defaultIntegrationStartupOptions()
-	want := filepath.Join(home, "Library", "Application Support", "deepright", "agent")
+	want := filepath.Join(integrationTestMacRuntimeBaseDir(home), "agent")
 	if defaults.Config.AgentDir != want {
 		t.Fatalf("defaults.Config.AgentDir = %q, want %q", defaults.Config.AgentDir, want)
 	}
@@ -7391,6 +7358,37 @@ func TestWSLDefaultRuntimePaths(t *testing.T) {
 	}
 	if info, err := os.Stat(wantKnowledgeDir); err != nil || !info.IsDir() {
 		t.Fatalf("knowledge dir not created: err=%v", err)
+	}
+}
+
+func TestPrepareIntegrationRuntimeBaseDirDoesNotMigrateLegacyRuntimeData(t *testing.T) {
+	runtimeDir := t.TempDir()
+	exeDir := t.TempDir()
+	useIntegrationExecutableDir(t, exeDir)
+	t.Setenv(integrationRuntimeDirEnv, runtimeDir)
+	oldRuntimeGOOS := integrationRuntimeGOOS
+	oldGetenv := integrationBrowserGetenvFn
+	defer func() {
+		integrationRuntimeGOOS = oldRuntimeGOOS
+		integrationBrowserGetenvFn = oldGetenv
+	}()
+	integrationRuntimeGOOS = "linux"
+	integrationBrowserGetenvFn = os.Getenv
+	t.Setenv("WSL_DISTRO_NAME", "")
+
+	if err := os.WriteFile(filepath.Join(exeDir, "data"), []byte("legacy-db"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := prepareIntegrationRuntimeBaseDir()
+	if err != nil {
+		t.Fatalf("prepareIntegrationRuntimeBaseDir: %v", err)
+	}
+	if got != runtimeDir {
+		t.Fatalf("runtimeDir = %q, want %q", got, runtimeDir)
+	}
+	if _, err := os.Stat(filepath.Join(runtimeDir, "data")); !os.IsNotExist(err) {
+		t.Fatalf("runtime data should not be migrated, stat err = %v", err)
 	}
 }
 
@@ -14583,7 +14581,7 @@ func TestExecuteTaskSkipsSandboxHelperForInternalRuntimePaths(t *testing.T) {
 		t.Fatalf("enable sandbox: %v", err)
 	}
 
-	runtimeRoot := filepath.Join(tmp, "Library", "Application Support", "deepright")
+	runtimeRoot := integrationTestMacRuntimeBaseDir(tmp)
 	targetFile := filepath.Join(runtimeRoot, "agent", "agent-a", "USER.md")
 	if err := os.MkdirAll(filepath.Dir(targetFile), 0o755); err != nil {
 		t.Fatalf("mkdir runtime dir: %v", err)
@@ -15340,7 +15338,7 @@ func TestIntegrationTokenCLIQueriesLatestConsumeRecords(t *testing.T) {
 	integrationUserHomeFn = func() (string, error) { return tmp, nil }
 	defer func() { integrationUserHomeFn = oldHomeFn }()
 
-	dbPath := filepath.Join(tmp, "Library", "Application Support", integrationRuntimeAppDir, "data")
+	dbPath := filepath.Join(integrationTestMacRuntimeBaseDir(tmp), "data")
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
 		t.Fatalf("mkdir runtime dir: %v", err)
 	}

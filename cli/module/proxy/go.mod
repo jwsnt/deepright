@@ -7,6 +7,7 @@ require (
 	connect v0.0.0
 	github.com/glebarez/go-sqlite v1.21.2
 	knowledge v0.0.0
+	runtimepaths v0.0.0
 	skill-scanner v0.0.0
 	static-server v0.0.0
 )
@@ -29,6 +30,8 @@ replace agent-scanner => ../agent
 replace connect => ../connect
 
 replace knowledge => ../knowledge
+
+replace runtimepaths => ../runtimepaths
 
 replace skill-scanner => ../skills
 

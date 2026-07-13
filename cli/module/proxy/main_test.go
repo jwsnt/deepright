@@ -29,6 +29,7 @@ import (
 	"reflect"
 	"regexp"
 	"runtime"
+	"runtimepaths"
 	"strconv"
 	"strings"
 	"sync"
@@ -69,6 +70,16 @@ func pluginParamFields(keys ...string) connectsvc.PluginParamFields {
 		fields = append(fields, connectsvc.PluginParamField{Key: key})
 	}
 	return fields
+}
+
+func proxyTestAppDir(t *testing.T, root string) string {
+	t.Helper()
+	if runtime.GOOS == "darwin" {
+		t.Setenv("HOME", root)
+		t.Setenv("USERPROFILE", root)
+		return runtimepaths.MacAppRuntimeBaseDir(root, runtimepaths.DeepRightMacBundleIdentifier, runtimepaths.DeepRightAppName)
+	}
+	return root
 }
 
 func findProxyAgentMetadataInList(t *testing.T, metadata map[string]interface{}, agentID string) map[string]interface{} {
@@ -201,9 +212,34 @@ func TestResolveDefaultAgentDirArgUsesMacAppSupportDirectory(t *testing.T) {
 	t.Setenv("AGENT_DIR", "")
 
 	got := resolveDefaultAgentDirArg()
-	want := filepath.Join(home, "Library", "Application Support", "deepright", "agent")
+	want := filepath.Join(runtimepaths.MacAppRuntimeBaseDir(home, runtimepaths.DeepRightMacBundleIdentifier, runtimepaths.DeepRightAppName), "agent")
 	if got != want {
 		t.Fatalf("resolveDefaultAgentDirArg() = %q, want %q", got, want)
+	}
+}
+
+func TestProxyAppDirUsesMacAppContainerByDefault(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("mac-specific default app dir")
+	}
+
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(t.TempDir()); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	got := proxyAppDir()
+	want := runtimepaths.MacAppRuntimeBaseDir(home, runtimepaths.DeepRightMacBundleIdentifier, runtimepaths.DeepRightAppName)
+	if got != want {
+		t.Fatalf("proxyAppDir() = %q, want %q", got, want)
 	}
 }
 
@@ -1412,7 +1448,8 @@ func TestProxyKnowledgeLastUpdateRemovedWithinInterval(t *testing.T) {
 	}
 
 	tmp := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(tmp, "knowledge"), 0o755); err != nil {
+	appDir := proxyTestAppDir(t, tmp)
+	if err := os.MkdirAll(filepath.Join(appDir, "knowledge"), 0o755); err != nil {
 		t.Fatalf("create knowledge dir: %v", err)
 	}
 	oldwd, err := os.Getwd()
@@ -1425,7 +1462,7 @@ func TestProxyKnowledgeLastUpdateRemovedWithinInterval(t *testing.T) {
 	defer os.Chdir(oldwd)
 
 	defer func() { _ = knowledgecore.CloseSharedDB() }()
-	db, err := knowledgecore.OpenSharedDB(tmp)
+	db, err := knowledgecore.OpenSharedDB(appDir)
 	if err != nil {
 		t.Fatalf("open knowledge db: %v", err)
 	}
@@ -1492,7 +1529,8 @@ func TestProxyKnowledgeLastUpdateRemovedWithinLockWindow(t *testing.T) {
 	}
 
 	tmp := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(tmp, "knowledge"), 0o755); err != nil {
+	appDir := proxyTestAppDir(t, tmp)
+	if err := os.MkdirAll(filepath.Join(appDir, "knowledge"), 0o755); err != nil {
 		t.Fatalf("create knowledge dir: %v", err)
 	}
 	oldwd, err := os.Getwd()
@@ -1505,7 +1543,7 @@ func TestProxyKnowledgeLastUpdateRemovedWithinLockWindow(t *testing.T) {
 	defer os.Chdir(oldwd)
 
 	defer func() { _ = knowledgecore.CloseSharedDB() }()
-	db, err := knowledgecore.OpenSharedDB(tmp)
+	db, err := knowledgecore.OpenSharedDB(appDir)
 	if err != nil {
 		t.Fatalf("open knowledge db: %v", err)
 	}
@@ -1584,7 +1622,8 @@ func TestProxyKnowledgeLastUpdateKeptWithinIntervalWhenKnowledgeCommitEnabled(t 
 	}
 
 	tmp := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(tmp, "knowledge"), 0o755); err != nil {
+	appDir := proxyTestAppDir(t, tmp)
+	if err := os.MkdirAll(filepath.Join(appDir, "knowledge"), 0o755); err != nil {
 		t.Fatalf("create knowledge dir: %v", err)
 	}
 	oldwd, err := os.Getwd()
@@ -1597,7 +1636,7 @@ func TestProxyKnowledgeLastUpdateKeptWithinIntervalWhenKnowledgeCommitEnabled(t 
 	defer os.Chdir(oldwd)
 
 	defer func() { _ = knowledgecore.CloseSharedDB() }()
-	db, err := knowledgecore.OpenSharedDB(tmp)
+	db, err := knowledgecore.OpenSharedDB(appDir)
 	if err != nil {
 		t.Fatalf("open knowledge db: %v", err)
 	}
@@ -1662,7 +1701,8 @@ func TestProxyKnowledgeLastUpdateKeptWithinLockWindowWhenKnowledgeCommitEnabled(
 	}
 
 	tmp := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(tmp, "knowledge"), 0o755); err != nil {
+	appDir := proxyTestAppDir(t, tmp)
+	if err := os.MkdirAll(filepath.Join(appDir, "knowledge"), 0o755); err != nil {
 		t.Fatalf("create knowledge dir: %v", err)
 	}
 	oldwd, err := os.Getwd()
@@ -1675,7 +1715,7 @@ func TestProxyKnowledgeLastUpdateKeptWithinLockWindowWhenKnowledgeCommitEnabled(
 	defer os.Chdir(oldwd)
 
 	defer func() { _ = knowledgecore.CloseSharedDB() }()
-	db, err := knowledgecore.OpenSharedDB(tmp)
+	db, err := knowledgecore.OpenSharedDB(appDir)
 	if err != nil {
 		t.Fatalf("open knowledge db: %v", err)
 	}
@@ -1747,7 +1787,8 @@ func TestProxyKnowledgeLastUpdateKeptAndLockUpdatedWhenExpired(t *testing.T) {
 	}
 
 	tmp := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(tmp, "knowledge"), 0o755); err != nil {
+	appDir := proxyTestAppDir(t, tmp)
+	if err := os.MkdirAll(filepath.Join(appDir, "knowledge"), 0o755); err != nil {
 		t.Fatalf("create knowledge dir: %v", err)
 	}
 	oldwd, err := os.Getwd()
@@ -1760,7 +1801,7 @@ func TestProxyKnowledgeLastUpdateKeptAndLockUpdatedWhenExpired(t *testing.T) {
 	defer os.Chdir(oldwd)
 
 	defer func() { _ = knowledgecore.CloseSharedDB() }()
-	db, err := knowledgecore.OpenSharedDB(tmp)
+	db, err := knowledgecore.OpenSharedDB(appDir)
 	if err != nil {
 		t.Fatalf("open knowledge db: %v", err)
 	}
@@ -1845,7 +1886,8 @@ func TestProxyKnowledgeManualUpdatesKnowledgeTimestampsAfterSSEDone(t *testing.T
 	}
 
 	tmp := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(tmp, "knowledge"), 0o755); err != nil {
+	appDir := proxyTestAppDir(t, tmp)
+	if err := os.MkdirAll(filepath.Join(appDir, "knowledge"), 0o755); err != nil {
 		t.Fatalf("create knowledge dir: %v", err)
 	}
 	oldwd, err := os.Getwd()

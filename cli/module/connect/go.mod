@@ -10,6 +10,7 @@ require (
 	github.com/larksuite/oapi-sdk-go/v3 v3.5.3
 	github.com/playwright-community/playwright-go v0.5700.1
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d
+	runtimepaths v0.0.0
 	github.com/zalando/go-keyring v0.2.6
 	golang.org/x/crypto v0.24.0
 	golang.org/x/text v0.16.0
@@ -32,3 +33,5 @@ require (
 	modernc.org/memory v1.5.0 // indirect
 	modernc.org/sqlite v1.23.1 // indirect
 )
+
+replace runtimepaths => ../runtimepaths

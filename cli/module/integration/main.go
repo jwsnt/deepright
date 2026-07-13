@@ -54,6 +54,7 @@ import (
 	integrationnotification "integration/notification"
 	"integration/runtimehost"
 	integrationstandalone "integration/standalone"
+	"runtimepaths"
 	"skill-scanner/skillscore"
 	"static-server/server"
 )
@@ -832,6 +833,7 @@ const (
 	integrationPluginDirEnv  = "DEEPRIGHT_PLUGIN_DIR"
 	integrationRuntimeDirEnv = "DEEPRIGHT_INTEGRATION_RUNTIME_DIR"
 	integrationRuntimeAppDir = "deepright"
+	integrationBundleID      = "cn.deepright.integration"
 )
 
 var integrationUserHomeFn = os.UserHomeDir
@@ -848,7 +850,7 @@ func integrationManagedRuntimeBaseDir() string {
 		if err != nil || strings.TrimSpace(home) == "" {
 			return ""
 		}
-		return filepath.Join(home, "Library", "Application Support", integrationRuntimeAppDir)
+		return runtimepaths.MacAppRuntimeBaseDir(home, integrationBundleID, integrationRuntimeAppDir)
 	case "linux":
 		if !integrationBrowserIsWSL() {
 			return ""
@@ -1310,7 +1312,7 @@ func integrationKnowledgeDirForAgent(agentDir, agentID string) (string, error) {
 
 func integrationKnowledgeLastUpdate(appDir string) int64 {
 	db, err := knowledgecore.OpenExistingDB(appDir)
-	if err != nil {
+	if err != nil || db == nil {
 		return 0
 	}
 	defer db.Close()
@@ -1733,9 +1735,6 @@ func integrationDefaultAgentDir() string {
 	if runtimeBase := strings.TrimSpace(integrationManagedRuntimeBaseDir()); runtimeBase != "" {
 		return filepath.Join(runtimeBase, "agent")
 	}
-	if info, err := os.Stat("agent"); err == nil && info.IsDir() {
-		return "agent"
-	}
 	return "agent"
 }
 
@@ -1856,160 +1855,6 @@ func copyReleaseAssetWithPermissions(srcPath, dstPath string, mode os.FileMode) 
 			}
 		}
 		return err
-	}
-	return nil
-}
-
-func migrateLegacyIntegrationDB(runtimeDir string) error {
-	runtimeDir = strings.TrimSpace(runtimeDir)
-	if runtimeDir == "" {
-		return nil
-	}
-
-	targetDB := filepath.Join(runtimeDir, "data")
-	hasData, err := integrationDBHasUserData(targetDB)
-	if err == nil && hasData {
-		return nil
-	}
-
-	sourceDB := ""
-	var sourceMod time.Time
-	for _, candidate := range integrationLegacyDBCandidates(targetDB) {
-		if samePath(candidate, targetDB) {
-			continue
-		}
-		hasCandidateData, candidateErr := integrationDBHasUserData(candidate)
-		if candidateErr != nil || !hasCandidateData {
-			continue
-		}
-		info, statErr := os.Stat(candidate)
-		if statErr != nil {
-			continue
-		}
-		if sourceDB == "" || info.ModTime().After(sourceMod) {
-			sourceDB = candidate
-			sourceMod = info.ModTime()
-		}
-	}
-	if sourceDB == "" {
-		return nil
-	}
-	return copyIntegrationDBFiles(sourceDB, targetDB)
-}
-
-func integrationLegacyDBCandidates(targetDB string) []string {
-	seen := map[string]struct{}{}
-	out := make([]string, 0, 3)
-	add := func(path string) {
-		path = strings.TrimSpace(path)
-		if path == "" {
-			return
-		}
-		clean := filepath.Clean(path)
-		if samePath(clean, targetDB) {
-			return
-		}
-		if _, ok := seen[clean]; ok {
-			return
-		}
-		seen[clean] = struct{}{}
-		out = append(out, clean)
-	}
-
-	if home, err := os.UserHomeDir(); err == nil && strings.TrimSpace(home) != "" {
-		add(filepath.Join(home, "Library", "Application Support", "integration", "data"))
-	}
-	if exeDir := integrationExecutableDir(); exeDir != "" {
-		add(filepath.Join(exeDir, "data"))
-	}
-	return out
-}
-
-func integrationDBHasUserData(path string) (bool, error) {
-	path = strings.TrimSpace(path)
-	if path == "" {
-		return false, nil
-	}
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, err
-	}
-
-	db, err := sql.Open("sqlite", path)
-	if err != nil {
-		return false, err
-	}
-	defer db.Close()
-
-	tables := []string{
-		"token_store",
-		"connect_meta",
-		"task_meta",
-		"connect_request",
-		"connect_response",
-		"chat_log",
-		"agent_message_log",
-		"cmd_log",
-	}
-	for _, table := range tables {
-		exists, existsErr := sqliteTableExists(db, table)
-		if existsErr != nil {
-			return false, existsErr
-		}
-		if !exists {
-			continue
-		}
-		var count int
-		if err := db.QueryRow(`SELECT COUNT(*) FROM ` + table).Scan(&count); err != nil {
-			return false, err
-		}
-		if count > 0 {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-func sqliteTableExists(db *sql.DB, table string) (bool, error) {
-	table = strings.TrimSpace(table)
-	if db == nil || table == "" {
-		return false, nil
-	}
-	var count int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?`, table).Scan(&count); err != nil {
-		return false, err
-	}
-	return count > 0, nil
-}
-
-func copyIntegrationDBFiles(srcDB, dstDB string) error {
-	if samePath(srcDB, dstDB) {
-		return nil
-	}
-	if err := ensureParentDir(dstDB); err != nil {
-		return err
-	}
-	for _, suffix := range []string{"", "-shm", "-wal"} {
-		_ = os.Remove(dstDB + suffix)
-	}
-	for _, suffix := range []string{"", "-shm", "-wal"} {
-		srcPath := srcDB + suffix
-		info, err := os.Stat(srcPath)
-		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return err
-		}
-		data, err := os.ReadFile(srcPath)
-		if err != nil {
-			return err
-		}
-		if err := os.WriteFile(dstDB+suffix, data, info.Mode().Perm()); err != nil {
-			return err
-		}
 	}
 	return nil
 }
@@ -13391,7 +13236,7 @@ func printCLIHelp() {
 	fmt.Println("  integration backup-clean --agent-dir ./agent")
 	fmt.Println("")
 	fmt.Println("Serve options:")
-	fmt.Println("  --agent-dir=DIR    Agent 根目录；macOS 默认 ~/Library/Application Support/deepright/agent，WSL 默认 ~/deepright/agent，不存在时自动创建")
+	fmt.Println("  --agent-dir=DIR    Agent 根目录；macOS 默认 app container 下的 deepright/agent，WSL 默认 ~/deepright/agent，不存在时自动创建")
 	fmt.Println("  --default-dir=DIR  新建 Agent 默认模板目录，默认当前目录下的 ./config")
 	fmt.Println("  --port=INT         HTTP 服务端口，固定 8080")
 	fmt.Println("  --host=URL         上游服务地址，默认 " + defaultUpstreamHost)
@@ -16968,8 +16813,8 @@ func startIntegrationLogRetentionCleanup(ctx context.Context) {
 		if err != nil {
 			return nil, err
 		}
-		db.SetMaxOpenConns(10)
-		db.SetMaxIdleConns(10)
+		db.SetMaxOpenConns(1)
+		db.SetMaxIdleConns(1)
 		db.SetConnMaxLifetime(0)
 		if _, err := db.Exec(`PRAGMA journal_mode=WAL`); err != nil {
 			_ = db.Close()

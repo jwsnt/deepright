@@ -26,6 +26,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"runtimepaths"
 	"sort"
 	"strconv"
 	"strings"
@@ -603,8 +604,8 @@ func startProxyLogRetentionCleanup(ctx context.Context) {
 		if err != nil {
 			return nil, err
 		}
-		db.SetMaxOpenConns(10)
-		db.SetMaxIdleConns(10)
+		db.SetMaxOpenConns(1)
+		db.SetMaxIdleConns(1)
 		db.SetConnMaxLifetime(0)
 		initChatTable(db)
 		return db, nil
@@ -927,7 +928,7 @@ func proxyKnowledgeDirForAgent(agentDir, agentID string) (string, error) {
 
 func proxyKnowledgeLastUpdate(appDir string) int64 {
 	db, err := knowledgecore.OpenExistingDB(appDir)
-	if err != nil {
+	if err != nil || db == nil {
 		return 0
 	}
 	defer db.Close()
@@ -9980,6 +9981,11 @@ func proxyAppDir() string {
 		}
 		return filepath.Clean(dir)
 	}
+	if runtime.GOOS == "darwin" {
+		if home, err := os.UserHomeDir(); err == nil && strings.TrimSpace(home) != "" {
+			return runtimepaths.MacAppRuntimeBaseDir(home, runtimepaths.DeepRightMacBundleIdentifier, runtimepaths.DeepRightAppName)
+		}
+	}
 	if cwd, err := os.Getwd(); err == nil {
 		if abs, err := filepath.Abs(cwd); err == nil {
 			return abs
@@ -11424,14 +11430,8 @@ func resolveDefaultAgentDirArg() string {
 	}
 	if runtime.GOOS == "darwin" {
 		if home, err := os.UserHomeDir(); err == nil && strings.TrimSpace(home) != "" {
-			return filepath.Join(home, "Library", "Application Support", "deepright", "agent")
+			return filepath.Join(runtimepaths.MacAppRuntimeBaseDir(home, runtimepaths.DeepRightMacBundleIdentifier, runtimepaths.DeepRightAppName), "agent")
 		}
-	}
-	if info, err := os.Stat("agent"); err == nil && info.IsDir() {
-		return "agent"
-	}
-	if info, err := os.Stat("../agent"); err == nil && info.IsDir() {
-		return "../agent"
 	}
 	return "agent"
 }

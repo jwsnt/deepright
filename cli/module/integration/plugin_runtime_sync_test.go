@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtimepaths"
 	"strings"
 	"testing"
 )
@@ -27,7 +28,7 @@ func TestPrepareIntegrationRuntimeLayoutForBundleLaunchBlocksPendingUpdatesWhenP
 	runtimeRoot := t.TempDir()
 	pluginDir := filepath.Join(runtimeRoot, "plugins")
 	if runtime.GOOS == "darwin" {
-		pluginDir = filepath.Join(runtimeRoot, "Library", "Application Support", integrationRuntimeAppDir, "plugins")
+		pluginDir = filepath.Join(runtimepaths.MacAppRuntimeBaseDir(runtimeRoot, integrationBundleID, integrationRuntimeAppDir), "plugins")
 	}
 	if err := os.MkdirAll(pluginDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -120,7 +121,7 @@ func TestPrepareIntegrationRuntimeLayoutForBundleLaunchSyncsPendingUpdatesWhenPo
 	runtimeRoot := t.TempDir()
 	pluginDir := filepath.Join(runtimeRoot, "plugins")
 	if runtime.GOOS == "darwin" {
-		pluginDir = filepath.Join(runtimeRoot, "Library", "Application Support", integrationRuntimeAppDir, "plugins")
+		pluginDir = filepath.Join(runtimepaths.MacAppRuntimeBaseDir(runtimeRoot, integrationBundleID, integrationRuntimeAppDir), "plugins")
 	}
 	if err := os.MkdirAll(pluginDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -199,7 +200,7 @@ func TestRunIntegrationPluginSyncBundledCLICheckOnly(t *testing.T) {
 	runtimeRoot := t.TempDir()
 	pluginDir := filepath.Join(runtimeRoot, "plugins")
 	if runtime.GOOS == "darwin" {
-		pluginDir = filepath.Join(runtimeRoot, "Library", "Application Support", integrationRuntimeAppDir, "plugins")
+		pluginDir = filepath.Join(runtimepaths.MacAppRuntimeBaseDir(runtimeRoot, integrationBundleID, integrationRuntimeAppDir), "plugins")
 	}
 	if err := os.MkdirAll(pluginDir, 0o755); err != nil {
 		t.Fatal(err)

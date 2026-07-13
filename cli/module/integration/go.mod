@@ -10,6 +10,7 @@ require (
 	github.com/panjf2000/ants/v2 v2.12.0
 	github.com/robfig/cron/v3 v3.0.1
 	knowledge v0.0.0
+	runtimepaths v0.0.0
 	skill-scanner v0.0.0
 	static-server v0.0.0
 )
@@ -35,6 +36,8 @@ replace cli-get => ../cli-get
 replace connect => ../connect
 
 replace knowledge => ../knowledge
+
+replace runtimepaths => ../runtimepaths
 
 replace skill-scanner => ../skills
 
