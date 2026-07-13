@@ -10,8 +10,9 @@ public class Knowledge {
 
     protected Long lastUpdate;
 
+    // 默认关闭，需要客户端显式打开
     @JsonProperty("knowledge_disable")
-    protected Boolean disable = false;
+    protected Boolean disable = true;
 
     protected String agentId;
 

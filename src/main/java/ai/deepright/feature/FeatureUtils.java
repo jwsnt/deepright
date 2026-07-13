@@ -137,6 +137,14 @@ public class FeatureUtils {
         return FeatureUtils.buildApp(workTask.getMetadata());
     }
 
+    public static String buildGit(Map<String, Object> metadata) throws Exception {
+        return MapUtils.getString(metadata, FeatureField.KEY_GIT);
+    }
+
+    public static String buildGit(WorkflowTask workTask) throws Exception {
+        return FeatureUtils.buildGit(workTask.getMetadata());
+    }
+
     public static String buildSys(WorkflowTask workTask) throws Exception {
         return StringUtils.defaultIfEmpty(MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_SYS), "darwin");
     }

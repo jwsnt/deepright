@@ -4,6 +4,8 @@ public interface FeatureField {
 
     public static final String KEY_KNOWLEDGE_CONTENT = "knowledge_content";
 
+    public static final String KEY_KNOWLEDGE_COMMIT = "knowledge_commit";
+
     // 自定义Response Schema
     public static final String KEY_RESPONSE_SCHEMA = "response_schema";
 
@@ -24,6 +26,8 @@ public interface FeatureField {
     public static final String KEY_FILE_SYSTEM = "file_system";
 
     public static final String KEY_CRON_TYPE = "cron_type";
+
+    public static final String KEY_KNOWLEDGE = "knowledge";
 
     public static final String KEY_WORKSPACE = "workspace";
 
@@ -67,4 +71,6 @@ public interface FeatureField {
     public static final String KEY_DIR = "dir";
 
     public static final String KEY_APP = "app";
+
+    public static final String KEY_GIT = "git";
 }

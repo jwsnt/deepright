@@ -127,20 +127,23 @@ public class DefMemoryService extends BaseFunction implements MemoryService {
 
     @Override
     public void commit(WorkflowTask workTask) throws Exception {
-        if (this.allowedUpdate(workTask)) {
+        // 不为定时任务，不为Task，不为后台任务、不为归纳Skills、不为Profile整理
+        if (this.allowedUpdateCharacter(workTask)) {
             this.updateCharacter(workTask, this.buildRefreshSession(workTask));
+        }
+        if (this.allowedUpdateMemory(workTask)) {
+            // 不为非定时任务或Task的后台任务、不为归纳Skills、不为Profile整理
+            // 具体是否执行，每个MemoryService再判断
             MemoryService memoryService = this.fetchMemoryService(workTask);
             if (memoryService != null) {
                 memoryService.commit(workTask);
             }
-        } else if (log.isDebugEnabled()) {
-            log.debug("The memory commit will be ignored for entropy");
         }
     }
 
     @Override
     public void refresh(WorkflowTask workTask, List<History> histories) throws Exception {
-        if (this.allowedUpdate(workTask)) {
+        if (this.allowedUpdateRefresh(workTask)) {
             String memory = History.buildMarkdown(histories, MemoryTruncate.builder()
                     .truncate(this.truncate)
                     .workTask(workTask)
@@ -158,11 +161,24 @@ public class DefMemoryService extends BaseFunction implements MemoryService {
         }
     }
 
-    protected Boolean allowedUpdate(WorkflowTask workTask) throws Exception {
-        // 不为后台任务（但Task除外）、不为归纳Skills、不为Profile整理
+    protected Boolean allowedUpdateCharacter(WorkflowTask workTask) throws Exception {
+        // 暂同allowedUpdateRefresh，子类Override
+        return this.allowedUpdateRefresh(workTask);
+    }
+
+    protected Boolean allowedUpdateRefresh(WorkflowTask workTask) throws Exception {
+        // 不为定时任务，不为Task，不为后台任务、不为归纳Skills、不为Profile整理
+        // Task禁止更新，外部不受控Query会干扰长期记忆
         // 知识库整理部分由KnowledgeService决策
         // Original为原始请求，Query为改写请求（等同Answer），不保存无价值记忆
-        return (!FeatureFlag.isDaemon(workTask) || FeatureFlag.isTask(workTask)) && !FeatureFlag.isProfileCommit(workTask) && !FeatureFlag.isKnowledgeCommit(workTask) && !FeatureFlag.isSkillExtract(workTask) && ((!ComplexityUtils.score(workTask.getOriginal() + System.lineSeparator() + workTask.getQuery()).is(ComplexityMode.FAST_REPLY)));
+        return !FeatureFlag.isProfileCommit(workTask) && !FeatureFlag.isCron(workTask) && !FeatureFlag.isTask(workTask) && !FeatureFlag.isDaemon(workTask) && !FeatureFlag.isKnowledgeCommit(workTask) && !FeatureFlag.isSkillExtract(workTask) && ((!ComplexityUtils.score(workTask.getOriginal() + System.lineSeparator() + workTask.getQuery()).is(ComplexityMode.FAST_REPLY)));
+    }
+
+    protected Boolean allowedUpdateMemory(WorkflowTask workTask) throws Exception {
+        // 不为非定时任务或Task的后台任务、不为归纳Skills、不为Profile整理
+        // 知识库整理部分由KnowledgeService决策
+        // Original为原始请求，Query为改写请求（等同Answer），不保存无价值记忆
+        return (!FeatureFlag.isDaemon(workTask) || FeatureFlag.isCron(workTask) || FeatureFlag.isTask(workTask)) && !FeatureFlag.isProfileCommit(workTask) && !FeatureFlag.isKnowledgeCommit(workTask) && !FeatureFlag.isSkillExtract(workTask)  && ((!ComplexityUtils.score(workTask.getOriginal() + System.lineSeparator() + workTask.getQuery()).is(ComplexityMode.FAST_REPLY)));
     }
 
     protected Boolean allowedRead(WorkflowTask workTask) throws Exception {

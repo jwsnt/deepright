@@ -59,8 +59,6 @@ import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import static org.springframework.util.StringUtils.hasText;
-
 @Slf4j
 @Getter
 @Setter
@@ -337,8 +335,11 @@ public class TaskFunction extends BaseFunction implements TaskResult {
     protected Map<String, Object> buildMetadata(WorkflowTask workTask, RouterDevice routerDevice) throws Exception {
         Map<String, Object> metadata = this.buildModelAndToken(workTask, routerDevice, new HashMap<String, Object>(routerDevice.getMetadata()));
         // @See CliRag
+        metadata.put(FeatureField.KEY_KNOWLEDGE_COMMIT, MapUtils.getObject(workTask.getMetadata(), FeatureField.KEY_KNOWLEDGE_COMMIT));
+        metadata.put(FeatureField.KEY_KNOWLEDGE, MapUtils.getObject(workTask.getMetadata(), FeatureField.KEY_KNOWLEDGE));
         metadata.put(FeatureField.KEY_MEDIA, MapUtils.getMap(routerDevice.getMetadata(), FeatureField.KEY_MEDIA));
-        metadata.put(FeatureField.KEY_USER, MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_USER));
+        metadata.put(FeatureField.KEY_GIT, FeatureUtils.buildGit(workTask.getMetadata()));
+        metadata.put(FeatureField.KEY_USER, FeatureUtils.buildUser(workTask));
         metadata.put(FeatureField.KEY_WORKSPACE, routerDevice.getWorkspace());
         metadata.put(FeatureField.KEY_SILENT, FeatureFlag.isSilent(workTask));
         metadata.put(FeatureField.KEY_TERMINAL, routerDevice.getTerminal());

@@ -77,8 +77,6 @@ public class GitMemoryService extends BaseFunction implements GitPath, MemorySer
 
     public static final String NAME = "memory.git";
 
-    public static final String KEY_GIT = "git";
-
     protected NotifierService notifierService;
 
     protected ResourceService resourceService;
@@ -206,6 +204,9 @@ public class GitMemoryService extends BaseFunction implements GitPath, MemorySer
                 .timeout(this.timeout)
                 .workTask(copyTask)
                 .build();
+        if (log.isInfoEnabled()) {
+            log.info("The long memory will be updated soon");
+        }
         SyncWorkflowTask.exeWorkflow(this.notifierService, syncConfig);
     }
 
@@ -215,13 +216,14 @@ public class GitMemoryService extends BaseFunction implements GitPath, MemorySer
 
     @Override
     public Boolean support(WorkflowTask workTask) throws Exception {
+        // 必须安装Git
         return !StringUtils.isEmpty(this.buildGitApp(workTask));
     }
 
 
     @Override
     public String buildGitApp(WorkflowTask workTask) throws Exception {
-        return MapUtils.getString(workTask.getMetadata(), GitMemoryService.KEY_GIT);
+        return FeatureUtils.buildGit(workTask.getMetadata());
     }
 
     @Override
@@ -354,7 +356,6 @@ public class GitMemoryService extends BaseFunction implements GitPath, MemorySer
         return CollectionUtils.isEmpty(History.getReferenceHistory(workTask.getHistories(), History.REFERENCE_SERVER)) && (FeatureUtils.buildLastResponse(workTask) != null || !ComplexityMode.FAST_REPLY.equals(ComplexityUtils.result(workTask)));
     }
 
-
     @Builder
     public static class MemoryCommitCallable extends BaseCallable {
 
@@ -393,6 +394,9 @@ public class GitMemoryService extends BaseFunction implements GitPath, MemorySer
                 }
                 // 使用>覆盖，只保留Git
                 String gitData = this.gitPath.buildGitData(this.workTask);
+                if (log.isInfoEnabled()) {
+                    log.info("The git path={}, file={}", this.path, gitData);
+                }
                 StringBuffer buffer = new StringBuffer().append("cd ").append(this.path).append(" && ");
                 buffer.append("echo ").append(FeatureUtils.escapeShell(this.workTask, this.buildContent(why))).append(" > ").append(gitData).append(" && ");
                 buffer.append(this.app).append(" add ").append(gitData).append(" && ").append(this.app).append(" commit -m ").append(FeatureUtils.escapeShell(this.workTask, digest));

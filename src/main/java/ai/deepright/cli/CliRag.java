@@ -93,6 +93,8 @@ public class CliRag extends RagCondition implements RagService {
         // 获取当前Agent信息
         RouterAgent agent = this.buildAgent(ragData.getQuery());
         if (agent != null) {
+            // 未传agentId（如Task任务或后台任务）则跳过
+            // 对齐 FeatureFlag和FeatureUtils
             ragData.getQuery().putMetadata(FeatureField.KEY_KNOWLEDGE_CONTENT, agent.getKnowledge());
             ragData.getQuery().putMetadata(FeatureField.KEY_WORKSPACE, agent.getWorkspace());
             ragData.getQuery().putMetadata(FeatureField.KEY_SKILLS, agent.getSkills());
@@ -229,11 +231,12 @@ public class CliRag extends RagCondition implements RagService {
 
     public RouterAgent buildAgent(WorkflowTask workTask) throws Exception {
         RouterAgent[] agents = FeatureUtils.buildRouterAgents(workTask);
-        String agent = FeatureUtils.buildAgentId(workTask);
-        if (!ArrayUtils.isEmpty(agents)) {
+        String agentId = FeatureUtils.buildAgentId(workTask);
+        // 未传agentId（如Task任务或后台任务）则跳过
+        if (!StringUtils.isEmpty(agentId) && !ArrayUtils.isEmpty(agents)) {
             for (RouterAgent each : agents) {
                 // 对比ID
-                if (StringUtils.equalsIgnoreCase(agent, each.getAgent())) {
+                if (StringUtils.equalsIgnoreCase(agentId, each.getAgent())) {
                     return each;
                 }
             }

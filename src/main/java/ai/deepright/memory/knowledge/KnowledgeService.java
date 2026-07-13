@@ -33,7 +33,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections.MapUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
@@ -61,10 +60,6 @@ public class KnowledgeService implements MemoryService {
     public static final String LANG_KEY_RECALL_MESSAGE = "knowledge.recall.message";
 
     public static final String LANG_KEY_INIT_MESSAGE = "knowledge.init.message";
-
-    public static final String KEY_KNOWLEDGE_COMMIT = "knowledge_commit";
-
-    public static final String KEY_KNOWLEDGE = "knowledge";
 
     public static final String DATE_FORMAT = "yyyy-MM-dd HH:mm:ss";
 
@@ -116,6 +111,8 @@ public class KnowledgeService implements MemoryService {
     @Override
     public String init(WorkflowTask workTask) throws Exception {
         if (FeatureFlag.isKnowledgeCommit(workTask)) {
+            // 更新客户端最后知识库时间（客户端在SSE响应结束时也会更新，双保险）
+            this.updateTime(workTask);
             return this.buildQuery(workTask);
         } else {
             return this.template4init.replace("#knowledge", this.buildPath(workTask));
@@ -152,12 +149,8 @@ public class KnowledgeService implements MemoryService {
 
     @Override
     public void commit(WorkflowTask workTask) throws Exception {
-        if (this.isCommit(workTask) && this.updateTime(workTask) && log.isInfoEnabled()) {
-            log.info("The knowledge positive commit has been success, device={}, agent={}", workTask.getDevice(), FeatureUtils.buildAgentId(workTask));
-            return;
-        }
-        if (this.allowedUpdate(workTask) && this.updateTime(workTask)) {
-            // 客户端时间间隔
+        // 不为手动更新，且同步客户端最后时间成功
+        if (this.allowUpdate(workTask) && this.updateTime(workTask)) {
             // Closeable=false, 只依赖CLI
             WorkflowTask copyTask = new HeartbeatWorkTask(this.routerService, workTask, false);
             // 继承Metadata
@@ -173,6 +166,9 @@ public class KnowledgeService implements MemoryService {
                     .timeout(this.timeout)
                     .workTask(copyTask)
                     .build();
+            if (log.isInfoEnabled()) {
+                log.info("The knowledge will be updated soon");
+            }
             SyncWorkflowTask.exeWorkflow(this.notifierService, syncConfig);
         }
     }
@@ -190,7 +186,7 @@ public class KnowledgeService implements MemoryService {
     protected Map<String, Object> buildMetadata(WorkflowTask workTask) throws Exception {
         Map<String, Object> metadata = new HashMap<String, Object>(workTask.getMetadata());
         // 标记知识库清洗
-        metadata.put(KnowledgeService.KEY_KNOWLEDGE_COMMIT, true);
+        metadata.put(FeatureField.KEY_KNOWLEDGE_COMMIT, true);
         // 关闭持久化上下文、关闭团队
         metadata.put(FeatureField.KEY_ROUTER_DISABLE, true);
         metadata.put(FeatureField.KEY_DAEMON, true);
@@ -200,7 +196,7 @@ public class KnowledgeService implements MemoryService {
     }
 
     protected Knowledge buildKnowledge(WorkflowTask workTask) throws Exception {
-        return workTask.getMetadata(KnowledgeService.KEY_KNOWLEDGE, Knowledge.class);
+        return workTask.getMetadata(FeatureField.KEY_KNOWLEDGE, Knowledge.class);
     }
 
     // Knowledge Path / Agent
@@ -240,20 +236,6 @@ public class KnowledgeService implements MemoryService {
         }
     }
 
-    protected Boolean allowedUpdate(WorkflowTask workTask, Knowledge knowledge) throws Exception {
-        // 如果是主动更新，则关闭以免二次更新
-        if (this.isCommit(workTask)) {
-            return false;
-        }
-        // 不传knowledge不更新，knowledge存在时仅在未显式关闭且达到更新时间间隔后允许更新
-        return !knowledge.getDisable() && knowledge.shouldUpdate(this.interval);
-    }
-
-    protected Boolean allowedUpdate(WorkflowTask workTask) throws Exception {
-        Knowledge knowledge = this.buildKnowledge(workTask);
-        return knowledge != null && this.allowedUpdate(workTask, knowledge);
-    }
-
     protected Boolean updateTime(WorkflowTask workTask) throws Exception {
         String path = FeatureUtils.buildApp(workTask);
         CliPubData pubData = this.cliSubFetcher.command(workTask, CliSubOps.builder()
@@ -267,14 +249,20 @@ public class KnowledgeService implements MemoryService {
         return pubData.isOk();
     }
 
+
     protected ZoneId buildZoneId(WorkflowTask workTask) throws Exception {
         String timezone = FeatureUtils.buildTimezone(workTask);
         return StringUtils.isBlank(timezone) ? ZoneId.systemDefault() : ZoneId.of(timezone);
     }
 
-    // 是否为主动更新
-    protected Boolean isCommit(WorkflowTask workTask) throws Exception {
-        return MapUtils.getBoolean(workTask.getMetadata(), KnowledgeService.KEY_KNOWLEDGE_COMMIT, false);
+    public Boolean allowUpdate(WorkflowTask workTask) throws Exception {
+        // 知识库更新是重型操作，必须为用户在客户端的有感操作（主动更新）或授权操作（开启自动更新）
+        // Task Cron不更新 且 允许更新（客户端时间间隔）
+        if (FeatureFlag.isKnowledgeCommit(workTask) || FeatureFlag.isTask(workTask) || FeatureFlag.isCron(workTask)) {
+            return false;
+        }
+        Knowledge knowledge = this.buildKnowledge(workTask);
+        return !knowledge.getDisable() && knowledge.shouldUpdate(this.interval);
     }
 
     @Builder
