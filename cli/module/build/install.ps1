@@ -32,10 +32,26 @@ function Test-WslInstalled {
 }
 
 function Test-DistroExists([string]$N) {
+    try {
+        $out = & wsl.exe --list --quiet 2>&1 | Out-String
+    } catch {
+        return $false
+    }
+
+    $targets = $out -split "`r?`n" | ForEach-Object { $_.Trim() } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    foreach ($target in $targets) {
+        if ($target.Equals($N, [System.StringComparison]::OrdinalIgnoreCase)) {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Test-DistroReachable([string]$N) {
     <# Retry up to 3 times -- WSL VM cold-start can take several seconds #>
     for ($i = 1; $i -le 3; $i++) {
         $out = & wsl.exe -d $N -u root -- echo "ok" 2>&1 | Out-String
-        if ($out -match "ok") {
+        if ($LASTEXITCODE -eq 0 -and $out -match "ok") {
             return $true
         }
         if ($i -lt 3) {
@@ -43,6 +59,16 @@ function Test-DistroExists([string]$N) {
         }
     }
     return $false
+}
+
+function Test-DistroIsUbuntu([string]$N) {
+    $out = & wsl.exe -d $N -u root -- bash -c "grep '^ID=ubuntu$' /etc/os-release >/dev/null 2>&1 && echo ok" 2>&1 | Out-String
+    return ($LASTEXITCODE -eq 0 -and $out -match "ok")
+}
+
+function Test-DistroUserExists([string]$N, [string]$UserName) {
+    $out = & wsl.exe -d $N -u root -- id -u $UserName 2>&1 | Out-String
+    return ($LASTEXITCODE -eq 0 -and $out.Trim() -match '^\d+$')
 }
 
 function Test-WslAppHealthy() {
@@ -154,8 +180,31 @@ L_Info "Log file: $LOG_FILE"
 # ====================================================================
 
 $needsFullInstall = $true
+$copyAppOnlyMode = $false
 
-if (Test-Path $LOCAL_SENTINEL_FILE) {
+$hasLocalSentinel = Test-Path $LOCAL_SENTINEL_FILE
+$existingDistro = Test-DistroExists -Name $DISTRO_NAME
+if ($existingDistro) {
+    $copyAppOnlyMode = $true
+    if (-not (Test-DistroReachable -N $DISTRO_NAME)) {
+        L_Warn "Detected distro '$DISTRO_NAME' in WSL list, but startup probe did not return OK"
+        L_Warn "Continuing with app refresh only because the distro is already registered"
+    } elseif (-not (Test-DistroIsUbuntu -N $DISTRO_NAME)) {
+        L_Warn "Detected distro '$DISTRO_NAME', but it did not confirm Ubuntu via /etc/os-release"
+        L_Warn "Continuing with app refresh only because the distro is already registered"
+    } elseif (-not (Test-DistroUserExists -N $DISTRO_NAME -UserName "deepright")) {
+        L_Warn "Detected distro '$DISTRO_NAME', but user deepright was not confirmed"
+        L_Warn "Continuing with app refresh only because the distro is already registered"
+    } else {
+        L_OK "Detected existing distro '$DISTRO_NAME' -- skipping WSL installation/configuration and refreshing app files only"
+    }
+} elseif ($hasLocalSentinel) {
+    $copyAppOnlyMode = $true
+    L_Warn "Local sentinel found, but distro '$DISTRO_NAME' was not detected from WSL list"
+    L_Warn "Skipping WSL reinstall and trying app refresh only to avoid deleting an existing distro"
+}
+
+if ((-not $existingDistro) -and (-not $copyAppOnlyMode) -and $hasLocalSentinel) {
     if ((Test-DistroExists -Name $DISTRO_NAME) -and (Test-WslAppHealthy)) {
         $needsFullInstall = $false
         L_OK "Sentinel found + distro alive + WSL app healthy -- skipping installation"
@@ -170,7 +219,9 @@ if (Test-Path $LOCAL_SENTINEL_FILE) {
 #   PHASE 1: Full installation (only if sentinel not found)
 # ====================================================================
 
-if ($needsFullInstall) {
+if ($needsFullInstall -or $copyAppOnlyMode) {
+
+if (-not $copyAppOnlyMode) {
 
 # ---- Step 1: Admin ----
 L_Step "Step 1/7: Check administrator privileges"
@@ -428,9 +479,14 @@ L_OK "node:     $nodeV"
 L_OK "npm:      $npmV"
 L_OK "python3:  $pyV"
 L_OK "bwrap:    $bwrapV"
+}
 
 # ---- Step 7: Copy app ----
-L_Step "Step 7/7: Copy app dir to WSL /app/"
+if ($copyAppOnlyMode) {
+    L_Step "Existing deepright distro detected: refresh app dir in WSL"
+} else {
+    L_Step "Step 7/7: Refresh app dir in WSL /app/"
+}
 
 $WSL_APP_TARGET = "/app"
 
@@ -440,29 +496,32 @@ if (Test-Path $APP_DIR) {
         L_Warn "app dir is empty, skipping"
         L_Info "Place program files in: $APP_DIR then re-run"
     } else {
-        # Check if files need updating
-        $needCopy = $false
-        foreach ($f in $fs) {
-            $rel = $f.FullName.Substring($APP_DIR.Length).TrimStart('\','/') -replace '\\','/'
-            $cmp = & wsl.exe -d $DISTRO_NAME -u root -- bash -c "stat -c %Y '${WSL_APP_TARGET}/$rel' 2>/dev/null || echo 0" 2>&1 | Out-String
-            $cmp = $cmp.Trim()
-            $wslTs = if ($cmp -match '^\d+$') { [long]$cmp } else { 0 }
-            $localTs = [long][math]::Floor([decimal]($f.LastWriteTimeUtc - (Get-Date "1970-01-01T00:00:00Z")).TotalSeconds)
-            if ($localTs -gt $wslTs) { $needCopy = $true; break }
-        }
-        if (-not $needCopy) {
-            L_OK "All files up to date, skipping"
+        if ($copyAppOnlyMode) {
+            L_Info "Fast path enabled: force refreshing app files in ${WSL_APP_TARGET}/"
         } else {
-            L_Info "Copying $($fs.Count) files..."
-            $wp = WslPath -P $APP_DIR
-            & wsl.exe -d $DISTRO_NAME -u root -- bash -c "mkdir -p ${WSL_APP_TARGET} 2>/dev/null; cp -r '${wp}'/* ${WSL_APP_TARGET}/ 2>/dev/null; chown -R deepright:deepright ${WSL_APP_TARGET}/; chmod -R u+rw ${WSL_APP_TARGET}/" 2>&1 | Out-Null
-            if ($LASTEXITCODE -eq 0) {
-                L_OK "App copied to ${WSL_APP_TARGET}/"
-                $cl = & wsl.exe -d $DISTRO_NAME -- bash -c "ls -la ${WSL_APP_TARGET}/" 2>&1 | Out-String
-                Write-Host $cl -F DarkGray
-            } else {
-                L_Warn "App copy may have partially failed"
+            L_Info "Force refreshing app files in ${WSL_APP_TARGET}/"
+        }
+
+        L_Info "Source app dir: $APP_DIR"
+        L_Info "Target WSL dir: ${WSL_APP_TARGET}/"
+        L_Info "Copying $($fs.Count) files..."
+        L_Info "Clearing existing ${WSL_APP_TARGET}/ contents before copy"
+        $wp = WslPath -P $APP_DIR
+        $copyOut = & wsl.exe -d $DISTRO_NAME -u root -- bash -lc "set -e; mkdir -p '${WSL_APP_TARGET}'; find '${WSL_APP_TARGET}' -mindepth 1 -maxdepth 1 -exec rm -rf {} +; cp -a '${wp}'/. '${WSL_APP_TARGET}/'; chown -R deepright:deepright '${WSL_APP_TARGET}/'; chmod -R u+rw '${WSL_APP_TARGET}/'" 2>&1 | Out-String
+        if (-not [string]::IsNullOrWhiteSpace($copyOut)) {
+            Add-Content -Path $LOG_FILE -Value "copy-app: $copyOut" -Encoding UTF8
+            Write-Host $copyOut -ForegroundColor DarkGray
+        }
+        if ($LASTEXITCODE -eq 0) {
+            L_OK "App package force-copied to ${WSL_APP_TARGET}/"
+            $cl = & wsl.exe -d $DISTRO_NAME -- bash -lc "echo '[WSL /app]'; ls -la '${WSL_APP_TARGET}/'; echo; if [ -d '${WSL_APP_TARGET}/plugins' ]; then echo '[WSL /app/plugins]'; ls -la '${WSL_APP_TARGET}/plugins'; fi" 2>&1 | Out-String
+            Write-Host $cl -F DarkGray
+        } else {
+            L_Err "App package refresh failed"
+            if ($copyAppOnlyMode) {
+                L_Info "If the distro is actually missing, remove the local sentinel and rerun the installer for a full install"
             }
+            exit 1
         }
     }
 } else {

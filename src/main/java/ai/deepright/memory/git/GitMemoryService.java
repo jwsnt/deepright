@@ -392,9 +392,10 @@ public class GitMemoryService extends BaseFunction implements GitPath, MemorySer
                     digest = "[datetime=" + GitMemoryService.DATE_FORMAT.format(this.workTask.getCreated()) + "][important=0][digest=" + this.workTask.getOriginal() + "]";
                 }
                 // 使用>覆盖，只保留Git
+                String gitData = this.gitPath.buildGitData(this.workTask);
                 StringBuffer buffer = new StringBuffer().append("cd ").append(this.path).append(" && ");
-                buffer.append("echo ").append(FeatureUtils.escapeShell(this.workTask, this.buildContent(why))).append(" > ").append(this.gitPath.buildGitData(this.workTask)).append(" && ");
-                buffer.append(this.app).append(" add ").append(this.gitPath.buildGitData(this.workTask)).append(" && ").append(this.app).append(" commit -m ").append(FeatureUtils.escapeShell(this.workTask, digest));
+                buffer.append("echo ").append(FeatureUtils.escapeShell(this.workTask, this.buildContent(why))).append(" > ").append(gitData).append(" && ");
+                buffer.append(this.app).append(" add ").append(gitData).append(" && ").append(this.app).append(" commit -m ").append(FeatureUtils.escapeShell(this.workTask, digest));
                 CliPubData pubData = this.buildCommit(buffer.toString());
                 if (!pubData.isOk()) {
                     if (StringUtils.containsIgnoreCase(pubData.getCmd(), XmlResourceLang.get(MemoryService.LANG_KEY_MEMORY_INIT_FILE))) {
@@ -405,6 +406,7 @@ public class GitMemoryService extends BaseFunction implements GitPath, MemorySer
                         }
                     }
                 }
+                // 最终检查
                 if (!pubData.isOk()) {
                     throw new WorkflowException("The long-term memory refresh failed=" + pubData.getCmd());
                 }

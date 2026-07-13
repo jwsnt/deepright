@@ -247,7 +247,7 @@ write_wrapper_config() {
   launcher_kind="$2"
   wrapper_app_name="$APP_NAME"
   wrapper_bundle_namespace="$APP_NAME"
-  wrapper_default_mode="auto"
+  wrapper_default_mode="install"
   wrapper_default_batch_name=""
   wrapper_install_batch_name="install.bat"
   wrapper_start_batch_name="start.bat"
