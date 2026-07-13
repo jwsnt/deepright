@@ -36,9 +36,9 @@ public class TaskData {
 
     public TaskData check() throws Exception {
         // 会抛出模型，需要字段对齐
-        WorkflowException.check(StringUtils.isEmpty(this.device), "The target_device can not be empty", ProtocolCode.C400);
-        WorkflowException.check(StringUtils.isEmpty(this.agent), "The target_agent can not be empty", ProtocolCode.C400);
-        WorkflowException.check(StringUtils.isEmpty(this.content), "The content can not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.device), "The target_device can not be empty");
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.agent), "The target_agent can not be empty");
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.content), "The content can not be empty");
         return this;
     }
 

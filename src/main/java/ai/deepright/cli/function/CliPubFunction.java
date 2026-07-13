@@ -70,12 +70,12 @@ public class CliPubFunction extends BaseFunction {
             log.info("The cli@pub router key={}", router.key());
         }
         CliPubData pubData = workTask.getObjectQuery(CliPubData.class);
-        WorkflowException.check(pubData == null, "The cli@pub can not be empty: " + router.key(), ProtocolCode.C400);
+        WorkflowException.checkCondition(pubData == null, "The cli@pub can not be empty: " + router.key());
         // 解码
         pubData = this.decodeData(workTask, pubData.check());
         // GZIP+BASE64后的CMD
         Object result = new CliPubExec(this.redis4event, this.timeout, this.circle, this.expire, GzipUtils.compressAsBase64(JsonUtils.write(pubData)), pubData.getTid()).exec();
-        WorkflowException.check(result == null, "The cli@pub failed: " + pubData.getTid(), ProtocolCode.C400);
+        WorkflowException.checkCondition(result == null, "The cli@pub failed: " + pubData.getTid());
         return result;
     }
 
@@ -85,7 +85,7 @@ public class CliPubFunction extends BaseFunction {
         // 执行成功、Type!=FUN 且超过指定大小或二进制格式（图片等），上传URL
         if (pubData.isOk() && !pubData.isType(CliPubSub.FUN) && (BytesUtils.utf8Bytes(pubData.getCmd()) >= this.oversize || SuffixUtils.isBinary(pubData.getSuffix()))) {
             FileStore fileStore = this.defStore.fetchStore(this.store);
-            WorkflowException.check(fileStore == null, "The file store can not be empty", ProtocolCode.C400);
+            WorkflowException.checkCondition(fileStore == null, "The file store can not be empty");
             pubData.setCmd(fileStore.store(decode, pubData.getSuffix(), workTask));
             pubData.setEncode(CliPubData.URL);
             return pubData;

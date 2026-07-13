@@ -1,12 +1,7 @@
 package ai.deepright.memory;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
-import ai.open.right.protocol.ProtocolCode;
-
-import ai.open.right.WorkflowException;
-
 import ai.deepright.lang.XmlResourceLang;
+import ai.open.right.WorkflowException;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.collections.CollectionUtils;
@@ -51,7 +46,7 @@ public class MemoryRecall {
     }
 
     public void checkValid() throws Exception {
-        WorkflowException.check(!(this.hasKeyword() || this.hasBefore() || this.hasAfter()), XmlResourceLang.get(MemoryService.LANG_KEY_MEMORY_RECALL_VALID), ProtocolCode.C400);
+        WorkflowException.checkCondition(!(this.hasKeyword() || this.hasBefore() || this.hasAfter()), XmlResourceLang.get(MemoryService.LANG_KEY_MEMORY_RECALL_VALID));
     }
 
     protected boolean isValidKeyword(String keyword) {

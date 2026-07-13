@@ -1,9 +1,5 @@
 package ai.deepright.task;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
-import ai.open.right.protocol.ProtocolCode;
-
 import ai.deepright.cli.CliPubData;
 import ai.deepright.cli.CliPubSub;
 import ai.deepright.cli.CliSubFetcher;
@@ -75,7 +71,7 @@ public class TaskExec implements Runnable {
                     .w(List.of(this.filename))
                     .exempted(true)
                     .build(), CliPubSub.buildPushCmd(this.workTask, this.defStore, this.oversize, answer.toString(), this.filename), "");
-            WorkflowException.check(!(pubData.isOk()), pubData.getCmd(), ProtocolCode.C400);
+            WorkflowException.checkCondition(!(pubData.isOk()), pubData.getCmd());
         } catch (Exception e) {
             WorkflowException.dolog(e);
         }

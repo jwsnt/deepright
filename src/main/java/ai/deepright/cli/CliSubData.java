@@ -1,7 +1,6 @@
 package ai.deepright.cli;
 
 import ai.open.right.WorkflowException;
-import ai.open.right.protocol.ProtocolCode;
 import lombok.*;
 import org.apache.commons.lang3.StringUtils;
 
@@ -45,11 +44,11 @@ public class CliSubData {
     protected Long ddl;
 
     public CliSubData check() throws Exception {
-        WorkflowException.check(StringUtils.isEmpty(this.router), "The device can not be empty", ProtocolCode.C400);
-        WorkflowException.check(this.subOps == null, "The sub ops can not be empty", ProtocolCode.C400);
-        WorkflowException.check(this.unwind == null, "The unwind can not be empty", ProtocolCode.C400);
-        WorkflowException.check(StringUtils.isEmpty(this.cmd), "The cmd can not be empty", ProtocolCode.C400);
-        WorkflowException.check(this.ddl == null, "The ddl can not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.router), "The device can not be empty");
+        WorkflowException.checkCondition(this.subOps == null, "The sub ops can not be empty");
+        WorkflowException.checkCondition(this.unwind == null, "The unwind can not be empty");
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.cmd), "The cmd can not be empty");
+        WorkflowException.checkCondition(this.ddl == null, "The ddl can not be empty");
         return this;
     }
 

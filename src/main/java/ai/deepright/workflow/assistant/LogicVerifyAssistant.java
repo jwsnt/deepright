@@ -74,8 +74,8 @@ public class LogicVerifyAssistant extends DefaultAssistant {
     public void init() throws Exception {
         this.template4verify = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4verify).openStream()), StandardCharsets.UTF_8);
         this.template4query = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4query).openStream()), StandardCharsets.UTF_8);
-        WorkflowException.check(StringUtils.isEmpty(this.template4verify), "The template verify must not be empty", ProtocolCode.C400);
-        WorkflowException.check(StringUtils.isEmpty(this.template4query), "The template query must not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4verify), "The template verify must not be empty");
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4query), "The template query must not be empty");
     }
 
     @Override
@@ -168,7 +168,7 @@ public class LogicVerifyAssistant extends DefaultAssistant {
         response = JsonUtils.like(response) ? response : JsonUtils.extract(response);
         try {
             Map<String, Object> result = JsonUtils.read(response, Map.class);
-            WorkflowException.check(MapUtils.getBoolean(result, "passed") == null, "The passed must not be empty", ProtocolCode.C400);
+            WorkflowException.checkCondition(MapUtils.getBoolean(result, "passed") == null, "The passed must not be empty");
             return result;
         } catch (Exception e) {
             if (log.isDebugEnabled()) {
@@ -180,7 +180,7 @@ public class LogicVerifyAssistant extends DefaultAssistant {
             String extract = StringUtils.trim(this.commit(workTask, "extract", response));
             extract = JsonUtils.like(extract) ? extract : JsonUtils.extract(extract);
             Map<String, Object> result = JsonUtils.read(extract, Map.class);
-            WorkflowException.check(MapUtils.getBoolean(result, "passed") == null, "The passed must not be empty", ProtocolCode.C400);
+            WorkflowException.checkCondition(MapUtils.getBoolean(result, "passed") == null, "The passed must not be empty");
             return result;
         } catch (Exception inner) {
             if (log.isDebugEnabled()) {

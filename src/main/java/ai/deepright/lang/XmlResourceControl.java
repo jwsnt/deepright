@@ -1,7 +1,5 @@
 package ai.deepright.lang;
 
-import ai.open.right.protocol.ProtocolCode;
-
 import ai.open.right.WorkflowException;
 
 import java.io.BufferedInputStream;
@@ -20,17 +18,17 @@ public class XmlResourceControl extends ResourceBundle.Control {
 
     @Override
     public List<String> getFormats(String baseName) {
-        WorkflowException.check(baseName == null, "The base name must not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(baseName == null, "The base name must not be empty");
         return List.of(XmlResourceControl.FORMAT_XML);
     }
 
     @Override
     public ResourceBundle newBundle(String baseName, Locale locale, String format, ClassLoader loader, boolean reload) throws IllegalAccessException, InstantiationException, IOException {
-        WorkflowException.check(baseName == null, "The base name must not be empty", ProtocolCode.C400);
-        WorkflowException.check(locale == null, "The locale must not be empty", ProtocolCode.C400);
-        WorkflowException.check(format == null, "The format must not be empty", ProtocolCode.C400);
-        WorkflowException.check(loader == null, "The loader must not be empty", ProtocolCode.C400);
-        WorkflowException.check(!(XmlResourceControl.FORMAT_XML.equals(format)), "The format can not be support:" + format, ProtocolCode.C400);
+        WorkflowException.checkCondition(baseName == null, "The base name must not be empty");
+        WorkflowException.checkCondition(locale == null, "The locale must not be empty");
+        WorkflowException.checkCondition(format == null, "The format must not be empty");
+        WorkflowException.checkCondition(loader == null, "The loader must not be empty");
+        WorkflowException.checkCondition(!(XmlResourceControl.FORMAT_XML.equals(format)), "The format can not be support:" + format);
         String resourceName = this.toResourceName(this.toBundleName(baseName, locale), XmlResourceControl.FORMAT_XML);
         ResourceBundle bundle = null;
         InputStream stream = null;

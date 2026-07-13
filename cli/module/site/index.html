@@ -5977,6 +5977,7 @@ const MAX_STORE = 2000, MAX_SHOW = 500, LAZY_PAGE = 20, MAX_CLI_SUB_SHOW = 30, M
 const LOCAL_STORAGE_SOFT_LIMIT_BYTES = Math.round(2.5 * 1024 * 1024);
 const LOCAL_STORAGE_COMPACT_TARGET_BYTES = Math.round(1.5 * 1024 * 1024);
 const LOCAL_STORAGE_MAINTENANCE_INTERVAL_MS = 30000;
+const LOCAL_STORAGE_SINGLE_CHAT_LIMIT_BYTES = Math.round(1 * 1024 * 1024);
 const MESSAGE_RENDER_CACHE_LIMIT = 240;
 const WIKI_RENDER_CACHE_LIMIT = 40;
 const LOW_POWER_RENDER_MESSAGE_MATH_LIMIT = 12;
@@ -25289,12 +25290,17 @@ let localStorageMaintenanceRunning = false;
 let localStorageMaintenanceNoticeShown = false;
 
 const CHAT_STORAGE_COMPACTION_CONFIGS = [
-  { stripCompletedRawSse: true, inactiveCliLimit: 30, activeCliLimit: 30, inactiveMessageLimit: 240, activeMessageLimit: Infinity },
-  { stripCompletedRawSse: true, inactiveCliLimit: 20, activeCliLimit: 30, inactiveMessageLimit: 120, activeMessageLimit: Infinity },
-  { stripRawSse: true, inactiveCliLimit: 10, activeCliLimit: 30, inactiveMessageLimit: 60, activeMessageLimit: 160 },
-  { stripRawSse: true, inactiveCliLimit: 0, activeCliLimit: 20, inactiveMessageLimit: 24, activeMessageLimit: 80 },
-  { stripRawSse: true, inactiveCliLimit: 0, activeCliLimit: 10, inactiveMessageLimit: 12, activeMessageLimit: 60 },
-  { stripRawSse: true, inactiveCliLimit: 0, activeCliLimit: 0, inactiveMessageLimit: 0, activeMessageLimit: 40 }
+  { stripCompletedRawSse: true, stripCompletedExplosionSnapshots: true, inactiveCliLimit: 30, activeCliLimit: 30, inactiveMessageLimit: 240, activeMessageLimit: Infinity },
+  { stripCompletedRawSse: true, stripCompletedExplosionSnapshots: true, inactiveCliLimit: 20, activeCliLimit: 30, inactiveMessageLimit: 120, activeMessageLimit: Infinity },
+  { stripRawSse: true, stripCompletedExplosionSnapshots: true, inactiveCliLimit: 10, activeCliLimit: 30, inactiveMessageLimit: 60, activeMessageLimit: 160 },
+  { stripRawSse: true, stripExplosionSnapshots: true, inactiveCliLimit: 0, activeCliLimit: 20, inactiveMessageLimit: 24, activeMessageLimit: 80 },
+  { stripRawSse: true, stripExplosionSnapshots: true, inactiveCliLimit: 0, activeCliLimit: 10, inactiveMessageLimit: 12, activeMessageLimit: 60 },
+  { stripRawSse: true, stripExplosionSnapshots: true, inactiveCliLimit: 0, activeCliLimit: 0, inactiveMessageLimit: 0, activeMessageLimit: 40 }
+];
+const SINGLE_CHAT_POST_SSE_COMPACTION_CONFIGS = [
+  { stripCompletedRawSse: true, stripCompletedExplosionSnapshots: true },
+  { stripRawSse: true, stripCompletedExplosionSnapshots: true },
+  { stripRawSse: true, stripExplosionSnapshots: true }
 ];
 
 function estimateLocalStorageTextBytes(value) {
@@ -25329,14 +25335,66 @@ function estimateLocalStorageUsageWithChatsPayload(payload) {
   return total;
 }
 
+function buildChatScopedStoragePayload(chatId, sourcePayload) {
+  const resolvedChatId = String(chatId || '').trim();
+  const payloadSource = sourcePayload && typeof sourcePayload === 'object' ? sourcePayload : buildChatsStoragePayload();
+  if (!resolvedChatId || !payloadSource.chats || !payloadSource.chats[resolvedChatId]) return null;
+  const scopedPayload = {
+    chats: { [resolvedChatId]: payloadSource.chats[resolvedChatId] },
+    order: [resolvedChatId],
+    agents: {},
+    models: {},
+    thinking: {},
+    verify: {},
+    htmlOutput: {},
+    swarm: {}
+  };
+  ['agents', 'models', 'thinking', 'verify', 'htmlOutput', 'swarm'].forEach(key => {
+    const sourceMap = payloadSource[key] && typeof payloadSource[key] === 'object' ? payloadSource[key] : null;
+    if (!sourceMap || !Object.prototype.hasOwnProperty.call(sourceMap, resolvedChatId)) return;
+    scopedPayload[key][resolvedChatId] = sourceMap[resolvedChatId];
+  });
+  return scopedPayload;
+}
+
+function estimateSingleChatStorageUsageBytes(chatId, sourcePayload) {
+  const scopedPayload = buildChatScopedStoragePayload(chatId, sourcePayload);
+  if (!scopedPayload) return 0;
+  return estimateLocalStorageTextBytes(CHATS_KEY) + estimateLocalStorageTextBytes(JSON.stringify(scopedPayload));
+}
+
 function findCompactedChatsPayloadForBudget(basePayload, targetBytes) {
   const sourcePayload = basePayload && typeof basePayload === 'object' ? basePayload : buildChatsStoragePayload();
   let bestPayload = null;
   let bestBytes = estimateLocalStorageUsageWithChatsPayload(sourcePayload);
   for (const config of CHAT_STORAGE_COMPACTION_CONFIGS) {
-    const compactedPayload = createQuotaCompactedChatsPayload(sourcePayload, config);
+    const compactedPayload = createQuotaCompactedChatsPayload(sourcePayload, { ...config, targetBytes });
     if (!compactedPayload) continue;
     const bytes = estimateLocalStorageUsageWithChatsPayload(compactedPayload);
+    if (!bestPayload || bytes < bestBytes) {
+      bestPayload = compactedPayload;
+      bestBytes = bytes;
+    }
+    if (bytes <= targetBytes) return { payload: compactedPayload, bytes };
+  }
+  return bestPayload ? { payload: bestPayload, bytes: bestBytes } : null;
+}
+
+function findCompactedSingleChatPayloadForBudget(chatId, basePayload, targetBytes) {
+  const resolvedChatId = String(chatId || '').trim();
+  const sourcePayload = basePayload && typeof basePayload === 'object' ? basePayload : buildChatsStoragePayload();
+  if (!resolvedChatId || !sourcePayload.chats || !sourcePayload.chats[resolvedChatId]) return null;
+  let bestPayload = null;
+  let bestBytes = estimateSingleChatStorageUsageBytes(resolvedChatId, sourcePayload);
+  for (const config of SINGLE_CHAT_POST_SSE_COMPACTION_CONFIGS) {
+    const compactedPayload = createQuotaCompactedChatsPayload(sourcePayload, {
+      ...config,
+      targetBytes,
+      targetChatIds: [resolvedChatId],
+      activeChatId: resolvedChatId
+    });
+    if (!compactedPayload) continue;
+    const bytes = estimateSingleChatStorageUsageBytes(resolvedChatId, compactedPayload);
     if (!bestPayload || bytes < bestBytes) {
       bestPayload = compactedPayload;
       bestBytes = bytes;
@@ -25363,6 +25421,26 @@ function syncChatsPayloadToRuntime(payload) {
   renderChatList();
 }
 
+function syncSingleChatPayloadToRuntime(chatId, payload) {
+  const resolvedChatId = String(chatId || '').trim();
+  if (!resolvedChatId || !payload || !payload.chats || !payload.chats[resolvedChatId]) return false;
+  state.chats[resolvedChatId] = payload.chats[resolvedChatId];
+  if (payload.agents && Object.prototype.hasOwnProperty.call(payload.agents, resolvedChatId)) chatAgents[resolvedChatId] = payload.agents[resolvedChatId];
+  else delete chatAgents[resolvedChatId];
+  if (payload.models && Object.prototype.hasOwnProperty.call(payload.models, resolvedChatId)) chatModels[resolvedChatId] = payload.models[resolvedChatId];
+  else delete chatModels[resolvedChatId];
+  if (payload.thinking && Object.prototype.hasOwnProperty.call(payload.thinking, resolvedChatId)) chatThinking[resolvedChatId] = payload.thinking[resolvedChatId];
+  else delete chatThinking[resolvedChatId];
+  if (payload.verify && Object.prototype.hasOwnProperty.call(payload.verify, resolvedChatId)) chatVerify[resolvedChatId] = payload.verify[resolvedChatId];
+  else delete chatVerify[resolvedChatId];
+  if (payload.htmlOutput && Object.prototype.hasOwnProperty.call(payload.htmlOutput, resolvedChatId)) chatHtmlOutput[resolvedChatId] = payload.htmlOutput[resolvedChatId];
+  else delete chatHtmlOutput[resolvedChatId];
+  if (payload.swarm && Object.prototype.hasOwnProperty.call(payload.swarm, resolvedChatId)) chatSwarm[resolvedChatId] = payload.swarm[resolvedChatId];
+  else delete chatSwarm[resolvedChatId];
+  chatModels = normalizeChatModelMap(chatModels);
+  return true;
+}
+
 function maintainLocalStorageBudget(options) {
   const opts = options && typeof options === 'object' ? options : {};
   if (localStorageMaintenanceRunning || hasGlobalPendingSseResponse()) return false;
@@ -25387,6 +25465,17 @@ function maintainLocalStorageBudget(options) {
   } finally {
     localStorageMaintenanceRunning = false;
   }
+}
+
+function maintainSingleChatStorageBudget(chatId) {
+  const resolvedChatId = String(chatId || '').trim();
+  if (!resolvedChatId || !state.chats[resolvedChatId]) return false;
+  const basePayload = buildChatsStoragePayload();
+  const baseBytes = estimateSingleChatStorageUsageBytes(resolvedChatId, basePayload);
+  if (baseBytes <= LOCAL_STORAGE_SINGLE_CHAT_LIMIT_BYTES) return false;
+  const result = findCompactedSingleChatPayloadForBudget(resolvedChatId, basePayload, LOCAL_STORAGE_SINGLE_CHAT_LIMIT_BYTES);
+  if (!result || !result.payload || result.bytes >= baseBytes) return false;
+  return syncSingleChatPayloadToRuntime(resolvedChatId, result.payload);
 }
 
 function startLocalStorageMaintenance() {
@@ -25485,46 +25574,133 @@ function trimStoredChatMessages(chat, limit) {
   return true;
 }
 
-function compactStoredChatPayload(payload, options) {
-  if (!payload || !payload.chats || typeof payload.chats !== 'object') return false;
+function getStoredCompactionCandidateTimestamp(msg) {
+  return toChatTimestamp(msg && (msg.receivedAt || msg.createdAt || '')) || '';
+}
+
+function buildStoredFieldCompactionCandidates(payload, options) {
+  if (!payload || !payload.chats || typeof payload.chats !== 'object') return { rawSse: [], explodedSnapshots: [] };
   const opts = options || {};
   const stripRawSseAll = !!opts.stripRawSse;
   const stripCompletedRawSse = !!opts.stripCompletedRawSse;
-  let changed = false;
-  Object.keys(payload.chats).forEach(chatId => {
+  const stripExplosionSnapshotsAll = !!opts.stripExplosionSnapshots;
+  const stripCompletedExplosionSnapshots = !!opts.stripCompletedExplosionSnapshots;
+  const targetChatIds = Array.isArray(opts.targetChatIds)
+    ? new Set(opts.targetChatIds.map(id => String(id || '').trim()).filter(Boolean))
+    : null;
+  const orderedIds = (Array.isArray(payload.order) ? payload.order : Object.keys(payload.chats || {}))
+    .map(id => String(id || '').trim())
+    .filter(id => id && payload.chats && payload.chats[id] && (!targetChatIds || targetChatIds.has(id)));
+  const chatOrderIndex = new Map();
+  orderedIds.forEach((chatId, index) => chatOrderIndex.set(chatId, index));
+  const rawSse = [];
+  const explodedSnapshots = [];
+  orderedIds.forEach(chatId => {
     const chat = payload.chats[chatId];
     if (!chat || !Array.isArray(chat.messages)) return;
     const stripRawSseForChat = stripRawSseAll || (stripCompletedRawSse && !chat.pendingRequest);
-    if (!stripRawSseForChat) return;
-    chat.messages.forEach(msg => {
-      if (!msg || msg.role !== 'assistant' || !Object.prototype.hasOwnProperty.call(msg, 'rawSse')) return;
-      delete msg.rawSse;
-      changed = true;
+    chat.messages.forEach((msg, messageIndex) => {
+      if (!msg || msg.role !== 'assistant') return;
+      const timestamp = getStoredCompactionCandidateTimestamp(msg);
+      const candidateBase = {
+        chatId,
+        chatOrder: chatOrderIndex.get(chatId) ?? Number.MAX_SAFE_INTEGER,
+        messageIndex,
+        timestamp
+      };
+      if (stripRawSseForChat && Object.prototype.hasOwnProperty.call(msg, 'rawSse')) {
+        rawSse.push(candidateBase);
+      }
+      const shouldStripExplosionSnapshots = stripExplosionSnapshotsAll
+        || (stripCompletedExplosionSnapshots && isAssistantTerminalMessage(msg));
+      const snapshotsProvideOnlyVisibleContent = !normalizeMessageText(msg.content) && Array.isArray(msg.explodedSnapshots) && msg.explodedSnapshots.length > 0;
+      if (!shouldStripExplosionSnapshots || snapshotsProvideOnlyVisibleContent) return;
+      if (
+        Object.prototype.hasOwnProperty.call(msg, 'explodedSnapshots')
+        || Object.prototype.hasOwnProperty.call(msg, 'explodedLogicalIds')
+      ) {
+        explodedSnapshots.push(candidateBase);
+      }
     });
   });
+  const sortCandidates = list => list.sort((a, b) => {
+    if (a.timestamp && b.timestamp && a.timestamp !== b.timestamp) return a.timestamp < b.timestamp ? -1 : 1;
+    if (a.timestamp && !b.timestamp) return -1;
+    if (!a.timestamp && b.timestamp) return 1;
+    if (a.chatOrder !== b.chatOrder) return a.chatOrder - b.chatOrder;
+    return a.messageIndex - b.messageIndex;
+  });
+  sortCandidates(rawSse);
+  sortCandidates(explodedSnapshots);
+  return { rawSse, explodedSnapshots };
+}
+
+function compactStoredChatPayload(payload, options) {
+  if (!payload || !payload.chats || typeof payload.chats !== 'object') return false;
+  const opts = options || {};
+  const targetBytes = Number.isFinite(opts.targetBytes) ? opts.targetBytes : 0;
+  const candidates = buildStoredFieldCompactionCandidates(payload, opts);
+  let changed = false;
+  const maybeReachedTarget = () => targetBytes > 0 && estimateLocalStorageUsageWithChatsPayload(payload) <= targetBytes;
+  for (const candidate of candidates.rawSse) {
+    const chat = payload.chats[candidate.chatId];
+    const msg = chat && Array.isArray(chat.messages) ? chat.messages[candidate.messageIndex] : null;
+    if (!msg || msg.role !== 'assistant' || !Object.prototype.hasOwnProperty.call(msg, 'rawSse')) continue;
+    delete msg.rawSse;
+    changed = true;
+    if (maybeReachedTarget()) return true;
+  }
+  for (const candidate of candidates.explodedSnapshots) {
+    const chat = payload.chats[candidate.chatId];
+    const msg = chat && Array.isArray(chat.messages) ? chat.messages[candidate.messageIndex] : null;
+    if (!msg || msg.role !== 'assistant') continue;
+    let removed = false;
+    if (Object.prototype.hasOwnProperty.call(msg, 'explodedSnapshots')) {
+      delete msg.explodedSnapshots;
+      removed = true;
+    }
+    if (Object.prototype.hasOwnProperty.call(msg, 'explodedLogicalIds')) {
+      delete msg.explodedLogicalIds;
+      removed = true;
+    }
+    if (!removed) continue;
+    changed = true;
+    if (maybeReachedTarget()) return true;
+  }
   return changed;
 }
 
 function createQuotaCompactedChatsPayload(basePayload, options) {
   const payload = JSON.parse(JSON.stringify(basePayload));
   const opts = options || {};
-  const activeChatId = String(state.activeChat || '').trim();
+  const activeChatId = String(opts.activeChatId != null ? opts.activeChatId : (state.activeChat || '')).trim();
   const inactiveMessageLimit = Number.isFinite(opts.inactiveMessageLimit) ? opts.inactiveMessageLimit : Infinity;
   const activeMessageLimit = Number.isFinite(opts.activeMessageLimit) ? opts.activeMessageLimit : Infinity;
   const inactiveCliLimit = Number.isFinite(opts.inactiveCliLimit) ? opts.inactiveCliLimit : Infinity;
   const activeCliLimit = Number.isFinite(opts.activeCliLimit) ? opts.activeCliLimit : Infinity;
+  const targetChatIds = Array.isArray(opts.targetChatIds)
+    ? new Set(opts.targetChatIds.map(id => String(id || '').trim()).filter(Boolean))
+    : null;
   let changed = false;
   const orderedIds = (Array.isArray(payload.order) ? payload.order : Object.keys(payload.chats || {}))
     .map(id => String(id || '').trim())
-    .filter(id => id && payload.chats && payload.chats[id]);
-  orderedIds.forEach(chatId => {
+    .filter(id => id && payload.chats && payload.chats[id] && (!targetChatIds || targetChatIds.has(id)));
+  if (compactStoredChatPayload(payload, opts)) changed = true;
+  if (Number.isFinite(opts.targetBytes) && opts.targetBytes > 0 && estimateLocalStorageUsageWithChatsPayload(payload) <= opts.targetBytes) {
+    return changed ? payload : null;
+  }
+  for (const chatId of orderedIds) {
     const chat = payload.chats[chatId];
     const isActive = chatId === activeChatId;
     if (trimStoredCliHistory(chat, isActive ? activeCliLimit : inactiveCliLimit)) changed = true;
+    if (Number.isFinite(opts.targetBytes) && opts.targetBytes > 0 && estimateLocalStorageUsageWithChatsPayload(payload) <= opts.targetBytes) {
+      return changed ? payload : null;
+    }
     if (trimStoredChatMessages(chat, isActive ? activeMessageLimit : inactiveMessageLimit)) changed = true;
-  });
-  // Drop duplicated SSE transcripts before sacrificing visible chat content.
-  if (compactStoredChatPayload(payload, opts)) changed = true;
+    if (Number.isFinite(opts.targetBytes) && opts.targetBytes > 0 && estimateLocalStorageUsageWithChatsPayload(payload) <= opts.targetBytes) {
+      return changed ? payload : null;
+    }
+  }
   return changed ? payload : null;
 }
 
@@ -25545,7 +25721,10 @@ function saveChats() {
     if (!isStorageQuotaError(err)) throw err;
   }
   for (const config of CHAT_STORAGE_COMPACTION_CONFIGS) {
-    const compactedPayload = createQuotaCompactedChatsPayload(basePayload, config);
+    const compactedPayload = createQuotaCompactedChatsPayload(basePayload, {
+      ...config,
+      targetBytes: LOCAL_STORAGE_COMPACT_TARGET_BYTES
+    });
     if (!compactedPayload) continue;
     try {
       tryPersistChatsPayload(compactedPayload);
@@ -35232,6 +35411,7 @@ function finishStreamingFor(chatId) {
     streamState.sawTarget = false;
     streamState.sessionToken = '';
   }
+  maintainSingleChatStorageBudget(chatId);
   syncCliGetQueueStatusPolling({ refreshNow: false });
   clearChatTaskBadgesAfterSseEnd(chatId);
   // Only update UI if this is the active chat

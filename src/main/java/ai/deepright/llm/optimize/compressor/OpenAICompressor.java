@@ -32,7 +32,7 @@ public class OpenAICompressor extends StoreCompressor {
             // String type
             String original = String.class.cast(funCallRequest.getArgs());
             FileStore fileStore = this.defStore.fetchStore(this.store);
-            WorkflowException.check(fileStore == null, "The file store can not empty: " + this.store, ProtocolCode.C400);
+            WorkflowException.checkCondition(fileStore == null, "The file store can not empty: " + this.store);
             // URL压缩在属性中
             String url = this.buildUrl(providerRequest, fileStore.store(original.getBytes(StandardCharsets.UTF_8), ".json", providerRequest.getMessage()));
             funCallRequest.setArgs(JsonUtils.write(ImmutableMap.of("the_original_digest", this.buildRecallQuery(providerRequest, original), "the_complete_content", url)));

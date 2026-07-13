@@ -152,3 +152,45 @@ func TestManagerStartAsyncWithDBOpenerMarksCompletion(t *testing.T) {
 	}
 	t.Fatalf("manager did not finish in time: %#v", manager.Snapshot())
 }
+
+func TestCleanupExpiredLogsDeletesInBatches(t *testing.T) {
+	db := openTestDB(t)
+	if _, err := db.Exec(`CREATE TABLE agent_message_log (id INTEGER PRIMARY KEY AUTOINCREMENT, agent_id TEXT NOT NULL DEFAULT '', chat_id TEXT NOT NULL DEFAULT '', content TEXT NOT NULL, log_type INTEGER NOT NULL, created_at TEXT NOT NULL)`); err != nil {
+		t.Fatalf("create agent_message_log: %v", err)
+	}
+
+	oldBatchSize := cleanupDeleteBatchSize
+	cleanupDeleteBatchSize = 2
+	defer func() {
+		cleanupDeleteBatchSize = oldBatchSize
+	}()
+
+	now := time.Date(2026, 7, 11, 12, 0, 0, 0, time.UTC)
+	expired := now.AddDate(0, 0, -31).Format(timeLayout)
+	fresh := now.AddDate(0, 0, -1).Format(timeLayout)
+
+	for i := 0; i < 5; i++ {
+		if _, err := db.Exec(`INSERT INTO agent_message_log (agent_id, chat_id, content, log_type, created_at) VALUES ('a', 'expired', 'old', 1, ?)`, expired); err != nil {
+			t.Fatalf("insert expired row %d: %v", i, err)
+		}
+	}
+	if _, err := db.Exec(`INSERT INTO agent_message_log (agent_id, chat_id, content, log_type, created_at) VALUES ('a', 'fresh', 'new', 1, ?)`, fresh); err != nil {
+		t.Fatalf("insert fresh row: %v", err)
+	}
+
+	result, err := CleanupExpiredLogs(context.Background(), db, now, 30)
+	if err != nil {
+		t.Fatalf("CleanupExpiredLogs: %v", err)
+	}
+	if result.DeletedAgentMessageLog != 5 {
+		t.Fatalf("DeletedAgentMessageLog = %d, want 5", result.DeletedAgentMessageLog)
+	}
+
+	var count int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM agent_message_log`).Scan(&count); err != nil {
+		t.Fatalf("count agent_message_log: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("agent_message_log rows = %d, want 1", count)
+	}
+}

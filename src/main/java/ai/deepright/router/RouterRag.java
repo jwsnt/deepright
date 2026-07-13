@@ -54,9 +54,9 @@ public class RouterRag extends RagCondition implements RagService {
         this.template4main = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4main).openStream()), StandardCharsets.UTF_8);
         // 覆盖（rewrite），不需要重入
         // 启动检测，必要资源
-        WorkflowException.check(StringUtils.isEmpty(this.template4offline), "The template offline must not be empty", ProtocolCode.C400);
-        WorkflowException.check(StringUtils.isEmpty(this.template4online), "The template online must not be empty", ProtocolCode.C400);
-        WorkflowException.check(StringUtils.isEmpty(this.template4main), "The template main must not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4offline), "The template offline must not be empty");
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4online), "The template online must not be empty");
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4main), "The template main must not be empty");
     }
 
     @Override

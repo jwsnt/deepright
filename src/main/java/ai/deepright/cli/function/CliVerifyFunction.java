@@ -69,7 +69,7 @@ public class CliVerifyFunction extends BaseFunction {
         this.template = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template).openStream()), StandardCharsets.UTF_8);
         // 覆盖（rewrite），不需要重入
         // 启动检测，必要资源
-        WorkflowException.check(StringUtils.isEmpty(this.template), "The template must not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template), "The template must not be empty");
     }
 
 
@@ -78,7 +78,7 @@ public class CliVerifyFunction extends BaseFunction {
         WorkflowTask workTask = functionContext.getWorkTask().printQuery();
         String query = StringUtils.trim(workTask.getQuery());
         query = JsonUtils.like(query) ? query : JsonUtils.extract(query);
-        WorkflowException.check(!(JsonUtils.like(query)), "The cli verify cannot be parsed as JSON due to unexpected formatting: " + workTask.getQuery(), ProtocolCode.C400);
+        WorkflowException.checkCondition(!(JsonUtils.like(query)), "The cli verify cannot be parsed as JSON due to unexpected formatting: " + workTask.getQuery());
         Verifier verifier = JsonUtils.read(query, Verifier.class);
         return this.checkArtifacts(workTask, verifier);
     }

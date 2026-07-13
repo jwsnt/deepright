@@ -75,7 +75,7 @@ public class CliPubData {
                             .build());
                     HttpResponse response = resource.execute(httpGet, null, null).get(timeout, TimeUnit.MILLISECONDS);
                     // 错误模型需要使用
-                    WorkflowException.check(!(ProtocolCode.range2xx(response.getStatusLine().getStatusCode())), this.getCmd(), ProtocolCode.C400);
+                    WorkflowException.checkSilent(!(ProtocolCode.range2xx(response.getStatusLine().getStatusCode())), this.getCmd());
                     try (BufferedInputStream input = new BufferedInputStream(response.getEntity().getContent())) {
                         this.setCmd(encode ? Base64.getEncoder().encodeToString(input.readAllBytes()) : IOUtils.toString(input, StandardCharsets.UTF_8));
                     }
@@ -107,15 +107,15 @@ public class CliPubData {
     }
 
     public CliPubData valid() throws Exception {
-        WorkflowException.check(!(CliPubData.SUCCESS.equals(this.getStatus())), this.getCmd(), ProtocolCode.C400);
+        WorkflowException.checkCondition(!(CliPubData.SUCCESS.equals(this.getStatus())), this.getCmd());
         return this;
     }
 
     public CliPubData check() throws Exception {
-        WorkflowException.check(this.suffix == null, "The cli@pub suffix can not be empty", ProtocolCode.C400);
-        WorkflowException.check(this.status == null, "The cli@pub status can not be empty", ProtocolCode.C400);
-        WorkflowException.check(StringUtils.isEmpty(this.cmd), "The cli@pub cmd can not be empty", ProtocolCode.C400);
-        WorkflowException.check(StringUtils.isEmpty(this.tid), "The cli@pub tid can not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(this.suffix == null, "The cli@pub suffix can not be empty");
+        WorkflowException.checkCondition(this.status == null, "The cli@pub status can not be empty");
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.cmd), "The cli@pub cmd can not be empty");
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.tid), "The cli@pub tid can not be empty");
         return this;
     }
 

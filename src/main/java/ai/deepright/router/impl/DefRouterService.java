@@ -71,7 +71,7 @@ public class DefRouterService implements RouterKey, RouterService {
 
     @PostConstruct
     public void init() throws Exception {
-        WorkflowException.check(!(this.update > this.cache), "The cli env config is invalid: " + this.update + " / " + this.cache, ProtocolCode.C400);
+        WorkflowException.checkCondition(!(this.update > this.cache), "The cli env config is invalid: " + this.update + " / " + this.cache);
         this.cache4expire = CacheBuilder.newBuilder().expireAfterWrite(this.cache, TimeUnit.MILLISECONDS).build();
     }
 
@@ -89,8 +89,8 @@ public class DefRouterService implements RouterKey, RouterService {
     public Boolean hasHeartbeat(RouterDevice routerDevice) throws Exception {
         // 检查Device+Key是否存在
         RouterDevice cacheDevice = this.fetch(routerDevice);
-        WorkflowException.check(cacheDevice == null, "The device [" + routerDevice.key() + "] is not exists", ProtocolCode.C400);
-        WorkflowException.check(cacheDevice.isExpired(this.expire), "The device [" + routerDevice.key() + "] is expired", ProtocolCode.C400);
+        WorkflowException.checkCondition(cacheDevice == null, "The device [" + routerDevice.key() + "] is not exists");
+        WorkflowException.checkCondition(cacheDevice.isExpired(this.expire), "The device [" + routerDevice.key() + "] is expired");
         return true;
     }
 

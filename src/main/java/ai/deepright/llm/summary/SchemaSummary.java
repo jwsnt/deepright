@@ -2,7 +2,6 @@ package ai.deepright.llm.summary;
 
 import ai.deepright.llm.provider.RequestProviderUtils;
 import ai.open.right.WorkflowException;
-import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.utils.BytesUtils;
 import ai.open.right.utils.JsonUtils;
 import ai.open.right.workflow.flow.WorkflowTask;
@@ -132,7 +131,7 @@ public class SchemaSummary extends SummaryServiceImpl {
         }
 
         public static HistoryPair[] toPairs(Summary[] summaries, WorkflowTask workTask) {
-            WorkflowException.check(ArrayUtils.isEmpty(summaries), "The history summaries must not be empty", ProtocolCode.C400);
+            WorkflowException.checkCondition(ArrayUtils.isEmpty(summaries), "The history summaries must not be empty");
             HistoryPair[] pairs = new HistoryPair[summaries.length];
             for (int i = 0; i < summaries.length; i++) {
                 pairs[i] = summaries[i].toPair();

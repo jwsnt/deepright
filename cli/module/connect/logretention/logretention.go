@@ -15,6 +15,8 @@ const (
 	timeLayout           = "2006-01-02T15:04:05.000"
 )
 
+var cleanupDeleteBatchSize = 500
+
 type Result struct {
 	RetentionDays          int
 	Cutoff                 string
@@ -205,43 +207,31 @@ func CleanupExpiredLogs(ctx context.Context, db *sql.DB, now time.Time, retentio
 		Cutoff:        now.AddDate(0, 0, -retentionDays).Format(timeLayout),
 	}
 
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return result, err
-	}
-	defer func() {
-		_ = tx.Rollback()
-	}()
-
-	if exists, err := tableExists(ctx, tx, "agent_message_log"); err != nil {
+	if exists, err := tableExists(ctx, db, "agent_message_log"); err != nil {
 		return result, err
 	} else if exists {
-		deleted, err := deleteBeforeCutoff(ctx, tx, "agent_message_log", result.Cutoff)
+		deleted, err := deleteBeforeCutoffBatched(ctx, db, "agent_message_log", result.Cutoff)
 		if err != nil {
 			return result, err
 		}
 		result.DeletedAgentMessageLog = deleted
 	}
 
-	if exists, err := tableExists(ctx, tx, "chat_log"); err != nil {
+	if exists, err := tableExists(ctx, db, "chat_log"); err != nil {
 		return result, err
 	} else if exists {
-		deleted, err := deleteBeforeCutoff(ctx, tx, "chat_log", result.Cutoff)
+		deleted, err := deleteBeforeCutoffBatched(ctx, db, "chat_log", result.Cutoff)
 		if err != nil {
 			return result, err
 		}
 		result.DeletedChatLog = deleted
 	}
-
-	if err := tx.Commit(); err != nil {
-		return result, err
-	}
 	return result, nil
 }
 
-func tableExists(ctx context.Context, tx *sql.Tx, name string) (bool, error) {
+func tableExists(ctx context.Context, db *sql.DB, name string) (bool, error) {
 	var count int
-	if err := tx.QueryRowContext(
+	if err := db.QueryRowContext(
 		ctx,
 		`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = ?`,
 		strings.TrimSpace(name),
@@ -254,6 +244,48 @@ func tableExists(ctx context.Context, tx *sql.Tx, name string) (bool, error) {
 func deleteBeforeCutoff(ctx context.Context, tx *sql.Tx, tableName, cutoff string) (int64, error) {
 	stmt := fmt.Sprintf(`DELETE FROM %s WHERE created_at != '' AND created_at < ?`, tableName)
 	res, err := tx.ExecContext(ctx, stmt, cutoff)
+	if err != nil {
+		return 0, err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return rows, nil
+}
+
+func deleteBeforeCutoffBatched(ctx context.Context, db *sql.DB, tableName, cutoff string) (int64, error) {
+	batchSize := cleanupDeleteBatchSize
+	if batchSize <= 0 {
+		batchSize = 500
+	}
+
+	var total int64
+	for {
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			return total, err
+		}
+
+		deleted, err := deleteBeforeCutoffBatch(ctx, tx, tableName, cutoff, batchSize)
+		if err != nil {
+			_ = tx.Rollback()
+			return total, err
+		}
+		if err := tx.Commit(); err != nil {
+			return total, err
+		}
+
+		total += deleted
+		if deleted < int64(batchSize) {
+			return total, nil
+		}
+	}
+}
+
+func deleteBeforeCutoffBatch(ctx context.Context, tx *sql.Tx, tableName, cutoff string, limit int) (int64, error) {
+	stmt := fmt.Sprintf(`DELETE FROM %s WHERE rowid IN (SELECT rowid FROM %s WHERE created_at != '' AND created_at < ? LIMIT ?)`, tableName, tableName)
+	res, err := tx.ExecContext(ctx, stmt, cutoff, limit)
 	if err != nil {
 		return 0, err
 	}

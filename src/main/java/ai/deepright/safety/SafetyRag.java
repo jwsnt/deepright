@@ -1,7 +1,6 @@
 package ai.deepright.safety;
 
 import ai.open.right.WorkflowException;
-import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.resouce.ResourceService;
 import ai.open.right.workflow.flow.llm.rag.RagCondition;
 import ai.open.right.workflow.flow.llm.rag.RagConfig;
@@ -42,7 +41,7 @@ public class SafetyRag extends RagCondition implements RagService {
         this.template = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template).openStream()), StandardCharsets.UTF_8);
         // 覆盖（rewrite），不需要重入
         // 启动检测，必要资源
-        WorkflowException.check(StringUtils.isEmpty(this.template), "The template must not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template), "The template must not be empty");
     }
 
     @Override

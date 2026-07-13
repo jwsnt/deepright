@@ -44,8 +44,10 @@ func OpenWarningStore(dbPath string) (*WarningStore, error) {
 	if err != nil {
 		return nil, fmt.Errorf("打开 sqlite 失败: %w", err)
 	}
-	db.SetMaxOpenConns(10)
-	db.SetMaxIdleConns(10)
+	// skills_warning is maintained as a full snapshot table, so a single shared
+	// SQLite connection keeps refreshes predictable and avoids extra write-lock contention.
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
 	db.SetConnMaxLifetime(0)
 
 	if _, err := db.Exec(warningTableDDL); err != nil {

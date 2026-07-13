@@ -85,8 +85,8 @@ public class DefMemoryService extends BaseFunction implements MemoryService {
         this.template4refreshSession = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4refreshSession).openStream()), StandardCharsets.UTF_8);
         // 覆盖（rewrite），不需要重入
         // 启动检测，必要资源
-        WorkflowException.check(StringUtils.isEmpty(this.template4refreshSummary), "The template refresh summary must not be empty", ProtocolCode.C400);
-        WorkflowException.check(StringUtils.isEmpty(this.template4refreshSession), "The template session summary must not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4refreshSummary), "The template refresh summary must not be empty");
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4refreshSession), "The template session summary must not be empty");
     }
 
 

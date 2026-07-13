@@ -113,7 +113,7 @@ public class MediaFileUploadTransferService extends MediaTransferServiceImpl {
         public void init() throws Exception {
             // 从客户端上传图片
             CliPubData pubData = this.cliSubFetcher.fetch(this.workTask, new RouterDevice(this.workTask), this.uri, "");
-            WorkflowException.check(!(pubData.isOk()), pubData.getCmd(), ProtocolCode.C400);
+            WorkflowException.checkCondition(!(pubData.isOk()), pubData.getCmd());
             // Vertex容易触发400:URL_REJECTED-REJECTED_FC_TOO_MANY_PENDING，需要转成base64
             this.fullData(pubData);
         }
@@ -127,7 +127,7 @@ public class MediaFileUploadTransferService extends MediaTransferServiceImpl {
                 this.mediaContext.setData(pubData.forceText(this.resource, this.sysStore, this.timeout, true).getCmd());
             }
             // 错误模型需要使用
-            WorkflowException.check(StringUtils.isEmpty(this.mediaContext.getData()), pubData.getCmd(), ProtocolCode.C915);
+            WorkflowException.checkCondition(StringUtils.isEmpty(this.mediaContext.getData()), pubData.getCmd());
             // 重写Mime Type
             this.mediaContext.setType(MediaContext.PREFIX_INLINE + this.mediaContext.getType());
         }

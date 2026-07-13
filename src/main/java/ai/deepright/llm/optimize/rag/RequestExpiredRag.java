@@ -62,7 +62,7 @@ public class RequestExpiredRag extends RagCondition implements RagService {
     @PostConstruct
     public void init() throws Exception {
         this.template4expired = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4expired).openStream()), StandardCharsets.UTF_8);
-        WorkflowException.check(StringUtils.isEmpty(this.template4expired), "The template expired must not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4expired), "The template expired must not be empty");
     }
 
     @Override

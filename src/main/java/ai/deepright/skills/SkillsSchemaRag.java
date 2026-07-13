@@ -4,7 +4,6 @@ import ai.deepright.feature.FeatureFlag;
 import ai.deepright.feature.FeatureUtils;
 import ai.deepright.utils.TemplateChecker;
 import ai.open.right.WorkflowException;
-import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.resouce.ResourceService;
 import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.llm.rag.RagConfig;
@@ -56,8 +55,8 @@ public class SkillsSchemaRag extends RagSkills implements SkillsChecker {
         this.template4extract = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4extract).openStream()), StandardCharsets.UTF_8);
         this.template4init = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4init).openStream()), StandardCharsets.UTF_8);
         // 覆盖（rewrite），不需要重入，启动检测，必要资源
-        WorkflowException.check(StringUtils.isEmpty(this.template4extract), "The template template4extract must not be empty", ProtocolCode.C400);
-        WorkflowException.check(StringUtils.isEmpty(this.template4init), "The template init must not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4extract), "The template template4extract must not be empty");
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4init), "The template init must not be empty");
         this.activePlugins.put(SkillsChecker.PLUGIN_BROWSER, "browser");
         this.activePlugins.put(SkillsChecker.PLUGIN_REMOTE, "remote");
     }

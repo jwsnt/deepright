@@ -18,7 +18,6 @@ import ai.deepright.utils.SecurityTruncater;
 import ai.deepright.utils.TemplateChecker;
 import ai.deepright.workflow.worktask.HeartbeatWorkTask;
 import ai.open.right.WorkflowException;
-import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.resouce.ResourceService;
 import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.llm.Segment;
@@ -102,10 +101,10 @@ public class KnowledgeService implements MemoryService {
         // IOUtils/JsonUtils负责关闭资源
         // 覆盖（rewrite），不需要重入
         // 启动检测，必要资源
-        WorkflowException.check(StringUtils.isEmpty(this.template4prefix), "The template prefix must not be empty", ProtocolCode.C400);
-        WorkflowException.check(StringUtils.isEmpty(this.template4recall), "The template recall must not be empty", ProtocolCode.C400);
-        WorkflowException.check(StringUtils.isEmpty(this.template4commit), "The template commit must not be empty", ProtocolCode.C400);
-        WorkflowException.check(StringUtils.isEmpty(this.template4init), "The template init must not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4prefix), "The template prefix must not be empty");
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4recall), "The template recall must not be empty");
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4commit), "The template commit must not be empty");
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4init), "The template init must not be empty");
     }
 
     @Override
@@ -135,7 +134,7 @@ public class KnowledgeService implements MemoryService {
                 .r(List.of(knowledge.getPath()))
                 .exempted(true)
                 .build(), buffer.toString(), "");
-        WorkflowException.check(!(pubData.isOk()), pubData.getCmd(), ProtocolCode.C400);
+        WorkflowException.checkCondition(!(pubData.isOk()), pubData.getCmd());
         if (!StringUtils.isEmpty(pubData.getCmd())) {
             String query = this.template4recall.replace("#init", this.template4init.replace("#knowledge", this.buildPath(workTask, knowledge))).replace("#recall", pubData.getCmd());
             if (log.isWarnEnabled() && !TemplateChecker.check(query)) {

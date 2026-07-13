@@ -122,7 +122,7 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
         this.template4safety = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4safety).openStream()), StandardCharsets.UTF_8);
         // 覆盖（rewrite），不需要重入
         // 启动检测，必要资源
-        WorkflowException.check(StringUtils.isEmpty(this.template4safety), "The template safety must not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4safety), "The template safety must not be empty");
     }
 
     public Object call(FunctionContext functionContext) throws Exception {
@@ -144,10 +144,10 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
             CliPubSub.checkValid(workTask);
             String query = StringUtils.trim(workTask.printQuery().getQuery());
             query = JsonUtils.like(query) ? query : JsonUtils.extract(query);
-            WorkflowException.check(!(JsonUtils.like(query)), "The cli request cannot be parsed as JSON due to unexpected formatting: " + workTask.getQuery(), ProtocolCode.C400);
+            WorkflowException.checkSilent(!(JsonUtils.like(query)), "The cli request cannot be parsed as JSON due to unexpected formatting: " + workTask.getQuery());
             Map<String, Object> source = JsonUtils.read(query, Map.class);
             RouterDevice router = this.buildTargetDevice(workTask, source);
-            WorkflowException.check(source == null, "The cli@sub can not be empty: " + router.key(), ProtocolCode.C400);
+            WorkflowException.checkCondition(source == null, "The cli@sub can not be empty: " + router.key());
             Integer timeout = this.buildTimeout(workTask, source);
             if (log.isInfoEnabled()) {
                 log.info("The cli@sub router timeout={}, key={}", timeout, router.key());
@@ -182,7 +182,7 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
             // 推送CLI任务队列到指定设备 并推送到端
             Object subRequest = new CliSubRequestExec(this.redis4event, this.interval, timeout, this.expire, router.getDevice(), JsonUtils.write(subData)).exec();
             // 需要模型可读
-            WorkflowException.check(subRequest == null, "The response is timeout, please try a different command.", ProtocolCode.C400);
+            WorkflowException.checkSilent(subRequest == null, "The response is timeout, please try a different command.");
             if (waitPub) {
                 // 等待通道结果
                 Object subResponse = new CliSubResponseExec(this.redis4event, this.interval, timeout, subData.getTid()).exec();
@@ -212,6 +212,7 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
                 return this.def;
             }
         } catch (RedisSystemException | QueryTimeoutException e) {
+            // 客户端的Blocker不可控，仅在DEBUG时告警，避免污染日志
             this.cliSubBlocker.block(workTask);
             throw new WorkflowException(e, this.debug ? ProtocolCode.C500 : ProtocolCode.C915).needSilent();
         } catch (Exception e) {
@@ -342,14 +343,14 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
     public CliTransferData transfer(WorkflowTask workTask, RouterDevice source, RouterDevice target, String path, String why) throws Exception {
         // 读取并推送
         CliPubData sourceData = this.fetch(workTask, source, path, why);
-        WorkflowException.check(!(sourceData.isOk()), sourceData.getCmd(), ProtocolCode.C400);
+        WorkflowException.checkCondition(!(sourceData.isOk()), sourceData.getCmd());
         String targetFile = FeatureUtils.escapePath(FeatureFlag.isWindows(target.getSys()), target.getWorkspace() + File.separator + "tmp" + File.separator + FilenameUtils.getName(path));
         String command = StringUtils.equalsIgnoreCase(CliPubData.URL, sourceData.getEncode()) ? CliPubSub.buildPushURL(workTask, this.httpProtocol.dataHost(sourceData.getCmd()), targetFile) : CliPubSub.buildPushCmd(workTask, this.sysStore, this.oversize, sourceData.getCmd(), targetFile);
         CliPubData targetData = this.command(workTask, CliSubOps.builder()
                 .app(List.of("cat", "curl", "mkdir"))
                 .w(List.of(targetFile))
                 .build(), true, FilenameUtils.getExtension(Paths.get(path).getFileName().toString()), target.getDevice(), target.getAgent(), command, why);
-        WorkflowException.check(!(targetData.isOk()), targetData.getCmd(), ProtocolCode.C400);
+        WorkflowException.checkCondition(!(targetData.isOk()), targetData.getCmd());
         return CliTransferData.builder()
                 .targetPubData(targetData)
                 .sourcePubData(sourceData)
@@ -359,17 +360,17 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
     }
 
     protected List<String> normalizePaths(WorkflowTask workTask, List<String> paths) throws Exception {
-        WorkflowException.check(CollectionUtils.isEmpty(paths), "The fetch paths can not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(CollectionUtils.isEmpty(paths), "The fetch paths can not be empty");
         List<String> normalized = new ArrayList<String>(paths.size());
         for (String path : paths) {
-            WorkflowException.check(StringUtils.isEmpty(path), "The fetch paths can not contain empty values", ProtocolCode.C400);
+            WorkflowException.checkCondition(StringUtils.isEmpty(path), "The fetch paths can not contain empty values");
             normalized.add(FeatureUtils.escapePath(workTask, FeatureUtils.escapeFile(workTask, path)));
         }
         return normalized;
     }
 
     protected String buildFetchCmd(WorkflowTask workTask, List<String> paths) throws Exception {
-        WorkflowException.check(CollectionUtils.isEmpty(paths), "The fetch paths can not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(CollectionUtils.isEmpty(paths), "The fetch paths can not be empty");
         List<String> escaped = new ArrayList<String>(paths.size());
         for (String path : paths) {
             escaped.add(FeatureUtils.escapeShell(workTask, path));
@@ -452,20 +453,21 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
                         .workTask(workTask)
                         .build();
                 Map<String, Object> result = JsonUtils.read(this.localhost(workTask, syncConfig).get(), Map.class);
-                WorkflowException.check(!MapUtils.getBooleanValue(result, "decision", false), "The command can not be allowed: " + MapUtils.getString(result, "why_do_this"), ProtocolCode.C400);
+                WorkflowException.checkCondition(!MapUtils.getBooleanValue(result, "decision", false), "The command can not be allowed: " + MapUtils.getString(result, "why_do_this"));
             }
         }
     }
 
     protected void checkHeartbeat(WorkflowTask workTask, RouterDevice routerDevice, CliSubData subData, Map<String, Object> source, Boolean exempted) throws Exception {
         if (!routerDevice.isSame(workTask)) {
-            WorkflowException.check(!(this.routerService.hasHeartbeat(routerDevice)), "The device [" + routerDevice.getDevice() + "][" + routerDevice.getAgent() + "]'s heartbeat was not detected.", ProtocolCode.C400);
+            WorkflowException.checkCondition(!(this.routerService.hasHeartbeat(routerDevice)), "The device [" + routerDevice.getDevice() + "][" + routerDevice.getAgent() + "]'s heartbeat was not detected.");
         }
     }
 
     protected void checkResponse(WorkflowTask workTask, CliSubData subData, Integer timeout, byte[] result) throws Exception {
         // 用于提示模型的错误
         if (ArrayUtils.isEmpty(result)) {
+            // 客户端超时不可控，仅在DEBUG时告警，避免污染日志
             throw new WorkflowException("The cli cmd (" + subData.getCmd() + ") has timed out after " + timeout + " ms, please ensure the command is valid.", this.debug ? ProtocolCode.C500 : ProtocolCode.C915).needSilent();
         }
     }

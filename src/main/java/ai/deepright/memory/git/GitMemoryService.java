@@ -115,9 +115,9 @@ public class GitMemoryService extends BaseFunction implements GitPath, MemorySer
         // IOUtils/JsonUtils负责关闭资源
         // 覆盖（rewrite），不需要重入
         // 启动检测，必要资源
-        WorkflowException.check(StringUtils.isEmpty(this.template4summaryStore), "The template summary store must not be empty", ProtocolCode.C400);
-        WorkflowException.check(StringUtils.isEmpty(this.template4summaryQuery), "The template summary query must not be empty", ProtocolCode.C400);
-        WorkflowException.check(StringUtils.isEmpty(this.template4memory), "The template init must not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4summaryStore), "The template summary store must not be empty");
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4summaryQuery), "The template summary query must not be empty");
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4memory), "The template init must not be empty");
     }
 
     @Override
@@ -142,7 +142,8 @@ public class GitMemoryService extends BaseFunction implements GitPath, MemorySer
         if (log.isInfoEnabled()) {
             log.info("The recalled memory={}, device={}", StringUtils.length(pubData.getCmd()), workTask.getDevice());
         }
-        WorkflowException.check(!(pubData.isOk()), pubData.getCmd(), StringUtils.containsIgnoreCase(pubData.getCmd(), XmlResourceLang.get(MemoryService.LANG_KEY_MEMORY_INIT_FILE)) ? ProtocolCode.C915 : ProtocolCode.C500);
+        // 如果为Git不存在则不告警，避免日志污染
+        WorkflowException.checkCondition(!(pubData.isOk()), pubData.getCmd(), StringUtils.containsIgnoreCase(pubData.getCmd(), XmlResourceLang.get(MemoryService.LANG_KEY_MEMORY_INIT_FILE)) ? ProtocolCode.C915 : ProtocolCode.C500);
         return SecurityTruncater.truncate(this.buildRecallCompress(workTask, recall, pubData.getCmd()), this.truncate);
     }
 
@@ -381,7 +382,7 @@ public class GitMemoryService extends BaseFunction implements GitPath, MemorySer
                 String digest = null;
                 if (JsonUtils.like(this.buffer.toString())) {
                     Map<String, Object> memory = JsonUtils.read(this.buffer.toString(), Map.class);
-                    WorkflowException.check(MapUtils.isEmpty(memory), "The git memory commit can not be empty", ProtocolCode.C400);
+                    WorkflowException.checkCondition(MapUtils.isEmpty(memory), "The git memory commit can not be empty");
                     Integer important = MapUtils.getInteger(memory, "important", 0);
                     digest = "[datetime=" + GitMemoryService.DATE_FORMAT.format(this.workTask.getCreated()) + "][important=" + important + "][needs=" + MapUtils.getString(memory, "needs") + "][digest=" + MapUtils.getString(memory, "digest", "") + "]";
                     why = MapUtils.getString(memory, "why_do_this");

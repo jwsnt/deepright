@@ -24,6 +24,6 @@ public class HeartbeatWorkTask extends MarkQueryWorkTask {
     @Override
     public void close() throws Exception {
         super.close();
-        WorkflowException.check(!(this.routerService.hasHeartbeat(this.workTask)), "The heartbeat workTask is closed", ProtocolCode.C400);
+        WorkflowException.checkCondition(!(this.routerService.hasHeartbeat(this.workTask)), "The heartbeat workTask is closed");
     }
 }

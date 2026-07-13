@@ -64,7 +64,7 @@ public class CliInsertRag extends RagCondition implements CliInsertService, RagS
     @PostConstruct
     public void init() throws Exception {
         this.template4insert = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4insert).openStream()), StandardCharsets.UTF_8);
-        WorkflowException.check(StringUtils.isEmpty(this.template4insert), "The template insert must not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4insert), "The template insert must not be empty");
     }
 
     @Override

@@ -28,7 +28,7 @@ public interface CliPubSub {
     // 检查Device
     public static void checkValid(WorkflowTask workTask) throws Exception {
         // 设备号不能为Null或默认值
-        WorkflowException.check(StringUtils.equalsIgnoreCase(workTask.getDevice(), UserContext.UNKNOWN) || StringUtils.isEmpty(workTask.getDevice()), "The cli device can not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(StringUtils.equalsIgnoreCase(workTask.getDevice(), UserContext.UNKNOWN) || StringUtils.isEmpty(workTask.getDevice()), "The cli device can not be empty");
     }
 
     // 构建推送CMD

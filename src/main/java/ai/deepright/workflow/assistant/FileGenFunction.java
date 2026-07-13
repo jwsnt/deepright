@@ -83,7 +83,7 @@ public class FileGenFunction extends BaseFunction {
         CliPubData pubData = this.cliSubFetcher.command(workTask, new RouterDevice(workTask), CliSubOps.builder()
                 .w(List.of(file))
                 .build(), CliPubSub.buildPushCmd(workTask, this.defStore, this.oversize, content, file), why);
-        WorkflowException.check(!(pubData.isOk()), pubData.getCmd(), ProtocolCode.C400);
+        WorkflowException.checkCondition(!(pubData.isOk()), pubData.getCmd());
         data.put("file_path", file);
         return data;
     }
@@ -92,21 +92,21 @@ public class FileGenFunction extends BaseFunction {
     protected Map<String, Object> buildQuery(WorkflowTask workTask, Map<String, Object> query) throws Exception {
         List<String> refers = List.class.cast(query.remove("refer_uris"));
         // 异常需要抛给模型
-        WorkflowException.check(CollectionUtils.isEmpty(refers), "The refer_uris can not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(CollectionUtils.isEmpty(refers), "The refer_uris can not be empty");
         for (String refer : refers) {
-            WorkflowException.check(StringUtils.isEmpty(refer), "The refer_uris cannot contain empty values", ProtocolCode.C400);
+            WorkflowException.checkCondition(StringUtils.isEmpty(refer), "The refer_uris cannot contain empty values");
         }
         if (!refers.isEmpty()) {
             // 禁止exempted=true豁免
             CliPubData pubData = this.cliSubFetcher.fetch(workTask, new RouterDevice(workTask), CliSubOps.builder()
                     .r(refers)
                     .build(), refers, "");
-            WorkflowException.check(SuffixUtils.isBinary(pubData.getSuffix()), "The referenced file cannot be a binary file: " + pubData.getSuffix(), ProtocolCode.C400);
-            WorkflowException.check(!pubData.isOk(), pubData.getCmd(), ProtocolCode.C400);
+            WorkflowException.checkCondition(SuffixUtils.isBinary(pubData.getSuffix()), "The referenced file cannot be a binary file: " + pubData.getSuffix());
+            WorkflowException.checkCondition(!pubData.isOk(), pubData.getCmd());
             if (!StringUtils.isEmpty(pubData.getCmd())) {
                 // 强制转换为TEXT
                 SysStore sysStore = SysStore.class.cast(this.defStore.fetchStore(SysStore.NAME));
-                WorkflowException.check(sysStore == null, "The file gen sys store can not be empty", ProtocolCode.C400);
+                WorkflowException.checkCondition(sysStore == null, "The file gen sys store can not be empty");
                 String referBody = pubData.forceText(this.resource, sysStore, this.timeout).getCmd();
                 this.checkSize(workTask, query, BytesUtils.utf8Bytes(referBody));
                 query.put("refer_body", referBody);

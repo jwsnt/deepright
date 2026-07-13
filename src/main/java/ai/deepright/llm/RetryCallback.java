@@ -1,7 +1,5 @@
 package ai.deepright.llm;
 
-import ai.open.right.protocol.ProtocolCode;
-
 import ai.open.right.WorkflowException;
 import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.llm.provider.ProviderReaderCallback;
@@ -22,7 +20,7 @@ public class RetryCallback extends ProviderReaderCallback {
     public RetryCallback(ProviderReaderConfig<ProviderRequest> providerReaderConfig, BlockingQueue<Object> messageQueue, ProviderRequest request, WorkflowTask workTask) throws Exception {
         super(providerReaderConfig, messageQueue, request, workTask);
         RetryConfig retryConfig = RetryConfig.class.cast(MapUtils.getObject(providerReaderConfig.getExtension(), RetryUtils.RETRY));
-        WorkflowException.check(retryConfig == null, "The retry config can not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(retryConfig == null, "The retry config can not be empty");
         this.retryConfig = retryConfig.check();
     }
 

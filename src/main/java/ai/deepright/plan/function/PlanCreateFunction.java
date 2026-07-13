@@ -73,9 +73,9 @@ public class PlanCreateFunction extends BaseFunction {
         this.template4query = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4query).openStream()), StandardCharsets.UTF_8);
         // 覆盖（rewrite），不需要重入
         // 启动检测，必要资源
-        WorkflowException.check(StringUtils.isEmpty(this.template4directly), "The template directly must not be empty", ProtocolCode.C400);
-        WorkflowException.check(StringUtils.isEmpty(this.template4answer), "The template answer must not be empty", ProtocolCode.C400);
-        WorkflowException.check(StringUtils.isEmpty(this.template4query), "The template query must not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4directly), "The template directly must not be empty");
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4answer), "The template answer must not be empty");
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4query), "The template query must not be empty");
     }
 
     @Override
@@ -91,7 +91,7 @@ public class PlanCreateFunction extends BaseFunction {
             return this.buildDirectly(workTask, workflow);
         }
         String why = MapUtils.getString(data, "why_do_this");
-        WorkflowException.check(StringUtils.isEmpty(why), "The why_do_this must not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(StringUtils.isEmpty(why), "The why_do_this must not be empty");
         String query = this.buildQuery(workTask, why);
         this.notify(workTask);
         this.source(workTask, CliPrinter.format(why, CliPrinter.SIZE_N));
@@ -132,8 +132,8 @@ public class PlanCreateFunction extends BaseFunction {
 
     protected String buildWorkflow(WorkflowTask workTask, Integer type) throws Exception {
         // 1=Open-ended questions，2=Closed-ended questions
-        WorkflowException.check(type == null, "The plan type cannot be empty, please set it to 1 for open-ended questions and 2 for closed-ended questions.", ProtocolCode.C400);
-        WorkflowException.check(type > PlanCreateFunction.CLOSE, "The plan type must be 1 or 2", ProtocolCode.C400);
+        WorkflowException.checkCondition(type == null, "The plan type cannot be empty, please set it to 1 for open-ended questions and 2 for closed-ended questions.");
+        WorkflowException.checkCondition(type > PlanCreateFunction.CLOSE, "The plan type must be 1 or 2");
         return PlanCreateFunction.OPEN.equals(type) ? "plan@open" : "plan@close";
     }
 

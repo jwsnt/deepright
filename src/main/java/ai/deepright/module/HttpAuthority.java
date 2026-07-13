@@ -36,13 +36,13 @@ public class HttpAuthority implements TokenMapping {
             return HttpAuthority.TOKEN;
         }
         String provider = FeatureUtils.buildTargetProvider(workTask);
-        WorkflowException.check(StringUtils.isEmpty(provider), "The provider can not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(StringUtils.isEmpty(provider), "The provider can not be empty");
         if (this.authService.support(provider)) {
             // 验证
             this.authService.auth(workTask, provider, token);
         } else {
             // 其他服务商检查Token
-            WorkflowException.check(StringUtils.isEmpty(token), "The token can not be empty", ProtocolCode.C400);
+            WorkflowException.checkCondition(StringUtils.isEmpty(token), "The token can not be empty");
             workTask.putMetadata(ProviderRequestService.KEY_INTERNAL + ProviderRequestService.KEY_TOKEN, StringUtils.trim(token));
         }
         return HttpAuthority.TOKEN;

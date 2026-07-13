@@ -10,7 +10,6 @@ import ai.deepright.feature.FeatureUtils;
 import ai.deepright.router.RouterDevice;
 import ai.deepright.utils.TemplateChecker;
 import ai.open.right.WorkflowException;
-import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.config.AllowedConfig;
 import ai.open.right.workflow.flow.file.DefStore;
@@ -60,7 +59,7 @@ public class MixedSkillFetcher extends FileSystemFetcher {
         SkillMetadata skill = this.fetchSkills(workTask).getSkills().get(name);
         // location固定为技能文件本身的绝对路径，而不是目录路径
         // /xxx/skills/skill-creator/SKILL.md
-        WorkflowException.check(skill == null, "The skill can not be empty: " + name, ProtocolCode.C400);
+        WorkflowException.checkCondition(skill == null, "The skill can not be empty: " + name);
         String location = MapUtils.getString(skill.getInternal(), "location");
         if (StringUtils.isEmpty(location)) {
             // 服务端Skills
@@ -75,7 +74,7 @@ public class MixedSkillFetcher extends FileSystemFetcher {
                     .r(List.of(escaped))
                     .exempted(true)
                     .build(), escaped, "");
-            WorkflowException.check(!(pubData.isOk()), pubData.getCmd(), ProtocolCode.C400);
+            WorkflowException.checkCondition(!(pubData.isOk()), pubData.getCmd());
             return this.replaceContent(workTask, name, path, this.removeHeader(pubData.getCmd()));
         } else {
             return this.buildRelated(workTask, fullPath, this.isBinary(workTask, name, path), name, path);
@@ -91,7 +90,7 @@ public class MixedSkillFetcher extends FileSystemFetcher {
     protected String buildRelated(WorkflowTask workTask, String location, Boolean binary, String name, String path) throws Exception {
         SkillMetadata skill = this.fetchSkills(workTask).getSkills().get(name);
         // location固定为技能文件本身的绝对路径，而不是目录路径
-        WorkflowException.check(skill == null, "The skill can not be empty: " + name, ProtocolCode.C400);
+        WorkflowException.checkCondition(skill == null, "The skill can not be empty: " + name);
         String client = MapUtils.getString(skill.getInternal(), "location");
         if (!StringUtils.isEmpty(client)) {
             // 客户端资源
@@ -100,7 +99,7 @@ public class MixedSkillFetcher extends FileSystemFetcher {
                     .app(binary ? List.of("mkdir", "curl", "base64", "gunzip") : List.of("mkdir", "cat"))
                     .exempted(true)
                     .build(), escaped, "");
-            WorkflowException.check(!(pubData.isOk()), pubData.getCmd(), ProtocolCode.C400);
+            WorkflowException.checkCondition(!(pubData.isOk()), pubData.getCmd());
             String prefix = this.buildPrefix(workTask, location, binary, name, path);
             String suffix = this.buildSuffix(workTask, location, binary, name, path);
             return !binary ? prefix + this.replaceContent(workTask, name, path, this.removeHeader(pubData.getCmd())) + suffix : pubData.getCmd();
@@ -131,7 +130,7 @@ public class MixedSkillFetcher extends FileSystemFetcher {
     protected String buildPath(WorkflowTask workTask, String name, String path) throws Exception {
         // @See CliRag
         String workspace = FeatureUtils.buildWorkspace(workTask);
-        WorkflowException.check(StringUtils.isEmpty(workspace), "The workspace can not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(StringUtils.isEmpty(workspace), "The workspace can not be empty");
         return this.buildSkills(workTask) + File.separator + name + File.separator + path;
     }
 
@@ -216,7 +215,7 @@ public class MixedSkillFetcher extends FileSystemFetcher {
         // @see CliRag
         String dir = MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_DIR);
         if (FeatureFlag.isMacOs(workTask)) {
-            WorkflowException.check(!(StringUtils.containsIgnoreCase(FeatureUtils.buildApp(workTask), ".app")), "The mac apps must be installed in the Applications folder.", ProtocolCode.C400);
+            WorkflowException.checkCondition(!(StringUtils.containsIgnoreCase(FeatureUtils.buildApp(workTask), ".app")), "The mac apps must be installed in the Applications folder.");
             return Paths.get(dir).getParent() + FeatureUtils.buildFileSeparator(workTask) + "Resources";
         } else {
             return dir;

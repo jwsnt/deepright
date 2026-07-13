@@ -61,7 +61,7 @@ public class MediaFileDownloadInlineService extends MediaInlineServiceImpl {
                 .w(List.of(file))
                 .exempted(true)
                 .build(), CliPubSub.buildPushURL(workTask, resource, file), "").valid();
-        WorkflowException.check(!(pubData.isOk()), pubData.getCmd(), ProtocolCode.C400);
+        WorkflowException.checkCondition(!(pubData.isOk()), pubData.getCmd());
         return file;
     }
 

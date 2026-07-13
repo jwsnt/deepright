@@ -114,7 +114,7 @@ public class HttpService extends NettyHttpHandler {
 
     protected void doDownload(ChannelHandlerContext ctx, QueryStringDecoder query) throws Exception {
         List<String> params = List.class.cast(MapUtils.getObject(query.parameters(), "name"));
-        WorkflowException.check(CollectionUtils.isEmpty(params), "The http server download param can not be empty", ProtocolCode.C915);
+        WorkflowException.checkCondition(CollectionUtils.isEmpty(params), "The http server download param can not be empty");
         RandomAccessFile random = this.sysStore.access(params.getFirst());
         if (random != null) {
             try {

@@ -1,9 +1,9 @@
 package ai.deepright.llm.optimize.compressor;
 
-import ai.open.right.protocol.ProtocolCode;
-
+import ai.deepright.llm.optimize.FunCallCompressor;
+import ai.deepright.module.HttpProtocol;
 import ai.open.right.WorkflowException;
-
+import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.utils.BytesUtils;
 import ai.open.right.utils.JsonUtils;
 import ai.open.right.workflow.flow.file.DefStore;
@@ -12,8 +12,6 @@ import ai.open.right.workflow.flow.llm.LLMFunCallRequest;
 import ai.open.right.workflow.flow.llm.LLMFunCallResponse;
 import ai.open.right.workflow.flow.llm.provider.ProviderRequest;
 import ai.open.right.workflow.flow.media.MediaTransferUtils;
-import ai.deepright.llm.optimize.FunCallCompressor;
-import ai.deepright.module.HttpProtocol;
 import com.google.common.collect.ImmutableMap;
 import lombok.Getter;
 import lombok.Setter;
@@ -49,7 +47,7 @@ abstract public class StoreCompressor implements FunCallCompressor {
     public void compress(ProviderRequest providerRequest, LLMFunCallResponse funCallResponse) throws Exception {
         if (this.shouldCompress(funCallResponse)) {
             FileStore fileStore = this.defStore.fetchStore(this.store);
-            WorkflowException.check(fileStore == null, "The file store can not empty: " + this.store, ProtocolCode.C400);
+            WorkflowException.checkCondition(fileStore == null, "The file store can not empty: " + this.store);
             // URL压缩在Query中
             String url = this.buildUrl(providerRequest, fileStore.store(funCallResponse.getResponse().getBytes(StandardCharsets.UTF_8), ".json", providerRequest.getMessage()));
             funCallResponse.setResponse(this.buildRecallAnswer(funCallResponse, url));
@@ -64,7 +62,7 @@ abstract public class StoreCompressor implements FunCallCompressor {
     public void compress(ProviderRequest providerRequest, LLMFunCallRequest funCallRequest) throws Exception {
         if (this.shouldCompress(funCallRequest)) {
             FileStore fileStore = this.defStore.fetchStore(this.store);
-            WorkflowException.check(fileStore == null, "The file store can not empty: " + this.store, ProtocolCode.C400);
+            WorkflowException.checkCondition(fileStore == null, "The file store can not empty: " + this.store);
             String original = JsonUtils.write(Map.class.cast(funCallRequest.getArgs()));
             // URL压缩在属性中
             String url = this.buildUrl(providerRequest, fileStore.store(original.getBytes(StandardCharsets.UTF_8), ".json", providerRequest.getMessage()));
