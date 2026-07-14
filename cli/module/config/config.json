@@ -9,10 +9,13 @@
     "heartbeat": 10,
     "debug": false
   },
+  "knowledge": {
+    "interval": 60
+  },
   "install_app": {
     "mac": [
-      "git",
       "python3",
+      "git",
       "npm"
     ]
   }

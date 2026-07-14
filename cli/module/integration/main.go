@@ -10,7 +10,9 @@ import (
 	"connect/sandboxstate"
 	"connect/skillstate"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -917,6 +919,81 @@ func integrationBundleRuntimeBaseDir() string {
 		return filepath.Clean(explicit)
 	}
 	return ""
+}
+
+func integrationBundleBrowserReuseMarkerPath(layout *integrationBundlePaths) (string, error) {
+	layout = layoutOrCurrentIntegrationBundle(layout)
+	if layout == nil {
+		return "", errors.New("bundle layout is unavailable")
+	}
+	runtimeBase := strings.TrimSpace(integrationBundleRuntimeBaseDir())
+	if runtimeBase == "" {
+		return "", errors.New("bundle runtime dir is unavailable")
+	}
+	fingerprint, err := integrationBundleLaunchFingerprint(layout)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(runtimeBase, "state", "browser-reuse", fingerprint+".seen"), nil
+}
+
+func integrationBundleLaunchFingerprint(layout *integrationBundlePaths) (string, error) {
+	layout = layoutOrCurrentIntegrationBundle(layout)
+	if layout == nil {
+		return "", errors.New("bundle layout is unavailable")
+	}
+	parts := make([]string, 0, 3)
+	if part, ok := integrationBundleLaunchFingerprintPart(filepath.Join(layout.ContentsDir, "Info.plist")); ok {
+		parts = append(parts, "plist:"+part)
+	}
+	if part, ok := integrationBundleLaunchFingerprintPart(filepath.Join(layout.MacOSDir, "integration")); ok {
+		parts = append(parts, "exe:"+part)
+	}
+	if part, ok := integrationBundleLaunchFingerprintPart(layout.BundleRoot); ok {
+		parts = append(parts, "bundle:"+part)
+	}
+	if len(parts) == 0 {
+		return "", errors.New("bundle fingerprint inputs are unavailable")
+	}
+	sum := sha256.Sum256([]byte(strings.Join(parts, "|")))
+	return hex.EncodeToString(sum[:]), nil
+}
+
+func integrationBundleLaunchFingerprintPart(path string) (string, bool) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return "", false
+	}
+	info, err := os.Stat(path)
+	if err != nil || info == nil {
+		return "", false
+	}
+	return fmt.Sprintf("%d:%d", info.Size(), info.ModTime().UnixNano()), true
+}
+
+func integrationShouldBypassExistingBrowserReuse(layout *integrationBundlePaths) (bool, func() error) {
+	markerPath, err := integrationBundleBrowserReuseMarkerPath(layout)
+	if err != nil {
+		return false, func() error { return nil }
+	}
+	if _, err := os.Stat(markerPath); err == nil {
+		return false, func() error { return nil }
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return false, func() error { return nil }
+	}
+	return true, func() error {
+		if err := os.MkdirAll(filepath.Dir(markerPath), 0o755); err != nil {
+			return err
+		}
+		return os.WriteFile(markerPath, []byte(time.Now().Format(time.RFC3339Nano)+"\n"), 0o644)
+	}
+}
+
+func layoutOrCurrentIntegrationBundle(layout *integrationBundlePaths) *integrationBundlePaths {
+	if layout != nil {
+		return layout
+	}
+	return integrationBundleLayout()
 }
 
 func integrationAllowedApplicationDirs() []string {
@@ -12062,7 +12139,9 @@ var integrationBrowserEntryProbeTimeout = 1500 * time.Millisecond
 var integrationReadyCheck = integrationReady
 var integrationBrowserEntryReadyCheck = integrationBrowserEntryReady
 var integrationOpenBrowserFn = openIntegrationBrowserMaximized
+var integrationOpenBrowserWithoutActivationFn = openIntegrationBrowserWithoutActivation
 var integrationStartLaunchSplashFn = startIntegrationLaunchSplash
+var integrationStartProcessFn = startIntegrationProcess
 var integrationPrimeSandboxModeFn = primeIntegrationSandboxMode
 var integrationPrimeSandboxDirectoryFn = primeIntegrationSandboxDirectory
 
@@ -14773,14 +14852,20 @@ func startIntegrationProcess(flags map[string]string, stdout, stderr io.Writer) 
 
 	port := resolveIntegrationLaunchPort(flags)
 	if pid, ok := readRunningPID(pidFile); ok {
-		if openExistingIntegrationBrowserIfReady(port, logWriter, stderr, "start reused running service pid=%d pid-file=%s addr=%s", pid, pidFile, fmt.Sprintf("127.0.0.1:%d", port)) {
+		if opened, openErr := openExistingIntegrationBrowserIfReady(port, logWriter, stderr, "start reused running service pid=%d pid-file=%s addr=%s", pid, pidFile, fmt.Sprintf("127.0.0.1:%d", port)); opened {
+			if openErr != nil {
+				return 1
+			}
 			return 0
 		}
 		integrationLifecycleLog(logWriter, "start failed: already running pid=%d pid-file=%s", pid, pidFile)
 		fmt.Fprintf(stderr, "integration already running: pid=%d\n", pid)
 		return 1
 	}
-	if openExistingIntegrationBrowserIfReady(port, logWriter, stderr, "start reused running service without pid-file=%s addr=%s", pidFile, fmt.Sprintf("127.0.0.1:%d", port)) {
+	if opened, openErr := openExistingIntegrationBrowserIfReady(port, logWriter, stderr, "start reused running service without pid-file=%s addr=%s", pidFile, fmt.Sprintf("127.0.0.1:%d", port)); opened {
+		if openErr != nil {
+			return 1
+		}
 		return 0
 	}
 	if err := ensureParentDir(pidFile); err != nil {
@@ -14828,7 +14913,9 @@ func startIntegrationProcess(flags map[string]string, stdout, stderr io.Writer) 
 		if pid, ok := readRunningPID(pidFile); ok && integrationReadyCheck(strconv.Itoa(port)) {
 			_ = os.Remove(startupStatusFile)
 			integrationLifecycleLog(logWriter, "service started pid=%d pid-file=%s log-file=%s addr=%s", pid, pidFile, logFile, fmt.Sprintf("127.0.0.1:%s", firstNonEmpty(flags["port"], "8080")))
-			openExistingIntegrationBrowserIfReady(port, logWriter, stderr, "")
+			if _, openErr := openExistingIntegrationBrowserIfReady(port, logWriter, stderr, ""); openErr != nil {
+				return 1
+			}
 			return 0
 		}
 		if !integrationProcessAlive(childPID) {
@@ -17056,7 +17143,8 @@ func shouldHandleIntegrationBundleAppLaunchWithContext(args []string, bundleIden
 }
 
 func handleIntegrationBundleAppLaunch(stderr io.Writer) int {
-	if !ensureIntegrationBundleLaunchAllowed(integrationBundleLayout(), stderr) {
+	layout := integrationBundleLayout()
+	if !ensureIntegrationBundleLaunchAllowed(layout, stderr) {
 		return 1
 	}
 	if err := integrationStartLaunchSplashFn(); err != nil {
@@ -17071,21 +17159,59 @@ func handleIntegrationBundleAppLaunch(stderr io.Writer) int {
 		}
 		return 1
 	}
+	openBrowserFn := integrationOpenBrowserFn
+	markBundleLaunchSeen := func() {}
+	bypassBrowserReuse := false
+	if bypassReuse, markSeen := integrationShouldBypassExistingBrowserReuse(layout); bypassReuse {
+		bypassBrowserReuse = true
+		openBrowserFn = integrationOpenBrowserWithoutActivationFn
+		markBundleLaunchSeen = func() {
+			if err := markSeen(); err != nil {
+				log.Printf("mark bundle launch browser reuse state failed: %v", err)
+			}
+		}
+	}
 	if updateBlocked {
-		if openExistingIntegrationBrowserIfReady(port, nil, stderr, "") {
+		if opened, openErr := openExistingIntegrationBrowserIfReadyWithOpener(port, nil, stderr, openBrowserFn, ""); opened {
+			if openErr != nil {
+				return 1
+			}
+			markBundleLaunchSeen()
 			return 0
 		}
-		if err := integrationOpenBrowserFn(integrationBrowserURL(port)); err != nil {
+		if err := openBrowserFn(integrationBrowserURL(port)); err != nil {
 			if stderr != nil {
 				fmt.Fprintf(stderr, "open browser failed: %v\n", err)
 			}
+			return 1
 		}
+		markBundleLaunchSeen()
 		return 0
 	}
-	if openExistingIntegrationBrowserIfReady(port, nil, stderr, "") {
+	if opened, openErr := openExistingIntegrationBrowserIfReadyWithOpener(port, nil, stderr, openBrowserFn, ""); opened {
+		if openErr != nil {
+			return 1
+		}
+		markBundleLaunchSeen()
 		return 0
 	}
-	return startIntegrationProcess(flags, os.Stdout, stderr)
+	if !bypassBrowserReuse {
+		code := integrationStartProcessFn(flags, os.Stdout, stderr)
+		if code == 0 {
+			markBundleLaunchSeen()
+		}
+		return code
+	}
+	originalOpenBrowserFn := integrationOpenBrowserFn
+	integrationOpenBrowserFn = openBrowserFn
+	defer func() {
+		integrationOpenBrowserFn = originalOpenBrowserFn
+	}()
+	code := integrationStartProcessFn(flags, os.Stdout, stderr)
+	if code == 0 {
+		markBundleLaunchSeen()
+	}
+	return code
 }
 
 func resolveIntegrationLaunchPort(flags map[string]string) int {
@@ -17101,9 +17227,13 @@ func resolveIntegrationLaunchPort(flags map[string]string) int {
 	return integrationServicePort
 }
 
-func openExistingIntegrationBrowserIfReady(port int, logWriter io.Writer, stderr io.Writer, successLogFormat string, args ...interface{}) bool {
+func openExistingIntegrationBrowserIfReady(port int, logWriter io.Writer, stderr io.Writer, successLogFormat string, args ...interface{}) (bool, error) {
+	return openExistingIntegrationBrowserIfReadyWithOpener(port, logWriter, stderr, integrationOpenBrowserFn, successLogFormat, args...)
+}
+
+func openExistingIntegrationBrowserIfReadyWithOpener(port int, logWriter io.Writer, stderr io.Writer, openBrowserFn func(string) error, successLogFormat string, args ...interface{}) (bool, error) {
 	if !integrationReadyCheck(strconv.Itoa(port)) {
-		return false
+		return false, nil
 	}
 	if !waitIntegrationBrowserEntryReady(port) {
 		if logWriter != nil {
@@ -17113,15 +17243,19 @@ func openExistingIntegrationBrowserIfReady(port int, logWriter io.Writer, stderr
 	if logWriter != nil && strings.TrimSpace(successLogFormat) != "" {
 		integrationLifecycleLog(logWriter, successLogFormat, args...)
 	}
-	if err := integrationOpenBrowserFn(integrationBrowserOpenURL(port)); err != nil {
+	if openBrowserFn == nil {
+		openBrowserFn = integrationOpenBrowserFn
+	}
+	if err := openBrowserFn(integrationBrowserOpenURL(port)); err != nil {
 		if logWriter != nil {
 			integrationLifecycleLog(logWriter, "open browser failed: %v", err)
 		}
 		if stderr != nil {
 			fmt.Fprintf(stderr, "open browser failed: %v\n", err)
 		}
+		return true, err
 	}
-	return true
+	return true, nil
 }
 
 func waitIntegrationBrowserEntryReady(port int) bool {

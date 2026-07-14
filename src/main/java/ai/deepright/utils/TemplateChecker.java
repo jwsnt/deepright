@@ -17,6 +17,8 @@ public class TemplateChecker {
             "#feishu",
             "#deepright",
             "#creator",
+            "#miniapp",
+            "#html",
             "#agentId",
             "#answer",
             "#app",

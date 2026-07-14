@@ -46,6 +46,16 @@
     + 去掉 `cliCommandHistory` 的本地持久化后，不能破坏现有 `/api/restore` 对 `cli/get`、`cli/pub` 的恢复展示
     + 正在执行中的会话刷新后，右侧 CLI 子任务允许先空窗、再逐步恢复，但不能因此丢失服务端已存在的 CLI 历史
     + 不得因为去持久化 `cliCommandHistory` 而破坏聊天主区正文恢复、任务 badge 恢复、footer inline hint 恢复等现有链路
++ 本地存储统计浮层的统计口径也需要同步收口：
+    + 浮层只能基于当前 origin 下已经写入 `localStorage` 的真实数据做分析，禁止再混入运行时 `state.chats`、运行时 CLI 历史或“若此刻保存将会写入什么”的估算值
+    + 若 `localStorage` 当前没有 `deepright_chats`，浮层应按“尚未落盘”处理，而不是回退到运行时 chat 状态做补算
+    + 总览卡片与会话明细里的各类占比必须共享同一套“已落盘字节数”分母，禁止再把运行时 `CLI` 叠加进单会话总量
+    + 会话分类口径应明确为：`正文`、`快照`、`原始流`、`元数据`；运行时 `CLI` 不再作为本地存储统计项展示
+    + 各分类属性定义需要固定：
+        + `正文`：消息中最终用于阅读的正文内容，占比主要来自 `content` 与 `cliSubContent`
+        + `快照`：`explodedSnapshots`、`explodedLogicalIds` 这类恢复或拆解过程中产生的快照/索引副本
+        + `原始流`：assistant 流式响应过程中的 `rawSse` 原始记录，用于恢复/回放，不等同于最终正文
+        + `元数据`：除正文、原始流、快照之外的其余已落盘结构与轻量状态，例如 chat 元字段、右侧 URL 预览轻量信息、agent/model/thinking/verify/htmlOutput/swarm 侧边映射，以及消息结构本身的包裹开销
 + 本次需求的验收重点如下：
     + 单个 chat 不得再因为 `cliCommandHistory.output` 而把 `localStorage` 顶到数 MB
     + 右侧 iframe 预览不应成为本地存储爆满的主因

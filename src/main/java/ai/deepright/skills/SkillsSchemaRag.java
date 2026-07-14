@@ -50,15 +50,21 @@ public class SkillsSchemaRag extends RagSkills implements SkillsChecker {
 
     protected String template4feishu;
 
+    protected String template4miniapp;
+
     protected String template4usage;
 
     protected String template4email;
 
     protected String template4image;
 
+    protected String template4html;
+
     protected String template4init;
 
     protected String skillDeepRight;
+
+    protected String skillMiniApp;
 
     protected String skillCreator;
 
@@ -66,6 +72,7 @@ public class SkillsSchemaRag extends RagSkills implements SkillsChecker {
     public void init() throws Exception {
         super.init();
         // IOUtils/JsonUtils负责关闭资源
+        this.template4miniapp = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4miniapp).openStream()), StandardCharsets.UTF_8);
         this.template4browser = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4browser).openStream()), StandardCharsets.UTF_8);
         this.template4creator = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4creator).openStream()), StandardCharsets.UTF_8);
         this.template4remote = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4remote).openStream()), StandardCharsets.UTF_8);
@@ -73,8 +80,10 @@ public class SkillsSchemaRag extends RagSkills implements SkillsChecker {
         this.template4usage = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4usage).openStream()), StandardCharsets.UTF_8);
         this.template4email = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4email).openStream()), StandardCharsets.UTF_8);
         this.template4image = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4image).openStream()), StandardCharsets.UTF_8);
+        this.template4html = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4html).openStream()), StandardCharsets.UTF_8);
         this.template4init = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4init).openStream()), StandardCharsets.UTF_8);
         // 覆盖（rewrite），不需要重入，启动检测，必要资源
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4miniapp), "The template miniapp must not be empty");
         WorkflowException.checkCondition(StringUtils.isEmpty(this.template4browser), "The template browser must not be empty");
         WorkflowException.checkCondition(StringUtils.isEmpty(this.template4creator), "The template extract must not be empty");
         WorkflowException.checkCondition(StringUtils.isEmpty(this.template4remote), "The template remote must not be empty");
@@ -82,6 +91,7 @@ public class SkillsSchemaRag extends RagSkills implements SkillsChecker {
         WorkflowException.checkCondition(StringUtils.isEmpty(this.template4email), "The template email must not be empty");
         WorkflowException.checkCondition(StringUtils.isEmpty(this.template4image), "The template image must not be empty");
         WorkflowException.checkCondition(StringUtils.isEmpty(this.template4usage), "The template usage must not be empty");
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4html), "The template html must not be empty");
         WorkflowException.checkCondition(StringUtils.isEmpty(this.template4init), "The template init must not be empty");
         this.activePlugins.put(SkillsChecker.PLUGIN_BROWSER_SKILL, SkillsChecker.PLUGIN_BROWSER_SWITCH);
         this.activePlugins.put(SkillsChecker.PLUGIN_REMOTE_SKILL, SkillsChecker.PLUGIN_REMOTE_SWITCH);
@@ -135,6 +145,7 @@ public class SkillsSchemaRag extends RagSkills implements SkillsChecker {
         String usage = this.template4usage.replace("#browser", this.allowedSkill(ragConfig, ragData, SkillsChecker.PLUGIN_BROWSER_SKILL) ? this.template4browser.replace("#browser", SkillsChecker.PLUGIN_BROWSER_SKILL) : "");
         usage = usage.replace("#remote", this.allowedSkill(ragConfig, ragData, SkillsChecker.PLUGIN_REMOTE_SKILL) ? this.template4remote.replace("#remote", SkillsChecker.PLUGIN_REMOTE_SKILL) : "");
         usage = usage.replace("#feishu", FeatureFlag.isActivePlugin(ragData.getQuery(), SkillsChecker.PLUGIN_FEISHU_SWITCH) ? this.template4feishu.replace("#deepright", this.skillDeepRight) : "");
+        usage = usage.replace("#miniapp", this.template4miniapp.replace("#miniapp", this.skillMiniApp).replace("#html", FeatureFlag.isHtml(ragData.getQuery()) ? this.template4html : ""));
         usage = usage.replace("#email", FeatureFlag.isActivePlugin(ragData.getQuery(), SkillsChecker.PLUGIN_EMAIL_SWITCH) ? this.template4email.replace("#deepright", this.skillDeepRight) : "");
         usage = usage.replace("#creator", this.isSkillExtract(ragConfig, ragData, skills) ? this.template4creator.replace("#creator", this.skillCreator) : "");
         usage = usage.replace("#image", RequestProviderUtils.isMultiOutputModel(ragData.getQuery()) ? this.template4image : "");
@@ -164,6 +175,9 @@ public class SkillsSchemaRag extends RagSkills implements SkillsChecker {
         @Value("${skills.schema.template.browser:classpath:config/skills/browser.md}")
         protected String template4browser;
 
+        @Value("${skills.schema.template.miniapp:classpath:config/skills/miniapp.md}")
+        protected String template4miniapp;
+
         @Value("${skills.schema.template.remote:classpath:config/skills/remote.md}")
         protected String template4remote;
 
@@ -179,11 +193,17 @@ public class SkillsSchemaRag extends RagSkills implements SkillsChecker {
         @Value("${skills.schema.template.email:classpath:config/skills/email.md}")
         protected String template4email;
 
+        @Value("${skills.schema.template.html:classpath:config/skills/html.md}")
+        protected String template4html;
+
         @Value("${skills.schema.template.init:classpath:config/skills/main.md}")
         protected String template4init;
 
         @Value("${skills.schema.deepright:__internal_deepright}")
         protected String skillDeepRight;
+
+        @Value("${skills.schema.miniapp:__internal_miniapp}")
+        protected String skillMiniApp;
 
         @Value("${skills.schema.creator:__internal_creator}")
         protected String skillCreator;

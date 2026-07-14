@@ -93,11 +93,19 @@ func integrationMacBrowserSpecs() []integrationMacBrowserSpec {
 }
 
 func openIntegrationBrowserMaximized(target string) error {
+	return openIntegrationBrowser(target, true)
+}
+
+func openIntegrationBrowserWithoutActivation(target string) error {
+	return openIntegrationBrowser(target, false)
+}
+
+func openIntegrationBrowser(target string, allowActivation bool) error {
 	target = strings.TrimSpace(target)
 	if target == "" {
 		return errors.New("browser target is empty")
 	}
-	if runtime.GOOS == "darwin" {
+	if allowActivation && runtime.GOOS == "darwin" {
 		handled, err := integrationBrowserOpenOrActivateExistingMacTab(target)
 		if handled {
 			return err
@@ -147,29 +155,8 @@ func integrationBrowserOpenCommand(goos, target string) (string, []string, error
 }
 
 func integrationBrowserOpenCommandWSL(target string) (string, []string, error) {
-	if path, ok := integrationBrowserFirstExistingFile(
-		"/mnt/c/Program Files/Google/Chrome/Application/chrome.exe",
-		"/mnt/c/Program Files (x86)/Google/Chrome/Application/chrome.exe",
-		"/mnt/c/Program Files/Google/Chrome for Testing/Application/chrome.exe",
-		"/mnt/c/Program Files (x86)/Google/Chrome for Testing/Application/chrome.exe",
-		"/mnt/c/Program Files/Microsoft/Edge/Application/msedge.exe",
-		"/mnt/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
-		"/mnt/c/Program Files/Chromium/Application/chrome.exe",
-		"/mnt/c/Program Files (x86)/Chromium/Application/chrome.exe",
-	); ok {
-		return path, []string{"--start-maximized", target}, nil
-	}
-	if path, ok := integrationBrowserFirstLookPath(
-		"chrome",
-		"chrome.exe",
-		"msedge",
-		"msedge.exe",
-		"chromium",
-		"chromium.exe",
-		"brave",
-		"brave.exe",
-	); ok {
-		return path, []string{"--start-maximized", target}, nil
+	if path, ok := integrationBrowserFirstExistingFile("/mnt/c/Windows/System32/cmd.exe"); ok {
+		return path, []string{"/c", "start", "/max", target}, nil
 	}
 	return "cmd.exe", []string{"/c", "start", "/max", target}, nil
 }

@@ -1,4 +1,5 @@
 #creator
+#miniapp
 #browser
 #remote
 #feishu

@@ -5073,7 +5073,7 @@ func TestOpenExistingIntegrationBrowserIfReadyWaitsForBrowserEntry(t *testing.T)
 	integrationBrowserEntryPollInterval = time.Millisecond
 
 	var stderr bytes.Buffer
-	if ok := openExistingIntegrationBrowserIfReady(18084, nil, &stderr, ""); !ok {
+	if ok, err := openExistingIntegrationBrowserIfReady(18084, nil, &stderr, ""); !ok || err != nil {
 		t.Fatal("openExistingIntegrationBrowserIfReady() = false, want true")
 	}
 	if opened != integrationBrowserOpenURL(18084) {
@@ -5120,7 +5120,7 @@ func TestOpenExistingIntegrationBrowserIfReadyOpensWhenBrowserEntryWaitTimesOut(
 	integrationBrowserEntryPollInterval = time.Millisecond
 
 	var stderr bytes.Buffer
-	if ok := openExistingIntegrationBrowserIfReady(18085, nil, &stderr, ""); !ok {
+	if ok, err := openExistingIntegrationBrowserIfReady(18085, nil, &stderr, ""); !ok || err != nil {
 		t.Fatal("openExistingIntegrationBrowserIfReady() = false, want true")
 	}
 	if opened != integrationBrowserOpenURL(18085) {
@@ -5131,6 +5131,33 @@ func TestOpenExistingIntegrationBrowserIfReadyOpensWhenBrowserEntryWaitTimesOut(
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+}
+
+func TestOpenExistingIntegrationBrowserIfReadyReturnsOpenError(t *testing.T) {
+	oldReadyCheck := integrationReadyCheck
+	oldBrowserEntryReadyCheck := integrationBrowserEntryReadyCheck
+	oldOpenBrowser := integrationOpenBrowserFn
+	defer func() {
+		integrationReadyCheck = oldReadyCheck
+		integrationBrowserEntryReadyCheck = oldBrowserEntryReadyCheck
+		integrationOpenBrowserFn = oldOpenBrowser
+	}()
+
+	integrationReadyCheck = func(string) bool { return true }
+	integrationBrowserEntryReadyCheck = func(int) bool { return true }
+	integrationOpenBrowserFn = func(string) error { return errors.New("boom") }
+
+	var stderr bytes.Buffer
+	ok, err := openExistingIntegrationBrowserIfReady(18086, nil, &stderr, "")
+	if !ok {
+		t.Fatal("openExistingIntegrationBrowserIfReady() = false, want true")
+	}
+	if err == nil || err.Error() != "boom" {
+		t.Fatalf("err = %v, want boom", err)
+	}
+	if got := stderr.String(); !strings.Contains(got, "open browser failed: boom") {
+		t.Fatalf("stderr = %q, want browser open failure", got)
 	}
 }
 
@@ -5186,6 +5213,43 @@ func TestStartIntegrationProcessOpensBrowserWhenAlreadyRunningEvenIfBrowserEntry
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+}
+
+func TestStartIntegrationProcessReturnsErrorWhenBrowserOpenFailsForRunningService(t *testing.T) {
+	tempDir := t.TempDir()
+	pidFile := filepath.Join(tempDir, "integration.pid")
+	logFile := filepath.Join(tempDir, "integration.log")
+	flags := map[string]string{
+		"pid-file": pidFile,
+		"log-file": logFile,
+		"port":     strconv.Itoa(integrationServicePort),
+	}
+	if err := os.WriteFile(pidFile, []byte(strconv.Itoa(os.Getpid())), 0o644); err != nil {
+		t.Fatalf("write pid file: %v", err)
+	}
+
+	oldReadyCheck := integrationReadyCheck
+	oldBrowserEntryReadyCheck := integrationBrowserEntryReadyCheck
+	oldOpenBrowser := integrationOpenBrowserFn
+	defer func() {
+		integrationReadyCheck = oldReadyCheck
+		integrationBrowserEntryReadyCheck = oldBrowserEntryReadyCheck
+		integrationOpenBrowserFn = oldOpenBrowser
+	}()
+
+	stubIntegrationReadyCheckForPID(t, pidFile)
+	integrationBrowserEntryReadyCheck = func(int) bool { return true }
+	integrationOpenBrowserFn = func(string) error { return errors.New("boom") }
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := startIntegrationProcess(flags, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("code = %d, want 1", code)
+	}
+	if got := stderr.String(); !strings.Contains(got, "open browser failed: boom") {
+		t.Fatalf("stderr = %q, want browser open failure", got)
 	}
 }
 
@@ -17210,6 +17274,7 @@ func TestHandleIntegrationBundleAppLaunchStartsSplashBeforeOpen(t *testing.T) {
 	oldReadyCheck := integrationReadyCheck
 	oldBrowserEntryReadyCheck := integrationBrowserEntryReadyCheck
 	oldOpenBrowser := integrationOpenBrowserFn
+	oldOpenBrowserWithoutActivation := integrationOpenBrowserWithoutActivationFn
 	oldExecutable := integrationExecutableFn
 	oldHome := integrationUserHomeFn
 	oldRuntimeEnv := os.Getenv(integrationRuntimeDirEnv)
@@ -17219,6 +17284,7 @@ func TestHandleIntegrationBundleAppLaunchStartsSplashBeforeOpen(t *testing.T) {
 		integrationReadyCheck = oldReadyCheck
 		integrationBrowserEntryReadyCheck = oldBrowserEntryReadyCheck
 		integrationOpenBrowserFn = oldOpenBrowser
+		integrationOpenBrowserWithoutActivationFn = oldOpenBrowserWithoutActivation
 		integrationExecutableFn = oldExecutable
 		integrationUserHomeFn = oldHome
 		_ = os.Setenv(integrationRuntimeDirEnv, oldRuntimeEnv)
@@ -17267,6 +17333,10 @@ func TestHandleIntegrationBundleAppLaunchStartsSplashBeforeOpen(t *testing.T) {
 		calls = append(calls, "open:"+target)
 		return nil
 	}
+	integrationOpenBrowserWithoutActivationFn = func(target string) error {
+		calls = append(calls, "open:"+target)
+		return nil
+	}
 
 	var stderr bytes.Buffer
 	if code := handleIntegrationBundleAppLaunch(&stderr); code != 0 {
@@ -17281,8 +17351,73 @@ func TestHandleIntegrationBundleAppLaunchStartsSplashBeforeOpen(t *testing.T) {
 	if !strings.HasPrefix(calls[1], "ready:") {
 		t.Fatalf("second call = %q, want readiness check", calls[1])
 	}
-	if !strings.HasPrefix(calls[2], "open:http://localhost:") || !strings.Contains(calls[2], "/site/") || !strings.HasSuffix(calls[2], "#app") {
+	if !strings.HasPrefix(calls[2], "open:http://localhost:") || (!strings.Contains(calls[2], "/site/") && !strings.HasSuffix(calls[2], "/launch")) {
 		t.Fatalf("third call = %q, want browser open URL", calls[2])
+	}
+}
+
+func TestHandleIntegrationBundleAppLaunchReturnsErrorWhenBrowserOpenFails(t *testing.T) {
+	oldSplash := integrationStartLaunchSplashFn
+	oldReadyCheck := integrationReadyCheck
+	oldBrowserEntryReadyCheck := integrationBrowserEntryReadyCheck
+	oldOpenBrowser := integrationOpenBrowserFn
+	oldOpenBrowserWithoutActivation := integrationOpenBrowserWithoutActivationFn
+	oldExecutable := integrationExecutableFn
+	oldHome := integrationUserHomeFn
+	oldRuntimeEnv := os.Getenv(integrationRuntimeDirEnv)
+	oldPluginEnv := os.Getenv(integrationPluginDirEnv)
+	defer func() {
+		integrationStartLaunchSplashFn = oldSplash
+		integrationReadyCheck = oldReadyCheck
+		integrationBrowserEntryReadyCheck = oldBrowserEntryReadyCheck
+		integrationOpenBrowserFn = oldOpenBrowser
+		integrationOpenBrowserWithoutActivationFn = oldOpenBrowserWithoutActivation
+		integrationExecutableFn = oldExecutable
+		integrationUserHomeFn = oldHome
+		_ = os.Setenv(integrationRuntimeDirEnv, oldRuntimeEnv)
+		_ = os.Setenv(integrationPluginDirEnv, oldPluginEnv)
+	}()
+
+	bundleRoot := filepath.Join(t.TempDir(), "DeepRight.app")
+	macOSDir := filepath.Join(bundleRoot, "Contents", "MacOS")
+	pluginsDir := filepath.Join(bundleRoot, "Contents", "Resources", "plugins")
+	if err := os.MkdirAll(macOSDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(pluginsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(pluginsDir, "browser"), []byte("plugin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	runtimeRoot := t.TempDir()
+	integrationExecutableFn = func() (string, error) {
+		return filepath.Join(macOSDir, "integration"), nil
+	}
+	if runtime.GOOS == "darwin" {
+		integrationUserHomeFn = func() (string, error) { return runtimeRoot, nil }
+	} else {
+		if err := os.Setenv(integrationRuntimeDirEnv, runtimeRoot); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Unsetenv(integrationPluginDirEnv); err != nil {
+		t.Fatal(err)
+	}
+
+	integrationStartLaunchSplashFn = func() error { return nil }
+	integrationReadyCheck = func(string) bool { return true }
+	integrationBrowserEntryReadyCheck = func(int) bool { return true }
+	integrationOpenBrowserFn = func(string) error { return errors.New("boom") }
+	integrationOpenBrowserWithoutActivationFn = func(string) error { return errors.New("boom") }
+
+	var stderr bytes.Buffer
+	if code := handleIntegrationBundleAppLaunch(&stderr); code != 1 {
+		t.Fatalf("handleIntegrationBundleAppLaunch() code = %d, want 1", code)
+	}
+	if got := stderr.String(); !strings.Contains(got, "open browser failed: boom") {
+		t.Fatalf("stderr = %q, want browser open failure", got)
 	}
 }
 
@@ -17367,6 +17502,189 @@ func TestHandleIntegrationBundleAppLaunchAllowsOutsideApplications(t *testing.T)
 	}
 	if got := stderr.String(); got != "" {
 		t.Fatalf("stderr = %q, want empty", got)
+	}
+}
+
+func TestHandleIntegrationBundleAppLaunchFirstLaunchBypassesExistingBrowserReuse(t *testing.T) {
+	oldExecutable := integrationExecutableFn
+	oldHome := integrationUserHomeFn
+	oldEvalSymlinks := integrationEvalSymlinksFn
+	oldSplash := integrationStartLaunchSplashFn
+	oldReadyCheck := integrationReadyCheck
+	oldBrowserEntryReadyCheck := integrationBrowserEntryReadyCheck
+	oldOpenBrowser := integrationOpenBrowserFn
+	oldOpenBrowserWithoutActivation := integrationOpenBrowserWithoutActivationFn
+	oldRuntimeEnv := os.Getenv(integrationRuntimeDirEnv)
+	oldPluginEnv := os.Getenv(integrationPluginDirEnv)
+	defer func() {
+		integrationExecutableFn = oldExecutable
+		integrationUserHomeFn = oldHome
+		integrationEvalSymlinksFn = oldEvalSymlinks
+		integrationStartLaunchSplashFn = oldSplash
+		integrationReadyCheck = oldReadyCheck
+		integrationBrowserEntryReadyCheck = oldBrowserEntryReadyCheck
+		integrationOpenBrowserFn = oldOpenBrowser
+		integrationOpenBrowserWithoutActivationFn = oldOpenBrowserWithoutActivation
+		_ = os.Setenv(integrationRuntimeDirEnv, oldRuntimeEnv)
+		_ = os.Setenv(integrationPluginDirEnv, oldPluginEnv)
+	}()
+
+	bundleRoot := filepath.Join(t.TempDir(), "DeepRight.app")
+	macOSDir := filepath.Join(bundleRoot, "Contents", "MacOS")
+	pluginsDir := filepath.Join(bundleRoot, "Contents", "Resources", "plugins")
+	infoPlist := filepath.Join(bundleRoot, "Contents", "Info.plist")
+	if err := os.MkdirAll(macOSDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(pluginsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(macOSDir, "integration"), []byte("integration"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(infoPlist, []byte("plist"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	runtimeRoot := t.TempDir()
+	integrationExecutableFn = func() (string, error) {
+		return filepath.Join(macOSDir, "integration"), nil
+	}
+	integrationUserHomeFn = func() (string, error) { return runtimeRoot, nil }
+	if err := os.Setenv(integrationRuntimeDirEnv, runtimeRoot); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Unsetenv(integrationPluginDirEnv); err != nil {
+		t.Fatal(err)
+	}
+	integrationEvalSymlinksFn = func(path string) (string, error) { return filepath.Clean(path), nil }
+	integrationStartLaunchSplashFn = func() error { return nil }
+	integrationReadyCheck = func(string) bool { return true }
+	integrationBrowserEntryReadyCheck = func(int) bool { return true }
+
+	var calls []string
+	integrationOpenBrowserFn = func(target string) error {
+		calls = append(calls, "reuse:"+target)
+		return nil
+	}
+	integrationOpenBrowserWithoutActivationFn = func(target string) error {
+		calls = append(calls, "direct:"+target)
+		return nil
+	}
+
+	var stderr bytes.Buffer
+	if code := handleIntegrationBundleAppLaunch(&stderr); code != 0 {
+		t.Fatalf("first handleIntegrationBundleAppLaunch() code = %d, stderr=%s", code, stderr.String())
+	}
+	if len(calls) != 1 || !strings.HasPrefix(calls[0], "direct:http://localhost:") {
+		t.Fatalf("first launch calls = %#v, want direct open", calls)
+	}
+
+	markerPath, err := integrationBundleBrowserReuseMarkerPath(integrationBundleLayout())
+	if err != nil {
+		t.Fatalf("integrationBundleBrowserReuseMarkerPath() error = %v", err)
+	}
+	if _, err := os.Stat(markerPath); err != nil {
+		t.Fatalf("marker file stat error = %v", err)
+	}
+
+	calls = nil
+	stderr.Reset()
+	if code := handleIntegrationBundleAppLaunch(&stderr); code != 0 {
+		t.Fatalf("second handleIntegrationBundleAppLaunch() code = %d, stderr=%s", code, stderr.String())
+	}
+	if len(calls) != 1 || !strings.HasPrefix(calls[0], "reuse:http://localhost:") {
+		t.Fatalf("second launch calls = %#v, want reused-browser open", calls)
+	}
+}
+
+func TestHandleIntegrationBundleAppLaunchFirstLaunchUsesDirectOpenWhileStartingService(t *testing.T) {
+	oldExecutable := integrationExecutableFn
+	oldHome := integrationUserHomeFn
+	oldEvalSymlinks := integrationEvalSymlinksFn
+	oldSplash := integrationStartLaunchSplashFn
+	oldReadyCheck := integrationReadyCheck
+	oldOpenBrowser := integrationOpenBrowserFn
+	oldOpenBrowserWithoutActivation := integrationOpenBrowserWithoutActivationFn
+	oldStartProcess := integrationStartProcessFn
+	oldRuntimeEnv := os.Getenv(integrationRuntimeDirEnv)
+	oldPluginEnv := os.Getenv(integrationPluginDirEnv)
+	defer func() {
+		integrationExecutableFn = oldExecutable
+		integrationUserHomeFn = oldHome
+		integrationEvalSymlinksFn = oldEvalSymlinks
+		integrationStartLaunchSplashFn = oldSplash
+		integrationReadyCheck = oldReadyCheck
+		integrationOpenBrowserFn = oldOpenBrowser
+		integrationOpenBrowserWithoutActivationFn = oldOpenBrowserWithoutActivation
+		integrationStartProcessFn = oldStartProcess
+		_ = os.Setenv(integrationRuntimeDirEnv, oldRuntimeEnv)
+		_ = os.Setenv(integrationPluginDirEnv, oldPluginEnv)
+	}()
+
+	bundleRoot := filepath.Join(t.TempDir(), "DeepRight.app")
+	macOSDir := filepath.Join(bundleRoot, "Contents", "MacOS")
+	pluginsDir := filepath.Join(bundleRoot, "Contents", "Resources", "plugins")
+	infoPlist := filepath.Join(bundleRoot, "Contents", "Info.plist")
+	if err := os.MkdirAll(macOSDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(pluginsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(macOSDir, "integration"), []byte("integration"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(infoPlist, []byte("plist"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	runtimeRoot := t.TempDir()
+	integrationExecutableFn = func() (string, error) {
+		return filepath.Join(macOSDir, "integration"), nil
+	}
+	integrationUserHomeFn = func() (string, error) { return runtimeRoot, nil }
+	if err := os.Setenv(integrationRuntimeDirEnv, runtimeRoot); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Unsetenv(integrationPluginDirEnv); err != nil {
+		t.Fatal(err)
+	}
+	integrationEvalSymlinksFn = func(path string) (string, error) { return filepath.Clean(path), nil }
+	integrationStartLaunchSplashFn = func() error { return nil }
+	integrationReadyCheck = func(string) bool { return false }
+
+	var calls []string
+	integrationOpenBrowserFn = func(target string) error {
+		calls = append(calls, "reuse:"+target)
+		return nil
+	}
+	integrationOpenBrowserWithoutActivationFn = func(target string) error {
+		calls = append(calls, "direct:"+target)
+		return nil
+	}
+	integrationStartProcessFn = func(flags map[string]string, stdout, stderr io.Writer) int {
+		if err := integrationOpenBrowserFn("http://localhost:8080/launch"); err != nil {
+			t.Fatalf("integrationOpenBrowserFn during start: %v", err)
+		}
+		return 0
+	}
+
+	var stderr bytes.Buffer
+	if code := handleIntegrationBundleAppLaunch(&stderr); code != 0 {
+		t.Fatalf("first handleIntegrationBundleAppLaunch() code = %d, stderr=%s", code, stderr.String())
+	}
+	if len(calls) != 1 || calls[0] != "direct:http://localhost:8080/launch" {
+		t.Fatalf("first launch calls = %#v, want direct open during startup", calls)
+	}
+
+	calls = nil
+	stderr.Reset()
+	if code := handleIntegrationBundleAppLaunch(&stderr); code != 0 {
+		t.Fatalf("second handleIntegrationBundleAppLaunch() code = %d, stderr=%s", code, stderr.String())
+	}
+	if len(calls) != 1 || calls[0] != "reuse:http://localhost:8080/launch" {
+		t.Fatalf("second launch calls = %#v, want reused open during startup", calls)
 	}
 }
 

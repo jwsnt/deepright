@@ -42,7 +42,7 @@ func TestIntegrationBrowserOpenCommandLinuxPrefersChromeFamily(t *testing.T) {
 	}
 }
 
-func TestIntegrationBrowserOpenCommandWSLPrefersWindowsChrome(t *testing.T) {
+func TestIntegrationBrowserOpenCommandWSLUsesCmdStart(t *testing.T) {
 	oldLookPath := integrationBrowserLookPathFn
 	oldStat := integrationBrowserStatFn
 	oldGetenv := integrationBrowserGetenvFn
@@ -54,21 +54,17 @@ func TestIntegrationBrowserOpenCommandWSLPrefersWindowsChrome(t *testing.T) {
 		integrationBrowserReadFileFn = oldReadFile
 	}()
 
-	root := t.TempDir()
-	chromePath := filepath.Join(root, "Program Files", "Google", "Chrome", "Application", "chrome.exe")
-	if err := os.MkdirAll(filepath.Dir(chromePath), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(chromePath, []byte("fake"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-
 	integrationBrowserLookPathFn = func(string) (string, error) {
 		return "", errors.New("missing")
 	}
+	root := t.TempDir()
+	cmdPath := filepath.Join(root, "cmd.exe")
+	if err := os.WriteFile(cmdPath, []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	integrationBrowserStatFn = func(path string) (os.FileInfo, error) {
-		if path == "/mnt/c/Program Files/Google/Chrome/Application/chrome.exe" {
-			return os.Stat(chromePath)
+		if path == "/mnt/c/Windows/System32/cmd.exe" {
+			return os.Stat(cmdPath)
 		}
 		return nil, os.ErrNotExist
 	}
@@ -81,10 +77,10 @@ func TestIntegrationBrowserOpenCommandWSLPrefersWindowsChrome(t *testing.T) {
 	if err != nil {
 		t.Fatalf("integrationBrowserOpenCommand: %v", err)
 	}
-	if cmd != "/mnt/c/Program Files/Google/Chrome/Application/chrome.exe" {
+	if cmd != "/mnt/c/Windows/System32/cmd.exe" {
 		t.Fatalf("cmd = %q", cmd)
 	}
-	if len(args) != 2 || args[0] != "--start-maximized" || args[1] != "http://localhost:8080/site/#app" {
+	if len(args) != 4 || args[0] != "/c" || args[1] != "start" || args[2] != "/max" || args[3] != "http://localhost:8080/site/#app" {
 		t.Fatalf("args = %#v", args)
 	}
 }

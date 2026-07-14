@@ -322,9 +322,9 @@ a{color:var(--accent);text-decoration:none}
 [data-theme="dark"] .new-chat-edit-btn:hover,[data-theme="dark"] .new-chat-edit-btn:focus-visible{border-color:rgba(144,174,255,.4);background:linear-gradient(180deg,rgba(24,43,78,.98),rgba(12,24,47,.96));color:#fff}
 .sidebar-section-header{display:flex;align-items:center;justify-content:flex-start;gap:4px;padding:8px 20px}
 .sidebar-label{padding:0;font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;min-width:0}
-.sidebar-storage-indicator{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border:none;padding:0;border-radius:999px;position:relative;flex-shrink:0;color:#617bb8;opacity:1;background:linear-gradient(180deg,rgba(223,229,247,.98),rgba(208,217,244,.92));box-shadow:inset 0 1px 0 rgba(255,255,255,.72),0 4px 10px rgba(112,129,175,.14);appearance:none;-webkit-appearance:none;cursor:pointer;transition:transform .18s ease,filter .18s ease,box-shadow .18s ease}
-.sidebar-storage-indicator:hover,.sidebar-storage-indicator:focus-visible{transform:translateY(-1px);filter:brightness(1.03);box-shadow:inset 0 1px 0 rgba(255,255,255,.78),0 6px 14px rgba(112,129,175,.18),0 0 0 2px rgba(133,154,212,.14);outline:none}
-.sidebar-storage-indicator svg{width:15px;height:15px;display:block}
+.sidebar-storage-indicator{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:none;padding:0;border-radius:999px;position:relative;flex-shrink:0;color:#a76824;opacity:1;background:linear-gradient(180deg,rgba(255,246,234,.98),rgba(247,221,187,.94));box-shadow:inset 0 1px 0 rgba(255,255,255,.78),0 4px 10px rgba(177,120,53,.16);appearance:none;-webkit-appearance:none;cursor:pointer;transition:transform .18s ease,filter .18s ease,box-shadow .18s ease}
+.sidebar-storage-indicator:hover,.sidebar-storage-indicator:focus-visible{transform:translateY(-1px);filter:brightness(1.03);box-shadow:inset 0 1px 0 rgba(255,255,255,.84),0 6px 14px rgba(177,120,53,.2),0 0 0 2px rgba(223,173,113,.18);outline:none}
+.sidebar-storage-indicator svg{width:13px;height:13px;display:block}
 [data-theme="dark"] .sidebar-storage-indicator{color:#aec5ff;background:linear-gradient(180deg,rgba(57,74,118,.94),rgba(43,58,98,.92));box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 6px 14px rgba(0,0,0,.26)}
 [data-theme="dark"] .sidebar-storage-indicator:hover,[data-theme="dark"] .sidebar-storage-indicator:focus-visible{box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 8px 16px rgba(0,0,0,.28),0 0 0 2px rgba(174,197,255,.12)}
 .install-app-indicator{display:none;align-items:center;justify-content:center;width:22px;height:22px;border:none;padding:0;border-radius:999px;position:relative;flex-shrink:0;color:#c7923d;opacity:1;background:radial-gradient(circle at 35% 35%,rgba(255,252,243,.98),rgba(var(--warm-rgb),.52) 42%,rgba(var(--warm-rgb),.18) 68%,transparent 82%);appearance:none;-webkit-appearance:none;cursor:pointer}
@@ -1422,6 +1422,9 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 .right-sidebar .rs-top{position:relative;flex:0 0 auto;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:220px auto 250px;border-bottom:1px solid var(--border);overflow:hidden;min-height:0;max-height:1000px;opacity:1;transition:max-height .38s cubic-bezier(.22,1,.36,1),opacity .28s ease,border-color .28s ease,padding .28s ease,margin .28s ease,filter .32s ease,transform .32s ease}
 .right-sidebar .rs-top.memo-tour-controls-locked{pointer-events:none}
 .right-sidebar.wiki-expanded .rs-top{max-height:0;opacity:0;border-bottom-color:transparent;pointer-events:none}
+.right-sidebar.cli-sub-expanded .rs-top{flex:1 1 100%;grid-template-columns:minmax(0,1fr);grid-template-rows:30px minmax(0,1fr);max-height:none;border-bottom-color:transparent}
+.right-sidebar.cli-sub-expanded .rs-top > .rs-row-divider{grid-column:1}
+.right-sidebar.cli-sub-expanded .rs-top .rs-cell:nth-child(1),.right-sidebar.cli-sub-expanded .rs-top .rs-cell:nth-child(2){display:none}
 .right-sidebar .rs-top .rs-cell{border:1px solid var(--border);padding:8px;overflow:auto;display:flex;flex-direction:column;min-height:0}
 .right-sidebar .rs-top .rs-cell:nth-child(1){border-top:none;border-left:none;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .rs-cell-upper{flex:none;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;transition:max-height .3s ease,opacity .3s ease;max-height:500px;opacity:1}
@@ -1526,8 +1529,8 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 .rs-row-title span{white-space:nowrap}
 .rs-cmd-toggle{width:18px;height:18px;border:1px solid var(--accent);border-radius:5px;background:var(--bg-card);color:rgb(var(--accent-soft-rgb));display:inline-flex;align-items:center;justify-content:center;padding:0;box-shadow:0 0 4px rgba(var(--accent-rgb),.50),0 0 10px rgba(var(--accent-rgb),.30),inset 0 0 6px rgba(var(--accent-rgb),.12);cursor:pointer;transition:var(--transition)}
 .rs-cmd-toggle:hover{transform:translateY(-1px);box-shadow:0 0 6px rgba(var(--accent-rgb),.58),0 0 14px rgba(var(--accent-rgb),.38),inset 0 0 8px rgba(var(--accent-rgb),.18)}
-[data-theme="dark"] .rs-cmd-toggle,[data-theme="dark"] .rs-wiki-refresh{border-color:rgba(84,220,255,.34);background:linear-gradient(180deg,rgba(20,54,79,.96),rgba(10,31,49,.94));color:#8ef4ff;box-shadow:0 10px 20px rgba(0,0,0,.22),0 0 0 1px rgba(220,251,255,.06) inset,0 0 14px rgba(0,212,255,.12)}
-[data-theme="dark"] .rs-cmd-toggle:hover,[data-theme="dark"] .rs-cmd-toggle:focus-visible,[data-theme="dark"] .rs-wiki-refresh:hover,[data-theme="dark"] .rs-wiki-refresh:focus-visible{border-color:rgba(126,244,255,.5);background:linear-gradient(180deg,rgba(27,70,100,.98),rgba(13,43,65,.96));color:#dffcff;box-shadow:0 12px 24px rgba(0,0,0,.24),0 0 0 1px rgba(230,253,255,.1) inset,0 0 18px rgba(0,212,255,.18);outline:none}
+[data-theme="dark"] .rs-cmd-toggle,[data-theme="dark"] .rs-wiki-refresh,[data-theme="dark"] .rs-cli-expand-btn{border-color:rgba(84,220,255,.34);background:linear-gradient(180deg,rgba(20,54,79,.96),rgba(10,31,49,.94));color:#8ef4ff;box-shadow:0 10px 20px rgba(0,0,0,.22),0 0 0 1px rgba(220,251,255,.06) inset,0 0 14px rgba(0,212,255,.12)}
+[data-theme="dark"] .rs-cmd-toggle:hover,[data-theme="dark"] .rs-cmd-toggle:focus-visible,[data-theme="dark"] .rs-wiki-refresh:hover,[data-theme="dark"] .rs-wiki-refresh:focus-visible,[data-theme="dark"] .rs-cli-expand-btn:hover,[data-theme="dark"] .rs-cli-expand-btn:focus-visible{border-color:rgba(126,244,255,.5);background:linear-gradient(180deg,rgba(27,70,100,.98),rgba(13,43,65,.96));color:#dffcff;box-shadow:0 12px 24px rgba(0,0,0,.24),0 0 0 1px rgba(230,253,255,.1) inset,0 0 18px rgba(0,212,255,.18);outline:none}
 .cmd-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding-left:20px;padding-right:20px;box-sizing:border-box;background:var(--modal-overlay-bg);backdrop-filter:blur(var(--modal-overlay-blur));-webkit-backdrop-filter:blur(var(--modal-overlay-blur));opacity:0;visibility:hidden;pointer-events:none;transition:opacity .24s ease,visibility 0s linear .24s;z-index:210}
 .cmd-overlay.show{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .24s ease}
 .cmd-panel{width:min(500px,calc(100vw - 40px));height:110px;background:linear-gradient(180deg,var(--modal-panel-bg-strong),var(--modal-panel-bg));border:1px solid var(--modal-panel-border);border-radius:24px;box-shadow:0 22px 58px rgba(16,24,40,.22);padding:0;display:flex;flex-direction:column;position:relative;overflow:hidden;transform:translateY(10px) scale(.98);transition:transform .24s cubic-bezier(.22,1,.36,1);backdrop-filter:none;-webkit-backdrop-filter:none}
@@ -1553,6 +1556,7 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 .cmd-toast.error{background:linear-gradient(180deg,rgba(255,236,240,.8),rgba(255,220,226,.62));border-color:rgba(255,90,107,.46);color:var(--error);box-shadow:0 18px 42px rgba(149,37,58,.16),0 0 0 1px rgba(255,90,107,.08);backdrop-filter:blur(24px) saturate(175%);-webkit-backdrop-filter:blur(24px) saturate(175%)}
 [data-theme="dark"] .cmd-toast.error{background:linear-gradient(180deg,rgba(74,23,32,.78),rgba(54,16,25,.64));border-color:rgba(255,126,144,.38);box-shadow:0 18px 42px rgba(0,0,0,.34),0 0 0 1px rgba(255,126,144,.1)}
 .right-sidebar .rs-top .rs-cell:nth-child(4){position:relative;border-bottom:none;border-left:none;border-right:none;overflow-y:auto;padding:10px 10px 15px;grid-column:span 2;min-height:0;background:var(--bg-sidebar);box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.18)}
+.right-sidebar.cli-sub-expanded .rs-top .rs-cell:nth-child(4){grid-column:1;min-height:0;height:auto}
 .right-sidebar .rs-top .rs-cell:nth-child(4).task-flash{animation:cliPulse .3s ease-in-out infinite;box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.40),0 0 14px rgba(var(--accent-rgb),.12)}
 @keyframes cliPulse{0%,100%{filter:brightness(1);opacity:1}50%{filter:brightness(1.14);opacity:.72}}
 .cli-sub-container,.plugin-log-stream{display:flex;flex-direction:column;padding:0;min-height:0;width:100%;box-sizing:border-box}
@@ -1681,8 +1685,9 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 .right-sidebar .rs-top .rs-cell:nth-child(5){display:none}
 .right-sidebar .rs-bottom{flex:1;overflow:hidden;padding:8px;display:flex;flex-direction:column;gap:0;min-height:0;background:var(--bg-sidebar);transition:flex .38s cubic-bezier(.22,1,.36,1),padding .28s ease,opacity .28s ease,filter .32s ease,transform .32s ease}
 .right-sidebar.wiki-expanded .rs-bottom{flex:1 1 100%;padding-top:10px}
+.right-sidebar.cli-sub-expanded .rs-bottom{flex:0 0 0;max-height:0;opacity:0;padding-top:0;padding-bottom:0;pointer-events:none;overflow:hidden}
 .rs-bottom-header{flex-shrink:0}
-.rs-wiki-refresh,.rs-wiki-tidy-btn{width:18px;height:18px;border:1px solid var(--accent);border-radius:5px;background:var(--bg-card);color:rgb(var(--accent-soft-rgb));display:inline-flex;align-items:center;justify-content:center;padding:0;box-shadow:0 0 4px rgba(var(--accent-rgb),.50),0 0 10px rgba(var(--accent-rgb),.30),inset 0 0 6px rgba(var(--accent-rgb),.12);cursor:pointer;transition:var(--transition)}
+.rs-wiki-refresh,.rs-wiki-tidy-btn,.rs-cli-expand-btn{width:18px;height:18px;border:1px solid var(--accent);border-radius:5px;background:var(--bg-card);color:rgb(var(--accent-soft-rgb));display:inline-flex;align-items:center;justify-content:center;padding:0;box-shadow:0 0 4px rgba(var(--accent-rgb),.50),0 0 10px rgba(var(--accent-rgb),.30),inset 0 0 6px rgba(var(--accent-rgb),.12);cursor:pointer;transition:var(--transition)}
 .rs-wiki-auto-toggle{height:18px;display:inline-flex;align-items:center;gap:6px;padding:0 6px;border:1px solid rgba(var(--accent-rgb),.22);border-radius:999px;background:rgba(var(--accent-rgb),.08);color:var(--text-secondary);font-size:10px;line-height:1;cursor:pointer;transition:var(--transition)}
 .rs-wiki-auto-toggle:hover{transform:translateY(-1px);border-color:rgba(var(--accent-rgb),.42);color:var(--text-primary)}
 .rs-wiki-auto-toggle:focus-visible{outline:none;box-shadow:0 0 0 2px rgba(var(--accent-rgb),.18)}
@@ -1692,7 +1697,7 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 .rs-wiki-auto-toggle.off .rs-wiki-auto-track{background:rgba(149,160,181,.22);box-shadow:inset 0 0 0 1px rgba(149,160,181,.18)}
 .rs-wiki-auto-thumb{position:absolute;top:1px;left:13px;width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 1px 4px rgba(var(--accent-rgb),.35);transition:left .18s ease,background .18s ease}
 .rs-wiki-auto-toggle.off .rs-wiki-auto-thumb{left:1px;background:#95a0b5;box-shadow:0 1px 3px rgba(149,160,181,.28)}
-.rs-wiki-refresh:hover{transform:translateY(-1px);box-shadow:0 0 6px rgba(var(--accent-rgb),.58),0 0 14px rgba(var(--accent-rgb),.38),inset 0 0 8px rgba(var(--accent-rgb),.18)}
+.rs-wiki-refresh:hover,.rs-cli-expand-btn:hover{transform:translateY(-1px);box-shadow:0 0 6px rgba(var(--accent-rgb),.58),0 0 14px rgba(var(--accent-rgb),.38),inset 0 0 8px rgba(var(--accent-rgb),.18)}
 .rs-wiki-tidy-btn{border-radius:999px;color:#95a0b5;background:transparent;border:none;box-shadow:none}
 .rs-wiki-tidy-btn:hover{transform:translateY(-1px) scale(1.05);box-shadow:none}
 .rs-wiki-tidy-btn:focus-visible{outline:none;box-shadow:0 0 0 2px rgba(var(--accent-rgb),.18)}
@@ -1701,6 +1706,7 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 .rs-wiki-tidy-btn.stale{color:#c7923d;filter:drop-shadow(0 0 6px rgba(var(--warm-rgb),.32));animation:installBulbPulse .9s ease-in-out infinite}
 .rs-wiki-refresh.is-refreshing svg{animation:wikiRefreshSpin .8s linear infinite}
 .right-sidebar.wiki-expanded .rs-wiki-refresh svg{transform:rotate(180deg)}
+.right-sidebar.cli-sub-expanded .rs-cli-expand-btn svg{transform:rotate(180deg)}
 @keyframes wikiRefreshSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .rs-wiki-panel{flex:1;min-height:0;display:flex;flex-direction:column;padding:10px;border:1px solid rgba(var(--accent-rgb),.18);border-top:none;background:var(--bg-sidebar);box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.08);transition:padding .28s ease,box-shadow .28s ease}
 .right-sidebar.wiki-expanded .rs-wiki-panel{padding:12px;box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.16),0 0 24px rgba(var(--accent-rgb),.08)}
@@ -3293,37 +3299,56 @@ body.quick-fan-transition-active{cursor:progress}
 [data-theme="dark"] .chat-session-log-content{background:rgba(9,18,34,.92);border-color:rgba(169,190,227,.14);color:#f3f9fd}
 
 /* Local storage stats overlay */
-.chat-storage-stats-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;background:rgba(19,24,36,.14);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .24s ease,visibility 0s linear .24s}
+.chat-storage-stats-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;background:rgba(19,24,36,.14);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .24s ease,visibility 0s linear .24s}
 .chat-storage-stats-overlay.show{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .24s ease}
-.chat-storage-stats-card{position:relative;width:min(980px,calc(100vw - 48px));max-height:min(88vh,800px);border-radius:28px;border:1px solid rgba(var(--accent-rgb),.18);background:linear-gradient(180deg,rgba(252,252,255,.94),rgba(234,240,252,.88));box-shadow:0 28px 72px rgba(47,63,107,.18),inset 0 1px 0 rgba(255,255,255,.88);display:flex;flex-direction:column;overflow:hidden;transform:translateY(10px) scale(.98);transition:transform .24s cubic-bezier(.22,1,.36,1),opacity .24s ease;backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%)}
+.chat-storage-stats-card{position:relative;width:min(860px,calc(100vw - 40px));max-height:min(86vh,760px);border-radius:26px;border:1px solid rgba(var(--accent-rgb),.18);background:linear-gradient(180deg,rgba(252,252,255,.94),rgba(234,240,252,.88));box-shadow:0 24px 60px rgba(47,63,107,.18),inset 0 1px 0 rgba(255,255,255,.88);display:flex;flex-direction:column;overflow:hidden;transform:translateY(10px) scale(.98);transition:transform .24s cubic-bezier(.22,1,.36,1),opacity .24s ease;backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%)}
 .chat-storage-stats-overlay.show .chat-storage-stats-card{transform:translateY(0) scale(1)}
-.chat-storage-stats-header{padding:18px 24px 10px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid color-mix(in srgb,var(--border) 88%,transparent)}
+.chat-storage-stats-header{padding:16px 20px 9px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;border-bottom:1px solid color-mix(in srgb,var(--border) 88%,transparent)}
 .chat-storage-stats-title-wrap{display:flex;flex-direction:column;gap:4px;min-width:0}
 .chat-storage-stats-kicker{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted)}
-.chat-storage-stats-title{font-size:22px;line-height:1.15;font-weight:700;color:var(--text-primary)}
+.chat-storage-stats-title{font-size:20px;line-height:1.15;font-weight:700;color:var(--text-primary)}
 .chat-storage-stats-subtitle{font-size:12px;line-height:1.5;color:var(--text-secondary)}
-.chat-storage-stats-close{width:34px;height:34px;flex:0 0 34px;border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition)}
+.chat-storage-stats-close{width:32px;height:32px;flex:0 0 32px;border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition)}
 .chat-storage-stats-close:hover,.chat-storage-stats-close:focus-visible{border-color:var(--accent);color:var(--text-primary);outline:none}
-.chat-storage-stats-toolbar{padding:10px 24px 0;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.chat-storage-stats-toolbar{padding:10px 20px 0;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .chat-storage-stats-toolbar-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
 .chat-storage-stats-chip{display:inline-flex;align-items:center;gap:6px;min-height:28px;padding:0 10px;border-radius:999px;background:rgba(80,112,184,.10);border:1px solid color-mix(in srgb,var(--border) 84%,rgba(80,112,184,.22));font-size:11px;color:var(--text-secondary)}
 .chat-storage-stats-chip strong{font-size:12px;color:var(--text-primary);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700}
-.chat-storage-stats-body{padding:14px 24px 20px;display:flex;flex-direction:column;gap:14px;min-height:0;overflow:auto;scrollbar-gutter:stable}
-.chat-storage-stats-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
-.chat-storage-stats-summary-card{padding:14px 15px;border-radius:22px;border:1px solid color-mix(in srgb,var(--border) 84%,rgba(80,112,184,.18));background:linear-gradient(180deg,rgba(255,255,255,.72),rgba(248,250,255,.46));display:flex;flex-direction:column;gap:8px;min-width:0}
+.chat-storage-stats-body{padding:12px 20px 16px;display:flex;flex-direction:column;gap:12px;min-height:0;overflow:auto;scrollbar-gutter:stable}
+.chat-storage-stats-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.chat-storage-stats-summary-card{padding:11px 13px;border-radius:20px;border:1px solid color-mix(in srgb,var(--border) 84%,rgba(80,112,184,.18));background:linear-gradient(180deg,rgba(255,255,255,.72),rgba(248,250,255,.46));display:flex;flex-direction:column;gap:5px;min-width:0}
 .chat-storage-stats-summary-card.warn{border-color:rgba(224,120,78,.28);background:linear-gradient(180deg,rgba(255,247,242,.92),rgba(255,236,224,.62))}
 .chat-storage-stats-summary-card.info{border-color:rgba(80,112,184,.24)}
 .chat-storage-stats-summary-kicker{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted)}
-.chat-storage-stats-summary-value{font-size:22px;line-height:1.05;font-weight:700;color:var(--text-primary);word-break:break-word}
-.chat-storage-stats-summary-meta{font-size:12px;line-height:1.6;color:var(--text-secondary)}
+.chat-storage-stats-summary-value{font-size:18px;line-height:1.05;font-weight:700;color:var(--text-primary);word-break:break-word}
+.chat-storage-stats-summary-meta{font-size:12px;line-height:1.35;color:var(--text-secondary)}
 .chat-storage-stats-summary-note{font-size:11px;line-height:1.55;color:var(--text-muted)}
+.chat-storage-stats-summary-meta:empty,.chat-storage-stats-summary-note:empty,.chat-storage-stats-summary-action:empty{display:none}
+.chat-storage-stats-summary-inline{display:flex;align-items:center;gap:8px}
+.chat-storage-stats-summary-action{display:flex;align-items:center;margin-left:auto;justify-content:flex-end}
+.chat-storage-stats-summary-btn{display:inline-flex;align-items:center;justify-content:center;min-height:26px;padding:0 10px;border:1px solid rgba(var(--accent-rgb),.18);border-radius:999px;background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(244,248,255,.78));box-shadow:inset 0 1px 0 rgba(255,255,255,.82);font-size:12px;font-weight:600;color:var(--text-primary);cursor:pointer;transition:var(--transition);white-space:nowrap}
+.chat-storage-stats-summary-btn:hover,.chat-storage-stats-summary-btn:focus-visible{border-color:rgba(var(--accent-rgb),.32);color:var(--accent);box-shadow:0 8px 18px rgba(var(--accent-rgb),.12),inset 0 1px 0 rgba(255,255,255,.88);outline:none}
 .chat-storage-stats-grid{display:grid;grid-template-columns:minmax(0,1.02fr) minmax(0,.98fr);gap:14px}
 .chat-storage-stats-panel{display:flex;flex-direction:column;gap:10px;min-height:0}
-.chat-storage-stats-section{display:flex;flex-direction:column;gap:8px;min-height:0}
+.chat-storage-stats-section{display:flex;flex-direction:column;gap:6px;min-height:0}
 .chat-storage-stats-section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .chat-storage-stats-section-title{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-secondary)}
 .chat-storage-stats-section-meta{font-size:11px;color:var(--text-muted)}
-.chat-storage-stats-shell{padding:10px;border-radius:22px;border:1px solid color-mix(in srgb,var(--border) 82%,rgba(80,112,184,.18));background:linear-gradient(180deg,color-mix(in srgb,var(--bg-sidebar) 82%,transparent),color-mix(in srgb,var(--bg-input) 86%,transparent));display:flex;flex-direction:column;gap:10px;min-height:0}
+.chat-storage-stats-shell{padding:8px;border-radius:20px;border:1px solid color-mix(in srgb,var(--border) 82%,rgba(80,112,184,.18));background:linear-gradient(180deg,color-mix(in srgb,var(--bg-sidebar) 82%,transparent),color-mix(in srgb,var(--bg-input) 86%,transparent));display:flex;flex-direction:column;gap:8px;min-height:0}
+.chat-storage-stats-table-wrap{max-height:300px;overflow:auto;border-radius:14px;scrollbar-gutter:stable}
+.chat-storage-stats-table{width:100%;min-width:600px;border-collapse:separate;border-spacing:0;font-size:12px;color:var(--text-secondary)}
+.chat-storage-stats-table thead th{position:sticky;top:0;z-index:1;padding:9px 10px;border-bottom:1px solid color-mix(in srgb,var(--border) 86%,transparent);background:rgba(248,251,255,.96);font-size:11px;font-weight:600;letter-spacing:.04em;text-align:left;color:var(--text-muted);white-space:nowrap}
+.chat-storage-stats-table tbody td{padding:10px 10px;border-bottom:1px solid color-mix(in srgb,var(--border) 88%,transparent);background:rgba(255,255,255,.42);vertical-align:middle}
+.chat-storage-stats-table tbody tr:last-child td{border-bottom:none}
+.chat-storage-stats-table tbody tr.active td{background:rgba(var(--accent-rgb),.08)}
+.chat-storage-stats-table th.num,.chat-storage-stats-table td.num{text-align:right;font-variant-numeric:tabular-nums}
+.chat-storage-stats-session-main{display:flex;align-items:center;gap:8px;min-width:0}
+.chat-storage-stats-session-name{min-width:0;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:var(--text-primary)}
+.chat-storage-stats-session-actions{display:flex;align-items:center;gap:6px;margin-left:auto;flex:0 0 auto}
+.chat-storage-stats-session-btn{display:inline-flex;align-items:center;justify-content:center;min-height:22px;padding:0 9px;border:1px solid color-mix(in srgb,var(--accent) 24%,var(--border) 76%);border-radius:999px;background:linear-gradient(180deg,rgba(255,255,255,.94),rgba(246,248,253,.84));box-shadow:inset 0 1px 0 rgba(255,255,255,.82);font-size:11px;font-weight:600;color:var(--text-primary);cursor:pointer;transition:var(--transition);white-space:nowrap}
+.chat-storage-stats-session-btn:hover,.chat-storage-stats-session-btn:focus-visible{border-color:color-mix(in srgb,var(--accent) 42%,var(--border) 58%);color:var(--accent);box-shadow:0 8px 16px rgba(var(--accent-rgb),.12),inset 0 1px 0 rgba(255,255,255,.88);outline:none}
+.chat-storage-stats-session-btn.danger{border-color:rgba(224,120,78,.28);color:#c35e35}
+.chat-storage-stats-session-btn.danger:hover,.chat-storage-stats-session-btn.danger:focus-visible{border-color:rgba(224,120,78,.46);color:#b04a23;box-shadow:0 8px 16px rgba(224,120,78,.14),inset 0 1px 0 rgba(255,255,255,.88)}
 .chat-storage-stats-list{display:flex;flex-direction:column;gap:10px;min-height:0}
 .chat-storage-stats-list.scroll{max-height:304px;overflow:auto;padding-right:4px}
 .chat-storage-stats-row{padding:12px 14px;border-radius:18px;border:1px solid color-mix(in srgb,var(--border) 86%,transparent);background:linear-gradient(180deg,rgba(255,255,255,.58),rgba(255,255,255,.3));display:flex;flex-direction:column;gap:8px}
@@ -3364,7 +3389,17 @@ body.quick-fan-transition-active{cursor:progress}
 [data-theme="dark"] .chat-storage-stats-chip strong{color:#f3f9fd}
 [data-theme="dark"] .chat-storage-stats-summary-card{background:linear-gradient(180deg,rgba(10,20,38,.74),rgba(13,24,42,.9));border-color:rgba(169,190,227,.14)}
 [data-theme="dark"] .chat-storage-stats-summary-card.warn{background:linear-gradient(180deg,rgba(58,28,22,.84),rgba(39,20,16,.9));border-color:rgba(255,158,121,.22)}
+[data-theme="dark"] .chat-storage-stats-summary-btn{background:linear-gradient(180deg,rgba(16,29,52,.92),rgba(11,21,39,.9));border-color:rgba(169,190,227,.18);box-shadow:inset 0 1px 0 rgba(255,255,255,.08);color:#f3f9fd}
+[data-theme="dark"] .chat-storage-stats-summary-btn:hover,[data-theme="dark"] .chat-storage-stats-summary-btn:focus-visible{border-color:rgba(159,196,255,.34);color:#9fe3ff;box-shadow:0 10px 22px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.1)}
 [data-theme="dark"] .chat-storage-stats-shell{background:linear-gradient(180deg,rgba(8,18,34,.78),rgba(11,21,40,.88));border-color:rgba(169,190,227,.14)}
+[data-theme="dark"] .chat-storage-stats-table thead th{background:rgba(10,20,38,.96);border-bottom-color:rgba(169,190,227,.14);color:#b7caeb}
+[data-theme="dark"] .chat-storage-stats-table tbody td{background:rgba(255,255,255,.03);border-bottom-color:rgba(169,190,227,.12)}
+[data-theme="dark"] .chat-storage-stats-table tbody tr.active td{background:rgba(var(--accent-soft-rgb),.08)}
+[data-theme="dark"] .chat-storage-stats-session-name{color:#f3f9fd}
+[data-theme="dark"] .chat-storage-stats-session-btn{background:linear-gradient(180deg,rgba(16,29,52,.92),rgba(11,21,39,.9));border-color:rgba(169,190,227,.18);box-shadow:inset 0 1px 0 rgba(255,255,255,.08);color:#f3f9fd}
+[data-theme="dark"] .chat-storage-stats-session-btn:hover,[data-theme="dark"] .chat-storage-stats-session-btn:focus-visible{border-color:rgba(159,196,255,.34);color:#9fe3ff;box-shadow:0 10px 20px rgba(0,0,0,.26),inset 0 1px 0 rgba(255,255,255,.1)}
+[data-theme="dark"] .chat-storage-stats-session-btn.danger{border-color:rgba(255,158,121,.26);color:#ffc8b2}
+[data-theme="dark"] .chat-storage-stats-session-btn.danger:hover,[data-theme="dark"] .chat-storage-stats-session-btn.danger:focus-visible{border-color:rgba(255,158,121,.42);color:#ffd6c7}
 [data-theme="dark"] .chat-storage-stats-row{background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border-color:rgba(169,190,227,.12)}
 [data-theme="dark"] .chat-storage-stats-tag{background:rgba(255,255,255,.08);color:#bed3f4}
 [data-theme="dark"] .chat-storage-stats-tag.warn{background:rgba(255,158,121,.16);color:#ffc8b2}
@@ -3408,6 +3443,7 @@ body.quick-fan-transition-active{cursor:progress}
   .chat-storage-stats-card{width:min(100%,calc(100vw - 16px));max-height:min(88vh,780px);border-radius:24px}
   .chat-storage-stats-toolbar{align-items:flex-start}
   .chat-storage-stats-summary,.chat-storage-stats-grid,.chat-storage-stats-insights,.chat-storage-stats-breakdown{grid-template-columns:minmax(0,1fr)}
+  .chat-storage-stats-table{min-width:560px}
   .chat-storage-stats-row-head,.chat-storage-stats-section-head{align-items:flex-start}
   .consume-overlay{padding:12px}
   .consume-card{width:min(100%,calc(100vw - 16px));max-height:min(88vh,760px);border-radius:24px}
@@ -4461,6 +4497,9 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
             <button type="button" class="rs-cmd-toggle" id="cmdToggleBtn" title="CMD" onclick="cmdTogglePanel(event)">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
             </button>
+            <button type="button" class="rs-cli-expand-btn" id="rsCliExpandBtn" title="展开系统指令" aria-label="展开系统指令" aria-pressed="false" onclick="toggleCliSubPanelExpanded(event)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.13-3.36L23 10M1 14l5.36 4.36A9 9 0 0020.49 15"/></svg>
+            </button>
           </div>
         </div>
       </div>
@@ -5058,9 +5097,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
   <div class="chat-storage-stats-card" id="chatStorageStatsPanel" onclick="event.stopPropagation()">
     <div class="chat-storage-stats-header">
       <div class="chat-storage-stats-title-wrap">
-        <div class="chat-storage-stats-kicker">空间概览</div>
         <div class="chat-storage-stats-title">本地存储统计</div>
-        <div class="chat-storage-stats-subtitle">查看当前页面各会话在本地的空间占用汇总。</div>
       </div>
       <button class="chat-storage-stats-close" id="chatStorageStatsCloseBtn" type="button" onclick="closeChatStorageStatsOverlay()" aria-label="关闭本地存储统计浮层">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -5068,8 +5105,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     </div>
     <div class="chat-storage-stats-toolbar">
       <div class="chat-storage-stats-toolbar-meta">
-        <span class="chat-storage-stats-chip">当前会话 <strong id="chatStorageStatsActiveChatValue">-</strong></span>
-        <span class="chat-storage-stats-chip">更新时间 <strong id="chatStorageStatsUpdatedAt">-</strong></span>
+        <span class="chat-storage-stats-chip">最后更新时间 <strong id="chatStorageStatsUpdatedAt">-</strong></span>
       </div>
       <div class="consume-actions">
         <button class="btn btn-secondary" type="button" onclick="refreshChatStorageStatsOverlay()">刷新</button>
@@ -5081,11 +5117,10 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
       </section>
       <section class="chat-storage-stats-section">
         <div class="chat-storage-stats-section-head">
-          <div class="chat-storage-stats-section-title">会话空间汇总</div>
-          <div class="chat-storage-stats-section-meta" id="chatStorageStatsSessionMeta"></div>
+          <div class="chat-storage-stats-section-title">会话明细</div>
         </div>
         <div class="chat-storage-stats-shell">
-          <div class="chat-storage-stats-list scroll" id="chatStorageStatsSessionList"></div>
+          <div class="chat-storage-stats-table-wrap" id="chatStorageStatsSessionList"></div>
         </div>
       </section>
     </div>
@@ -6025,6 +6060,10 @@ const rightSidebarUrlPreviewState = {
   subtitle: '',
   chatId: '',
   requestKey: ''
+};
+const cliSubPanelExpandedState = {
+  active: false,
+  chatId: ''
 };
 const rightSidebarUrlPreviewExpandedState = {
   active: false,
@@ -7041,6 +7080,7 @@ const ENERGY_SAVER_PAGE_TASK_INTERVALS = Object.freeze({
   wiki: 60
 });
 const DOC_TIDY_STALE_THRESHOLD_MS = 8 * 60 * 60 * 1000;
+const KNOWLEDGE_TIDY_INTERVAL_DEFAULT_MINUTES = 60;
 const CHAT_AUTO_SCROLL_THRESHOLD_PX = 72;
 const CHAT_SCROLL_CONTROL_SYNC_MARGIN_PX = 6;
 const CHAT_MESSAGE_SCROLL_ALIGN_TOP_PX = 10;
@@ -8155,6 +8195,14 @@ function formatStorageShare(bytes, total) {
   return (ratio >= 10 ? ratio.toFixed(0) : ratio.toFixed(1)) + '%';
 }
 
+function formatStorageRemainingShare(bytes, total) {
+  const safeBytes = Math.max(0, Number(bytes) || 0);
+  const safeTotal = Math.max(0, Number(total) || 0);
+  if (safeTotal <= 0) return '0%';
+  const ratio = Math.max(0, 100 - safeBytes / safeTotal * 100);
+  return (ratio >= 10 ? ratio.toFixed(0) : ratio.toFixed(1)) + '%';
+}
+
 function resolveStorageBarWidth(bytes, total) {
   const safeBytes = Math.max(0, Number(bytes) || 0);
   const safeTotal = Math.max(0, Number(total) || 0);
@@ -8176,6 +8224,19 @@ function formatStorageStatsTime(value) {
   const mm = String(date.getMinutes()).padStart(2, '0');
   const ss = String(date.getSeconds()).padStart(2, '0');
   return `${hh}:${mm}:${ss}`;
+}
+
+function createEmptyChatsStoragePayload() {
+  return {
+    chats: {},
+    order: [],
+    agents: {},
+    models: {},
+    thinking: {},
+    verify: {},
+    htmlOutput: {},
+    swarm: {}
+  };
 }
 
 function readStoredChatsPayload() {
@@ -8234,34 +8295,12 @@ function getChatStorageSidePayload(chatId, payload) {
   return next;
 }
 
-function resolveChatStorageUpdatedAt(runtimeChat, storedChat) {
-  let latest = '';
-  const assign = value => {
-    const normalized = toChatTimestamp(value || '');
-    if (!normalized) return;
-    if (!latest || normalized > latest) latest = normalized;
-  };
-  [runtimeChat, storedChat].forEach(chat => {
-    if (!chat || typeof chat !== 'object') return;
-    assign(chat.lastRestoreAt);
-    assign(chat.lastRequestAt);
-    assign(chat.lastCompletionNoticeAt);
-    assign(chat.historyBeforeAt);
-    assign(chat.coldHistoryTailAt);
-    if (Array.isArray(chat.messages)) {
-      chat.messages.forEach(msg => assign(msg && (msg.receivedAt || msg.createdAt || '')));
-    }
-  });
-  return latest;
-}
-
 function buildChatStorageBreakdown(chatId, payload) {
   const resolvedChatId = String(chatId || '').trim();
   const sourcePayload = payload && typeof payload === 'object' ? payload : {};
-  const runtimeChat = resolvedChatId ? state.chats[resolvedChatId] : null;
   const storedChat = resolvedChatId && sourcePayload.chats && sourcePayload.chats[resolvedChatId]
     ? sourcePayload.chats[resolvedChatId]
-    : (runtimeChat ? cloneChatForStorage(runtimeChat) : null);
+    : null;
   if (!storedChat) return null;
   const messages = Array.isArray(storedChat.messages) ? storedChat.messages : [];
   let contentBytes = 0;
@@ -8298,22 +8337,15 @@ function buildChatStorageBreakdown(chatId, payload) {
   const scopedPayload = buildChatScopedStoragePayload(resolvedChatId, sourcePayload);
   const scopedBytes = scopedPayload ? estimateJsonStorageBytes(scopedPayload) : 0;
   const scopedOverheadBytes = Math.max(0, scopedBytes - chatObjectBytes - sideBytes);
-  const runtimeCliHistory = runtimeChat ? normalizeCliCommandHistoryList(runtimeChat.cliCommandHistory) : [];
-  const runtimeCliBytes = estimateJsonStorageBytes(runtimeCliHistory);
-  const runtimeCliCount = runtimeCliHistory.length;
-  const label = String((runtimeChat && runtimeChat.lastMsg) || storedChat.lastMsg || '新会话').trim() || '新会话';
+  const label = String(storedChat.lastMsg || '新会话').trim() || '新会话';
   const currentChatId = String(state.activeChat || '').trim();
-  const updatedAt = resolveChatStorageUpdatedAt(runtimeChat, storedChat);
   const contentGroupBytes = contentBytes + cliSubBytes;
   const snapshotGroupBytes = snapshotBytes + logicalIdBytes;
   const metaGroupBytes = previewBytes + chatMetaBytes + chatEnvelopeBytes + sideBytes + scopedOverheadBytes + messageResidualBytes;
-  const observedBytes = scopedBytes + runtimeCliBytes;
   return {
     chatId: resolvedChatId,
     label,
-    updatedAt,
     scopedBytes,
-    observedBytes,
     chatObjectBytes,
     sideBytes,
     scopedOverheadBytes,
@@ -8330,21 +8362,17 @@ function buildChatStorageBreakdown(chatId, payload) {
     chatMetaBytes,
     chatEnvelopeBytes,
     metaGroupBytes,
-    runtimeCliBytes,
-    runtimeCliCount,
     previewState,
     msgCount: messages.length,
     userCount,
     assistantCount,
-    pending: !!(runtimeChat && runtimeChat.pendingRequest),
     active: resolvedChatId && resolvedChatId === currentChatId
   };
 }
 
 function collectChatStorageStats() {
   const keyStats = collectLocalStorageKeyStats();
-  const storedPayload = readStoredChatsPayload() || buildChatsStoragePayload();
-  const runtimePayload = buildChatsStoragePayload();
+  const storedPayload = readStoredChatsPayload() || createEmptyChatsStoragePayload();
   const chatsKeyItem = keyStats.items.find(item => item.key === CHATS_KEY) || null;
   const chatIds = Array.isArray(storedPayload.order)
     ? storedPayload.order.filter(chatId => storedPayload.chats && storedPayload.chats[chatId])
@@ -8352,18 +8380,9 @@ function collectChatStorageStats() {
   const chatRows = chatIds.map(chatId => buildChatStorageBreakdown(chatId, storedPayload)).filter(Boolean);
   chatRows.sort((a, b) => b.scopedBytes - a.scopedBytes);
   const chatsStoredValueBytes = chatsKeyItem ? chatsKeyItem.valueBytes : estimateJsonStorageBytes(storedPayload);
-  const chatsRuntimeValueBytes = estimateJsonStorageBytes(runtimePayload);
-  let runtimeCliTotalBytes = 0;
-  let runtimeCliTotalCount = 0;
-  Object.keys(state.chats || {}).forEach(chatId => {
-    const runtimeCliHistory = normalizeCliCommandHistoryList(state.chats[chatId] && state.chats[chatId].cliCommandHistory);
-    runtimeCliTotalBytes += estimateJsonStorageBytes(runtimeCliHistory);
-    runtimeCliTotalCount += runtimeCliHistory.length;
-  });
   const activeChatId = String(state.activeChat || (chatRows[0] && chatRows[0].chatId) || '').trim();
   const activeChat = chatRows.find(item => item.chatId === activeChatId) || null;
   const largestChat = chatRows[0] || null;
-  const chatsDeltaBytes = chatsRuntimeValueBytes - chatsStoredValueBytes;
   return {
     totalBytes: keyStats.totalBytes,
     totalKeys: keyStats.items.length,
@@ -8371,14 +8390,10 @@ function collectChatStorageStats() {
     chatsKeyItem,
     storedPayload,
     chatsStoredValueBytes,
-    chatsRuntimeValueBytes,
-    chatsDeltaBytes,
     chatRows,
     activeChatId,
     activeChat,
     largestChat,
-    runtimeCliTotalBytes,
-    runtimeCliTotalCount,
     refreshedAt: Date.now()
   };
 }
@@ -8387,105 +8402,81 @@ function renderChatStorageStatsSummary(stats) {
   const el = document.getElementById('chatStorageStatsSummary');
   if (!el) return;
   const largestChat = stats && stats.largestChat ? stats.largestChat : null;
+  const totalBytes = Math.max(0, Number(stats && stats.totalBytes) || 0);
+  const chatsStoredValueBytes = Math.max(0, Number(stats && stats.chatsStoredValueBytes) || 0);
   const cards = [
     {
-      kicker: '本地总占用',
-      value: formatUploadBytes(stats && stats.totalBytes),
-      meta: `${stats && stats.totalKeys || 0} 个存储项 · 软上限 ${formatStorageShare(stats && stats.totalBytes, LOCAL_STORAGE_SOFT_LIMIT_BYTES)}`,
-      note: (stats && stats.totalBytes > LOCAL_STORAGE_SOFT_LIMIT_BYTES) ? '当前浏览器本地空间已进入压缩风险区。' : '当前浏览器本地空间仍在安全范围内。',
-      tone: (stats && stats.totalBytes > LOCAL_STORAGE_SOFT_LIMIT_BYTES) ? 'warn' : 'info'
+      kicker: '总储存',
+      value: formatUploadBytes(totalBytes),
+      meta: `剩余 ${formatStorageRemainingShare(totalBytes, LOCAL_STORAGE_SOFT_LIMIT_BYTES)}`,
+      tone: totalBytes > LOCAL_STORAGE_SOFT_LIMIT_BYTES ? 'warn' : 'info'
     },
     {
-      kicker: '会话落盘占用',
-      value: formatUploadBytes(stats && stats.chatsStoredValueBytes),
-      meta: `${stats && stats.chatRows ? stats.chatRows.length : 0} 个会话 · 占本地总空间 ${formatStorageShare(stats && (stats.chatsKeyItem ? stats.chatsKeyItem.totalBytes : 0), stats && stats.totalBytes)}`,
-      note: '这是当前 localStorage 里已经实际写入的会话数据。',
-      tone: 'info'
-    },
-    {
-      kicker: '实时估算占用',
-      value: formatUploadBytes(stats && stats.chatsRuntimeValueBytes),
-      meta: stats && Math.abs(stats.chatsDeltaBytes) >= 1024
-        ? ((stats.chatsDeltaBytes > 0 ? '较已落盘多 ' : '较已落盘少 ') + formatUploadBytes(Math.abs(stats.chatsDeltaBytes)))
-        : '与已落盘版本基本一致',
-      note: '按当前页面内存态重新估算，会比已落盘值更接近此刻实际情况。',
+      kicker: '会话存储',
+      value: formatUploadBytes(chatsStoredValueBytes),
+      meta: `占总存储 ${formatStorageShare(chatsStoredValueBytes, totalBytes)}`,
       tone: 'info'
     },
     {
       kicker: '最大会话',
       value: formatUploadBytes(largestChat && largestChat.scopedBytes),
-      meta: largestChat ? summarizeStoragePreviewText(largestChat.label, 26) : '暂无会话',
-      note: largestChat ? (`占会话落盘空间 ${formatStorageShare(largestChat.scopedBytes, stats && stats.chatsStoredValueBytes)}`) : '暂无可比较数据',
-      tone: largestChat && largestChat.scopedBytes > Math.max(0, (stats && stats.chatsStoredValueBytes || 0) * 0.4) ? 'warn' : 'info'
-    },
-    {
-      kicker: '运行时 CLI',
-      value: formatUploadBytes(stats && stats.runtimeCliTotalBytes),
-      meta: `${stats && stats.runtimeCliTotalCount || 0} 条命令 · 不落盘`,
-      note: '这部分只影响当前页展示，刷新后会依赖 restore / live poll 重建。',
-      tone: 'info'
+      meta: largestChat ? (`占会话存储 ${formatStorageShare(largestChat.scopedBytes, chatsStoredValueBytes)}`) : '',
+      action: largestChat
+        ? `<button class="chat-storage-stats-summary-btn" type="button" onclick='openChatStorageStatsSession(${JSON.stringify(String(largestChat.chatId || ''))})'>查看会话</button>`
+        : '',
+      tone: largestChat && largestChat.scopedBytes > Math.max(0, chatsStoredValueBytes * 0.4) ? 'warn' : 'info'
     }
   ];
   el.innerHTML = cards.map(card => `<article class="chat-storage-stats-summary-card${card.tone ? (' ' + card.tone) : ''}">
     <div class="chat-storage-stats-summary-kicker">${esc(card.kicker)}</div>
     <div class="chat-storage-stats-summary-value">${esc(card.value)}</div>
-    <div class="chat-storage-stats-summary-meta">${esc(card.meta)}</div>
-    <div class="chat-storage-stats-summary-note">${esc(card.note)}</div>
+    <div class="chat-storage-stats-summary-inline">
+      <div class="chat-storage-stats-summary-meta">${esc(card.meta || '')}</div>
+      <div class="chat-storage-stats-summary-action">${card.action || ''}</div>
+    </div>
+    <div class="chat-storage-stats-summary-note">${esc(card.note || '')}</div>
   </article>`).join('');
 }
 
 function renderChatStorageStatsChatList(stats) {
-  const meta = document.getElementById('chatStorageStatsSessionMeta');
   const el = document.getElementById('chatStorageStatsSessionList');
-  if (meta) meta.textContent = `共 ${stats && stats.chatRows ? stats.chatRows.length : 0} 个会话，按占用从大到小排序`;
   if (!el) return;
   const items = stats && Array.isArray(stats.chatRows) ? stats.chatRows : [];
   if (!items.length) {
     el.innerHTML = '<div class="chat-storage-stats-empty">当前没有可分析的会话持久化数据。</div>';
     return;
   }
-  el.innerHTML = items.map(item => {
-    const chips = [];
-    if (item.active) chips.push('<span class="chat-storage-stats-tag info">当前会话</span>');
-    if (item.pending) chips.push('<span class="chat-storage-stats-tag warn">进行中</span>');
-    if (item.previewState && item.previewState.active) chips.push('<span class="chat-storage-stats-tag">URL预览</span>');
-    const observedTotal = Math.max(item.observedBytes, 1);
-    const segments = [
-      { cls: 'content', bytes: item.contentGroupBytes },
-      { cls: 'raw', bytes: item.rawSseBytes },
-      { cls: 'snapshot', bytes: item.snapshotGroupBytes },
-      { cls: 'meta', bytes: item.metaGroupBytes },
-      { cls: 'runtime', bytes: item.runtimeCliBytes }
-    ].filter(segment => segment.bytes > 0);
-    const pills = [
-      { cls: 'content', label: '正文', bytes: item.contentGroupBytes },
-      { cls: 'raw', label: '流记录', bytes: item.rawSseBytes },
-      { cls: 'snapshot', label: '快照', bytes: item.snapshotGroupBytes },
-      { cls: 'meta', label: '元数据', bytes: item.metaGroupBytes },
-      { cls: 'runtime', label: '运行CLI', bytes: item.runtimeCliBytes }
-    ].filter(entry => entry.bytes > 0);
-    return `<article class="chat-storage-stats-row${item.active ? ' active' : ''}">
-      <div class="chat-storage-stats-row-head">
-        <div class="chat-storage-stats-row-title">${esc(item.label)}</div>
-        <div class="chat-storage-stats-row-meta">${esc(formatUploadBytes(item.scopedBytes))} · 占会话存储 ${esc(formatStorageShare(item.scopedBytes, stats.chatsStoredValueBytes))}<br>最后更新 ${esc(item.updatedAt ? formatSandboxUpdatedAt(item.updatedAt) : '未记录')}</div>
-      </div>
-      <div class="chat-storage-stats-row-chips">${chips.join('')}</div>
-      <div class="chat-storage-stats-bar"><span style="width:${resolveStorageBarWidth(item.scopedBytes, stats.chatsStoredValueBytes)}"></span></div>
-      <div class="chat-storage-stats-session-bar">${segments.map(segment => `<span class="chat-storage-stats-session-segment ${segment.cls}" style="width:${resolveStorageBarWidth(segment.bytes, observedTotal)}"></span>`).join('')}</div>
-      <div class="chat-storage-stats-session-pills">${pills.map(entry => `<span class="chat-storage-stats-session-pill"><span class="chat-storage-stats-session-dot ${entry.cls}"></span>${esc(entry.label)} ${esc(formatStorageShare(entry.bytes, observedTotal))}</span>`).join('')}</div>
-      <div class="chat-storage-stats-row-sub">消息 ${esc(String(item.msgCount))} 条（U${esc(String(item.userCount))} / A${esc(String(item.assistantCount))}） · 预估总量 ${esc(formatUploadBytes(item.observedBytes))}${item.runtimeCliBytes > 0 ? (' · 其中运行时 CLI ' + esc(formatUploadBytes(item.runtimeCliBytes))) : ''}</div>
-    </article>`;
-  }).join('');
+  el.innerHTML = `<table class="chat-storage-stats-table">
+    <thead>
+      <tr>
+        <th>会话</th>
+        <th class="num">会话存储</th>
+        <th class="num">正文占比</th>
+        <th class="num">快照占比</th>
+        <th class="num">原始流占比</th>
+        <th class="num">元数据占比</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${items.map(item => {
+    const scopedTotal = Math.max(item.scopedBytes, 1);
+    const metaBytes = Math.max(0, Number(item.metaGroupBytes) || 0);
+    return `<tr${item.active ? ' class="active"' : ''}>
+        <td><div class="chat-storage-stats-session-main"><div class="chat-storage-stats-session-name" title="${esc(item.label).replace(/"/g, '&quot;')}">${esc(item.label)}</div><div class="chat-storage-stats-session-actions"><button class="chat-storage-stats-session-btn" type="button" onclick='openChatStorageStatsSession(${JSON.stringify(String(item.chatId || ''))})'>查看</button><button class="chat-storage-stats-session-btn danger" type="button" onclick='deleteChatStorageStatsSession(${JSON.stringify(String(item.chatId || ''))})'>删除</button></div></div></td>
+        <td class="num">${esc(formatUploadBytes(item.scopedBytes))}</td>
+        <td class="num">${esc(formatStorageShare(item.contentGroupBytes, scopedTotal))}</td>
+        <td class="num">${esc(formatStorageShare(item.snapshotGroupBytes, scopedTotal))}</td>
+        <td class="num">${esc(formatStorageShare(item.rawSseBytes, scopedTotal))}</td>
+        <td class="num">${esc(formatStorageShare(metaBytes, scopedTotal))}</td>
+      </tr>`;
+  }).join('')}
+    </tbody>
+  </table>`;
 }
 
 function renderChatStorageStatsOverlay() {
   const stats = chatStorageStatsState.stats;
-  const activeValue = document.getElementById('chatStorageStatsActiveChatValue');
   const updatedAt = document.getElementById('chatStorageStatsUpdatedAt');
-  if (activeValue) {
-    const activeLabel = stats && stats.activeChat ? summarizeStoragePreviewText(stats.activeChat.label, 20) : '未选中';
-    activeValue.textContent = activeLabel || '未选中';
-  }
   if (updatedAt) updatedAt.textContent = formatStorageStatsTime(chatStorageStatsState.refreshedAt || Date.now());
   renderChatStorageStatsSummary(stats);
   renderChatStorageStatsChatList(stats);
@@ -8507,6 +8498,27 @@ function closeChatStorageStatsOverlay() {
   if (!overlay) return;
   setOverlayVisible(overlay, false);
   chatStorageStatsState.visible = false;
+}
+
+function openChatStorageStatsSession(chatId) {
+  const resolvedChatId = String(chatId || '').trim();
+  if (!resolvedChatId || !state.chats[resolvedChatId]) {
+    vfsShowUploadToast('未找到对应会话', true);
+    return;
+  }
+  closeChatStorageStatsOverlay();
+  switchChat(resolvedChatId);
+}
+
+function deleteChatStorageStatsSession(chatId) {
+  const resolvedChatId = String(chatId || '').trim();
+  if (!resolvedChatId || !state.chats[resolvedChatId]) {
+    vfsShowUploadToast('未找到对应会话', true);
+    return;
+  }
+  pendingDeleteId = resolvedChatId;
+  confirmDelete();
+  if (chatStorageStatsState.visible) refreshChatStorageStatsOverlay();
 }
 
 function openChatStorageStatsOverlay(event) {
@@ -11945,6 +11957,7 @@ function applyRightSidebarState(collapsed) {
   const rightSidebar = document.getElementById('rightSidebar');
   if (!rightSidebar) return;
   if (collapsed) rsMetaLeave();
+  if (collapsed) setCliSubPanelExpanded(false);
   rightSidebar.classList.toggle('collapsed', !!collapsed);
   try { localStorage.setItem(RIGHT_SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0'); } catch {}
   updateRightSidebarToggleUI();
@@ -11966,6 +11979,82 @@ function toggleRightSidebar() {
 function isRightSidebarCollapsed() {
   const rightSidebar = document.getElementById('rightSidebar');
   return !!(rightSidebar && rightSidebar.classList.contains('collapsed'));
+}
+
+function isCliSubPanelExpanded() {
+  return !!(cliSubPanelExpandedState && cliSubPanelExpandedState.active);
+}
+
+function captureCliSubScrollSnapshot() {
+  const container = document.getElementById('rsCliSubCell');
+  if (!container) return null;
+  return {
+    scrollTop: container.scrollTop,
+    scrollLeft: container.scrollLeft
+  };
+}
+
+function restoreCliSubScrollSnapshot(snapshot) {
+  const container = document.getElementById('rsCliSubCell');
+  if (!container || !snapshot) return;
+  container.scrollTop = Math.max(0, Math.min(Number(snapshot.scrollTop) || 0, Math.max(0, container.scrollHeight - container.clientHeight)));
+  container.scrollLeft = Math.max(0, Math.min(Number(snapshot.scrollLeft) || 0, Math.max(0, container.scrollWidth - container.clientWidth)));
+}
+
+function renderCliSubPanelExpandedState(options = {}) {
+  const rightSidebar = document.getElementById('rightSidebar');
+  const btn = document.getElementById('rsCliExpandBtn');
+  const activeChatId = String(state.activeChat || '').trim();
+  if (
+    cliSubPanelExpandedState.active &&
+    (!activeChatId || isRightSidebarCollapsed() || (cliSubPanelExpandedState.chatId && cliSubPanelExpandedState.chatId !== activeChatId))
+  ) {
+    cliSubPanelExpandedState.active = false;
+    cliSubPanelExpandedState.chatId = '';
+  }
+  const expanded = !!(cliSubPanelExpandedState.active && activeChatId && !isRightSidebarCollapsed());
+  if (rightSidebar) rightSidebar.classList.toggle('cli-sub-expanded', expanded);
+  if (btn) {
+    const label = expanded ? '还原系统指令布局' : '展开系统指令';
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+    btn.setAttribute('aria-pressed', expanded ? 'true' : 'false');
+  }
+  if (options.scrollSnapshot) restoreCliSubScrollSnapshot(options.scrollSnapshot);
+  scheduleLayoutSync();
+  scheduleCliSubScrollBottomButtonSync();
+  refreshOverlayStates();
+  if (isOnboardingActive()) scheduleOnboardingSync();
+}
+
+function setCliSubPanelExpanded(nextExpanded) {
+  const next = !!nextExpanded;
+  const activeChatId = String(state.activeChat || '').trim();
+  if (next && (!activeChatId || isRightSidebarCollapsed())) return false;
+  const changed =
+    cliSubPanelExpandedState.active !== next ||
+    String(cliSubPanelExpandedState.chatId || '').trim() !== (next ? activeChatId : '');
+  if (!changed) return true;
+  const scrollSnapshot = captureCliSubScrollSnapshot();
+  if (next) {
+    const wikiState = ensureWikiPanelState();
+    if (wikiState.expanded) {
+      wikiState.expanded = false;
+      renderWikiPanel();
+    }
+  }
+  cliSubPanelExpandedState.active = next;
+  cliSubPanelExpandedState.chatId = next ? activeChatId : '';
+  renderCliSubPanelExpandedState({ scrollSnapshot });
+  return true;
+}
+
+function toggleCliSubPanelExpanded(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  return setCliSubPanelExpanded(!isCliSubPanelExpanded());
 }
 
 const URL_PREVIEW_BLOCKED_RESOURCE_EXTENSIONS = new Set([
@@ -12041,6 +12130,17 @@ function normalizeRightSidebarUrlPreviewHref(href) {
     return url.href;
   } catch {
     return '';
+  }
+}
+
+function isLocalHttpUrlPreviewAutoOpenEligible(href) {
+  const normalizedHref = normalizeRightSidebarUrlPreviewHref(href);
+  if (!normalizedHref) return false;
+  try {
+    const url = new URL(normalizedHref);
+    return isLocalHostName(String(url.hostname || '').trim().toLowerCase());
+  } catch {
+    return false;
   }
 }
 
@@ -12449,7 +12549,7 @@ async function probeRightSidebarUrlPreview(href, chatId, token) {
 async function autoOpenRightSidebarUrlPreviewFromText(chatId, text) {
   const resolvedChatId = String(chatId || '').trim();
   if (!resolvedChatId || !state.chats || !state.chats[resolvedChatId]) return false;
-  const hrefs = extractHttpUrlsFromText(text);
+  const hrefs = extractHttpUrlsFromText(text).filter(isLocalHttpUrlPreviewAutoOpenEligible);
   if (!hrefs.length) return false;
   const token = ++rightSidebarUrlPreviewAutoOpenSeq;
   rightSidebarUrlPreviewAutoOpenTokens[resolvedChatId] = token;
@@ -21748,12 +21848,14 @@ function parseWikiLastUpdateAgeMs(ts) {
 function renderWikiTidyIndicator() {
   const btn = document.getElementById('rsWikiTidyBtn');
   if (!btn) return;
+  ensureKnowledgeTidyThresholdLoaded();
   const path = getWikiTidyPath();
   const agentId = getCurrentWikiAgentId();
   const currentRefreshAt = getWikiLastRefreshAt(agentId);
   const ageMs = parseWikiLastUpdateAgeMs(currentRefreshAt);
+  const staleThresholdMs = getKnowledgeTidyThresholdMs();
   const stale = ageMs != null
-    ? ageMs > DOC_TIDY_STALE_THRESHOLD_MS && getWikiStaleDismissedAt(agentId) !== currentRefreshAt
+    ? ageMs > staleThresholdMs && getWikiStaleDismissedAt(agentId) !== currentRefreshAt
     : false;
   const busy = isActiveChatBusyForTidy();
   const visibleTitle = busy
@@ -22750,6 +22852,7 @@ function finalizeBootShell() {
   updateModelIndicator();
   syncFullscreenToggleUI();
   renderWikiPanel();
+  renderCliSubPanelExpandedState();
   renderRightSidebarUrlPreview();
   bindWikiPanelInteractions();
 }
@@ -22797,6 +22900,7 @@ async function init() {
   vfsInit();
   syncFullscreenToggleUI();
   renderWikiPanel();
+  renderCliSubPanelExpandedState();
   renderRightSidebarUrlPreview();
   startWikiAutoRefresh();
   const initialWikiDoc = String((state.wikiPanel && state.wikiPanel.currentDoc) || '').trim();
@@ -23035,7 +23139,7 @@ function acknowledgeWikiTidyIndicator() {
   const agentId = getCurrentWikiAgentId();
   const currentRefreshAt = getWikiLastRefreshAt(agentId);
   const ageMs = parseWikiLastUpdateAgeMs(currentRefreshAt);
-  if (ageMs == null || ageMs <= DOC_TIDY_STALE_THRESHOLD_MS) return false;
+  if (ageMs == null || ageMs <= getKnowledgeTidyThresholdMs()) return false;
   wikiState.staleDismissedByAgent[agentId] = currentRefreshAt;
   wikiState.staleDismissedAt = currentRefreshAt;
   renderWikiTidyIndicator();
@@ -23491,6 +23595,7 @@ async function rsRefreshWikiPanel() {
       renderWikiPanel();
       return;
     }
+    setCliSubPanelExpanded(false);
     const agentId = getCurrentWikiAgentId();
     const currentDoc = normalizeWikiDocPath(wikiState.currentDoc || getWikiHomeDoc(agentId));
     await loadWikiKnowledgePath();
@@ -29364,6 +29469,7 @@ function switchChat(id) {
   cmdClosePanel(true);
   // Close agent select overlay if open (will re-check for new chat)
   hideAgentSelectOverlay();
+  setCliSubPanelExpanded(false);
   // Save current input draft
   const input = document.getElementById('msgInput');
   if (state.activeChat && input) {
@@ -33169,6 +33275,33 @@ async function readRuntimeConfig(force) {
   }
 }
 
+function normalizeKnowledgeTidyIntervalMinutes(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) return KNOWLEDGE_TIDY_INTERVAL_DEFAULT_MINUTES;
+  return Math.floor(num);
+}
+
+function resolveKnowledgeTidyThresholdMs(config) {
+  const knowledgeConfig = config && typeof config === 'object' && !Array.isArray(config) ? config.knowledge : null;
+  if (!knowledgeConfig || typeof knowledgeConfig !== 'object' || Array.isArray(knowledgeConfig)) {
+    return KNOWLEDGE_TIDY_INTERVAL_DEFAULT_MINUTES * 60 * 1000;
+  }
+  return normalizeKnowledgeTidyIntervalMinutes(knowledgeConfig.interval) * 60 * 1000;
+}
+
+function getKnowledgeTidyThresholdMs() {
+  return resolveKnowledgeTidyThresholdMs(runtimeConfigCache);
+}
+
+function ensureKnowledgeTidyThresholdLoaded() {
+  if (runtimeConfigCache || runtimeConfigRequest) return;
+  readRuntimeConfig(false)
+    .then(() => {
+      renderWikiTidyIndicator();
+    })
+    .catch(() => {});
+}
+
 async function readRuntimeAgentDir(force) {
   const raw = await readRuntimeConfig(force);
   const agentDir = normalizeFsPath(raw && raw['agent-dir']);
@@ -35437,6 +35570,7 @@ async function sendCenterMessage(rawText, options) {
   function canApplyStreamingAutoUrlPreview(entry, href) {
     const normalizedHref = normalizeRightSidebarUrlPreviewHref(href);
     if (!streamingAutoUrlPreview.active || !normalizedHref) return false;
+    if (!isLocalHttpUrlPreviewAutoOpenEligible(normalizedHref)) return false;
     if (!state.chats || !state.chats[chatId]) return false;
     if (entry && entry.assistantMsg && String(entry.assistantMsg.streamSessionToken || '').trim() !== streamSessionToken) {
       return false;
