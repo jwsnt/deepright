@@ -322,11 +322,11 @@ a{color:var(--accent);text-decoration:none}
 [data-theme="dark"] .new-chat-edit-btn:hover,[data-theme="dark"] .new-chat-edit-btn:focus-visible{border-color:rgba(144,174,255,.4);background:linear-gradient(180deg,rgba(24,43,78,.98),rgba(12,24,47,.96));color:#fff}
 .sidebar-section-header{display:flex;align-items:center;justify-content:flex-start;gap:4px;padding:8px 20px}
 .sidebar-label{padding:0;font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;min-width:0}
-.sidebar-storage-indicator{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:none;padding:0;border-radius:999px;position:relative;flex-shrink:0;color:#4763a8;opacity:.92;background:radial-gradient(circle at 35% 35%,rgba(255,255,255,.98),rgba(178,202,255,.52) 44%,rgba(112,147,229,.16) 72%,transparent 86%);appearance:none;-webkit-appearance:none;cursor:pointer;transition:transform .18s ease,filter .18s ease,box-shadow .18s ease}
-.sidebar-storage-indicator:hover,.sidebar-storage-indicator:focus-visible{transform:translateY(-1px) scale(1.03);filter:brightness(1.04);box-shadow:0 0 0 2px rgba(var(--accent-rgb),.12);outline:none}
-.sidebar-storage-indicator svg{width:16px;height:16px;display:block;filter:drop-shadow(0 0 6px rgba(89,118,196,.2))}
-[data-theme="dark"] .sidebar-storage-indicator{color:#9fc4ff;background:radial-gradient(circle at 35% 35%,rgba(245,248,255,.96),rgba(79,115,196,.36) 44%,rgba(79,115,196,.12) 74%,transparent 88%)}
-[data-theme="dark"] .sidebar-storage-indicator svg{filter:drop-shadow(0 0 8px rgba(159,196,255,.22))}
+.sidebar-storage-indicator{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border:none;padding:0;border-radius:999px;position:relative;flex-shrink:0;color:#617bb8;opacity:1;background:linear-gradient(180deg,rgba(223,229,247,.98),rgba(208,217,244,.92));box-shadow:inset 0 1px 0 rgba(255,255,255,.72),0 4px 10px rgba(112,129,175,.14);appearance:none;-webkit-appearance:none;cursor:pointer;transition:transform .18s ease,filter .18s ease,box-shadow .18s ease}
+.sidebar-storage-indicator:hover,.sidebar-storage-indicator:focus-visible{transform:translateY(-1px);filter:brightness(1.03);box-shadow:inset 0 1px 0 rgba(255,255,255,.78),0 6px 14px rgba(112,129,175,.18),0 0 0 2px rgba(133,154,212,.14);outline:none}
+.sidebar-storage-indicator svg{width:15px;height:15px;display:block}
+[data-theme="dark"] .sidebar-storage-indicator{color:#aec5ff;background:linear-gradient(180deg,rgba(57,74,118,.94),rgba(43,58,98,.92));box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 6px 14px rgba(0,0,0,.26)}
+[data-theme="dark"] .sidebar-storage-indicator:hover,[data-theme="dark"] .sidebar-storage-indicator:focus-visible{box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 8px 16px rgba(0,0,0,.28),0 0 0 2px rgba(174,197,255,.12)}
 .install-app-indicator{display:none;align-items:center;justify-content:center;width:22px;height:22px;border:none;padding:0;border-radius:999px;position:relative;flex-shrink:0;color:#c7923d;opacity:1;background:radial-gradient(circle at 35% 35%,rgba(255,252,243,.98),rgba(var(--warm-rgb),.52) 42%,rgba(var(--warm-rgb),.18) 68%,transparent 82%);appearance:none;-webkit-appearance:none;cursor:pointer}
 .install-app-indicator.show{display:inline-flex;animation:installBulbPulse .9s ease-in-out infinite}
 .install-app-indicator svg{width:18px;height:18px;display:block;filter:drop-shadow(0 0 6px rgba(var(--warm-rgb),.62)) drop-shadow(0 0 14px rgba(var(--warm-rgb),.34))}
@@ -3343,6 +3343,21 @@ body.quick-fan-transition-active{cursor:progress}
 .chat-storage-stats-insight{padding:12px 14px;border-radius:18px;border:1px solid color-mix(in srgb,var(--border) 86%,rgba(80,112,184,.18));background:linear-gradient(180deg,rgba(255,255,255,.56),rgba(248,250,255,.38));font-size:12px;line-height:1.65;color:var(--text-secondary)}
 .chat-storage-stats-insight strong{color:var(--text-primary)}
 .chat-storage-stats-breakdown{display:grid;grid-template-columns:minmax(0,.96fr) minmax(0,1.04fr);gap:12px}
+.chat-storage-stats-session-bar{display:flex;align-items:stretch;height:10px;border-radius:999px;background:rgba(80,112,184,.08);overflow:hidden}
+.chat-storage-stats-session-segment{height:100%;min-width:2px}
+.chat-storage-stats-session-segment.content{background:linear-gradient(90deg,#6c89d8,#8aa8f2)}
+.chat-storage-stats-session-segment.raw{background:linear-gradient(90deg,#f19a62,#efb27d)}
+.chat-storage-stats-session-segment.snapshot{background:linear-gradient(90deg,#72bba8,#8ad0be)}
+.chat-storage-stats-session-segment.meta{background:linear-gradient(90deg,#b49adf,#c4b2ea)}
+.chat-storage-stats-session-segment.runtime{background:linear-gradient(90deg,#9099a8,#b4bcc8)}
+.chat-storage-stats-session-pills{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.chat-storage-stats-session-pill{display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:0 9px;border-radius:999px;background:rgba(16,24,40,.05);font-size:11px;line-height:1;color:var(--text-secondary)}
+.chat-storage-stats-session-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+.chat-storage-stats-session-dot.content{background:#7d98e6}
+.chat-storage-stats-session-dot.raw{background:#f0a26c}
+.chat-storage-stats-session-dot.snapshot{background:#7dc7b4}
+.chat-storage-stats-session-dot.meta{background:#baa4e3}
+.chat-storage-stats-session-dot.runtime{background:#9da6b4}
 .chat-storage-stats-empty{display:flex;align-items:center;justify-content:center;min-height:112px;padding:18px;border:1px dashed color-mix(in srgb,var(--border) 82%,transparent);border-radius:20px;background:color-mix(in srgb,var(--bg-sidebar) 66%,transparent);font-size:12px;line-height:1.7;color:var(--text-muted);text-align:center}
 [data-theme="dark"] .chat-storage-stats-card{background:linear-gradient(180deg,rgba(14,26,47,.94),rgba(10,20,38,.9));border-color:rgba(169,190,227,.18);box-shadow:0 28px 68px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.08)}
 [data-theme="dark"] .chat-storage-stats-chip{background:rgba(var(--accent-soft-rgb),.12);border-color:rgba(169,190,227,.18);color:#b7caeb}
@@ -3357,6 +3372,8 @@ body.quick-fan-transition-active{cursor:progress}
 [data-theme="dark"] .chat-storage-stats-bar{background:rgba(159,196,255,.14)}
 [data-theme="dark"] .chat-storage-stats-bar > span{background:linear-gradient(90deg,rgba(117,154,245,.9),rgba(159,196,255,.96))}
 [data-theme="dark"] .chat-storage-stats-insight{background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border-color:rgba(169,190,227,.12);color:#c4d6f2}
+[data-theme="dark"] .chat-storage-stats-session-bar{background:rgba(159,196,255,.12)}
+[data-theme="dark"] .chat-storage-stats-session-pill{background:rgba(255,255,255,.08);color:#c8d7f0}
 
 @media (max-width:760px){
   .chat-container{padding:20px 12px 14px;margin:8px 8px 0;border-radius:28px}
@@ -4093,11 +4110,10 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     <div class="sidebar-section-header">
       <div class="sidebar-label">最近</div>
       <button type="button" class="sidebar-storage-indicator" id="chatStorageStatsBtn" aria-label="本地存储统计" title="本地存储统计" onclick="openChatStorageStatsOverlay(event)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M5 19V10"/>
-          <path d="M12 19V6"/>
-          <path d="M19 19v-4"/>
-          <path d="M4 19h16"/>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4.5 18.5h15"/>
+          <path d="M7 16V9"/>
+          <path d="M7 16c1.7-2.1 3.1-3.8 4.2-5.2.5-.7 1.3-.8 1.9-.2L16.2 13c.4.4 1 .4 1.4 0l1.3-1.3"/>
         </svg>
       </button>
       <button type="button" class="install-app-indicator" id="installAppIndicator" aria-hidden="true" aria-label="安装建议" title="" onclick="toggleInstallAppPopover(event)">
@@ -5042,9 +5058,9 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
   <div class="chat-storage-stats-card" id="chatStorageStatsPanel" onclick="event.stopPropagation()">
     <div class="chat-storage-stats-header">
       <div class="chat-storage-stats-title-wrap">
-        <div class="chat-storage-stats-kicker">Storage Debug</div>
+        <div class="chat-storage-stats-kicker">空间概览</div>
         <div class="chat-storage-stats-title">本地存储统计</div>
-        <div class="chat-storage-stats-subtitle">按浏览器 `localStorage`、`deepright_chats`、会话 payload 与运行时未持久化字段做多维分析。</div>
+        <div class="chat-storage-stats-subtitle">查看当前页面各会话在本地的空间占用汇总。</div>
       </div>
       <button class="chat-storage-stats-close" id="chatStorageStatsCloseBtn" type="button" onclick="closeChatStorageStatsOverlay()" aria-label="关闭本地存储统计浮层">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -5065,47 +5081,11 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
       </section>
       <section class="chat-storage-stats-section">
         <div class="chat-storage-stats-section-head">
-          <div class="chat-storage-stats-section-title">诊断结论</div>
-          <div class="chat-storage-stats-section-meta" id="chatStorageStatsInsightMeta"></div>
+          <div class="chat-storage-stats-section-title">会话空间汇总</div>
+          <div class="chat-storage-stats-section-meta" id="chatStorageStatsSessionMeta"></div>
         </div>
-        <div class="chat-storage-stats-insights" id="chatStorageStatsInsights"></div>
-      </section>
-      <section class="chat-storage-stats-grid">
-        <div class="chat-storage-stats-panel">
-          <div class="chat-storage-stats-section">
-            <div class="chat-storage-stats-section-head">
-              <div class="chat-storage-stats-section-title">localStorage Key 排名</div>
-              <div class="chat-storage-stats-section-meta" id="chatStorageStatsKeyMeta"></div>
-            </div>
-            <div class="chat-storage-stats-shell">
-              <div class="chat-storage-stats-list scroll" id="chatStorageStatsKeyList"></div>
-            </div>
-          </div>
-        </div>
-        <div class="chat-storage-stats-panel">
-          <div class="chat-storage-stats-section">
-            <div class="chat-storage-stats-section-head">
-              <div class="chat-storage-stats-section-title">会话占用排名</div>
-              <div class="chat-storage-stats-section-meta" id="chatStorageStatsChatMeta"></div>
-            </div>
-            <div class="chat-storage-stats-shell">
-              <div class="chat-storage-stats-list scroll" id="chatStorageStatsChatList"></div>
-            </div>
-          </div>
-        </div>
-      </section>
-      <section class="chat-storage-stats-section">
-        <div class="chat-storage-stats-section-head">
-          <div class="chat-storage-stats-section-title">当前会话拆解</div>
-          <div class="chat-storage-stats-section-meta" id="chatStorageStatsBreakdownMeta"></div>
-        </div>
-        <div class="chat-storage-stats-breakdown">
-          <div class="chat-storage-stats-shell">
-            <div class="chat-storage-stats-list" id="chatStorageStatsActiveSummary"></div>
-          </div>
-          <div class="chat-storage-stats-shell">
-            <div class="chat-storage-stats-list" id="chatStorageStatsBreakdownList"></div>
-          </div>
+        <div class="chat-storage-stats-shell">
+          <div class="chat-storage-stats-list scroll" id="chatStorageStatsSessionList"></div>
         </div>
       </section>
     </div>
@@ -8254,6 +8234,27 @@ function getChatStorageSidePayload(chatId, payload) {
   return next;
 }
 
+function resolveChatStorageUpdatedAt(runtimeChat, storedChat) {
+  let latest = '';
+  const assign = value => {
+    const normalized = toChatTimestamp(value || '');
+    if (!normalized) return;
+    if (!latest || normalized > latest) latest = normalized;
+  };
+  [runtimeChat, storedChat].forEach(chat => {
+    if (!chat || typeof chat !== 'object') return;
+    assign(chat.lastRestoreAt);
+    assign(chat.lastRequestAt);
+    assign(chat.lastCompletionNoticeAt);
+    assign(chat.historyBeforeAt);
+    assign(chat.coldHistoryTailAt);
+    if (Array.isArray(chat.messages)) {
+      chat.messages.forEach(msg => assign(msg && (msg.receivedAt || msg.createdAt || '')));
+    }
+  });
+  return latest;
+}
+
 function buildChatStorageBreakdown(chatId, payload) {
   const resolvedChatId = String(chatId || '').trim();
   const sourcePayload = payload && typeof payload === 'object' ? payload : {};
@@ -8302,23 +8303,33 @@ function buildChatStorageBreakdown(chatId, payload) {
   const runtimeCliCount = runtimeCliHistory.length;
   const label = String((runtimeChat && runtimeChat.lastMsg) || storedChat.lastMsg || '新会话').trim() || '新会话';
   const currentChatId = String(state.activeChat || '').trim();
+  const updatedAt = resolveChatStorageUpdatedAt(runtimeChat, storedChat);
+  const contentGroupBytes = contentBytes + cliSubBytes;
+  const snapshotGroupBytes = snapshotBytes + logicalIdBytes;
+  const metaGroupBytes = previewBytes + chatMetaBytes + chatEnvelopeBytes + sideBytes + scopedOverheadBytes + messageResidualBytes;
+  const observedBytes = scopedBytes + runtimeCliBytes;
   return {
     chatId: resolvedChatId,
     label,
+    updatedAt,
     scopedBytes,
+    observedBytes,
     chatObjectBytes,
     sideBytes,
     scopedOverheadBytes,
     messagesBytes,
     contentBytes,
     cliSubBytes,
+    contentGroupBytes,
     rawSseBytes,
     snapshotBytes,
     logicalIdBytes,
+    snapshotGroupBytes,
     messageResidualBytes,
     previewBytes,
     chatMetaBytes,
     chatEnvelopeBytes,
+    metaGroupBytes,
     runtimeCliBytes,
     runtimeCliCount,
     previewState,
@@ -8342,7 +8353,6 @@ function collectChatStorageStats() {
   chatRows.sort((a, b) => b.scopedBytes - a.scopedBytes);
   const chatsStoredValueBytes = chatsKeyItem ? chatsKeyItem.valueBytes : estimateJsonStorageBytes(storedPayload);
   const chatsRuntimeValueBytes = estimateJsonStorageBytes(runtimePayload);
-  const otherKeysTotalBytes = Math.max(0, keyStats.totalBytes - (chatsKeyItem ? chatsKeyItem.totalBytes : 0));
   let runtimeCliTotalBytes = 0;
   let runtimeCliTotalCount = 0;
   Object.keys(state.chats || {}).forEach(chatId => {
@@ -8352,34 +8362,8 @@ function collectChatStorageStats() {
   });
   const activeChatId = String(state.activeChat || (chatRows[0] && chatRows[0].chatId) || '').trim();
   const activeChat = chatRows.find(item => item.chatId === activeChatId) || null;
-  const largestKey = keyStats.items[0] || null;
   const largestChat = chatRows[0] || null;
   const chatsDeltaBytes = chatsRuntimeValueBytes - chatsStoredValueBytes;
-  const insights = [];
-  const storageLimitShare = formatStorageShare(keyStats.totalBytes, LOCAL_STORAGE_SOFT_LIMIT_BYTES);
-  insights.push(
-    keyStats.totalBytes > LOCAL_STORAGE_SOFT_LIMIT_BYTES
-      ? `当前 origin 已使用 <strong>${formatUploadBytes(keyStats.totalBytes)}</strong>，超过 soft limit <strong>${formatUploadBytes(LOCAL_STORAGE_SOFT_LIMIT_BYTES)}</strong>。`
-      : `当前 origin 已使用 <strong>${formatUploadBytes(keyStats.totalBytes)}</strong>，约为 soft limit 的 <strong>${storageLimitShare}</strong>。`
-  );
-  if (largestKey) {
-    insights.push(`最大 key 是 <strong>${esc(largestKey.key)}</strong>，占当前 origin 的 <strong>${formatStorageShare(largestKey.totalBytes, keyStats.totalBytes)}</strong>。`);
-  }
-  if (largestChat) {
-    insights.push(`最大会话是 <strong>${esc(largestChat.label)}</strong>，在 ` + '`deepright_chats`' + ` 中约占 <strong>${formatStorageShare(largestChat.scopedBytes, chatsStoredValueBytes)}</strong>。`);
-  }
-  if (runtimeCliTotalBytes > 0) {
-    insights.push(`运行时 CLI 历史约 <strong>${formatUploadBytes(runtimeCliTotalBytes)}</strong>、共 <strong>${runtimeCliTotalCount}</strong> 条；它用于当前页展示，但默认不写入本地持久化。`);
-  } else {
-    insights.push('当前运行时 CLI 历史体积接近 0，右侧子任务面板主要依赖实时恢复，不会额外挤占本地持久化空间。');
-  }
-  if (Math.abs(chatsDeltaBytes) >= 1024) {
-    insights.push(
-      chatsDeltaBytes > 0
-        ? `按当前内存重算的 ` + '`deepright_chats`' + ` 会比已落盘版本再大 <strong>${formatUploadBytes(chatsDeltaBytes)}</strong>。`
-        : `按当前内存重算的 ` + '`deepright_chats`' + ` 会比已落盘版本少 <strong>${formatUploadBytes(Math.abs(chatsDeltaBytes))}</strong>。`
-    );
-  }
   return {
     totalBytes: keyStats.totalBytes,
     totalKeys: keyStats.items.length,
@@ -8389,15 +8373,12 @@ function collectChatStorageStats() {
     chatsStoredValueBytes,
     chatsRuntimeValueBytes,
     chatsDeltaBytes,
-    otherKeysTotalBytes,
     chatRows,
     activeChatId,
     activeChat,
-    largestKey,
     largestChat,
     runtimeCliTotalBytes,
     runtimeCliTotalCount,
-    insights: insights.slice(0, 6),
     refreshedAt: Date.now()
   };
 }
@@ -8408,40 +8389,40 @@ function renderChatStorageStatsSummary(stats) {
   const largestChat = stats && stats.largestChat ? stats.largestChat : null;
   const cards = [
     {
-      kicker: 'Origin Total',
+      kicker: '本地总占用',
       value: formatUploadBytes(stats && stats.totalBytes),
-      meta: `${stats && stats.totalKeys || 0} 个 key · soft limit ${formatStorageShare(stats && stats.totalBytes, LOCAL_STORAGE_SOFT_LIMIT_BYTES)}`,
-      note: (stats && stats.totalBytes > LOCAL_STORAGE_SOFT_LIMIT_BYTES) ? '已进入自动压缩风险区' : '仍在本地预算范围内',
+      meta: `${stats && stats.totalKeys || 0} 个存储项 · 软上限 ${formatStorageShare(stats && stats.totalBytes, LOCAL_STORAGE_SOFT_LIMIT_BYTES)}`,
+      note: (stats && stats.totalBytes > LOCAL_STORAGE_SOFT_LIMIT_BYTES) ? '当前浏览器本地空间已进入压缩风险区。' : '当前浏览器本地空间仍在安全范围内。',
       tone: (stats && stats.totalBytes > LOCAL_STORAGE_SOFT_LIMIT_BYTES) ? 'warn' : 'info'
     },
     {
-      kicker: 'deepright_chats',
+      kicker: '会话落盘占用',
       value: formatUploadBytes(stats && stats.chatsStoredValueBytes),
-      meta: `${stats && stats.chatRows ? stats.chatRows.length : 0} 个会话 · 占 origin ${formatStorageShare(stats && (stats.chatsKeyItem ? stats.chatsKeyItem.totalBytes : 0), stats && stats.totalBytes)}`,
-      note: '当前 localStorage 已落盘版本',
+      meta: `${stats && stats.chatRows ? stats.chatRows.length : 0} 个会话 · 占本地总空间 ${formatStorageShare(stats && (stats.chatsKeyItem ? stats.chatsKeyItem.totalBytes : 0), stats && stats.totalBytes)}`,
+      note: '这是当前 localStorage 里已经实际写入的会话数据。',
       tone: 'info'
     },
     {
-      kicker: 'Memory Rebuild',
+      kicker: '实时估算占用',
       value: formatUploadBytes(stats && stats.chatsRuntimeValueBytes),
       meta: stats && Math.abs(stats.chatsDeltaBytes) >= 1024
-        ? ((stats.chatsDeltaBytes > 0 ? '较落盘 +' : '较落盘 -') + formatUploadBytes(Math.abs(stats.chatsDeltaBytes)))
+        ? ((stats.chatsDeltaBytes > 0 ? '较已落盘多 ' : '较已落盘少 ') + formatUploadBytes(Math.abs(stats.chatsDeltaBytes)))
         : '与已落盘版本基本一致',
-      note: '按当前内存态重新序列化 deepright_chats',
+      note: '按当前页面内存态重新估算，会比已落盘值更接近此刻实际情况。',
       tone: 'info'
     },
     {
-      kicker: 'Largest Chat',
+      kicker: '最大会话',
       value: formatUploadBytes(largestChat && largestChat.scopedBytes),
       meta: largestChat ? summarizeStoragePreviewText(largestChat.label, 26) : '暂无会话',
-      note: largestChat ? (`消息 ${largestChat.msgCount} 条 · 预览 ${largestChat.previewState.active ? '开启' : '关闭'}`) : '无数据',
+      note: largestChat ? (`占会话落盘空间 ${formatStorageShare(largestChat.scopedBytes, stats && stats.chatsStoredValueBytes)}`) : '暂无可比较数据',
       tone: largestChat && largestChat.scopedBytes > Math.max(0, (stats && stats.chatsStoredValueBytes || 0) * 0.4) ? 'warn' : 'info'
     },
     {
-      kicker: 'Runtime CLI',
+      kicker: '运行时 CLI',
       value: formatUploadBytes(stats && stats.runtimeCliTotalBytes),
-      meta: `${stats && stats.runtimeCliTotalCount || 0} 条命令 · 未持久化`,
-      note: '刷新前即时可见，刷新后依赖 /api/restore / live poll',
+      meta: `${stats && stats.runtimeCliTotalCount || 0} 条命令 · 不落盘`,
+      note: '这部分只影响当前页展示，刷新后会依赖 restore / live poll 重建。',
       tone: 'info'
     }
   ];
@@ -8453,49 +8434,10 @@ function renderChatStorageStatsSummary(stats) {
   </article>`).join('');
 }
 
-function renderChatStorageStatsInsights(stats) {
-  const meta = document.getElementById('chatStorageStatsInsightMeta');
-  const el = document.getElementById('chatStorageStatsInsights');
-  if (meta) meta.textContent = `自动结论 ${stats && stats.insights ? stats.insights.length : 0} 条`;
-  if (!el) return;
-  const insights = stats && Array.isArray(stats.insights) ? stats.insights : [];
-  if (!insights.length) {
-    el.innerHTML = '<div class="chat-storage-stats-empty">当前没有可展示的自动诊断结论。</div>';
-    return;
-  }
-  el.innerHTML = insights.map(item => `<div class="chat-storage-stats-insight">${item}</div>`).join('');
-}
-
-function renderChatStorageStatsKeyList(stats) {
-  const meta = document.getElementById('chatStorageStatsKeyMeta');
-  const el = document.getElementById('chatStorageStatsKeyList');
-  if (meta) meta.textContent = `共 ${stats && stats.keyStats ? stats.keyStats.length : 0} 个 key`;
-  if (!el) return;
-  const items = stats && Array.isArray(stats.keyStats) ? stats.keyStats : [];
-  if (!items.length) {
-    el.innerHTML = '<div class="chat-storage-stats-empty">当前浏览器 localStorage 还没有任何 key。</div>';
-    return;
-  }
-  el.innerHTML = items.map(item => {
-    const chips = [];
-    if (item.key === CHATS_KEY) chips.push('<span class="chat-storage-stats-tag info">会话主 payload</span>');
-    if (item.totalBytes > LOCAL_STORAGE_SOFT_LIMIT_BYTES * 0.3) chips.push('<span class="chat-storage-stats-tag warn">高占用</span>');
-    return `<article class="chat-storage-stats-row${item.key === CHATS_KEY ? ' active' : ''}">
-      <div class="chat-storage-stats-row-head">
-        <div class="chat-storage-stats-row-title"><code>${esc(item.key)}</code></div>
-        <div class="chat-storage-stats-row-meta">${esc(formatUploadBytes(item.totalBytes))} · ${esc(formatStorageShare(item.totalBytes, stats.totalBytes))}</div>
-      </div>
-      <div class="chat-storage-stats-row-chips">${chips.join('')}</div>
-      <div class="chat-storage-stats-bar"><span style="width:${resolveStorageBarWidth(item.totalBytes, stats.totalBytes)}"></span></div>
-      <div class="chat-storage-stats-row-sub">key ${esc(formatUploadBytes(item.keyBytes))} · value ${esc(formatUploadBytes(item.valueBytes))}${item.preview ? (' · ' + esc(item.preview)) : ''}</div>
-    </article>`;
-  }).join('');
-}
-
 function renderChatStorageStatsChatList(stats) {
-  const meta = document.getElementById('chatStorageStatsChatMeta');
-  const el = document.getElementById('chatStorageStatsChatList');
-  if (meta) meta.textContent = `按单会话 scoped payload 估算`;
+  const meta = document.getElementById('chatStorageStatsSessionMeta');
+  const el = document.getElementById('chatStorageStatsSessionList');
+  if (meta) meta.textContent = `共 ${stats && stats.chatRows ? stats.chatRows.length : 0} 个会话，按占用从大到小排序`;
   if (!el) return;
   const items = stats && Array.isArray(stats.chatRows) ? stats.chatRows : [];
   if (!items.length) {
@@ -8507,87 +8449,31 @@ function renderChatStorageStatsChatList(stats) {
     if (item.active) chips.push('<span class="chat-storage-stats-tag info">当前会话</span>');
     if (item.pending) chips.push('<span class="chat-storage-stats-tag warn">进行中</span>');
     if (item.previewState && item.previewState.active) chips.push('<span class="chat-storage-stats-tag">URL预览</span>');
-    if (item.runtimeCliBytes > 0) chips.push('<span class="chat-storage-stats-tag">运行时CLI ' + esc(formatUploadBytes(item.runtimeCliBytes)) + '</span>');
+    const observedTotal = Math.max(item.observedBytes, 1);
+    const segments = [
+      { cls: 'content', bytes: item.contentGroupBytes },
+      { cls: 'raw', bytes: item.rawSseBytes },
+      { cls: 'snapshot', bytes: item.snapshotGroupBytes },
+      { cls: 'meta', bytes: item.metaGroupBytes },
+      { cls: 'runtime', bytes: item.runtimeCliBytes }
+    ].filter(segment => segment.bytes > 0);
+    const pills = [
+      { cls: 'content', label: '正文', bytes: item.contentGroupBytes },
+      { cls: 'raw', label: '流记录', bytes: item.rawSseBytes },
+      { cls: 'snapshot', label: '快照', bytes: item.snapshotGroupBytes },
+      { cls: 'meta', label: '元数据', bytes: item.metaGroupBytes },
+      { cls: 'runtime', label: '运行CLI', bytes: item.runtimeCliBytes }
+    ].filter(entry => entry.bytes > 0);
     return `<article class="chat-storage-stats-row${item.active ? ' active' : ''}">
       <div class="chat-storage-stats-row-head">
         <div class="chat-storage-stats-row-title">${esc(item.label)}</div>
-        <div class="chat-storage-stats-row-meta">${esc(formatUploadBytes(item.scopedBytes))} · ${esc(formatStorageShare(item.scopedBytes, stats.chatsStoredValueBytes))}</div>
+        <div class="chat-storage-stats-row-meta">${esc(formatUploadBytes(item.scopedBytes))} · 占会话存储 ${esc(formatStorageShare(item.scopedBytes, stats.chatsStoredValueBytes))}<br>最后更新 ${esc(item.updatedAt ? formatSandboxUpdatedAt(item.updatedAt) : '未记录')}</div>
       </div>
       <div class="chat-storage-stats-row-chips">${chips.join('')}</div>
       <div class="chat-storage-stats-bar"><span style="width:${resolveStorageBarWidth(item.scopedBytes, stats.chatsStoredValueBytes)}"></span></div>
-      <div class="chat-storage-stats-row-sub">消息 ${esc(String(item.msgCount))} 条（U${esc(String(item.userCount))} / A${esc(String(item.assistantCount))}） · side maps ${esc(formatUploadBytes(item.sideBytes))} · wrapper ${esc(formatUploadBytes(item.scopedOverheadBytes))}</div>
-    </article>`;
-  }).join('');
-}
-
-function renderChatStorageStatsActiveChat(stats) {
-  const meta = document.getElementById('chatStorageStatsBreakdownMeta');
-  const activeSummary = document.getElementById('chatStorageStatsActiveSummary');
-  const breakdownList = document.getElementById('chatStorageStatsBreakdownList');
-  const activeChat = stats && stats.activeChat ? stats.activeChat : null;
-  if (meta) meta.textContent = activeChat ? `chat_id=${activeChat.chatId}` : '未选中会话';
-  if (!activeSummary || !breakdownList) return;
-  if (!activeChat) {
-    activeSummary.innerHTML = '<div class="chat-storage-stats-empty">当前没有可拆解的活动会话。</div>';
-    breakdownList.innerHTML = '<div class="chat-storage-stats-empty">选择会话后，这里会显示字段级体积分布。</div>';
-    return;
-  }
-  const summaryRows = [
-    {
-      title: activeChat.label,
-      meta: `${formatUploadBytes(activeChat.scopedBytes)} · 占 deepright_chats ${formatStorageShare(activeChat.scopedBytes, stats.chatsStoredValueBytes)}`,
-      sub: `消息 ${activeChat.msgCount} 条，当前 ${activeChat.pending ? '仍在执行' : '已完成'}，URL 预览 ${activeChat.previewState.active ? '开启' : '关闭'}。`,
-      barBytes: activeChat.scopedBytes,
-      barTotal: activeChat.scopedBytes
-    },
-    {
-      title: '落盘组成',
-      meta: `chat object ${formatUploadBytes(activeChat.chatObjectBytes)} · side maps ${formatUploadBytes(activeChat.sideBytes)}`,
-      sub: `外层 wrapper / order / map key 约 ${formatUploadBytes(activeChat.scopedOverheadBytes)}。`,
-      barBytes: activeChat.chatObjectBytes + activeChat.sideBytes,
-      barTotal: activeChat.scopedBytes
-    },
-    {
-      title: '运行时 CLI（未持久化）',
-      meta: `${formatUploadBytes(activeChat.runtimeCliBytes)} · ${activeChat.runtimeCliCount} 条命令`,
-      sub: activeChat.runtimeCliBytes > 0
-        ? '当前页右侧 CLI 子任务仍可即时展示，但这部分不会再进入 localStorage。'
-        : '当前运行时没有额外 CLI 输出体积。',
-      barBytes: activeChat.runtimeCliBytes,
-      barTotal: Math.max(activeChat.scopedBytes, activeChat.runtimeCliBytes)
-    }
-  ];
-  activeSummary.innerHTML = summaryRows.map(item => `<article class="chat-storage-stats-row active">
-    <div class="chat-storage-stats-row-head">
-      <div class="chat-storage-stats-row-title">${esc(item.title)}</div>
-      <div class="chat-storage-stats-row-meta">${esc(item.meta)}</div>
-    </div>
-    <div class="chat-storage-stats-bar"><span style="width:${resolveStorageBarWidth(item.barBytes, item.barTotal)}"></span></div>
-    <div class="chat-storage-stats-row-sub">${esc(item.sub)}</div>
-  </article>`).join('');
-  const breakdownRows = [
-    { title: '消息正文 content', bytes: activeChat.contentBytes, note: '中心区可直接阅读的正文内容。', tag: '' },
-    { title: '助手 CLI 子消息 cliSubContent', bytes: activeChat.cliSubBytes, note: 'assistant 气泡内嵌的 CLI 子消息镜像。', tag: '' },
-    { title: '原始 rawSse', bytes: activeChat.rawSseBytes, note: '仅用于回放 / 恢复的冗余字段。', tag: activeChat.rawSseBytes > 0 ? 'warn' : '' },
-    { title: 'explodedSnapshots', bytes: activeChat.snapshotBytes, note: '思考展开快照副本。', tag: activeChat.snapshotBytes > 0 ? 'warn' : '' },
-    { title: 'explodedLogicalIds', bytes: activeChat.logicalIdBytes, note: '思考逻辑 ID 映射。', tag: '' },
-    { title: '消息结构 / 其它字段', bytes: activeChat.messageResidualBytes, note: '消息对象中的 role、时间戳、状态等。', tag: '' },
-    { title: 'URL 预览元数据', bytes: activeChat.previewBytes, note: activeChat.previewState.active ? summarizeStoragePreviewText(activeChat.previewState.href, 60) : '仅保存轻量 meta，不保存 iframe 页面正文。', tag: activeChat.previewState.active ? 'info' : '' },
-    { title: 'Chat 级元数据', bytes: activeChat.chatMetaBytes + activeChat.chatEnvelopeBytes, note: '如 lastMsg、pendingRequest、恢复指针等。', tag: '' },
-    { title: '关联 maps / scoped wrapper', bytes: activeChat.sideBytes + activeChat.scopedOverheadBytes, note: '来自 agents/models/thinking/verify/htmlOutput/swarm 与 scoped payload 外层开销。', tag: '' },
-    { title: '运行时 CLI（未持久化）', bytes: activeChat.runtimeCliBytes, note: '只影响当前页内存态与右侧展示，不会写入 deepright_chats。', tag: 'info' }
-  ].filter(item => item.bytes > 0 || item.tag || item.title === '运行时 CLI（未持久化）');
-  const maxBreakdown = breakdownRows.reduce((max, item) => Math.max(max, item.bytes), 0);
-  breakdownList.innerHTML = breakdownRows.map(item => {
-    const chips = item.tag ? `<span class="chat-storage-stats-tag ${item.tag}">${item.tag === 'warn' ? '压缩热点' : '运行时/轻量'}</span>` : '';
-    return `<article class="chat-storage-stats-row">
-      <div class="chat-storage-stats-row-head">
-        <div class="chat-storage-stats-row-title">${esc(item.title)}</div>
-        <div class="chat-storage-stats-row-meta">${esc(formatUploadBytes(item.bytes))}</div>
-      </div>
-      <div class="chat-storage-stats-row-chips">${chips}</div>
-      <div class="chat-storage-stats-bar"><span style="width:${resolveStorageBarWidth(item.bytes, maxBreakdown)}"></span></div>
-      <div class="chat-storage-stats-row-sub">${esc(item.note)}</div>
+      <div class="chat-storage-stats-session-bar">${segments.map(segment => `<span class="chat-storage-stats-session-segment ${segment.cls}" style="width:${resolveStorageBarWidth(segment.bytes, observedTotal)}"></span>`).join('')}</div>
+      <div class="chat-storage-stats-session-pills">${pills.map(entry => `<span class="chat-storage-stats-session-pill"><span class="chat-storage-stats-session-dot ${entry.cls}"></span>${esc(entry.label)} ${esc(formatStorageShare(entry.bytes, observedTotal))}</span>`).join('')}</div>
+      <div class="chat-storage-stats-row-sub">消息 ${esc(String(item.msgCount))} 条（U${esc(String(item.userCount))} / A${esc(String(item.assistantCount))}） · 预估总量 ${esc(formatUploadBytes(item.observedBytes))}${item.runtimeCliBytes > 0 ? (' · 其中运行时 CLI ' + esc(formatUploadBytes(item.runtimeCliBytes))) : ''}</div>
     </article>`;
   }).join('');
 }
@@ -8602,10 +8488,7 @@ function renderChatStorageStatsOverlay() {
   }
   if (updatedAt) updatedAt.textContent = formatStorageStatsTime(chatStorageStatsState.refreshedAt || Date.now());
   renderChatStorageStatsSummary(stats);
-  renderChatStorageStatsInsights(stats);
-  renderChatStorageStatsKeyList(stats);
   renderChatStorageStatsChatList(stats);
-  renderChatStorageStatsActiveChat(stats);
 }
 
 function refreshChatStorageStatsOverlay() {
