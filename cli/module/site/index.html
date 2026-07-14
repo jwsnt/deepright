@@ -322,6 +322,11 @@ a{color:var(--accent);text-decoration:none}
 [data-theme="dark"] .new-chat-edit-btn:hover,[data-theme="dark"] .new-chat-edit-btn:focus-visible{border-color:rgba(144,174,255,.4);background:linear-gradient(180deg,rgba(24,43,78,.98),rgba(12,24,47,.96));color:#fff}
 .sidebar-section-header{display:flex;align-items:center;justify-content:flex-start;gap:4px;padding:8px 20px}
 .sidebar-label{padding:0;font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;min-width:0}
+.sidebar-storage-indicator{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:none;padding:0;border-radius:999px;position:relative;flex-shrink:0;color:#4763a8;opacity:.92;background:radial-gradient(circle at 35% 35%,rgba(255,255,255,.98),rgba(178,202,255,.52) 44%,rgba(112,147,229,.16) 72%,transparent 86%);appearance:none;-webkit-appearance:none;cursor:pointer;transition:transform .18s ease,filter .18s ease,box-shadow .18s ease}
+.sidebar-storage-indicator:hover,.sidebar-storage-indicator:focus-visible{transform:translateY(-1px) scale(1.03);filter:brightness(1.04);box-shadow:0 0 0 2px rgba(var(--accent-rgb),.12);outline:none}
+.sidebar-storage-indicator svg{width:16px;height:16px;display:block;filter:drop-shadow(0 0 6px rgba(89,118,196,.2))}
+[data-theme="dark"] .sidebar-storage-indicator{color:#9fc4ff;background:radial-gradient(circle at 35% 35%,rgba(245,248,255,.96),rgba(79,115,196,.36) 44%,rgba(79,115,196,.12) 74%,transparent 88%)}
+[data-theme="dark"] .sidebar-storage-indicator svg{filter:drop-shadow(0 0 8px rgba(159,196,255,.22))}
 .install-app-indicator{display:none;align-items:center;justify-content:center;width:22px;height:22px;border:none;padding:0;border-radius:999px;position:relative;flex-shrink:0;color:#c7923d;opacity:1;background:radial-gradient(circle at 35% 35%,rgba(255,252,243,.98),rgba(var(--warm-rgb),.52) 42%,rgba(var(--warm-rgb),.18) 68%,transparent 82%);appearance:none;-webkit-appearance:none;cursor:pointer}
 .install-app-indicator.show{display:inline-flex;animation:installBulbPulse .9s ease-in-out infinite}
 .install-app-indicator svg{width:18px;height:18px;display:block;filter:drop-shadow(0 0 6px rgba(var(--warm-rgb),.62)) drop-shadow(0 0 14px rgba(var(--warm-rgb),.34))}
@@ -3287,6 +3292,72 @@ body.quick-fan-transition-active{cursor:progress}
 [data-theme="dark"] .chat-session-log-type{background:rgba(var(--accent-soft-rgb),.14);color:#9fe3ff}
 [data-theme="dark"] .chat-session-log-content{background:rgba(9,18,34,.92);border-color:rgba(169,190,227,.14);color:#f3f9fd}
 
+/* Local storage stats overlay */
+.chat-storage-stats-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;background:rgba(19,24,36,.14);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .24s ease,visibility 0s linear .24s}
+.chat-storage-stats-overlay.show{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .24s ease}
+.chat-storage-stats-card{position:relative;width:min(980px,calc(100vw - 48px));max-height:min(88vh,800px);border-radius:28px;border:1px solid rgba(var(--accent-rgb),.18);background:linear-gradient(180deg,rgba(252,252,255,.94),rgba(234,240,252,.88));box-shadow:0 28px 72px rgba(47,63,107,.18),inset 0 1px 0 rgba(255,255,255,.88);display:flex;flex-direction:column;overflow:hidden;transform:translateY(10px) scale(.98);transition:transform .24s cubic-bezier(.22,1,.36,1),opacity .24s ease;backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%)}
+.chat-storage-stats-overlay.show .chat-storage-stats-card{transform:translateY(0) scale(1)}
+.chat-storage-stats-header{padding:18px 24px 10px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid color-mix(in srgb,var(--border) 88%,transparent)}
+.chat-storage-stats-title-wrap{display:flex;flex-direction:column;gap:4px;min-width:0}
+.chat-storage-stats-kicker{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted)}
+.chat-storage-stats-title{font-size:22px;line-height:1.15;font-weight:700;color:var(--text-primary)}
+.chat-storage-stats-subtitle{font-size:12px;line-height:1.5;color:var(--text-secondary)}
+.chat-storage-stats-close{width:34px;height:34px;flex:0 0 34px;border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition)}
+.chat-storage-stats-close:hover,.chat-storage-stats-close:focus-visible{border-color:var(--accent);color:var(--text-primary);outline:none}
+.chat-storage-stats-toolbar{padding:10px 24px 0;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.chat-storage-stats-toolbar-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.chat-storage-stats-chip{display:inline-flex;align-items:center;gap:6px;min-height:28px;padding:0 10px;border-radius:999px;background:rgba(80,112,184,.10);border:1px solid color-mix(in srgb,var(--border) 84%,rgba(80,112,184,.22));font-size:11px;color:var(--text-secondary)}
+.chat-storage-stats-chip strong{font-size:12px;color:var(--text-primary);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700}
+.chat-storage-stats-body{padding:14px 24px 20px;display:flex;flex-direction:column;gap:14px;min-height:0;overflow:auto;scrollbar-gutter:stable}
+.chat-storage-stats-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.chat-storage-stats-summary-card{padding:14px 15px;border-radius:22px;border:1px solid color-mix(in srgb,var(--border) 84%,rgba(80,112,184,.18));background:linear-gradient(180deg,rgba(255,255,255,.72),rgba(248,250,255,.46));display:flex;flex-direction:column;gap:8px;min-width:0}
+.chat-storage-stats-summary-card.warn{border-color:rgba(224,120,78,.28);background:linear-gradient(180deg,rgba(255,247,242,.92),rgba(255,236,224,.62))}
+.chat-storage-stats-summary-card.info{border-color:rgba(80,112,184,.24)}
+.chat-storage-stats-summary-kicker{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted)}
+.chat-storage-stats-summary-value{font-size:22px;line-height:1.05;font-weight:700;color:var(--text-primary);word-break:break-word}
+.chat-storage-stats-summary-meta{font-size:12px;line-height:1.6;color:var(--text-secondary)}
+.chat-storage-stats-summary-note{font-size:11px;line-height:1.55;color:var(--text-muted)}
+.chat-storage-stats-grid{display:grid;grid-template-columns:minmax(0,1.02fr) minmax(0,.98fr);gap:14px}
+.chat-storage-stats-panel{display:flex;flex-direction:column;gap:10px;min-height:0}
+.chat-storage-stats-section{display:flex;flex-direction:column;gap:8px;min-height:0}
+.chat-storage-stats-section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.chat-storage-stats-section-title{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-secondary)}
+.chat-storage-stats-section-meta{font-size:11px;color:var(--text-muted)}
+.chat-storage-stats-shell{padding:10px;border-radius:22px;border:1px solid color-mix(in srgb,var(--border) 82%,rgba(80,112,184,.18));background:linear-gradient(180deg,color-mix(in srgb,var(--bg-sidebar) 82%,transparent),color-mix(in srgb,var(--bg-input) 86%,transparent));display:flex;flex-direction:column;gap:10px;min-height:0}
+.chat-storage-stats-list{display:flex;flex-direction:column;gap:10px;min-height:0}
+.chat-storage-stats-list.scroll{max-height:304px;overflow:auto;padding-right:4px}
+.chat-storage-stats-row{padding:12px 14px;border-radius:18px;border:1px solid color-mix(in srgb,var(--border) 86%,transparent);background:linear-gradient(180deg,rgba(255,255,255,.58),rgba(255,255,255,.3));display:flex;flex-direction:column;gap:8px}
+.chat-storage-stats-row.active{border-color:rgba(var(--accent-rgb),.28);box-shadow:0 0 0 1px rgba(var(--accent-rgb),.12) inset}
+.chat-storage-stats-row-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.chat-storage-stats-row-title{font-size:13px;font-weight:600;line-height:1.45;color:var(--text-primary);word-break:break-word}
+.chat-storage-stats-row-title code{font-size:12px}
+.chat-storage-stats-row-meta{font-size:12px;line-height:1.55;color:var(--text-secondary);text-align:right}
+.chat-storage-stats-row-sub{font-size:11px;line-height:1.6;color:var(--text-muted);word-break:break-word}
+.chat-storage-stats-row-chips{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.chat-storage-stats-tag{display:inline-flex;align-items:center;min-height:24px;padding:0 9px;border-radius:999px;background:rgba(16,24,40,.05);font-size:10px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-secondary)}
+.chat-storage-stats-tag.warn{background:rgba(224,120,78,.12);color:#b45d33}
+.chat-storage-stats-tag.info{background:rgba(var(--accent-rgb),.12);color:var(--accent)}
+.chat-storage-stats-bar{position:relative;height:8px;border-radius:999px;background:rgba(80,112,184,.10);overflow:hidden}
+.chat-storage-stats-bar > span{position:absolute;left:0;top:0;bottom:0;border-radius:inherit;background:linear-gradient(90deg,rgba(92,126,208,.84),rgba(143,176,255,.92))}
+.chat-storage-stats-insights{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.chat-storage-stats-insight{padding:12px 14px;border-radius:18px;border:1px solid color-mix(in srgb,var(--border) 86%,rgba(80,112,184,.18));background:linear-gradient(180deg,rgba(255,255,255,.56),rgba(248,250,255,.38));font-size:12px;line-height:1.65;color:var(--text-secondary)}
+.chat-storage-stats-insight strong{color:var(--text-primary)}
+.chat-storage-stats-breakdown{display:grid;grid-template-columns:minmax(0,.96fr) minmax(0,1.04fr);gap:12px}
+.chat-storage-stats-empty{display:flex;align-items:center;justify-content:center;min-height:112px;padding:18px;border:1px dashed color-mix(in srgb,var(--border) 82%,transparent);border-radius:20px;background:color-mix(in srgb,var(--bg-sidebar) 66%,transparent);font-size:12px;line-height:1.7;color:var(--text-muted);text-align:center}
+[data-theme="dark"] .chat-storage-stats-card{background:linear-gradient(180deg,rgba(14,26,47,.94),rgba(10,20,38,.9));border-color:rgba(169,190,227,.18);box-shadow:0 28px 68px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.08)}
+[data-theme="dark"] .chat-storage-stats-chip{background:rgba(var(--accent-soft-rgb),.12);border-color:rgba(169,190,227,.18);color:#b7caeb}
+[data-theme="dark"] .chat-storage-stats-chip strong{color:#f3f9fd}
+[data-theme="dark"] .chat-storage-stats-summary-card{background:linear-gradient(180deg,rgba(10,20,38,.74),rgba(13,24,42,.9));border-color:rgba(169,190,227,.14)}
+[data-theme="dark"] .chat-storage-stats-summary-card.warn{background:linear-gradient(180deg,rgba(58,28,22,.84),rgba(39,20,16,.9));border-color:rgba(255,158,121,.22)}
+[data-theme="dark"] .chat-storage-stats-shell{background:linear-gradient(180deg,rgba(8,18,34,.78),rgba(11,21,40,.88));border-color:rgba(169,190,227,.14)}
+[data-theme="dark"] .chat-storage-stats-row{background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border-color:rgba(169,190,227,.12)}
+[data-theme="dark"] .chat-storage-stats-tag{background:rgba(255,255,255,.08);color:#bed3f4}
+[data-theme="dark"] .chat-storage-stats-tag.warn{background:rgba(255,158,121,.16);color:#ffc8b2}
+[data-theme="dark"] .chat-storage-stats-tag.info{background:rgba(var(--accent-soft-rgb),.14);color:#9fe3ff}
+[data-theme="dark"] .chat-storage-stats-bar{background:rgba(159,196,255,.14)}
+[data-theme="dark"] .chat-storage-stats-bar > span{background:linear-gradient(90deg,rgba(117,154,245,.9),rgba(159,196,255,.96))}
+[data-theme="dark"] .chat-storage-stats-insight{background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border-color:rgba(169,190,227,.12);color:#c4d6f2}
+
 @media (max-width:760px){
   .chat-container{padding:20px 12px 14px;margin:8px 8px 0;border-radius:28px}
   .chat-session-toolbar{top:16px;left:18px}
@@ -3316,6 +3387,11 @@ body.quick-fan-transition-active{cursor:progress}
   .plugin-meta-item{flex-direction:column;align-items:stretch;gap:8px}
   .plugin-meta-label{flex:none}
   .plugin-meta-list{max-height:250px}
+  .chat-storage-stats-overlay{padding:12px}
+  .chat-storage-stats-card{width:min(100%,calc(100vw - 16px));max-height:min(88vh,780px);border-radius:24px}
+  .chat-storage-stats-toolbar{align-items:flex-start}
+  .chat-storage-stats-summary,.chat-storage-stats-grid,.chat-storage-stats-insights,.chat-storage-stats-breakdown{grid-template-columns:minmax(0,1fr)}
+  .chat-storage-stats-row-head,.chat-storage-stats-section-head{align-items:flex-start}
   .consume-overlay{padding:12px}
   .consume-card{width:min(100%,calc(100vw - 16px));max-height:min(88vh,760px);border-radius:24px}
   .consume-card.consume-logs-expanded{height:min(88vh,760px)}
@@ -4016,6 +4092,14 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     </div>
     <div class="sidebar-section-header">
       <div class="sidebar-label">最近</div>
+      <button type="button" class="sidebar-storage-indicator" id="chatStorageStatsBtn" aria-label="本地存储统计" title="本地存储统计" onclick="openChatStorageStatsOverlay(event)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M5 19V10"/>
+          <path d="M12 19V6"/>
+          <path d="M19 19v-4"/>
+          <path d="M4 19h16"/>
+        </svg>
+      </button>
       <button type="button" class="install-app-indicator" id="installAppIndicator" aria-hidden="true" aria-label="安装建议" title="" onclick="toggleInstallAppPopover(event)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M9 18h6"/>
@@ -4954,6 +5038,79 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     </div>
   </div>
 </div>
+<div class="chat-storage-stats-overlay" id="chatStorageStatsOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="28" onclick="handleChatStorageStatsOverlayClick(event)" aria-hidden="true">
+  <div class="chat-storage-stats-card" id="chatStorageStatsPanel" onclick="event.stopPropagation()">
+    <div class="chat-storage-stats-header">
+      <div class="chat-storage-stats-title-wrap">
+        <div class="chat-storage-stats-kicker">Storage Debug</div>
+        <div class="chat-storage-stats-title">本地存储统计</div>
+        <div class="chat-storage-stats-subtitle">按浏览器 `localStorage`、`deepright_chats`、会话 payload 与运行时未持久化字段做多维分析。</div>
+      </div>
+      <button class="chat-storage-stats-close" id="chatStorageStatsCloseBtn" type="button" onclick="closeChatStorageStatsOverlay()" aria-label="关闭本地存储统计浮层">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="chat-storage-stats-toolbar">
+      <div class="chat-storage-stats-toolbar-meta">
+        <span class="chat-storage-stats-chip">当前会话 <strong id="chatStorageStatsActiveChatValue">-</strong></span>
+        <span class="chat-storage-stats-chip">更新时间 <strong id="chatStorageStatsUpdatedAt">-</strong></span>
+      </div>
+      <div class="consume-actions">
+        <button class="btn btn-secondary" type="button" onclick="refreshChatStorageStatsOverlay()">刷新</button>
+      </div>
+    </div>
+    <div class="chat-storage-stats-body">
+      <section class="chat-storage-stats-section">
+        <div class="chat-storage-stats-summary" id="chatStorageStatsSummary"></div>
+      </section>
+      <section class="chat-storage-stats-section">
+        <div class="chat-storage-stats-section-head">
+          <div class="chat-storage-stats-section-title">诊断结论</div>
+          <div class="chat-storage-stats-section-meta" id="chatStorageStatsInsightMeta"></div>
+        </div>
+        <div class="chat-storage-stats-insights" id="chatStorageStatsInsights"></div>
+      </section>
+      <section class="chat-storage-stats-grid">
+        <div class="chat-storage-stats-panel">
+          <div class="chat-storage-stats-section">
+            <div class="chat-storage-stats-section-head">
+              <div class="chat-storage-stats-section-title">localStorage Key 排名</div>
+              <div class="chat-storage-stats-section-meta" id="chatStorageStatsKeyMeta"></div>
+            </div>
+            <div class="chat-storage-stats-shell">
+              <div class="chat-storage-stats-list scroll" id="chatStorageStatsKeyList"></div>
+            </div>
+          </div>
+        </div>
+        <div class="chat-storage-stats-panel">
+          <div class="chat-storage-stats-section">
+            <div class="chat-storage-stats-section-head">
+              <div class="chat-storage-stats-section-title">会话占用排名</div>
+              <div class="chat-storage-stats-section-meta" id="chatStorageStatsChatMeta"></div>
+            </div>
+            <div class="chat-storage-stats-shell">
+              <div class="chat-storage-stats-list scroll" id="chatStorageStatsChatList"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="chat-storage-stats-section">
+        <div class="chat-storage-stats-section-head">
+          <div class="chat-storage-stats-section-title">当前会话拆解</div>
+          <div class="chat-storage-stats-section-meta" id="chatStorageStatsBreakdownMeta"></div>
+        </div>
+        <div class="chat-storage-stats-breakdown">
+          <div class="chat-storage-stats-shell">
+            <div class="chat-storage-stats-list" id="chatStorageStatsActiveSummary"></div>
+          </div>
+          <div class="chat-storage-stats-shell">
+            <div class="chat-storage-stats-list" id="chatStorageStatsBreakdownList"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
 <div class="cmd-toast" id="cmdToast" data-overlay-base data-overlay-domain="center" data-overlay-order="35"></div>
 <div class="center-notice-overlay" id="agentSelectOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="20" onclick="handleAgentSelectOverlayClick(event)" aria-hidden="true">
   <div class="center-notice-card error" onclick="event.stopPropagation()">
@@ -5432,7 +5589,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
             <button class="remote-btn inactive" id="settingsRemoteBtn" type="button" onclick="handleSettingsRemoteClick(event)" title="外部设备连接" style="display:none"><span>R</span></button>
           </div>
           <div class="memo-reset-tip" id="memoResetTip">切换Agent会丢弃尚未保存的备忘录</div>
-          <div class="swarm-save-tip" id="swarmSaveTip">蜂群或外部设备连接配置需要在保存后生效</div>
+          <div class="swarm-save-tip" id="swarmSaveTip">外部设备连接配置需要在保存后生效</div>
           <div class="swarm-panel" id="swarmPanel">
             <div class="swarm-row swarm-toolbar">
               <div class="swarm-main-controls">
@@ -7286,6 +7443,11 @@ let chatSessionLogState = {
   chatId: '',
   records: []
 };
+let chatStorageStatsState = {
+  visible: false,
+  refreshedAt: 0,
+  stats: null
+};
 let logoVisualMode = 'report';
 const DEFAULT_SKILL_EXTRACT_GOAL = '把文件中最近几轮对话和工具调用提炼成可复用的SKILL';
 const SKILL_TOUR_GOAL_INPUT_DEMO_TEXT = '把文件中最近几轮对话和工具调用提炼成可复用 生成最近1周，HTML格式财务报表 的SKILL。';
@@ -7994,6 +8156,486 @@ function closeChatSessionLogOverlay(force) {
   if (!overlay) return;
   setOverlayVisible(overlay, false);
   chatSessionLogState.visible = false;
+}
+
+function estimateJsonStorageBytes(value) {
+  try {
+    const text = JSON.stringify(value);
+    return typeof text === 'string' ? estimateLocalStorageTextBytes(text) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function formatStorageShare(bytes, total) {
+  const safeBytes = Math.max(0, Number(bytes) || 0);
+  const safeTotal = Math.max(0, Number(total) || 0);
+  if (safeTotal <= 0) return '0%';
+  const ratio = safeBytes / safeTotal * 100;
+  return (ratio >= 10 ? ratio.toFixed(0) : ratio.toFixed(1)) + '%';
+}
+
+function resolveStorageBarWidth(bytes, total) {
+  const safeBytes = Math.max(0, Number(bytes) || 0);
+  const safeTotal = Math.max(0, Number(total) || 0);
+  if (safeBytes <= 0 || safeTotal <= 0) return '0%';
+  return Math.max(4, Math.min(100, safeBytes / safeTotal * 100)).toFixed(1) + '%';
+}
+
+function summarizeStoragePreviewText(value, limit) {
+  const max = Math.max(12, Number(limit) || 72);
+  const text = normalizeMessageText(String(value || '').replace(/\s+/g, ' ').trim());
+  if (!text) return '';
+  return text.length > max ? (text.slice(0, max - 1) + '…') : text;
+}
+
+function formatStorageStatsTime(value) {
+  const date = value ? new Date(value) : new Date();
+  if (!Number.isFinite(date.getTime())) return '-';
+  const hh = String(date.getHours()).padStart(2, '0');
+  const mm = String(date.getMinutes()).padStart(2, '0');
+  const ss = String(date.getSeconds()).padStart(2, '0');
+  return `${hh}:${mm}:${ss}`;
+}
+
+function readStoredChatsPayload() {
+  try {
+    const raw = localStorage.getItem(CHATS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function collectLocalStorageKeyStats() {
+  const items = [];
+  let totalBytes = 0;
+  try {
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = String(localStorage.key(i) || '');
+      const value = localStorage.getItem(key);
+      const keyBytes = estimateLocalStorageTextBytes(key);
+      const valueBytes = estimateLocalStorageTextBytes(value);
+      const itemTotal = keyBytes + valueBytes;
+      totalBytes += itemTotal;
+      items.push({
+        key,
+        keyBytes,
+        valueBytes,
+        totalBytes: itemTotal,
+        preview: key === CHATS_KEY ? '聊天主 payload' : summarizeStoragePreviewText(value, 84)
+      });
+    }
+  } catch {
+    return { totalBytes: 0, items: [] };
+  }
+  items.sort((a, b) => b.totalBytes - a.totalBytes);
+  return { totalBytes, items };
+}
+
+function getChatStorageSidePayload(chatId, payload) {
+  const resolvedChatId = String(chatId || '').trim();
+  const source = payload && typeof payload === 'object' ? payload : {};
+  const next = {};
+  [
+    ['agent', source.agents],
+    ['model', source.models],
+    ['thinking', source.thinking],
+    ['verify', source.verify],
+    ['htmlOutput', source.htmlOutput],
+    ['swarm', source.swarm]
+  ].forEach(([key, map]) => {
+    if (!map || typeof map !== 'object') return;
+    if (!Object.prototype.hasOwnProperty.call(map, resolvedChatId)) return;
+    next[key] = map[resolvedChatId];
+  });
+  return next;
+}
+
+function buildChatStorageBreakdown(chatId, payload) {
+  const resolvedChatId = String(chatId || '').trim();
+  const sourcePayload = payload && typeof payload === 'object' ? payload : {};
+  const runtimeChat = resolvedChatId ? state.chats[resolvedChatId] : null;
+  const storedChat = resolvedChatId && sourcePayload.chats && sourcePayload.chats[resolvedChatId]
+    ? sourcePayload.chats[resolvedChatId]
+    : (runtimeChat ? cloneChatForStorage(runtimeChat) : null);
+  if (!storedChat) return null;
+  const messages = Array.isArray(storedChat.messages) ? storedChat.messages : [];
+  let contentBytes = 0;
+  let cliSubBytes = 0;
+  let rawSseBytes = 0;
+  let snapshotBytes = 0;
+  let logicalIdBytes = 0;
+  let userCount = 0;
+  let assistantCount = 0;
+  messages.forEach(msg => {
+    if (msg && msg.role === 'user') userCount += 1;
+    if (msg && msg.role === 'assistant') assistantCount += 1;
+    if (msg && Object.prototype.hasOwnProperty.call(msg, 'content')) contentBytes += estimateJsonStorageBytes(msg.content);
+    if (msg && Object.prototype.hasOwnProperty.call(msg, 'cliSubContent')) cliSubBytes += estimateJsonStorageBytes(msg.cliSubContent);
+    if (msg && Object.prototype.hasOwnProperty.call(msg, 'rawSse')) rawSseBytes += estimateJsonStorageBytes(msg.rawSse);
+    if (msg && Object.prototype.hasOwnProperty.call(msg, 'explodedSnapshots')) snapshotBytes += estimateJsonStorageBytes(msg.explodedSnapshots);
+    if (msg && Object.prototype.hasOwnProperty.call(msg, 'explodedLogicalIds')) logicalIdBytes += estimateJsonStorageBytes(msg.explodedLogicalIds);
+  });
+  const messagesBytes = estimateJsonStorageBytes(messages);
+  const messageResidualBytes = Math.max(0, messagesBytes - contentBytes - cliSubBytes - rawSseBytes - snapshotBytes - logicalIdBytes);
+  const previewState = normalizeChatUrlPreviewState(storedChat.rightSidebarUrlPreview);
+  const previewBytes = (previewState.active || previewState.href || previewState.title || previewState.subtitle)
+    ? estimateJsonStorageBytes(previewState)
+    : 0;
+  const chatMeta = { ...storedChat };
+  delete chatMeta.messages;
+  delete chatMeta.rightSidebarUrlPreview;
+  delete chatMeta.cliCommandHistory;
+  const chatMetaBytes = estimateJsonStorageBytes(chatMeta);
+  const chatObjectBytes = estimateJsonStorageBytes(storedChat);
+  const chatEnvelopeBytes = Math.max(0, chatObjectBytes - messagesBytes - previewBytes - chatMetaBytes);
+  const sidePayload = getChatStorageSidePayload(resolvedChatId, sourcePayload);
+  const sideBytes = estimateJsonStorageBytes(sidePayload);
+  const scopedPayload = buildChatScopedStoragePayload(resolvedChatId, sourcePayload);
+  const scopedBytes = scopedPayload ? estimateJsonStorageBytes(scopedPayload) : 0;
+  const scopedOverheadBytes = Math.max(0, scopedBytes - chatObjectBytes - sideBytes);
+  const runtimeCliHistory = runtimeChat ? normalizeCliCommandHistoryList(runtimeChat.cliCommandHistory) : [];
+  const runtimeCliBytes = estimateJsonStorageBytes(runtimeCliHistory);
+  const runtimeCliCount = runtimeCliHistory.length;
+  const label = String((runtimeChat && runtimeChat.lastMsg) || storedChat.lastMsg || '新会话').trim() || '新会话';
+  const currentChatId = String(state.activeChat || '').trim();
+  return {
+    chatId: resolvedChatId,
+    label,
+    scopedBytes,
+    chatObjectBytes,
+    sideBytes,
+    scopedOverheadBytes,
+    messagesBytes,
+    contentBytes,
+    cliSubBytes,
+    rawSseBytes,
+    snapshotBytes,
+    logicalIdBytes,
+    messageResidualBytes,
+    previewBytes,
+    chatMetaBytes,
+    chatEnvelopeBytes,
+    runtimeCliBytes,
+    runtimeCliCount,
+    previewState,
+    msgCount: messages.length,
+    userCount,
+    assistantCount,
+    pending: !!(runtimeChat && runtimeChat.pendingRequest),
+    active: resolvedChatId && resolvedChatId === currentChatId
+  };
+}
+
+function collectChatStorageStats() {
+  const keyStats = collectLocalStorageKeyStats();
+  const storedPayload = readStoredChatsPayload() || buildChatsStoragePayload();
+  const runtimePayload = buildChatsStoragePayload();
+  const chatsKeyItem = keyStats.items.find(item => item.key === CHATS_KEY) || null;
+  const chatIds = Array.isArray(storedPayload.order)
+    ? storedPayload.order.filter(chatId => storedPayload.chats && storedPayload.chats[chatId])
+    : Object.keys(storedPayload.chats || {});
+  const chatRows = chatIds.map(chatId => buildChatStorageBreakdown(chatId, storedPayload)).filter(Boolean);
+  chatRows.sort((a, b) => b.scopedBytes - a.scopedBytes);
+  const chatsStoredValueBytes = chatsKeyItem ? chatsKeyItem.valueBytes : estimateJsonStorageBytes(storedPayload);
+  const chatsRuntimeValueBytes = estimateJsonStorageBytes(runtimePayload);
+  const otherKeysTotalBytes = Math.max(0, keyStats.totalBytes - (chatsKeyItem ? chatsKeyItem.totalBytes : 0));
+  let runtimeCliTotalBytes = 0;
+  let runtimeCliTotalCount = 0;
+  Object.keys(state.chats || {}).forEach(chatId => {
+    const runtimeCliHistory = normalizeCliCommandHistoryList(state.chats[chatId] && state.chats[chatId].cliCommandHistory);
+    runtimeCliTotalBytes += estimateJsonStorageBytes(runtimeCliHistory);
+    runtimeCliTotalCount += runtimeCliHistory.length;
+  });
+  const activeChatId = String(state.activeChat || (chatRows[0] && chatRows[0].chatId) || '').trim();
+  const activeChat = chatRows.find(item => item.chatId === activeChatId) || null;
+  const largestKey = keyStats.items[0] || null;
+  const largestChat = chatRows[0] || null;
+  const chatsDeltaBytes = chatsRuntimeValueBytes - chatsStoredValueBytes;
+  const insights = [];
+  const storageLimitShare = formatStorageShare(keyStats.totalBytes, LOCAL_STORAGE_SOFT_LIMIT_BYTES);
+  insights.push(
+    keyStats.totalBytes > LOCAL_STORAGE_SOFT_LIMIT_BYTES
+      ? `当前 origin 已使用 <strong>${formatUploadBytes(keyStats.totalBytes)}</strong>，超过 soft limit <strong>${formatUploadBytes(LOCAL_STORAGE_SOFT_LIMIT_BYTES)}</strong>。`
+      : `当前 origin 已使用 <strong>${formatUploadBytes(keyStats.totalBytes)}</strong>，约为 soft limit 的 <strong>${storageLimitShare}</strong>。`
+  );
+  if (largestKey) {
+    insights.push(`最大 key 是 <strong>${esc(largestKey.key)}</strong>，占当前 origin 的 <strong>${formatStorageShare(largestKey.totalBytes, keyStats.totalBytes)}</strong>。`);
+  }
+  if (largestChat) {
+    insights.push(`最大会话是 <strong>${esc(largestChat.label)}</strong>，在 ` + '`deepright_chats`' + ` 中约占 <strong>${formatStorageShare(largestChat.scopedBytes, chatsStoredValueBytes)}</strong>。`);
+  }
+  if (runtimeCliTotalBytes > 0) {
+    insights.push(`运行时 CLI 历史约 <strong>${formatUploadBytes(runtimeCliTotalBytes)}</strong>、共 <strong>${runtimeCliTotalCount}</strong> 条；它用于当前页展示，但默认不写入本地持久化。`);
+  } else {
+    insights.push('当前运行时 CLI 历史体积接近 0，右侧子任务面板主要依赖实时恢复，不会额外挤占本地持久化空间。');
+  }
+  if (Math.abs(chatsDeltaBytes) >= 1024) {
+    insights.push(
+      chatsDeltaBytes > 0
+        ? `按当前内存重算的 ` + '`deepright_chats`' + ` 会比已落盘版本再大 <strong>${formatUploadBytes(chatsDeltaBytes)}</strong>。`
+        : `按当前内存重算的 ` + '`deepright_chats`' + ` 会比已落盘版本少 <strong>${formatUploadBytes(Math.abs(chatsDeltaBytes))}</strong>。`
+    );
+  }
+  return {
+    totalBytes: keyStats.totalBytes,
+    totalKeys: keyStats.items.length,
+    keyStats: keyStats.items,
+    chatsKeyItem,
+    storedPayload,
+    chatsStoredValueBytes,
+    chatsRuntimeValueBytes,
+    chatsDeltaBytes,
+    otherKeysTotalBytes,
+    chatRows,
+    activeChatId,
+    activeChat,
+    largestKey,
+    largestChat,
+    runtimeCliTotalBytes,
+    runtimeCliTotalCount,
+    insights: insights.slice(0, 6),
+    refreshedAt: Date.now()
+  };
+}
+
+function renderChatStorageStatsSummary(stats) {
+  const el = document.getElementById('chatStorageStatsSummary');
+  if (!el) return;
+  const largestChat = stats && stats.largestChat ? stats.largestChat : null;
+  const cards = [
+    {
+      kicker: 'Origin Total',
+      value: formatUploadBytes(stats && stats.totalBytes),
+      meta: `${stats && stats.totalKeys || 0} 个 key · soft limit ${formatStorageShare(stats && stats.totalBytes, LOCAL_STORAGE_SOFT_LIMIT_BYTES)}`,
+      note: (stats && stats.totalBytes > LOCAL_STORAGE_SOFT_LIMIT_BYTES) ? '已进入自动压缩风险区' : '仍在本地预算范围内',
+      tone: (stats && stats.totalBytes > LOCAL_STORAGE_SOFT_LIMIT_BYTES) ? 'warn' : 'info'
+    },
+    {
+      kicker: 'deepright_chats',
+      value: formatUploadBytes(stats && stats.chatsStoredValueBytes),
+      meta: `${stats && stats.chatRows ? stats.chatRows.length : 0} 个会话 · 占 origin ${formatStorageShare(stats && (stats.chatsKeyItem ? stats.chatsKeyItem.totalBytes : 0), stats && stats.totalBytes)}`,
+      note: '当前 localStorage 已落盘版本',
+      tone: 'info'
+    },
+    {
+      kicker: 'Memory Rebuild',
+      value: formatUploadBytes(stats && stats.chatsRuntimeValueBytes),
+      meta: stats && Math.abs(stats.chatsDeltaBytes) >= 1024
+        ? ((stats.chatsDeltaBytes > 0 ? '较落盘 +' : '较落盘 -') + formatUploadBytes(Math.abs(stats.chatsDeltaBytes)))
+        : '与已落盘版本基本一致',
+      note: '按当前内存态重新序列化 deepright_chats',
+      tone: 'info'
+    },
+    {
+      kicker: 'Largest Chat',
+      value: formatUploadBytes(largestChat && largestChat.scopedBytes),
+      meta: largestChat ? summarizeStoragePreviewText(largestChat.label, 26) : '暂无会话',
+      note: largestChat ? (`消息 ${largestChat.msgCount} 条 · 预览 ${largestChat.previewState.active ? '开启' : '关闭'}`) : '无数据',
+      tone: largestChat && largestChat.scopedBytes > Math.max(0, (stats && stats.chatsStoredValueBytes || 0) * 0.4) ? 'warn' : 'info'
+    },
+    {
+      kicker: 'Runtime CLI',
+      value: formatUploadBytes(stats && stats.runtimeCliTotalBytes),
+      meta: `${stats && stats.runtimeCliTotalCount || 0} 条命令 · 未持久化`,
+      note: '刷新前即时可见，刷新后依赖 /api/restore / live poll',
+      tone: 'info'
+    }
+  ];
+  el.innerHTML = cards.map(card => `<article class="chat-storage-stats-summary-card${card.tone ? (' ' + card.tone) : ''}">
+    <div class="chat-storage-stats-summary-kicker">${esc(card.kicker)}</div>
+    <div class="chat-storage-stats-summary-value">${esc(card.value)}</div>
+    <div class="chat-storage-stats-summary-meta">${esc(card.meta)}</div>
+    <div class="chat-storage-stats-summary-note">${esc(card.note)}</div>
+  </article>`).join('');
+}
+
+function renderChatStorageStatsInsights(stats) {
+  const meta = document.getElementById('chatStorageStatsInsightMeta');
+  const el = document.getElementById('chatStorageStatsInsights');
+  if (meta) meta.textContent = `自动结论 ${stats && stats.insights ? stats.insights.length : 0} 条`;
+  if (!el) return;
+  const insights = stats && Array.isArray(stats.insights) ? stats.insights : [];
+  if (!insights.length) {
+    el.innerHTML = '<div class="chat-storage-stats-empty">当前没有可展示的自动诊断结论。</div>';
+    return;
+  }
+  el.innerHTML = insights.map(item => `<div class="chat-storage-stats-insight">${item}</div>`).join('');
+}
+
+function renderChatStorageStatsKeyList(stats) {
+  const meta = document.getElementById('chatStorageStatsKeyMeta');
+  const el = document.getElementById('chatStorageStatsKeyList');
+  if (meta) meta.textContent = `共 ${stats && stats.keyStats ? stats.keyStats.length : 0} 个 key`;
+  if (!el) return;
+  const items = stats && Array.isArray(stats.keyStats) ? stats.keyStats : [];
+  if (!items.length) {
+    el.innerHTML = '<div class="chat-storage-stats-empty">当前浏览器 localStorage 还没有任何 key。</div>';
+    return;
+  }
+  el.innerHTML = items.map(item => {
+    const chips = [];
+    if (item.key === CHATS_KEY) chips.push('<span class="chat-storage-stats-tag info">会话主 payload</span>');
+    if (item.totalBytes > LOCAL_STORAGE_SOFT_LIMIT_BYTES * 0.3) chips.push('<span class="chat-storage-stats-tag warn">高占用</span>');
+    return `<article class="chat-storage-stats-row${item.key === CHATS_KEY ? ' active' : ''}">
+      <div class="chat-storage-stats-row-head">
+        <div class="chat-storage-stats-row-title"><code>${esc(item.key)}</code></div>
+        <div class="chat-storage-stats-row-meta">${esc(formatUploadBytes(item.totalBytes))} · ${esc(formatStorageShare(item.totalBytes, stats.totalBytes))}</div>
+      </div>
+      <div class="chat-storage-stats-row-chips">${chips.join('')}</div>
+      <div class="chat-storage-stats-bar"><span style="width:${resolveStorageBarWidth(item.totalBytes, stats.totalBytes)}"></span></div>
+      <div class="chat-storage-stats-row-sub">key ${esc(formatUploadBytes(item.keyBytes))} · value ${esc(formatUploadBytes(item.valueBytes))}${item.preview ? (' · ' + esc(item.preview)) : ''}</div>
+    </article>`;
+  }).join('');
+}
+
+function renderChatStorageStatsChatList(stats) {
+  const meta = document.getElementById('chatStorageStatsChatMeta');
+  const el = document.getElementById('chatStorageStatsChatList');
+  if (meta) meta.textContent = `按单会话 scoped payload 估算`;
+  if (!el) return;
+  const items = stats && Array.isArray(stats.chatRows) ? stats.chatRows : [];
+  if (!items.length) {
+    el.innerHTML = '<div class="chat-storage-stats-empty">当前没有可分析的会话持久化数据。</div>';
+    return;
+  }
+  el.innerHTML = items.map(item => {
+    const chips = [];
+    if (item.active) chips.push('<span class="chat-storage-stats-tag info">当前会话</span>');
+    if (item.pending) chips.push('<span class="chat-storage-stats-tag warn">进行中</span>');
+    if (item.previewState && item.previewState.active) chips.push('<span class="chat-storage-stats-tag">URL预览</span>');
+    if (item.runtimeCliBytes > 0) chips.push('<span class="chat-storage-stats-tag">运行时CLI ' + esc(formatUploadBytes(item.runtimeCliBytes)) + '</span>');
+    return `<article class="chat-storage-stats-row${item.active ? ' active' : ''}">
+      <div class="chat-storage-stats-row-head">
+        <div class="chat-storage-stats-row-title">${esc(item.label)}</div>
+        <div class="chat-storage-stats-row-meta">${esc(formatUploadBytes(item.scopedBytes))} · ${esc(formatStorageShare(item.scopedBytes, stats.chatsStoredValueBytes))}</div>
+      </div>
+      <div class="chat-storage-stats-row-chips">${chips.join('')}</div>
+      <div class="chat-storage-stats-bar"><span style="width:${resolveStorageBarWidth(item.scopedBytes, stats.chatsStoredValueBytes)}"></span></div>
+      <div class="chat-storage-stats-row-sub">消息 ${esc(String(item.msgCount))} 条（U${esc(String(item.userCount))} / A${esc(String(item.assistantCount))}） · side maps ${esc(formatUploadBytes(item.sideBytes))} · wrapper ${esc(formatUploadBytes(item.scopedOverheadBytes))}</div>
+    </article>`;
+  }).join('');
+}
+
+function renderChatStorageStatsActiveChat(stats) {
+  const meta = document.getElementById('chatStorageStatsBreakdownMeta');
+  const activeSummary = document.getElementById('chatStorageStatsActiveSummary');
+  const breakdownList = document.getElementById('chatStorageStatsBreakdownList');
+  const activeChat = stats && stats.activeChat ? stats.activeChat : null;
+  if (meta) meta.textContent = activeChat ? `chat_id=${activeChat.chatId}` : '未选中会话';
+  if (!activeSummary || !breakdownList) return;
+  if (!activeChat) {
+    activeSummary.innerHTML = '<div class="chat-storage-stats-empty">当前没有可拆解的活动会话。</div>';
+    breakdownList.innerHTML = '<div class="chat-storage-stats-empty">选择会话后，这里会显示字段级体积分布。</div>';
+    return;
+  }
+  const summaryRows = [
+    {
+      title: activeChat.label,
+      meta: `${formatUploadBytes(activeChat.scopedBytes)} · 占 deepright_chats ${formatStorageShare(activeChat.scopedBytes, stats.chatsStoredValueBytes)}`,
+      sub: `消息 ${activeChat.msgCount} 条，当前 ${activeChat.pending ? '仍在执行' : '已完成'}，URL 预览 ${activeChat.previewState.active ? '开启' : '关闭'}。`,
+      barBytes: activeChat.scopedBytes,
+      barTotal: activeChat.scopedBytes
+    },
+    {
+      title: '落盘组成',
+      meta: `chat object ${formatUploadBytes(activeChat.chatObjectBytes)} · side maps ${formatUploadBytes(activeChat.sideBytes)}`,
+      sub: `外层 wrapper / order / map key 约 ${formatUploadBytes(activeChat.scopedOverheadBytes)}。`,
+      barBytes: activeChat.chatObjectBytes + activeChat.sideBytes,
+      barTotal: activeChat.scopedBytes
+    },
+    {
+      title: '运行时 CLI（未持久化）',
+      meta: `${formatUploadBytes(activeChat.runtimeCliBytes)} · ${activeChat.runtimeCliCount} 条命令`,
+      sub: activeChat.runtimeCliBytes > 0
+        ? '当前页右侧 CLI 子任务仍可即时展示，但这部分不会再进入 localStorage。'
+        : '当前运行时没有额外 CLI 输出体积。',
+      barBytes: activeChat.runtimeCliBytes,
+      barTotal: Math.max(activeChat.scopedBytes, activeChat.runtimeCliBytes)
+    }
+  ];
+  activeSummary.innerHTML = summaryRows.map(item => `<article class="chat-storage-stats-row active">
+    <div class="chat-storage-stats-row-head">
+      <div class="chat-storage-stats-row-title">${esc(item.title)}</div>
+      <div class="chat-storage-stats-row-meta">${esc(item.meta)}</div>
+    </div>
+    <div class="chat-storage-stats-bar"><span style="width:${resolveStorageBarWidth(item.barBytes, item.barTotal)}"></span></div>
+    <div class="chat-storage-stats-row-sub">${esc(item.sub)}</div>
+  </article>`).join('');
+  const breakdownRows = [
+    { title: '消息正文 content', bytes: activeChat.contentBytes, note: '中心区可直接阅读的正文内容。', tag: '' },
+    { title: '助手 CLI 子消息 cliSubContent', bytes: activeChat.cliSubBytes, note: 'assistant 气泡内嵌的 CLI 子消息镜像。', tag: '' },
+    { title: '原始 rawSse', bytes: activeChat.rawSseBytes, note: '仅用于回放 / 恢复的冗余字段。', tag: activeChat.rawSseBytes > 0 ? 'warn' : '' },
+    { title: 'explodedSnapshots', bytes: activeChat.snapshotBytes, note: '思考展开快照副本。', tag: activeChat.snapshotBytes > 0 ? 'warn' : '' },
+    { title: 'explodedLogicalIds', bytes: activeChat.logicalIdBytes, note: '思考逻辑 ID 映射。', tag: '' },
+    { title: '消息结构 / 其它字段', bytes: activeChat.messageResidualBytes, note: '消息对象中的 role、时间戳、状态等。', tag: '' },
+    { title: 'URL 预览元数据', bytes: activeChat.previewBytes, note: activeChat.previewState.active ? summarizeStoragePreviewText(activeChat.previewState.href, 60) : '仅保存轻量 meta，不保存 iframe 页面正文。', tag: activeChat.previewState.active ? 'info' : '' },
+    { title: 'Chat 级元数据', bytes: activeChat.chatMetaBytes + activeChat.chatEnvelopeBytes, note: '如 lastMsg、pendingRequest、恢复指针等。', tag: '' },
+    { title: '关联 maps / scoped wrapper', bytes: activeChat.sideBytes + activeChat.scopedOverheadBytes, note: '来自 agents/models/thinking/verify/htmlOutput/swarm 与 scoped payload 外层开销。', tag: '' },
+    { title: '运行时 CLI（未持久化）', bytes: activeChat.runtimeCliBytes, note: '只影响当前页内存态与右侧展示，不会写入 deepright_chats。', tag: 'info' }
+  ].filter(item => item.bytes > 0 || item.tag || item.title === '运行时 CLI（未持久化）');
+  const maxBreakdown = breakdownRows.reduce((max, item) => Math.max(max, item.bytes), 0);
+  breakdownList.innerHTML = breakdownRows.map(item => {
+    const chips = item.tag ? `<span class="chat-storage-stats-tag ${item.tag}">${item.tag === 'warn' ? '压缩热点' : '运行时/轻量'}</span>` : '';
+    return `<article class="chat-storage-stats-row">
+      <div class="chat-storage-stats-row-head">
+        <div class="chat-storage-stats-row-title">${esc(item.title)}</div>
+        <div class="chat-storage-stats-row-meta">${esc(formatUploadBytes(item.bytes))}</div>
+      </div>
+      <div class="chat-storage-stats-row-chips">${chips}</div>
+      <div class="chat-storage-stats-bar"><span style="width:${resolveStorageBarWidth(item.bytes, maxBreakdown)}"></span></div>
+      <div class="chat-storage-stats-row-sub">${esc(item.note)}</div>
+    </article>`;
+  }).join('');
+}
+
+function renderChatStorageStatsOverlay() {
+  const stats = chatStorageStatsState.stats;
+  const activeValue = document.getElementById('chatStorageStatsActiveChatValue');
+  const updatedAt = document.getElementById('chatStorageStatsUpdatedAt');
+  if (activeValue) {
+    const activeLabel = stats && stats.activeChat ? summarizeStoragePreviewText(stats.activeChat.label, 20) : '未选中';
+    activeValue.textContent = activeLabel || '未选中';
+  }
+  if (updatedAt) updatedAt.textContent = formatStorageStatsTime(chatStorageStatsState.refreshedAt || Date.now());
+  renderChatStorageStatsSummary(stats);
+  renderChatStorageStatsInsights(stats);
+  renderChatStorageStatsKeyList(stats);
+  renderChatStorageStatsChatList(stats);
+  renderChatStorageStatsActiveChat(stats);
+}
+
+function refreshChatStorageStatsOverlay() {
+  chatStorageStatsState.stats = collectChatStorageStats();
+  chatStorageStatsState.refreshedAt = Date.now();
+  if (chatStorageStatsState.visible) renderChatStorageStatsOverlay();
+}
+
+function handleChatStorageStatsOverlayClick(event) {
+  if (!event || event.target !== event.currentTarget) return;
+  closeChatStorageStatsOverlay();
+}
+
+function closeChatStorageStatsOverlay() {
+  const overlay = document.getElementById('chatStorageStatsOverlay');
+  if (!overlay) return;
+  setOverlayVisible(overlay, false);
+  chatStorageStatsState.visible = false;
+}
+
+function openChatStorageStatsOverlay(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  const overlay = document.getElementById('chatStorageStatsOverlay');
+  if (!overlay) return;
+  chatStorageStatsState.visible = true;
+  refreshChatStorageStatsOverlay();
+  showExclusiveOverlay(overlay);
 }
 
 function resetChatSessionLogQueryInputs() {
@@ -10565,27 +11207,13 @@ function getOnboardingStepConfig(step) {
       return {
         domain: 'center',
         selector: '#swarmSaveBtn',
-        message: '配置完后需要点击确认。',
+        message: '配置完后点击确认即可立即保存。',
         actionLabel: '知道了',
         padding: 8,
         highlightPadding: 12,
         cardPlacement: 'above',
         cardWidth: 320,
         cardMinHeight: 118,
-        cardOffsetY: 16
-      };
-    case 'swarm-tour-settings-save':
-      return {
-        domain: 'center',
-        selector: '#settingsSaveBtn',
-        message: '保存后让蜂群生效。',
-        actionLabel: '知道了',
-        padding: 8,
-        highlightPadding: 12,
-        cardPlacement: 'above-left',
-        cardWidth: 320,
-        cardMinHeight: 118,
-        cardOffsetX: -66,
         cardOffsetY: 16
       };
     case 'swarm-tour-settings-bee':
@@ -13085,7 +13713,7 @@ function handleModelConfigOverflowPreviewLeave(input) {
 }
 
 function isSettingsOnboardingStep(step) {
-  return ['models-intro', 'model-config-glow-toggle', 'model-config-glow-panel', 'custom-url', 'custom-fast', 'custom-thinking', 'custom-multi-input', 'custom-multi-output', 'media-output-tour-launch', 'media-output-tour-panel', 'media-output-tour-agent', 'model-url-safety-tour-toggle', 'new-agent', 'swarm-tour-toggle', 'swarm-tour-thinking', 'swarm-tour-model', 'swarm-tour-desc', 'swarm-tour-confirm', 'swarm-tour-settings-save', 'swarm-tour-settings-bee', 'remote-agent-tour-toggle', 'remote-agent-tour-panel', 'remote-agent-tour-confirm', 'remote-agent-tour-settings-save', 'remote-agent-tour-deviceid', 'sse-503-settings', 'agent-transfer-tour-export', 'agent-transfer-tour-import'].includes(String(step || '').trim());
+  return ['models-intro', 'model-config-glow-toggle', 'model-config-glow-panel', 'custom-url', 'custom-fast', 'custom-thinking', 'custom-multi-input', 'custom-multi-output', 'media-output-tour-launch', 'media-output-tour-panel', 'media-output-tour-agent', 'model-url-safety-tour-toggle', 'new-agent', 'swarm-tour-toggle', 'swarm-tour-thinking', 'swarm-tour-model', 'swarm-tour-desc', 'swarm-tour-confirm', 'swarm-tour-settings-bee', 'remote-agent-tour-toggle', 'remote-agent-tour-panel', 'remote-agent-tour-confirm', 'remote-agent-tour-settings-save', 'remote-agent-tour-deviceid', 'sse-503-settings', 'agent-transfer-tour-export', 'agent-transfer-tour-import'].includes(String(step || '').trim());
 }
 
 function isModelConfigGlowTourOnboardingStep(step) {
@@ -13153,7 +13781,7 @@ function isClearReloadTourOnboardingStep(step) {
 }
 
 function isSwarmTourOnboardingStep(step) {
-  return ['swarm-tour-toggle', 'swarm-tour-thinking', 'swarm-tour-model', 'swarm-tour-desc', 'swarm-tour-confirm', 'swarm-tour-settings-save', 'swarm-tour-settings-bee', 'swarm-tour-input-bee'].includes(String(step || '').trim());
+  return ['swarm-tour-toggle', 'swarm-tour-thinking', 'swarm-tour-model', 'swarm-tour-desc', 'swarm-tour-confirm', 'swarm-tour-settings-bee', 'swarm-tour-input-bee'].includes(String(step || '').trim());
 }
 
 function isRemoteAgentTourOnboardingStep(step) {
@@ -13331,7 +13959,7 @@ function isMemoTourDetailListStep(step) {
 }
 
 function isSwarmTourSettingsStep(step) {
-  return ['swarm-tour-toggle', 'swarm-tour-thinking', 'swarm-tour-model', 'swarm-tour-desc', 'swarm-tour-confirm', 'swarm-tour-settings-save', 'swarm-tour-settings-bee'].includes(String(step || '').trim());
+  return ['swarm-tour-toggle', 'swarm-tour-thinking', 'swarm-tour-model', 'swarm-tour-desc', 'swarm-tour-confirm', 'swarm-tour-settings-bee'].includes(String(step || '').trim());
 }
 
 function isSwarmTourPanelStep(step) {
@@ -20367,9 +20995,6 @@ function handleOnboardingAction(event) {
       setOnboardingStep('swarm-tour-confirm');
       return;
     case 'swarm-tour-confirm':
-      setOnboardingStep('swarm-tour-settings-save');
-      return;
-    case 'swarm-tour-settings-save':
       setOnboardingStep('swarm-tour-settings-bee');
       return;
     case 'swarm-tour-settings-bee':
@@ -25310,6 +25935,10 @@ function loadChats() {
       applyChatsStoragePayload(d);
       let normalizedChanged = false;
       Object.values(state.chats).forEach(chat => {
+        if (chat && Object.prototype.hasOwnProperty.call(chat, 'cliCommandHistory')) {
+          delete chat.cliCommandHistory;
+          normalizedChanged = true;
+        }
         if (normalizeLoadedChat(chat)) normalizedChanged = true;
       });
       if (normalizedChanged) saveChats();
@@ -25555,7 +26184,7 @@ function cloneChatForStorage(chat) {
   if (!chat || typeof chat !== 'object') return chat;
   const next = { ...chat };
   next.messages = Array.isArray(chat.messages) ? chat.messages.map(cloneMessageForStorage) : [];
-  next.cliCommandHistory = normalizeCliCommandHistoryList(chat.cliCommandHistory);
+  delete next.cliCommandHistory;
   return next;
 }
 
@@ -25749,6 +26378,7 @@ function saveChats() {
     chatStorageFailureNoticeShown = false;
     tryPersistChatsPayload(basePayload);
     maintainLocalStorageBudget({ showNotice: false });
+    if (chatStorageStatsState.visible) refreshChatStorageStatsOverlay();
     return true;
   } catch (err) {
     if (!isStorageQuotaError(err)) throw err;
@@ -25767,6 +26397,7 @@ function saveChats() {
         maybeShowChatStorageNotice('本地存储空间不足，已仅保存最近部分会话历史', false);
       }
       chatStorageFailureNoticeShown = false;
+      if (chatStorageStatsState.visible) refreshChatStorageStatsOverlay();
       return true;
     } catch (err) {
       if (!isStorageQuotaError(err)) throw err;
@@ -38831,6 +39462,7 @@ let _configCheckSeq = 0;
 let _swarmConfigLoadSeq = 0;
 let swarmConfigDraft = { description: '', thinking: false, swarm: false, model: '' };
 let pendingSwarmConfigSave = null;
+let swarmConfigSaveInFlight = false;
 let remoteConfigDraft = [];
 let pendingRemoteConfigSave = null;
 let mediaConfigDraft = {};
@@ -38936,6 +39568,13 @@ function clearPendingRemoteConfigSave() {
   updateSwarmSaveTip();
 }
 
+function syncSwarmSaveButtonState() {
+  const btn = document.getElementById('swarmSaveBtn');
+  if (!btn) return;
+  btn.disabled = !!swarmConfigSaveInFlight;
+  btn.textContent = swarmConfigSaveInFlight ? '保存中...' : '确认';
+}
+
 function setPendingSwarmConfigSave(agentId, draft) {
   const resolvedAgentId = String(agentId || '').trim();
   if (!resolvedAgentId) {
@@ -38996,10 +39635,12 @@ function updateSwarmSaveTip() {
   const agentSelect = document.getElementById('agentSelect');
   if (!el) return;
   const currentAgentId = String(agentSelect && agentSelect.value || '').trim();
-  const show = !!(
-    (pendingSwarmConfigSave && pendingSwarmConfigSave.agentId && pendingSwarmConfigSave.agentId === currentAgentId) ||
-    (pendingRemoteConfigSave && pendingRemoteConfigSave.agentId && pendingRemoteConfigSave.agentId === currentAgentId)
-  );
+  const hasPendingSwarm = !!(pendingSwarmConfigSave && pendingSwarmConfigSave.agentId && pendingSwarmConfigSave.agentId === currentAgentId);
+  const hasPendingRemote = !!(pendingRemoteConfigSave && pendingRemoteConfigSave.agentId && pendingRemoteConfigSave.agentId === currentAgentId);
+  const show = hasPendingSwarm || hasPendingRemote;
+  if (hasPendingSwarm && hasPendingRemote) el.textContent = '蜂群或外部设备连接配置需要在保存后生效';
+  else if (hasPendingSwarm) el.textContent = '蜂群配置需要在保存后生效';
+  else el.textContent = '外部设备连接配置需要在保存后生效';
   el.classList.toggle('show', show);
 }
 
@@ -39600,6 +40241,7 @@ function applySwarmDraftToPanel() {
     thinkingLabel.textContent = draft.thinking ? 'Thinking' : 'Auto';
     thinkingLabel.classList.toggle('on', !!draft.thinking);
   }
+  syncSwarmSaveButtonState();
   updateSwarmModelUI();
 }
 
@@ -39852,7 +40494,7 @@ function toggleSwarmSwitch() {
 }
 
 async function saveSwarmConfig() {
-  if (isSwarmTourInteractionLocked()) return;
+  if (isSwarmTourInteractionLocked() || swarmConfigSaveInFlight) return;
   const agentId = document.getElementById('agentSelect').value;
   if (!agentId) return;
   syncSwarmDraftFromPanel();
@@ -39868,11 +40510,39 @@ async function saveSwarmConfig() {
       setSwarmError('开启蜂群时，描述为必填项。');
       return;
     }
+    const savedModels = getOrderedConfiguredModelNames(normalizeModelMap(state.settings.models || {}));
+    if (!savedModels.includes(normalizeModelName(draft.model))) {
+      setSwarmError('请先保存模型与密钥，再保存蜂群配置。');
+      return;
+    }
   }
-  setPendingSwarmConfigSave(agentId, draft);
-  swarmConfigDraft = draft;
-  applySwarmDraftToPanel();
-  hideSwarmPanel();
+  swarmConfigSaveInFlight = true;
+  syncSwarmSaveButtonState();
+  try {
+    const savedAgentConfig = await writeAgentConfig(agentId, draft);
+    swarmConfigDraft = normalizeSwarmConfig(savedAgentConfig);
+    clearPendingSwarmConfigSave();
+    applySwarmDraftToPanel();
+    const activeChatAgentId = String(chatAgents[state.activeChat] || '').trim();
+    if (activeChatAgentId && activeChatAgentId === String(agentId || '').trim()) {
+      swarmEnabled = !!swarmConfigDraft.swarm;
+      updateThinkingUI();
+    }
+    updateBeeIcons();
+    hideSwarmPanel();
+    if (!hasSwarmSaveSuccessRecord() && savedAgentConfig.swarm) {
+      markSwarmSaveSuccessRecord();
+      swarmSaveSuccessTourState.agentId = String(agentId || '').trim();
+      swarmSaveSuccessTourState.agentName = resolveSwarmSaveSuccessTourAgentName(swarmSaveSuccessTourState.agentId);
+      swarmSaveSuccessTourState.pendingStart = !!swarmSaveSuccessTourState.agentName;
+      queueSwarmSaveSuccessTourOnboarding(agentId);
+    }
+  } catch (e) {
+    setSwarmError('保存蜂群配置失败：' + ((e && e.message) || '网络异常'));
+  } finally {
+    swarmConfigSaveInFlight = false;
+    syncSwarmSaveButtonState();
+  }
 }
 
 function updateSettingsBeeIcon() {
@@ -43451,6 +44121,8 @@ function resolveOverlayCancelButton(scope) {
       return findVisibleButton(scope, ['#pluginModalCancelBtn', '.plugin-modal-close']) || findVisibleButtonByText(scope, ['关闭窗口', '关闭插件', '修改配置', '取消', '关闭']);
     case 'chatSessionLogOverlay':
       return findVisibleButton(scope, ['#chatSessionLogCloseBtn']) || findVisibleButtonByText(scope, ['取消', '关闭']);
+    case 'chatStorageStatsOverlay':
+      return findVisibleButton(scope, ['#chatStorageStatsCloseBtn']) || findVisibleButtonByText(scope, ['取消', '关闭']);
     case 'sandboxOverlay':
       return findVisibleButton(scope, ['#sandboxCloseBtn']) || findVisibleButtonByText(scope, ['关闭会话沙盒']);
     case 'shutdownConfirmOverlay':
