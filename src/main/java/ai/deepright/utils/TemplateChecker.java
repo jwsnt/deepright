@@ -9,6 +9,14 @@ public class TemplateChecker {
     public static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\$\\{[^}]+}");
 
     public static final String[] PLACEHOLDER = Arrays.asList(
+            "#skill_usage",
+            "#browser",
+            "#remote",
+            "#image",
+            "#email",
+            "#feishu",
+            "#deepright",
+            "#creator",
             "#agentId",
             "#answer",
             "#app",

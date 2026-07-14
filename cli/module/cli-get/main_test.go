@@ -1111,6 +1111,60 @@ func TestResolveSandboxExecutablePathFromLinuxHelpersConfig(t *testing.T) {
 	}
 }
 
+func TestConfiguredHTTPDebugFromNestedConfig(t *testing.T) {
+	root := t.TempDir()
+	execPath := filepath.Join(root, "integration.app", "Contents", "MacOS", "integration")
+	configPath := filepath.Join(root, "integration.app", "Contents", "Resources", "config", "config.json")
+
+	if err := os.MkdirAll(filepath.Dir(execPath), 0o755); err != nil {
+		t.Fatalf("mkdir exec dir: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	if err := os.WriteFile(execPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatalf("write exec: %v", err)
+	}
+	if err := os.WriteFile(configPath, []byte(`{"http":{"heartbeat":10,"debug":true}}`), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	restoreExec := osExecutable
+	osExecutable = func() (string, error) { return execPath, nil }
+	defer func() { osExecutable = restoreExec }()
+
+	if !configuredHTTPDebug() {
+		t.Fatal("configuredHTTPDebug() = false, want true")
+	}
+}
+
+func TestConfiguredHTTPDebugIgnoresLegacyFlatKey(t *testing.T) {
+	root := t.TempDir()
+	execPath := filepath.Join(root, "integration.app", "Contents", "MacOS", "integration")
+	configPath := filepath.Join(root, "integration.app", "Contents", "Resources", "config", "config.json")
+
+	if err := os.MkdirAll(filepath.Dir(execPath), 0o755); err != nil {
+		t.Fatalf("mkdir exec dir: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	if err := os.WriteFile(execPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatalf("write exec: %v", err)
+	}
+	if err := os.WriteFile(configPath, []byte(`{"http_debug":true}`), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	restoreExec := osExecutable
+	osExecutable = func() (string, error) { return execPath, nil }
+	defer func() { osExecutable = restoreExec }()
+
+	if configuredHTTPDebug() {
+		t.Fatal("configuredHTTPDebug() = true, want false")
+	}
+}
+
 func TestProcessTaskUsesSandboxAppWhenEnabled(t *testing.T) {
 	oldwd, err := os.Getwd()
 	if err != nil {

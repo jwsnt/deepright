@@ -2399,7 +2399,7 @@ func publishResultWithRetry(ctx context.Context, client *http.Client, hostFn fun
 	}
 }
 
-func runCliGetExecuteWorker(ctx context.Context, taskQueue <-chan queuedCliGetTask, publishQueue chan<- queuedCliGetPublish, terminal string) {
+func runCliGetExecuteWorker(ctx context.Context, taskQueue <-chan queuedCliGetTask, publishQueue chan<- queuedCliGetPublish, terminal string, cfg *Config) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -2450,7 +2450,9 @@ func runCliGetExecuteWorker(ctx context.Context, taskQueue <-chan queuedCliGetTa
 				return
 			case publishQueue <- queuedCliGetPublish{result: result, metadata: item.metadata}:
 				recordCliGetRuntimeEvent(cliGetRuntimeSnapshot{PendingPublishes: 1})
-				log.Printf("cli-get: publish queued tid=%s pending=%d", strings.TrimSpace(task.Tid), len(publishQueue))
+				if integrationHTTPDebugEnabled(cfg) {
+					log.Printf("cli-get: publish queued tid=%s pending=%d", strings.TrimSpace(task.Tid), len(publishQueue))
+				}
 			}
 		}
 	}
@@ -2509,7 +2511,7 @@ func startCliGet(ctx context.Context, cfg *Config) {
 	setCliGetRunningWorkers(0)
 
 	for i := 0; i < cfg.Thread; i++ {
-		go runCliGetExecuteWorker(ctx, taskQueue, publishQueue, terminal)
+		go runCliGetExecuteWorker(ctx, taskQueue, publishQueue, terminal, cfg)
 		go runCliGetPublishWorker(ctx, client, publishQueue, retryInterval, cfg.RetryTimes, cfg)
 	}
 
@@ -2573,7 +2575,9 @@ func startCliGet(ctx context.Context, cfg *Config) {
 				return
 			case taskQueue <- queuedCliGetTask{task: t, metadata: metadata}:
 				recordCliGetRuntimeEvent(cliGetRuntimeSnapshot{PendingTasks: 1})
-				log.Printf("cli-get: task queued tid=%s pending=%d capacity=%d", strings.TrimSpace(t.Tid), len(taskQueue), cap(taskQueue))
+				if integrationHTTPDebugEnabled(cfg) {
+					log.Printf("cli-get: task queued tid=%s pending=%d capacity=%d", strings.TrimSpace(t.Tid), len(taskQueue), cap(taskQueue))
+				}
 			}
 		}
 	}()

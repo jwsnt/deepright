@@ -69,6 +69,17 @@
   --warm-pill-inset:rgba(255,255,255,.9);--warm-pill-inset-strong:rgba(255,255,255,.94);
   --warm-pill-ring:rgba(255,192,58,.22);--warm-pill-glow:rgba(255,192,58,.22);--warm-pill-glow-strong:rgba(255,192,58,.32);
   --warm-pill-shimmer:rgba(255,255,255,.82);
+  --input-bubble-bg-start:rgba(255,247,240,.98);--input-bubble-bg-end:rgba(255,236,223,.94);
+  --input-bubble-border:rgba(255,186,128,.42);--input-bubble-text:#7a4a00;
+  --input-bubble-shadow:0 10px 24px rgba(16,24,40,.1),inset 0 1px 0 rgba(255,255,255,.72);
+  --input-bubble-file-bg-start:rgba(255,247,240,.98);--input-bubble-file-bg-end:rgba(255,236,223,.94);
+  --input-bubble-file-border:rgba(255,186,128,.42);--input-bubble-file-text:#7a4a00;
+  --input-bubble-skill-bg-start:rgba(240,252,248,.98);--input-bubble-skill-bg-end:rgba(222,246,238,.94);
+  --input-bubble-skill-border:rgba(15,118,110,.24);--input-bubble-skill-text:#0f766e;
+  --input-bubble-team-bg-start:rgba(255,245,236,.98);--input-bubble-team-bg-end:rgba(255,229,213,.94);
+  --input-bubble-team-border:rgba(234,88,12,.26);--input-bubble-team-text:#c2410c;
+  --input-bubble-image-bg-start:rgba(255,240,226,.98);--input-bubble-image-bg-end:rgba(255,218,191,.94);
+  --input-bubble-image-border:rgba(255,145,74,.34);--input-bubble-image-text:#9a3412;
 }
 [data-theme="dark"]{
   --accent-rgb:0,212,255;--accent-soft-rgb:122,241,255;--contrast-rgb:44,44,52;--warm-rgb:255,196,112;
@@ -110,6 +121,17 @@
   --warm-pill-inset:rgba(255,255,255,.04);--warm-pill-inset-strong:rgba(255,255,255,.04);
   --warm-pill-ring:rgba(255,190,132,.16);--warm-pill-glow:rgba(255,190,132,.22);--warm-pill-glow-strong:rgba(255,190,132,.36);
   --warm-pill-shimmer:rgba(255,255,255,.26);
+  --input-bubble-bg-start:rgba(39,87,189,.82);--input-bubble-bg-end:rgba(20,56,133,.68);
+  --input-bubble-border:rgba(123,165,255,.4);--input-bubble-text:#b8d4ff;
+  --input-bubble-shadow:0 12px 26px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.08);
+  --input-bubble-file-bg-start:rgba(39,87,189,.82);--input-bubble-file-bg-end:rgba(20,56,133,.68);
+  --input-bubble-file-border:rgba(123,165,255,.4);--input-bubble-file-text:#b8d4ff;
+  --input-bubble-skill-bg-start:rgba(17,94,89,.72);--input-bubble-skill-bg-end:rgba(11,68,64,.54);
+  --input-bubble-skill-border:rgba(94,234,212,.24);--input-bubble-skill-text:#99f6e4;
+  --input-bubble-team-bg-start:rgba(39,87,189,.82);--input-bubble-team-bg-end:rgba(20,56,133,.68);
+  --input-bubble-team-border:rgba(123,165,255,.4);--input-bubble-team-text:#b8d4ff;
+  --input-bubble-image-bg-start:rgba(28,72,160,.88);--input-bubble-image-bg-end:rgba(14,43,110,.76);
+  --input-bubble-image-border:rgba(122,241,255,.28);--input-bubble-image-text:#d7f6ff;
   --delete-cta-bg-start:#79efff;--delete-cta-bg-end:#2397ff;
   --delete-cta-bg-start-hover:#97f5ff;--delete-cta-bg-end-hover:#46abff;
   --delete-cta-border:rgba(122,241,255,.42);--delete-cta-shadow:rgba(20,151,255,.26);
@@ -1834,13 +1856,17 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .input-editable *{text-align:center}
 .input-editable:empty::before{content:attr(data-placeholder);color:var(--text-muted)}
 .input-editable.locked{opacity:.72;cursor:not-allowed}
-.input-editable .at-bubble{display:inline-flex;align-items:center;gap:3px;max-width:100%;min-width:0;overflow:hidden;background:var(--accent);color:#fff;font-size:12px;padding:1px 7px;border-radius:10px;vertical-align:middle;margin:0 2px;user-select:all;line-height:1.6;position:relative}
-.input-editable .at-bubble[data-bubble-kind="image"]{background:linear-gradient(135deg,#0ea5e9,var(--accent))}
+.input-editable .at-bubble{display:inline-flex;align-items:center;gap:3px;max-width:100%;min-width:0;overflow:hidden;background:linear-gradient(180deg,var(--input-bubble-bg-start),var(--input-bubble-bg-end));border:1px solid var(--input-bubble-border);box-shadow:var(--input-bubble-shadow);color:var(--input-bubble-text);font-size:12px;padding:1px 7px;border-radius:10px;vertical-align:middle;margin:0 2px;user-select:all;line-height:1.6;position:relative;transition:background .24s ease,border-color .24s ease,color .24s ease,box-shadow .24s ease,filter .16s ease}
+.input-editable .at-bubble[data-prefix="[FILE:"]{--input-bubble-bg-start:var(--input-bubble-file-bg-start);--input-bubble-bg-end:var(--input-bubble-file-bg-end);--input-bubble-border:var(--input-bubble-file-border);--input-bubble-text:var(--input-bubble-file-text);cursor:pointer}
+.input-editable .at-bubble[data-prefix="[FILE:"]:hover{filter:brightness(1.04)}
+.input-editable .at-bubble[data-prefix="[SKILL:"]{--input-bubble-bg-start:var(--input-bubble-skill-bg-start);--input-bubble-bg-end:var(--input-bubble-skill-bg-end);--input-bubble-border:var(--input-bubble-skill-border);--input-bubble-text:var(--input-bubble-skill-text)}
+.input-editable .at-bubble[data-prefix="[TEAM:"]{--input-bubble-bg-start:var(--input-bubble-team-bg-start);--input-bubble-bg-end:var(--input-bubble-team-bg-end);--input-bubble-border:var(--input-bubble-team-border);--input-bubble-text:var(--input-bubble-team-text)}
+.input-editable .at-bubble[data-bubble-kind="image"]{--input-bubble-bg-start:var(--input-bubble-image-bg-start);--input-bubble-bg-end:var(--input-bubble-image-bg-end);--input-bubble-border:var(--input-bubble-image-border);--input-bubble-text:var(--input-bubble-image-text)}
 .input-editable .at-bubble .bubble-label{display:inline-block;max-width:320px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .input-editable .at-bubble .bubble-del{flex:0 0 auto}
 .input-editable .at-bubble .bubble-del{width:10px;height:10px;opacity:.5;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;border:none;background:none;padding:0;vertical-align:middle}
 .input-editable .at-bubble .bubble-del:hover{opacity:1}
-.input-editable .at-bubble .bubble-del svg{width:10px;height:10px;color:#fff}
+.input-editable .at-bubble .bubble-del svg{width:10px;height:10px;color:currentColor}
 .rs-note-input .at-bubble{max-width:calc(100% - 4px)}
 .rs-note-input .at-bubble .bubble-label{max-width:100%}
 .message-edit-overlay{background:rgba(14,22,38,.22);backdrop-filter:blur(12px) saturate(135%);-webkit-backdrop-filter:blur(12px) saturate(135%)}
@@ -2965,13 +2991,17 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
 .plugin-modal-email-warning-desc{margin:0;font-size:12px;line-height:1.7;color:var(--text-secondary)}
 .plugin-modal-email-warning-value{padding:7px 12px;border-radius:999px;background:color-mix(in srgb,var(--error-bg) 68%,transparent);border:1px solid color-mix(in srgb,var(--error) 24%,transparent);font-size:11px;color:var(--error)}
 .plugin-modal-email-warning-btn{min-width:108px;margin-top:4px}
-.plugin-modal-browser-restart-confirm{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(19,24,36,.18);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .22s ease,visibility 0s linear .22s;z-index:6}
+.plugin-modal-browser-restart-confirm{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(circle at top,rgba(255,186,197,.24),transparent 42%),rgba(68,12,21,.2);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .22s ease,visibility 0s linear .22s;z-index:6}
 .plugin-modal-browser-restart-confirm.show{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .22s ease}
-.plugin-modal-browser-restart-card{width:min(420px,100%);padding:24px 22px 20px;border-radius:24px;border:1px solid rgba(124,152,214,.34);background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(240,246,255,.9));box-shadow:0 24px 60px rgba(16,24,40,.18),inset 0 1px 0 rgba(255,255,255,.82);display:flex;flex-direction:column;gap:16px;align-items:center;text-align:center}
-.plugin-modal-browser-restart-desc{margin:0;font-size:13px;line-height:1.8;color:var(--text-primary);display:flex;flex-direction:column;align-items:center;gap:2px}
-.plugin-modal-browser-restart-desc-line{display:block;white-space:nowrap}
+.plugin-modal-browser-restart-card{width:min(420px,100%);padding:24px 22px 20px;border-radius:24px;border:1px solid rgba(214,74,96,.38);background:linear-gradient(180deg,rgba(255,248,249,.98),rgba(255,234,238,.92));box-shadow:0 24px 60px rgba(99,23,37,.18),0 0 0 1px rgba(255,255,255,.52) inset;display:flex;flex-direction:column;gap:16px;align-items:center;text-align:center}
+.plugin-modal-browser-restart-desc{margin:0;font-size:13px;line-height:1.8;color:#6f2030;display:flex;flex-direction:column;align-items:center;gap:2px}
+.plugin-modal-browser-restart-desc-line{display:block;max-width:100%;white-space:normal}
 .plugin-modal-browser-restart-actions{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
 .plugin-modal-browser-restart-actions .btn{min-width:96px}
+.plugin-modal-browser-restart-actions .btn-primary{background:linear-gradient(180deg,#f46c7f,#d83b52);border-color:#d83b52;box-shadow:0 14px 28px rgba(216,59,82,.24)}
+.plugin-modal-browser-restart-actions .btn-primary:hover,.plugin-modal-browser-restart-actions .btn-primary:focus-visible{background:linear-gradient(180deg,#fb7a8c,#df4760);border-color:#df4760;outline:none}
+.plugin-modal-browser-restart-actions .btn-secondary{border-color:rgba(216,59,82,.18);background:rgba(255,255,255,.7);color:#8b3040}
+.plugin-modal-browser-restart-actions .btn-secondary:hover,.plugin-modal-browser-restart-actions .btn-secondary:focus-visible{border-color:rgba(216,59,82,.32);background:rgba(255,255,255,.84);color:#772535;outline:none}
 .plugin-modal-transition-lock{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(19,24,36,.18);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .22s ease,visibility 0s linear .22s;overflow:hidden}
 .plugin-modal-transition-lock::before{content:'';position:absolute;inset:-35%;background:radial-gradient(circle at 20% 20%,rgba(var(--accent-rgb),.28),transparent 45%),radial-gradient(circle at 80% 15%,rgba(var(--accent-soft-rgb),.24),transparent 42%),radial-gradient(circle at 50% 85%,rgba(var(--accent-rgb),.18),transparent 46%);opacity:.85;animation:pluginModalLockGlow 2.4s ease-in-out infinite}
 .plugin-modal-transition-lock.show{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .22s ease}
@@ -2995,8 +3025,11 @@ body.quick-fan-transition-active{cursor:progress}
 [data-theme="dark"] .plugin-modal-email-warning-card{background:linear-gradient(180deg,rgba(63,24,24,.94),rgba(25,15,24,.94));border-color:rgba(255,138,138,.2);box-shadow:0 24px 60px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.06)}
 [data-theme="dark"] .plugin-modal-email-warning-desc{color:#f2d1d1}
 [data-theme="dark"] .plugin-modal-email-warning-value{background:rgba(255,77,79,.14);border-color:rgba(255,138,138,.22);color:#ffb1b1}
-[data-theme="dark"] .plugin-modal-browser-restart-card{background:linear-gradient(180deg,rgba(15,27,49,.96),rgba(10,20,38,.92));border-color:rgba(169,190,227,.2);box-shadow:0 24px 60px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.06)}
-[data-theme="dark"] .plugin-modal-browser-restart-desc{color:#f3f9fd}
+[data-theme="dark"] .plugin-modal-browser-restart-confirm{background:radial-gradient(circle at top,rgba(255,132,158,.18),transparent 38%),rgba(24,6,11,.52)}
+[data-theme="dark"] .plugin-modal-browser-restart-card{background:linear-gradient(180deg,rgba(68,20,31,.96),rgba(35,12,19,.94));border-color:rgba(255,129,152,.22);box-shadow:0 24px 60px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.05)}
+[data-theme="dark"] .plugin-modal-browser-restart-desc{color:#ffe6eb}
+[data-theme="dark"] .plugin-modal-browser-restart-actions .btn-secondary{background:rgba(255,255,255,.06);border-color:rgba(255,129,152,.18);color:#ffd5de}
+[data-theme="dark"] .plugin-modal-browser-restart-actions .btn-secondary:hover,[data-theme="dark"] .plugin-modal-browser-restart-actions .btn-secondary:focus-visible{background:rgba(255,255,255,.1);border-color:rgba(255,129,152,.28);color:#fff0f4;outline:none}
 .plugin-modal-log-section{flex:1;min-height:0}
 .plugin-log-shell{flex:1;min-height:240px;max-height:360px;padding:8px;border:1px solid color-mix(in srgb,var(--border) 82%,var(--accent) 18%);border-radius:18px;background:linear-gradient(180deg,color-mix(in srgb,var(--bg-sidebar) 82%,transparent),color-mix(in srgb,var(--bg-input) 86%,transparent));overflow:hidden}
 .plugin-log-stream{height:100%;overflow-y:auto;gap:3px;padding:0 4px 0 0}
@@ -4744,8 +4777,8 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     <div class="plugin-modal-browser-restart-confirm" id="pluginModalBrowserRestartConfirm" aria-hidden="true">
       <div class="plugin-modal-browser-restart-card" onclick="event.stopPropagation()">
         <p class="plugin-modal-browser-restart-desc" id="pluginModalBrowserRestartConfirmDesc">
-          <span class="plugin-modal-browser-restart-desc-line">稍后会自动关闭浏览器后重新打开，可能需要1至2分钟</span>
-          <span class="plugin-modal-browser-restart-desc-line">期间请勿打开浏览器</span>
+          <span class="plugin-modal-browser-restart-desc-line">稍后会自动关闭浏览器并复制登录状态，可能需要1至2分钟</span>
+          <span class="plugin-modal-browser-restart-desc-line">完成后会自动重启，期间请勿手动启动应用或打开浏览器</span>
         </p>
         <div class="plugin-modal-browser-restart-actions">
           <button class="btn btn-primary" id="pluginModalBrowserRestartConfirmBtn" type="button" onclick="pluginModalConfirmBrowserRestart()">知道了</button>
@@ -8079,8 +8112,8 @@ const QUICK_FAN_MODAL_WAIT_HINT = '正在准备插件配置与会话环境，请
 const PLUGIN_MODAL_MODEL_DROPDOWN_GAP = 8;
 const PLUGIN_MODAL_MODEL_DROPDOWN_MAX_HEIGHT = 280;
 const PLUGIN_MODAL_BROWSER_RESTART_CONFIRM_HINT = [
-  '稍后会自动关闭浏览器后重新打开，可能需要1至2分钟',
-  '期间请勿打开浏览器'
+  '稍后会自动关闭浏览器并复制登录状态，可能需要1至2分钟',
+  '完成后会自动重启，期间请勿手动启动应用或打开浏览器'
 ];
 const EMAIL_PLUGIN_INTERVAL_FIELD = 'email_pop3_interval';
 const EMAIL_PLUGIN_INTERVAL_RECOMMENDED_SECONDS = 300;
@@ -40961,9 +40994,23 @@ function hideAllAt() {
   atSavedRange = null;
 }
 
+function ensureAtActiveVisible(panelId, itemSelector) {
+  const panel = document.getElementById(panelId);
+  if (!panel) return;
+  const active = panel.querySelector(itemSelector + '.active');
+  if (!active) return;
+  const panelTop = panel.scrollTop;
+  const panelBottom = panelTop + panel.clientHeight;
+  const itemTop = active.offsetTop;
+  const itemBottom = itemTop + active.offsetHeight;
+  if (itemTop < panelTop) panel.scrollTop = itemTop;
+  else if (itemBottom > panelBottom) panel.scrollTop = itemBottom - panel.clientHeight;
+}
+
 function updateAtMenuHighlight() {
   const items = Array.from(document.querySelectorAll('#' + getAtMenuId() + ' .at-menu-item')).filter(el => el.style.display !== 'none');
   items.forEach((el, i) => el.classList.toggle('active', i === atMenuIdx));
+  ensureAtActiveVisible(getAtMenuId(), '.at-menu-item');
 }
 
 function atSelectType(type) {
@@ -41294,11 +41341,13 @@ handleKey = function(e) {
 function updateSkillHighlight() {
   const items = document.querySelectorAll('#' + getAtSkillId() + ' .at-skill-item');
   items.forEach((el, i) => el.classList.toggle('active', i === atSkillIdx));
+  ensureAtActiveVisible(getAtSkillId(), '.at-skill-item');
 }
 
 function updateAgentHighlight() {
   const items = document.querySelectorAll('#' + getAtAgentId() + ' .at-skill-item');
   items.forEach((el, i) => el.classList.toggle('active', i === atAgentIdx));
+  ensureAtActiveVisible(getAtAgentId(), '.at-skill-item');
 }
 
 // ===== Virtual File System =====
@@ -45266,6 +45315,44 @@ async function showMessagePathActionsForAnchor(anchor) {
   if (actions.length) showSelectionActionBubble(rect, actions);
 }
 
+function isInputActionBubbleElement(target) {
+  const bubble = closestFromEventTarget(target, '#msgInput .at-bubble, #rsNoteInput .at-bubble');
+  if (!(bubble instanceof Element)) return null;
+  const prefix = String(bubble.getAttribute('data-prefix') || '').trim();
+  const rawValue = getInputBubbleRawValue(bubble);
+  if (prefix !== '[FILE:' && !resolveMessageHttpLink(rawValue)) return null;
+  return bubble;
+}
+
+function getInputBubbleRawValue(bubble) {
+  if (!(bubble instanceof Element)) return '';
+  return String(bubble.getAttribute('data-value') || '').trim();
+}
+
+function getInputBubbleActionRect(bubble) {
+  if (!(bubble instanceof Element) || typeof bubble.getBoundingClientRect !== 'function') return null;
+  return bubble.getBoundingClientRect();
+}
+
+async function showInputBubbleActionsForElement(bubble) {
+  if (!(bubble instanceof Element)) return;
+  const rect = getInputBubbleActionRect(bubble);
+  if (!rect || (!rect.width && !rect.height)) return;
+  const rawValue = getInputBubbleRawValue(bubble);
+  if (!rawValue) return;
+  const httpLink = resolveMessageHttpLink(rawValue);
+  if (httpLink) {
+    const actions = buildMessageHttpActionItems(httpLink.href, rawValue);
+    if (actions.length) showSelectionActionBubble(rect, actions);
+    return;
+  }
+  const actionState = await resolveMessageFileActionState(rawValue);
+  if (!actionState) return;
+  actionState.rawPath = rawValue;
+  const actions = buildMessageFileActionItems(actionState);
+  if (actions.length) showSelectionActionBubble(rect, actions);
+}
+
 async function showSelectedMessagePathActions(anchor) {
   const container = document.getElementById('chatContainer');
   const selection = window.getSelection ? window.getSelection() : null;
@@ -45346,6 +45433,13 @@ document.addEventListener('dblclick', e => {
   }, 50);
 });
 document.addEventListener('click', e => {
+  const inputBubble = isInputActionBubbleElement(e.target);
+  if (inputBubble && !closestFromEventTarget(e.target, '.bubble-del')) {
+    e.preventDefault();
+    e.stopPropagation();
+    Promise.resolve().then(() => showInputBubbleActionsForElement(inputBubble)).catch(() => {});
+    return;
+  }
   const pathBubble = closestFromEventTarget(e.target, 'a.message-path-link');
   if (pathBubble) {
     e.preventDefault();
@@ -45368,6 +45462,11 @@ document.addEventListener('mouseup', e => {
 });
 // Remove bubble on click elsewhere
 document.addEventListener('mousedown', e => {
+  const inputBubble = isInputActionBubbleElement(e.target);
+  if (inputBubble && !closestFromEventTarget(e.target, '.bubble-del')) {
+    e.preventDefault();
+    return;
+  }
   if (isPluginLogTarget(e.target)) return;
   if (isOnboardingActive() && isMessageUrlTourOnboardingStep(onboardingState.step)) return;
   if (selBubbleEl && !closestFromEventTarget(e.target, '.sel-file-bubble')) {

@@ -1,6 +1,6 @@
 ---
 name: __internal_remote
-description: 使用SSH/SCP连接远程主机，并执行命令、上传文件、下载文件
+description: 通过复用的网络通道连接指定SSH远程主机，执行所需命令，并完成文件上传或下载操作
 ---
 
 ### 可执行文件

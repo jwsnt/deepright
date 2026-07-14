@@ -997,21 +997,90 @@ func cliGetConfigPaths() []string {
 	return paths
 }
 
-func configuredSandboxApp() string {
+func readCliGetConfigRaw() map[string]interface{} {
 	for _, path := range cliGetConfigPaths() {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			continue
 		}
+		decoder := json.NewDecoder(bytes.NewReader(data))
+		decoder.UseNumber()
 		var raw map[string]interface{}
-		if err := json.Unmarshal(data, &raw); err != nil {
+		if err := decoder.Decode(&raw); err != nil {
 			continue
 		}
-		if value := strings.TrimSpace(fmt.Sprint(raw["sandbox_app"])); value != "" && value != "<nil>" {
-			return value
+		if raw == nil {
+			return map[string]interface{}{}
 		}
+		return raw
+	}
+	return map[string]interface{}{}
+}
+
+func configuredSandboxAppFromRaw(raw map[string]interface{}) string {
+	if value := strings.TrimSpace(fmt.Sprint(raw["sandbox_app"])); value != "" && value != "<nil>" {
+		return value
 	}
 	return ""
+}
+
+func configuredSandboxApp() string {
+	return configuredSandboxAppFromRaw(readCliGetConfigRaw())
+}
+
+func cliGetConfigBool(raw interface{}) (bool, bool) {
+	switch value := raw.(type) {
+	case bool:
+		return value, true
+	case string:
+		parsed, err := strconv.ParseBool(strings.TrimSpace(value))
+		if err != nil {
+			return false, false
+		}
+		return parsed, true
+	case json.Number:
+		parsed, err := value.Int64()
+		if err != nil {
+			return false, false
+		}
+		return parsed != 0, true
+	case float64:
+		return value != 0, true
+	default:
+		text := strings.TrimSpace(fmt.Sprint(raw))
+		if text == "" || text == "<nil>" {
+			return false, false
+		}
+		parsed, err := strconv.ParseBool(text)
+		if err != nil {
+			return false, false
+		}
+		return parsed, true
+	}
+}
+
+func configuredHTTPDebugFromRaw(raw map[string]interface{}) bool {
+	httpRaw, ok := raw["http"]
+	if !ok || httpRaw == nil {
+		return false
+	}
+	httpConfig, ok := httpRaw.(map[string]interface{})
+	if !ok {
+		return false
+	}
+	value, ok := cliGetConfigBool(httpConfig["debug"])
+	return ok && value
+}
+
+func configuredHTTPDebug() bool {
+	return configuredHTTPDebugFromRaw(readCliGetConfigRaw())
+}
+
+func cliGetDebugPrintf(enabled bool, format string, args ...interface{}) {
+	if !enabled {
+		return
+	}
+	fmt.Printf(format, args...)
 }
 
 func sandboxExecutableCandidates(raw, mode string) []string {
@@ -1211,7 +1280,7 @@ func publishWithRetry(client *http.Client, host string, result *ResultPayload, m
 	}
 }
 
-func runExecuteWorker(taskQueue <-chan queuedTask, publishQueue chan<- queuedPublish, terminal string, sandboxExecutable string) {
+func runExecuteWorker(taskQueue <-chan queuedTask, publishQueue chan<- queuedPublish, terminal string, sandboxExecutable string, httpDebug bool) {
 	for item := range taskQueue {
 		task := item.task
 		if isTaskExpired(&task, time.Now()) {
@@ -1231,7 +1300,7 @@ func runExecuteWorker(taskQueue <-chan queuedTask, publishQueue chan<- queuedPub
 			continue
 		}
 		publishQueue <- queuedPublish{result: result, metadata: item.metadata}
-		fmt.Printf("cli-get: publish queued tid=%s pending=%d\n", strings.TrimSpace(task.Tid), len(publishQueue))
+		cliGetDebugPrintf(httpDebug, "cli-get: publish queued tid=%s pending=%d\n", strings.TrimSpace(task.Tid), len(publishQueue))
 	}
 }
 
@@ -1271,6 +1340,7 @@ type Config struct {
 	AgentDir          string
 	Device            string
 	SandboxApp        string
+	HTTPDebug         bool
 	AgentCacheMs      int
 	SleepMs           int
 	Thread            int
@@ -1308,9 +1378,11 @@ func main() {
 		fmt.Fprintln(os.Stderr, "error: --agent-dir is required")
 		os.Exit(1)
 	}
+	startupConfig := readCliGetConfigRaw()
 	if strings.TrimSpace(cfg.SandboxApp) == "" {
-		cfg.SandboxApp = configuredSandboxApp()
+		cfg.SandboxApp = configuredSandboxAppFromRaw(startupConfig)
 	}
+	cfg.HTTPDebug = configuredHTTPDebugFromRaw(startupConfig)
 
 	terminal := detectTerminal()
 	if terminal == "" {
@@ -1350,7 +1422,7 @@ func main() {
 	publishQueue := make(chan queuedPublish, cfg.Queue)
 
 	for i := 0; i < cfg.Thread; i++ {
-		go runExecuteWorker(taskQueue, publishQueue, terminal, cfg.SandboxApp)
+		go runExecuteWorker(taskQueue, publishQueue, terminal, cfg.SandboxApp, cfg.HTTPDebug)
 		go runPublishWorker(client, cfg.Host, publishQueue, retryInterval, cfg.RetryTimes)
 	}
 
@@ -1388,6 +1460,6 @@ func main() {
 		// Dispatch task to worker pool, then immediately loop for next heartbeat
 		t := *task
 		taskQueue <- queuedTask{task: t, metadata: metadata}
-		fmt.Printf("cli-get: task queued tid=%s pending=%d capacity=%d\n", strings.TrimSpace(t.Tid), len(taskQueue), cap(taskQueue))
+		cliGetDebugPrintf(cfg.HTTPDebug, "cli-get: task queued tid=%s pending=%d capacity=%d\n", strings.TrimSpace(t.Tid), len(taskQueue), cap(taskQueue))
 	}
 }
