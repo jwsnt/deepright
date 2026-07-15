@@ -12939,12 +12939,8 @@ func TestPluginsExecHandlerRunsNestedCommand(t *testing.T) {
 	if got := fmt.Sprint(payload.Data.Output["chatId"]); got != "b1" {
 		t.Fatalf("chatId = %q", got)
 	}
-	want, err := os.Executable()
-	if err != nil {
-		t.Fatalf("os.Executable: %v", err)
-	}
-	if got := strings.TrimSpace(fmt.Sprint(payload.Data.Output["connectBin"])); got != want {
-		t.Fatalf("connectBin = %q, want %q", got, want)
+	if got := strings.TrimSpace(fmt.Sprint(payload.Data.Output["connectBin"])); got != "" {
+		t.Fatalf("connectBin = %q, want empty", got)
 	}
 }
 
@@ -13175,6 +13171,31 @@ func TestIntegrationPluginsExecCLI(t *testing.T) {
 	}
 	if got := fmt.Sprint(payload.Data.Output["chatId"]); got != "b1" {
 		t.Fatalf("chatId = %q", got)
+	}
+	if got := strings.TrimSpace(fmt.Sprint(payload.Data.Output["connectBin"])); got != "" {
+		t.Fatalf("connectBin = %q, want empty", got)
+	}
+}
+
+func TestShouldEnsureIntegrationPluginConnectBinForExec(t *testing.T) {
+	tests := []struct {
+		name    string
+		target  string
+		command string
+		want    bool
+	}{
+		{name: "browser instance init", target: "browser", command: "instance init", want: false},
+		{name: "browser goto", target: "browser", command: "goto https://example.com", want: false},
+		{name: "browser start", target: "browser", command: "start", want: true},
+		{name: "non browser exec", target: "feishu", command: "send", want: true},
+		{name: "invalid browser command", target: "browser", command: "\"unterminated", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := shouldEnsureIntegrationPluginConnectBinForExec(tt.target, tt.command); got != tt.want {
+				t.Fatalf("shouldEnsureIntegrationPluginConnectBinForExec(%q, %q) = %v, want %v", tt.target, tt.command, got, tt.want)
+			}
+		})
 	}
 }
 

@@ -51,3 +51,41 @@ func TestBrowserRenderLogLineKeepsFullLauncherRequestAndResponse(t *testing.T) {
 		t.Fatalf("log line should not truncate request/response, got: %s", line)
 	}
 }
+
+func TestBrowserRenderLogLineIncludesCopySourceAndTarget(t *testing.T) {
+	line := browserRenderLogLine(map[string]any{
+		"timestamp": "2026-07-15T12:00:00Z",
+		"event":     "browser_start_wsl_chrome_def",
+		"stage":     "copy_begin",
+		"sourceDir": `C:\Users\jiawei.shen\AppData\Local\Google\Chrome\User Data`,
+		"targetDir": `C:\ProgramData\deepright\chrome_def`,
+	})
+
+	for _, wanted := range []string{
+		`复制来源=C:\Users\jiawei.shen\AppData\Local\Google\Chrome\User Data`,
+		`复制目标=C:\ProgramData\deepright\chrome_def`,
+	} {
+		if !strings.Contains(line, wanted) {
+			t.Fatalf("log line should contain %q, got: %s", wanted, line)
+		}
+	}
+}
+
+func TestBrowserRenderLogLineUsesProfileDirAsCopyTarget(t *testing.T) {
+	line := browserRenderLogLine(map[string]any{
+		"timestamp":  "2026-07-15T12:00:00Z",
+		"event":      "browser_create_trace",
+		"stage":      "instance.wsl.user_data.seed.begin",
+		"sourceDir":  `C:\ProgramData\deepright\chrome_def`,
+		"profileDir": `C:\ProgramData\deepright\chrome_ab12`,
+	})
+
+	for _, wanted := range []string{
+		`复制来源=C:\ProgramData\deepright\chrome_def`,
+		`复制目标=C:\ProgramData\deepright\chrome_ab12`,
+	} {
+		if !strings.Contains(line, wanted) {
+			t.Fatalf("log line should contain %q, got: %s", wanted, line)
+		}
+	}
+}

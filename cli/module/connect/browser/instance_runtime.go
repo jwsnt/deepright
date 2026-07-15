@@ -1913,6 +1913,17 @@ func browserShouldSkipClonedChromeUserDataPath(rel string) (bool, string) {
 		return false, ""
 	}
 	segments := strings.Split(filepath.ToSlash(rel), "/")
+	if len(segments) == 1 {
+		name := strings.TrimSpace(segments[0])
+		switch name {
+		case "RunningChromeVersion":
+			return true, "skip chrome runtime version marker"
+		default:
+			if browserShouldRemoveClonedChromeLockEntry(name) {
+				return true, "skip chrome runtime lock path"
+			}
+		}
+	}
 	if browserPathSegmentsContain(segments, "CacheStorage") {
 		return true, "skip chrome CacheStorage path"
 	}

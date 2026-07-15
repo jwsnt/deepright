@@ -43,6 +43,16 @@ func browserRenderLogLine(payload map[string]any) string {
 	appendParam("页面", firstNonEmptyBrowser(browserPayloadString(payload["target"]), browserPayloadString(payload["url"]), browserPayloadString(payload["cdp"])))
 	appendParam("Cookie 文件", payload["cookiePath"])
 	appendParam("驱动目录", payload["driverDir"])
+	if source := browserHumanExactParam("复制来源", payload["sourceDir"]); source != "" {
+		params = append(params, source)
+	}
+	copyTarget := payload["targetDir"]
+	if strings.TrimSpace(browserPayloadString(copyTarget)) == "" {
+		copyTarget = payload["profileDir"]
+	}
+	if target := browserHumanExactParam("复制目标", copyTarget); target != "" {
+		params = append(params, target)
+	}
 	appendParam("错误", payload["error"])
 	appendParam("结果说明", payload["output"])
 	if args, ok := payload["args"].([]string); ok && len(args) > 0 {

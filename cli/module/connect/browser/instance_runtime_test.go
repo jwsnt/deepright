@@ -303,6 +303,37 @@ func TestBrowserInitInstanceDestroysExistingInstanceBeforeCreate(t *testing.T) {
 	}
 }
 
+func TestBrowserShouldSkipClonedChromeUserDataPathSkipsRuntimeMarkers(t *testing.T) {
+	tests := []struct {
+		path string
+		want string
+	}{
+		{path: "RunningChromeVersion", want: "skip chrome runtime version marker"},
+		{path: "SingletonLock", want: "skip chrome runtime lock path"},
+		{path: "SingletonCookie", want: "skip chrome runtime lock path"},
+		{path: "SingletonSocket", want: "skip chrome runtime lock path"},
+		{path: "DevToolsActivePort", want: "skip chrome runtime lock path"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			got, reason := browserShouldSkipClonedChromeUserDataPath(tt.path)
+			if !got {
+				t.Fatalf("browserShouldSkipClonedChromeUserDataPath(%q) = false, want true", tt.path)
+			}
+			if reason != tt.want {
+				t.Fatalf("reason = %q, want %q", reason, tt.want)
+			}
+		})
+	}
+}
+
+func TestBrowserShouldSkipClonedChromeUserDataPathKeepsRegularProfileData(t *testing.T) {
+	got, reason := browserShouldSkipClonedChromeUserDataPath(filepath.Join("Default", "Preferences"))
+	if got {
+		t.Fatalf("browserShouldSkipClonedChromeUserDataPath(Default/Preferences) = true, reason=%q", reason)
+	}
+}
+
 func TestBrowserCreateInstanceReusesChatScopedRecordAcrossAgentChanges(t *testing.T) {
 	restore := stubBrowserRuntime()
 	defer restore()

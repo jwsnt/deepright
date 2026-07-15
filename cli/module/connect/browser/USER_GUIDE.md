@@ -78,6 +78,8 @@
 - `start` 是唯一允许传入 `--connect-bin` 的 Browser 命令
 - `start` 成功后，才会把本次 `--connect-bin` 写入 Browser 同目录的 `browser_runtime.json`
 - 如果 `start` 失败，不会新写也不会覆盖已有的 `browser_runtime.json`
+- 通过 `integration plugins exec` 或 `/api/plugins/exec` 转发 Browser 时，也只有 `browser start` 会被自动补 `--connect-bin`
+- `browser instance init`、`browser instance create`、`goto`、`eval` 等非 `start` 命令不会再由 `integration` 偷偷补 `--connect-bin`
 - `start` 会先检查并准备 Playwright driver；失败只记日志，不中断后续启动
 - 如果配置了 `cookie_path`，`start` 会先执行一次同路径的 `store + fetch` 校验
 - `start` 在执行前后都会把一次 `browser instance list` 快照写入 `browser.log`
@@ -137,6 +139,7 @@
 - `profileDir` 就是本次实例实际使用的受管 `--user-data-dir` 目录
 - 在 macOS / Linux / Windows 原生环境里，如果该目录不存在，会基于当前系统 Chrome 的 `User Data` 根目录复制一份精简副本；如果已存在则直接复用
 - 复制时会过滤 `CacheStorage`、`OptGuideOnDeviceModel` 和其他易失缓存目录，同时保留 `Default/WebStorage`、`Default/IndexedDB`、`Default/Local Storage`
+- 复制时也会跳过纯运行态文件：`RunningChromeVersion`、`SingletonLock`、`SingletonCookie`、`SingletonSocket`、`DevToolsActivePort`
 - 在 Windows WSL / WSL2 下，`profileDir` 仍会出现在原有响应报文里，但它的值以 `browser_instance_wsl` 实际返回的 `user-data-dir` 为准
 - 在 Windows WSL / WSL2 下，新的 `profileDir` 固定落在 `C:\ProgramData\deepright\chrome_<随机后缀>`
 - 如果这个 WSL 目录是首次创建，则会优先尝试从 `C:\ProgramData\deepright\chrome_def` 复制一份精简副本
@@ -153,7 +156,9 @@
 
 - 会先检查该 `AgentId + ChatId` 是否已有实例；如果有，则先走一次优雅 `shutdown`
 - 然后重新创建一个新的有头 Chrome CDP
+- `init` 不接受 `--connect-bin`；运行时路径统一从 `browser_runtime.json` 读取
 - `init` 会等到新 CDP 真正可用后才写入状态
+- 初始化时如果正在复制系统 Chrome 登录态目录，会跳过 `RunningChromeVersion`、`Singleton*`、`DevToolsActivePort` 等运行态文件，避免重复初始化时因为这些 symlink / lock 已存在而直接失败
 - 在 macOS 下，写入状态后命令会继续阻塞，直到这个 Chrome/CDP 被关闭，再把状态删掉
 - 在 Linux 原生环境里，写入状态后命令立即返回，不再等待这个 Chrome/CDP 被关闭
 - 在 Windows WSL / WSL2 下，写入状态后命令会继续阻塞，直到这个 Chrome/CDP 被关闭，再删除状态

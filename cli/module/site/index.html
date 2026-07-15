@@ -24934,7 +24934,9 @@ function pluginModalSyncTransitionLock() {
   }
   if (title) {
     title.textContent = pending
-      ? (pluginModalState.started ? '正在重启插件' : '正在启动插件')
+      ? (pluginModalState.submittingAction === 'close'
+        ? '正在关闭插件'
+        : (pluginModalState.started ? '正在重启插件' : '正在启动插件'))
       : (failed ? '启动失败' : '启动成功');
   }
   if (desc) desc.textContent = pluginModalState.transitionDetail || PLUGIN_MODAL_WAIT_HINT;
@@ -24980,7 +24982,7 @@ function pluginModalUpdateActionButtons() {
     stopBtn.disabled = remoteRestricted || blocked || !hasStarted;
     stopBtn.textContent = remoteRestricted
       ? '远程不可关闭'
-      : (busy && submittingAction === 'close' ? '关闭插件中' : '关闭插件');
+      : '关闭插件';
   }
   if (viewSessionBtn) {
     viewSessionBtn.hidden = !canViewSession;
@@ -25927,6 +25929,7 @@ async function pluginModalAction(action) {
     pluginModalState.submitting = true;
     pluginModalState.submittingAction = 'close';
     pluginModalUpdateActionButtons();
+    pluginModalSetTransitionLock(true, 'pending', '正在关闭插件，请稍候');
     fetchExecApi('/api/plugins/stop?key=' + encodeURIComponent(pluginKey), {
       method: 'POST'
     }).then(async resp => {
@@ -25939,6 +25942,7 @@ async function pluginModalAction(action) {
       vfsShowUploadToast('关闭成功', false);
       closePluginModal(true);
     }).catch(err => {
+      pluginModalSetTransitionLock(false, 'pending', PLUGIN_MODAL_WAIT_HINT);
       vfsShowUploadToast(name + ' 关闭失败: ' + err.message, true);
     }).finally(() => {
       pluginModalState.submitting = false;

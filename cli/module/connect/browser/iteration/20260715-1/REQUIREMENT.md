@@ -13,6 +13,8 @@
 + `browser start` 成功后，才将本次 `--connect-bin` 写入或覆盖 `browser_runtime.json`
 + `browser start` 失败时，不写入 `browser_runtime.json`，也不覆盖旧文件
 + 除 `browser start` 外，所有 Browser 命令如果传入 `--connect-bin`，都必须立即判定为不合法参数并报错，不能继续执行，不能静默忽略，不能做兼容处理
++ `integration` 侧的 `plugins exec` / `/api/plugins/exec` 在调用 Browser 时，也必须遵守同一条边界：只有 `browser start` 可以被自动补齐 `--connect-bin`
++ `integration` 侧转发 `browser instance init`、`browser instance create`、`browser goto`、`browser eval` 等非 `start` 命令时，不得再偷偷补 `--connect-bin`
 + 后续所有 Browser 内部需要用到 integration 路径或运行时根目录的地方，都统一从 `browser_runtime.json` 读取
 + `browserResolveRuntimeConfigPath` 改为优先从 `browser_runtime.json` 读取，不再直接消费命令行传入的 `--connect-bin`
 + `browserRuntimeRoot` 改为优先从 `browser_runtime.json` 读取，不再直接消费命令行传入的 `--connect-bin`
@@ -21,12 +23,17 @@
 + 删除 `browser_runtime.json` 失败时，只记录日志，不导致 `browser stop` 失败
 + `browser instance shutdown` 不删除 `browser_runtime.json`
 + 如果其他内部逻辑仍然需要 integration 路径，也统一改为从 `browser_runtime.json` 读取，禁止保留新的命令行 `--connect-bin` 读取入口
++ `browser instance create/init` 在准备 Chrome user-data-dir 时，复制系统 Chrome Profile 的过滤规则需要补齐运行态文件
++ 复制过程中除原有缓存、模型、锁文件过滤外，还要明确跳过 `RunningChromeVersion`、`SingletonLock`、`SingletonCookie`、`SingletonSocket`、`DevToolsActivePort` 等纯运行态文件
++ 目标是避免同一个 `agentId + chatId` 被连续点击或重入初始化时，因为旧运行态 symlink / lock 文件已存在而把 `instance init` 打成 500
 
 ### 最终效果
 + 当 Browser 已从运行时插件目录执行时，`browser start --connect-bin ...` 会把 integration 路径写入 `browser_runtime.json`
 + 后续 `browser instance create/init/restart/get/list/shutdown` 以及其他 Browser 命令，都不再接收 `--connect-bin`，而是从 `browser_runtime.json` 读取需要的 integration 路径
 + 当用户或调用链误传 `--connect-bin` 到非 `start` 命令时，会第一时间报错暴露异常
 + `browser stop` 会清理 `browser_runtime.json`，但清理失败不会影响 stop 主流程
++ 当 Browser 由 `integration plugins exec` 或 `/api/plugins/exec` 转发时，`browser instance init` 不会再因为被偷偷补入 `--connect-bin` 而报 `--connect-bin is only supported by browser start`
++ `browser instance create/init` 在复制 Chrome 登录态目录时，会自动跳过纯运行态文件；重复初始化、重试初始化、或复制未结束前再次进入初始化，不应再因为 `RunningChromeVersion` 等 symlink 已存在而直接失败
 
 #### 插件日志
 + 必须在插件同目录下提供以browser.log的日志文件

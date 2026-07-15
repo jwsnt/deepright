@@ -14344,7 +14344,7 @@ func handlePluginsExec(cfg *Config) http.HandlerFunc {
 			connectsvc.WritePluginActionError(w, http.StatusBadRequest, err)
 			return
 		}
-		ensureIntegrationPluginConnectBin(flags)
+		ensureIntegrationPluginConnectBinForExec(name, command, flags)
 
 		result, err := connectsvc.RunPluginExecCommand(name, command, flags, resolveIntegrationPluginExecTimeout(cfg))
 		if err != nil {
@@ -14412,6 +14412,24 @@ func ensureIntegrationPluginConnectBin(flags map[string]string) {
 		exe = ""
 	}
 	connectsvc.EnsureConnectBinary(flags, exe)
+}
+
+func ensureIntegrationPluginConnectBinForExec(name, command string, flags map[string]string) {
+	if !shouldEnsureIntegrationPluginConnectBinForExec(name, command) {
+		return
+	}
+	ensureIntegrationPluginConnectBin(flags)
+}
+
+func shouldEnsureIntegrationPluginConnectBinForExec(name, command string) bool {
+	if !strings.EqualFold(strings.TrimSpace(name), "browser") {
+		return true
+	}
+	args, err := connectsvc.SplitPluginExecCommand(command)
+	if err != nil || len(args) == 0 {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(args[0]), "start")
 }
 
 func appendPluginActionFailureLog(plugin, action string, actionErr error) error {
@@ -15296,7 +15314,7 @@ func runIntegrationPluginCLI(args []string) {
 		fmt.Println("  sync-bundled  Check or sync bundled plugins into the runtime plugins directory")
 		fmt.Println("")
 		fmt.Println("Notes:")
-		fmt.Println("  start/stop/exec 会在可解析当前 integration 可执行文件时自动补齐 --connect-bin。")
+		fmt.Println("  start 会自动补齐 --connect-bin；exec 仅在 browser start 之外的插件命令需要时补齐。")
 		fmt.Println("")
 		fmt.Println("Examples:")
 		fmt.Println("  integration plugins start --key feishu --connect-bin ./integration")
@@ -15317,7 +15335,7 @@ func runIntegrationPluginCLI(args []string) {
 		command := connectsvc.FirstValue(flags, "command")
 		delete(flags, "key")
 		delete(flags, "command")
-		ensureIntegrationPluginConnectBin(flags)
+		ensureIntegrationPluginConnectBinForExec(target, command, flags)
 		result, err := connectsvc.RunPluginExecCommand(target, command, flags, resolveIntegrationPluginExecTimeout(nil))
 		if err != nil {
 			log.Fatal(err)

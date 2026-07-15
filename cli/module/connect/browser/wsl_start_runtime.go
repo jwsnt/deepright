@@ -71,6 +71,10 @@ func browserPrepareWSLChromeDefForStart(flags map[string]string) (bool, error) {
 		}, err)
 		return false, err
 	}
+	browserLogWSLLifecycleEvent("browser_start_wsl_chrome_def", "copy_begin", map[string]any{
+		"sourceDir": sourceWin,
+		"targetDir": targetWin,
+	}, nil)
 
 	copyStats, err := browserCopyDirectoryWithProgress(
 		sourceUnix,
