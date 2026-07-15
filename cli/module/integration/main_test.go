@@ -1497,9 +1497,6 @@ func TestIntegrationChatCompletionsInjectsSelectedAgentVersionAndSandbox(t *test
 	if meta["sandbox_path"] != "/Users/demo/Desktop" {
 		t.Fatalf("metadata.sandbox_path = %#v, want /Users/demo/Desktop", meta["sandbox_path"])
 	}
-	if _, exists := meta["plugin_dir"]; exists {
-		t.Fatalf("metadata.plugin_dir should be absent: %#v", meta["plugin_dir"])
-	}
 	if meta["plugins_dir"] != pluginDir {
 		t.Fatalf("metadata.plugins_dir = %#v, want %s", meta["plugins_dir"], pluginDir)
 	}
@@ -1844,12 +1841,12 @@ func TestStopIntegrationPluginsUsesConnectPluginStatusAsSingleSourceOfTruth(t *t
 		if action != "stop" {
 			t.Fatalf("action = %q, want stop", action)
 		}
-		if got := strings.TrimSpace(flags["connect-bin"]); got == "" {
-			t.Fatalf("expected connect-bin for stop action")
+		if got := strings.TrimSpace(flags["connect-bin"]); got != "" {
+			t.Fatalf("connect-bin = %q, want empty", got)
 		}
 		return &connectsvc.PluginActionResult{
 			Path:    "/tmp/test-release/plugins/browser",
-			Command: []string{"stop", "--connect-bin", flags["connect-bin"]},
+			Command: []string{"stop"},
 		}, nil
 	}
 
@@ -4279,6 +4276,16 @@ func TestLookupForwardedPluginsDirPrefersRuntimePluginsDirOverEnv(t *testing.T) 
 	}
 }
 
+func TestLookupForwardedPluginsDirDoesNotFallbackToPluginEnv(t *testing.T) {
+	disableIntegrationManagedRuntimeForTest(t)
+	t.Setenv(integrationRuntimeDirEnv, "")
+	t.Setenv(integrationPluginDirEnv, filepath.Join(t.TempDir(), "bundled", "plugins"))
+
+	if got, ok := lookupForwardedPluginsDir(); ok {
+		t.Fatalf("lookupForwardedPluginsDir() = %q, want not found", got)
+	}
+}
+
 func TestIntegrationBundleRuntimeBaseDirUsesFixedWSLHomeDirectory(t *testing.T) {
 	homeDir := filepath.Join(t.TempDir(), "home", "tester")
 	if err := os.MkdirAll(homeDir, 0o755); err != nil {
@@ -5908,7 +5915,7 @@ func TestStopIntegrationProcessSkipsPluginsThatAreNotStarted(t *testing.T) {
 	}
 }
 
-func TestStopIntegrationProcessPassesConnectBinToPluginStop(t *testing.T) {
+func TestStopIntegrationProcessDoesNotPassConnectBinToPluginStop(t *testing.T) {
 	tempDir := t.TempDir()
 	pluginsDir := filepath.Join(tempDir, "plugins")
 	if err := os.MkdirAll(pluginsDir, 0o755); err != nil {
@@ -5970,8 +5977,8 @@ func TestStopIntegrationProcessPassesConnectBinToPluginStop(t *testing.T) {
 		if action != "stop" {
 			t.Fatalf("action = %q, want stop", action)
 		}
-		if got := strings.TrimSpace(flags["connect-bin"]); got != scriptPath {
-			t.Fatalf("connect-bin = %q, want %q", got, scriptPath)
+		if got := strings.TrimSpace(flags["connect-bin"]); got != "" {
+			t.Fatalf("connect-bin = %q, want empty", got)
 		}
 		return &connectsvc.PluginActionResult{
 			Path:    target,
@@ -8179,9 +8186,6 @@ func TestHeartbeatInjectsSandboxPathForCurrentPageSession(t *testing.T) {
 	}
 	if meta["sandbox_path"] != "/Users/demo/Desktop" {
 		t.Fatalf("metadata.sandbox_path = %#v, want /Users/demo/Desktop", meta["sandbox_path"])
-	}
-	if _, exists := meta["plugin_dir"]; exists {
-		t.Fatalf("metadata.plugin_dir should be absent: %#v", meta["plugin_dir"])
 	}
 	if meta["plugins_dir"] != pluginDir {
 		t.Fatalf("metadata.plugins_dir = %#v, want %s", meta["plugins_dir"], pluginDir)
@@ -10891,9 +10895,6 @@ func TestCronExecuteOnceInjectsMetaIDAndCronTypeIntoRequestMetadata(t *testing.T
 	}
 	if metadata["sandbox_path"] != "/Users/demo/Documents/feishu" {
 		t.Fatalf("metadata sandbox_path = %v, want /Users/demo/Documents/feishu", metadata["sandbox_path"])
-	}
-	if _, exists := metadata["plugin_dir"]; exists {
-		t.Fatalf("metadata.plugin_dir should be absent: %v", metadata["plugin_dir"])
 	}
 	if metadata["plugins_dir"] != pluginDir {
 		t.Fatalf("metadata.plugins_dir = %v, want %s", metadata["plugins_dir"], pluginDir)
@@ -15589,6 +15590,58 @@ func TestIntegrationHandleConsumeAggregatesByModel(t *testing.T) {
 	}
 }
 
+func TestIntegrationHandleConsumeClearsAllRecords(t *testing.T) {
+	tmp := t.TempDir()
+
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	db, err := sql.Open("sqlite", filepath.Join(tmp, "data"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+	cronDB = db
+	defer func() { cronDB = nil }()
+	for _, record := range []tokenconsume.Record{
+		{Model: "model-a", AgentID: "agent-a", Function: "chat", Timestamp: 1},
+		{Model: "model-b", AgentID: "agent-b", Function: "chat", Timestamp: 2},
+	} {
+		if _, err := tokenconsume.Insert(cronDB, record); err != nil {
+			t.Fatalf("insert consume record: %v", err)
+		}
+	}
+
+	rec := httptest.NewRecorder()
+	handleConsume()(rec, httptest.NewRequest(http.MethodDelete, "/api/consume", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	var payload struct {
+		Status  int   `json:"status"`
+		Deleted int64 `json:"deleted"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload.Status != 0 || payload.Deleted != 2 {
+		t.Fatalf("unexpected payload: %+v", payload)
+	}
+	var remaining int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM token_consume_log`).Scan(&remaining); err != nil {
+		t.Fatalf("count consume records: %v", err)
+	}
+	if remaining != 0 {
+		t.Fatalf("remaining records = %d, want 0", remaining)
+	}
+}
+
 func TestIntegrationHandleChatSessionLogReturnsDescendingRawRows(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -16674,22 +16727,11 @@ func TestPluginsStopHandlerRejectsFlagStyleLifecycleOnlyPlugin(t *testing.T) {
 	}
 }
 
-func TestPluginsStopHandlerPassesConnectBin(t *testing.T) {
-	scriptPath := filepath.Join(t.TempDir(), "integration-bin")
-	if err := os.WriteFile(scriptPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-		t.Fatalf("write fake integration executable: %v", err)
-	}
-
-	originalExecutable := integrationExecutableFn
+func TestPluginsStopHandlerDoesNotPassConnectBin(t *testing.T) {
 	originalRunConnectPluginAction := runConnectPluginAction
 	defer func() {
-		integrationExecutableFn = originalExecutable
 		runConnectPluginAction = originalRunConnectPluginAction
 	}()
-
-	integrationExecutableFn = func() (string, error) {
-		return scriptPath, nil
-	}
 	runConnectPluginAction = func(target, action string, flags map[string]string) (*connectsvc.PluginActionResult, error) {
 		if target != "browser" {
 			t.Fatalf("target = %q, want browser", target)
@@ -16697,8 +16739,8 @@ func TestPluginsStopHandlerPassesConnectBin(t *testing.T) {
 		if action != "stop" {
 			t.Fatalf("action = %q, want stop", action)
 		}
-		if got := strings.TrimSpace(flags["connect-bin"]); got != scriptPath {
-			t.Fatalf("connect-bin = %q, want %q", got, scriptPath)
+		if got := strings.TrimSpace(flags["connect-bin"]); got != "" {
+			t.Fatalf("connect-bin = %q, want empty", got)
 		}
 		return &connectsvc.PluginActionResult{
 			Path:    target,
@@ -16891,22 +16933,11 @@ func TestPluginsStartHandlerWritesFailureToPluginLog(t *testing.T) {
 	}
 }
 
-func TestIntegrationPluginCLIPassesConnectBinToStop(t *testing.T) {
-	scriptPath := filepath.Join(t.TempDir(), "integration-bin")
-	if err := os.WriteFile(scriptPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-		t.Fatalf("write fake integration executable: %v", err)
-	}
-
-	originalExecutable := integrationExecutableFn
+func TestIntegrationPluginCLIDoesNotPassConnectBinToStop(t *testing.T) {
 	originalRunConnectPluginAction := runConnectPluginAction
 	defer func() {
-		integrationExecutableFn = originalExecutable
 		runConnectPluginAction = originalRunConnectPluginAction
 	}()
-
-	integrationExecutableFn = func() (string, error) {
-		return scriptPath, nil
-	}
 	runConnectPluginAction = func(target, action string, flags map[string]string) (*connectsvc.PluginActionResult, error) {
 		if target != "browser" {
 			t.Fatalf("target = %q, want browser", target)
@@ -16914,8 +16945,8 @@ func TestIntegrationPluginCLIPassesConnectBinToStop(t *testing.T) {
 		if action != "stop" {
 			t.Fatalf("action = %q, want stop", action)
 		}
-		if got := strings.TrimSpace(flags["connect-bin"]); got != scriptPath {
-			t.Fatalf("connect-bin = %q, want %q", got, scriptPath)
+		if got := strings.TrimSpace(flags["connect-bin"]); got != "" {
+			t.Fatalf("connect-bin = %q, want empty", got)
 		}
 		return &connectsvc.PluginActionResult{
 			Path:    "/tmp/browser",

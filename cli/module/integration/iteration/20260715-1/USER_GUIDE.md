@@ -6,7 +6,7 @@
 - `integration` 发往上游的 `/cli/get` 心跳请求，也会补充顶层 `metadata.plugins_dir`
 - 内部 `memo`、`email`、`feishu` 等任务最终转发到上游 `/v1/chat/completions` 时，同样会补充顶层 `metadata.plugins_dir`
 - 字段值优先按 integration 当前运行时目录规则解析真实插件目录；只有运行时目录不可得时，才回退到进程环境变量 `DEEPRIGHT_PLUGIN_DIR`
-- 外部请求如果手工传入 `metadata.plugin_dir` 或 `metadata.plugins_dir`，最终也会被 integration 按真实运行时目录覆盖，并且只保留 `plugins_dir`
+- 外部请求里的旧插件目录字段不会继续向下游透传；最终只保留 `metadata.plugins_dir`
 
 ## 字段说明
 

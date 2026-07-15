@@ -8685,6 +8685,68 @@ func TestProxyHandleConsumeAggregatesByModel(t *testing.T) {
 	}
 }
 
+func TestProxyHandleConsumeClearsAllRecords(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+	if err := os.MkdirAll(proxyTestAppDir(t, tmp), 0o755); err != nil {
+		t.Fatalf("create test app dir: %v", err)
+	}
+
+	oldProxyOsExecutable := proxyOsExecutable
+	proxyOsExecutable = func() (string, error) { return filepath.Join(tmp, "proxy"), nil }
+	defer func() { proxyOsExecutable = oldProxyOsExecutable }()
+	oldSharedDataDB := sharedDataDB
+	sharedDataDB = pooledDB{}
+	defer func() {
+		if sharedDataDB.db != nil {
+			_ = sharedDataDB.db.Close()
+		}
+		sharedDataDB = oldSharedDataDB
+	}()
+	db, err := getDataDB()
+	if err != nil {
+		t.Fatalf("getDataDB: %v", err)
+	}
+	for _, record := range []tokenconsume.Record{
+		{Model: "model-a", AgentID: "agent-a", Function: "chat", Timestamp: 1},
+		{Model: "model-b", AgentID: "agent-b", Function: "chat", Timestamp: 2},
+	} {
+		if _, err := tokenconsume.Insert(db, record); err != nil {
+			t.Fatalf("insert consume record: %v", err)
+		}
+	}
+
+	rec := httptest.NewRecorder()
+	(&ProxyServer{}).HandleConsume(rec, httptest.NewRequest(http.MethodDelete, "/api/consume", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	var payload struct {
+		Status  int   `json:"status"`
+		Deleted int64 `json:"deleted"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload.Status != 0 || payload.Deleted != 2 {
+		t.Fatalf("unexpected payload: %+v", payload)
+	}
+	var remaining int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM token_consume_log`).Scan(&remaining); err != nil {
+		t.Fatalf("count consume records: %v", err)
+	}
+	if remaining != 0 {
+		t.Fatalf("remaining records = %d, want 0", remaining)
+	}
+}
+
 func TestProxyHandleChatSessionLogReturnsDescendingRawRows(t *testing.T) {
 	oldwd, err := os.Getwd()
 	if err != nil {

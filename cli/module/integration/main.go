@@ -1140,9 +1140,6 @@ func integrationBundledPluginDir() string {
 func integrationRuntimePluginDir() string {
 	runtimeDir := strings.TrimSpace(integrationBundleRuntimeBaseDir())
 	if runtimeDir == "" {
-		if explicit := strings.TrimSpace(os.Getenv(integrationPluginDirEnv)); explicit != "" {
-			return filepath.Clean(explicit)
-		}
 		return ""
 	}
 	return filepath.Join(runtimeDir, "plugins")
@@ -1797,9 +1794,6 @@ func injectSandboxPathMetadata(metaMap map[string]interface{}, chatID string) {
 func lookupForwardedPluginsDir() (string, bool) {
 	pluginDir := strings.TrimSpace(integrationRuntimePluginDir())
 	if pluginDir == "" {
-		pluginDir = strings.TrimSpace(os.Getenv(integrationPluginDirEnv))
-	}
-	if pluginDir == "" {
 		return "", false
 	}
 	if !filepath.IsAbs(pluginDir) {
@@ -1819,7 +1813,6 @@ func injectPluginsDirMetadata(metaMap map[string]interface{}) {
 	if metaMap == nil {
 		return
 	}
-	delete(metaMap, "plugin_dir")
 	delete(metaMap, "plugins_dir")
 	if pluginDir, ok := lookupForwardedPluginsDir(); ok {
 		metaMap["plugins_dir"] = pluginDir
@@ -7655,13 +7648,24 @@ func handleToken() http.HandlerFunc {
 
 func handleConsume() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
+		if r.Method != http.MethodGet && r.Method != http.MethodDelete {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
 		if cronDB == nil {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "db not ready"})
+			return
+		}
+		if r.Method == http.MethodDelete {
+			deleted, err := tokenconsume.Clear(cronDB)
+			if err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "clear error: " + err.Error()})
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 0, "deleted": deleted})
 			return
 		}
 		startRaw := strings.TrimSpace(r.URL.Query().Get("starTime"))
@@ -14381,7 +14385,7 @@ func handlePluginAction(action string) http.HandlerFunc {
 			connectsvc.WritePluginActionError(w, http.StatusBadRequest, err)
 			return
 		}
-		if action == "start" || action == "stop" {
+		if action == "start" {
 			ensureIntegrationPluginConnectBin(flags)
 		}
 
@@ -15327,7 +15331,7 @@ func runIntegrationPluginCLI(args []string) {
 		}
 		target := connectsvc.FirstValue(flags, "key")
 		delete(flags, "key")
-		if args[0] == "start" || args[0] == "stop" {
+		if args[0] == "start" {
 			ensureIntegrationPluginConnectBin(flags)
 		}
 		result, err := runConnectPluginAction(target, args[0], flags)
@@ -16001,9 +16005,9 @@ func stopIntegrationPlugins(logWriter io.Writer) []string {
 		if label == "" {
 			label = target
 		}
-		flags := map[string]string{}
-		ensureIntegrationPluginConnectBin(flags)
-		status, err := runConnectPluginStatus(target, flags)
+		statusFlags := map[string]string{}
+		ensureIntegrationPluginConnectBin(statusFlags)
+		status, err := runConnectPluginStatus(target, statusFlags)
 		if err != nil {
 			failed++
 			warning := fmt.Sprintf("stop plugin %s status failed: %v", label, err)
@@ -16015,7 +16019,7 @@ func stopIntegrationPlugins(logWriter io.Writer) []string {
 			continue
 		}
 		integrationStopLog(logWriter, "stopping plugin name=%s target=%s", label, target)
-		result, err := runConnectPluginAction(target, "stop", flags)
+		result, err := runConnectPluginAction(target, "stop", map[string]string{})
 		if err != nil {
 			failed++
 			warning := fmt.Sprintf("stop plugin %s failed: %v", label, err)

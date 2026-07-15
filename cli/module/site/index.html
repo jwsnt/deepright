@@ -3071,6 +3071,33 @@ body.quick-fan-transition-active{cursor:progress}
 .browser-instance-init-lock[data-phase="ready"] .browser-instance-init-spinner{display:none}
 .browser-instance-init-title{margin-top:14px;font-size:18px;font-weight:700;color:var(--text-primary)}
 .browser-instance-init-desc{margin-top:8px;font-size:12px;line-height:1.7;color:var(--text-secondary)}
+.browser-instance-init-taskbar-guide{position:absolute;z-index:2;top:calc(100% + 12px);left:50%;display:none;width:min(286px,calc(100vw - 48px));height:78px;transform:translateX(-50%);pointer-events:none;filter:drop-shadow(0 12px 22px rgba(15,23,42,.16))}
+.browser-instance-init-taskbar-guide.show{display:block}
+.browser-instance-init-taskbar-guide-copy{display:block;margin-bottom:8px;color:color-mix(in srgb,var(--text-primary) 88%,var(--accent) 12%);font-size:12px;font-weight:700;line-height:1.25;letter-spacing:.01em;text-align:center;text-shadow:0 1px 0 rgba(255,255,255,.64)}
+.browser-instance-init-taskbar-guide-bar{position:relative;display:flex;align-items:center;justify-content:center;gap:11px;height:48px;padding:0 16px;border:1px solid rgba(255,255,255,.68);border-radius:15px;background:linear-gradient(180deg,rgba(247,250,255,.93),rgba(221,230,243,.9));box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 5px 16px rgba(39,54,78,.16);overflow:hidden}
+.browser-instance-init-taskbar-guide-bar::before{content:'';position:absolute;inset:0;background:linear-gradient(108deg,transparent 29%,rgba(255,255,255,.64) 47%,transparent 65%);transform:translateX(-130%);animation:browserInstanceTaskbarSheen 2.5s ease-in-out infinite}
+.browser-instance-init-taskbar-guide-app{position:relative;z-index:1;width:22px;height:22px;border-radius:6px;background:rgba(105,126,158,.2);opacity:.52}
+.browser-instance-init-taskbar-guide-app::before{content:'';position:absolute;inset:6px;border-radius:3px;background:rgba(255,255,255,.7)}
+.browser-instance-init-taskbar-guide-chrome{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,.74);box-shadow:0 0 0 0 rgba(66,133,244,.34);animation:browserInstanceTaskbarChromePulse 1.7s ease-in-out infinite}
+.browser-instance-init-taskbar-guide-chrome::before,.browser-instance-init-taskbar-guide-chrome::after{content:'';position:absolute;border:2px solid rgba(66,133,244,.5);border-radius:14px;opacity:0;animation:browserInstanceTaskbarChromeRing 1.7s ease-out infinite}
+.browser-instance-init-taskbar-guide-chrome::after{animation-delay:.85s}
+.browser-instance-init-taskbar-guide-chrome svg{position:relative;z-index:1;width:28px;height:28px;filter:drop-shadow(0 2px 2px rgba(40,76,138,.22));animation:browserInstanceTaskbarChromeBounce 1.7s cubic-bezier(.34,1.56,.64,1) infinite}
+.browser-instance-init-taskbar-guide-cursor{position:absolute;z-index:3;top:-5px;left:calc(50% + 13px);width:22px;height:25px;color:#1f2937;filter:drop-shadow(0 2px 2px rgba(15,23,42,.3));transform:translate(15px,-7px) scale(.84);transform-origin:top left;opacity:0;animation:browserInstanceTaskbarCursor 1.7s ease-in-out infinite}
+.browser-instance-init-taskbar-guide-cursor path{fill:#fff;stroke:currentColor;stroke-width:1.7;stroke-linejoin:round}
+@keyframes browserInstanceTaskbarSheen{0%,36%{transform:translateX(-130%)}64%,100%{transform:translateX(130%)}}
+@keyframes browserInstanceTaskbarChromePulse{0%,100%{box-shadow:0 0 0 0 rgba(66,133,244,.12),0 4px 8px rgba(25,64,123,.16)}50%{box-shadow:0 0 0 7px rgba(66,133,244,.08),0 7px 13px rgba(25,64,123,.24)}}
+@keyframes browserInstanceTaskbarChromeRing{0%,42%{width:32px;height:32px;opacity:0}56%{opacity:.72}100%{width:62px;height:62px;opacity:0}}
+@keyframes browserInstanceTaskbarChromeBounce{0%,100%{transform:translateY(0) scale(1)}42%{transform:translateY(-3px) scale(1.04)}64%{transform:translateY(1px) scale(.98)}}
+@keyframes browserInstanceTaskbarCursor{0%,26%{opacity:0;transform:translate(15px,-7px) scale(.84)}42%,58%{opacity:1;transform:translate(1px,3px) scale(1)}66%{opacity:1;transform:translate(2px,4px) scale(.9)}76%,100%{opacity:0;transform:translate(11px,-2px) scale(.84)}}
+[data-theme="dark"] .browser-instance-init-taskbar-guide-copy{color:#f1f7ff;text-shadow:0 1px 0 rgba(0,0,0,.32)}
+[data-theme="dark"] .browser-instance-init-taskbar-guide-bar{border-color:rgba(181,207,244,.26);background:linear-gradient(180deg,rgba(43,53,70,.96),rgba(25,33,47,.94));box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 8px 20px rgba(0,0,0,.3)}
+[data-theme="dark"] .browser-instance-init-taskbar-guide-bar::before{background:linear-gradient(108deg,transparent 29%,rgba(198,224,255,.13) 47%,transparent 65%)}
+[data-theme="dark"] .browser-instance-init-taskbar-guide-app{background:rgba(196,216,247,.15)}
+[data-theme="dark"] .browser-instance-init-taskbar-guide-app::before{background:rgba(224,241,255,.68)}
+[data-theme="dark"] .browser-instance-init-taskbar-guide-chrome{background:rgba(239,247,255,.92)}
+[data-energy-saver="on"] .browser-instance-init-taskbar-guide,[data-low-power-rendering="on"] .browser-instance-init-taskbar-guide{filter:none}
+[data-energy-saver="on"] .browser-instance-init-taskbar-guide-bar::before,[data-energy-saver="on"] .browser-instance-init-taskbar-guide-chrome,[data-energy-saver="on"] .browser-instance-init-taskbar-guide-chrome::before,[data-energy-saver="on"] .browser-instance-init-taskbar-guide-chrome::after,[data-energy-saver="on"] .browser-instance-init-taskbar-guide-chrome svg,[data-energy-saver="on"] .browser-instance-init-taskbar-guide-cursor,[data-low-power-rendering="on"] .browser-instance-init-taskbar-guide-bar::before,[data-low-power-rendering="on"] .browser-instance-init-taskbar-guide-chrome,[data-low-power-rendering="on"] .browser-instance-init-taskbar-guide-chrome::before,[data-low-power-rendering="on"] .browser-instance-init-taskbar-guide-chrome::after,[data-low-power-rendering="on"] .browser-instance-init-taskbar-guide-chrome svg,[data-low-power-rendering="on"] .browser-instance-init-taskbar-guide-cursor{animation:none!important}
+@media (prefers-reduced-motion:reduce){.browser-instance-init-taskbar-guide-bar::before,.browser-instance-init-taskbar-guide-chrome,.browser-instance-init-taskbar-guide-chrome::before,.browser-instance-init-taskbar-guide-chrome::after,.browser-instance-init-taskbar-guide-chrome svg,.browser-instance-init-taskbar-guide-cursor{animation:none!important}.browser-instance-init-taskbar-guide-cursor{display:none}}
 .browser-instance-init-lock[data-phase="ready"] .browser-instance-init-title{margin-top:0}
 .browser-instance-init-actions{display:flex;width:100%;margin-top:18px;justify-content:center;opacity:0;visibility:hidden;pointer-events:none;transform:translateY(6px);transition:opacity .22s ease,transform .22s ease,visibility 0s linear .22s}
 .browser-instance-init-actions.show{opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0);transition:opacity .22s ease,transform .22s ease}
@@ -3151,6 +3178,8 @@ body.quick-fan-transition-active{cursor:progress}
 .consume-input:disabled{opacity:.6;cursor:not-allowed}
 .consume-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px}
 .consume-actions .btn{min-width:88px}
+.consume-actions .consume-clear-btn{border-color:color-mix(in srgb,var(--error) 38%,var(--border));background:color-mix(in srgb,var(--error) 8%,var(--bg-input));color:var(--error)}
+.consume-actions .consume-clear-btn:hover,.consume-actions .consume-clear-btn:focus-visible{border-color:var(--error);background:color-mix(in srgb,var(--error) 14%,var(--bg-input));outline:none}
 .consume-error{display:none;font-size:12px;line-height:1.6;color:var(--error);font-weight:600}
 .consume-error:not(:empty){display:block;padding:2px 24px 0}
 .consume-body{padding:0 24px 16px;display:flex;flex-direction:column;gap:12px;min-height:0;flex:1;overflow:auto;scrollbar-gutter:stable}
@@ -4940,6 +4969,25 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     <div class="browser-instance-init-spinner"></div>
     <div class="browser-instance-init-title" id="browserInstanceInitLockTitle">正在进行浏览器插件登录</div>
     <div class="browser-instance-init-desc" id="browserInstanceInitLockDesc">稍后会为您单独打开用于登录账号的浏览器，这个过程可能需要等待若干分钟。在登录所有账号后点击下方完成按钮，解锁界面。</div>
+    <div class="browser-instance-init-taskbar-guide" id="browserInstanceInitTaskbarGuide" aria-hidden="true">
+      <span class="browser-instance-init-taskbar-guide-copy">请留意 Windows 任务栏中的 Chrome 登录窗口</span>
+      <span class="browser-instance-init-taskbar-guide-bar">
+        <i class="browser-instance-init-taskbar-guide-app"></i>
+        <i class="browser-instance-init-taskbar-guide-app"></i>
+        <span class="browser-instance-init-taskbar-guide-chrome">
+          <svg viewBox="0 0 48 48" aria-hidden="true">
+            <path fill="#EA4335" d="M24 4a20 20 0 0 1 17.3 10H24a10 10 0 0 0-8.66 5L6.68 14A20 20 0 0 1 24 4Z"></path>
+            <path fill="#FBBC05" d="M41.3 14A20 20 0 0 1 24 44l8.66-15A10 10 0 0 0 34 24c0-3.64-1.95-6.83-4.86-8.58L24 14h17.3Z"></path>
+            <path fill="#34A853" d="M24 44A20 20 0 0 1 6.68 14l8.66 15A10 10 0 0 0 24 34c3.64 0 6.83-1.95 8.66-5L24 44Z"></path>
+            <circle cx="24" cy="24" r="9" fill="#4285F4"></circle>
+            <circle cx="24" cy="24" r="4.25" fill="#BFE3FF"></circle>
+          </svg>
+        </span>
+        <i class="browser-instance-init-taskbar-guide-app"></i>
+        <i class="browser-instance-init-taskbar-guide-app"></i>
+        <svg class="browser-instance-init-taskbar-guide-cursor" viewBox="0 0 26 30" aria-hidden="true"><path d="M3 2 22 18.5l-8.3 1.1-2.8 8-3-1 2.7-8.1L3 2Z"></path></svg>
+      </span>
+    </div>
     <div class="browser-instance-init-actions">
       <button class="btn btn-primary" id="browserInstanceInitDoneBtn" type="button" onclick="handleBrowserInstanceInitDoneClick(event)">完成</button>
     </div>
@@ -4979,8 +5027,8 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
         <input class="consume-input" id="consumeLimitInput" type="number" min="1" step="1" />
       </label>
       <div class="consume-actions">
-        <button class="btn btn-secondary" type="button" id="consumeResetBtn" onclick="resetConsumeQueryInputs()">默认</button>
         <button class="btn btn-primary" type="button" id="consumeQueryBtn" onclick="submitConsumeQuery()">查询</button>
+        <button class="btn btn-secondary consume-clear-btn" type="button" id="consumeClearBtn" onclick="clearConsumeRecords()">清空记录</button>
       </div>
     </div>
     <div class="consume-error" id="consumeError"></div>
@@ -7030,7 +7078,9 @@ let browserInstanceInitState = {
   binding: { agentId: '', chatId: '' },
   guidePreview: false,
   doneVisible: false,
-  doneRevealTimer: null
+  doneRevealTimer: null,
+  windowsOrWsl: isCurrentRuntimeWindows() ? true : null,
+  windowsOrWslRequest: null
 };
 let skillsWarnings = [];
 let skillsWarningIndex = new Map();
@@ -7708,7 +7758,7 @@ function setConsumeError(message) {
 
 function setConsumeLoading(loading) {
   consumeState.loading = !!loading;
-  const ids = ['consumeStartInput', 'consumeCloseInput', 'consumeLimitInput', 'consumeResetBtn', 'consumeQueryBtn', 'consumeCloseBtn'];
+  const ids = ['consumeStartInput', 'consumeCloseInput', 'consumeLimitInput', 'consumeClearBtn', 'consumeQueryBtn', 'consumeCloseBtn'];
   ids.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.disabled = !!loading;
@@ -8012,6 +8062,32 @@ async function submitConsumeQuery() {
     if (requestSeq !== consumeState.requestSeq) return;
     setConsumeError(err && err.message ? err.message : '查询 Token 用量失败');
     renderConsumeResultState([], { error: true });
+  } finally {
+    if (requestSeq === consumeState.requestSeq) setConsumeLoading(false);
+  }
+}
+
+async function clearConsumeRecords() {
+  if (!consumeState.visible || consumeState.loading) return;
+  if (!window.confirm('确定要清空所有 Token 记录吗？此操作不可恢复。')) return;
+  setConsumeError('');
+  setConsumeLoading(true);
+  const requestSeq = ++consumeState.requestSeq;
+  try {
+    const resp = await fetchExecApi('/api/consume', { method: 'DELETE', cache: 'no-store' });
+    let data = null;
+    try { data = await resp.json(); } catch {}
+    if (requestSeq !== consumeState.requestSeq) return;
+    if (!resp.ok || !data || data.status !== 0) {
+      const message = (data && (data.content || data.message)) || ('清空失败: HTTP ' + resp.status);
+      throw new Error(message);
+    }
+    renderConsumeResultState([], { queried: true });
+    const footerMeta = document.getElementById('consumeFooterMeta');
+    if (footerMeta) footerMeta.textContent = '已清空 ' + Math.max(0, Number(data.deleted) || 0) + ' 条 Token 记录';
+  } catch (err) {
+    if (requestSeq !== consumeState.requestSeq) return;
+    setConsumeError(err && err.message ? err.message : '清空 Token 记录失败');
   } finally {
     if (requestSeq === consumeState.requestSeq) setConsumeLoading(false);
   }
@@ -8677,6 +8753,7 @@ let pluginModalState = {
   logRequestSeq: 0,
   actionTimer: null,
   submitting: false,
+  submittingAction: '',
   transitionLocked: false,
   transitionStatus: 'pending',
   transitionDetail: PLUGIN_MODAL_WAIT_HINT,
@@ -23894,6 +23971,25 @@ function markBrowserInstanceInitReady() {
   browserInstanceInitState.doneVisible = true;
 }
 
+function shouldShowBrowserInstanceWindowsTaskbarGuide() {
+  return isCurrentRuntimeWindows() || browserInstanceInitState.windowsOrWsl === true;
+}
+
+function resolveBrowserInstanceWindowsTaskbarGuideRuntime() {
+  if (browserInstanceInitState.windowsOrWsl !== null || browserInstanceInitState.windowsOrWslRequest) return;
+  browserInstanceInitState.windowsOrWslRequest = isCurrentRuntimeWindowsOrWSL()
+    .then(isWindowsOrWsl => {
+      browserInstanceInitState.windowsOrWsl = !!isWindowsOrWsl;
+    })
+    .catch(() => {
+      browserInstanceInitState.windowsOrWsl = false;
+    })
+    .finally(() => {
+      browserInstanceInitState.windowsOrWslRequest = null;
+      renderBrowserInstanceInitLock();
+    });
+}
+
 function renderBrowserInstanceInitLock() {
   const overlay = document.getElementById('browserInstanceInitLock');
   if (!overlay) return;
@@ -23901,17 +23997,25 @@ function renderBrowserInstanceInitLock() {
   const title = document.getElementById('browserInstanceInitLockTitle');
   const desc = document.getElementById('browserInstanceInitLockDesc');
   const doneBtn = document.getElementById('browserInstanceInitDoneBtn');
+  const taskbarGuide = document.getElementById('browserInstanceInitTaskbarGuide');
   const actions = doneBtn ? doneBtn.parentElement : null;
   const phase = String(browserInstanceInitState.phase || 'idle');
   const guidePreview = !!(browserInstanceInitState.guidePreview && phase === 'idle');
   const pluginStart = phase === 'plugin-start';
   const ready = phase === 'ready';
   const show = phase !== 'idle' || guidePreview;
+  const initializing = phase === 'init' || pluginStart;
+  const showWindowsTaskbarGuide = show && !guidePreview && initializing && shouldShowBrowserInstanceWindowsTaskbarGuide();
+  if (show && !guidePreview && initializing) resolveBrowserInstanceWindowsTaskbarGuideRuntime();
   if (show) maybeCollapseLeftSidebarForFloatingOverlay(overlay);
   overlay.classList.toggle('show', show);
   overlay.setAttribute('aria-hidden', show ? 'false' : 'true');
   overlay.dataset.tone = 'progress';
   overlay.dataset.phase = guidePreview ? 'tour-preview' : phase;
+  if (taskbarGuide) {
+    taskbarGuide.classList.toggle('show', showWindowsTaskbarGuide);
+    taskbarGuide.setAttribute('aria-hidden', showWindowsTaskbarGuide ? 'false' : 'true');
+  }
   if (title) {
     if (phase === 'destroy') title.textContent = '正在关闭浏览器插件登录';
     else if (pluginStart) title.textContent = '浏览器插件初始化中';
@@ -24855,6 +24959,7 @@ function pluginModalUpdateActionButtons() {
   const cancelBtn = document.getElementById('pluginModalCancelBtn');
   const closeIconBtn = document.getElementById('pluginModalCloseIconBtn');
   const busy = !!pluginModalState.submitting;
+  const submittingAction = String(pluginModalState.submittingAction || '').trim();
   const locked = !!pluginModalState.transitionLocked;
   const blocked = busy || locked || !!pluginModalState.browserRestartConfirmVisible || !!pluginModalState.emailIntervalWarningVisible;
   const hasStarted = !!pluginModalState.started;
@@ -24866,14 +24971,16 @@ function pluginModalUpdateActionButtons() {
     startBtn.disabled = remoteRestricted || blocked;
     startBtn.textContent = remoteRestricted
       ? (hasStarted ? '远程不可重启' : '远程不可启动')
-      : (busy
+      : (busy && submittingAction === 'start'
         ? (hasStarted ? '重启插件中' : '启动插件中')
         : (hasStarted ? '重启插件' : '启动插件'));
   }
   if (stopBtn) {
     stopBtn.style.display = remoteRestricted ? 'none' : '';
     stopBtn.disabled = remoteRestricted || blocked || !hasStarted;
-    stopBtn.textContent = remoteRestricted ? '远程不可关闭' : '关闭插件';
+    stopBtn.textContent = remoteRestricted
+      ? '远程不可关闭'
+      : (busy && submittingAction === 'close' ? '关闭插件中' : '关闭插件');
   }
   if (viewSessionBtn) {
     viewSessionBtn.hidden = !canViewSession;
@@ -24905,6 +25012,7 @@ function pluginModalSetTransitionLock(locked, status, detail) {
 function pluginModalResetActionState() {
   pluginModalClearActionTimer();
   pluginModalState.submitting = false;
+  pluginModalState.submittingAction = '';
   pluginModalState.statusLoading = false;
   pluginModalState.statusError = '';
   pluginModalSetBrowserRestartConfirmVisible(false);
@@ -25515,6 +25623,7 @@ async function pluginModalStartPluginFlow(options) {
   }
 
   pluginModalState.submitting = true;
+  pluginModalState.submittingAction = 'start';
   pluginModalUpdateActionButtons();
   pluginModalClearActionTimer();
   pluginModalStopLogStream();
@@ -25578,6 +25687,7 @@ async function pluginModalStartPluginFlow(options) {
     }
   } finally {
     pluginModalState.submitting = false;
+    pluginModalState.submittingAction = '';
     pluginModalUpdateActionButtons();
   }
 
@@ -25815,6 +25925,7 @@ async function pluginModalAction(action) {
   } else if (action === 'close') {
     if (pluginModalState.submitting || pluginModalState.transitionLocked || !pluginModalState.started || !pluginKey) return;
     pluginModalState.submitting = true;
+    pluginModalState.submittingAction = 'close';
     pluginModalUpdateActionButtons();
     fetchExecApi('/api/plugins/stop?key=' + encodeURIComponent(pluginKey), {
       method: 'POST'
@@ -25831,6 +25942,7 @@ async function pluginModalAction(action) {
       vfsShowUploadToast(name + ' 关闭失败: ' + err.message, true);
     }).finally(() => {
       pluginModalState.submitting = false;
+      pluginModalState.submittingAction = '';
       pluginModalUpdateActionButtons();
     });
     return;

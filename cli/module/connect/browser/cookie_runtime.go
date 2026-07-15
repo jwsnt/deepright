@@ -26,6 +26,10 @@ func runCookieCommand(command string, args []string, stdout, stderr io.Writer) i
 		fmt.Fprintf(stderr, "%s does not accept positional arguments\n", command)
 		return 1
 	}
+	if err := browserRejectConnectBinFlag(flags, false); err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1
+	}
 	if err := browserRejectRemovedFlags(flags); err != nil {
 		fmt.Fprintln(stderr, err.Error())
 		return 1

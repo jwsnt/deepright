@@ -16,7 +16,7 @@
 ./browser name
 ./browser param
 ./browser command
-./browser start
+./browser start --connect-bin /path/to/integration
 ./browser stop
 ./browser fetch --cookie_path ./cookies.json
 ./browser store --cookie_path ./cookies.json
@@ -70,11 +70,14 @@
 ### start
 
 ```bash
-./browser start
+./browser start --connect-bin /path/to/integration
 ```
 
 补充行为：
 
+- `start` 是唯一允许传入 `--connect-bin` 的 Browser 命令
+- `start` 成功后，才会把本次 `--connect-bin` 写入 Browser 同目录的 `browser_runtime.json`
+- 如果 `start` 失败，不会新写也不会覆盖已有的 `browser_runtime.json`
 - `start` 会先检查并准备 Playwright driver；失败只记日志，不中断后续启动
 - 如果配置了 `cookie_path`，`start` 会先执行一次同路径的 `store + fetch` 校验
 - `start` 在执行前后都会把一次 `browser instance list` 快照写入 `browser.log`
@@ -96,12 +99,15 @@
 说明：
 
 - `start` 和 `stop` 都会读取 `browser` 同目录下的 `browser_instance.json`
-- 如果传入 `--connect-bin` 且能解析到主应用 `config/config.json`，运行根目录会统一收口到 `integration` 应用目录下的 `plugins/`
+- Browser 后续命令需要的 integration 路径，统一优先从 `browser_runtime.json` 读取
+- 如果 `browser_runtime.json` 不存在，才会按当前 `browser` 二进制路径推断 runtime config
+- 除 `browser start` 外，其他 Browser 命令传入 `--connect-bin` 都会立即报错
 - `start` 和 `stop` 在执行前后都会把一次 `browser instance list` 快照写入 `browser.log`
 - `stop` 会先停止 Playwright daemon
 - 然后通过 `instance list` 枚举所有受管 CDP，并逐个调用 `shutdown`
 - 单个实例关闭失败只会写 `browser.log`，不会阻断其他实例继续关闭
 - `stop` 结束前还会清理 `agent-dir` 下所有 `chrome_${port}` 结构的受管实例目录
+- `stop` 结束时会 best-effort 删除 Browser 同目录的 `browser_runtime.json`；删除失败只写日志，不会导致 `stop` 失败
 - 通过 `integration` 运行且未显式覆盖 `--agent-dir` 时，macOS 默认会清理 `~/Library/Application Support/deepright/agent` 下的这些目录
 - 在 Windows WSL / WSL2 下，`stop` 会在原有关闭流程全部结束后，并发删除 `C:\ProgramData\deepright` 下所有 `chrome*` 目录，包括 `chrome_def`
 - 每个目录的删除成功和失败都会写入 `browser.log`
@@ -119,6 +125,7 @@
 - 返回结果包含 `agentId`、`chatId`、`port`、`pid`、`cdp`、`profileDir`
 - `--agentId`、`--chatId` 会先统一转成小写
 - 会优先读取 Browser 插件配置里的 `meta.chrome` 和 `meta.headless`
+- 如果存在 `browser_runtime.json`，Browser 插件配置读取会优先沿该文件记录的 integration/runtime 定位
 - 在 Windows WSL / WSL2 下，当 `meta.chrome` 缺失时优先回退到默认路径 `/mnt/c/Program Files/Google/Chrome/Application/chrome.exe`
 - 默认路径不可用时，再退回命令行 `--chrome` 和系统自动探测
 - `meta.headless=false/FALSE/False` 时以有头模式启动

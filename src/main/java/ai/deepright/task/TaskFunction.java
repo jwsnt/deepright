@@ -338,7 +338,7 @@ public class TaskFunction extends BaseFunction implements TaskResult {
         metadata.put(FeatureField.KEY_KNOWLEDGE_COMMIT, MapUtils.getObject(workTask.getMetadata(), FeatureField.KEY_KNOWLEDGE_COMMIT));
         metadata.put(FeatureField.KEY_KNOWLEDGE, MapUtils.getObject(workTask.getMetadata(), FeatureField.KEY_KNOWLEDGE));
         metadata.put(FeatureField.KEY_MEDIA, MapUtils.getMap(routerDevice.getMetadata(), FeatureField.KEY_MEDIA));
-        metadata.put(FeatureField.KEY_PLUGIN_DIR, FeatureUtils.buildPluginDir(routerDevice.getMetadata()));
+        metadata.put(FeatureField.KEY_PLUGINS_DIR, FeatureUtils.buildPluginsDir(routerDevice.getMetadata()));
         metadata.put(FeatureField.KEY_USER, FeatureUtils.buildUser(routerDevice.getMetadata()));
         metadata.put(FeatureField.KEY_GIT, FeatureUtils.buildGit(routerDevice.getMetadata()));
         metadata.put(FeatureField.KEY_WORKSPACE, routerDevice.getWorkspace());

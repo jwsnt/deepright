@@ -43,15 +43,13 @@ func prepareIntegrationRuntimeBaseDir() (string, error) {
 }
 
 func resolveIntegrationRuntimePluginDirFromRuntimeBase(runtimeDir string) (string, error) {
-	pluginDir := strings.TrimSpace(integrationRuntimePluginDir())
-	if pluginDir == "" {
-		pluginDir = strings.TrimSpace(os.Getenv(integrationPluginDirEnv))
-		if pluginDir == "" && strings.TrimSpace(runtimeDir) != "" {
-			pluginDir = filepath.Join(runtimeDir, "plugins")
-		}
+	runtimeDir = strings.TrimSpace(runtimeDir)
+	pluginDir := ""
+	if runtimeDir != "" {
+		pluginDir = filepath.Join(runtimeDir, "plugins")
 	}
 	if pluginDir == "" {
-		return "", fmt.Errorf("resolve application plugins dir")
+		return "", fmt.Errorf("resolve application runtime plugins dir")
 	}
 	info, err := os.Stat(pluginDir)
 	if err == nil && !info.IsDir() {

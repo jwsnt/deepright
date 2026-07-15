@@ -111,6 +111,19 @@ func Insert(db *sql.DB, record Record) (Record, error) {
 	return normalized, nil
 }
 
+// Clear removes every saved token consumption record and returns the number of
+// rows that were deleted.
+func Clear(db *sql.DB) (int64, error) {
+	if err := EnsureSchema(db); err != nil {
+		return 0, err
+	}
+	result, err := db.Exec(`DELETE FROM ` + tableName)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 func ParseQueryTime(value string, loc *time.Location) (int64, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {

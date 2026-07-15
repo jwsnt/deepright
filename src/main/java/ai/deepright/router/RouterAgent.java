@@ -50,7 +50,7 @@ public class RouterAgent {
         Map<String, Object> metadata = new HashMap<String, Object>();
         // WorkTask的Metadata有状态位，不能全部复制
         metadata.put(FeatureField.KEY_ROUTER_DESC, MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_ROUTER_DESC));
-        metadata.put(FeatureField.KEY_PLUGIN_DIR, FeatureUtils.buildPluginDir(workTask));
+        metadata.put(FeatureField.KEY_PLUGINS_DIR, FeatureUtils.buildPluginsDir(workTask));
         metadata.put(FeatureField.KEY_TERMINAL, FeatureUtils.buildTerminal(workTask));
         metadata.put(FeatureField.KEY_TIMEZONE, FeatureUtils.buildTimezone(workTask));
         metadata.put(FeatureField.KEY_GATEWAY, FeatureUtils.buildGateway(workTask));

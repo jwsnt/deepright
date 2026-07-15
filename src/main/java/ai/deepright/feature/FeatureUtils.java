@@ -87,6 +87,14 @@ public class FeatureUtils {
         return MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_PROVIDER, FeatureUtils.buildTargetProvider(workTask));
     }
 
+    public static String buildPluginsDir(Map<String, Object> metadata) throws Exception {
+        return MapUtils.getString(metadata, FeatureField.KEY_PLUGINS_DIR);
+    }
+
+    public static String buildPluginsDir(WorkflowTask workTask) throws Exception {
+        return FeatureUtils.buildPluginsDir(workTask.getMetadata());
+    }
+
     public static String buildSandBoxPath(WorkflowTask workTask) throws Exception {
         return MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_SANDBOX_PATH);
     }
@@ -101,14 +109,6 @@ public class FeatureUtils {
 
     public static String buildKnowledge(WorkflowTask workTask) throws Exception {
         return MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_KNOWLEDGE_CONTENT);
-    }
-
-    public static String buildPluginDir(Map<String, Object> metadata) throws Exception {
-        return MapUtils.getString(metadata, FeatureField.KEY_PLUGIN_DIR);
-    }
-
-    public static String buildPluginDir(WorkflowTask workTask) throws Exception {
-        return FeatureUtils.buildPluginDir(workTask.getMetadata());
     }
 
     public static String buildTerminal(WorkflowTask workTask) throws Exception {

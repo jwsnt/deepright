@@ -85,6 +85,10 @@ func runCLI(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintln(stderr, err.Error())
 			return 1
 		}
+		if err := browserRejectConnectBinFlag(flags, false); err != nil {
+			fmt.Fprintln(stderr, err.Error())
+			return 1
+		}
 		if err := browserRejectRemovedFlags(flags); err != nil {
 			fmt.Fprintln(stderr, err.Error())
 			return 1
@@ -128,14 +132,18 @@ func runCLI(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "%s is only available as `browser instance %s`\n", command, command)
 		return 1
 	default:
-		refreshInstanceFromSessionArgs(args)
 		flags, _, err := parseCLIArgs(args)
 		if err == nil {
+			if err := browserRejectConnectBinFlag(flags, false); err != nil {
+				fmt.Fprintln(stderr, err.Error())
+				return 1
+			}
 			if err := browserRejectRemovedFlags(flags); err != nil {
 				fmt.Fprintln(stderr, err.Error())
 				return 1
 			}
 		}
+		refreshInstanceFromSessionArgs(args)
 		nextArgs, err := normalizeBrowserCommandArgs(args)
 		if err != nil {
 			fmt.Fprintln(stderr, err.Error())
@@ -231,6 +239,10 @@ func runInstanceCommand(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, err.Error())
 		return 1
 	}
+	if err := browserRejectConnectBinFlag(flags, false); err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1
+	}
 	if err := browserRejectRemovedFlags(flags); err != nil {
 		fmt.Fprintln(stderr, err.Error())
 		return 1
@@ -318,6 +330,10 @@ func runPluginLifecycleCommand(command string, args []string, stdout, stderr io.
 		fmt.Fprintln(stderr, err.Error())
 		return 1
 	}
+	if err := browserRejectConnectBinFlag(flags, command == "start"); err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1
+	}
 	if len(positionals) > 0 {
 		fmt.Fprintf(stderr, "%s does not accept positional arguments\n", command)
 		return 1
@@ -372,6 +388,12 @@ func runPluginLifecycleCommand(command string, args []string, stdout, stderr io.
 			fmt.Fprintln(stderr, err.Error())
 			return 1
 		}
+		if connectBin := strings.TrimSpace(flags["connect-bin"]); connectBin != "" {
+			if err := browserWriteRecordedConnectBin(connectBin); err != nil {
+				fmt.Fprintln(stderr, err.Error())
+				return 1
+			}
+		}
 		browserLogPluginDaemonEvent(command, result)
 		if reopenIntegrationOnWSL {
 			_ = browserRestartIntegrationAfterWSLStartFn(flags)
@@ -400,6 +422,7 @@ func runPluginLifecycleCommand(command string, args []string, stdout, stderr io.
 	browserLogInstanceListEvent(command, "after", afterItems)
 	if command == "stop" {
 		browserMaybeCleanupWSLProgramDataChromeDirsFn()
+		browserMaybeRemoveRecordedConnectBin()
 	}
 	fmt.Fprintln(stdout, "OK")
 	return 0
@@ -417,9 +440,13 @@ func runDaemonCommand(args []string, stdout, stderr io.Writer) int {
 		printDaemonHelp(stdout)
 		return 0
 	case "start", "stop", "serve":
-		if command != "stop" {
-			flags, err := connectsvc.ParseFlags(args[1:])
-			if err == nil {
+		flags, err := connectsvc.ParseFlags(args[1:])
+		if err == nil {
+			if err := browserRejectConnectBinFlag(flags, false); err != nil {
+				fmt.Fprintln(stderr, err.Error())
+				return 1
+			}
+			if command != "stop" {
 				if err := browserRejectRemovedFlags(flags); err != nil {
 					fmt.Fprintln(stderr, err.Error())
 					return 1
@@ -511,6 +538,16 @@ func browserRetryFromFlags(flags map[string]string) int {
 	return value
 }
 
+func browserRejectConnectBinFlag(flags map[string]string, allowed bool) error {
+	if allowed {
+		return nil
+	}
+	if _, ok := flags["connect-bin"]; ok {
+		return fmt.Errorf("--connect-bin is only supported by `browser start`")
+	}
+	return nil
+}
+
 func browserIntFlagValue(flags map[string]string, key string) (int, bool) {
 	raw, ok := flags[key]
 	if !ok || strings.TrimSpace(raw) == "" {
@@ -534,7 +571,9 @@ func browserRuntimeRoot(flags map[string]string) (string, string, error) {
 	if abs, err := filepath.Abs(browserPath); err == nil {
 		browserPath = abs
 	}
-	if root, ok := browserIntegrationPluginsRoot(flags); ok {
+	if root, ok, err := browserIntegrationPluginsRoot(); err != nil {
+		return "", "", err
+	} else if ok {
 		return root, filepath.Join(root, "browser"), nil
 	}
 	root := filepath.Dir(browserPath)
@@ -544,18 +583,25 @@ func browserRuntimeRoot(flags map[string]string) (string, string, error) {
 	return root, browserPath, nil
 }
 
-func browserIntegrationPluginsRoot(flags map[string]string) (string, bool) {
-	connectBin := strings.TrimSpace(flags["connect-bin"])
-	if connectBin == "" {
-		return "", false
+func browserIntegrationPluginsRoot() (string, bool, error) {
+	connectBin, ok, err := browserReadRecordedConnectBin()
+	if err != nil {
+		return "", false, err
 	}
+	if !ok {
+		return "", false, nil
+	}
+	return browserIntegrationPluginsRootFromConnectBin(connectBin)
+}
+
+func browserIntegrationPluginsRootFromConnectBin(connectBin string) (string, bool, error) {
 	runtimePath, ok := browserResolveIntegrationRuntimePath(connectBin)
 	if !ok {
-		return "", false
+		return "", false, fmt.Errorf("resolve runtime config from %s", browserRuntimeFileName)
 	}
 	cfg, err := browserReadRuntimeConfig(runtimePath)
 	if err != nil {
-		return "", false
+		return "", false, err
 	}
 	appDir := strings.TrimSpace(cfg["app-dir"])
 	if appDir == "" {
@@ -565,12 +611,12 @@ func browserIntegrationPluginsRoot(flags map[string]string) (string, bool) {
 		}
 	}
 	if appDir == "" {
-		return "", false
+		return "", false, fmt.Errorf("resolve app-dir from %s", runtimePath)
 	}
 	if abs, err := filepath.Abs(appDir); err == nil {
 		appDir = abs
 	}
-	return filepath.Join(appDir, "plugins"), true
+	return filepath.Join(appDir, "plugins"), true, nil
 }
 
 func browserResolveBundledIntegrationRuntimePath(connectBin string) string {
@@ -1036,6 +1082,8 @@ func browserFlagEnabled(flags map[string]string, key string) bool {
 func printHelp(w io.Writer) {
 	fmt.Fprintln(w, "Usage:")
 	fmt.Fprintln(w, "  browser help")
+	fmt.Fprintln(w, "  browser start [--connect-bin PATH]")
+	fmt.Fprintln(w, "  browser stop")
 	fmt.Fprintln(w, "  browser fetch [--cookie_path PATH]")
 	fmt.Fprintln(w, "  browser store [--cookie_path PATH]")
 	fmt.Fprintln(w, "  browser --session AGENT@CHAT goto <url>")
@@ -1078,6 +1126,7 @@ func printHelp(w io.Writer) {
 	fmt.Fprintln(w, "  --browser-timeout VALUE    Playwright wall-clock timeout, default 120s")
 	fmt.Fprintln(w, "  --browser_retry N          consecutive timeout count before Playwright daemon is killed, default 3")
 	fmt.Fprintln(w, "  --cookie_path PATH         browser cookie file path; can also come from plugin meta")
+	fmt.Fprintln(w, "  --connect-bin PATH         only browser start accepts it; on success it is persisted into ./browser_runtime.json")
 	fmt.Fprintln(w, "  --state-dir DIR            Playwright state root, default ./.browser_playwright")
 	fmt.Fprintln(w, "  --instance-state PATH      override browser_instance.json path for browser instance commands")
 	fmt.Fprintln(w, "  --chrome PATH              override the Chrome executable used by instance create")
@@ -1104,11 +1153,13 @@ func printHelp(w io.Writer) {
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "Notes:")
 	fmt.Fprintln(w, "  - browser logs are written to ./browser.log beside the browser executable")
+	fmt.Fprintln(w, "  - browser start writes ./browser_runtime.json only after a successful start, and every non-start command rejects --connect-bin immediately")
 	fmt.Fprintln(w, "  - browser start first preflights the local playwright driver beside the plugin and continues even on failure or timeout")
 	fmt.Fprintln(w, "  - browser fetch/store/start reuse the same cookie_path resolution and validation logic")
 	fmt.Fprintln(w, "  - plugin lifecycle reset closes every managed CDP instance so integration can restart browser safely")
 	fmt.Fprintln(w, "  - on WSL, browser start also force-closes all Windows Chrome processes, refreshes C:\\ProgramData\\deepright\\chrome_def from the Windows Chrome User Data root with filtered-copy rules, and only logs the reason when that refresh fails")
 	fmt.Fprintln(w, "  - on WSL, browser start best-effort reruns `integration start` after a successful chrome_def refresh so the host app can reopen Chrome")
+	fmt.Fprintln(w, "  - browser stop best-effort deletes ./browser_runtime.json after the stop flow and only logs a cleanup error if that removal fails")
 	fmt.Fprintln(w, "  - on WSL, browser stop finishes by concurrently deleting every C:\\ProgramData\\deepright\\chrome* directory; success and failure are both logged and never fail stop")
 	fmt.Fprintln(w, "  - managed Agent@Chat sessions refresh browser instance activity and idle instances are cleaned when instance state is reloaded")
 	fmt.Fprintln(w, "  - browser shutdown force-stops one managed Chrome pid after resolving it from instance state")
@@ -1145,8 +1196,8 @@ func printInstanceHelp(w io.Writer) {
 	fmt.Fprintln(w, "  - state file defaults to ./browser_instance.json beside the browser executable")
 	fmt.Fprintln(w, "  - Chrome is resolved from the local system, or overridden with --chrome PATH")
 	fmt.Fprintln(w, "  - on WSL, Chrome resolves browser meta chrome first and otherwise falls back to /mnt/c/Program Files/Google/Chrome/Application/chrome.exe")
-	fmt.Fprintln(w, "  - create prefers browser meta headless from --connect-bin: false => headed, true/invalid => --headless new, empty => fallback to --headless")
-	fmt.Fprintln(w, "  - without --connect-bin, create still accepts --headless none for standalone headed mode")
+	fmt.Fprintln(w, "  - create prefers browser meta headless from the recorded browser_runtime.json integration runtime: false => headed, true/invalid => --headless new, empty => fallback to --headless")
+	fmt.Fprintln(w, "  - without a recorded integration runtime, create still accepts --headless none for standalone headed mode")
 	fmt.Fprintln(w, "  - outside WSL, create reuses the managed chrome_${port} directory when it already exists")
 	fmt.Fprintln(w, "  - init destroys the old AgentId + ChatId instance first when one is already live")
 	fmt.Fprintln(w, "  - init always launches headed Chrome, registers the new instance in get/list, and returns once ready")

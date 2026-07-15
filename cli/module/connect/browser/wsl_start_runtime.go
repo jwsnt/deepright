@@ -246,8 +246,10 @@ func browserRunIntegrationStart(flags map[string]string) error {
 }
 
 func browserResolveIntegrationStartBinary(flags map[string]string) (string, error) {
-	if connectBin := strings.TrimSpace(flags["connect-bin"]); connectBin != "" {
-		return browserEnsureExecutablePath(connectBin)
+	if connectBin, ok, err := browserReadRecordedConnectBin(); err != nil {
+		return "", err
+	} else if ok {
+		return connectBin, nil
 	}
 
 	browserPath, err := browserExecutablePathFn()
@@ -266,7 +268,7 @@ func browserResolveIntegrationStartBinary(flags map[string]string) (string, erro
 			return resolved, nil
 		}
 	}
-	return "", errors.New("integration binary not found; pass --connect-bin")
+	return "", errors.New("integration binary not found; start browser with --connect-bin first or run beside integration")
 }
 
 func browserRunWSLCommandCombinedOutput(name string, args ...string) ([]byte, error) {

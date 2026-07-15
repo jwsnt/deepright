@@ -213,7 +213,7 @@ public class MixedSkillFetcher extends FileSystemFetcher {
 
     protected String buildDir(WorkflowTask workTask) throws Exception {
         // @see CliRag
-        String dir = FeatureUtils.buildPluginDir(workTask);
+        String dir = FeatureUtils.buildPluginsDir(workTask);
         if (FeatureFlag.isMacOs(workTask)) {
             WorkflowException.checkCondition(!(StringUtils.containsIgnoreCase(FeatureUtils.buildApp(workTask), ".app")), "The mac apps must be installed in the Applications folder.");
             return Paths.get(dir).getParent() + FeatureUtils.buildFileSeparator(workTask) + "Resources";

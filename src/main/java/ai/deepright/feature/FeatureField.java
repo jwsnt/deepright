@@ -25,7 +25,7 @@ public interface FeatureField {
 
     public static final String KEY_FILE_SYSTEM = "file_system";
 
-    public static final String KEY_PLUGIN_DIR = "plugin_dir";
+    public static final String KEY_PLUGINS_DIR = "plugins_dir";
 
     public static final String KEY_CRON_TYPE = "cron_type";
 

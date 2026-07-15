@@ -5130,7 +5130,7 @@ func runProxySandboxCLI(args []string) {
 }
 
 func (p *ProxyServer) HandleConsume(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
+	if r.Method != http.MethodGet && r.Method != http.MethodDelete {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -5138,6 +5138,17 @@ func (p *ProxyServer) HandleConsume(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "db error: " + err.Error()})
+		return
+	}
+	if r.Method == http.MethodDelete {
+		deleted, err := tokenconsume.Clear(db)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "clear error: " + err.Error()})
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{"status": 0, "deleted": deleted})
 		return
 	}
 	startRaw := strings.TrimSpace(r.URL.Query().Get("starTime"))

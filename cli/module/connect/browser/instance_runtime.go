@@ -1130,18 +1130,18 @@ func browserGracefulStopPluginInstances(flags map[string]string) {
 		browserLogAsyncLifecycleEvent("browser_stop_instances", "list_error", nil, 0, err)
 		return
 	}
-		for _, item := range items {
-			nextFlags := browserFlagsWithoutIdentity(flags)
-			nextFlags["agentId"] = item.AgentID
-			nextFlags["chatId"] = item.ChatID
-			browserLogInstanceShutdownRequest("plugin_stop_cleanup", nextFlags, map[string]any{
-				"pid":  item.PID,
-				"port": item.Port,
-				"cdp":  item.CDP,
-			})
-			if err := browserInvokeInstanceShutdown(nextFlags); err != nil {
-				browserLogAsyncLifecycleEvent("browser_stop_instances", "shutdown_error", []string{item.AgentID, item.ChatID, strconv.Itoa(item.Port)}, item.PID, err)
-				continue
+	for _, item := range items {
+		nextFlags := browserFlagsWithoutIdentity(flags)
+		nextFlags["agentId"] = item.AgentID
+		nextFlags["chatId"] = item.ChatID
+		browserLogInstanceShutdownRequest("plugin_stop_cleanup", nextFlags, map[string]any{
+			"pid":  item.PID,
+			"port": item.Port,
+			"cdp":  item.CDP,
+		})
+		if err := browserInvokeInstanceShutdown(nextFlags); err != nil {
+			browserLogAsyncLifecycleEvent("browser_stop_instances", "shutdown_error", []string{item.AgentID, item.ChatID, strconv.Itoa(item.Port)}, item.PID, err)
+			continue
 		}
 		browserLogClosureEventFn("stop_shutdown", map[string]any{
 			"agentId": item.AgentID,
@@ -1432,18 +1432,21 @@ func browserLookupLiveInstance(flags map[string]string) (browserInstanceRecord, 
 }
 
 func browserResolveAgentRoot(flags map[string]string) (string, error) {
-	if runtimePath, ok := browserResolveRuntimeConfigPath(flags); ok {
+	if runtimePath, ok, err := browserResolveRuntimeConfigPath(flags); err != nil {
+		return "", err
+	} else if ok {
 		cfg, err := browserReadRuntimeConfig(runtimePath)
-		if err == nil {
-			agentRoot := browserResolveRuntimePathValue(runtimePath, cfg["agent-dir"])
-			if agentRoot == "" {
-				if appDir := browserResolveRuntimePathValue(runtimePath, cfg["app-dir"]); appDir != "" {
-					agentRoot = filepath.Join(appDir, "agent")
-				}
+		if err != nil {
+			return "", err
+		}
+		agentRoot := browserResolveRuntimePathValue(runtimePath, cfg["agent-dir"])
+		if agentRoot == "" {
+			if appDir := browserResolveRuntimePathValue(runtimePath, cfg["app-dir"]); appDir != "" {
+				agentRoot = filepath.Join(appDir, "agent")
 			}
-			if agentRoot != "" {
-				return agentRoot, nil
-			}
+		}
+		if agentRoot != "" {
+			return agentRoot, nil
 		}
 	}
 	root, _, err := browserRuntimeRoot(flags)
@@ -1451,20 +1454,6 @@ func browserResolveAgentRoot(flags map[string]string) (string, error) {
 		return "", err
 	}
 	return root, nil
-}
-
-func browserResolveConnectBinCleanupRoot(flags map[string]string) (string, error) {
-	connectBin := strings.TrimSpace(flags["connect-bin"])
-	if connectBin == "" {
-		return "", nil
-	}
-	if absPath, err := filepath.Abs(connectBin); err == nil {
-		connectBin = absPath
-	}
-	if info, err := os.Stat(connectBin); err == nil && info.IsDir() {
-		return connectBin, nil
-	}
-	return filepath.Dir(connectBin), nil
 }
 
 func browserResolveAgentWorkspace(flags map[string]string, agentID string) (string, error) {
@@ -1479,18 +1468,22 @@ func browserResolveAgentWorkspace(flags map[string]string, agentID string) (stri
 	return filepath.Join(agentRoot, agentID), nil
 }
 
-func browserResolveRuntimeConfigPath(flags map[string]string) (string, bool) {
-	if connectBin := strings.TrimSpace(flags["connect-bin"]); connectBin != "" {
-		return browserResolveIntegrationRuntimePath(connectBin)
+func browserResolveRuntimeConfigPath(flags map[string]string) (string, bool, error) {
+	_ = flags
+	if runtimePath, ok, err := browserResolveRecordedRuntimeConfigPath(); err != nil {
+		return "", false, err
+	} else if ok {
+		return runtimePath, true, nil
 	}
 	execPath, err := browserExecutablePathFn()
 	if err != nil {
-		return "", false
+		return "", false, err
 	}
 	if resolved, err := filepath.EvalSymlinks(execPath); err == nil {
 		execPath = resolved
 	}
-	return connectsvc.ResolveRuntimeConfigPathNearBinary(execPath)
+	runtimePath, ok := connectsvc.ResolveRuntimeConfigPathNearBinary(execPath)
+	return runtimePath, ok, nil
 }
 
 func browserResolveRuntimePathValue(runtimePath, raw string) string {

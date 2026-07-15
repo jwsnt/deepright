@@ -21,7 +21,10 @@ type browserCookieMetaResponse struct {
 }
 
 func browserLookupPluginMeta(flags map[string]string, key string, allowInfer bool) (browserCookieMetaResponse, bool, error) {
-	connectBin, prefix := browserResolveMetaLookupCommand(flags, allowInfer)
+	connectBin, prefix, err := browserResolveMetaLookupCommand(flags, allowInfer)
+	if err != nil {
+		return browserCookieMetaResponse{}, false, err
+	}
 	if strings.TrimSpace(connectBin) == "" {
 		return browserCookieMetaResponse{}, false, nil
 	}
@@ -44,37 +47,48 @@ func browserLookupPluginMeta(flags map[string]string, key string, allowInfer boo
 	return response, true, nil
 }
 
-func browserResolveMetaLookupCommand(flags map[string]string, allowInfer bool) (string, []string) {
-	explicit := strings.TrimSpace(flags["connect-bin"])
-	if explicit == "" && allowInfer {
-		explicit = browserInferMetaLookupBinary(flags)
+func browserResolveMetaLookupCommand(flags map[string]string, allowInfer bool) (string, []string, error) {
+	if connectBin, ok, err := browserReadRecordedConnectBin(); err != nil {
+		return "", nil, err
+	} else if ok {
+		return browserNormalizeBinaryPath(connectBin), browserConnectPrefixForBinary(connectBin), nil
 	}
-	if explicit == "" {
-		return "", nil
+	if !allowInfer {
+		return "", nil, nil
 	}
-	return browserNormalizeBinaryPath(explicit), browserConnectPrefixForBinary(explicit)
+	connectBin, err := browserInferMetaLookupBinary(flags)
+	if err != nil {
+		return "", nil, err
+	}
+	if strings.TrimSpace(connectBin) == "" {
+		return "", nil, nil
+	}
+	return browserNormalizeBinaryPath(connectBin), browserConnectPrefixForBinary(connectBin), nil
 }
 
-func browserInferMetaLookupBinary(flags map[string]string) string {
-	runtimePath, ok := browserResolveRuntimeConfigPath(flags)
+func browserInferMetaLookupBinary(flags map[string]string) (string, error) {
+	runtimePath, ok, err := browserResolveRuntimeConfigPath(flags)
+	if err != nil {
+		return "", err
+	}
 	if !ok {
-		return ""
+		return "", nil
 	}
 	cfg, err := browserReadRuntimeConfig(runtimePath)
 	if err != nil {
-		return ""
+		return "", err
 	}
 	if appPath := browserResolveRuntimePathValue(runtimePath, cfg["app"]); appPath != "" {
-		return appPath
+		return appPath, nil
 	}
 	baseDir := filepath.Dir(runtimePath)
 	for _, name := range []string{"integration", "integration.exe", "proxy", "proxy.exe"} {
 		candidate := filepath.Join(baseDir, name)
 		if info, statErr := os.Stat(candidate); statErr == nil && !info.IsDir() {
-			return candidate
+			return candidate, nil
 		}
 	}
-	return ""
+	return "", nil
 }
 
 func browserNormalizeBinaryPath(value string) string {

@@ -434,11 +434,21 @@ func TestBrowserResolveChromeHeadlessModeFromPluginMetaTrue(t *testing.T) {
 	restore := stubBrowserRuntime()
 	defer restore()
 
+	exeDir := t.TempDir()
+	browserExecutablePathFn = func() (string, error) {
+		return writeBrowserBinaryFixture(t, exeDir), nil
+	}
+	connectBin := filepath.Join(t.TempDir(), "integration")
+	if err := os.WriteFile(connectBin, []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeBrowserRuntimeRecordFixture(t, connectBin)
+
 	browserCookieCommandContextFn = func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		return exec.CommandContext(ctx, "sh", "-c", "cat <<'EOF'\n{\"key\":\"browser\",\"meta\":{\"headless\":\"TRUE\"}}\nEOF\n")
 	}
 
-	mode, ok, err := browserResolveChromeHeadlessModeFromPluginMeta(map[string]string{"connect-bin": "/tmp/integration"})
+	mode, ok, err := browserResolveChromeHeadlessModeFromPluginMeta(map[string]string{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -451,11 +461,21 @@ func TestBrowserResolveChromeHeadlessModeFromPluginMetaFalse(t *testing.T) {
 	restore := stubBrowserRuntime()
 	defer restore()
 
+	exeDir := t.TempDir()
+	browserExecutablePathFn = func() (string, error) {
+		return writeBrowserBinaryFixture(t, exeDir), nil
+	}
+	connectBin := filepath.Join(t.TempDir(), "integration")
+	if err := os.WriteFile(connectBin, []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeBrowserRuntimeRecordFixture(t, connectBin)
+
 	browserCookieCommandContextFn = func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		return exec.CommandContext(ctx, "sh", "-c", "cat <<'EOF'\n{\"key\":\"browser\",\"meta\":{\"headless\":\"FALSE\"}}\nEOF\n")
 	}
 
-	mode, ok, err := browserResolveChromeHeadlessModeFromPluginMeta(map[string]string{"connect-bin": "/tmp/integration"})
+	mode, ok, err := browserResolveChromeHeadlessModeFromPluginMeta(map[string]string{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -468,11 +488,21 @@ func TestBrowserResolveChromeHeadlessModeFromPluginMetaInvalidDefaultsHeadless(t
 	restore := stubBrowserRuntime()
 	defer restore()
 
+	exeDir := t.TempDir()
+	browserExecutablePathFn = func() (string, error) {
+		return writeBrowserBinaryFixture(t, exeDir), nil
+	}
+	connectBin := filepath.Join(t.TempDir(), "integration")
+	if err := os.WriteFile(connectBin, []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeBrowserRuntimeRecordFixture(t, connectBin)
+
 	browserCookieCommandContextFn = func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		return exec.CommandContext(ctx, "sh", "-c", "cat <<'EOF'\n{\"key\":\"browser\",\"meta\":{\"headless\":\"maybe\"}}\nEOF\n")
 	}
 
-	mode, ok, err := browserResolveChromeHeadlessModeFromPluginMeta(map[string]string{"connect-bin": "/tmp/integration"})
+	mode, ok, err := browserResolveChromeHeadlessModeFromPluginMeta(map[string]string{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -485,11 +515,21 @@ func TestBrowserResolveChromeHeadlessModeFromPluginMetaEmptyFallsBack(t *testing
 	restore := stubBrowserRuntime()
 	defer restore()
 
+	exeDir := t.TempDir()
+	browserExecutablePathFn = func() (string, error) {
+		return writeBrowserBinaryFixture(t, exeDir), nil
+	}
+	connectBin := filepath.Join(t.TempDir(), "integration")
+	if err := os.WriteFile(connectBin, []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeBrowserRuntimeRecordFixture(t, connectBin)
+
 	browserCookieCommandContextFn = func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		return exec.CommandContext(ctx, "sh", "-c", "cat <<'EOF'\n{\"key\":\"browser\",\"meta\":{\"headless\":\"\"}}\nEOF\n")
 	}
 
-	mode, ok, err := browserResolveChromeHeadlessModeFromPluginMeta(map[string]string{"connect-bin": "/tmp/integration"})
+	mode, ok, err := browserResolveChromeHeadlessModeFromPluginMeta(map[string]string{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1374,7 +1414,13 @@ func TestBrowserCleanupStopUserDataRemovesManagedChromeDirsUnderAgentRoot(t *tes
 		return false, nil
 	}
 
-	if err := browserCleanupStopUserData(map[string]string{"connect-bin": connectBin}); err != nil {
+	exeDir := t.TempDir()
+	browserExecutablePathFn = func() (string, error) {
+		return writeBrowserBinaryFixture(t, exeDir), nil
+	}
+	writeBrowserRuntimeRecordFixture(t, connectBin)
+
+	if err := browserCleanupStopUserData(map[string]string{}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(targetProfileDir); !os.IsNotExist(err) {

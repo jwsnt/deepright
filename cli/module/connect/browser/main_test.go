@@ -218,6 +218,59 @@ func stubBrowserRuntime() func() {
 	}
 }
 
+func writeBrowserBinaryFixture(t *testing.T, dir string) string {
+	t.Helper()
+	path := filepath.Join(dir, "browser")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func writeBundledConnectBinFixture(t *testing.T, homeDir string, cfg map[string]string) (string, string) {
+	t.Helper()
+	bundleRoot := filepath.Join(t.TempDir(), "DeepRight.app")
+	macOSDir := filepath.Join(bundleRoot, "Contents", "MacOS")
+	runtimeDir := filepath.Join(runtimepaths.MacAppRuntimeBaseDir(homeDir, runtimepaths.DeepRightMacBundleIdentifier, runtimepaths.DeepRightAppName), "config")
+	if err := os.MkdirAll(macOSDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(runtimeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	connectBin := filepath.Join(macOSDir, "integration")
+	if err := os.WriteFile(connectBin, []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if cfg == nil {
+		cfg = map[string]string{}
+	}
+	payload, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtimePath := filepath.Join(runtimeDir, "config.json")
+	if err := os.WriteFile(runtimePath, append(payload, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return connectBin, runtimePath
+}
+
+func writeBrowserRuntimeRecordFixture(t *testing.T, connectBin string) string {
+	t.Helper()
+	if err := browserWriteRecordedConnectBin(connectBin); err != nil {
+		t.Fatal(err)
+	}
+	runtimeFilePath, err := browserRuntimeFilePath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return runtimeFilePath
+}
+
 func TestHelpOmitsLegacyWSLBootstrapDetails(t *testing.T) {
 	restore := stubBrowserRuntime()
 	defer restore()
@@ -261,25 +314,17 @@ func TestBrowserRuntimeRootUsesBundledRuntimePluginDir(t *testing.T) {
 	t.Setenv("HOME", homeDir)
 	t.Setenv("USERPROFILE", homeDir)
 
-	bundleRoot := filepath.Join(t.TempDir(), "DeepRight.app")
-	macOSDir := filepath.Join(bundleRoot, "Contents", "MacOS")
-	runtimeDir := filepath.Join(runtimepaths.MacAppRuntimeBaseDir(homeDir, runtimepaths.DeepRightMacBundleIdentifier, runtimepaths.DeepRightAppName), "config")
-	if err := os.MkdirAll(macOSDir, 0o755); err != nil {
-		t.Fatal(err)
+	exeDir := t.TempDir()
+	browserExecutablePathFn = func() (string, error) {
+		return writeBrowserBinaryFixture(t, exeDir), nil
 	}
-	if err := os.MkdirAll(runtimeDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	connectBin := filepath.Join(macOSDir, "integration")
-	if err := os.WriteFile(connectBin, []byte("fake"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	appDir := filepath.Dir(runtimeDir)
-	if err := os.WriteFile(filepath.Join(runtimeDir, "config.json"), []byte(fmt.Sprintf("{\"app-dir\":%q}\n", appDir)), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	appDir := filepath.Join(t.TempDir(), "runtime-app")
+	connectBin, _ := writeBundledConnectBinFixture(t, homeDir, map[string]string{
+		"app-dir": appDir,
+	})
+	writeBrowserRuntimeRecordFixture(t, connectBin)
 
-	root, browserPath, err := browserRuntimeRoot(map[string]string{"connect-bin": connectBin})
+	root, browserPath, err := browserRuntimeRoot(map[string]string{})
 	if err != nil {
 		t.Fatalf("browserRuntimeRoot() error = %v", err)
 	}
@@ -289,6 +334,173 @@ func TestBrowserRuntimeRootUsesBundledRuntimePluginDir(t *testing.T) {
 	}
 	if browserPath != filepath.Join(wantRoot, "browser") {
 		t.Fatalf("browser path = %q, want %q", browserPath, filepath.Join(wantRoot, "browser"))
+	}
+}
+
+func TestPluginStartWritesBrowserRuntimeRecordOnSuccess(t *testing.T) {
+	restore := stubBrowserRuntime()
+	defer restore()
+
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	t.Setenv("USERPROFILE", homeDir)
+
+	exeDir := t.TempDir()
+	browserExecutablePathFn = func() (string, error) {
+		return writeBrowserBinaryFixture(t, exeDir), nil
+	}
+	connectBin, _ := writeBundledConnectBinFixture(t, homeDir, map[string]string{
+		"app-dir": filepath.Join(t.TempDir(), "runtime-app"),
+	})
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	if code := runCLI([]string{"start", "--connect-bin", connectBin}, stdout, stderr); code != 0 {
+		t.Fatalf("start exit code = %d, stderr = %s", code, stderr.String())
+	}
+
+	recorded, ok, err := browserReadRecordedConnectBin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("expected browser runtime record to exist")
+	}
+	if recorded != connectBin {
+		t.Fatalf("recorded connect bin = %q, want %q", recorded, connectBin)
+	}
+}
+
+func TestPluginStartFailureDoesNotOverwriteBrowserRuntimeRecord(t *testing.T) {
+	restore := stubBrowserRuntime()
+	defer restore()
+
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	t.Setenv("USERPROFILE", homeDir)
+
+	exeDir := t.TempDir()
+	browserExecutablePathFn = func() (string, error) {
+		return writeBrowserBinaryFixture(t, exeDir), nil
+	}
+
+	oldConnectBin, _ := writeBundledConnectBinFixture(t, homeDir, map[string]string{
+		"app-dir": filepath.Join(t.TempDir(), "runtime-app"),
+	})
+	writeBrowserRuntimeRecordFixture(t, oldConnectBin)
+
+	newConnectBin := filepath.Join(t.TempDir(), "integration-new")
+	if err := os.WriteFile(newConnectBin, []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	playwrightStartFn = func(opts browserplaywrightsvc.Options, launchPrefix []string) (*browserplaywrightsvc.StartResult, error) {
+		return nil, errors.New("boom")
+	}
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	if code := runCLI([]string{"start", "--connect-bin", newConnectBin}, stdout, stderr); code == 0 {
+		t.Fatal("expected start to fail")
+	}
+
+	recorded, ok, err := browserReadRecordedConnectBin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("expected browser runtime record to remain")
+	}
+	if recorded != oldConnectBin {
+		t.Fatalf("recorded connect bin = %q, want %q", recorded, oldConnectBin)
+	}
+}
+
+func TestPluginStopRemovesBrowserRuntimeRecord(t *testing.T) {
+	restore := stubBrowserRuntime()
+	defer restore()
+
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	t.Setenv("USERPROFILE", homeDir)
+
+	exeDir := t.TempDir()
+	browserExecutablePathFn = func() (string, error) {
+		return writeBrowserBinaryFixture(t, exeDir), nil
+	}
+
+	connectBin, _ := writeBundledConnectBinFixture(t, homeDir, map[string]string{
+		"app-dir": filepath.Join(t.TempDir(), "runtime-app"),
+	})
+	runtimeFilePath := writeBrowserRuntimeRecordFixture(t, connectBin)
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	if code := runCLI([]string{"stop"}, stdout, stderr); code != 0 {
+		t.Fatalf("stop exit code = %d, stderr = %s", code, stderr.String())
+	}
+	if _, err := os.Stat(runtimeFilePath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("runtime record still exists, err = %v", err)
+	}
+}
+
+func TestPluginStopDoesNotFailWhenBrowserRuntimeRecordRemovalFails(t *testing.T) {
+	restore := stubBrowserRuntime()
+	defer restore()
+
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	t.Setenv("USERPROFILE", homeDir)
+
+	exeDir := t.TempDir()
+	browserExecutablePathFn = func() (string, error) {
+		return writeBrowserBinaryFixture(t, exeDir), nil
+	}
+
+	connectBin, _ := writeBundledConnectBinFixture(t, homeDir, map[string]string{
+		"app-dir": filepath.Join(t.TempDir(), "runtime-app"),
+	})
+	runtimeFilePath := writeBrowserRuntimeRecordFixture(t, connectBin)
+	browserRemoveAllFn = func(path string) error {
+		if path == runtimeFilePath {
+			return os.ErrPermission
+		}
+		return os.RemoveAll(path)
+	}
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	if code := runCLI([]string{"stop"}, stdout, stderr); code != 0 {
+		t.Fatalf("stop exit code = %d, stderr = %s", code, stderr.String())
+	}
+	if _, err := os.Stat(runtimeFilePath); err != nil {
+		t.Fatalf("runtime record stat error = %v", err)
+	}
+}
+
+func TestInstanceShutdownDoesNotRemoveBrowserRuntimeRecord(t *testing.T) {
+	restore := stubBrowserRuntime()
+	defer restore()
+
+	exeDir := t.TempDir()
+	browserExecutablePathFn = func() (string, error) {
+		return writeBrowserBinaryFixture(t, exeDir), nil
+	}
+	connectBin := filepath.Join(t.TempDir(), "integration")
+	if err := os.WriteFile(connectBin, []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runtimeFilePath := writeBrowserRuntimeRecordFixture(t, connectBin)
+	instanceDestroyFn = func(flags map[string]string) error {
+		return nil
+	}
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	if code := runInstanceCommand([]string{"shutdown"}, stdout, stderr); code != 0 {
+		t.Fatalf("shutdown exit code = %d, stderr = %s", code, stderr.String())
+	}
+	if _, err := os.Stat(runtimeFilePath); err != nil {
+		t.Fatalf("runtime record stat error = %v", err)
 	}
 }
 
@@ -302,6 +514,35 @@ func TestRunCLIRejectsTopLevelInitCommand(t *testing.T) {
 		t.Fatal("expected init to fail")
 	}
 	if !strings.Contains(stderr.String(), "unknown command: init") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestRunCLIFetchRejectsConnectBin(t *testing.T) {
+	restore := stubBrowserRuntime()
+	defer restore()
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	if code := runCLI([]string{"fetch", "--connect-bin", "/tmp/integration"}, stdout, stderr); code == 0 {
+		t.Fatal("expected fetch to reject --connect-bin")
+	}
+	if !strings.Contains(stderr.String(), "--connect-bin is only supported by `browser start`") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestRunCLIDirectCommandRejectsConnectBin(t *testing.T) {
+	restore := stubBrowserRuntime()
+	defer restore()
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	args := []string{"--connect-bin", "/tmp/integration", "--session", "agent-a@chat-1", "goto", "https://example.com"}
+	if code := runCLI(args, stdout, stderr); code == 0 {
+		t.Fatal("expected direct command to reject --connect-bin")
+	}
+	if !strings.Contains(stderr.String(), "--connect-bin is only supported by `browser start`") {
 		t.Fatalf("stderr = %q", stderr.String())
 	}
 }

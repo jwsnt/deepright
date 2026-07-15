@@ -92,3 +92,26 @@ func TestBrowserPrepareWSLChromeDefForStartCopiesFilteredWindowsUserData(t *test
 		t.Fatalf("expected lock removed, stat err=%v", err)
 	}
 }
+
+func TestBrowserResolveIntegrationStartBinaryUsesRecordedConnectBin(t *testing.T) {
+	restore := stubBrowserRuntime()
+	defer restore()
+
+	exeDir := t.TempDir()
+	browserExecutablePathFn = func() (string, error) {
+		return writeBrowserBinaryFixture(t, exeDir), nil
+	}
+	connectBin := filepath.Join(t.TempDir(), "integration")
+	if err := os.WriteFile(connectBin, []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeBrowserRuntimeRecordFixture(t, connectBin)
+
+	got, err := browserResolveIntegrationStartBinary(map[string]string{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != connectBin {
+		t.Fatalf("integration binary = %q, want %q", got, connectBin)
+	}
+}
