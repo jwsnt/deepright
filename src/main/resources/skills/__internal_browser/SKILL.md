@@ -4,7 +4,7 @@ description: 通过浏览器访问指定网站，模拟真实用户完成指定�
 ---
 
 ### 可执行文件
-#dir/plugins/browser
+#plugins_dir/browser
 + 当前agentId: #agentId
 + 当前chatId: #chat
 
@@ -30,7 +30,7 @@ browser --session #agentId@#chat eval 'document.body ? document.body.innerText.s
 + 超时时前等待重试，而不是立即切换命令或页面
 + 可以通过timeout或browser-timeout调整
 ```
-#dir/plugins/browser
+#plugins_dir/browser
     --session "#agentId@#chat" \
     --navigation-timeout 120000 \
     --browser-timeout 30s \

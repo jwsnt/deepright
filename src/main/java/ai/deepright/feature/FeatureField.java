@@ -68,6 +68,8 @@ public interface FeatureField {
 
     public static final String KEY_SOUL = "soul";
 
+    public static final String KEY_DIR = "dir";
+
     public static final String KEY_SYS = "sys";
 
     public static final String KEY_APP = "app";

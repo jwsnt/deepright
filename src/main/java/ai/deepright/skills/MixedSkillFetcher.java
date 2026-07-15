@@ -151,6 +151,7 @@ public class MixedSkillFetcher extends FileSystemFetcher {
 
     @Override
     protected String replaceContent(WorkflowTask workTask, String name, String path, String data) throws Exception {
+        data = this.updatePluginsDir(workTask, name, path, data);
         data = this.updateWorkspace(workTask, name, path, data);
         data = this.updateTerminal(workTask, name, path, data);
         data = this.updateProvider(workTask, name, path, data);
@@ -163,6 +164,10 @@ public class MixedSkillFetcher extends FileSystemFetcher {
         data = this.updateApp(workTask, name, path, data);
         data = this.updateDir(workTask, name, path, data);
         return data;
+    }
+
+    protected String updatePluginsDir(WorkflowTask workTask, String name, String path, String data) throws Exception {
+        return data.replace("#plugins_dir", FeatureUtils.buildPluginsDir(workTask));
     }
 
     protected String updateWorkspace(WorkflowTask workTask, String name, String path, String data) throws Exception {

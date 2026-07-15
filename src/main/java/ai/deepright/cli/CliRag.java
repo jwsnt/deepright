@@ -84,6 +84,7 @@ public class CliRag extends RagCondition implements RagService {
         this.updateUser(ragConfig, ragData);
         this.updateSys(ragConfig, ragData);
         this.updateApp(ragConfig, ragData);
+        this.updateDir(ragConfig, ragData);
         return new RagAtOnce(ragConfig);
     }
 
@@ -204,6 +205,17 @@ public class CliRag extends RagCondition implements RagService {
             String sys = FeatureUtils.buildSys(ragData.getQuery());
             WorkflowException.checkCondition(StringUtils.isEmpty(sys), "The cli sys can not be empty");
             RagService.updatePrompt(ragConfig, ragData, replace, sys);
+        }
+    }
+
+    protected void updateDir(RagConfig ragConfig, RagData ragData) throws Exception {
+        // 首次从App推导
+        if (ragData.getQuery().isEntry()) {
+            ragData.getQuery().putMetadata(FeatureField.KEY_DIR, StringUtils.defaultIfEmpty(Paths.get(StringUtils.defaultIfEmpty(FeatureUtils.buildApp(ragData.getQuery()), "")).getParent().toString(), ""));
+        }
+        String replace = MapUtils.getString(ragConfig.getGlobalConfig(), FeatureField.KEY_DIR);
+        if (!StringUtils.isEmpty(replace)) {
+            RagService.updatePrompt(ragConfig, ragData, replace, ragData.getQuery().getMetadata(FeatureField.KEY_DIR, String.class));
         }
     }
 
