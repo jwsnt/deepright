@@ -1,7 +1,5 @@
 package ai.deepright.feature;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
 import ai.deepright.router.RouterAgent;
 import ai.open.right.utils.JsonUtils;
 import ai.open.right.workflow.flow.WorkflowTask;
@@ -105,6 +103,14 @@ public class FeatureUtils {
         return MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_KNOWLEDGE_CONTENT);
     }
 
+    public static String buildPluginDir(Map<String, Object> metadata) throws Exception {
+        return MapUtils.getString(metadata, FeatureField.KEY_PLUGIN_DIR);
+    }
+
+    public static String buildPluginDir(WorkflowTask workTask) throws Exception {
+        return FeatureUtils.buildPluginDir(workTask.getMetadata());
+    }
+
     public static String buildTerminal(WorkflowTask workTask) throws Exception {
         return MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_TERMINAL);
     }
@@ -121,8 +127,13 @@ public class FeatureUtils {
         return MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_AGENTID);
     }
 
+    public static String buildUser(Map<String, Object> metadata) throws Exception {
+        return StringUtils.defaultIfEmpty(MapUtils.getString(metadata, FeatureField.KEY_USER), "");
+    }
+
+
     public static String buildUser(WorkflowTask workTask) throws Exception {
-        return StringUtils.defaultIfEmpty(MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_USER), "");
+        return FeatureUtils.buildUser(workTask.getMetadata());
     }
 
     public static String buildSoul(WorkflowTask workTask) throws Exception {

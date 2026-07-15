@@ -1395,6 +1395,7 @@ func TestProxyChatCompletionsKeepsBoolMetadataOnlyUnderMetadata(t *testing.T) {
 
 func TestIntegrationChatCompletionsInjectsSelectedAgentVersionAndSandbox(t *testing.T) {
 	disableIntegrationNotificationsForTest(t)
+	disableIntegrationManagedRuntimeForTest(t)
 	flushAgentCache()
 	oldwd, err := os.Getwd()
 	if err != nil {
@@ -1444,6 +1445,8 @@ func TestIntegrationChatCompletionsInjectsSelectedAgentVersionAndSandbox(t *test
 	if _, err := sandboxstate.SetWithDirectory(cronDB, "A", "chat-version", sandboxstate.ModeFilePickNet, "/Users/demo/Desktop"); err != nil {
 		t.Fatalf("set sandbox: %v", err)
 	}
+	pluginDir := filepath.Join(t.TempDir(), "plugins")
+	t.Setenv(integrationPluginDirEnv, pluginDir)
 
 	var capturedBody map[string]interface{}
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1464,7 +1467,7 @@ func TestIntegrationChatCompletionsInjectsSelectedAgentVersionAndSandbox(t *test
 	server := httptest.NewServer(http.HandlerFunc(handleChatCompletions(cfg, proxyClient)))
 	defer server.Close()
 
-	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"HELLO VERSION"}],"metadata":{"agentId":"A","chat":"chat-version","sandbox_path":"/tmp/forged"}}`
+	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"HELLO VERSION"}],"metadata":{"agentId":"A","chat":"chat-version","sandbox_path":"/tmp/forged","plugin_dir":"/tmp/old-plugin-dir","plugins_dir":"/tmp/forged-plugins-dir"}}`
 	req, _ := http.NewRequest(http.MethodPost, server.URL, strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 
@@ -1493,6 +1496,12 @@ func TestIntegrationChatCompletionsInjectsSelectedAgentVersionAndSandbox(t *test
 	}
 	if meta["sandbox_path"] != "/Users/demo/Desktop" {
 		t.Fatalf("metadata.sandbox_path = %#v, want /Users/demo/Desktop", meta["sandbox_path"])
+	}
+	if _, exists := meta["plugin_dir"]; exists {
+		t.Fatalf("metadata.plugin_dir should be absent: %#v", meta["plugin_dir"])
+	}
+	if meta["plugins_dir"] != pluginDir {
+		t.Fatalf("metadata.plugins_dir = %#v, want %s", meta["plugins_dir"], pluginDir)
 	}
 }
 
@@ -4232,6 +4241,41 @@ func TestIntegrationBundleRuntimeBaseDirUsesFixedAppSupportDirectory(t *testing.
 	want := integrationTestMacRuntimeBaseDir(home)
 	if got != want {
 		t.Fatalf("integrationBundleRuntimeBaseDir() = %q, want %q", got, want)
+	}
+}
+
+func TestLookupForwardedPluginsDirPrefersRuntimePluginsDirOverEnv(t *testing.T) {
+	bundleRoot := filepath.Join(t.TempDir(), "integration.app")
+	macOSDir := filepath.Join(bundleRoot, "Contents", "MacOS")
+	if err := os.MkdirAll(macOSDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	originalExecutable := integrationExecutableFn
+	originalHomeFn := integrationUserHomeFn
+	originalRuntimeGOOS := integrationRuntimeGOOS
+	defer func() {
+		integrationExecutableFn = originalExecutable
+		integrationUserHomeFn = originalHomeFn
+		integrationRuntimeGOOS = originalRuntimeGOOS
+	}()
+
+	runtimeHome := t.TempDir()
+	integrationExecutableFn = func() (string, error) {
+		return filepath.Join(macOSDir, "integration"), nil
+	}
+	integrationUserHomeFn = func() (string, error) { return runtimeHome, nil }
+	integrationRuntimeGOOS = "darwin"
+	t.Setenv(integrationRuntimeDirEnv, "")
+	t.Setenv(integrationPluginDirEnv, filepath.Join(bundleRoot, "Contents", "MacOS"))
+
+	got, ok := lookupForwardedPluginsDir()
+	if !ok {
+		t.Fatal("lookupForwardedPluginsDir() = not found, want runtime plugins dir")
+	}
+	want := filepath.Join(integrationTestMacRuntimeBaseDir(runtimeHome), "plugins")
+	if got != want {
+		t.Fatalf("lookupForwardedPluginsDir() = %q, want %q", got, want)
 	}
 }
 
@@ -8061,6 +8105,7 @@ func TestCliGetHeartbeatAndExecute(t *testing.T) {
 }
 
 func TestHeartbeatInjectsSandboxPathForCurrentPageSession(t *testing.T) {
+	disableIntegrationManagedRuntimeForTest(t)
 	oldwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("getwd: %v", err)
@@ -8070,6 +8115,8 @@ func TestHeartbeatInjectsSandboxPathForCurrentPageSession(t *testing.T) {
 		t.Fatalf("chdir: %v", err)
 	}
 	defer os.Chdir(oldwd)
+	pluginDir := filepath.Join(tmp, "plugins")
+	t.Setenv(integrationPluginDirEnv, pluginDir)
 
 	if cronDB != nil {
 		_ = cronDB.Close()
@@ -8132,6 +8179,12 @@ func TestHeartbeatInjectsSandboxPathForCurrentPageSession(t *testing.T) {
 	}
 	if meta["sandbox_path"] != "/Users/demo/Desktop" {
 		t.Fatalf("metadata.sandbox_path = %#v, want /Users/demo/Desktop", meta["sandbox_path"])
+	}
+	if _, exists := meta["plugin_dir"]; exists {
+		t.Fatalf("metadata.plugin_dir should be absent: %#v", meta["plugin_dir"])
+	}
+	if meta["plugins_dir"] != pluginDir {
+		t.Fatalf("metadata.plugins_dir = %#v, want %s", meta["plugins_dir"], pluginDir)
 	}
 }
 
@@ -10701,6 +10754,7 @@ func TestIntegrationConnectHTTPFlow(t *testing.T) {
 }
 
 func TestCronExecuteOnceInjectsMetaIDAndCronTypeIntoRequestMetadata(t *testing.T) {
+	disableIntegrationManagedRuntimeForTest(t)
 	oldwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("getwd: %v", err)
@@ -10710,6 +10764,8 @@ func TestCronExecuteOnceInjectsMetaIDAndCronTypeIntoRequestMetadata(t *testing.T
 		t.Fatalf("chdir: %v", err)
 	}
 	defer os.Chdir(oldwd)
+	pluginDir := filepath.Join(tmp, "plugins")
+	t.Setenv(integrationPluginDirEnv, pluginDir)
 
 	if cronDB != nil {
 		_ = cronDB.Close()
@@ -10835,6 +10891,12 @@ func TestCronExecuteOnceInjectsMetaIDAndCronTypeIntoRequestMetadata(t *testing.T
 	}
 	if metadata["sandbox_path"] != "/Users/demo/Documents/feishu" {
 		t.Fatalf("metadata sandbox_path = %v, want /Users/demo/Documents/feishu", metadata["sandbox_path"])
+	}
+	if _, exists := metadata["plugin_dir"]; exists {
+		t.Fatalf("metadata.plugin_dir should be absent: %v", metadata["plugin_dir"])
+	}
+	if metadata["plugins_dir"] != pluginDir {
+		t.Fatalf("metadata.plugins_dir = %v, want %s", metadata["plugins_dir"], pluginDir)
 	}
 	if metadata["META_ID"] != "12" {
 		t.Fatalf("metadata META_ID = %v, want 12", metadata["META_ID"])

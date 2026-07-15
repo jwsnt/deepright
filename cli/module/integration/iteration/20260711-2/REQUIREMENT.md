@@ -15,7 +15,17 @@
 + 所以设计/编译都需要遵守integration的二进制和CLI收口原则
 
 ### 需求介绍
-+
++ 所有转发/v1/chat/completions和cli/get时需要带上metadata.plugin_dir = $DEEPRIGHT_PLUGIN_DIR
++ $DEEPRIGHT_PLUGIN_DIR表示包含插件二进制文件的绝对路径
++ 包括备忘录和飞书、邮件
+```
+{
+    "metadata": {
+    ...
+    "plugin_dir": 绝对路径
+    }
+}
+```
 
 ### 编写代码
 + 以Golang编写以上代码，要求：

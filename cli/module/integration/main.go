@@ -1794,6 +1794,38 @@ func injectSandboxPathMetadata(metaMap map[string]interface{}, chatID string) {
 	}
 }
 
+func lookupForwardedPluginsDir() (string, bool) {
+	pluginDir := strings.TrimSpace(integrationRuntimePluginDir())
+	if pluginDir == "" {
+		pluginDir = strings.TrimSpace(os.Getenv(integrationPluginDirEnv))
+	}
+	if pluginDir == "" {
+		return "", false
+	}
+	if !filepath.IsAbs(pluginDir) {
+		absPath, err := filepath.Abs(pluginDir)
+		if err == nil {
+			pluginDir = absPath
+		}
+	}
+	pluginDir = filepath.Clean(strings.TrimSpace(pluginDir))
+	if pluginDir == "" {
+		return "", false
+	}
+	return pluginDir, true
+}
+
+func injectPluginsDirMetadata(metaMap map[string]interface{}) {
+	if metaMap == nil {
+		return
+	}
+	delete(metaMap, "plugin_dir")
+	delete(metaMap, "plugins_dir")
+	if pluginDir, ok := lookupForwardedPluginsDir(); ok {
+		metaMap["plugins_dir"] = pluginDir
+	}
+}
+
 func pruneForwardedKnowledgeCommit(metaMap map[string]interface{}) {
 	if metaMap == nil {
 		return
@@ -2064,6 +2096,7 @@ func heartbeat(client *http.Client, host string, metadata *AgentOutput, cfg *Con
 	currentChatID := resolveCurrentPageSessionChatID()
 	injectLastResponseMetadata(metaMap, currentChatID)
 	injectSandboxPathMetadata(metaMap, currentChatID)
+	injectPluginsDirMetadata(metaMap)
 	injectLiveAgentKnowledgeIntoAgentList(metaMap)
 	pruneForwardedKnowledgeCommit(metaMap)
 	reqBody, _ := json.Marshal(map[string]interface{}{
@@ -11644,6 +11677,7 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 		_, mergedChatID := requestChatContext(metaMap)
 		injectLastResponseMetadata(metaMap, mergedChatID)
 		injectSandboxPathMetadata(metaMap, mergedChatID)
+		injectPluginsDirMetadata(metaMap)
 		reqData["metadata"] = metaMap
 		syncForwardedChatRequestFlags(reqData, metaMap)
 
@@ -16775,6 +16809,7 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 		injectLiveAgentKnowledgeIntoAgentList(metaMap)
 		injectLastResponseMetadata(metaMap, chatID)
 		injectSandboxPathMetadata(metaMap, chatID)
+		injectPluginsDirMetadata(metaMap)
 		if routerRemote := readAgentRouterRemote(cfg.AgentDir, cfg.Device, t.AgentID, agentTTL); len(routerRemote) > 0 {
 			metaMap["router_remote"] = routerRemote
 		}

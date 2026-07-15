@@ -25,6 +25,8 @@ public interface FeatureField {
 
     public static final String KEY_FILE_SYSTEM = "file_system";
 
+    public static final String KEY_PLUGIN_DIR = "plugin_dir";
+
     public static final String KEY_CRON_TYPE = "cron_type";
 
     public static final String KEY_KNOWLEDGE = "knowledge";
@@ -67,8 +69,6 @@ public interface FeatureField {
     public static final String KEY_SOUL = "soul";
 
     public static final String KEY_SYS = "sys";
-
-    public static final String KEY_DIR = "dir";
 
     public static final String KEY_APP = "app";
 
