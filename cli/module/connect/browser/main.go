@@ -89,7 +89,9 @@ func runCLI(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintln(stderr, err.Error())
 			return 1
 		}
-		if err := instanceShutdownFn(normalizeSharedInstanceFlags(flags)); err != nil {
+		normalizedFlags := normalizeSharedInstanceFlags(flags)
+		browserLogInstanceShutdownRequest("top_level_shutdown_command", normalizedFlags, nil)
+		if err := instanceShutdownFn(normalizedFlags); err != nil {
 			fmt.Fprintln(stderr, err.Error())
 			return 1
 		}
@@ -264,14 +266,18 @@ func runInstanceCommand(args []string, stdout, stderr io.Writer) int {
 		connectsvc.WriteJSON(stdout, item)
 		return 0
 	case "stop":
-		if err := instanceShutdownFn(normalizeSharedInstanceFlags(flags)); err != nil {
+		normalizedFlags := normalizeSharedInstanceFlags(flags)
+		browserLogInstanceShutdownRequest("instance_stop_command", normalizedFlags, nil)
+		if err := instanceShutdownFn(normalizedFlags); err != nil {
 			fmt.Fprintln(stderr, err.Error())
 			return 1
 		}
 		fmt.Fprintln(stdout, "OK")
 		return 0
 	case "shutdown":
-		if err := browserInvokeInstanceShutdown(normalizeSharedInstanceFlags(flags)); err != nil {
+		normalizedFlags := normalizeSharedInstanceFlags(flags)
+		browserLogInstanceShutdownRequest("instance_shutdown_command", normalizedFlags, nil)
+		if err := browserInvokeInstanceShutdown(normalizedFlags); err != nil {
 			fmt.Fprintln(stderr, err.Error())
 			return 1
 		}
@@ -1060,7 +1066,7 @@ func printHelp(w io.Writer) {
 	fmt.Fprintln(w, "  - instance create prepares one managed --user-data-dir before launch")
 	fmt.Fprintln(w, "    using <agent workspace>/chrome_${port} on macOS/Linux and C:\\ProgramData\\deepright\\chrome_${suffix} on WSL")
 	fmt.Fprintln(w, "  - on WSL, browser resolves Chrome from browser meta chrome first, then falls back to /mnt/c/Program Files/Google/Chrome/Application/chrome.exe")
-	fmt.Fprintln(w, "  - on WSL, instance create/init call browser_launcher.sh beside the plugin and use browser_instance_wsl launch/reuse logic")
+	fmt.Fprintln(w, "  - on WSL, instance create/init use browser_launcher.sh beside the plugin for browser_instance_wsl launch/reuse logic; if the packaged plugin is missing that script, browser recreates it automatically before launch")
 	fmt.Fprintln(w, "  - on WSL, a fresh managed profile best-effort seeds from C:\\ProgramData\\deepright\\chrome_def; missing source or copy failures only write logs and fall back to an empty profile dir")
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "Shared Flags:")

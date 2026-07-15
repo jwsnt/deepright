@@ -363,6 +363,7 @@ func browserInitInstance(flags map[string]string) (browserInstanceRecord, error)
 			return browserInstanceRecord{}, err
 		}
 	}
+	browserLogInstanceShutdownRequest("instance_init_replace_existing", next, nil)
 	if err := browserInvokeInstanceShutdown(next); err != nil && !browserIsInstanceNotFoundError(err) {
 		return browserInstanceRecord{}, err
 	}
@@ -1129,13 +1130,18 @@ func browserGracefulStopPluginInstances(flags map[string]string) {
 		browserLogAsyncLifecycleEvent("browser_stop_instances", "list_error", nil, 0, err)
 		return
 	}
-	for _, item := range items {
-		nextFlags := browserFlagsWithoutIdentity(flags)
-		nextFlags["agentId"] = item.AgentID
-		nextFlags["chatId"] = item.ChatID
-		if err := browserInvokeInstanceShutdown(nextFlags); err != nil {
-			browserLogAsyncLifecycleEvent("browser_stop_instances", "shutdown_error", []string{item.AgentID, item.ChatID, strconv.Itoa(item.Port)}, item.PID, err)
-			continue
+		for _, item := range items {
+			nextFlags := browserFlagsWithoutIdentity(flags)
+			nextFlags["agentId"] = item.AgentID
+			nextFlags["chatId"] = item.ChatID
+			browserLogInstanceShutdownRequest("plugin_stop_cleanup", nextFlags, map[string]any{
+				"pid":  item.PID,
+				"port": item.Port,
+				"cdp":  item.CDP,
+			})
+			if err := browserInvokeInstanceShutdown(nextFlags); err != nil {
+				browserLogAsyncLifecycleEvent("browser_stop_instances", "shutdown_error", []string{item.AgentID, item.ChatID, strconv.Itoa(item.Port)}, item.PID, err)
+				continue
 		}
 		browserLogClosureEventFn("stop_shutdown", map[string]any{
 			"agentId": item.AgentID,
@@ -1153,6 +1159,28 @@ func browserInvokeInstanceShutdown(flags map[string]string) error {
 		return nil
 	}
 	return err
+}
+
+func browserLogInstanceShutdownRequest(reason string, flags map[string]string, extra map[string]any) {
+	next := browserNormalizeIdentityFlags(flags)
+	payload := map[string]any{
+		"event":     "browser_instance_shutdown_request",
+		"reason":    strings.TrimSpace(reason),
+		"timestamp": browserNowFn().Format(time.RFC3339Nano),
+	}
+	if session := strings.TrimSpace(next["session"]); session != "" {
+		payload["session"] = session
+	}
+	if agentID := firstNonEmptyBrowser(strings.TrimSpace(next["agentId"]), strings.TrimSpace(next["agent"])); agentID != "" {
+		payload["agentId"] = agentID
+	}
+	if chatID := firstNonEmptyBrowser(strings.TrimSpace(next["chatId"]), strings.TrimSpace(next["chat"])); chatID != "" {
+		payload["chatId"] = chatID
+	}
+	for key, value := range extra {
+		payload[key] = value
+	}
+	browserAppendLogJSON(payload)
 }
 
 func browserReleaseManagedInstance(item browserInstanceStateRecord) error {
@@ -2827,6 +2855,9 @@ func browserLogPluginDaemonEvent(command string, result *browserplaywrightsvc.St
 	}
 	if result.PID > 0 {
 		payload["pid"] = result.PID
+	}
+	if reason := strings.TrimSpace(result.Reason); reason != "" {
+		payload["reason"] = reason
 	}
 	browserAppendLogJSON(payload)
 }

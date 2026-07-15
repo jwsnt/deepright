@@ -137,6 +137,8 @@ func browserEventAction(event string) string {
 	switch strings.TrimSpace(event) {
 	case "browser_instance_close":
 		return "关闭了一个浏览器实例"
+	case "browser_instance_shutdown_request":
+		return "记录了浏览器实例关闭请求"
 	case "browser_instance_list":
 		return "查看了当前浏览器实例列表"
 	case "browser_plugin_daemon":

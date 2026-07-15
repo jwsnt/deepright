@@ -167,7 +167,7 @@ func StartDaemon(opts Options, launchPrefix []string) (*StartResult, error) {
 		}, nil
 	}
 	if waitForDaemonReady(normalized.Addr, 300*time.Millisecond) {
-		_ = forceStopDaemonByAddr(normalized.Addr)
+		_ = forceStopDaemonByAddr(normalized.StateDir, normalized.Addr)
 		time.Sleep(150 * time.Millisecond)
 	}
 
@@ -203,9 +203,14 @@ func StartDaemon(opts Options, launchPrefix []string) (*StartResult, error) {
 	_ = cmd.Process.Release()
 
 	if !waitForDaemonReady(normalized.Addr, normalized.BrowserTimeout) {
+		_ = writeDaemonShutdownReason(normalized.StateDir, "start_timeout_cleanup", pid, map[string]string{
+			"addr":    normalized.Addr,
+			"timeout": normalized.BrowserTimeout.String(),
+		})
 		_ = forceStopDaemonProcess(normalized.PIDFile)
 		return nil, fmt.Errorf("browser_playwright start timed out after %s waiting for daemon at %s", normalized.BrowserTimeout, normalized.Addr)
 	}
+	_ = clearDaemonShutdownReason(normalized.StateDir)
 	return &StartResult{
 		Status:  "started",
 		PID:     pid,
@@ -230,7 +235,7 @@ func daemonOwnedByCurrentRuntime(opts Options) bool {
 	return meta.PID == pid && strings.TrimSpace(meta.Addr) == strings.TrimSpace(opts.Addr)
 }
 
-func forceStopDaemonByAddr(addr string) error {
+func forceStopDaemonByAddr(stateDir, addr string) error {
 	addr = strings.TrimSpace(addr)
 	if addr == "" {
 		return nil
@@ -256,6 +261,9 @@ func forceStopDaemonByAddr(addr string) error {
 		if convErr != nil || pid <= 0 {
 			continue
 		}
+		_ = writeDaemonShutdownReason(stateDir, "replace_existing_daemon_for_addr_reuse", pid, map[string]string{
+			"addr": addr,
+		})
 		proc, findErr := os.FindProcess(pid)
 		if findErr != nil {
 			continue
@@ -283,28 +291,33 @@ func StopDaemon(opts Options) (*StartResult, error) {
 	pid, err := readPIDFile(normalized.PIDFile)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return &StartResult{Status: "stopped", PIDFile: normalized.PIDFile, LogFile: normalized.LogFile, Addr: normalized.Addr}, nil
+			return &StartResult{Status: "stopped", PIDFile: normalized.PIDFile, LogFile: normalized.LogFile, Addr: normalized.Addr, Reason: "already_stopped"}, nil
 		}
 		return nil, err
 	}
 	if !processAliveFn(pid) {
 		_ = os.Remove(normalized.PIDFile)
-		return &StartResult{Status: "stopped", PID: pid, PIDFile: normalized.PIDFile, LogFile: normalized.LogFile, Addr: normalized.Addr}, nil
+		return &StartResult{Status: "stopped", PID: pid, PIDFile: normalized.PIDFile, LogFile: normalized.LogFile, Addr: normalized.Addr, Reason: "stale_pid_file"}, nil
 	}
 	proc, err := os.FindProcess(pid)
 	if err != nil {
 		_ = os.Remove(normalized.PIDFile)
-		return &StartResult{Status: "stopped", PID: pid, PIDFile: normalized.PIDFile, LogFile: normalized.LogFile, Addr: normalized.Addr}, nil
+		return &StartResult{Status: "stopped", PID: pid, PIDFile: normalized.PIDFile, LogFile: normalized.LogFile, Addr: normalized.Addr, Reason: "process_lookup_failed_after_stop"}, nil
 	}
+	reason := "explicit_stop_command"
+	_ = writeDaemonShutdownReason(normalized.StateDir, reason, pid, map[string]string{
+		"addr": normalized.Addr,
+		"pid":  strconv.Itoa(pid),
+	})
 	_ = proc.Signal(syscall.SIGTERM)
 	if waitForProcessExit(pid, normalized.BrowserTimeout) {
 		_ = os.Remove(normalized.PIDFile)
-		return &StartResult{Status: "stopped", PID: pid, PIDFile: normalized.PIDFile, LogFile: normalized.LogFile, Addr: normalized.Addr}, nil
+		return &StartResult{Status: "stopped", PID: pid, PIDFile: normalized.PIDFile, LogFile: normalized.LogFile, Addr: normalized.Addr, Reason: reason}, nil
 	}
 	_ = proc.Signal(syscall.SIGKILL)
 	if waitForProcessExit(pid, 500*time.Millisecond) {
 		_ = os.Remove(normalized.PIDFile)
-		return &StartResult{Status: "stopped", PID: pid, PIDFile: normalized.PIDFile, LogFile: normalized.LogFile, Addr: normalized.Addr}, nil
+		return &StartResult{Status: "stopped", PID: pid, PIDFile: normalized.PIDFile, LogFile: normalized.LogFile, Addr: normalized.Addr, Reason: reason}, nil
 	}
 	return nil, fmt.Errorf("browser_playwright stop timed out after %s waiting for pid=%d", normalized.BrowserTimeout+500*time.Millisecond, pid)
 }
@@ -359,9 +372,27 @@ func ServeForeground(opts Options, stderr io.Writer) error {
 	defer stop()
 	go func() {
 		<-ctx.Done()
-		logger.Printf("用参数：进程=%d；原因=%v，做了：开始关闭浏览器后台服务", os.Getpid(), ctx.Err())
+		reasonText := "原因=signal_or_context_cancel_without_marker"
+		if reason, err := consumeDaemonShutdownReason(normalized.StateDir, os.Getpid()); err == nil {
+			if text := daemonShutdownReasonLogFields(reason); strings.TrimSpace(text) != "" {
+				reasonText = text
+			}
+		} else if !os.IsNotExist(err) {
+			reasonText = "原因=shutdown_reason_read_error；详情=" + err.Error()
+		}
+		activeSessions := svc.activeSessionNames()
+		svc.logDiagnostic(map[string]any{
+			"event":              "daemon_shutdown_signal",
+			"reason":             reasonText,
+			"context":            fmt.Sprint(ctx.Err()),
+			"pid":                os.Getpid(),
+			"ppid":               os.Getppid(),
+			"activeSessionCount": len(activeSessions),
+			"activeSessions":     activeSessions,
+		})
+		logger.Printf("用参数：进程=%d；%s；上下文=%v，做了：开始关闭浏览器后台服务", os.Getpid(), reasonText, ctx.Err())
 		if err := svc.shutdown(); err != nil {
-			logger.Printf("用参数：进程=%d；原因=%v，做了：关闭浏览器后台服务时清理资源失败", os.Getpid(), err)
+			logger.Printf("用参数：进程=%d；%s；错误=%v，做了：关闭浏览器后台服务时清理资源失败", os.Getpid(), reasonText, err)
 		}
 		_ = server.Shutdown(context.Background())
 	}()
@@ -868,6 +899,12 @@ func handleDaemonCommandTimeout(opts Options, command string) error {
 		threshold = defaultDaemonTimeoutKillThreshold
 	}
 	if count >= threshold {
+		pid, _ := readPIDFile(opts.PIDFile)
+		_ = writeDaemonShutdownReason(opts.StateDir, "command_timeout_threshold_reached", pid, map[string]string{
+			"command":   strings.TrimSpace(command),
+			"count":     strconv.Itoa(count),
+			"threshold": strconv.Itoa(threshold),
+		})
 		_ = forceStopDaemonProcessFn(opts.PIDFile)
 		_ = clearDaemonCommandTimeoutState(opts.StateDir)
 		return fmt.Errorf("browser_playwright %s timed out after %s; daemon stopped after %d consecutive timeouts", command, opts.BrowserTimeout, count)

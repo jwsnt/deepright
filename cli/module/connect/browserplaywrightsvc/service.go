@@ -179,14 +179,14 @@ func (d *daemonService) execute(req CommandRequest) (*CommandResult, error) {
 		return result, nil
 	case "close-all":
 		for name := range d.sessions {
-			_ = d.closeSession(name)
+			_ = d.closeSessionWithReason(name, "close_all_command")
 		}
 		result := &CommandResult{Command: req.Command, Message: "closed all sessions"}
 		d.logCommandDiagnostic("finish", sessionName, req, result, nil, time.Since(startedAt))
 		return result, nil
 	case "kill-all":
 		for name := range d.sessions {
-			_ = d.closeSession(name)
+			_ = d.closeSessionWithReason(name, "kill_all_command")
 		}
 		result := &CommandResult{Command: req.Command, Message: "killed all sessions"}
 		d.logCommandDiagnostic("finish", sessionName, req, result, nil, time.Since(startedAt))
@@ -221,7 +221,8 @@ func (d *daemonService) execute(req CommandRequest) (*CommandResult, error) {
 		return nil, err
 	}
 	if req.Command == "attach" || req.Command == "create" {
-		if err := d.closeSession(sessionName); err != nil {
+		closeReason := "session_replace_before_" + strings.TrimSpace(req.Command)
+		if err := d.closeSessionWithReason(sessionName, closeReason); err != nil {
 			d.logCommandDiagnostic("error", sessionName, req, nil, err, time.Since(startedAt))
 			return nil, err
 		}
@@ -681,9 +682,19 @@ func (d *daemonService) listSessions() ([]SessionSummary, error) {
 }
 
 func (d *daemonService) closeSession(name string) error {
+	return d.closeSessionWithReason(name, "unspecified")
+}
+
+func (d *daemonService) closeSessionWithReason(name, reason string) error {
 	name = sanitizeName(name)
 	sess := d.sessions[name]
 	if sess == nil {
+		d.logDiagnostic(map[string]any{
+			"event":   "session_close",
+			"stage":   "skip_missing",
+			"session": name,
+			"reason":  strings.TrimSpace(reason),
+		})
 		return nil
 	}
 	var err error
@@ -693,6 +704,22 @@ func (d *daemonService) closeSession(name string) error {
 		err = sess.context.Close()
 	}
 	delete(d.sessions, name)
+	fields := map[string]any{
+		"event":   "session_close",
+		"stage":   "finish",
+		"session": name,
+		"reason":  strings.TrimSpace(reason),
+	}
+	if sess.browser != nil {
+		fields["mode"] = "browser"
+	} else {
+		fields["mode"] = "context"
+	}
+	fields["remainingSessionCount"] = len(d.sessions)
+	if err != nil {
+		fields["error"] = err.Error()
+	}
+	d.logDiagnostic(fields)
 	return err
 }
 
@@ -702,7 +729,7 @@ func (d *daemonService) shutdown() error {
 
 	var shutdownErr error
 	for name := range d.sessions {
-		if err := d.closeSession(name); err != nil {
+		if err := d.closeSessionWithReason(name, "daemon_shutdown"); err != nil {
 			shutdownErr = errors.Join(shutdownErr, err)
 		}
 	}
@@ -713,6 +740,21 @@ func (d *daemonService) shutdown() error {
 		d.pw = nil
 	}
 	return shutdownErr
+}
+
+func (d *daemonService) activeSessionNames() []string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.activeSessionNamesLocked()
+}
+
+func (d *daemonService) activeSessionNamesLocked() []string {
+	names := make([]string, 0, len(d.sessions))
+	for name := range d.sessions {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 type persistedSession struct {

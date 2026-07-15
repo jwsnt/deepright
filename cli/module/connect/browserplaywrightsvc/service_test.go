@@ -515,8 +515,58 @@ func TestStopDaemonTreatsStalePIDFileAsStopped(t *testing.T) {
 	if result.Status != "stopped" {
 		t.Fatalf("status = %q, want stopped", result.Status)
 	}
+	if result.Reason != "stale_pid_file" {
+		t.Fatalf("reason = %q, want stale_pid_file", result.Reason)
+	}
 	if _, err := os.Stat(pidFile); !os.IsNotExist(err) {
 		t.Fatalf("pid file should be removed, stat err=%v", err)
+	}
+}
+
+func TestConsumeDaemonShutdownReasonRemovesMarkerFile(t *testing.T) {
+	stateDir := t.TempDir()
+	if err := writeDaemonShutdownReason(stateDir, "explicit_stop_command", 1001, map[string]string{
+		"addr": "127.0.0.1:18333",
+		"pid":  "1001",
+	}); err != nil {
+		t.Fatalf("write shutdown reason: %v", err)
+	}
+
+	item, err := consumeDaemonShutdownReason(stateDir, 1001)
+	if err != nil {
+		t.Fatalf("consume shutdown reason: %v", err)
+	}
+	if item.Reason != "explicit_stop_command" {
+		t.Fatalf("reason = %q, want explicit_stop_command", item.Reason)
+	}
+	if item.TargetPID != 1001 {
+		t.Fatalf("targetPid = %d, want 1001", item.TargetPID)
+	}
+	if item.RequestedByPID <= 0 {
+		t.Fatalf("requestedByPid = %d, want positive", item.RequestedByPID)
+	}
+	if item.Details["addr"] != "127.0.0.1:18333" {
+		t.Fatalf("addr detail = %q", item.Details["addr"])
+	}
+	if _, err := os.Stat(shutdownReasonPath(stateDir)); !os.IsNotExist(err) {
+		t.Fatalf("shutdown reason marker should be removed, stat err=%v", err)
+	}
+}
+
+func TestConsumeDaemonShutdownReasonSkipsMismatchedTargetPID(t *testing.T) {
+	stateDir := t.TempDir()
+	if err := writeDaemonShutdownReason(stateDir, "explicit_stop_command", 1001, map[string]string{
+		"addr": "127.0.0.1:18333",
+	}); err != nil {
+		t.Fatalf("write shutdown reason: %v", err)
+	}
+
+	_, err := consumeDaemonShutdownReason(stateDir, 2002)
+	if !os.IsNotExist(err) {
+		t.Fatalf("consume mismatch err = %v, want not exist", err)
+	}
+	if _, err := os.Stat(shutdownReasonPath(stateDir)); err != nil {
+		t.Fatalf("shutdown reason marker should remain for other pid, stat err=%v", err)
 	}
 }
 
@@ -600,6 +650,9 @@ func TestStopDaemonWaitsForProcessExit(t *testing.T) {
 	}
 	if result.Status != "stopped" {
 		t.Fatalf("status = %q, want stopped", result.Status)
+	}
+	if result.Reason != "explicit_stop_command" {
+		t.Fatalf("reason = %q, want explicit_stop_command", result.Reason)
 	}
 	select {
 	case <-done:

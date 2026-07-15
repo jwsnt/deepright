@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -80,6 +81,10 @@ func metaPath(stateDir string) string {
 
 func timeoutStatePath(stateDir string) string {
 	return filepath.Join(stateDir, "command_timeout_state.json")
+}
+
+func shutdownReasonPath(stateDir string) string {
+	return filepath.Join(stateDir, "shutdown_reason.json")
 }
 
 func executableRoot(explicit string) (string, error) {
@@ -166,6 +171,14 @@ type daemonMeta struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
+type daemonShutdownReason struct {
+	Reason         string            `json:"reason"`
+	TargetPID      int               `json:"targetPid,omitempty"`
+	RequestedAt    time.Time         `json:"requestedAt"`
+	RequestedByPID int               `json:"requestedByPid,omitempty"`
+	Details        map[string]string `json:"details,omitempty"`
+}
+
 func writeJSONFile(path string, value any) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
@@ -175,6 +188,84 @@ func writeJSONFile(path string, value any) error {
 		return err
 	}
 	return os.WriteFile(path, append(data, '\n'), 0o644)
+}
+
+func writeDaemonShutdownReason(stateDir, reason string, targetPID int, details map[string]string) error {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return nil
+	}
+	copied := map[string]string{}
+	for key, value := range details {
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		if key == "" || value == "" {
+			continue
+		}
+		copied[key] = value
+	}
+	if len(copied) == 0 {
+		copied = nil
+	}
+	return writeJSONFile(shutdownReasonPath(stateDir), daemonShutdownReason{
+		Reason:         reason,
+		TargetPID:      targetPID,
+		RequestedAt:    time.Now(),
+		RequestedByPID: os.Getpid(),
+		Details:        copied,
+	})
+}
+
+func consumeDaemonShutdownReason(stateDir string, currentPID int) (daemonShutdownReason, error) {
+	path := shutdownReasonPath(stateDir)
+	var item daemonShutdownReason
+	if err := readJSONFile(path, &item); err != nil {
+		return daemonShutdownReason{}, err
+	}
+	if item.TargetPID > 0 && currentPID > 0 && item.TargetPID != currentPID {
+		return daemonShutdownReason{}, os.ErrNotExist
+	}
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return daemonShutdownReason{}, err
+	}
+	return item, nil
+}
+
+func clearDaemonShutdownReason(stateDir string) error {
+	err := os.Remove(shutdownReasonPath(stateDir))
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+func daemonShutdownReasonLogFields(item daemonShutdownReason) string {
+	parts := []string{}
+	if reason := strings.TrimSpace(item.Reason); reason != "" {
+		parts = append(parts, "原因="+reason)
+	}
+	if item.RequestedByPID > 0 {
+		parts = append(parts, "来源进程="+strconv.Itoa(item.RequestedByPID))
+	}
+	if item.TargetPID > 0 {
+		parts = append(parts, "目标进程="+strconv.Itoa(item.TargetPID))
+	}
+	if !item.RequestedAt.IsZero() {
+		parts = append(parts, "请求时间="+item.RequestedAt.Format(time.RFC3339Nano))
+	}
+	if len(item.Details) > 0 {
+		keys := make([]string, 0, len(item.Details))
+		for key := range item.Details {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		detailParts := make([]string, 0, len(keys))
+		for _, key := range keys {
+			detailParts = append(detailParts, key+"="+item.Details[key])
+		}
+		parts = append(parts, "详情="+strings.Join(detailParts, ","))
+	}
+	return strings.Join(parts, "；")
 }
 
 func readJSONFile(path string, out any) error {

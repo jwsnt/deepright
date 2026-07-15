@@ -15,8 +15,30 @@ import (
 )
 
 const (
-	browserLauncherScriptName    = "browser_launcher.sh"
-	browserLauncherScriptTimeout = 45 * time.Second
+	browserLauncherScriptName     = "browser_launcher.sh"
+	browserLauncherScriptTimeout  = 45 * time.Second
+	browserEmbeddedLauncherScript = `#!/bin/sh
+
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+
+BROWSER_BIN="${DEEPRIGHT_BROWSER_BIN:-}"
+if [ -z "$BROWSER_BIN" ]; then
+  for candidate in "$SCRIPT_DIR/browser" "$SCRIPT_DIR/../browser"; do
+    if [ -x "$candidate" ]; then
+      BROWSER_BIN="$candidate"
+      break
+    fi
+  done
+fi
+
+if [ -z "$BROWSER_BIN" ]; then
+  printf '{"status":1,"message":"browser binary not found beside launcher"}\n'
+  exit 1
+fi
+
+exec "$BROWSER_BIN" __wsl-instance acquire "$@"`
 )
 
 type browserWSLLauncherResponse struct {
@@ -61,7 +83,14 @@ func browserResolveLauncherScriptPath(flags map[string]string) (string, error) {
 		}
 		return candidate, nil
 	}
-	return "", fmt.Errorf("browser launcher script not found: %s", filepath.Join(root, browserLauncherScriptName))
+	materialized := filepath.Join(root, browserLauncherScriptName)
+	if err := browserWriteFileFn(materialized, []byte(browserEmbeddedLauncherScript+"\n"), 0o755); err != nil {
+		return "", fmt.Errorf("browser launcher script not found and could not be recreated: %w", err)
+	}
+	if absPath, absErr := filepath.Abs(materialized); absErr == nil {
+		return absPath, nil
+	}
+	return materialized, nil
 }
 
 func browserRunWSLLauncher(flags map[string]string, agentID, chatID string, headless bool, chromePath string) (browserWSLLauncherRunResult, error) {
@@ -101,6 +130,12 @@ func browserRunWSLLauncher(flags map[string]string, agentID, chatID string, head
 	stderr := &bytes.Buffer{}
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
+	cmd.Env = os.Environ()
+	if root, _, rootErr := browserRuntimeRoot(flags); rootErr == nil {
+		if browserBin := browserResolveLauncherBinaryPath(root); browserBin != "" {
+			cmd.Env = append(cmd.Env, "DEEPRIGHT_BROWSER_BIN="+browserBin)
+		}
+	}
 
 	runErr := cmd.Run()
 	stdoutText := strings.TrimSpace(stdout.String())
@@ -179,6 +214,29 @@ func browserRunWSLLauncher(flags map[string]string, agentID, chatID string, head
 		Stdout:   stdoutText,
 		Stderr:   stderrText,
 	}, nil
+}
+
+func browserResolveLauncherBinaryPath(root string) string {
+	root = strings.TrimSpace(root)
+	if root == "" {
+		return ""
+	}
+	for _, candidate := range []string{
+		filepath.Join(root, "browser"),
+		filepath.Join(root, "browser.exe"),
+		filepath.Join(root, "..", "browser"),
+		filepath.Join(root, "..", "browser.exe"),
+	} {
+		info, err := os.Stat(candidate)
+		if err != nil || info.IsDir() {
+			continue
+		}
+		if absPath, absErr := filepath.Abs(candidate); absErr == nil {
+			return absPath
+		}
+		return candidate
+	}
+	return ""
 }
 
 func browserAcquireWSLManagedInstanceWithLauncher(flags map[string]string, agentID, chatID string, headless bool, chromePath string) (browserWSLInstanceRecord, error) {

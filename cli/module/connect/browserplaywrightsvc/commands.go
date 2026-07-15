@@ -108,7 +108,7 @@ func (d *daemonService) cmdReload(name string, sess *liveSession, req CommandReq
 }
 
 func (d *daemonService) cmdClose(name string) (*CommandResult, error) {
-	if err := d.closeSession(name); err != nil {
+	if err := d.closeSessionWithReason(name, "close_command"); err != nil {
 		return nil, err
 	}
 	return &CommandResult{Session: name, Command: "close", Message: "session closed"}, nil

@@ -5,7 +5,6 @@ import ai.open.right.netty.NettyAlarm;
 import ai.open.right.netty.NettyCloser;
 import ai.open.right.netty.NettyWriter;
 import ai.open.right.netty.chat.server.http.NettyHttpHandler;
-import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.workflow.flow.file.impl.SysStore;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;

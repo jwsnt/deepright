@@ -47,6 +47,7 @@ type StartResult struct {
 	PIDFile string `json:"pidFile,omitempty"`
 	LogFile string `json:"logFile,omitempty"`
 	Addr    string `json:"addr,omitempty"`
+	Reason  string `json:"reason,omitempty"`
 }
 
 type NameInfo struct {
