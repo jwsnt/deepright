@@ -696,11 +696,13 @@ func TestBrowserInitInstanceUsesWindowsStyleWSLUserDataDir(t *testing.T) {
 		t.Fatal(err)
 	}
 	launcherArgsPath := filepath.Join(pluginDir, "launcher.args")
+	launcherForceRecreatePath := filepath.Join(pluginDir, "launcher.force-recreate")
 	launcherPath := filepath.Join(pluginDir, "browser_launcher.sh")
 	launcherScript := fmt.Sprintf(`#!/bin/bash
 printf '%%s\n' "$@" > %q
+printf '%%s\n' "$DEEPRIGHT_BROWSER_WSL_FORCE_RECREATE" > %q
 printf '%%s\n' '{"status":0,"pid":9003,"port":23092,"ws":"ws://127.0.0.1:23092/devtools/browser/test","http":"http://localhost:23092","user-data-dir":"C:\\ProgramData\\deepright\\chrome_xy99","message":""}'
-`, launcherArgsPath)
+`, launcherArgsPath, launcherForceRecreatePath)
 	if err := os.WriteFile(launcherPath, []byte(launcherScript), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -752,6 +754,13 @@ printf '%%s\n' '{"status":0,"pid":9003,"port":23092,"ws":"ws://127.0.0.1:23092/d
 	wantArgs := []string{"--agentId", "agent-a", "--chatId", "chat-001", "--headless", "false", "--chrome", chromePath}
 	if strings.Join(gotArgs, ",") != strings.Join(wantArgs, ",") {
 		t.Fatalf("launcher args = %v, want %v", gotArgs, wantArgs)
+	}
+	forceRecreateData, err := os.ReadFile(launcherForceRecreatePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(forceRecreateData)) != "1" {
+		t.Fatalf("force recreate environment = %q, want 1", forceRecreateData)
 	}
 	got, err := browserGetInstance(map[string]string{
 		"state":   statePath,

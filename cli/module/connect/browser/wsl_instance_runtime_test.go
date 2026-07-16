@@ -19,7 +19,7 @@ func TestBrowserWSLInstanceSeedReservedProfileDirSeedsFromChromeDef(t *testing.T
 	for rel, body := range map[string]string{
 		filepath.Join("Default", "Preferences"):                            "{}",
 		filepath.Join("Default", "Local Storage", "leveldb", "000003.log"): "keep",
-		filepath.Join("Default", "Network", "Cache", "index"):              "skip",
+		filepath.Join("Default", "Network", "Cache", "index"):              "keep",
 		"SingletonLock": "lock",
 	} {
 		path := filepath.Join(sourceDir, rel)
@@ -49,7 +49,7 @@ func TestBrowserWSLInstanceSeedReservedProfileDirSeedsFromChromeDef(t *testing.T
 		if path != profileWin {
 			t.Fatalf("cleanup path = %q, want %q", path, profileWin)
 		}
-		return browserCleanupClonedChromeUserDataForOS(profileDir, "windows")
+		return os.RemoveAll(filepath.Join(profileDir, "SingletonLock"))
 	}
 
 	if err := browserWSLInstanceSeedReservedProfileDir(profileWin, profileDir); err != nil {
@@ -64,8 +64,8 @@ func TestBrowserWSLInstanceSeedReservedProfileDirSeedsFromChromeDef(t *testing.T
 	if _, err := os.Stat(filepath.Join(profileDir, "Default", "Local Storage", "leveldb", "000003.log")); err != nil {
 		t.Fatalf("expected copied login data: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(profileDir, "Default", "Network", "Cache", "index")); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("expected volatile cache to be skipped, err=%v", err)
+	if _, err := os.Stat(filepath.Join(profileDir, "Default", "Network", "Cache", "index")); err != nil {
+		t.Fatalf("expected Network directory to be copied, err=%v", err)
 	}
 	if _, err := os.Stat(filepath.Join(profileDir, "SingletonLock")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("expected lock file cleanup, err=%v", err)

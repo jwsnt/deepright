@@ -14,10 +14,8 @@ const (
 )
 
 var (
-	browserPrepareWSLChromeDefForStartFn     = browserPrepareWSLChromeDefForStart
-	browserRestartIntegrationAfterWSLStartFn = browserRestartIntegrationAfterWSLStart
-	browserWSLCommandCombinedOutputFn        = browserRunWSLCommandCombinedOutput
-	browserWSLIntegrationStartFn             = browserRunIntegrationStart
+	browserPrepareWSLChromeDefForStartFn = browserPrepareWSLChromeDefForStart
+	browserWSLCommandCombinedOutputFn    = browserRunWSLCommandCombinedOutput
 )
 
 func browserPrepareWSLChromeDefForStart(flags map[string]string) (bool, error) {
@@ -76,7 +74,7 @@ func browserPrepareWSLChromeDefForStart(flags map[string]string) (bool, error) {
 		"targetDir": targetWin,
 	}, nil)
 
-	copyStats, err := browserCopyDirectoryWithProgress(
+	copyStats, err := browserCopyWSLChromeUserDataWithProgress(
 		sourceUnix,
 		targetUnix,
 		browserInstanceUserDataProgressTracer("browser_start_wsl_chrome_def.copy.progress", map[string]any{
@@ -118,25 +116,6 @@ func browserPrepareWSLChromeDefForStart(flags map[string]string) (bool, error) {
 		"bytes":      copyStats.Bytes,
 	}, nil)
 	return true, nil
-}
-
-func browserRestartIntegrationAfterWSLStart(flags map[string]string) error {
-	isWSL, err := browserWSLDetectFn()
-	if err != nil {
-		browserLogWSLLifecycleEvent("browser_start_wsl_integration", "detect_error", nil, err)
-		return err
-	}
-	if !isWSL {
-		return nil
-	}
-
-	browserLogWSLLifecycleEvent("browser_start_wsl_integration", "begin", nil, nil)
-	if err := browserWSLIntegrationStartFn(flags); err != nil {
-		browserLogWSLLifecycleEvent("browser_start_wsl_integration", "restart_error", nil, err)
-		return err
-	}
-	browserLogWSLLifecycleEvent("browser_start_wsl_integration", "ready", nil, nil)
-	return nil
 }
 
 func browserTerminateAllWSLChromeProcesses() (int, error) {
@@ -229,50 +208,6 @@ func browserResolveWSLChromeDefTargetDir() (string, string, error) {
 		return "", "", err
 	}
 	return browserWSLChromeDefRoot, strings.TrimSpace(unixPath), nil
-}
-
-func browserRunIntegrationStart(flags map[string]string) error {
-	exe, err := browserResolveIntegrationStartBinary(flags)
-	if err != nil {
-		return err
-	}
-	cmd := exec.Command(exe, "start")
-	cmd.Dir = filepath.Dir(exe)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		message := strings.TrimSpace(strings.ReplaceAll(string(output), "\r", ""))
-		if message == "" {
-			return fmt.Errorf("run integration start failed: %w", err)
-		}
-		return fmt.Errorf("run integration start failed: %w: %s", err, message)
-	}
-	return nil
-}
-
-func browserResolveIntegrationStartBinary(flags map[string]string) (string, error) {
-	if connectBin, ok, err := browserReadRecordedConnectBin(); err != nil {
-		return "", err
-	} else if ok {
-		return connectBin, nil
-	}
-
-	browserPath, err := browserExecutablePathFn()
-	if err != nil {
-		return "", err
-	}
-	if absPath, absErr := filepath.Abs(browserPath); absErr == nil {
-		browserPath = absPath
-	}
-
-	for _, candidate := range []string{
-		filepath.Join(filepath.Dir(browserPath), "..", "integration"),
-		filepath.Join(filepath.Dir(browserPath), "integration"),
-	} {
-		if resolved, ensureErr := browserEnsureExecutablePath(candidate); ensureErr == nil {
-			return resolved, nil
-		}
-	}
-	return "", errors.New("integration binary not found; start browser with --connect-bin first or run beside integration")
 }
 
 func browserRunWSLCommandCombinedOutput(name string, args ...string) ([]byte, error) {

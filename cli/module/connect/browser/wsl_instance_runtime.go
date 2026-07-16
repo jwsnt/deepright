@@ -55,7 +55,7 @@ type browserWSLInstanceVersion struct {
 
 var (
 	browserWSLInstanceLookupRecordFn  = browserWSLInstanceLookupRecord
-	browserWSLInstanceCopyDirectoryFn = browserCopyDirectoryWithProgress
+	browserWSLInstanceCopyDirectoryFn = browserCopyWSLChromeUserDataWithProgress
 )
 
 func browserWSLInstanceCommand(args []string) int {
@@ -70,9 +70,10 @@ func browserWSLInstanceCommand(args []string) int {
 	agentID := strings.TrimSpace(connectsvc.FirstValue(flags, "agentId", "agent"))
 	chatID := strings.TrimSpace(connectsvc.FirstValue(flags, "chatId", "chat"))
 	headless := connectsvc.BoolValue(flags, "headless", true)
+	forceRecreate := browserWSLForceRecreateRequested()
 	chromePath := strings.TrimSpace(connectsvc.FirstValue(flags, "chrome"))
 
-	record, err := browserWSLInstanceAcquire(agentID, chatID, headless, chromePath)
+	record, err := browserWSLInstanceAcquire(agentID, chatID, headless, forceRecreate, chromePath)
 	if err != nil {
 		return browserWSLInstanceWriteFailure(err)
 	}
@@ -87,6 +88,15 @@ func browserWSLInstanceCommand(args []string) int {
 	return 0
 }
 
+func browserWSLForceRecreateRequested() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(browserWSLForceRecreateEnv))) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
 func browserWSLInstanceWriteFailure(err error) int {
 	message := "unknown error"
 	if err != nil && strings.TrimSpace(err.Error()) != "" {
@@ -99,7 +109,7 @@ func browserWSLInstanceWriteFailure(err error) int {
 	return 1
 }
 
-func browserWSLInstanceAcquire(agentID, chatID string, headless bool, chromePath string) (browserWSLInstanceRecord, error) {
+func browserWSLInstanceAcquire(agentID, chatID string, headless, forceRecreate bool, chromePath string) (browserWSLInstanceRecord, error) {
 	if ok, err := browserWSLDetectFn(); err != nil {
 		return browserWSLInstanceRecord{}, err
 	} else if !ok {
@@ -131,22 +141,38 @@ func browserWSLInstanceAcquire(agentID, chatID string, headless bool, chromePath
 		return browserWSLInstanceRecord{}, err
 	}
 	if found {
-		liveRecord, live, probeErr := browserWSLInstanceProbeRecord(existing)
-		if probeErr == nil && live {
-			if err := browserWSLInstanceUpsertRecord(db, liveRecord); err != nil {
+		if forceRecreate {
+			if err := browserWSLInstanceStopForRecreate(existing); err != nil {
 				return browserWSLInstanceRecord{}, err
 			}
-			return liveRecord, nil
-		}
-		reusedRecord, reused, reuseErr := browserWSLInstanceRestartStaleRecord(agentID, chatID, existing, headless, chromePath)
-		if reuseErr == nil && reused {
-			if err := browserWSLInstanceUpsertRecord(db, reusedRecord); err != nil {
+			recreatedRecord, recreated, recreateErr := browserWSLInstanceRestartStaleRecord(agentID, chatID, existing, headless, chromePath)
+			if recreateErr == nil && recreated {
+				if err := browserWSLInstanceUpsertRecord(db, recreatedRecord); err != nil {
+					return browserWSLInstanceRecord{}, err
+				}
+				return recreatedRecord, nil
+			}
+			if err := browserWSLInstanceDeleteRecord(db, agentID, chatID); err != nil {
 				return browserWSLInstanceRecord{}, err
 			}
-			return reusedRecord, nil
-		}
-		if err := browserWSLInstanceDeleteRecord(db, agentID, chatID); err != nil {
-			return browserWSLInstanceRecord{}, err
+		} else {
+			liveRecord, live, probeErr := browserWSLInstanceProbeRecord(existing)
+			if probeErr == nil && live {
+				if err := browserWSLInstanceUpsertRecord(db, liveRecord); err != nil {
+					return browserWSLInstanceRecord{}, err
+				}
+				return liveRecord, nil
+			}
+			reusedRecord, reused, reuseErr := browserWSLInstanceRestartStaleRecord(agentID, chatID, existing, headless, chromePath)
+			if reuseErr == nil && reused {
+				if err := browserWSLInstanceUpsertRecord(db, reusedRecord); err != nil {
+					return browserWSLInstanceRecord{}, err
+				}
+				return reusedRecord, nil
+			}
+			if err := browserWSLInstanceDeleteRecord(db, agentID, chatID); err != nil {
+				return browserWSLInstanceRecord{}, err
+			}
 		}
 	}
 
@@ -170,6 +196,16 @@ func browserWSLInstanceAcquire(agentID, chatID string, headless bool, chromePath
 		return browserWSLInstanceRecord{}, err
 	}
 	return record, nil
+}
+
+func browserWSLInstanceStopForRecreate(item browserWSLInstanceRecord) error {
+	if item.Port <= 0 {
+		return nil
+	}
+	if pid, found := browserWSLInstanceLookupPIDByPort(item.Port); found {
+		return browserWSLTerminateProcessFn(pid, item.Port)
+	}
+	return browserWSLInstanceWaitForPortRelease(item.Port, 5*time.Second)
 }
 
 func browserWSLInstanceLookupUserDataDir(agentID, chatID string) (string, bool) {

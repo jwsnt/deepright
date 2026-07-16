@@ -27,6 +27,8 @@ func TestBrowserPrepareWSLChromeDefForStartCopiesFilteredWindowsUserData(t *test
 
 	writeFile("Default/WebStorage/keep.txt", "keep")
 	writeFile("Default/Cache/remove.txt", "remove")
+	writeFile("Default/Network/Cookies", "keep")
+	writeFile("Default/Network/Cache/index", "keep")
 	writeFile("Default/Service Worker/CacheStorage/remove.txt", "remove")
 	writeFile("SingletonLock", "locked")
 
@@ -65,7 +67,7 @@ func TestBrowserPrepareWSLChromeDefForStartCopiesFilteredWindowsUserData(t *test
 		if profileDir != browserWSLChromeDefRoot {
 			t.Fatalf("cleanup profile dir = %q, want %q", profileDir, browserWSLChromeDefRoot)
 		}
-		return browserCleanupClonedChromeUserDataForOS(targetUnix, "windows")
+		return os.RemoveAll(filepath.Join(targetUnix, "SingletonLock"))
 	}
 
 	ok, err := browserPrepareWSLChromeDefForStart(nil)
@@ -85,33 +87,40 @@ func TestBrowserPrepareWSLChromeDefForStartCopiesFilteredWindowsUserData(t *test
 	if _, err := os.Stat(filepath.Join(targetUnix, "Default", "Cache", "remove.txt")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("expected cache file removed, stat err=%v", err)
 	}
-	if _, err := os.Stat(filepath.Join(targetUnix, "Default", "Service Worker", "CacheStorage", "remove.txt")); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("expected CacheStorage removed, stat err=%v", err)
+	for _, rel := range []string{
+		filepath.Join("Default", "Network", "Cookies"),
+		filepath.Join("Default", "Network", "Cache", "index"),
+		filepath.Join("Default", "Service Worker", "CacheStorage", "remove.txt"),
+	} {
+		if _, err := os.Stat(filepath.Join(targetUnix, rel)); err != nil {
+			t.Fatalf("expected preserved login-state file %q: %v", rel, err)
+		}
 	}
 	if _, err := os.Stat(filepath.Join(targetUnix, "SingletonLock")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("expected lock removed, stat err=%v", err)
 	}
 }
 
-func TestBrowserResolveIntegrationStartBinaryUsesRecordedConnectBin(t *testing.T) {
-	restore := stubBrowserRuntime()
-	defer restore()
-
-	exeDir := t.TempDir()
-	browserExecutablePathFn = func() (string, error) {
-		return writeBrowserBinaryFixture(t, exeDir), nil
+func TestBrowserShouldSkipWSLChromeUserDataPathPreservesLoginState(t *testing.T) {
+	paths := []string{
+		filepath.Join("Default", "Network", "Cookies"),
+		filepath.Join("Default", "Network", "Cache", "index"),
+		filepath.Join("Default", "Login Data"),
+		filepath.Join("Default", "Login Data For Account"),
+		filepath.Join("Default", "Web Data"),
+		filepath.Join("Default", "Local Storage", "leveldb", "000003.log"),
+		filepath.Join("Default", "Session Storage", "000003.log"),
+		filepath.Join("Default", "IndexedDB", "https_example.com_0.indexeddb.leveldb", "000003.log"),
+		filepath.Join("Default", "WebStorage", "keep"),
+		filepath.Join("Default", "Service Worker", "CacheStorage", "keep"),
+		filepath.Join("Profile 1", "Network", "Cookies"),
 	}
-	connectBin := filepath.Join(t.TempDir(), "integration")
-	if err := os.WriteFile(connectBin, []byte("fake"), 0o755); err != nil {
-		t.Fatal(err)
+	for _, path := range paths {
+		if skip, reason := browserShouldSkipWSLChromeUserDataPath(path); skip {
+			t.Fatalf("WSL copy skipped login-state path %q: %s", path, reason)
+		}
 	}
-	writeBrowserRuntimeRecordFixture(t, connectBin)
-
-	got, err := browserResolveIntegrationStartBinary(map[string]string{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got != connectBin {
-		t.Fatalf("integration binary = %q, want %q", got, connectBin)
+	if skip, _ := browserShouldSkipWSLChromeUserDataPath(filepath.Join("Default", "Cache", "data")); !skip {
+		t.Fatal("WSL copy should still skip the Chrome cache directory")
 	}
 }

@@ -12,6 +12,9 @@
   "knowledge": {
     "interval": 60
   },
+  "browser": {
+    "init_timeout": 300
+  },
   "install_app": {
     "mac": [
       "python3",

@@ -30,7 +30,7 @@
 
 - `help` 会输出 `create / init / restart / stop / shutdown / list / get` 的完整使用手册
 - 手册会明确说明 Windows WSL / WSL2 下，`create` / `init` 的受管实例目录固定落在 `C:\ProgramData\deepright\chrome_<随机后缀>`
-- 手册会明确说明 Windows WSL / WSL2 下，`stop` 在原流程结束后会继续并发清理 `C:\ProgramData\deepright` 下全部 `chrome*` 目录
+- 手册会明确说明 Windows WSL / WSL2 下，`stop` 只会关闭指定实例，不会清理其他受管 profile 目录
 - `help` 只负责说明命令行为，不会修改实例状态
 
 ## create
@@ -73,16 +73,18 @@
 行为：
 
 - 必须显式传入 `--agentId` 和 `--chatId`
-- 会先执行一次 `instance get`
-- 只有在 `instance get` 确认该 CDP 已存在且可用时，才会继续执行一次 `destroy`
-- 如果实例原本不存在，会直接继续创建，不因为 `instance not found` 中断
+- 会先查询该实例，并执行一次 `instance shutdown` 尝试关闭旧 CDP 和旧 Chrome
+- 如果实例原本不存在或已被手动关闭，仍会继续创建，不会因为 `instance not found` 中断
 - 然后按与 `create` 完全一致的 `chrome`、端口、`user-data-dir` 解析规则重新创建实例
 - `user-data-dir` 如果已存在则直接复用；如果不存在才按 `create` 的复制逻辑准备
 - `init` 强制使用有头模式；在 Windows WSL / WSL2 下会调用 `browser_launcher.sh`，并走 `browser_instance_wsl` 的有头获取逻辑
-- 创建过程会先等新的 CDP 可用；在 macOS 和 Windows WSL / WSL2 下会继续阻塞到该 Chrome/CDP 退出，在 Linux 原生环境下则会在 ready 后立即返回
+- 创建过程会等待新的 CDP 可用后返回；不会复用旧的存活 CDP
 - 后续在 `get` / `list` / `create` / `restart` 重载状态时，会自动清理已经退出的 Chrome/CDP 状态
 - 非 WSL 的同步启动会使用 `--remote-debugging-address=0.0.0.0`
 - 在 Windows WSL / WSL2 里，脚本会负责启动 `browser_instance_wsl`，并把其返回的 `user-data-dir` 映射到原有 CLI 的 `profileDir`
+- `init` 会强制重建同一 `agentId + chatId` 的 CDP，并以有头模式启动；`create` 才会复用可用的已有 CDP
+- WSL 的启动等待上限读取 integration 的 `config.json`：`browser.init_timeout`（单位：秒）；默认配置为 `300`
+- 通过集成页面初始化时，新的有头 Chrome 实际启动成功后才会显示“完成”按钮；点击按钮会调用 `instance shutdown`
 
 ## stop
 
@@ -95,9 +97,7 @@
 - 必须显式传入 `--agentId` 和 `--chatId`
 - 会直接强制结束指定实例对应的 Chrome 进程
 - 成功关闭后会删除该实例对应的状态记录
-- 在 Windows WSL / WSL2 下，会在原有 stop 流程结束后，并发删除 `C:\ProgramData\deepright` 下全部 `chrome*` 目录，包括 `chrome_def`
-- 每个目录的删除成功和失败都会写入 `browser.log`
-- 任意目录删除失败都不会阻断命令返回
+- 在 Windows WSL / WSL2 下，不会额外删除 `chrome_def` 或任何其他 `chrome_*` 目录
 - 成功时输出 `OK`
 
 ## shutdown
@@ -112,6 +112,7 @@
 - 会直接强制结束对应 Chrome 进程
 - 在 Windows WSL / WSL2 下，会额外在 Windows 宿主机侧执行 `Stop-Process -Id <pid> -Force` 并确认端口释放
 - 关闭失败会写 `browser.log`，同时命令直接返回错误
+- Windows WSL / WSL2 下，如果有头 Chrome 已被手动关闭，仍会完成状态清理并返回 `OK`
 - 在 Windows WSL / WSL2 下，`shutdown` 不会删除 `chrome_*` 目录
 - 如果删除后 `browser_instance.json` 已经没有任何实例记录，则会一并删除这个文件
 - 不传 `--agentId` / `--chatId` 时，会兼容清理旧版本遗留的固定端口 CDP；如果它已经不存在，则默认成功
@@ -157,6 +158,6 @@
 
 ## WSL2 说明
 
-`browser_instance create` / `browser_instance init` 在 Windows WSL2 下，会通过 `browser_instance_wsl` 返回真实的 `profileDir`，并统一落在 `C:\ProgramData\deepright\chrome_<随机后缀>`。
+`browser_instance create` / `browser_instance init` 在 Windows WSL2 下，会通过 `browser_instance_wsl` 返回真实的 `profileDir`，并统一落在 `C:\ProgramData\deepright\chrome_<随机后缀>`。其中 `init` 会先关闭旧实例、以有头模式重新启动，并读取 `config.json` 的 `browser.init_timeout`（单位：秒，默认 `300`）作为启动等待上限。
 
-`browser_instance stop` 在 Windows WSL2 下，会先按原有流程关闭目标实例并清理状态；然后并发删除 `C:\ProgramData\deepright` 下全部 `chrome*` 目录，并把每个删除成功或失败都写入 `browser.log`，但不会因此让 stop 失败。
+`browser_instance stop` 在 Windows WSL2 下只会关闭目标实例并清理对应状态；`chrome_def` 和其他 `chrome_*` 目录都会保留。

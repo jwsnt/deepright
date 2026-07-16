@@ -17,6 +17,7 @@ import (
 const (
 	browserLauncherScriptName     = "browser_launcher.sh"
 	browserLauncherScriptTimeout  = 45 * time.Second
+	browserWSLForceRecreateEnv    = "DEEPRIGHT_BROWSER_WSL_FORCE_RECREATE"
 	browserEmbeddedLauncherScript = `#!/bin/sh
 
 set -eu
@@ -59,6 +60,12 @@ type browserWSLLauncherRunResult struct {
 	Stderr   string
 }
 
+type browserWSLInitRuntimeConfig struct {
+	Browser struct {
+		InitTimeout *int `json:"init_timeout"`
+	} `json:"browser"`
+}
+
 var (
 	browserResolveLauncherScriptPathFn = browserResolveLauncherScriptPath
 	browserLauncherCommandContextFn    = exec.CommandContext
@@ -93,12 +100,15 @@ func browserResolveLauncherScriptPath(flags map[string]string) (string, error) {
 	return materialized, nil
 }
 
-func browserRunWSLLauncher(flags map[string]string, agentID, chatID string, headless bool, chromePath string) (browserWSLLauncherRunResult, error) {
+func browserRunWSLLauncher(flags map[string]string, agentID, chatID string, headless, forceRecreate bool, chromePath string) (browserWSLLauncherRunResult, error) {
 	scriptPath, err := browserResolveLauncherScriptPathFn(flags)
 	if err != nil {
 		return browserWSLLauncherRunResult{}, err
 	}
 	timeout := browserLauncherScriptTimeout
+	if forceRecreate {
+		timeout = browserWSLInitTimeoutFromRuntimeConfig(flags, timeout)
+	}
 	if timeout <= 0 {
 		timeout = 45 * time.Second
 	}
@@ -116,11 +126,13 @@ func browserRunWSLLauncher(flags map[string]string, agentID, chatID string, head
 	}
 	requestText := browserFormatCommandLine("/bin/bash", args)
 	browserCreateTrace("instance.wsl.launcher.request", map[string]any{
-		"agentId":    agentID,
-		"chatId":     chatID,
-		"request":    requestText,
-		"scriptPath": scriptPath,
-		"headless":   headless,
+		"agentId":       agentID,
+		"chatId":        chatID,
+		"request":       requestText,
+		"scriptPath":    scriptPath,
+		"headless":      headless,
+		"forceRecreate": forceRecreate,
+		"timeout":       timeout.String(),
 	})
 
 	cmd := browserLauncherCommandContextFn(ctx, "/bin/bash", args...)
@@ -130,7 +142,7 @@ func browserRunWSLLauncher(flags map[string]string, agentID, chatID string, head
 	stderr := &bytes.Buffer{}
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
-	cmd.Env = os.Environ()
+	cmd.Env = browserWSLLauncherEnvironment(forceRecreate)
 	if root, _, rootErr := browserRuntimeRoot(flags); rootErr == nil {
 		if browserBin := browserResolveLauncherBinaryPath(root); browserBin != "" {
 			cmd.Env = append(cmd.Env, "DEEPRIGHT_BROWSER_BIN="+browserBin)
@@ -216,6 +228,40 @@ func browserRunWSLLauncher(flags map[string]string, agentID, chatID string, head
 	}, nil
 }
 
+// browserWSLInitTimeoutFromRuntimeConfig reads browser.init_timeout from the
+// integration config.json. The value is a positive number of seconds.
+func browserWSLInitTimeoutFromRuntimeConfig(flags map[string]string, fallback time.Duration) time.Duration {
+	if fallback <= 0 {
+		fallback = 45 * time.Second
+	}
+	runtimePath, ok, err := browserResolveRuntimeConfigPath(flags)
+	if err != nil || !ok {
+		return fallback
+	}
+	data, err := browserReadFileFn(runtimePath)
+	if err != nil {
+		return fallback
+	}
+	var cfg browserWSLInitRuntimeConfig
+	if err := json.Unmarshal(data, &cfg); err != nil || cfg.Browser.InitTimeout == nil || *cfg.Browser.InitTimeout <= 0 {
+		return fallback
+	}
+	return time.Duration(*cfg.Browser.InitTimeout) * time.Second
+}
+
+func browserWSLLauncherEnvironment(forceRecreate bool) []string {
+	env := make([]string, 0, len(os.Environ())+1)
+	for _, value := range os.Environ() {
+		if !strings.HasPrefix(value, browserWSLForceRecreateEnv+"=") {
+			env = append(env, value)
+		}
+	}
+	if forceRecreate {
+		env = append(env, browserWSLForceRecreateEnv+"=1")
+	}
+	return env
+}
+
 func browserResolveLauncherBinaryPath(root string) string {
 	root = strings.TrimSpace(root)
 	if root == "" {
@@ -239,8 +285,8 @@ func browserResolveLauncherBinaryPath(root string) string {
 	return ""
 }
 
-func browserAcquireWSLManagedInstanceWithLauncher(flags map[string]string, agentID, chatID string, headless bool, chromePath string) (browserWSLInstanceRecord, error) {
-	result, err := browserRunWSLLauncher(flags, agentID, chatID, headless, chromePath)
+func browserAcquireWSLManagedInstanceWithLauncher(flags map[string]string, agentID, chatID string, headless, forceRecreate bool, chromePath string) (browserWSLInstanceRecord, error) {
+	result, err := browserRunWSLLauncher(flags, agentID, chatID, headless, forceRecreate, chromePath)
 	if err != nil {
 		return browserWSLInstanceRecord{}, err
 	}

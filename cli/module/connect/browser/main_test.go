@@ -73,9 +73,7 @@ func stubBrowserRuntime() func() {
 	oldBrowserLifecycleProbeTimeout := browserLifecycleProbeTimeout
 	oldBrowserSleepFn := browserSleepFn
 	oldBrowserPrepareWSLChromeDefForStartFn := browserPrepareWSLChromeDefForStartFn
-	oldBrowserRestartIntegrationAfterWSLStartFn := browserRestartIntegrationAfterWSLStartFn
 	oldBrowserWSLCommandCombinedOutputFn := browserWSLCommandCombinedOutputFn
-	oldBrowserWSLIntegrationStartFn := browserWSLIntegrationStartFn
 	oldBrowserMaybeCleanupWSLProgramDataChromeDirsFn := browserMaybeCleanupWSLProgramDataChromeDirsFn
 
 	playwrightRunCLIFn = func(args []string, stdout, stderr io.Writer) int {
@@ -151,9 +149,7 @@ func stubBrowserRuntime() func() {
 	browserLifecycleProbeTimeout = time.Minute
 	browserSleepFn = time.Sleep
 	browserPrepareWSLChromeDefForStartFn = browserPrepareWSLChromeDefForStart
-	browserRestartIntegrationAfterWSLStartFn = browserRestartIntegrationAfterWSLStart
 	browserWSLCommandCombinedOutputFn = browserRunWSLCommandCombinedOutput
-	browserWSLIntegrationStartFn = browserRunIntegrationStart
 	browserMaybeCleanupWSLProgramDataChromeDirsFn = browserMaybeCleanupWSLProgramDataChromeDirs
 
 	return func() {
@@ -211,9 +207,7 @@ func stubBrowserRuntime() func() {
 		browserLifecycleProbeTimeout = oldBrowserLifecycleProbeTimeout
 		browserSleepFn = oldBrowserSleepFn
 		browserPrepareWSLChromeDefForStartFn = oldBrowserPrepareWSLChromeDefForStartFn
-		browserRestartIntegrationAfterWSLStartFn = oldBrowserRestartIntegrationAfterWSLStartFn
 		browserWSLCommandCombinedOutputFn = oldBrowserWSLCommandCombinedOutputFn
-		browserWSLIntegrationStartFn = oldBrowserWSLIntegrationStartFn
 		browserMaybeCleanupWSLProgramDataChromeDirsFn = oldBrowserMaybeCleanupWSLProgramDataChromeDirsFn
 	}
 }
@@ -288,8 +282,8 @@ func TestHelpOmitsLegacyWSLBootstrapDetails(t *testing.T) {
 		"./browser shutdown --agentId agent-a --chatId chat-001",
 		"/mnt/c/Program Files/Google/Chrome/Application/chrome.exe",
 		"C:\\ProgramData\\deepright\\chrome_def",
-		"browser start best-effort reruns `integration start`",
-		"browser stop finishes by concurrently deleting every C:\\ProgramData\\deepright\\chrome* directory",
+		"browser start refreshes chrome_def without restarting integration or opening a new page",
+		"browser stop only deletes C:\\ProgramData\\deepright\\chrome_def; managed chrome_* directories are preserved",
 	} {
 		if !strings.Contains(text, wanted) {
 			t.Fatalf("help output missing %q\n%s", wanted, text)
@@ -299,6 +293,7 @@ func TestHelpOmitsLegacyWSLBootstrapDetails(t *testing.T) {
 		"localhost:29876",
 		"browser start logs the full fixed-port Chrome launch command",
 		"browser start also runs one fixed Chrome CDP",
+		"browser start best-effort reruns `integration start`",
 	} {
 		if strings.Contains(text, hidden) {
 			t.Fatalf("help output should not expose %q\n%s", hidden, text)
@@ -864,7 +859,7 @@ func TestPluginLifecycleUsesUnifiedRestartFlow(t *testing.T) {
 	}
 }
 
-func TestPluginLifecycleStartOnWSLRefreshSuccessRestartsIntegration(t *testing.T) {
+func TestPluginLifecycleStartOnWSLRefreshSuccessDoesNotRestartIntegration(t *testing.T) {
 	restore := stubBrowserRuntime()
 	defer restore()
 
@@ -874,15 +869,10 @@ func TestPluginLifecycleStartOnWSLRefreshSuccessRestartsIntegration(t *testing.T
 	}
 
 	refreshCalls := 0
-	reopenCalls := 0
 	restartCalls := 0
 	browserPrepareWSLChromeDefForStartFn = func(flags map[string]string) (bool, error) {
 		refreshCalls++
 		return true, nil
-	}
-	browserRestartIntegrationAfterWSLStartFn = func(flags map[string]string) error {
-		reopenCalls++
-		return nil
 	}
 	instanceRestartFn = func(flags map[string]string) error {
 		restartCalls++
@@ -905,9 +895,6 @@ func TestPluginLifecycleStartOnWSLRefreshSuccessRestartsIntegration(t *testing.T
 	}
 	if restartCalls != 1 {
 		t.Fatalf("restart calls = %d, want 1", restartCalls)
-	}
-	if reopenCalls != 1 {
-		t.Fatalf("integration restart calls = %d, want 1", reopenCalls)
 	}
 }
 
@@ -921,15 +908,10 @@ func TestPluginLifecycleStartOnWSLRefreshFailureDoesNotBlockStart(t *testing.T) 
 	}
 
 	refreshCalls := 0
-	reopenCalls := 0
 	restartCalls := 0
 	browserPrepareWSLChromeDefForStartFn = func(flags map[string]string) (bool, error) {
 		refreshCalls++
 		return false, errors.New("copy failed")
-	}
-	browserRestartIntegrationAfterWSLStartFn = func(flags map[string]string) error {
-		reopenCalls++
-		return nil
 	}
 	instanceRestartFn = func(flags map[string]string) error {
 		restartCalls++
@@ -952,9 +934,6 @@ func TestPluginLifecycleStartOnWSLRefreshFailureDoesNotBlockStart(t *testing.T) 
 	}
 	if restartCalls != 1 {
 		t.Fatalf("restart calls = %d, want 1", restartCalls)
-	}
-	if reopenCalls != 0 {
-		t.Fatalf("integration restart calls = %d, want 0", reopenCalls)
 	}
 }
 

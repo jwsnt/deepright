@@ -216,7 +216,7 @@ func browserCreateInstance(flags map[string]string) (browserInstanceRecord, erro
 			"chromePath":   chromePath,
 			"headlessMode": headlessMode,
 		})
-		wslRecord, err := browserAcquireWSLManagedInstanceWithLauncher(flags, agentID, chatID, headlessMode != "none", chromePath)
+		wslRecord, err := browserAcquireWSLManagedInstanceWithLauncher(flags, agentID, chatID, headlessMode != "none", false, chromePath)
 		if err != nil {
 			return browserInstanceRecord{}, err
 		}
@@ -586,7 +586,7 @@ func browserCreateAttachedInstance(flags map[string]string, agentID, chatID stri
 		waitFn       func() error
 	)
 	if isWSL {
-		wslRecord, err := browserAcquireWSLManagedInstanceWithLauncher(flags, agentID, chatID, false, chromePath)
+		wslRecord, err := browserAcquireWSLManagedInstanceWithLauncher(flags, agentID, chatID, false, true, chromePath)
 		if err != nil {
 			return browserInstanceRecord{}, err
 		}
@@ -1784,6 +1784,14 @@ func browserCopyDirectory(sourceDir, targetDir string) error {
 }
 
 func browserCopyDirectoryWithProgress(sourceDir, targetDir string, progressFn func(browserArchiveProgress), skipFn func(string, error)) (browserArchiveProgress, error) {
+	return browserCopyDirectoryWithProgressUsingSkipRule(sourceDir, targetDir, progressFn, skipFn, browserShouldSkipClonedChromeUserDataPath)
+}
+
+func browserCopyWSLChromeUserDataWithProgress(sourceDir, targetDir string, progressFn func(browserArchiveProgress), skipFn func(string, error)) (browserArchiveProgress, error) {
+	return browserCopyDirectoryWithProgressUsingSkipRule(sourceDir, targetDir, progressFn, skipFn, browserShouldSkipWSLChromeUserDataPath)
+}
+
+func browserCopyDirectoryWithProgressUsingSkipRule(sourceDir, targetDir string, progressFn func(browserArchiveProgress), skipFn func(string, error), shouldSkip func(string) (bool, string)) (browserArchiveProgress, error) {
 	progress := browserArchiveProgress{}
 	sourceDir = filepath.Clean(strings.TrimSpace(sourceDir))
 	targetDir = filepath.Clean(strings.TrimSpace(targetDir))
@@ -1808,7 +1816,7 @@ func browserCopyDirectoryWithProgress(sourceDir, targetDir string, progressFn fu
 		if rel != "." {
 			destination = filepath.Join(targetDir, rel)
 		}
-		if skip, reason := browserShouldSkipClonedChromeUserDataPath(rel); skip {
+		if skip, reason := shouldSkip(rel); skip {
 			if skipFn != nil {
 				skipFn(path, errors.New(reason))
 			}
@@ -1953,6 +1961,30 @@ func browserShouldSkipClonedChromeUserDataPath(rel string) (bool, string) {
 		}
 	}
 	return false, ""
+}
+
+func browserShouldSkipWSLChromeUserDataPath(rel string) (bool, string) {
+	segments := strings.Split(filepath.ToSlash(filepath.Clean(strings.TrimSpace(rel))), "/")
+	if browserWSLChromeLoginStatePath(segments) {
+		return false, ""
+	}
+	return browserShouldSkipClonedChromeUserDataPath(rel)
+}
+
+func browserWSLChromeLoginStatePath(segments []string) bool {
+	if len(segments) < 2 {
+		return false
+	}
+	profile := strings.TrimSpace(segments[0])
+	if profile != "Default" && profile != "Guest Profile" && profile != "System Profile" && !strings.HasPrefix(profile, "Profile ") {
+		return false
+	}
+	switch strings.TrimSpace(segments[1]) {
+	case "Network", "Cookies", "Login Data", "Login Data For Account", "Web Data", "Preferences", "Secure Preferences", "Local Storage", "Session Storage", "IndexedDB", "WebStorage", "Extension State", "Extension Cookies", "Extension Rules", "Service Worker", "GCM Store", "Shared Dictionary", "blob_storage":
+		return true
+	default:
+		return false
+	}
 }
 
 func browserPathSegmentsHavePrefix(pathSegments, prefix []string) bool {

@@ -43,7 +43,7 @@
 
 - `help` 会覆盖插件入口命令和 `instance` 子命令的完整使用手册
 - 手册会明确说明 Windows WSL / WSL2 下，`instance create` / `instance init` 返回的 `profileDir` 固定落在 `C:\ProgramData\deepright\chrome_<随机后缀>`
-- 手册会明确说明 Windows WSL / WSL2 下，`browser stop` 和 `browser instance stop` 在原有关闭流程结束后，都会继续处理 `C:\ProgramData\deepright` 下全部 `chrome*` 目录的清理语义
+- 手册会明确说明 Windows WSL / WSL2 下，`browser stop` 在原有关闭流程结束后只会删除 `C:\ProgramData\deepright\chrome_def`，不会删除 `chrome_*` 实例目录
 
 ## 插件元信息
 
@@ -87,10 +87,11 @@
 - 在 Windows WSL / WSL2 下，`start` 会先强制关闭 Windows 宿主机当前所有 `chrome.exe` 进程，包括 `integration start` 打开的浏览器窗口
 - 然后把 Windows 默认 Chrome 的 `User Data` 目录重新复制到 `C:\ProgramData\deepright\chrome_def`
 - 如果 `C:\ProgramData\deepright\chrome_def` 已存在，会先删除后再复制
-- 复制时沿用实例复制同一套精简规则：过滤 `CacheStorage`、`OptGuideOnDeviceModel`、`Default/Cache`、`Default/Code Cache`、`Default/GPUCache`、`Default/Network` 等易失缓存，同时保留登录态相关目录
+- 复制时会保留各 Chrome Profile 的 `Network`、`Login Data`、`Local Storage`、`Session Storage`、`IndexedDB`、`WebStorage`、`Service Worker` 等登录态目录；只过滤明确的纯缓存和模型目录
 - 复制结束后会继续清理 `SingletonLock`、`SingletonCookie`、`SingletonSocket`、`DevToolsActivePort`、`lockfile`、`*.lock`、`*-journal` 等锁文件
+- Windows WSL / WSL2 下，强制重建的 `instance init` 启动等待上限读取 integration 的 `config.json`：`browser.init_timeout`（单位：秒）；默认配置为 `300`，避免登录态目录较大时启动器提前超时
 - 如果关闭 Chrome 或复制 `chrome_def` 失败，只写 `browser.log`，不会中断 `start`
-- 如果 `chrome_def` 刷新成功，`start` 会再尝试执行一次 `integration start`，让主应用重新打开新的 Chrome 窗口
+- `chrome_def` 刷新成功后不会重启 `integration`，因此不会额外打开或激活新的页面
 
 ### stop
 
@@ -108,12 +109,12 @@
 - `stop` 会先停止 Playwright daemon
 - 然后通过 `instance list` 枚举所有受管 CDP，并逐个调用 `shutdown`
 - 单个实例关闭失败只会写 `browser.log`，不会阻断其他实例继续关闭
-- `stop` 结束前还会清理 `agent-dir` 下所有 `chrome_${port}` 结构的受管实例目录
+- 在非 WSL 环境中，`stop` 结束前会清理 `agent-dir` 下所有 `chrome_${port}` 结构的受管实例目录
 - `stop` 结束时会 best-effort 删除 Browser 同目录的 `browser_runtime.json`；删除失败只写日志，不会导致 `stop` 失败
 - 通过 `integration` 运行且未显式覆盖 `--agent-dir` 时，macOS 默认会清理 `~/Library/Application Support/deepright/agent` 下的这些目录
-- 在 Windows WSL / WSL2 下，`stop` 会在原有关闭流程全部结束后，并发删除 `C:\ProgramData\deepright` 下所有 `chrome*` 目录，包括 `chrome_def`
-- 每个目录的删除成功和失败都会写入 `browser.log`
-- 任意目录删除失败都不会阻断 `stop` 返回 `OK`
+- 在 Windows WSL / WSL2 下，`stop` 会在原有关闭流程全部结束后只删除 `C:\ProgramData\deepright\chrome_def`
+- `chrome_xxx` 实例目录会保留，不受 `browser stop` 的收尾清理影响
+- `chrome_def` 删除成功和失败都会写入 `browser.log`，且删除失败不会阻断 `stop` 返回 `OK`
 
 ## instance create
 
@@ -161,9 +162,13 @@
 - 初始化时如果正在复制系统 Chrome 登录态目录，会跳过 `RunningChromeVersion`、`Singleton*`、`DevToolsActivePort` 等运行态文件，避免重复初始化时因为这些 symlink / lock 已存在而直接失败
 - 在 macOS 下，写入状态后命令会继续阻塞，直到这个 Chrome/CDP 被关闭，再把状态删掉
 - 在 Linux 原生环境里，写入状态后命令立即返回，不再等待这个 Chrome/CDP 被关闭
-- 在 Windows WSL / WSL2 下，写入状态后命令会继续阻塞，直到这个 Chrome/CDP 被关闭，再删除状态
+- 在 Windows WSL / WSL2 下，命令会在新的有头 Chrome/CDP 就绪并写入状态后返回；关闭由集成页面的“完成”按钮或 `instance shutdown` 执行
 - 后续在 `get` / `list` / `create` / `restart` 重载状态时，会自动清理已经退出的 Chrome/CDP 状态
-- 在 Windows WSL / WSL2 下，`init` 会通过插件同目录的 `browser_launcher.sh` 调用 `browser_instance_wsl` 逻辑，以有头模式启动或复用实例
+- 在 Windows WSL / WSL2 下，`init` 会通过插件同目录的 `browser_launcher.sh` 调用 `browser_instance_wsl` 逻辑，以有头模式启动实例
+- 在 Windows WSL / WSL2 下，`init` 会先对同一 `agentId + chatId` 执行一次 `shutdown`，再以 `headless=false` 强制重新拉起有头 Chrome；不会直接复用旧的存活 CDP
+- WSL下如果对应的 `chrome_xxx` profile 不存在，`init` 会从 `chrome_def` 创建；profile 已存在时保留其内容，但仍会关闭旧实例并重新启动 Chrome
+- WSL强制重新创建是 `init` 内部行为，通过 `DEEPRIGHT_BROWSER_WSL_FORCE_RECREATE` 传递；用户无需、也不能使用 `--force-recreate` 参数
+- 通过集成页面初始化时，“完成”按钮只会在新的有头 Chrome 启动成功后出现；点击该按钮会调用 `instance shutdown`。用户先手动关闭窗口后再点击，关闭操作仍会返回 `OK`
 
 ## instance stop
 
@@ -177,9 +182,7 @@
 - 会从 `browser_instance.json` 中定位实例
 - 按 `pid` 结束 Chrome 进程
 - 删除对应状态记录
-- 在 Windows WSL / WSL2 下，会在原有 stop 流程结束后，并发删除 `C:\ProgramData\deepright` 下全部 `chrome*` 目录，包括 `chrome_def`
-- 每个目录的删除成功和失败都会写入 `browser.log`
-- 任意目录删除失败都不会阻断 `stop` 返回 `OK`
+- 在 Windows WSL / WSL2 下，`instance stop` 只会关闭指定实例并更新状态；不会清理 `chrome_def` 或其他 `chrome_*` 目录
 - 成功时输出 `OK`
 
 ## instance shutdown
@@ -194,6 +197,7 @@
 - 会直接强制结束对应 Chrome 进程
 - 在 Windows WSL / WSL2 下，会额外在 Windows 宿主机侧强制结束该进程并确认端口释放
 - 进程关闭后会继续清理状态记录
+- Windows WSL / WSL2 下，端口确认使用绝对路径的 PowerShell 执行；若 Chrome 已被手动关闭，也会完成状态清理并返回 `OK`
 - 在 Windows WSL / WSL2 下，`shutdown` 不会删除 `C:\ProgramData\deepright\chrome_*` 目录
 - 如果删除后 `browser_instance.json` 已为空，会一并删除该状态文件
 - 兼容旧版本残留时，不带 `--agentId` / `--chatId` 的 `shutdown` 仍会尝试清理历史固定端口 CDP

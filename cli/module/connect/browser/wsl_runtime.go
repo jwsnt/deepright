@@ -971,7 +971,7 @@ func browserIsWSLWindowsPortFree(port int) (bool, error) {
 		return false, fmt.Errorf("invalid port: %d", port)
 	}
 	script := fmt.Sprintf(`$items = @(Get-NetTCPConnection -State Listen -LocalPort %d -ErrorAction SilentlyContinue); if ($items.Count -gt 0) { "busy" } else { "free" }`, port)
-	output, err := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script).Output()
+	output, err := exec.Command(browserWSLPowerShellPath, "-NoProfile", "-NonInteractive", "-Command", script).Output()
 	if err != nil {
 		return false, err
 	}

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestBrowserResolveLauncherScriptPathRecreatesMissingLauncher(t *testing.T) {
@@ -33,5 +34,52 @@ func TestBrowserResolveLauncherScriptPathRecreatesMissingLauncher(t *testing.T) 
 	}
 	if !strings.Contains(text, `exec "$BROWSER_BIN" __wsl-instance acquire "$@"`) {
 		t.Fatalf("launcher script missing acquire command: %s", text)
+	}
+}
+
+func TestBrowserWSLInitTimeoutFromRuntimeConfig(t *testing.T) {
+	restore := stubBrowserRuntime()
+	defer restore()
+
+	runtimeRoot := t.TempDir()
+	pluginDir := filepath.Join(runtimeRoot, "plugins")
+	browserPath := writeBrowserBinaryFixture(t, pluginDir)
+	browserExecutablePathFn = func() (string, error) {
+		return browserPath, nil
+	}
+	runtimePath := filepath.Join(runtimeRoot, "config", "config.json")
+	if err := os.MkdirAll(filepath.Dir(runtimePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(runtimePath, []byte(`{"browser":{"init_timeout":300}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := browserWSLInitTimeoutFromRuntimeConfig(map[string]string{}, 45*time.Second); got != 5*time.Minute {
+		t.Fatalf("timeout = %s, want %s", got, 5*time.Minute)
+	}
+}
+
+func TestBrowserWSLInitTimeoutFromRuntimeConfigFallsBackForInvalidValue(t *testing.T) {
+	restore := stubBrowserRuntime()
+	defer restore()
+
+	runtimeRoot := t.TempDir()
+	pluginDir := filepath.Join(runtimeRoot, "plugins")
+	browserPath := writeBrowserBinaryFixture(t, pluginDir)
+	browserExecutablePathFn = func() (string, error) {
+		return browserPath, nil
+	}
+	runtimePath := filepath.Join(runtimeRoot, "config", "config.json")
+	if err := os.MkdirAll(filepath.Dir(runtimePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(runtimePath, []byte(`{"browser":{"init_timeout":0}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	const fallback = 45 * time.Second
+	if got := browserWSLInitTimeoutFromRuntimeConfig(map[string]string{}, fallback); got != fallback {
+		t.Fatalf("timeout = %s, want fallback %s", got, fallback)
 	}
 }

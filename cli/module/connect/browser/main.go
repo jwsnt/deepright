@@ -372,10 +372,9 @@ func runPluginLifecycleCommand(command string, args []string, stdout, stderr io.
 		}
 	}
 	browserLogInstanceListEvent(command, "before", beforeItems)
-	reopenIntegrationOnWSL := false
 	switch command {
 	case "start":
-		reopenIntegrationOnWSL, _ = browserPrepareWSLChromeDefForStartFn(flags)
+		_, _ = browserPrepareWSLChromeDefForStartFn(flags)
 		if err := instanceRestartFn(normalizedFlags); err != nil {
 			fmt.Fprintln(stderr, err.Error())
 			return 1
@@ -395,9 +394,6 @@ func runPluginLifecycleCommand(command string, args []string, stdout, stderr io.
 			}
 		}
 		browserLogPluginDaemonEvent(command, result)
-		if reopenIntegrationOnWSL {
-			_ = browserRestartIntegrationAfterWSLStartFn(flags)
-		}
 	case "stop":
 		result, err := playwrightStopFn(pluginOpts)
 		if err != nil {
@@ -1158,9 +1154,9 @@ func printHelp(w io.Writer) {
 	fmt.Fprintln(w, "  - browser fetch/store/start reuse the same cookie_path resolution and validation logic")
 	fmt.Fprintln(w, "  - plugin lifecycle reset closes every managed CDP instance so integration can restart browser safely")
 	fmt.Fprintln(w, "  - on WSL, browser start also force-closes all Windows Chrome processes, refreshes C:\\ProgramData\\deepright\\chrome_def from the Windows Chrome User Data root with filtered-copy rules, and only logs the reason when that refresh fails")
-	fmt.Fprintln(w, "  - on WSL, browser start best-effort reruns `integration start` after a successful chrome_def refresh so the host app can reopen Chrome")
+	fmt.Fprintln(w, "  - on WSL, browser start refreshes chrome_def without restarting integration or opening a new page")
 	fmt.Fprintln(w, "  - browser stop best-effort deletes ./browser_runtime.json after the stop flow and only logs a cleanup error if that removal fails")
-	fmt.Fprintln(w, "  - on WSL, browser stop finishes by concurrently deleting every C:\\ProgramData\\deepright\\chrome* directory; success and failure are both logged and never fail stop")
+	fmt.Fprintln(w, "  - on WSL, browser stop only deletes C:\\ProgramData\\deepright\\chrome_def; managed chrome_* directories are preserved")
 	fmt.Fprintln(w, "  - managed Agent@Chat sessions refresh browser instance activity and idle instances are cleaned when instance state is reloaded")
 	fmt.Fprintln(w, "  - browser shutdown force-stops one managed Chrome pid after resolving it from instance state")
 	fmt.Fprintln(w, "  - supported platforms: macOS, Linux, and Windows")

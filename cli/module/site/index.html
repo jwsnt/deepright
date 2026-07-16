@@ -23947,20 +23947,6 @@ function resetBrowserInstanceInitState() {
   browserInstanceInitState.doneVisible = false;
 }
 
-function scheduleBrowserInstanceDoneReveal() {
-  if (browserInstanceInitState.doneRevealTimer) {
-    clearTimeout(browserInstanceInitState.doneRevealTimer);
-    browserInstanceInitState.doneRevealTimer = null;
-  }
-  browserInstanceInitState.doneVisible = false;
-  browserInstanceInitState.doneRevealTimer = setTimeout(() => {
-    browserInstanceInitState.doneRevealTimer = null;
-    if (browserInstanceInitState.phase === 'idle' || browserInstanceInitState.phase === 'destroy') return;
-    browserInstanceInitState.doneVisible = true;
-    renderBrowserInstanceInitLock();
-  }, 30000);
-}
-
 function markBrowserInstanceInitReady() {
   if (browserInstanceInitState.doneRevealTimer) {
     clearTimeout(browserInstanceInitState.doneRevealTimer);
@@ -24004,7 +23990,7 @@ function renderBrowserInstanceInitLock() {
   const pluginStart = phase === 'plugin-start';
   const ready = phase === 'ready';
   const show = phase !== 'idle' || guidePreview;
-  const initializing = phase === 'init' || pluginStart;
+  const initializing = phase === 'init';
   const showWindowsTaskbarGuide = show && !guidePreview && initializing && shouldShowBrowserInstanceWindowsTaskbarGuide();
   if (show && !guidePreview && initializing) resolveBrowserInstanceWindowsTaskbarGuideRuntime();
   if (show) maybeCollapseLeftSidebarForFloatingOverlay(overlay);
@@ -24094,7 +24080,6 @@ async function handleBrowserInstanceInitBadgeClick(event) {
   browserInstanceInitState.loading = true;
   browserInstanceInitState.phase = 'init';
   browserInstanceInitState.binding = { chatId: binding.chatId };
-  scheduleBrowserInstanceDoneReveal();
   renderBrowserInstanceInitBadge();
   closeQuickFanMenu();
   closeRightSidebarUrlPreview();
