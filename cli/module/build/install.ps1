@@ -21,6 +21,51 @@ function L_Err($m)  {                     Write-Host "  [X] $m" -F Red;     Add-
 function L_Info($m) {                     Write-Host "  [i] $m" -F Gray;    Add-Content -Path $LOG_FILE -Value "  [INFO] $m" -Encoding UTF8 }
 
 # ---------- Helpers ----------
+function Invoke-WslWithLiveOutput([string]$Description, [string[]]$Arguments) {
+    # Do not redirect or pipe wsl.exe here. Its installer writes progress using
+    # terminal control characters, which only render correctly when attached to
+    # the current console.
+    Add-Content -Path $LOG_FILE -Value "wsl command started: wsl.exe $($Arguments -join ' ')" -Encoding UTF8
+    & wsl.exe @Arguments
+    $script:LAST_WSL_COMMAND_EXIT_CODE = $LASTEXITCODE
+    Add-Content -Path $LOG_FILE -Value "wsl command finished: $Description (exitCode=$script:LAST_WSL_COMMAND_EXIT_CODE)" -Encoding UTF8
+}
+
+function Download-FileWithProgress([string]$Url, [string]$Destination, [string]$Activity) {
+    $request = $null
+    $response = $null
+    $input = $null
+    $output = $null
+    $received = [int64]0
+
+    try {
+        $request = [System.Net.HttpWebRequest]::Create($Url)
+        $response = $request.GetResponse()
+        $total = [int64]$response.ContentLength
+        $input = $response.GetResponseStream()
+        $output = [System.IO.File]::Open($Destination, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+        $buffer = New-Object byte[] (1024 * 1024)
+
+        while (($read = $input.Read($buffer, 0, $buffer.Length)) -gt 0) {
+            $output.Write($buffer, 0, $read)
+            $received += $read
+
+            if ($total -gt 0) {
+                $percent = [Math]::Min(100, [Math]::Floor(($received * 100.0) / $total))
+                $status = "{0}% ({1:N1} / {2:N1} MB)" -f $percent, ($received / 1MB), ($total / 1MB)
+                Write-Progress -Activity $Activity -Status $status -PercentComplete $percent
+            } else {
+                Write-Progress -Activity $Activity -Status ("{0:N1} MB downloaded" -f ($received / 1MB))
+            }
+        }
+    } finally {
+        Write-Progress -Activity $Activity -Completed
+        if ($output) { $output.Dispose() }
+        if ($input) { $input.Dispose() }
+        if ($response) { $response.Dispose() }
+    }
+}
+
 function Test-Admin {
     $id = [Security.Principal.WindowsIdentity]::GetCurrent()
     $p  = New-Object Security.Principal.WindowsPrincipal($id)
@@ -299,8 +344,7 @@ if (Test-WslInstalled) {
     L_OK "WSL already installed"
 } else {
     L_Info "Installing WSL (may take several minutes)..."
-    $o = & wsl.exe --install --no-distribution 2>&1 | Out-String
-    Add-Content -Path $LOG_FILE -Value "WSL install: $o" -Encoding UTF8
+    Invoke-WslWithLiveOutput -Description "WSL install" -Arguments @("--install", "--no-distribution")
     if (-not (Test-WslInstalled)) {
         L_Info "Trying DISM fallback..."
         $d1 = & dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart 2>&1 | Out-String
@@ -328,8 +372,7 @@ L_OK ".wslconfig written"
 
 # 4b: Update WSL
 L_Info "Updating WSL..."
-$wu = & wsl.exe --update 2>&1 | Out-String
-Add-Content -Path $LOG_FILE -Value "wsl --update: $wu" -Encoding UTF8
+Invoke-WslWithLiveOutput -Description "WSL update" -Arguments @("--update")
 L_OK "WSL updated"
 
 # 4c: Shutdown with clean config
@@ -378,8 +421,7 @@ if ($distroExists) {
 
     # Method 1: wsl --install -d Ubuntu
     L_Info "Method 1: wsl --install -d Ubuntu..."
-    $i1 = & wsl.exe --install -d Ubuntu --no-launch 2>&1 | Out-String
-    Add-Content -Path $LOG_FILE -Value "wsl --install -d Ubuntu: $i1" -Encoding UTF8
+    Invoke-WslWithLiveOutput -Description "Ubuntu install" -Arguments @("--install", "-d", "Ubuntu", "--no-launch")
     Start-Sleep -Seconds 10
 
     $ubuntuOk = Test-DistroExists -Name "Ubuntu"
@@ -412,9 +454,9 @@ if ($distroExists) {
         L_Info "URL: $rootfsUrl"
         try {
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-            $wc = New-Object System.Net.WebClient
-            $wc.DownloadFile($rootfsUrl, $rootfsFile)
+            Download-FileWithProgress -Url $rootfsUrl -Destination $rootfsFile -Activity "Downloading Ubuntu rootfs"
         } catch {
+            Remove-Item -Path $rootfsFile -Force -ErrorAction SilentlyContinue
             L_Err "Download error: $_"; exit 1
         }
         if (-not (Test-Path $rootfsFile)) { L_Err "Download failed"; exit 1 }
