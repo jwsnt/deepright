@@ -617,6 +617,7 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
         protected HttpProtocol httpProtocol;
 
         @Autowired
+        // 使用本地文件系统过度
         protected SysStore sysStore;
 
         @Value("${cli.sub.template.safety:classpath:config/cli/safety.md}")

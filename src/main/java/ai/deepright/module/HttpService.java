@@ -111,6 +111,7 @@ public class HttpService extends NettyHttpHandler {
         }
     }
 
+    // 如果为单机模式则从磁盘读取
     protected void doDownload(ChannelHandlerContext ctx, QueryStringDecoder query) throws Exception {
         List<String> params = List.class.cast(MapUtils.getObject(query.parameters(), "name"));
         WorkflowException.checkCondition(CollectionUtils.isEmpty(params), "The http server download param can not be empty");

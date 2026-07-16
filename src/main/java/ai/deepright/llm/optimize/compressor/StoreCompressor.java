@@ -2,12 +2,9 @@ package ai.deepright.llm.optimize.compressor;
 
 import ai.deepright.llm.optimize.FunCallCompressor;
 import ai.deepright.module.HttpProtocol;
-import ai.open.right.WorkflowException;
-import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.utils.BytesUtils;
 import ai.open.right.utils.JsonUtils;
-import ai.open.right.workflow.flow.file.DefStore;
-import ai.open.right.workflow.flow.file.FileStore;
+import ai.open.right.workflow.flow.file.impl.SysStore;
 import ai.open.right.workflow.flow.llm.LLMFunCallRequest;
 import ai.open.right.workflow.flow.llm.LLMFunCallResponse;
 import ai.open.right.workflow.flow.llm.provider.ProviderRequest;
@@ -36,20 +33,16 @@ abstract public class StoreCompressor implements FunCallCompressor {
 
     protected Integer suffixReserve;
 
-    protected DefStore defStore;
+    protected SysStore sysStore;
 
     // 压缩单条FunCall的阈值（50k）
     protected Integer oversize;
 
-    protected String store;
-
     @Override
     public void compress(ProviderRequest providerRequest, LLMFunCallResponse funCallResponse) throws Exception {
         if (this.shouldCompress(funCallResponse)) {
-            FileStore fileStore = this.defStore.fetchStore(this.store);
-            WorkflowException.checkCondition(fileStore == null, "The file store can not empty: " + this.store);
             // URL压缩在Query中
-            String url = this.buildUrl(providerRequest, fileStore.store(funCallResponse.getResponse().getBytes(StandardCharsets.UTF_8), ".json", providerRequest.getMessage()));
+            String url = this.buildUrl(providerRequest, this.sysStore.store(funCallResponse.getResponse().getBytes(StandardCharsets.UTF_8), ".json", providerRequest.getMessage()));
             funCallResponse.setResponse(this.buildRecallAnswer(funCallResponse, url));
             funCallResponse.putMetadata(FunCallCompressor.FLAG, true);
             if (log.isWarnEnabled()) {
@@ -61,11 +54,9 @@ abstract public class StoreCompressor implements FunCallCompressor {
     @Override
     public void compress(ProviderRequest providerRequest, LLMFunCallRequest funCallRequest) throws Exception {
         if (this.shouldCompress(funCallRequest)) {
-            FileStore fileStore = this.defStore.fetchStore(this.store);
-            WorkflowException.checkCondition(fileStore == null, "The file store can not empty: " + this.store);
             String original = JsonUtils.write(Map.class.cast(funCallRequest.getArgs()));
             // URL压缩在属性中
-            String url = this.buildUrl(providerRequest, fileStore.store(original.getBytes(StandardCharsets.UTF_8), ".json", providerRequest.getMessage()));
+            String url = this.buildUrl(providerRequest, this.sysStore.store(original.getBytes(StandardCharsets.UTF_8), ".json", providerRequest.getMessage()));
             funCallRequest.setArgs(ImmutableMap.of("the_original_digest", this.buildRecallQuery(providerRequest, original), "the_complete_content", url));
             funCallRequest.putMetadata(FunCallCompressor.FLAG, true);
             if (log.isWarnEnabled()) {
@@ -123,7 +114,7 @@ abstract public class StoreCompressor implements FunCallCompressor {
         protected HttpProtocol httpProtocol;
 
         @Autowired
-        protected DefStore defStore;
+        protected SysStore sysStore;
 
         @Value("${optimize.oversize.funcall.each.prefix.reserve:50}")
         protected Integer prefixReserve;
@@ -134,8 +125,5 @@ abstract public class StoreCompressor implements FunCallCompressor {
         // 51,200字节，50k
         @Value("${optimize.oversize.funcall.each:51200}")
         protected Integer oversize;
-
-        @Value("${optimize.compress.store:file.store.sys}")
-        protected String store;
     }
 }

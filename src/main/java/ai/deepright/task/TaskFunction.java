@@ -22,7 +22,7 @@ import ai.open.right.resouce.ResourceService;
 import ai.open.right.utils.JsonUtils;
 import ai.open.right.utils.SplitUtils;
 import ai.open.right.workflow.flow.WorkflowTask;
-import ai.open.right.workflow.flow.file.DefStore;
+import ai.open.right.workflow.flow.file.impl.SysStore;
 import ai.open.right.workflow.flow.function.FunctionContext;
 import ai.open.right.workflow.flow.function.impl.BaseFunction;
 import ai.open.right.workflow.flow.llm.Segment;
@@ -98,7 +98,7 @@ public class TaskFunction extends BaseFunction implements TaskResult {
 
     protected String template4async;
 
-    protected DefStore defStore;
+    protected SysStore sysStore;
 
     protected Integer oversize;
 
@@ -176,7 +176,7 @@ public class TaskFunction extends BaseFunction implements TaskResult {
     protected String execAsync(WorkflowTask workTask, List<TaskSync> syncTasks, Integer timeout) throws Exception {
         TaskExec exec = TaskExec.builder()
                 .cliSubFetcher(this.cliSubFetcher)
-                .defStore(this.defStore)
+                .sysStore(this.sysStore)
                 .oversize(this.oversize)
                 .taskSyncs(syncTasks)
                 .workTask(workTask)
@@ -642,7 +642,7 @@ public class TaskFunction extends BaseFunction implements TaskResult {
         protected String template4async;
 
         @Autowired
-        protected DefStore defStore;
+        protected SysStore sysStore;
 
         @Value("${cli.push.oversize:1048576}")
         protected Integer oversize;

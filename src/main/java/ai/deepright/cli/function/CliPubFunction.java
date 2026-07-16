@@ -1,17 +1,13 @@
 package ai.deepright.cli.function;
 
-import ai.open.right.protocol.ProtocolCode;
-
-import ai.open.right.WorkflowException;
-
 import ai.deepright.cli.CliPubData;
 import ai.deepright.cli.CliPubSub;
 import ai.deepright.cli.CliSubFetcher;
 import ai.deepright.router.RouterDevice;
+import ai.open.right.WorkflowException;
 import ai.open.right.utils.*;
 import ai.open.right.workflow.flow.WorkflowTask;
-import ai.open.right.workflow.flow.file.DefStore;
-import ai.open.right.workflow.flow.file.FileStore;
+import ai.open.right.workflow.flow.file.impl.SysStore;
 import ai.open.right.workflow.flow.function.FunctionContext;
 import ai.open.right.workflow.flow.function.impl.BaseFunction;
 import lombok.Getter;
@@ -46,7 +42,7 @@ public class CliPubFunction extends BaseFunction {
 
     protected CliSubFetcher cliSubFetcher;
 
-    protected DefStore defStore;
+    protected SysStore sysStore;
 
     // 超过指定大小需要转存（数据不进Redis，默认1.5M）
     protected Integer oversize;
@@ -59,8 +55,6 @@ public class CliPubFunction extends BaseFunction {
 
     // 队列Key过期时间（ms），与Sub共享
     protected Integer expire;
-
-    protected String store;
 
     public Object call(FunctionContext functionContext) throws Exception {
         WorkflowTask workTask = log.isDebugEnabled() ? functionContext.getWorkTask().printQuery() : functionContext.getWorkTask();
@@ -84,9 +78,7 @@ public class CliPubFunction extends BaseFunction {
         byte[] decode = GzipUtils.decompressAsBase64(pubData.getCmd());
         // 执行成功、Type!=FUN 且超过指定大小或二进制格式（图片等），上传URL
         if (pubData.isOk() && !pubData.isType(CliPubSub.FUN) && (BytesUtils.utf8Bytes(pubData.getCmd()) >= this.oversize || SuffixUtils.isBinary(pubData.getSuffix()))) {
-            FileStore fileStore = this.defStore.fetchStore(this.store);
-            WorkflowException.checkCondition(fileStore == null, "The file store can not be empty");
-            pubData.setCmd(fileStore.store(decode, pubData.getSuffix(), workTask));
+            pubData.setCmd(this.sysStore.store(decode, pubData.getSuffix(), workTask));
             pubData.setEncode(CliPubData.URL);
             return pubData;
         } else {
@@ -173,7 +165,8 @@ public class CliPubFunction extends BaseFunction {
         protected CliSubFetcher cliSubFetcher;
 
         @Autowired
-        protected DefStore defStore;
+        // 使用本地文件系统过度
+        protected SysStore sysStore;
 
         // 超过这个字节大小使用Cli URL协议
         @Value("${cli.pub.oversize:204800}")
@@ -189,10 +182,6 @@ public class CliPubFunction extends BaseFunction {
         // Pub Sub共享过期时间
         @Value("${cli.expire:300000}")
         protected Integer expire;
-
-        // 使用的转存服务
-        @Value("${cli.store:file.store.sys}")
-        protected String store;
 
         @Bean(CliPubFunction.NAME)
         @ConditionalOnMissingBean(name = CliPubFunction.NAME)

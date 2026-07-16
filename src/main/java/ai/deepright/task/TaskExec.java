@@ -7,7 +7,7 @@ import ai.deepright.cli.CliSubOps;
 import ai.deepright.feature.FeatureUtils;
 import ai.open.right.WorkflowException;
 import ai.open.right.workflow.flow.WorkflowTask;
-import ai.open.right.workflow.flow.file.DefStore;
+import ai.open.right.workflow.flow.file.impl.SysStore;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
@@ -40,7 +40,7 @@ public class TaskExec implements Runnable {
 
     protected TaskResult taskResult;
 
-    protected DefStore defStore;
+    protected SysStore sysStore;
 
     // 大于此值（字节，默认1.5M）的文件会被上传到DefStore后下发URL
     protected Integer oversize;
@@ -70,7 +70,7 @@ public class TaskExec implements Runnable {
             CliPubData pubData = this.cliSubFetcher.command(this.workTask, CliSubOps.builder()
                     .w(List.of(this.filename))
                     .exempted(true)
-                    .build(), CliPubSub.buildPushCmd(this.workTask, this.defStore, this.oversize, answer.toString(), this.filename), "");
+                    .build(), CliPubSub.buildPushCmd(this.workTask, this.sysStore, this.oversize, answer.toString(), this.filename), "");
             WorkflowException.checkCondition(!(pubData.isOk()), pubData.getCmd());
         } catch (Exception e) {
             WorkflowException.dolog(e);

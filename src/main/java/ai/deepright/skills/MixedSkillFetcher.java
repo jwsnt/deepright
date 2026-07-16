@@ -12,7 +12,7 @@ import ai.deepright.utils.TemplateChecker;
 import ai.open.right.WorkflowException;
 import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.config.AllowedConfig;
-import ai.open.right.workflow.flow.file.DefStore;
+import ai.open.right.workflow.flow.file.impl.SysStore;
 import ai.open.right.workflow.skill.SkillMetadata;
 import ai.open.right.workflow.skill.Skills;
 import ai.open.right.workflow.skill.SkillsFetcher;
@@ -43,7 +43,7 @@ public class MixedSkillFetcher extends FileSystemFetcher {
 
     protected CliSubFetcher cliSubFetcher;
 
-    protected DefStore defStore;
+    protected SysStore sysStore;
 
     protected Integer oversize;
 
@@ -111,7 +111,7 @@ public class MixedSkillFetcher extends FileSystemFetcher {
             this.cliSubFetcher.command(workTask, new RouterDevice(workTask), CliSubOps.builder()
                     .app(binary ? List.of("mkdir", "curl", "base64", "gunzip") : List.of("mkdir", "cat"))
                     // 精确匹配
-                    .exempted(true).build(), CliPubSub.buildPushCmd(workTask, this.defStore, binary, this.oversize, content, cliPath), "").valid();
+                    .exempted(true).build(), CliPubSub.buildPushCmd(workTask, this.sysStore, binary, this.oversize, content, cliPath), "").valid();
             String resource = this.template.replace("#path", cliPath);
             resource = resource.replace("#tools_skill", this.skills);
             resource = resource.replace("#tools_cli", this.cli);
@@ -240,7 +240,7 @@ public class MixedSkillFetcher extends FileSystemFetcher {
         protected CliSubFetcher cliSubFetcher;
 
         @Autowired
-        protected DefStore defStore;
+        protected SysStore sysStore;
 
         @Value("${cli.push.oversize:1048576}")
         protected Integer oversize;

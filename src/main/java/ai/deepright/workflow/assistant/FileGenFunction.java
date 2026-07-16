@@ -7,12 +7,10 @@ import ai.deepright.cli.CliSubOps;
 import ai.deepright.lang.XmlResourceLang;
 import ai.deepright.router.RouterDevice;
 import ai.open.right.WorkflowException;
-import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.utils.BytesUtils;
 import ai.open.right.utils.JsonUtils;
 import ai.open.right.utils.SuffixUtils;
 import ai.open.right.workflow.flow.WorkflowTask;
-import ai.open.right.workflow.flow.file.DefStore;
 import ai.open.right.workflow.flow.file.impl.SysStore;
 import ai.open.right.workflow.flow.function.FunctionContext;
 import ai.open.right.workflow.flow.function.impl.BaseFunction;
@@ -48,7 +46,7 @@ public class FileGenFunction extends BaseFunction {
 
     protected CliSubFetcher cliSubFetcher;
 
-    protected DefStore defStore;
+    protected SysStore sysStore;
 
     // 大于此值（字节，默认1.5M）的文件会被上传到DefStore后下发URL
     protected Integer oversize;
@@ -82,7 +80,7 @@ public class FileGenFunction extends BaseFunction {
         // 禁止exempted=true豁免
         CliPubData pubData = this.cliSubFetcher.command(workTask, new RouterDevice(workTask), CliSubOps.builder()
                 .w(List.of(file))
-                .build(), CliPubSub.buildPushCmd(workTask, this.defStore, this.oversize, content, file), why);
+                .build(), CliPubSub.buildPushCmd(workTask, this.sysStore, this.oversize, content, file), why);
         WorkflowException.checkCondition(!(pubData.isOk()), pubData.getCmd());
         data.put("file_path", file);
         return data;
@@ -105,9 +103,7 @@ public class FileGenFunction extends BaseFunction {
             WorkflowException.checkCondition(!pubData.isOk(), pubData.getCmd());
             if (!StringUtils.isEmpty(pubData.getCmd())) {
                 // 强制转换为TEXT
-                SysStore sysStore = SysStore.class.cast(this.defStore.fetchStore(SysStore.NAME));
-                WorkflowException.checkCondition(sysStore == null, "The file gen sys store can not be empty");
-                String referBody = pubData.forceText(this.resource, sysStore, this.timeout).getCmd();
+                String referBody = pubData.forceText(this.resource, this.sysStore, this.timeout).getCmd();
                 this.checkSize(workTask, query, BytesUtils.utf8Bytes(referBody));
                 query.put("refer_body", referBody);
             }
@@ -137,7 +133,7 @@ public class FileGenFunction extends BaseFunction {
         protected CliSubFetcher cliSubFetcher;
 
         @Autowired
-        protected DefStore defStore;
+        protected SysStore sysStore;
 
         @Value("${cli.push.oversize:1048576}")
         protected Integer oversize;
