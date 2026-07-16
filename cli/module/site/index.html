@@ -1533,7 +1533,7 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 [data-theme="dark"] .rs-cmd-toggle:hover,[data-theme="dark"] .rs-cmd-toggle:focus-visible,[data-theme="dark"] .rs-wiki-refresh:hover,[data-theme="dark"] .rs-wiki-refresh:focus-visible,[data-theme="dark"] .rs-cli-expand-btn:hover,[data-theme="dark"] .rs-cli-expand-btn:focus-visible{border-color:rgba(126,244,255,.5);background:linear-gradient(180deg,rgba(27,70,100,.98),rgba(13,43,65,.96));color:#dffcff;box-shadow:0 12px 24px rgba(0,0,0,.24),0 0 0 1px rgba(230,253,255,.1) inset,0 0 18px rgba(0,212,255,.18);outline:none}
 .cmd-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding-left:20px;padding-right:20px;box-sizing:border-box;background:var(--modal-overlay-bg);backdrop-filter:blur(var(--modal-overlay-blur));-webkit-backdrop-filter:blur(var(--modal-overlay-blur));opacity:0;visibility:hidden;pointer-events:none;transition:opacity .24s ease,visibility 0s linear .24s;z-index:210}
 .cmd-overlay.show{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .24s ease}
-.cmd-panel{width:min(500px,calc(100vw - 40px));height:110px;background:linear-gradient(180deg,var(--modal-panel-bg-strong),var(--modal-panel-bg));border:1px solid var(--modal-panel-border);border-radius:24px;box-shadow:0 22px 58px rgba(16,24,40,.22);padding:0;display:flex;flex-direction:column;position:relative;overflow:hidden;transform:translateY(10px) scale(.98);transition:transform .24s cubic-bezier(.22,1,.36,1);backdrop-filter:none;-webkit-backdrop-filter:none}
+.cmd-panel{width:min(500px,calc(100vw - 40px));height:114px;background:linear-gradient(180deg,var(--modal-panel-bg-strong),var(--modal-panel-bg));border:1px solid var(--modal-panel-border);border-radius:24px;box-shadow:0 22px 58px rgba(16,24,40,.22);padding:0;display:flex;flex-direction:column;position:relative;overflow:hidden;transform:translateY(10px) scale(.98);transition:transform .24s cubic-bezier(.22,1,.36,1);backdrop-filter:none;-webkit-backdrop-filter:none}
 .cmd-overlay.show .cmd-panel{transform:translateY(0) scale(1)}
 .cmd-panel-main,.cmd-panel-confirm{position:absolute;inset:10px 12px;display:flex;flex-direction:column;min-height:0;opacity:0;transform:none;pointer-events:none;transition:opacity .1s ease}
 .cmd-panel-main{opacity:1;pointer-events:auto}
@@ -1542,7 +1542,13 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 .cmd-input{width:100%;height:42px;flex:0 0 42px;border:1px solid var(--modal-field-border);border-radius:12px;background:var(--modal-field-bg);color:var(--text-primary);font-size:10px;line-height:1.2;padding:12px 16px;resize:none;outline:none;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .cmd-input:focus{border-color:var(--accent)}
 .cmd-input::placeholder{color:var(--text-muted)}
-.cmd-tip,.cmd-confirm-title{margin-top:5px;min-height:14px;font-size:10px;line-height:1;color:var(--error);text-align:right;transition:color .18s ease,text-shadow .18s ease,opacity .18s ease}
+.cmd-options{margin-top:5px;min-height:18px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.cmd-timeout{display:inline-flex;align-items:center;gap:4px;font-size:10px;line-height:1;color:var(--text-secondary);white-space:nowrap}
+.cmd-timeout-input{width:48px;height:18px;box-sizing:border-box;padding:0 4px;border:1px solid var(--modal-field-border);border-radius:5px;background:var(--modal-field-bg);color:var(--text-primary);font:10px ui-monospace,SFMono-Regular,Menlo,monospace;outline:none}
+.cmd-timeout-input:focus{border-color:var(--accent)}
+.cmd-tip,.cmd-confirm-title{min-height:14px;font-size:10px;line-height:1;color:var(--error);text-align:right;transition:color .18s ease,text-shadow .18s ease,opacity .18s ease}
+.cmd-options .cmd-tip{margin:0;margin-left:auto}
+.cmd-confirm-title{margin-top:5px}
 .cmd-panel.danger-focus:not(.confirming) .cmd-tip,.cmd-panel.danger-focus.confirming .cmd-confirm-title{color:#ff4d4f;text-shadow:0 0 8px rgba(255,77,79,.26),0 0 14px rgba(255,77,79,.18);animation:cmdDangerBlink .28s ease-in-out 4}
 @keyframes cmdDangerBlink{0%,100%{opacity:1}50%{opacity:.36}}
 .cmd-confirm-preview{width:100%;height:42px;flex:0 0 42px;padding:12px 16px;border:1px solid var(--modal-field-border);border-radius:12px;background:var(--modal-field-bg);font-size:10px;line-height:1.2;color:var(--text-primary);white-space:pre-wrap;word-break:break-all;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
@@ -4751,7 +4757,10 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
   <div class="cmd-panel" id="cmdPanel">
     <div class="cmd-panel-main">
       <textarea id="cmdInput" class="cmd-input" rows="5" placeholder="输入 CMD" onkeydown="cmdHandleKey(event)"></textarea>
-      <div class="cmd-tip">Tip: 仅限本机执行，含 rm 的命令会被拦截。</div>
+      <div class="cmd-options">
+        <label class="cmd-timeout" for="cmdTimeoutInput">超时 <input id="cmdTimeoutInput" class="cmd-timeout-input" type="number" min="1" step="1" inputmode="numeric" value="300" aria-label="CMD 超时秒数" onkeydown="cmdHandleKey(event)"> 秒</label>
+        <div class="cmd-tip">Tip: 仅限本机执行，含 rm 的命令会被拦截。</div>
+      </div>
       <div class="cmd-actions">
         <button type="button" class="cmd-cancel-btn" onclick="cmdClosePanel()">取消</button>
         <button type="button" class="cmd-exec-btn" id="cmdRequestBtn" onclick="cmdRequestConfirm()">执行</button>
@@ -33274,6 +33283,8 @@ function updateModelIndicator() {
 
 let cmdExecuting = false;
 let cmdDangerFocusTimer = null;
+const cmdDefaultTimeoutSeconds = 300;
+let cmdPendingTimeoutMs = cmdDefaultTimeoutSeconds * 1000;
 let cliKillPendingBubble = null;
 
 function cliKillResetConfirmState() {
@@ -33898,9 +33909,11 @@ async function cmdCopyFromCliBubble(event) {
 function cmdSetBusy(busy) {
   cmdExecuting = !!busy;
   const input = document.getElementById('cmdInput');
+  const timeoutInput = document.getElementById('cmdTimeoutInput');
   const requestBtn = document.getElementById('cmdRequestBtn');
   const confirmBtn = document.getElementById('cmdConfirmBtn');
   if (input) input.disabled = cmdExecuting;
+  if (timeoutInput) timeoutInput.disabled = cmdExecuting;
   if (requestBtn) {
     requestBtn.disabled = cmdExecuting;
     requestBtn.textContent = cmdExecuting ? '执行中' : '执行';
@@ -33947,10 +33960,13 @@ function cmdHighlightDangerTip() {
 
 function cmdResetPanel() {
   const input = document.getElementById('cmdInput');
+  const timeoutInput = document.getElementById('cmdTimeoutInput');
   const preview = document.getElementById('cmdConfirmPreview');
   const panel = document.getElementById('cmdPanel');
   if (input) input.value = '';
+  if (timeoutInput) timeoutInput.value = String(cmdDefaultTimeoutSeconds);
   if (preview) preview.textContent = '';
+  cmdPendingTimeoutMs = cmdDefaultTimeoutSeconds * 1000;
   if (panel) panel.classList.remove('confirming', 'danger-focus');
   clearTimeout(cmdDangerFocusTimer);
   cmdDangerFocusTimer = null;
@@ -34099,6 +34115,23 @@ function cmdHandleKey(event) {
   }
 }
 
+function cmdGetTimeoutMs() {
+  const input = document.getElementById('cmdTimeoutInput');
+  const raw = input ? input.value.trim() : '';
+  if (!/^\d+$/.test(raw)) {
+    cmdShowToast('超时请输入正整数（秒）', true);
+    if (input) input.focus();
+    return null;
+  }
+  const seconds = Number(raw);
+  if (!Number.isSafeInteger(seconds) || seconds <= 0 || seconds > Math.floor(Number.MAX_SAFE_INTEGER / 1000)) {
+    cmdShowToast('超时请输入有效的正整数秒数', true);
+    if (input) input.focus();
+    return null;
+  }
+  return seconds * 1000;
+}
+
 function cmdRequestConfirm() {
   const chatId = state.activeChat;
   if (!chatId) {
@@ -34117,8 +34150,11 @@ function cmdRequestConfirm() {
     if (input) input.focus();
     return;
   }
+  const timeoutMs = cmdGetTimeoutMs();
+  if (timeoutMs === null) return;
   const preview = document.getElementById('cmdConfirmPreview');
   const panel = document.getElementById('cmdPanel');
+  cmdPendingTimeoutMs = timeoutMs;
   if (preview) preview.textContent = cmd;
   if (panel) panel.classList.add('confirming');
   cmdHighlightDangerTip();
@@ -34153,6 +34189,7 @@ async function cmdExecuteConfirmed() {
     return;
   }
 
+  const timeoutMs = cmdPendingTimeoutMs;
   cmdSetBusy(true);
   const historyEntry = startManualCmdCliHistory(chatId, cmd);
   cmdClosePanel(true);
@@ -34173,7 +34210,7 @@ async function cmdExecuteConfirmed() {
     const resp = await fetchExecApi('/api/cmd', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ agentId, chatId, cmd })
+      body: JSON.stringify({ agentId, chatId, cmd, timeout: timeoutMs })
     });
     const rawText = await resp.text();
     let data = null;

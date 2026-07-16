@@ -3,6 +3,7 @@ package main
 import (
 	"connect/browserplaywrightsvc"
 	"connect/connectsvc"
+	"context"
 	cryptorand "crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
@@ -86,6 +87,7 @@ var (
 	browserRandomIntnFn                                    = browserRandomIntn
 	browserAttachedCommandStartProcessFn                   = browserStartAttachedChromeProcessDirect
 	browserAttachedCommandWaitForExitFn                    = browserWaitForChromeProcessExit
+	browserResolveInstanceInitRuntimeConfigFn              = browserResolveInstanceInitRuntimeConfig
 )
 
 type browserCDPVersion struct {
@@ -216,7 +218,7 @@ func browserCreateInstance(flags map[string]string) (browserInstanceRecord, erro
 			"chromePath":   chromePath,
 			"headlessMode": headlessMode,
 		})
-		wslRecord, err := browserAcquireWSLManagedInstanceWithLauncher(flags, agentID, chatID, headlessMode != "none", false, chromePath)
+		wslRecord, err := browserAcquireWSLManagedInstanceWithLauncher(context.Background(), flags, agentID, chatID, headlessMode != "none", false, chromePath)
 		if err != nil {
 			return browserInstanceRecord{}, err
 		}
@@ -358,6 +360,21 @@ func browserInitInstance(flags map[string]string) (browserInstanceRecord, error)
 	}
 	next["agentId"] = agentID
 	next["chatId"] = chatID
+	runtimeConfig, err := browserResolveInstanceInitRuntimeConfigFn()
+	if err != nil {
+		return browserInstanceRecord{}, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), runtimeConfig.Timeout)
+	defer cancel()
+	browserCreateTrace("instance.init.config", map[string]any{
+		"agentId":    agentID,
+		"chatId":     chatID,
+		"configPath": runtimeConfig.ConfigPath,
+		"timeout":    runtimeConfig.Timeout.String(),
+	})
+	if err := browserInstanceInitContextError(ctx.Done()); err != nil {
+		return browserInstanceRecord{}, err
+	}
 	if _, err := instanceGetFn(next); err != nil {
 		if !browserIsInstanceNotFoundError(err) {
 			return browserInstanceRecord{}, err
@@ -367,7 +384,10 @@ func browserInitInstance(flags map[string]string) (browserInstanceRecord, error)
 	if err := browserInvokeInstanceShutdown(next); err != nil && !browserIsInstanceNotFoundError(err) {
 		return browserInstanceRecord{}, err
 	}
-	return browserCreateAttachedInstance(next, agentID, chatID)
+	if err := browserInstanceInitContextError(ctx.Done()); err != nil {
+		return browserInstanceRecord{}, err
+	}
+	return browserCreateAttachedInstance(ctx, next, agentID, chatID)
 }
 
 func browserDestroyInstance(flags map[string]string) error {
@@ -552,7 +572,10 @@ func browserIsInstanceNotFoundError(err error) bool {
 	return strings.Contains(strings.ToLower(strings.TrimSpace(err.Error())), "instance not found:")
 }
 
-func browserCreateAttachedInstance(flags map[string]string, agentID, chatID string) (browserInstanceRecord, error) {
+func browserCreateAttachedInstance(ctx context.Context, flags map[string]string, agentID, chatID string) (browserInstanceRecord, error) {
+	if err := browserInstanceInitContextError(ctx.Done()); err != nil {
+		return browserInstanceRecord{}, err
+	}
 	browserCreateTrace("instance.init.begin", map[string]any{
 		"agentId": agentID,
 		"chatId":  chatID,
@@ -586,8 +609,16 @@ func browserCreateAttachedInstance(flags map[string]string, agentID, chatID stri
 		waitFn       func() error
 	)
 	if isWSL {
-		wslRecord, err := browserAcquireWSLManagedInstanceWithLauncher(flags, agentID, chatID, false, true, chromePath)
+		wslRecord, err := browserAcquireWSLManagedInstanceWithLauncher(ctx, flags, agentID, chatID, false, true, chromePath)
 		if err != nil {
+			if timeoutErr := browserInstanceInitContextError(ctx.Done()); timeoutErr != nil {
+				browserBestEffortCleanupTimedOutWSLInit(agentID, chatID)
+				return browserInstanceRecord{}, timeoutErr
+			}
+			return browserInstanceRecord{}, err
+		}
+		if err := browserInstanceInitContextError(ctx.Done()); err != nil {
+			_ = browserTerminateManagedInstanceFn(browserInstanceRecord{PID: wslRecord.PID, Port: wslRecord.Port})
 			return browserInstanceRecord{}, err
 		}
 		browserCreateTrace("instance.init.launch", map[string]any{
@@ -604,6 +635,10 @@ func browserCreateAttachedInstance(flags map[string]string, agentID, chatID stri
 			PID:          wslRecord.PID,
 			CDP:          wslRecord.WS,
 			LastActiveAt: browserFormatActivityTime(browserNowFn()),
+		}
+		if err := browserInstanceInitContextError(ctx.Done()); err != nil {
+			_ = browserTerminateManagedInstanceFn(browserInstanceRecord{PID: wslRecord.PID, Port: wslRecord.Port})
+			return browserInstanceRecord{}, err
 		}
 		items = browserUpsertInstanceState(items, item)
 		if err := browserSaveInstances(statePath, items); err != nil {
@@ -631,7 +666,7 @@ func browserCreateAttachedInstance(flags map[string]string, agentID, chatID stri
 		return browserInstanceRecord{}, err
 	}
 	if browserRuntimeGOOSFn() == "darwin" {
-		if err := browserPrepareChromeUserDataDirFn(flags, profilePaths.Local); err != nil {
+		if err := browserPrepareChromeUserDataDirWithContext(ctx, flags, profilePaths.Local); err != nil {
 			return browserInstanceRecord{}, err
 		}
 		launchArgs := browserInitChromeLaunchArgs(port, profilePaths.Launch)
@@ -652,7 +687,15 @@ func browserCreateAttachedInstance(flags map[string]string, agentID, chatID stri
 		if waitFn == nil {
 			waitFn = func() error { return nil }
 		}
-		if err = browserWaitForPortFn(pid, port, browserChromeStartupTimeout()); err != nil {
+		if err = browserWaitForPortFn(pid, port, browserInstanceInitRemainingTimeout(ctx)); err != nil {
+			_ = browserTerminateProcessFn(pid)
+			_ = waitFn()
+			if timeoutErr := browserInstanceInitContextError(ctx.Done()); timeoutErr != nil {
+				return browserInstanceRecord{}, timeoutErr
+			}
+			return browserInstanceRecord{}, err
+		}
+		if err := browserInstanceInitContextError(ctx.Done()); err != nil {
 			_ = browserTerminateProcessFn(pid)
 			_ = waitFn()
 			return browserInstanceRecord{}, err
@@ -671,6 +714,11 @@ func browserCreateAttachedInstance(flags map[string]string, agentID, chatID stri
 			PID:          pid,
 			CDP:          cdp,
 			LastActiveAt: browserFormatActivityTime(browserNowFn()),
+		}
+		if err := browserInstanceInitContextError(ctx.Done()); err != nil {
+			_ = browserTerminateProcessFn(pid)
+			_ = waitFn()
+			return browserInstanceRecord{}, err
 		}
 		items = browserUpsertInstanceState(items, item)
 		if err := browserSaveInstances(statePath, items); err != nil {
@@ -699,7 +747,7 @@ func browserCreateAttachedInstance(flags map[string]string, agentID, chatID stri
 		"port":             port,
 		"attempt":          1,
 	})
-	if err := browserPrepareChromeUserDataDirFn(flags, profilePaths.Local); err != nil {
+	if err := browserPrepareChromeUserDataDirWithContext(ctx, flags, profilePaths.Local); err != nil {
 		return browserInstanceRecord{}, err
 	}
 	launchArgs := browserInitChromeLaunchArgs(port, profilePaths.Launch)
@@ -720,7 +768,15 @@ func browserCreateAttachedInstance(flags map[string]string, agentID, chatID stri
 	if waitFn == nil {
 		waitFn = func() error { return nil }
 	}
-	if err = browserWaitForPortFn(pid, port, browserChromeStartupTimeout()); err != nil {
+	if err = browserWaitForPortFn(pid, port, browserInstanceInitRemainingTimeout(ctx)); err != nil {
+		_ = browserTerminateProcessFn(pid)
+		_ = waitFn()
+		if timeoutErr := browserInstanceInitContextError(ctx.Done()); timeoutErr != nil {
+			return browserInstanceRecord{}, timeoutErr
+		}
+		return browserInstanceRecord{}, err
+	}
+	if err := browserInstanceInitContextError(ctx.Done()); err != nil {
 		_ = browserTerminateProcessFn(pid)
 		_ = waitFn()
 		return browserInstanceRecord{}, err
@@ -740,6 +796,11 @@ func browserCreateAttachedInstance(flags map[string]string, agentID, chatID stri
 		CDP:          cdp,
 		LastActiveAt: browserFormatActivityTime(browserNowFn()),
 	}
+	if err := browserInstanceInitContextError(ctx.Done()); err != nil {
+		_ = browserTerminateProcessFn(pid)
+		_ = waitFn()
+		return browserInstanceRecord{}, err
+	}
 	items = browserUpsertInstanceState(items, item)
 	if err := browserSaveInstances(statePath, items); err != nil {
 		_ = browserTerminateProcessFn(pid)
@@ -758,6 +819,14 @@ func browserCreateAttachedInstance(flags map[string]string, agentID, chatID stri
 		"cdp":     item.CDP,
 	})
 	return apiRecord, nil
+}
+
+func browserBestEffortCleanupTimedOutWSLInit(agentID, chatID string) {
+	item, found := browserWSLInstanceLookupRecordFn(agentID, chatID)
+	if !found || item.PID <= 0 {
+		return
+	}
+	_ = browserWSLTerminateProcessFn(item.PID, item.Port)
 }
 
 func browserDestroyInstanceAlreadyClosed(item browserInstanceRecord) bool {
@@ -1491,6 +1560,13 @@ func browserResolveRuntimePathValue(runtimePath, raw string) string {
 }
 
 func browserPrepareChromeUserDataDir(flags map[string]string, profileDir string) error {
+	return browserPrepareChromeUserDataDirWithContext(context.Background(), flags, profileDir)
+}
+
+func browserPrepareChromeUserDataDirWithContext(ctx context.Context, flags map[string]string, profileDir string) error {
+	if err := browserInstanceInitContextError(ctx.Done()); err != nil {
+		return err
+	}
 	profileDir = strings.TrimSpace(profileDir)
 	if profileDir == "" {
 		return errors.New("chrome profile dir is required")
@@ -1623,7 +1699,7 @@ func browserPrepareChromeUserDataDir(flags map[string]string, profileDir string)
 		"sourceDir":  sourceDir,
 		"sourceKind": sourceKind,
 	})
-	copyStats, err := browserCopyDirectoryWithProgress(
+	copyStats, err := browserCopyDirectoryWithProgressContext(ctx,
 		sourceDir,
 		profileDir,
 		browserInstanceUserDataProgressTracer("instance.user_data.copy.progress", map[string]any{
@@ -1675,6 +1751,18 @@ func browserPrepareChromeUserDataDir(flags map[string]string, profileDir string)
 		"sourceKind": sourceKind,
 	})
 	return nil
+}
+
+func browserInstanceInitRemainingTimeout(ctx context.Context) time.Duration {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return browserChromeStartupTimeout()
+	}
+	remaining := time.Until(deadline)
+	if remaining <= 0 {
+		return time.Nanosecond
+	}
+	return remaining
 }
 
 func browserMaybeCleanupPreparedChromeUserData(profileDir string) error {
@@ -1784,14 +1872,22 @@ func browserCopyDirectory(sourceDir, targetDir string) error {
 }
 
 func browserCopyDirectoryWithProgress(sourceDir, targetDir string, progressFn func(browserArchiveProgress), skipFn func(string, error)) (browserArchiveProgress, error) {
-	return browserCopyDirectoryWithProgressUsingSkipRule(sourceDir, targetDir, progressFn, skipFn, browserShouldSkipClonedChromeUserDataPath)
+	return browserCopyDirectoryWithProgressContext(context.Background(), sourceDir, targetDir, progressFn, skipFn)
+}
+
+func browserCopyDirectoryWithProgressContext(ctx context.Context, sourceDir, targetDir string, progressFn func(browserArchiveProgress), skipFn func(string, error)) (browserArchiveProgress, error) {
+	return browserCopyDirectoryWithProgressUsingSkipRuleContext(ctx, sourceDir, targetDir, progressFn, skipFn, browserShouldSkipClonedChromeUserDataPath)
 }
 
 func browserCopyWSLChromeUserDataWithProgress(sourceDir, targetDir string, progressFn func(browserArchiveProgress), skipFn func(string, error)) (browserArchiveProgress, error) {
-	return browserCopyDirectoryWithProgressUsingSkipRule(sourceDir, targetDir, progressFn, skipFn, browserShouldSkipWSLChromeUserDataPath)
+	return browserCopyDirectoryWithProgressUsingSkipRuleContext(context.Background(), sourceDir, targetDir, progressFn, skipFn, browserShouldSkipWSLChromeUserDataPath)
 }
 
 func browserCopyDirectoryWithProgressUsingSkipRule(sourceDir, targetDir string, progressFn func(browserArchiveProgress), skipFn func(string, error), shouldSkip func(string) (bool, string)) (browserArchiveProgress, error) {
+	return browserCopyDirectoryWithProgressUsingSkipRuleContext(context.Background(), sourceDir, targetDir, progressFn, skipFn, shouldSkip)
+}
+
+func browserCopyDirectoryWithProgressUsingSkipRuleContext(ctx context.Context, sourceDir, targetDir string, progressFn func(browserArchiveProgress), skipFn func(string, error), shouldSkip func(string) (bool, string)) (browserArchiveProgress, error) {
 	progress := browserArchiveProgress{}
 	sourceDir = filepath.Clean(strings.TrimSpace(sourceDir))
 	targetDir = filepath.Clean(strings.TrimSpace(targetDir))
@@ -1799,6 +1895,9 @@ func browserCopyDirectoryWithProgressUsingSkipRule(sourceDir, targetDir string, 
 		return progress, errors.New("source and target chrome dirs are required")
 	}
 	err := filepath.WalkDir(sourceDir, func(path string, entry fs.DirEntry, walkErr error) error {
+		if err := browserInstanceInitContextError(ctx.Done()); err != nil {
+			return err
+		}
 		if walkErr != nil {
 			if browserShouldSkipArchivePathError(walkErr) {
 				if skipFn != nil {
@@ -1847,7 +1946,7 @@ func browserCopyDirectoryWithProgressUsingSkipRule(sourceDir, targetDir string, 
 			}
 			return nil
 		case mode.IsRegular():
-			if err := browserCopyFile(path, destination, mode.Perm()); err != nil {
+			if err := browserCopyFileWithContext(ctx, path, destination, mode.Perm()); err != nil {
 				if browserShouldSkipArchivePathError(err) {
 					if skipFn != nil {
 						skipFn(path, err)
@@ -2035,6 +2134,13 @@ func browserExtractRemoteDebuggingPort(commandLine string) int {
 }
 
 func browserCopyFile(sourcePath, targetPath string, perm fs.FileMode) error {
+	return browserCopyFileWithContext(context.Background(), sourcePath, targetPath, perm)
+}
+
+func browserCopyFileWithContext(ctx context.Context, sourcePath, targetPath string, perm fs.FileMode) error {
+	if err := browserInstanceInitContextError(ctx.Done()); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
 		return err
 	}
@@ -2048,9 +2154,26 @@ func browserCopyFile(sourcePath, targetPath string, perm fs.FileMode) error {
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(dst, src); err != nil {
-		dst.Close()
-		return err
+	buffer := make([]byte, 128*1024)
+	for {
+		if err := browserInstanceInitContextError(ctx.Done()); err != nil {
+			_ = dst.Close()
+			return err
+		}
+		readCount, readErr := src.Read(buffer)
+		if readCount > 0 {
+			if _, err := dst.Write(buffer[:readCount]); err != nil {
+				_ = dst.Close()
+				return err
+			}
+		}
+		if errors.Is(readErr, io.EOF) {
+			break
+		}
+		if readErr != nil {
+			_ = dst.Close()
+			return readErr
+		}
 	}
 	if err := dst.Close(); err != nil {
 		return err

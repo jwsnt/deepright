@@ -242,3 +242,15 @@ func TestRunCommandWithModeUsesBubblewrapBinary(t *testing.T) {
 func shellQuote(path string) string {
 	return "'" + strings.ReplaceAll(path, "'", "'\\''") + "'"
 }
+
+func TestTimeoutOutput(t *testing.T) {
+	if got := timeoutOutput(""); got != "[Warning: Command execution timed out.]" {
+		t.Fatalf("timeoutOutput(empty) = %q", got)
+	}
+	if got := timeoutOutput("partial output"); got != "partial output[Warning: Command execution timed out, the returned content may be incomplete.]" {
+		t.Fatalf("timeoutOutput(partial) = %q", got)
+	}
+	if got := timeoutOutput("\n\t "); got != "[Warning: Command execution timed out.]" {
+		t.Fatalf("timeoutOutput(whitespace) = %q", got)
+	}
+}

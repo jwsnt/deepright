@@ -73,7 +73,11 @@ func browserWSLInstanceCommand(args []string) int {
 	forceRecreate := browserWSLForceRecreateRequested()
 	chromePath := strings.TrimSpace(connectsvc.FirstValue(flags, "chrome"))
 
-	record, err := browserWSLInstanceAcquire(agentID, chatID, headless, forceRecreate, chromePath)
+	timeout := browserWSLInstanceTimeout
+	if forceRecreate {
+		timeout = browserWSLInstanceInitTimeoutFromEnvironment()
+	}
+	record, err := browserWSLInstanceAcquire(agentID, chatID, headless, forceRecreate, chromePath, timeout)
 	if err != nil {
 		return browserWSLInstanceWriteFailure(err)
 	}
@@ -109,7 +113,10 @@ func browserWSLInstanceWriteFailure(err error) int {
 	return 1
 }
 
-func browserWSLInstanceAcquire(agentID, chatID string, headless, forceRecreate bool, chromePath string) (browserWSLInstanceRecord, error) {
+func browserWSLInstanceAcquire(agentID, chatID string, headless, forceRecreate bool, chromePath string, timeout time.Duration) (browserWSLInstanceRecord, error) {
+	if timeout <= 0 {
+		timeout = browserWSLInstanceTimeout
+	}
 	if ok, err := browserWSLDetectFn(); err != nil {
 		return browserWSLInstanceRecord{}, err
 	} else if !ok {
@@ -145,7 +152,7 @@ func browserWSLInstanceAcquire(agentID, chatID string, headless, forceRecreate b
 			if err := browserWSLInstanceStopForRecreate(existing); err != nil {
 				return browserWSLInstanceRecord{}, err
 			}
-			recreatedRecord, recreated, recreateErr := browserWSLInstanceRestartStaleRecord(agentID, chatID, existing, headless, chromePath)
+			recreatedRecord, recreated, recreateErr := browserWSLInstanceRestartStaleRecord(agentID, chatID, existing, headless, chromePath, timeout)
 			if recreateErr == nil && recreated {
 				if err := browserWSLInstanceUpsertRecord(db, recreatedRecord); err != nil {
 					return browserWSLInstanceRecord{}, err
@@ -163,7 +170,7 @@ func browserWSLInstanceAcquire(agentID, chatID string, headless, forceRecreate b
 				}
 				return liveRecord, nil
 			}
-			reusedRecord, reused, reuseErr := browserWSLInstanceRestartStaleRecord(agentID, chatID, existing, headless, chromePath)
+			reusedRecord, reused, reuseErr := browserWSLInstanceRestartStaleRecord(agentID, chatID, existing, headless, chromePath, timeout)
 			if reuseErr == nil && reused {
 				if err := browserWSLInstanceUpsertRecord(db, reusedRecord); err != nil {
 					return browserWSLInstanceRecord{}, err
@@ -187,9 +194,9 @@ func browserWSLInstanceAcquire(agentID, chatID string, headless, forceRecreate b
 		return browserWSLInstanceRecord{}, err
 	}
 
-	record, err := browserWSLInstanceWaitForReady(agentID, chatID, 0, profileWin, profileUnix, launchPID)
+	record, err := browserWSLInstanceWaitForReady(agentID, chatID, 0, profileWin, profileUnix, launchPID, timeout)
 	if err != nil {
-		_ = browserWSLInstanceRemoveProfile(profileWin)
+		_ = browserWSLTerminateProcessFn(launchPID, 0)
 		return browserWSLInstanceRecord{}, err
 	}
 	if err := browserWSLInstanceUpsertRecord(db, record); err != nil {
@@ -237,7 +244,7 @@ func browserWSLInstanceLookupRecord(agentID, chatID string) (browserWSLInstanceR
 	return record, true
 }
 
-func browserWSLInstanceRestartStaleRecord(agentID, chatID string, item browserWSLInstanceRecord, headless bool, chromePath string) (browserWSLInstanceRecord, bool, error) {
+func browserWSLInstanceRestartStaleRecord(agentID, chatID string, item browserWSLInstanceRecord, headless bool, chromePath string, timeout time.Duration) (browserWSLInstanceRecord, bool, error) {
 	if item.Port <= 0 {
 		return browserWSLInstanceRecord{}, false, errors.New("stored port is invalid")
 	}
@@ -265,8 +272,9 @@ func browserWSLInstanceRestartStaleRecord(agentID, chatID string, item browserWS
 	if err != nil {
 		return browserWSLInstanceRecord{}, false, err
 	}
-	record, err := browserWSLInstanceWaitForReady(agentID, chatID, item.Port, profileWin, profileUnix, launchPID)
+	record, err := browserWSLInstanceWaitForReady(agentID, chatID, item.Port, profileWin, profileUnix, launchPID, timeout)
 	if err != nil {
+		_ = browserWSLTerminateProcessFn(launchPID, item.Port)
 		return browserWSLInstanceRecord{}, false, err
 	}
 	record.Port = item.Port
@@ -574,8 +582,11 @@ func browserWSLInstanceResolveChromePath(chromePath string) string {
 	return chromePath
 }
 
-func browserWSLInstanceWaitForReady(agentID, chatID string, expectedPort int, profileWin, profileUnix string, launchPID int) (browserWSLInstanceRecord, error) {
-	deadline := time.Now().Add(browserWSLInstanceTimeout)
+func browserWSLInstanceWaitForReady(agentID, chatID string, expectedPort int, profileWin, profileUnix string, launchPID int, timeout time.Duration) (browserWSLInstanceRecord, error) {
+	if timeout <= 0 {
+		timeout = browserWSLInstanceTimeout
+	}
+	deadline := time.Now().Add(timeout)
 	var lastErr error
 
 	for {
@@ -619,9 +630,21 @@ func browserWSLInstanceWaitForReady(agentID, chatID string, expectedPort int, pr
 	}
 
 	if lastErr == nil {
-		lastErr = errors.New("cdp not ready after 30s")
+		lastErr = fmt.Errorf("cdp not ready after %s", timeout)
 	}
 	return browserWSLInstanceRecord{}, lastErr
+}
+
+func browserWSLInstanceInitTimeoutFromEnvironment() time.Duration {
+	raw := strings.TrimSpace(os.Getenv(browserWSLInitTimeoutEnv))
+	if raw == "" {
+		return browserWSLInstanceTimeout
+	}
+	seconds, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || seconds <= 0 {
+		return browserWSLInstanceTimeout
+	}
+	return time.Duration(seconds) * time.Second
 }
 
 func browserWSLInstanceWaitForPortRelease(port int, timeout time.Duration) error {

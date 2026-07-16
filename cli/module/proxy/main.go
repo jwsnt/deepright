@@ -1545,7 +1545,7 @@ func executeExternalCommand(binary string, args []string, rawCmd string, timeout
 	out, err := c.CombinedOutput()
 	output := string(out)
 	if ctx.Err() == context.DeadlineExceeded {
-		return 1, "命令执行超时"
+		return 1, formatCommandTimeoutOutput(output)
 	}
 	if ctx.Err() == context.Canceled {
 		return 1, "命令被终止"
@@ -1560,6 +1560,13 @@ func executeExternalCommand(binary string, args []string, rawCmd string, timeout
 		return 1, err.Error()
 	}
 	return 0, output
+}
+
+func formatCommandTimeoutOutput(output string) string {
+	if strings.TrimSpace(output) == "" {
+		return "[Warning: Command execution timed out.]"
+	}
+	return output + "[Warning: Command execution timed out, the returned content may be incomplete.]"
 }
 
 func executeShellCommand(shell, rawCmd string, timeoutMs int64, onStart func(*activeCmd)) (int, string) {

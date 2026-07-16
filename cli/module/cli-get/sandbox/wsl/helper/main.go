@@ -244,7 +244,7 @@ func runCommandWithMode(cmdText, shell string, timeoutMS int, mode string, force
 		return commandResult{Status: 1, Output: output}
 	}
 	if ctx.Err() == context.DeadlineExceeded {
-		return commandResult{Status: 1, Output: "命令执行超时"}
+		return commandResult{Status: 1, Output: timeoutOutput(output)}
 	}
 	if ctx.Err() == context.Canceled {
 		return commandResult{Status: 1, Output: "命令被终止"}
@@ -256,6 +256,13 @@ func runCommandWithMode(cmdText, shell string, timeoutMS int, mode string, force
 		return commandResult{Status: 1, Output: err.Error()}
 	}
 	return commandResult{Status: 0, Output: output}
+}
+
+func timeoutOutput(output string) string {
+	if strings.TrimSpace(output) == "" {
+		return "[Warning: Command execution timed out.]"
+	}
+	return output + "[Warning: Command execution timed out, the returned content may be incomplete.]"
 }
 
 func resolveShellPath(shell string) (string, error) {

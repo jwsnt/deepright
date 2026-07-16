@@ -37,9 +37,10 @@ func TestBrowserResolveLauncherScriptPathRecreatesMissingLauncher(t *testing.T) 
 	}
 }
 
-func TestBrowserWSLInitTimeoutFromRuntimeConfig(t *testing.T) {
+func TestBrowserResolveInstanceInitRuntimeConfigUsesRecordedIntegrationConfig(t *testing.T) {
 	restore := stubBrowserRuntime()
 	defer restore()
+	browserResolveInstanceInitRuntimeConfigFn = browserResolveInstanceInitRuntimeConfig
 
 	runtimeRoot := t.TempDir()
 	pluginDir := filepath.Join(runtimeRoot, "plugins")
@@ -54,15 +55,27 @@ func TestBrowserWSLInitTimeoutFromRuntimeConfig(t *testing.T) {
 	if err := os.WriteFile(runtimePath, []byte(`{"browser":{"init_timeout":300}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	connectBin := filepath.Join(runtimeRoot, "integration")
+	if err := os.WriteFile(connectBin, []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := browserWriteRecordedConnectBin(connectBin); err != nil {
+		t.Fatal(err)
+	}
 
-	if got := browserWSLInitTimeoutFromRuntimeConfig(map[string]string{}, 45*time.Second); got != 5*time.Minute {
-		t.Fatalf("timeout = %s, want %s", got, 5*time.Minute)
+	config, err := browserResolveInstanceInitRuntimeConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.Timeout != 5*time.Minute {
+		t.Fatalf("timeout = %s, want %s", config.Timeout, 5*time.Minute)
 	}
 }
 
-func TestBrowserWSLInitTimeoutFromRuntimeConfigFallsBackForInvalidValue(t *testing.T) {
+func TestBrowserResolveInstanceInitRuntimeConfigDefaultsOnlyWhenFieldIsMissing(t *testing.T) {
 	restore := stubBrowserRuntime()
 	defer restore()
+	browserResolveInstanceInitRuntimeConfigFn = browserResolveInstanceInitRuntimeConfig
 
 	runtimeRoot := t.TempDir()
 	pluginDir := filepath.Join(runtimeRoot, "plugins")
@@ -74,12 +87,22 @@ func TestBrowserWSLInitTimeoutFromRuntimeConfigFallsBackForInvalidValue(t *testi
 	if err := os.MkdirAll(filepath.Dir(runtimePath), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(runtimePath, []byte(`{"browser":{"init_timeout":0}}`), 0o644); err != nil {
+	if err := os.WriteFile(runtimePath, []byte(`{"browser":{}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	connectBin := filepath.Join(runtimeRoot, "integration")
+	if err := os.WriteFile(connectBin, []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := browserWriteRecordedConnectBin(connectBin); err != nil {
 		t.Fatal(err)
 	}
 
-	const fallback = 45 * time.Second
-	if got := browserWSLInitTimeoutFromRuntimeConfig(map[string]string{}, fallback); got != fallback {
-		t.Fatalf("timeout = %s, want fallback %s", got, fallback)
+	config, err := browserResolveInstanceInitRuntimeConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.Timeout != browserDefaultInstanceInitTimeout {
+		t.Fatalf("timeout = %s, want %s", config.Timeout, browserDefaultInstanceInitTimeout)
 	}
 }

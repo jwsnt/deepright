@@ -89,7 +89,6 @@
 - 如果 `C:\ProgramData\deepright\chrome_def` 已存在，会先删除后再复制
 - 复制时会保留各 Chrome Profile 的 `Network`、`Login Data`、`Local Storage`、`Session Storage`、`IndexedDB`、`WebStorage`、`Service Worker` 等登录态目录；只过滤明确的纯缓存和模型目录
 - 复制结束后会继续清理 `SingletonLock`、`SingletonCookie`、`SingletonSocket`、`DevToolsActivePort`、`lockfile`、`*.lock`、`*-journal` 等锁文件
-- Windows WSL / WSL2 下，强制重建的 `instance init` 启动等待上限读取 integration 的 `config.json`：`browser.init_timeout`（单位：秒）；默认配置为 `300`，避免登录态目录较大时启动器提前超时
 - 如果关闭 Chrome 或复制 `chrome_def` 失败，只写 `browser.log`，不会中断 `start`
 - `chrome_def` 刷新成功后不会重启 `integration`，因此不会额外打开或激活新的页面
 
@@ -102,8 +101,7 @@
 说明：
 
 - `start` 和 `stop` 都会读取 `browser` 同目录下的 `browser_instance.json`
-- Browser 后续命令需要的 integration 路径，统一优先从 `browser_runtime.json` 读取
-- 如果 `browser_runtime.json` 不存在，才会按当前 `browser` 二进制路径推断 runtime config
+- 除 `instance init` 外的 Browser 后续命令需要的 integration 路径，统一优先从 `browser_runtime.json` 读取
 - 除 `browser start` 外，其他 Browser 命令传入 `--connect-bin` 都会立即报错
 - `start` 和 `stop` 在执行前后都会把一次 `browser instance list` 快照写入 `browser.log`
 - `stop` 会先停止 Playwright daemon
@@ -157,12 +155,13 @@
 
 - 会先检查该 `AgentId + ChatId` 是否已有实例；如果有，则先走一次优雅 `shutdown`
 - 然后重新创建一个新的有头 Chrome CDP
-- `init` 不接受 `--connect-bin`；运行时路径统一从 `browser_runtime.json` 读取
+- `init` 不接受 `--connect-bin`，且必须先成功执行过 `browser start`；它只使用 Browser 同目录 `browser_runtime.json` 中记录的 integration 路径定位 `config/config.json`，不会从当前目录或 Browser 二进制目录猜测配置位置
+- 所有平台的 `init` 都读取 integration `config/config.json` 的 `browser.init_timeout`，单位为秒；字段缺失时默认 `300` 秒
+- `config/config.json` 不存在、JSON 解析失败、`browser.init_timeout` 不是正整数或 `browser_runtime.json` 不存在/非法时，`init` 会立即报错；配置校验在关闭旧CDP前完成，因此不会影响既有实例
+- `browser.init_timeout` 是整个初始化的总时限，覆盖旧实例关闭、profile准备/复制、Chrome启动和CDP就绪；超时时会终止本次新Chrome并清理本次运行状态，同时保留profile目录
 - `init` 会等到新 CDP 真正可用后才写入状态
 - 初始化时如果正在复制系统 Chrome 登录态目录，会跳过 `RunningChromeVersion`、`Singleton*`、`DevToolsActivePort` 等运行态文件，避免重复初始化时因为这些 symlink / lock 已存在而直接失败
-- 在 macOS 下，写入状态后命令会继续阻塞，直到这个 Chrome/CDP 被关闭，再把状态删掉
-- 在 Linux 原生环境里，写入状态后命令立即返回，不再等待这个 Chrome/CDP 被关闭
-- 在 Windows WSL / WSL2 下，命令会在新的有头 Chrome/CDP 就绪并写入状态后返回；关闭由集成页面的“完成”按钮或 `instance shutdown` 执行
+- 在 macOS、Windows、WSL / WSL2 和Linux下，命令会在新的有头 Chrome/CDP 就绪并写入状态后返回；关闭由集成页面的“完成”按钮或 `instance shutdown` 执行
 - 后续在 `get` / `list` / `create` / `restart` 重载状态时，会自动清理已经退出的 Chrome/CDP 状态
 - 在 Windows WSL / WSL2 下，`init` 会通过插件同目录的 `browser_launcher.sh` 调用 `browser_instance_wsl` 逻辑，以有头模式启动实例
 - 在 Windows WSL / WSL2 下，`init` 会先对同一 `agentId + chatId` 执行一次 `shutdown`，再以 `headless=false` 强制重新拉起有头 Chrome；不会直接复用旧的存活 CDP

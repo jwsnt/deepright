@@ -55,8 +55,53 @@ func TestExecuteTaskReturnsTimeoutMessage(t *testing.T) {
 	if result.Status != 1 {
 		t.Fatalf("status = %d, want 1", result.Status)
 	}
-	if result.Cmd != "命令执行超时" {
-		t.Fatalf("cmd = %q, want 命令执行超时", result.Cmd)
+	if result.Cmd != "[Warning: Command execution timed out.]" {
+		t.Fatalf("cmd = %q, want timeout warning", result.Cmd)
+	}
+	if got := timeoutOutput("\n\t "); got != "[Warning: Command execution timed out.]" {
+		t.Fatalf("timeoutOutput(whitespace) = %q", got)
+	}
+}
+
+func TestExecuteTaskPreservesPartialOutputOnTimeout(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell command is POSIX-specific")
+	}
+	task := &TaskContent{
+		Timeout: 50,
+		Suffix:  "cmd",
+		Type:    "cmd",
+		Tid:     "t-timeout-partial",
+		Cmd:     "printf 'partial output'; sleep 1",
+	}
+	result := ExecuteTask(task, "/bin/sh")
+	if result.Status != 1 {
+		t.Fatalf("status = %d, want 1", result.Status)
+	}
+	want := "partial output[Warning: Command execution timed out, the returned content may be incomplete.]"
+	if result.Cmd != want {
+		t.Fatalf("cmd = %q, want %q", result.Cmd, want)
+	}
+}
+
+func TestExecuteTaskPreservesStderrOnTimeout(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell command is POSIX-specific")
+	}
+	task := &TaskContent{
+		Timeout: 50,
+		Suffix:  "cmd",
+		Type:    "cmd",
+		Tid:     "t-timeout-stderr",
+		Cmd:     "printf 'stderr output' >&2; sleep 1",
+	}
+	result := ExecuteTask(task, "/bin/sh")
+	if result.Status != 1 {
+		t.Fatalf("status = %d, want 1", result.Status)
+	}
+	want := "stderr output[Warning: Command execution timed out, the returned content may be incomplete.]"
+	if result.Cmd != want {
+		t.Fatalf("cmd = %q, want %q", result.Cmd, want)
 	}
 }
 

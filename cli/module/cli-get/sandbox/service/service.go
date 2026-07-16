@@ -18,6 +18,8 @@ import (
 
 const (
 	defaultTaskTimeout = 180 * time.Second
+	timeoutMessage     = "[Warning: Command execution timed out.]"
+	timeoutWarning     = "[Warning: Command execution timed out, the returned content may be incomplete.]"
 )
 
 var sandboxPermissionDeniedMarkers = []string{
@@ -104,6 +106,13 @@ func RunCommandWithMode(cmdText, shell string, timeoutMS int, mode string) Comma
 	}
 }
 
+func timeoutOutput(output string) string {
+	if strings.TrimSpace(output) == "" {
+		return timeoutMessage
+	}
+	return output + timeoutWarning
+}
+
 func executeShellCommand(shell string, task *TaskContent, mode string) (int, string) {
 	timeout := time.Duration(task.Timeout) * time.Millisecond
 	if task.Timeout <= 0 {
@@ -162,7 +171,7 @@ func executeShellCommand(shell string, task *TaskContent, mode string) (int, str
 		return 1, "CLI_SANDBOX权限拒绝"
 	}
 	if ctx.Err() == context.DeadlineExceeded {
-		return 1, "命令执行超时"
+		return 1, timeoutOutput(output)
 	}
 	if ctx.Err() == context.Canceled {
 		return 1, "命令被终止"

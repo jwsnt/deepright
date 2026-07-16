@@ -63,6 +63,7 @@ func stubBrowserRuntime() func() {
 	oldBrowserWSLInstanceLookupRecordFn := browserWSLInstanceLookupRecordFn
 	oldBrowserAttachedCommandStartProcessFn := browserAttachedCommandStartProcessFn
 	oldBrowserAttachedCommandWaitForExitFn := browserAttachedCommandWaitForExitFn
+	oldBrowserResolveInstanceInitRuntimeConfigFn := browserResolveInstanceInitRuntimeConfigFn
 	oldBrowserAllocateCreatePortFn := browserAllocateCreatePortFn
 	oldBrowserAllocateInitPortFn := browserAllocateInitPortFn
 	oldBrowserAllocatePortFn := browserAllocatePortFn
@@ -139,6 +140,9 @@ func stubBrowserRuntime() func() {
 	browserWSLInstanceLookupRecordFn = browserWSLInstanceLookupRecord
 	browserAttachedCommandStartProcessFn = browserStartAttachedChromeProcessDirect
 	browserAttachedCommandWaitForExitFn = browserWaitForChromeProcessExit
+	browserResolveInstanceInitRuntimeConfigFn = func() (browserInstanceInitRuntimeConfig, error) {
+		return browserInstanceInitRuntimeConfig{Timeout: browserDefaultInstanceInitTimeout, ConfigPath: "test"}, nil
+	}
 	browserAllocateCreatePortFn = browserAllocateCreatePort
 	browserAllocateInitPortFn = browserAllocateInitPort
 	browserAllocatePortFn = browserAllocatePort
@@ -197,6 +201,7 @@ func stubBrowserRuntime() func() {
 		browserWSLInstanceLookupRecordFn = oldBrowserWSLInstanceLookupRecordFn
 		browserAttachedCommandStartProcessFn = oldBrowserAttachedCommandStartProcessFn
 		browserAttachedCommandWaitForExitFn = oldBrowserAttachedCommandWaitForExitFn
+		browserResolveInstanceInitRuntimeConfigFn = oldBrowserResolveInstanceInitRuntimeConfigFn
 		browserAllocateCreatePortFn = oldBrowserAllocateCreatePortFn
 		browserAllocateInitPortFn = oldBrowserAllocateInitPortFn
 		browserAllocatePortFn = oldBrowserAllocatePortFn
@@ -555,6 +560,8 @@ func TestRunInstanceHelpIncludesInitCommand(t *testing.T) {
 	for _, wanted := range []string{
 		"browser instance init --agentId AGENT --chatId CHAT",
 		"init always launches headed Chrome, registers the new instance in get/list, and returns once ready",
+		"init requires a successful browser start and uses only its recorded integration config/config.json",
+		"browser.init_timeout is a positive integer number of seconds; a missing field defaults to 300",
 		"on WSL, create/init call browser_launcher.sh beside the plugin; profileDir still stays in the normal CLI response",
 		"C:\\ProgramData\\deepright\\chrome_${suffix}",
 	} {

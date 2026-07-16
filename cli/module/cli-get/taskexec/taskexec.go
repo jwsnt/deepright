@@ -13,7 +13,11 @@ import (
 	"time"
 )
 
-const DefaultTaskTimeout = 180 * time.Second
+const (
+	DefaultTaskTimeout = 180 * time.Second
+	timeoutMessage     = "[Warning: Command execution timed out.]"
+	timeoutWarning     = "[Warning: Command execution timed out, the returned content may be incomplete.]"
+)
 
 var permissionDeniedMarkers = []string{
 	"permission denied",
@@ -77,6 +81,13 @@ func IsPermissionDenied(text string) bool {
 		}
 	}
 	return false
+}
+
+func timeoutOutput(output string) string {
+	if strings.TrimSpace(output) == "" {
+		return timeoutMessage
+	}
+	return output + timeoutWarning
 }
 
 func Execute(rawCmd string, opts Options) Result {
@@ -190,17 +201,17 @@ func Execute(rawCmd string, opts Options) Result {
 	if permissionFlag {
 		return Result{Status: 1, Output: output, PermissionDenied: true}
 	}
+	if ctx.Err() == context.DeadlineExceeded {
+		return Result{Status: 1, Output: timeoutOutput(output), TimedOut: true}
+	}
+	if ctx.Err() == context.Canceled {
+		return Result{Status: 1, Output: "命令被终止", Cancelled: true}
+	}
 	if streamErr1 != nil {
 		return Result{Status: 1, Output: streamErr1.Error()}
 	}
 	if streamErr2 != nil {
 		return Result{Status: 1, Output: streamErr2.Error()}
-	}
-	if ctx.Err() == context.DeadlineExceeded {
-		return Result{Status: 1, Output: "命令执行超时", TimedOut: true}
-	}
-	if ctx.Err() == context.Canceled {
-		return Result{Status: 1, Output: "命令被终止", Cancelled: true}
 	}
 	if waitErr != nil {
 		if exitErr, ok := waitErr.(*exec.ExitError); ok && exitErr.ExitCode() == -1 {

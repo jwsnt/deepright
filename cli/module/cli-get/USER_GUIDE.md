@@ -6,7 +6,7 @@ CLI-Get 是一个心跳上报与任务执行客户端。它以心跳方式将 Ag
 
 - 默认模式：`cli/get -> 本地 Shell 执行 -> cli/pub`
 - 当前版本实际为两段式流水线：`cli/get -> 本地任务队列 -> 执行 -> 本地发布队列 -> cli/pub`
-- 当某个 `Agent+Chat` 的 `sandbox_exe` 为有效枚举值时：`cli/get -> 对应模式的 CLI_SANDBOX -cmd -> cli/pub`
+- 当任务的非空 `chat` 命中有效 `sandbox_exe` 时：`cli/get -> 对应模式的 CLI_SANDBOX -cmd -> cli/pub`
 - 如果 `cli/get` 响应任务中带有 `subOps.exempted=true`，则即使当前会话已开启沙盒，也仍然走原始链路：`cli/get -> 本地 Shell 执行 -> cli/pub`
 - 如果当前工作目录共享 SQLite `data` 的 `message_insert` 表中存在当前 `chat` 的待上传插入消息，则会在 `cli/pub` 前自动附带最多 `5` 条 `insert` 记录；发布成功后自动改为已上传
 
@@ -145,7 +145,8 @@ go build -o cli-get .
 
 ## Sandbox 模式
 
-- `cli-get` 会为每个 `AgentId + Chat` 保存一条 `sandbox_exe` 枚举值，默认空字符串
+- `cli-get` 按 `chatId` 保存和查找 `sandbox_exe`；`agentId` 不参与沙盒状态定位，只用于执行与日志观测
+- `chatId` 必须为非空字符串。空白或缺失的 `chatId` 不会命中已有沙盒状态，也不能写入或删除沙盒状态；这类任务始终按非沙盒链路处理
 - 只有以下 3 个枚举值会启用沙盒：
   - `filepick`：执行前弹出目录选择器；未选择则返回权限拒绝
   - `net`：通过 `sandbox-exec` 关闭网络
@@ -153,8 +154,11 @@ go build -o cli-get .
 - `sandbox_exe` 为空、缺失或不是以上 3 个值时，继续走原来的本地 Shell 执行链路
 - 如果 `cli/get` 响应报文中的 `subOps.exempted=true`，也会直接跳过沙盒并走原始本地执行链路
 - `sandbox_exe` 状态保存在当前工作目录下 SQLite `data` 的 `cli_sandbox_state` 表
-- 新版本首次运行时，如果检测到旧版 `cli_sandbox_state` 仍是历史布尔字段结构，会直接删除旧表并按文本枚举结构重建
-- 关闭沙盒时会直接删除对应 `AgentId + Chat` 的状态行，不再保留旧的关闭记录
+- 表以 `chat_id` 为唯一键，包含 `sandbox_exe`、`allowed_dir` 与 `updated_at`；不会使用 `agent_id + chat_id` 联合主键或联合查询作为运行时命中条件
+- 新版本首次运行时，如检测到旧版表结构（包括以 `agent_id + chat_id` 为键的结构），会删除旧表并重建；旧状态不会迁移
+- 关闭沙盒时会直接删除该 `chatId` 的状态行，不保留关闭记录。无记录等价于模式 `off`
+- 不同 `agentId` 使用同一非空 `chatId` 时，会命中同一条沙盒状态；同一 `agentId` 的不同 `chatId` 则彼此独立
+- 每次成功变更状态会向标准错误输出文本日志，包含 `agentId`、`chatId`、旧模式和新模式；无记录与删除后的状态均记为 `off`。命中沙盒执行时也会输出包含 `agentId`、`chatId` 和当前模式的查找日志
 - `sandbox_app` 优先来自 `--sandbox_app`；未传时读取主程序侧的 `config/config.json` 中的 `sandbox_app`
 - 如果当前会话启用了沙盒模式，但没有找到对应模式的 `CLI_SANDBOX` 可执行文件，本次任务会直接按失败结果回传，不会静默回退到本地直连执行
 - macOS 下会按 `sandbox_exe` 解析对应 bundle：

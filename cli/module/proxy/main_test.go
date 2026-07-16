@@ -12381,3 +12381,30 @@ func TestValidateServeOptionsRejectsUnsupportedPort(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestExecuteExternalCommandTimeoutOutput(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell command is POSIX-specific")
+	}
+
+	tests := []struct {
+		name string
+		cmd  string
+		want string
+	}{
+		{"no output", "sleep 1", "[Warning: Command execution timed out.]"},
+		{"stdout", "printf 'stdout output'; sleep 1", "stdout output[Warning: Command execution timed out, the returned content may be incomplete.]"},
+		{"stderr", "printf 'stderr output' >&2; sleep 1", "stderr output[Warning: Command execution timed out, the returned content may be incomplete.]"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			status, output := executeExternalCommand("/bin/sh", []string{"-c", tt.cmd}, tt.cmd, 50, nil)
+			if status != 1 {
+				t.Fatalf("status = %d, want 1", status)
+			}
+			if output != tt.want {
+				t.Fatalf("output = %q, want %q", output, tt.want)
+			}
+		})
+	}
+}

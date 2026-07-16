@@ -51,6 +51,8 @@ const (
 	logTypeCLIGet                 = 2
 	logTypeCLIPub                 = 3
 	defaultTaskTimeout            = 180 * time.Second
+	commandTimeoutMessage         = "[Warning: Command execution timed out.]"
+	commandTimeoutWarning         = "[Warning: Command execution timed out, the returned content may be incomplete.]"
 	sandboxModeFilePick           = "filepick"
 	sandboxModeNet                = "net"
 	sandboxModeFilePickNet        = "filepick_net"
@@ -1206,9 +1208,7 @@ func ExecuteTaskViaSandboxApp(task *TaskContent, sandboxExecutable, allowedDir s
 		text = "命令被终止"
 	case errors.Is(ctx.Err(), context.DeadlineExceeded):
 		status = 1
-		if strings.TrimSpace(text) == "" {
-			text = "命令执行超时"
-		}
+		text = timeoutOutput(text)
 	case err != nil:
 		status = 1
 		if strings.TrimSpace(text) == "" {
@@ -1225,6 +1225,13 @@ func ExecuteTaskViaSandboxApp(task *TaskContent, sandboxExecutable, allowedDir s
 		Cmd:     gzipBase64String(text),
 		Tid:     task.Tid,
 	}
+}
+
+func timeoutOutput(output string) string {
+	if strings.TrimSpace(output) == "" {
+		return commandTimeoutMessage
+	}
+	return output + commandTimeoutWarning
 }
 
 func ProcessTask(client *http.Client, host string, task *TaskContent, terminal string, metadata *AgentOutput, sandboxExecutable string) error {

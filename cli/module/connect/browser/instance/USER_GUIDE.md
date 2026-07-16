@@ -83,7 +83,9 @@
 - 非 WSL 的同步启动会使用 `--remote-debugging-address=0.0.0.0`
 - 在 Windows WSL / WSL2 里，脚本会负责启动 `browser_instance_wsl`，并把其返回的 `user-data-dir` 映射到原有 CLI 的 `profileDir`
 - `init` 会强制重建同一 `agentId + chatId` 的 CDP，并以有头模式启动；`create` 才会复用可用的已有 CDP
-- WSL 的启动等待上限读取 integration 的 `config.json`：`browser.init_timeout`（单位：秒）；默认配置为 `300`
+- 所有平台的 `init` 都必须先成功执行过 `browser start`，并只通过其生成的 `browser_runtime.json` 定位 integration 的 `config/config.json`；不会猜测其他配置路径
+- `browser.init_timeout` 是 `config/config.json` 中的嵌套正整数秒配置；字段缺失时默认为 `300` 秒，文件缺失、JSON非法或字段非法时立即报错，且不会关闭旧实例
+- 该时限覆盖旧实例关闭、profile复制、Chrome启动和CDP就绪；超时时终止本次新Chrome、清理本次运行状态并保留profile目录
 - 通过集成页面初始化时，新的有头 Chrome 实际启动成功后才会显示“完成”按钮；点击按钮会调用 `instance shutdown`
 
 ## stop
@@ -158,6 +160,6 @@
 
 ## WSL2 说明
 
-`browser_instance create` / `browser_instance init` 在 Windows WSL2 下，会通过 `browser_instance_wsl` 返回真实的 `profileDir`，并统一落在 `C:\ProgramData\deepright\chrome_<随机后缀>`。其中 `init` 会先关闭旧实例、以有头模式重新启动，并读取 `config.json` 的 `browser.init_timeout`（单位：秒，默认 `300`）作为启动等待上限。
+`browser_instance create` / `browser_instance init` 在 Windows WSL2 下，会通过 `browser_instance_wsl` 返回真实的 `profileDir`，并统一落在 `C:\ProgramData\deepright\chrome_<随机后缀>`。其中 `init` 会先完成全平台通用的配置校验，再关闭旧实例并以有头模式重新启动。
 
 `browser_instance stop` 在 Windows WSL2 下只会关闭目标实例并清理对应状态；`chrome_def` 和其他 `chrome_*` 目录都会保留。
