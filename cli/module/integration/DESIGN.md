@@ -277,13 +277,13 @@ HTTP 相关配置当前只从嵌套 `http` 节读取：
 
 ### 端口约束
 
-当前实现不是“任意端口可配置”，而是强制：
+本地 HTTP 服务端口按以下优先级确定：
 
 ```text
---port 只允许 8080
+--port > config/config.json.port > 8080
 ```
 
-`validateIntegrationServicePort()` 会直接拒绝其他端口。
+`validateIntegrationServicePort()` 会拒绝 `1` 至 `65535` 之外的端口。
 
 ## 生命周期设计
 
@@ -324,7 +324,7 @@ integration add-request
 
 1. 读取 `config/config.json`
 2. 绑定 flag，并让 CLI 覆盖配置默认值
-3. 校验端口只能是 `8080`
+3. 校验端口范围为 `1` 至 `65535`
 4. 解析 `default-dir` / `agent-dir` / `site`
 5. 初始化 knowledge runtime
 6. 把最终配置写回 `config/config.json`
@@ -1262,7 +1262,6 @@ bundle 双击启动时：
 
 - 当前核心逻辑高度集中在 `main.go`，模块内聚度高但体量很大。
 - `config/config.json` 同时承担启动配置与运行时记录，旧版单独启动配置文件的描述已不符合当前实现。
-- 服务端口当前硬编码只允许 `8080`。
 - 高频 cron `cycle = 3 / 4 / 5` 只在创建时铺 5 天窗口，后台不会继续补齐。
 - `delete-meta` 与部分 cleanup 流程可能留下 `started = 3` 的孤立 detail 历史记录。
 - `cli-get` 在“无任务”场景当前不会 sleep，会持续快速轮询。

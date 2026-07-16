@@ -814,7 +814,7 @@ proxy --agent-dir ./agent
 |------|------|--------|------|
 | `--agent-dir` | 是 | - | Agent 根目录 |
 | `--default-dir` | 否 | 启动目录下的 `./config` | 新建 Agent 和空 `agent-dir` 启动补齐 `DEF_AGENT` 时使用的默认模板目录 |
-| `--port` | 否 | `8080` | 代理监听端口 |
+| `--port` | 否 | `config/config.json.port`，未配置时为 `8080` | 代理监听端口；显式 `--port` 优先 |
 | `--host` | 否 | `https://www.deepright.cn` | 上游服务地址 |
 | `--device` | 否 | 自动探测 | 设备 ID |
 | `--agent-cache` | 否 | `10000` | Agent 元数据缓存 TTL，单位毫秒 |

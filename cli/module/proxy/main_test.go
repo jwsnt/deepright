@@ -12372,13 +12372,47 @@ func TestProxyBrowserURL(t *testing.T) {
 	}
 }
 
-func TestValidateServeOptionsRejectsUnsupportedPort(t *testing.T) {
-	err := validateServeOptions(serveOptions{port: 9876})
-	if err == nil {
-		t.Fatalf("expected unsupported port error")
+func TestValidateServeOptionsAcceptsCustomPort(t *testing.T) {
+	if err := validateServeOptions(serveOptions{port: 9876}); err != nil {
+		t.Fatalf("validateServeOptions: %v", err)
 	}
-	if !strings.Contains(err.Error(), "--port only supports 8080") {
-		t.Fatalf("err = %v", err)
+}
+
+func TestNewServeFlagSetUsesConfiguredPortUnlessOverridden(t *testing.T) {
+	tempDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tempDir, "config"), 0o755); err != nil {
+		t.Fatalf("mkdir config: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tempDir, "config", "config.json"), []byte(`{"port":19876}`), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	previousDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(previousDir) })
+
+	var opts serveOptions
+	fs := newServeFlagSet("serve", &opts)
+	fs.SetOutput(io.Discard)
+	if err := fs.Parse(nil); err != nil {
+		t.Fatalf("parse defaults: %v", err)
+	}
+	if opts.port != 19876 {
+		t.Fatalf("configured port = %d, want 19876", opts.port)
+	}
+
+	var overridden serveOptions
+	overrideFS := newServeFlagSet("serve", &overridden)
+	overrideFS.SetOutput(io.Discard)
+	if err := overrideFS.Parse([]string{"--port", "18081"}); err != nil {
+		t.Fatalf("parse override: %v", err)
+	}
+	if overridden.port != 18081 {
+		t.Fatalf("overridden port = %d, want 18081", overridden.port)
 	}
 }
 

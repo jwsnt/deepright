@@ -125,13 +125,13 @@
 
 ### 端口约束
 
-`validateProxyServicePort()` 当前把服务端口限制死为：
+本地 HTTP 服务端口按以下优先级确定：
 
 ```text
-8080
+--port > config/config.json.port > 8080
 ```
 
-也就是说帮助文案虽然仍接受 `--port`，但实现上只支持 `8080`。
+`validateProxyServicePort()` 会拒绝 `1` 至 `65535` 之外的端口。
 
 ### `config/config.json`
 
@@ -987,7 +987,7 @@ CLI `proxy log-skill ...` 直接复用同一导出函数 `exportRoundLog(...)`�
 - `skills_warning` 支持 refresh 扫描
 - cron 执行会注入 `META_ID`、`cron_type`、`response_schema`、detail 级 `router_disable`
 - connect pending request 会桥接成即时 cron detail，并在可行时直接执行
-- 服务端口校验只接受 `8080`
+- 服务端口校验会拒绝 `1` 至 `65535` 之外的值
 
 ## 当前实现约束
 
@@ -995,7 +995,7 @@ CLI `proxy log-skill ...` 直接复用同一导出函数 `exportRoundLog(...)`�
 
 - `main.go` 体量非常大，HTTP、CLI、schema、后台任务高度耦合，后续维护成本较高
 - `proxy` 与 `integration` 已统一使用主应用 `config/config.json` 记录运行态启动配置
-- `serve` 的 `--port` 参数当前实质上只接受 `8080`
+- `serve` 的 `--port` 参数优先于 `config/config.json.port`，未配置时回退至 `8080`
 - 帮助文案已暴露 `proxy sandbox ...`，但 `main()` 尚未把它注册成正式顶层 CLI 子命令
 - 文件接口的安全边界并不完全统一：`/api/edit`、`/api/del` 严格限制在 workspace，下游的 `/api/data`、`/api/files`、`/api/raw`、`/api/folder?path=...` 则仍允许绝对路径能力
 - 许多实现细节直接依赖共享 sqlite 同文件协作，而不是明确的服务边界；这让它与 `knowledge`、`connect`、`agentcore` 的运行时耦合较深

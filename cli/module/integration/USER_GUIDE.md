@@ -748,6 +748,7 @@ curl http://127.0.0.1:8080/install_app
 ### `config/config.json` 运行态字段
 
 - 以 HTTP 服务模式启动 `integration` 时，会把解析后的实际运行参数直接写回主应用 `config/config.json`
+- 本地 HTTP 端口的优先级为：显式 `--port`、`config/config.json` 的 `port`、默认 `8080`；端口必须介于 `1` 与 `65535` 之间
 - 文件中会同时保留静态启动配置和运行态字段；例如 `app`、`app-dir`、`resources-dir`、`db`
 - 其中 `db` 会写入应用启动目录下 `data` 的绝对路径
 - `integration stop` 不会删除主应用 `config/config.json`

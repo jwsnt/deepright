@@ -7613,7 +7613,7 @@ func TestLoadIntegrationStartupOptionsReadsBundledResourcesConfig(t *testing.T) 
 	}
 }
 
-func TestLoadIntegrationStartupOptionsRejectsUnsupportedPort(t *testing.T) {
+func TestLoadIntegrationStartupOptionsReadsConfiguredPort(t *testing.T) {
 	tempDir := t.TempDir()
 	useIntegrationExecutableDir(t, tempDir)
 
@@ -7626,14 +7626,53 @@ func TestLoadIntegrationStartupOptionsRejectsUnsupportedPort(t *testing.T) {
 		t.Fatalf("write config.json: %v", err)
 	}
 
-	_, path, err := loadIntegrationStartupOptions()
-	if err == nil {
-		t.Fatalf("expected unsupported port error")
+	opts, path, err := loadIntegrationStartupOptions()
+	if err != nil {
+		t.Fatalf("loadIntegrationStartupOptions: %v", err)
 	}
 	if path != configPath {
 		t.Fatalf("path = %q, want %q", path, configPath)
 	}
-	if !strings.Contains(err.Error(), "--port only supports 8080") {
+	if opts.Config.Port != 19090 {
+		t.Fatalf("port = %d, want 19090", opts.Config.Port)
+	}
+}
+
+func TestLoadIntegrationStartupOptionsPortOverrideTakesPrecedence(t *testing.T) {
+	tempDir := t.TempDir()
+	useIntegrationExecutableDir(t, tempDir)
+
+	configDir := filepath.Join(tempDir, "config")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(`{"port":70000}`), 0o644); err != nil {
+		t.Fatalf("write config.json: %v", err)
+	}
+
+	opts, _, err := loadIntegrationStartupOptionsWithPortOverride(true)
+	if err != nil {
+		t.Fatalf("loadIntegrationStartupOptionsWithPortOverride: %v", err)
+	}
+	if opts.Config.Port != integrationServicePort {
+		t.Fatalf("port = %d, want default %d before CLI flag parsing", opts.Config.Port, integrationServicePort)
+	}
+}
+
+func TestLoadIntegrationStartupOptionsRejectsInvalidConfiguredPort(t *testing.T) {
+	tempDir := t.TempDir()
+	useIntegrationExecutableDir(t, tempDir)
+
+	configDir := filepath.Join(tempDir, "config")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(`{"port":70000}`), 0o644); err != nil {
+		t.Fatalf("write config.json: %v", err)
+	}
+
+	_, _, err := loadIntegrationStartupOptions()
+	if err == nil || !strings.Contains(err.Error(), "--port must be between 1 and 65535") {
 		t.Fatalf("err = %v", err)
 	}
 }
@@ -7679,7 +7718,7 @@ func TestBindIntegrationServeFlagsCLIOverridesStartupConfig(t *testing.T) {
 	}
 	if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(`{
   "host": "http://www.dr.cn",
-  "port": 8080,
+  "port": 19876,
   "thread": 9,
   "pid-file": "startup.pid",
   "log-file": "startup.log"
@@ -7701,15 +7740,15 @@ func TestBindIntegrationServeFlagsCLIOverridesStartupConfig(t *testing.T) {
 	startupStatusFile := ""
 	bindIntegrationServeFlags(fs, &cfg, &pidFile, &logFile, &startupStatusFile, defaults)
 
-	if err := fs.Parse([]string{"--host", "http://www.deepright.cn", "--thread", "4"}); err != nil {
+	if err := fs.Parse([]string{"--host", "http://www.deepright.cn", "--port", "18081", "--thread", "4"}); err != nil {
 		t.Fatalf("parse flags: %v", err)
 	}
 
 	if cfg.Host != "http://www.deepright.cn" {
 		t.Fatalf("host = %q, want CLI value", cfg.Host)
 	}
-	if cfg.Port != integrationServicePort {
-		t.Fatalf("port = %d, want fixed port %d", cfg.Port, integrationServicePort)
+	if cfg.Port != 18081 {
+		t.Fatalf("port = %d, want CLI port 18081", cfg.Port)
 	}
 	if cfg.Thread != 4 {
 		t.Fatalf("thread = %d, want CLI value 4", cfg.Thread)
@@ -7740,7 +7779,7 @@ func TestLifecyclePathsAndPortFallBackToStartupConfig(t *testing.T) {
 		t.Fatalf("mkdir config dir: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(`{
-  "port": 8080,
+  "port": 19876,
   "pidFile": "custom.pid",
   "log_file": "custom.log"
 }
@@ -7748,8 +7787,8 @@ func TestLifecyclePathsAndPortFallBackToStartupConfig(t *testing.T) {
 		t.Fatalf("write config.json: %v", err)
 	}
 
-	if got := resolveIntegrationLaunchPort(map[string]string{}); got != integrationServicePort {
-		t.Fatalf("resolveIntegrationLaunchPort() = %d, want %d", got, integrationServicePort)
+	if got := resolveIntegrationLaunchPort(map[string]string{}); got != 19876 {
+		t.Fatalf("resolveIntegrationLaunchPort() = %d, want 19876", got)
 	}
 	if got := integrationPIDFilePath(map[string]string{}); got != integrationResolveAppPath("custom.pid") {
 		t.Fatalf("integrationPIDFilePath() = %q, want %q", got, integrationResolveAppPath("custom.pid"))
@@ -8143,10 +8182,10 @@ func TestIntegrationBundleLaunchAllowedAnyLocation(t *testing.T) {
 }
 
 func TestResolveIntegrationLaunchPort(t *testing.T) {
-	if got := resolveIntegrationLaunchPort(map[string]string{"port": "18081"}); got != integrationServicePort {
-		t.Fatalf("resolveIntegrationLaunchPort() = %d, want %d", got, integrationServicePort)
+	if got := resolveIntegrationLaunchPort(map[string]string{"port": "18081"}); got != 18081 {
+		t.Fatalf("resolveIntegrationLaunchPort() = %d, want 18081", got)
 	}
-	if got := resolveIntegrationLaunchPort(map[string]string{"port": "invalid"}); got != integrationServicePort {
+	if got := resolveIntegrationLaunchPort(map[string]string{"port": "70000"}); got != integrationServicePort {
 		t.Fatalf("resolveIntegrationLaunchPort() invalid = %d, want %d", got, integrationServicePort)
 	}
 	if got := resolveIntegrationLaunchPort(nil); got != integrationServicePort {
@@ -13927,34 +13966,34 @@ func TestIntegrationCLIHelpIncludesStandalone(t *testing.T) {
 	}
 }
 
-func TestRunIntegrationHostCLIRejectsUnsupportedPort(t *testing.T) {
+func TestRunIntegrationHostCLIRejectsInvalidPort(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := runIntegrationHostCLI([]string{"get", "--port", "9090"}, &stdout, &stderr)
+	code := runIntegrationHostCLI([]string{"get", "--port", "70000"}, &stdout, &stderr)
 	if code != 1 {
 		t.Fatalf("code = %d, want 1", code)
 	}
 	if stdout.Len() != 0 {
 		t.Fatalf("stdout = %q, want empty", stdout.String())
 	}
-	if !strings.Contains(stderr.String(), "--port only supports 8080") {
+	if !strings.Contains(stderr.String(), "--port must be between 1 and 65535") {
 		t.Fatalf("stderr = %q", stderr.String())
 	}
 }
 
-func TestRunIntegrationStandaloneCLIRejectsUnsupportedPort(t *testing.T) {
+func TestRunIntegrationStandaloneCLIRejectsInvalidPort(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := runIntegrationStandaloneCLI([]string{"get", "--port", "9090"}, &stdout, &stderr)
+	code := runIntegrationStandaloneCLI([]string{"get", "--port", "70000"}, &stdout, &stderr)
 	if code != 1 {
 		t.Fatalf("code = %d, want 1", code)
 	}
 	if stdout.Len() != 0 {
 		t.Fatalf("stdout = %q, want empty", stdout.String())
 	}
-	if !strings.Contains(stderr.String(), "--port only supports 8080") {
+	if !strings.Contains(stderr.String(), "--port must be between 1 and 65535") {
 		t.Fatalf("stderr = %q", stderr.String())
 	}
 }

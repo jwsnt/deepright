@@ -1,6 +1,7 @@
 {
   "host": "https://www.deepright.cn",
   "version": "1.0",
+  "port": 19876,
   "skills": [
     "__internal_cron",
     "__internal_remote",

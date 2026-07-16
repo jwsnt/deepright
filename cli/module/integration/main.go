@@ -21,6 +21,7 @@ import (
 	"io/fs"
 	"knowledge/knowledgecore"
 	"log"
+	"maps"
 	"mime/multipart"
 	"net"
 	"net/http"
@@ -12950,8 +12951,8 @@ func applyIntegrationStartupConfig(opts *integrationStartupOptions, values map[s
 }
 
 func validateIntegrationServicePort(port int) error {
-	if port != integrationServicePort {
-		return fmt.Errorf("--port only supports %d", integrationServicePort)
+	if port < 1 || port > 65535 {
+		return fmt.Errorf("--port must be between 1 and 65535")
 	}
 	return nil
 }
@@ -12970,16 +12971,24 @@ func validateIntegrationTopLevelPortFlag(flags map[string]string) error {
 	}
 	port, err := strconv.Atoi(rawPort)
 	if err != nil {
-		return fmt.Errorf("--port only supports %d", integrationServicePort)
+		return fmt.Errorf("--port must be between 1 and 65535")
 	}
 	return validateIntegrationServicePort(port)
 }
 
 func loadIntegrationStartupOptions() (integrationStartupOptions, string, error) {
+	return loadIntegrationStartupOptionsWithPortOverride(false)
+}
+
+func loadIntegrationStartupOptionsWithPortOverride(portOverridden bool) (integrationStartupOptions, string, error) {
 	opts := defaultIntegrationStartupOptions()
 	values, path, err := readIntegrationStartupConfig()
 	if err != nil {
 		return opts, path, err
+	}
+	if portOverridden {
+		values = maps.Clone(values)
+		delete(values, "port")
 	}
 	if err := applyIntegrationStartupConfig(&opts, values); err != nil {
 		return opts, path, err
@@ -13711,7 +13720,7 @@ func printCLIHelp() {
 	fmt.Println("Serve options:")
 	fmt.Println("  --agent-dir=DIR    Agent 根目录；macOS 默认 app container 下的 deepright/agent，WSL 默认 ~/deepright/agent，不存在时自动创建")
 	fmt.Println("  --default-dir=DIR  新建 Agent 默认模板目录，默认当前目录下的 ./config")
-	fmt.Println("  --port=INT         HTTP 服务端口，固定 8080")
+	fmt.Println("  --port=INT         HTTP 服务端口；未指定时读取 config/config.json.port，默认 8080")
 	fmt.Println("  --host=URL         上游服务地址，默认 " + defaultUpstreamHost)
 	fmt.Println("  --device=ID        设备 ID，可选")
 	fmt.Println("  --agent-cache=MS   Agent 元数据缓存时长（毫秒）")
@@ -14199,7 +14208,7 @@ func runIntegrationKnowledgeLastUpdateCLI(args []string, stdout, stderr io.Write
 }
 
 func defaultIntegrationHostAPIBase() string {
-	return fmt.Sprintf("http://127.0.0.1:%d", integrationServicePort)
+	return fmt.Sprintf("http://127.0.0.1:%d", resolveIntegrationLaunchPort(nil))
 }
 
 func resolveIntegrationHostAPIBase(addr string, port int) string {
@@ -14920,7 +14929,8 @@ func handleShutdown(controller *integrationShutdownController) http.HandlerFunc 
 }
 
 func runIntegrationForeground(args []string, stderr io.Writer) int {
-	startupOpts, configPath, err := loadIntegrationStartupOptions()
+	flags := parseTopLevelFlags(args)
+	startupOpts, configPath, err := loadIntegrationStartupOptionsWithPortOverride(strings.TrimSpace(flags["port"]) != "")
 	if err != nil {
 		if strings.TrimSpace(configPath) != "" {
 			fmt.Fprintf(stderr, "%s: %v\n", configPath, err)
@@ -15273,7 +15283,7 @@ func startIntegrationProcess(flags map[string]string, stdout, stderr io.Writer) 
 	}
 	defer logWriter.Close()
 	integrationLifecycleLog(logWriter, "start requested pid-file=%s log-file=%s", pidFile, logFile)
-	if _, configPath, err := loadIntegrationStartupOptions(); err != nil {
+	if _, configPath, err := loadIntegrationStartupOptionsWithPortOverride(strings.TrimSpace(flags["port"]) != ""); err != nil {
 		message := err.Error()
 		if strings.TrimSpace(configPath) != "" {
 			message = fmt.Sprintf("%s: %v", configPath, err)
@@ -15350,7 +15360,7 @@ func startIntegrationProcess(flags map[string]string, stdout, stderr io.Writer) 
 		}
 		if pid, ok := readRunningPID(pidFile); ok && integrationReadyCheck(strconv.Itoa(port)) {
 			_ = os.Remove(startupStatusFile)
-			integrationLifecycleLog(logWriter, "service started pid=%d pid-file=%s log-file=%s addr=%s", pid, pidFile, logFile, fmt.Sprintf("127.0.0.1:%s", firstNonEmpty(flags["port"], "8080")))
+			integrationLifecycleLog(logWriter, "service started pid=%d pid-file=%s log-file=%s addr=%s", pid, pidFile, logFile, fmt.Sprintf("127.0.0.1:%d", port))
 			if _, openErr := openExistingIntegrationBrowserIfReady(port, logWriter, stderr, ""); openErr != nil {
 				return 1
 			}
@@ -17776,7 +17786,7 @@ func resolveIntegrationLaunchPort(flags map[string]string) int {
 			portValue = value
 		}
 	}
-	if value, err := strconv.Atoi(portValue); err == nil && value == integrationServicePort {
+	if value, err := strconv.Atoi(portValue); err == nil && validateIntegrationServicePort(value) == nil {
 		return value
 	}
 	return integrationServicePort

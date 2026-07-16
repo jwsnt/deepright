@@ -70,7 +70,7 @@ func printIntegrationAPIHelp() {
 	fmt.Println("")
 	fmt.Println("Common options:")
 	fmt.Println("  --addr URL        Integration HTTP base address, default http://127.0.0.1:<runtime port>")
-	fmt.Println("  --port INT        Integration HTTP port; only 8080 is supported")
+	fmt.Println("  --port INT        Integration HTTP port; defaults to config/config.json port, then 8080")
 	fmt.Println("  --output PATH     Save response body to file instead of stdout (for download/knowledge etc.)")
 	fmt.Println("")
 	fmt.Println("Commands:")

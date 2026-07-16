@@ -9939,8 +9939,8 @@ func resolveServeReply(reply string) string {
 }
 
 func validateProxyServicePort(port int) error {
-	if port != proxyServicePort {
-		return fmt.Errorf("--port only supports %d", proxyServicePort)
+	if port < 1 || port > 65535 {
+		return fmt.Errorf("--port must be between 1 and 65535")
 	}
 	return nil
 }
@@ -9957,6 +9957,15 @@ func flagProvided(fs *flag.FlagSet, name string) bool {
 		}
 	})
 	return provided
+}
+
+func configuredProxyServicePort() int {
+	value := strings.TrimSpace(configuredProxyStringValue("port"))
+	port, err := strconv.Atoi(value)
+	if err != nil || validateProxyServicePort(port) != nil {
+		return proxyServicePort
+	}
+	return port
 }
 
 func writeProxyStartupConfig(data map[string]interface{}) {
@@ -10116,7 +10125,8 @@ func syncDefaultAgentVersion(agentDir, defaultDir string) error {
 func newServeFlagSet(name string, opts *serveOptions) *flag.FlagSet {
 	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
-	fs.IntVar(&opts.port, "port", proxyServicePort, "proxy listen port")
+	opts.port = configuredProxyServicePort()
+	fs.IntVar(&opts.port, "port", opts.port, "proxy listen port")
 	fs.StringVar(&opts.host, "host", defaultUpstreamHost, "upstream server URL")
 	fs.StringVar(&opts.agentDir, "agent-dir", "", "agent directory (required)")
 	fs.StringVar(&opts.defaultDir, "default-dir", "", "default agent template directory (default: ./config under startup dir)")
@@ -10999,7 +11009,7 @@ func printHelp() {
 	fmt.Println("Serve options:")
 	fmt.Println("  --agent-dir=DIR       Agent 根目录，启动 HTTP 服务时必填")
 	fmt.Println("  --default-dir=DIR     新建 Agent 默认模板目录，默认当前启动目录下的 ./config")
-	fmt.Println("  --port=INT            监听端口，固定 8080")
+	fmt.Println("  --port=INT            监听端口；未指定时读取 config/config.json.port，默认 8080")
 	fmt.Println("  --host=URL            上游服务地址，默认 " + defaultUpstreamHost)
 	fmt.Println("  --device=ID           设备 ID，可选")
 	fmt.Println("  --agent-cache=MS      Agent 元数据缓存时长（毫秒）")

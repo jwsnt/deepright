@@ -12,6 +12,7 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.DefaultFileRegion;
 import io.netty.handler.codec.http.*;
+import io.netty.handler.stream.ChunkedStream;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.CharsetUtil;
@@ -30,13 +31,14 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.util.List;
 
 @Slf4j
 @Getter
 @Setter
-public class HttpService extends NettyHttpHandler {
+public class HttpHandler extends NettyHttpHandler {
 
     protected static final ByteBuf SSE_HEARTBEAT_BUF = Unpooled.copiedBuffer(": keepalive\n\n", CharsetUtil.US_ASCII);
 
@@ -68,7 +70,7 @@ public class HttpService extends NettyHttpHandler {
             IdleStateEvent event = IdleStateEvent.class.cast(evt);
             if (NettyWriter.isSse(ctx) && IdleState.WRITER_IDLE.equals(event.state())) {
                 // SSE 注释心跳
-                ctx.writeAndFlush(new DefaultHttpContent(HttpService.SSE_HEARTBEAT_BUF.retainedDuplicate())).addListener(NettyAlarm.INSTANCE);
+                ctx.writeAndFlush(new DefaultHttpContent(HttpHandler.SSE_HEARTBEAT_BUF.retainedDuplicate())).addListener(NettyAlarm.INSTANCE);
             } else {
                 if (log.isInfoEnabled()) {
                     log.info("Channel will be closed by idle={}", ctx.channel().remoteAddress());
@@ -115,13 +117,31 @@ public class HttpService extends NettyHttpHandler {
     protected void doDownload(ChannelHandlerContext ctx, QueryStringDecoder query) throws Exception {
         List<String> params = List.class.cast(MapUtils.getObject(query.parameters(), "name"));
         WorkflowException.checkCondition(CollectionUtils.isEmpty(params), "The http server download param can not be empty");
-        RandomAccessFile random = this.sysStore.access(params.getFirst());
-        if (random != null) {
+        if (this.sysStore.supportNetwork()) {
+            // 优先网络
+            this.doStreamCopy(ctx, params.getFirst());
+        } else {
+            this.doFileCopy(ctx, params.getFirst());
+        }
+    }
+
+    protected void doStreamCopy(ChannelHandlerContext ctx, InputStream stream) throws Exception {
+        HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
+        response.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/octet-stream");
+        HttpUtil.setTransferEncodingChunked(response, true);
+        ctx.write(response);
+        ctx.writeAndFlush(new HttpChunkedInput(new ChunkedStream(stream))).addListener(NettyCloser.INSTANCE);
+    }
+
+    protected void doStreamCopy(ChannelHandlerContext ctx, String name) throws Exception {
+        // 由ChunkHandler负责关闭流
+        InputStream stream = this.sysStore.stream(name);
+        if (stream != null) {
             try {
-                this.doFileCopy(ctx, random);
+                this.doStreamCopy(ctx, stream);
             } catch (Exception e) {
+                stream.close();
                 WorkflowException.dolog(e);
-                random.close();
                 throw e;
             }
         } else {
@@ -139,6 +159,21 @@ public class HttpService extends NettyHttpHandler {
         ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT).addListener(NettyCloser.INSTANCE);
     }
 
+    protected void doFileCopy(ChannelHandlerContext ctx, String name) throws Exception {
+        RandomAccessFile random = this.sysStore.access(name);
+        if (random != null) {
+            try {
+                this.doFileCopy(ctx, random);
+            } catch (Exception e) {
+                WorkflowException.dolog(e);
+                random.close();
+                throw e;
+            }
+        } else {
+            this.doEmpty(ctx);
+        }
+    }
+
     protected void doHealth(ChannelHandlerContext ctx, QueryStringDecoder query) throws Exception {
         if (log.isDebugEnabled()) {
             log.debug("The http server health check url={}", query.uri());
@@ -148,7 +183,7 @@ public class HttpService extends NettyHttpHandler {
     }
 
     @Override
-    // 从Header获取Token
+// 从Header获取Token
     protected String token(FullHttpRequest fullHttpRequest) throws Exception {
         if (StringUtils.startsWithIgnoreCase(fullHttpRequest.uri(), HttpDistributor.MAIN)) {
             return super.token(fullHttpRequest);
@@ -178,7 +213,7 @@ public class HttpService extends NettyHttpHandler {
     @Configuration
     @Setter
     @Getter
-    public static class ModuleConfig extends InitConfig {
+    public static class HandlerConfig extends InitConfig {
 
         @Autowired
         protected HttpProtocol httpProtocol;
@@ -195,9 +230,9 @@ public class HttpService extends NettyHttpHandler {
         @Bean
         @ConditionalOnMissingBean(value = NettyHttpHandler.class)
         public NettyHttpHandler nettyHttpHandler() throws Exception {
-            HttpService httpService = new HttpService();
+            HttpHandler httpService = new HttpHandler();
             BeanUtils.copyProperties(this, httpService);
-            log.info("HttpService inited");
+            log.info("HttpHandler inited");
             return httpService;
         }
     }
