@@ -83,6 +83,13 @@ sudo -n /usr/bin/env HOME=/home/deepright /app/integration start
 
 启动完成行中的 `integration_uid=0 integration_user=root` 表示服务已实际以 root 身份运行。
 
+### 4. apt 安装超时与 fallback
+
+- `apt-get update` 及每个软件包的一次安装尝试最多执行 10 分钟；超时后会终止对应安装进程，安装器继续处理后续软件包。
+- `git`、`python3`、`python3-pip`、`curl`、`build-essential`、`bubblewrap`、`xdg-utils` 按单个包安装，当前使用 Ubuntu apt 源。
+- Node.js 依次尝试 NodeSource 20.x 与 Ubuntu apt（`nodejs`、`npm`）两个源。
+- 最终无法安装的软件包会在控制台和 `install.log` 中以红色错误记录，但不会中断后续安装与应用启动。
+
 ## 幂等行为
 
 - 已安装的 WSL2 不会重复安装

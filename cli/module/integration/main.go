@@ -2725,9 +2725,9 @@ func startCliGet(ctx context.Context, cfg *Config) {
 				err      error
 			)
 			if currentChatID != "" {
-				metadata, err = getAgentOutputForChat(cfg.AgentDir, cfg.Device, agentTTL, currentChatID)
+				metadata, err = getAgentOutputForChat(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL, currentChatID)
 			} else {
-				metadata, err = getAgentOutput(cfg.AgentDir, cfg.Device, agentTTL)
+				metadata, err = getAgentOutput(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL)
 			}
 			if err != nil {
 				log.Printf("cli-get: agent scan error: %v", err)
@@ -3209,7 +3209,7 @@ func handleCmd(cfg *Config) http.HandlerFunc {
 		}
 
 		agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
-		metadata, err := getAgentOutput(cfg.AgentDir, cfg.Device, agentTTL)
+		metadata, err := getAgentOutput(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL)
 		if err != nil {
 			log.Printf("api/cmd: agent scan error: %v", err)
 			sharedutil.WriteCmdResponse(w, http.StatusInternalServerError, CmdResponse{
@@ -3333,7 +3333,7 @@ func handleKill(cfg *Config) http.HandlerFunc {
 		}
 
 		agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
-		metadata, err := getAgentOutput(cfg.AgentDir, cfg.Device, agentTTL)
+		metadata, err := getAgentOutput(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL)
 		if err != nil {
 			log.Printf("api/kill: agent scan error: %v", err)
 			sharedutil.WriteKillResponse(w, http.StatusInternalServerError, KillResponse{
@@ -3419,7 +3419,7 @@ func handleAgentIDs(cfg *Config) http.HandlerFunc {
 			return
 		}
 		agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
-		metadata, err := getAgentOutput(cfg.AgentDir, cfg.Device, agentTTL)
+		metadata, err := getAgentOutput(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL)
 		if err != nil {
 			log.Printf("api/agentId: agent scan error: %v", err)
 			http.Error(w, "Failed to get agent metadata", http.StatusInternalServerError)
@@ -3459,7 +3459,7 @@ func handleSwarmAgents(cfg *Config) http.HandlerFunc {
 			return
 		}
 		agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
-		metadata, err := getAgentOutput(cfg.AgentDir, cfg.Device, agentTTL)
+		metadata, err := getAgentOutput(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL)
 		if err != nil {
 			log.Printf("api/swarm_agent: agent scan error: %v", err)
 			http.Error(w, "Failed to get agent metadata", http.StatusInternalServerError)
@@ -3477,7 +3477,7 @@ func handleDeviceID(cfg *Config) http.HandlerFunc {
 			return
 		}
 		agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
-		metadata, err := getAgentOutput(cfg.AgentDir, cfg.Device, agentTTL)
+		metadata, err := getAgentOutput(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL)
 		if err != nil {
 			log.Printf("api/deviceId: agent scan error: %v", err)
 			w.Header().Set("Content-Type", "application/json")
@@ -4019,7 +4019,7 @@ func handleFolder(cfg *Config) http.HandlerFunc {
 			return
 		}
 		agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
-		metadata, err := getAgentOutput(cfg.AgentDir, cfg.Device, agentTTL)
+		metadata, err := getAgentOutput(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL)
 		if err != nil {
 			log.Printf("api/folder: agent scan error: %v", err)
 			http.Error(w, "Failed to get agent metadata", http.StatusInternalServerError)
@@ -4073,9 +4073,9 @@ func handleSkills(cfg *Config) http.HandlerFunc {
 			err      error
 		)
 		if chatID != "" {
-			metadata, err = getAgentOutputForChat(cfg.AgentDir, cfg.Device, agentTTL, chatID)
+			metadata, err = getAgentOutputForChat(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL, chatID)
 		} else {
-			metadata, err = getAgentOutput(cfg.AgentDir, cfg.Device, agentTTL)
+			metadata, err = getAgentOutput(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL)
 		}
 		if err != nil {
 			log.Printf("api/skills: agent scan error: %v", err)
@@ -5161,7 +5161,7 @@ func handleWorkspace(cfg *Config) http.HandlerFunc {
 			return
 		}
 		agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
-		metadata, err := getAgentOutput(cfg.AgentDir, cfg.Device, agentTTL)
+		metadata, err := getAgentOutput(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL)
 		if err != nil {
 			log.Printf("api/workspace: agent scan error: %v", err)
 			http.Error(w, "Failed to get agent metadata", http.StatusInternalServerError)
@@ -5233,7 +5233,7 @@ func handleEdit(cfg *Config) http.HandlerFunc {
 		}
 		saveAsNew := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("saveAsNew")), "true")
 		agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
-		metadata, err := getAgentOutput(cfg.AgentDir, cfg.Device, agentTTL)
+		metadata, err := getAgentOutput(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL)
 		if err != nil {
 			writeEditResp(w, EditResponse{AgentID: agentID, Path: relPath, Content: "Agent 元数据获取失败: " + err.Error(), Status: 1})
 			return
@@ -5333,7 +5333,7 @@ func handleDel(cfg *Config) http.HandlerFunc {
 			return
 		}
 		agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
-		metadata, err := getAgentOutput(cfg.AgentDir, cfg.Device, agentTTL)
+		metadata, err := getAgentOutput(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL)
 		if err != nil {
 			writeDelResp(w, DelResponse{AgentID: agentID, Path: relPath, Content: "Agent 元数据获取失败: " + err.Error(), Status: 1})
 			return
@@ -5415,7 +5415,7 @@ func handleRaw(cfg *Config) http.HandlerFunc {
 				return
 			}
 			agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
-			metadata, err := getAgentOutput(cfg.AgentDir, cfg.Device, agentTTL)
+			metadata, err := getAgentOutput(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL)
 			if err != nil {
 				writeRawResp(w, RawResponse{AgentID: agentID, Path: pathParam, Content: "Agent 元数据获取失败: " + err.Error(), Status: 1})
 				return
@@ -6579,7 +6579,7 @@ func handleAgentCreate(cfg *Config) http.HandlerFunc {
 			return
 		}
 		agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
-		metadata, err := getAgentOutput(cfg.AgentDir, cfg.Device, agentTTL)
+		metadata, err := getAgentOutput(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "agent metadata error: " + err.Error()})
@@ -6644,7 +6644,7 @@ func handleUpload(cfg *Config) http.HandlerFunc {
 			return
 		}
 		agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
-		metadata, err := getAgentOutput(cfg.AgentDir, cfg.Device, agentTTL)
+		metadata, err := getAgentOutput(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "agent metadata error: " + err.Error()})
@@ -7622,7 +7622,7 @@ func handleSwarm(cfg *Config) http.HandlerFunc {
 			return
 		}
 		agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
-		metadata, err := getAgentOutput(cfg.AgentDir, cfg.Device, agentTTL)
+		metadata, err := getAgentOutput(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "agent metadata error: " + err.Error()})
@@ -8034,7 +8034,7 @@ func handleCron(cfg *Config) http.HandlerFunc {
 			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "invalid request: " + err.Error()})
 			return
 		}
-		if err := validateIntegrationAgentExists(cfg.AgentDir, cfg.Device, agentID); err != nil {
+		if err := validateIntegrationAgentExists(cfg.AgentDir, cfg.effectiveDeviceID(), agentID); err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": err.Error()})
 			return
@@ -8828,7 +8828,7 @@ func cleanupDeletedAgentCronData(cfg *Config) {
 		agentID := strings.TrimSpace(item.AgentID)
 		exists, ok := agentExistsCache[agentID]
 		if !ok {
-			exists = agentExists(cfg.AgentDir, cfg.Device, agentID)
+			exists = agentExists(cfg.AgentDir, cfg.effectiveDeviceID(), agentID)
 			agentExistsCache[agentID] = exists
 		}
 		if !exists {
@@ -8854,7 +8854,7 @@ func cleanupInvalidCronData(cfg *Config) {
 
 	for _, item := range metaItems {
 		agentID := strings.TrimSpace(item.AgentID)
-		if !agentExists(cfg.AgentDir, cfg.Device, agentID) {
+		if !agentExists(cfg.AgentDir, cfg.effectiveDeviceID(), agentID) {
 			continue
 		}
 
@@ -10055,7 +10055,7 @@ type roundLogOptions struct {
 const roundLogStorageTimeLayout = "2006-01-02T15:04:05.000"
 
 func getWorkspaceByAgentID(cfg *Config, agentID string) (string, error) {
-	metadata, err := getAgentOutput(cfg.AgentDir, cfg.Device, time.Duration(cfg.AgentCacheMs)*time.Millisecond)
+	metadata, err := getAgentOutput(cfg.AgentDir, cfg.effectiveDeviceID(), time.Duration(cfg.AgentCacheMs)*time.Millisecond)
 	if err != nil {
 		return "", err
 	}
@@ -11708,7 +11708,7 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 		// Inject metadata
 		agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
 		_, requestedChatID := requestChatContext(reqData["metadata"])
-		metadata, err := getAgentOutputForChat(cfg.AgentDir, cfg.Device, agentTTL, requestedChatID)
+		metadata, err := getAgentOutputForChat(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL, requestedChatID)
 		if err != nil {
 			log.Printf("proxy: agent scan error: %v", err)
 			http.Error(w, "Failed to get metadata", http.StatusInternalServerError)
@@ -12208,6 +12208,191 @@ func registerAppStatic(mux *http.ServeMux, cfg *Config) {
 // Config & main
 // ═══════════════════════════════════════════════════════════════════════════
 
+const integrationDeviceRefreshInterval = time.Minute
+
+const (
+	integrationDeviceSourceFlag   = "flag"
+	integrationDeviceSourceConfig = "config"
+	integrationDeviceSourceSystem = "system"
+)
+
+var integrationGenerateDeviceID = agentcore.GenerateDeviceID
+
+type integrationDeviceSnapshot struct {
+	ID     string
+	Source string
+}
+
+type integrationDeviceConfigVersion struct {
+	exists      bool
+	modifiedAt  time.Time
+	size        int64
+	statErrText string
+}
+
+func (v integrationDeviceConfigVersion) equal(other integrationDeviceConfigVersion) bool {
+	return v.exists == other.exists && v.modifiedAt.Equal(other.modifiedAt) && v.size == other.size && v.statErrText == other.statErrText
+}
+
+type integrationDeviceState struct {
+	flagDevice   string
+	configDevice string
+	fallbackID   string
+	current      atomic.Value // integrationDeviceSnapshot
+	lastVersion  integrationDeviceConfigVersion
+}
+
+func newIntegrationDeviceState(flagDevice, configDevice, fallbackID string) *integrationDeviceState {
+	state := &integrationDeviceState{
+		flagDevice:   strings.TrimSpace(flagDevice),
+		configDevice: strings.TrimSpace(configDevice),
+		fallbackID:   strings.TrimSpace(fallbackID),
+	}
+	state.current.Store(state.nextSnapshot())
+	return state
+}
+
+func (s *integrationDeviceState) nextSnapshot() integrationDeviceSnapshot {
+	if s == nil {
+		return integrationDeviceSnapshot{}
+	}
+	if s.flagDevice != "" {
+		return integrationDeviceSnapshot{ID: s.flagDevice, Source: integrationDeviceSourceFlag}
+	}
+	if s.configDevice != "" {
+		return integrationDeviceSnapshot{ID: s.configDevice, Source: integrationDeviceSourceConfig}
+	}
+	return integrationDeviceSnapshot{ID: s.fallbackID, Source: integrationDeviceSourceSystem}
+}
+
+func (s *integrationDeviceState) snapshot() integrationDeviceSnapshot {
+	if s == nil {
+		return integrationDeviceSnapshot{}
+	}
+	if value := s.current.Load(); value != nil {
+		if snapshot, ok := value.(integrationDeviceSnapshot); ok {
+			return snapshot
+		}
+	}
+	return s.nextSnapshot()
+}
+
+func (s *integrationDeviceState) effectiveDeviceID() string {
+	return s.snapshot().ID
+}
+
+func integrationDeviceConfigVersionForPath(path string) integrationDeviceConfigVersion {
+	info, err := os.Stat(path)
+	if err == nil {
+		return integrationDeviceConfigVersion{exists: true, modifiedAt: info.ModTime(), size: info.Size()}
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return integrationDeviceConfigVersion{}
+	}
+	return integrationDeviceConfigVersion{statErrText: err.Error()}
+}
+
+func integrationConfiguredDeviceValue(raw interface{}) string {
+	value, ok := raw.(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(value)
+}
+
+func readIntegrationConfiguredDevice() (string, error) {
+	raw, _, err := readIntegrationStartupConfigRaw()
+	if err != nil {
+		return "", err
+	}
+	if raw == nil {
+		return "", nil
+	}
+	return integrationConfiguredDeviceValue(raw["device"]), nil
+}
+
+func (s *integrationDeviceState) captureConfigVersion() {
+	if s == nil {
+		return
+	}
+	s.lastVersion = integrationDeviceConfigVersionForPath(integrationStartupConfigPath())
+}
+
+func (s *integrationDeviceState) refreshConfig() {
+	if s == nil {
+		return
+	}
+	version := integrationDeviceConfigVersionForPath(integrationStartupConfigPath())
+	if version.equal(s.lastVersion) {
+		return
+	}
+	s.lastVersion = version
+	if version.statErrText != "" {
+		current := s.snapshot()
+		log.Printf("device refresh failed source=%s err=%s", current.Source, version.statErrText)
+		return
+	}
+
+	configDevice, err := readIntegrationConfiguredDevice()
+	if err != nil {
+		current := s.snapshot()
+		log.Printf("device refresh failed source=%s err=%v", current.Source, err)
+		return
+	}
+	previous := s.snapshot()
+	s.configDevice = configDevice
+	current := s.nextSnapshot()
+	s.current.Store(current)
+	log.Printf("device refresh succeeded source=%s changed=%t", current.Source, previous != current)
+}
+
+func startIntegrationDeviceConfigRefresh(ctx context.Context, state *integrationDeviceState) {
+	if ctx == nil || state == nil {
+		return
+	}
+	go func() {
+		ticker := time.NewTicker(integrationDeviceRefreshInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				state.refreshConfig()
+			}
+		}
+	}()
+}
+
+func initializeIntegrationDeviceState(cfg *Config, explicitDevice string) error {
+	if cfg == nil {
+		return fmt.Errorf("device configuration is required")
+	}
+	configDevice, err := readIntegrationConfiguredDevice()
+	if err != nil {
+		return err
+	}
+	explicitDevice = strings.TrimSpace(explicitDevice)
+	state := newIntegrationDeviceState(explicitDevice, configDevice, integrationGenerateDeviceID())
+	cfg.DeviceState = state
+	if explicitDevice != "" {
+		cfg.Device = explicitDevice
+	} else {
+		cfg.Device = configDevice
+	}
+	return nil
+}
+
+func (cfg *Config) effectiveDeviceID() string {
+	if cfg != nil && cfg.DeviceState != nil {
+		return cfg.DeviceState.effectiveDeviceID()
+	}
+	if cfg == nil {
+		return ""
+	}
+	return strings.TrimSpace(cfg.Device)
+}
+
 type Config struct {
 	// Shared
 	Port           int
@@ -12217,6 +12402,7 @@ type Config struct {
 	AgentDir       string
 	DefaultDir     string
 	Device         string
+	DeviceState    *integrationDeviceState
 	AgentCacheMs   int
 	ConnectCacheMs int
 	Site           string
@@ -12609,6 +12795,10 @@ func integrationStartupConfigValue(values map[string]interface{}, key string) (s
 	if !ok || raw == nil {
 		return "", false
 	}
+	if strings.TrimSpace(key) == "device" {
+		value := integrationConfiguredDeviceValue(raw)
+		return value, value != ""
+	}
 	value := strings.TrimSpace(fmt.Sprint(raw))
 	if value == "" {
 		return "", false
@@ -12667,7 +12857,7 @@ func applyIntegrationStartupConfig(opts *integrationStartupOptions, values map[s
 				opts.Config.DefaultDir = value
 			}
 		case "device":
-			opts.Config.Device = strings.TrimSpace(fmt.Sprint(raw))
+			opts.Config.Device = integrationConfiguredDeviceValue(raw)
 		case "agent-cache":
 			if err := assignIntegrationStartupConfigInt(raw, key, &opts.Config.AgentCacheMs); err != nil {
 				return err
@@ -12843,6 +13033,26 @@ func bindIntegrationServeFlags(fs *flag.FlagSet, cfg *Config, pidFileFlag, logFi
 	if startupStatusFile != nil {
 		fs.StringVar(startupStatusFile, "startup-status-file", "", "integration startup status file path")
 	}
+}
+
+func integrationFlagValue(fs *flag.FlagSet, name string) (string, bool) {
+	if fs == nil {
+		return "", false
+	}
+	provided := false
+	fs.Visit(func(item *flag.Flag) {
+		if item.Name == name {
+			provided = true
+		}
+	})
+	if !provided {
+		return "", false
+	}
+	item := fs.Lookup(name)
+	if item == nil {
+		return "", false
+	}
+	return strings.TrimSpace(item.Value.String()), true
 }
 
 func writeRuntimeConfig(data map[string]interface{}) {
@@ -14732,6 +14942,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return 1
 	}
+	explicitDevice, _ := integrationFlagValue(fs, "device")
 
 	logFilePath := integrationLogFilePath(map[string]string{"log-file": logFileFlag})
 	serveLogWriter, err := newIntegrationDailyLogWriter(logFilePath, integrationLogRetentionDays)
@@ -14772,6 +14983,9 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	}
 	if err := validateIntegrationServicePort(cfg.Port); err != nil {
 		return reportStartupFailure("error: %v", err)
+	}
+	if err := initializeIntegrationDeviceState(&cfg, explicitDevice); err != nil {
+		return reportStartupFailure("error: initialize device: %v", err)
 	}
 
 	cfg.Reply = resolveServeReply(cfg.Reply)
@@ -14850,6 +15064,9 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 		"pid-file":                  pidFile,
 		"log-file":                  integrationLogFilePath(map[string]string{"log-file": logFileFlag}),
 	})
+	if cfg.DeviceState != nil {
+		cfg.DeviceState.captureConfigVersion()
+	}
 
 	connectTimeout := time.Duration(cfg.ConnectTimeoutMs) * time.Millisecond
 	proxyClient := http11client.NewClient(http11client.Options{
@@ -14996,6 +15213,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	}()
 
 	startCliGet(ctx, &cfg)
+	startIntegrationDeviceConfigRefresh(ctx, cfg.DeviceState)
 	initCronDB()
 	startIntegrationLogRetentionCleanup(ctx)
 	startCronCheck(ctx, &cfg)
@@ -17033,7 +17251,7 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 	}
 
 	for _, t := range tasks {
-		if !agentExists(cfg.AgentDir, cfg.Device, t.AgentID) {
+		if !agentExists(cfg.AgentDir, cfg.effectiveDeviceID(), t.AgentID) {
 			appendCronDetailLog(cronDB, cronDetailLogEntry{
 				DetailID:       t.ID,
 				MetaID:         t.MetaID,
@@ -17091,7 +17309,7 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 
 		// Build metadata
 		agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
-		metadata, err := getAgentOutputForChat(cfg.AgentDir, cfg.Device, agentTTL, chatID)
+		metadata, err := getAgentOutputForChat(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL, chatID)
 		if err != nil {
 			cronDB.Exec(`UPDATE task_detail SET started = 0 WHERE id = ?`, t.ID)
 			logCronDetailStatusByID(cronDB, t.ID, "reset_started")
@@ -17112,7 +17330,7 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 		injectLastResponseMetadata(metaMap, chatID)
 		injectSandboxPathMetadata(metaMap, chatID)
 		injectPluginsDirMetadata(metaMap)
-		if routerRemote := readAgentRouterRemote(cfg.AgentDir, cfg.Device, t.AgentID, agentTTL); len(routerRemote) > 0 {
+		if routerRemote := readAgentRouterRemote(cfg.AgentDir, cfg.effectiveDeviceID(), t.AgentID, agentTTL); len(routerRemote) > 0 {
 			metaMap["router_remote"] = routerRemote
 		}
 		if metaID := lastMetaRefID(t.MetaRef); metaID != "" {

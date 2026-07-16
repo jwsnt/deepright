@@ -34,6 +34,7 @@ import (
 	"runtimepaths"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"testing"
@@ -7170,6 +7171,177 @@ func useIntegrationExecutableDir(t *testing.T, dir string) {
 		integrationExecutableFn = originalExecutable
 	})
 	t.Setenv(integrationRuntimeDirEnv, "")
+}
+
+func writeIntegrationDeviceConfig(t *testing.T, root, content string) string {
+	t.Helper()
+	configDir := filepath.Join(root, "config")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	configPath := filepath.Join(configDir, "config.json")
+	if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
+		t.Fatalf("write config.json: %v", err)
+	}
+	return configPath
+}
+
+func TestIntegrationDeviceStateUsesFlagConfigThenSystem(t *testing.T) {
+	tempDir := t.TempDir()
+	useIntegrationExecutableDir(t, tempDir)
+	writeIntegrationDeviceConfig(t, tempDir, `{"device":" config-device "}`)
+
+	originalGenerate := integrationGenerateDeviceID
+	generated := 0
+	integrationGenerateDeviceID = func() string {
+		generated++
+		return "system-device"
+	}
+	t.Cleanup(func() { integrationGenerateDeviceID = originalGenerate })
+
+	flagCfg := &Config{}
+	if err := initializeIntegrationDeviceState(flagCfg, " flag-device "); err != nil {
+		t.Fatalf("initialize flag state: %v", err)
+	}
+	if snapshot := flagCfg.DeviceState.snapshot(); snapshot.ID != "flag-device" || snapshot.Source != integrationDeviceSourceFlag {
+		t.Fatalf("flag snapshot = %#v", snapshot)
+	}
+	if flagCfg.Device != "flag-device" {
+		t.Fatalf("flag config Device = %q, want flag-device", flagCfg.Device)
+	}
+
+	configCfg := &Config{}
+	if err := initializeIntegrationDeviceState(configCfg, ""); err != nil {
+		t.Fatalf("initialize config state: %v", err)
+	}
+	if snapshot := configCfg.DeviceState.snapshot(); snapshot.ID != "config-device" || snapshot.Source != integrationDeviceSourceConfig {
+		t.Fatalf("config snapshot = %#v", snapshot)
+	}
+
+	writeIntegrationDeviceConfig(t, tempDir, `{"device":1234}`)
+	fallbackCfg := &Config{}
+	if err := initializeIntegrationDeviceState(fallbackCfg, ""); err != nil {
+		t.Fatalf("initialize fallback state: %v", err)
+	}
+	if snapshot := fallbackCfg.DeviceState.snapshot(); snapshot.ID != "system-device" || snapshot.Source != integrationDeviceSourceSystem {
+		t.Fatalf("fallback snapshot = %#v", snapshot)
+	}
+	if generated != 3 {
+		t.Fatalf("system device generated %d times, want once per service startup", generated)
+	}
+}
+
+func TestIntegrationConfiguredDeviceValueRejectsInvalidValues(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  interface{}
+		want string
+	}{
+		{name: "string", raw: " device ", want: "device"},
+		{name: "missing", raw: nil, want: ""},
+		{name: "number", raw: json.Number("1234"), want: ""},
+		{name: "object", raw: map[string]interface{}{"id": "device"}, want: ""},
+		{name: "empty", raw: "", want: ""},
+		{name: "spaces", raw: " \t ", want: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := integrationConfiguredDeviceValue(tt.raw); got != tt.want {
+				t.Fatalf("integrationConfiguredDeviceValue(%#v) = %q, want %q", tt.raw, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIntegrationDeviceStateRefreshKeepsLastSuccessfulValue(t *testing.T) {
+	tempDir := t.TempDir()
+	useIntegrationExecutableDir(t, tempDir)
+	writeIntegrationDeviceConfig(t, tempDir, `{"device":"config-a"}`)
+	state := newIntegrationDeviceState("", "config-a", "system-device")
+	state.captureConfigVersion()
+
+	var logBuf bytes.Buffer
+	originalWriter := log.Writer()
+	originalFlags := log.Flags()
+	log.SetOutput(&logBuf)
+	log.SetFlags(0)
+	t.Cleanup(func() {
+		log.SetOutput(originalWriter)
+		log.SetFlags(originalFlags)
+	})
+
+	writeIntegrationDeviceConfig(t, tempDir, `{"device":"config-next"}`)
+	state.refreshConfig()
+	if snapshot := state.snapshot(); snapshot.ID != "config-next" || snapshot.Source != integrationDeviceSourceConfig {
+		t.Fatalf("refreshed snapshot = %#v", snapshot)
+	}
+	if !strings.Contains(logBuf.String(), "device refresh succeeded") {
+		t.Fatalf("success log missing: %s", logBuf.String())
+	}
+
+	logBuf.Reset()
+	writeIntegrationDeviceConfig(t, tempDir, `{"device":`)
+	state.refreshConfig()
+	if snapshot := state.snapshot(); snapshot.ID != "config-next" || snapshot.Source != integrationDeviceSourceConfig {
+		t.Fatalf("snapshot after malformed config = %#v", snapshot)
+	}
+	if !strings.Contains(logBuf.String(), "device refresh failed") {
+		t.Fatalf("failure log missing: %s", logBuf.String())
+	}
+	firstFailureLog := logBuf.String()
+	state.refreshConfig()
+	if logBuf.String() != firstFailureLog {
+		t.Fatalf("unchanged malformed config logged again: %s", logBuf.String())
+	}
+
+	logBuf.Reset()
+	writeIntegrationDeviceConfig(t, tempDir, `{"device":null}`)
+	state.refreshConfig()
+	if snapshot := state.snapshot(); snapshot.ID != "system-device" || snapshot.Source != integrationDeviceSourceSystem {
+		t.Fatalf("snapshot after empty config = %#v", snapshot)
+	}
+	if !strings.Contains(logBuf.String(), "device refresh succeeded") {
+		t.Fatalf("empty config success log missing: %s", logBuf.String())
+	}
+}
+
+func TestIntegrationDeviceStateRefreshDoesNotOverrideFlag(t *testing.T) {
+	tempDir := t.TempDir()
+	useIntegrationExecutableDir(t, tempDir)
+	writeIntegrationDeviceConfig(t, tempDir, `{"device":"config-a"}`)
+	state := newIntegrationDeviceState("flag-device", "config-a", "system-device")
+	state.captureConfigVersion()
+
+	writeIntegrationDeviceConfig(t, tempDir, `{"device":"config-next"}`)
+	state.refreshConfig()
+	if snapshot := state.snapshot(); snapshot.ID != "flag-device" || snapshot.Source != integrationDeviceSourceFlag {
+		t.Fatalf("flag snapshot after config refresh = %#v", snapshot)
+	}
+}
+
+func TestIntegrationDeviceStateRefreshSupportsConcurrentReaders(t *testing.T) {
+	tempDir := t.TempDir()
+	useIntegrationExecutableDir(t, tempDir)
+	writeIntegrationDeviceConfig(t, tempDir, `{"device":"config-a"}`)
+	state := newIntegrationDeviceState("", "config-a", "system-device")
+	state.captureConfigVersion()
+
+	var readers sync.WaitGroup
+	for range 16 {
+		readers.Add(1)
+		go func() {
+			defer readers.Done()
+			for range 1000 {
+				_ = state.effectiveDeviceID()
+			}
+		}()
+	}
+	writeIntegrationDeviceConfig(t, tempDir, `{"device":"config-next"}`)
+	state.refreshConfig()
+	readers.Wait()
+	if got := state.effectiveDeviceID(); got != "config-next" {
+		t.Fatalf("effective device = %q, want config-next", got)
+	}
 }
 
 func useBundledIntegrationExecutable(t *testing.T, bundleRoot string) {

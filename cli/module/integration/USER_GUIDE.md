@@ -92,6 +92,7 @@ cd /path/to/deepright/cli/module/integration
 | `--site` | 否 | `./site` | 静态站点目录；默认取当前应用目录下的 `site` | static |
 | `--pid-file` | 否 | 默认当前应用目录下的 `integration.pid`；WSL 下为 `~/deepright/integration.pid` | 后台启动时使用的 PID 文件路径 | integration 生命周期 |
 | `--log-file` | 否 | 默认当前应用目录下的 `integration.log`；WSL 下为 `~/deepright/integration.log` | 后台启动时写入的日志文件路径 | integration 生命周期 |
+
 | `--connect_timeout` | 否 | `15000` | 上游服务连接超时（毫秒） | proxy |
 | `--knowledge_update_interval` | 否 | `7200000` | knowledge `lastUpdate` 透传阈值（毫秒） | proxy |
 | `--knowledge_update_lock` | 否 | `1800000` | knowledge 更新申请锁窗口（毫秒） | proxy |
@@ -106,6 +107,24 @@ cd /path/to/deepright/cli/module/integration
 | `--http_connect_timeout` | 否 | `15000` | HTTP 连接超时（毫秒） | cli-get |
 | `--http_socket_timeout` | 否 | `45000` | HTTP 读取超时（毫秒） | cli-get |
 | `--idle_timeout` | 否 | `90` | 连接池空闲超时（秒） | cli-get |
+
+### `device` 解析与热更新
+
+Integration 服务使用同一个全局 `deviceId` 快照构建 Agent 元数据，优先级如下：
+
+1. 非空的 `--device`
+2. 主应用 `config/config.json` 中非空字符串类型的 `device`
+3. 服务启动时自动生成的系统 device
+
+`device` 缺失、`null`、数字/对象等非字符串、空字符串或仅空白字符串，都会视为未配置，并继续使用下一层来源。系统 device 只在服务启动时生成一次；配置后续清空时会回退到同一个启动期系统值。
+
+服务启动后每 60 秒检查一次 `config/config.json`。文件未变化时不会重新读取或输出刷新日志；文件变化后：
+
+- JSON 读取成功时刷新内存中的配置值，后续 heartbeat、聊天、cron、Agent 接口以及 `GET /api/deviceId` 使用新的有效值；
+- JSON 读取失败时保留最近一次成功值，并输出失败日志；同一个失败文件版本不会每 60 秒重复记录；
+- 有效 `--device` 始终优先于配置文件。配置文件变化仍会被检查并记录日志，但不会改变当前 deviceId。
+
+配置刷新采用最终一致性：已经开始构建 metadata 的请求可以继续使用旧值，之后的新请求读取新快照；不会影响正在执行的请求。
 
 ### 示例
 

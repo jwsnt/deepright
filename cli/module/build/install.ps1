@@ -10,6 +10,8 @@ $WSL_SENTINEL  = "/home/deepright/.deepright_initialized"
 $LOCAL_SENTINEL_DIR  = "C:\ProgramData\deepright"
 $LOCAL_SENTINEL_FILE = Join-Path $LOCAL_SENTINEL_DIR ".deepright_installed"
 $SHORTCUT_NAME = "DeepRight"
+$WSL_APT_TIMEOUT_SECONDS = 600
+$WSL_APT_TIMEOUT_KILL_AFTER_SECONDS = 30
 
 # ---------- Log ----------
 function L_Step($m) { $l="`n========================================  $m"; Write-Host $l -F Cyan;   Add-Content -Path $LOG_FILE -Value $l -Encoding UTF8 }
@@ -109,6 +111,55 @@ function Fix-WslConfig([string]$Path) {
 function Test-WslTool([string]$cmd) {
     & wsl.exe -d $DISTRO_NAME -- bash -c "command -v $cmd > /dev/null 2>&1" | Out-Null
     return ($LASTEXITCODE -eq 0)
+}
+
+function Invoke-WslTimedInstallCommand([string]$Package, [string]$Source, [string]$Command) {
+    $encodedCommand = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($Command))
+    $wslScript = "set -o pipefail; encoded='$encodedCommand'; command=`$(printf '%s' `"`$encoded`" | base64 -d); timeout --signal=TERM --kill-after=${WSL_APT_TIMEOUT_KILL_AFTER_SECONDS}s ${WSL_APT_TIMEOUT_SECONDS}s bash -c `"`$command`""
+    $output = & wsl.exe -d $DISTRO_NAME -- bash -c $wslScript 2>&1 | Out-String
+    $exitCode = $LASTEXITCODE
+    $timedOut = ($exitCode -eq 124 -or $exitCode -eq 137)
+    $result = if ($exitCode -eq 0) { "success" } elseif ($timedOut) { "timeout" } else { "failed" }
+    Add-Content -Path $LOG_FILE -Value "apt attempt: package=$Package source=$Source timeoutSeconds=$WSL_APT_TIMEOUT_SECONDS result=$result exitCode=$exitCode command=$Command output=$output" -Encoding UTF8
+    return [PSCustomObject]@{
+        Success = ($exitCode -eq 0)
+        TimedOut = $timedOut
+        ExitCode = $exitCode
+        Output = $output.Trim()
+    }
+}
+
+function Install-WslAptPackage([string]$Package) {
+    L_Info "Installing $Package from Ubuntu apt (timeout: $WSL_APT_TIMEOUT_SECONDS seconds)..."
+    $result = Invoke-WslTimedInstallCommand -Package $Package -Source "ubuntu-apt" -Command "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -- $Package"
+    if ($result.Success) {
+        L_OK "$Package installed from Ubuntu apt"
+        return $true
+    }
+    $reason = if ($result.TimedOut) { "timed out after $WSL_APT_TIMEOUT_SECONDS seconds" } else { "failed with exit code $($result.ExitCode)" }
+    L_Err "$Package installation from Ubuntu apt $reason; no fallback source is configured, continuing"
+    return $false
+}
+
+function Install-WslNodeJS {
+    L_Info "Installing Node.js 20.x from NodeSource (timeout: $WSL_APT_TIMEOUT_SECONDS seconds)..."
+    $nodeSource = Invoke-WslTimedInstallCommand -Package "nodejs" -Source "nodesource-20" -Command "set -o pipefail; curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs"
+    if ($nodeSource.Success) {
+        L_OK "Node.js 20.x LTS + npm installed from NodeSource"
+        return $true
+    }
+
+    $reason = if ($nodeSource.TimedOut) { "timed out after $WSL_APT_TIMEOUT_SECONDS seconds" } else { "failed with exit code $($nodeSource.ExitCode)" }
+    L_Warn "NodeSource installation $reason; trying Ubuntu apt fallback"
+    $fallback = Invoke-WslTimedInstallCommand -Package "nodejs" -Source "ubuntu-apt" -Command "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs npm"
+    if ($fallback.Success) {
+        L_OK "Node.js + npm installed from Ubuntu apt"
+        return $true
+    }
+
+    $reason = if ($fallback.TimedOut) { "timed out after $WSL_APT_TIMEOUT_SECONDS seconds" } else { "failed with exit code $($fallback.ExitCode)" }
+    L_Err "Node.js installation from all sources failed; Ubuntu apt fallback $reason, continuing"
+    return $false
 }
 
 function New-AppShortcut([string]$ShortcutPath, [string]$TargetPath, [string]$WorkingDir, [string]$IconPath, [string]$Description) {
@@ -430,37 +481,37 @@ L_OK ".wslconfig already configured with networkingMode=mirrored"
 # ---- Step 6: Tools ----
 L_Step "Step 6/7: Install tools (git, npm, python3, bubblewrap, xdg-open)"
 
-$needGit   = -not (Test-WslTool "git")
-$needPy    = -not (Test-WslTool "python3")
-$needNode  = -not (Test-WslTool "node")
-$needBwrap = -not (Test-WslTool "bwrap")
-$needXdgOpen = -not (Test-WslTool "xdg-open")
+$aptPackages = @(
+    @{ Package = "git"; Command = "git" },
+    @{ Package = "python3"; Command = "python3" },
+    @{ Package = "python3-pip"; Command = "pip3" },
+    @{ Package = "curl"; Command = "curl" },
+    @{ Package = "build-essential"; Command = "make" },
+    @{ Package = "bubblewrap"; Command = "bwrap" },
+    @{ Package = "xdg-utils"; Command = "xdg-open" }
+)
+$missingAptPackages = @($aptPackages | Where-Object { -not (Test-WslTool ($_.Command)) })
+$needNode = -not (Test-WslTool "node")
+$needNpm = -not (Test-WslTool "npm")
 
-if (-not ($needGit -or $needPy -or $needNode -or $needBwrap -or $needXdgOpen)) {
+if ($missingAptPackages.Count -eq 0 -and -not ($needNode -or $needNpm)) {
     L_OK "All tools already installed"
 } else {
-    L_Info "Updating apt..."
-    & wsl.exe -d $DISTRO_NAME -- bash -c "sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq" 2>&1 | Out-Null
-    L_OK "apt updated"
-
-    if ($needGit -or $needPy -or $needBwrap -or $needXdgOpen) {
-        L_Info "Installing git, python3, pip, curl, bubblewrap, xdg-open..."
-        $ar = & wsl.exe -d $DISTRO_NAME -- bash -c "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y git python3 python3-pip curl build-essential bubblewrap xdg-utils 2>&1" | Out-String
-        Add-Content -Path $LOG_FILE -Value "apt: $ar" -Encoding UTF8
-        if ($LASTEXITCODE -eq 0) { L_OK "git, python3, pip, curl, bubblewrap, xdg-open installed" } else { L_Warn "Some packages may have failed" }
+    L_Info "Updating apt (timeout: $WSL_APT_TIMEOUT_SECONDS seconds)..."
+    $aptUpdate = Invoke-WslTimedInstallCommand -Package "apt-get update" -Source "ubuntu-apt" -Command "sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq"
+    if ($aptUpdate.Success) {
+        L_OK "apt updated"
+    } else {
+        $reason = if ($aptUpdate.TimedOut) { "timed out after $WSL_APT_TIMEOUT_SECONDS seconds" } else { "failed with exit code $($aptUpdate.ExitCode)" }
+        L_Err "apt update $reason; continuing with package installation"
     }
 
-    if ($needNode) {
-        L_Info "Installing Node.js 20.x LTS (npm)..."
-        $nr = & wsl.exe -d $DISTRO_NAME -- bash -c "curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - 2>&1 && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs 2>&1" | Out-String
-        Add-Content -Path $LOG_FILE -Value "node: $nr" -Encoding UTF8
-        if ($LASTEXITCODE -eq 0) {
-            L_OK "Node.js 20.x LTS + npm installed"
-        } else {
-            L_Warn "NodeSource failed, trying system packages..."
-            & wsl.exe -d $DISTRO_NAME -- bash -c "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs npm 2>&1" | Out-Null
-            if ($LASTEXITCODE -eq 0) { L_OK "Node.js + npm (system) installed" } else { L_Err "Node.js install failed" }
-        }
+    foreach ($aptPackage in $missingAptPackages) {
+        $null = Install-WslAptPackage -Package ($aptPackage.Package)
+    }
+
+    if ($needNode -or $needNpm) {
+        $null = Install-WslNodeJS
     }
 }
 

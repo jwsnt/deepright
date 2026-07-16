@@ -280,7 +280,14 @@ agentcore.GetOutputWithPlugins(root, deviceID, ttl, pluginDir, pluginRuntimes)
 
 `nextHeartbeatBackoff()` 按二倍指数退避，直到上限。
 
-当前实现只在 `Heartbeat` 返回 error 时休眠；无任务时不会 sleep，而是立即进入下一次心跳。
+`Heartbeat` 失败时，主循环先按当前 `heartbeatBackoff` 等待，再把下一次等待值翻倍；默认 `--sleep=3000ms` 时，连续失败的等待序列为 `3s → 6s → 12s → 15s → 15s ...`。任意一次成功响应（包括服务端长轮询结束后返回“无任务”）都会将 `heartbeatBackoff` 重置为 `sleepDur`。
+
+当前实现只在 `Heartbeat` 返回 error 时休眠；无任务时不会 sleep，而是立即进入下一次心跳。该行为依赖服务端对无任务请求进行长轮询阻塞，避免客户端形成高频请求。
+
+退避范围必须区分：
+
++ Agent metadata 扫描失败和本地任务队列满时，只固定等待一次 `sleepDur`，不做指数退避。
++ `/cli/pub` 失败使用独立的 `retry_interval` 和 `retry_times` 重试策略，不改变心跳退避状态。
 
 这个行为与需求里“无任务也可休眠”略有不同，但它是当前代码的真实语义，设计文档必须以实现为准。
 
@@ -604,8 +611,12 @@ CREATE INDEX IF NOT EXISTS idx_agent_message_log_agent_chat_type_time
 
 + `Heartbeat()` 失败：
     + 打 stderr
-    + 按指数退避 sleep
+    + 按 `sleepDur`、`2 × sleepDur`、`4 × sleepDur` 的指数退避 sleep，最大 15 秒
     + 继续
+
++ 任意一次 `Heartbeat()` 成功：
+    + 将心跳退避重置为 `sleepDur`
+    + 无任务时由服务端长轮询控制请求节奏，客户端立即发起下一次心跳
 
 + 任务投递后执行失败：
     + 不影响主线程后续心跳
