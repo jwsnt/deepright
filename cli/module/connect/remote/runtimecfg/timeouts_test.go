@@ -88,29 +88,27 @@ func TestNormalizeBinaryPathExpandsRelative(t *testing.T) {
 	}
 }
 
-func TestConnectPrefixForBinary(t *testing.T) {
+func TestParseTimeoutSeconds(t *testing.T) {
 	tests := []struct {
 		name   string
-		binary string
-		want   []string
+		raw    string
+		want   time.Duration
+		wantOK bool
 	}{
-		{"integration", "integration", []string{"connect"}},
-		{"proxy", "proxy", []string{"connect"}},
-		{"integration with path", "/path/to/integration", []string{"connect"}},
-		{"proxy with ext", "proxy.exe", []string{"connect"}},
-		{"other binary", "other", nil},
+		{"valid seconds", "300", 300 * time.Second, true},
+		{"empty", "", 0, false},
+		{"zero", "0", 0, false},
+		{"negative", "-1", 0, false},
+		{"invalid", "three hundred", 0, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := connectPrefixForBinary(tt.binary)
-			if len(got) != len(tt.want) {
-				t.Errorf("connectPrefixForBinary() = %v, want %v", got, tt.want)
-				return
+			got, ok := ParseTimeoutSeconds(tt.raw)
+			if ok != tt.wantOK {
+				t.Errorf("ParseTimeoutSeconds() ok = %v, want %v", ok, tt.wantOK)
 			}
-			for i := range got {
-				if got[i] != tt.want[i] {
-					t.Errorf("connectPrefixForBinary() = %v, want %v", got, tt.want)
-				}
+			if got != tt.want {
+				t.Errorf("ParseTimeoutSeconds() = %v, want %v", got, tt.want)
 			}
 		})
 	}

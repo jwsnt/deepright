@@ -547,7 +547,7 @@ func TestRunCLIDirectCommandRejectsConnectBin(t *testing.T) {
 	}
 }
 
-func TestRunInstanceHelpIncludesInitCommand(t *testing.T) {
+func TestRunInstanceHelpHidesInitCommand(t *testing.T) {
 	restore := stubBrowserRuntime()
 	defer restore()
 
@@ -558,15 +558,27 @@ func TestRunInstanceHelpIncludesInitCommand(t *testing.T) {
 	}
 	text := stdout.String()
 	for _, wanted := range []string{
-		"browser instance init --agentId AGENT --chatId CHAT",
-		"init always launches headed Chrome, registers the new instance in get/list, and returns once ready",
-		"init requires a successful browser start and uses only its recorded integration config/config.json",
-		"browser.init_timeout is a positive integer number of seconds; a missing field defaults to 300",
-		"on WSL, create/init call browser_launcher.sh beside the plugin; profileDir still stays in the normal CLI response",
+		"browser instance create --agentId AGENT --chatId CHAT",
+		"on WSL, create calls browser_launcher.sh beside the plugin; profileDir still stays in the normal CLI response",
 		"C:\\ProgramData\\deepright\\chrome_${suffix}",
 	} {
 		if !strings.Contains(text, wanted) {
 			t.Fatalf("instance help missing %q\n%s", wanted, text)
+		}
+	}
+	if strings.Contains(text, "init") {
+		t.Fatalf("instance help unexpectedly mentions init\n%s", text)
+	}
+
+	topLevelStdout := &bytes.Buffer{}
+	topLevelStderr := &bytes.Buffer{}
+	if code := runCLI([]string{"help"}, topLevelStdout, topLevelStderr); code != 0 {
+		t.Fatalf("top-level help exit code = %d, stderr = %s", code, topLevelStderr.String())
+	}
+	topLevelHelp := topLevelStdout.String()
+	for _, hidden := range []string{"browser instance init", "<create|init|"} {
+		if strings.Contains(topLevelHelp, hidden) {
+			t.Fatalf("top-level help unexpectedly mentions %q\n%s", hidden, topLevelHelp)
 		}
 	}
 }

@@ -4091,7 +4091,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
 </div>
 <div id="heartbeatAlertOverlay" class="heartbeat-alert-overlay" aria-hidden="true">
   <div class="heartbeat-alert-panel" role="alert" aria-live="assertive" aria-atomic="true">
-    <div class="heartbeat-alert-badge"><span class="heartbeat-alert-dot" aria-hidden="true"></span>Remote Service Alert</div>
+    <div class="heartbeat-alert-badge"><span class="heartbeat-alert-dot" aria-hidden="true"></span><span id="heartbeatAlertBadgeText">Remote Service Alert</span></div>
     <h1 class="heartbeat-alert-title">Heartbeat Error</h1>
   </div>
 </div>
@@ -23847,6 +23847,7 @@ function normalizeQuickPluginEntries(items) {
   return items.map(item => {
     const name = String(item && item.name != null ? item.name : '').trim();
     const key = String(item && (item.key != null ? item.key : item.plugin != null ? item.plugin : '') || '').trim();
+    if (key.toLowerCase() === 'remote') return null;
     const param = normalizePluginParamDefinitions(Array.isArray(item && item.param) ? item.param : []);
     const scopeDefined = !!(item && typeof item === 'object' && Object.prototype.hasOwnProperty.call(item, 'scope'));
     const scope = normalizePluginScopeList(scopeDefined && Array.isArray(item && item.scope) ? item.scope : []);
@@ -24435,6 +24436,7 @@ function quickFanAction(event, action) {
     event.stopPropagation();
   }
   if (isOnboardingActive() && (isPluginTourOnboardingStep(onboardingState.step) || isPluginSuccessTourOnboardingStep(onboardingState.step))) return;
+  if (isRemotePlugin(action)) return;
   closeQuickFanMenu();
   openPluginModal(action);
 }
@@ -25757,7 +25759,7 @@ function renderPluginModalMeta(plugin) {
 
 async function openPluginModal(plugin) {
   const overlay = document.getElementById('pluginModalOverlay');
-  if (!overlay || !plugin || !plugin.name) return;
+  if (!overlay || !plugin || !plugin.name || isRemotePlugin(plugin)) return;
   const pluginKey = getPluginRuntimeKey(plugin);
   const pluginName = String(plugin.name || '插件').trim() || '插件';
   pushQuickFanTransitionLock({
@@ -46806,15 +46808,31 @@ function startStarAnim() {
 
 // ===== Heartbeat Monitor =====
 const HEARTBEAT_ALERT_DURATION_MS = 10000;
-const HEARTBEAT_FAILURE_THRESHOLD_DEFAULT = 10;
+const HEARTBEAT_FAILURE_THRESHOLD_DEFAULT = 3;
+const HEARTBEAT_FAILURE_THRESHOLD_CACHE_KEY = 'deepright-heartbeat-failure-threshold-v1';
+const HEARTBEAT_FAILURE_THRESHOLD_CACHE_TTL_MS = 300 * 1000;
+const HEARTBEAT_ALERT_KIND_REMOTE = 'remote';
+const HEARTBEAT_ALERT_KIND_INTEGRATION_CLOSED = 'integration-closed';
 let heartbeatFailCount = 0;
+let heartbeatFailureKind = '';
 let heartbeatAlertHideTimer = 0;
 let heartbeatAlertActiveUntil = 0;
 
 function getHeartbeatAlertElements() {
   return {
-    overlay: document.getElementById('heartbeatAlertOverlay')
+    overlay: document.getElementById('heartbeatAlertOverlay'),
+    badgeText: document.getElementById('heartbeatAlertBadgeText')
   };
+}
+
+function normalizeHeartbeatAlertKind(kind) {
+  return kind === HEARTBEAT_ALERT_KIND_INTEGRATION_CLOSED ? HEARTBEAT_ALERT_KIND_INTEGRATION_CLOSED : HEARTBEAT_ALERT_KIND_REMOTE;
+}
+
+function setHeartbeatAlertBadgeText(kind) {
+  const { badgeText } = getHeartbeatAlertElements();
+  if (!badgeText) return;
+  badgeText.textContent = normalizeHeartbeatAlertKind(kind) === HEARTBEAT_ALERT_KIND_INTEGRATION_CLOSED ? '本地应用已关闭' : 'Remote Service Alert';
 }
 
 function hideHeartbeatAlert() {
@@ -46827,6 +46845,7 @@ function hideHeartbeatAlert() {
   if (!overlay) return;
   overlay.classList.remove('show');
   overlay.setAttribute('aria-hidden', 'true');
+  setHeartbeatAlertBadgeText(HEARTBEAT_ALERT_KIND_REMOTE);
 }
 
 function scheduleHeartbeatAlertHide() {
@@ -46845,42 +46864,132 @@ function scheduleHeartbeatAlertHide() {
   }, remainMs);
 }
 
-function triggerHeartbeatAlert() {
+function triggerHeartbeatAlert(kind) {
   const { overlay } = getHeartbeatAlertElements();
   if (!overlay) return;
-  const now = Date.now();
-  heartbeatAlertActiveUntil = Math.max(heartbeatAlertActiveUntil, now) + HEARTBEAT_ALERT_DURATION_MS;
+  const alertKind = normalizeHeartbeatAlertKind(kind);
+  setHeartbeatAlertBadgeText(alertKind);
+  if (alertKind === HEARTBEAT_ALERT_KIND_INTEGRATION_CLOSED) {
+    heartbeatAlertActiveUntil = 0;
+    if (heartbeatAlertHideTimer) {
+      clearTimeout(heartbeatAlertHideTimer);
+      heartbeatAlertHideTimer = 0;
+    }
+  } else {
+    const now = Date.now();
+    heartbeatAlertActiveUntil = Math.max(heartbeatAlertActiveUntil, now) + HEARTBEAT_ALERT_DURATION_MS;
+  }
   overlay.classList.add('show');
   overlay.setAttribute('aria-hidden', 'false');
-  scheduleHeartbeatAlertHide();
+  if (alertKind === HEARTBEAT_ALERT_KIND_REMOTE) scheduleHeartbeatAlertHide();
 }
 
 function handleHeartbeatFailureAlert() {
-  triggerHeartbeatAlert();
+  triggerHeartbeatAlert(HEARTBEAT_ALERT_KIND_REMOTE);
+}
+
+function handleIntegrationClosedAlert() {
+  triggerHeartbeatAlert(HEARTBEAT_ALERT_KIND_INTEGRATION_CLOSED);
 }
 
 function clearHeartbeatFailureAlert() {
   hideHeartbeatAlert();
 }
 
+function recordHeartbeatFailure(kind) {
+  const failureKind = normalizeHeartbeatAlertKind(kind);
+  if (heartbeatFailureKind !== failureKind) {
+    heartbeatFailureKind = failureKind;
+    heartbeatFailCount = 0;
+  }
+  heartbeatFailCount += 1;
+  return heartbeatFailCount;
+}
+
+function resetHeartbeatFailures() {
+  heartbeatFailCount = 0;
+  heartbeatFailureKind = '';
+}
+
+function applyHeartbeatFailure(kind, threshold) {
+  if (recordHeartbeatFailure(kind) >= threshold) {
+    if (normalizeHeartbeatAlertKind(kind) === HEARTBEAT_ALERT_KIND_INTEGRATION_CLOSED) {
+      handleIntegrationClosedAlert();
+    } else {
+      handleHeartbeatFailureAlert();
+    }
+    setLogoVisualState(logoVisualMode, 'hb-fail');
+  } else {
+    clearHeartbeatFailureAlert();
+  }
+}
+
 function normalizeHeartbeatFailureThreshold(value) {
   const num = Number(value);
-  if (!Number.isFinite(num) || num <= 0) return HEARTBEAT_FAILURE_THRESHOLD_DEFAULT;
-  return Math.floor(num);
+  if (!Number.isFinite(num) || !Number.isInteger(num) || num <= 0) return null;
+  return num;
 }
 
 function resolveHeartbeatFailureThreshold(config) {
   const httpConfig = config && typeof config === 'object' && !Array.isArray(config) ? config.http : null;
-  if (!httpConfig || typeof httpConfig !== 'object' || Array.isArray(httpConfig)) {
-    return HEARTBEAT_FAILURE_THRESHOLD_DEFAULT;
-  }
+  if (!httpConfig || typeof httpConfig !== 'object' || Array.isArray(httpConfig)) return null;
   return normalizeHeartbeatFailureThreshold(httpConfig.heartbeat);
 }
 
+function readHeartbeatFailureThresholdCache() {
+  let raw = null;
+  try {
+    raw = localStorage.getItem(HEARTBEAT_FAILURE_THRESHOLD_CACHE_KEY);
+  } catch {
+    return { state: 'unavailable', value: null };
+  }
+  if (!raw) return { state: 'missing', value: null };
+  let cached = null;
+  try {
+    cached = JSON.parse(raw);
+  } catch {
+    return { state: 'invalid', value: null };
+  }
+  if (!cached || typeof cached !== 'object' || Array.isArray(cached)) {
+    return { state: 'invalid', value: null };
+  }
+  const value = normalizeHeartbeatFailureThreshold(cached.value);
+  const cachedAt = Number(cached.cachedAt);
+  const now = Date.now();
+  if (value == null || !Number.isFinite(cachedAt) || !Number.isInteger(cachedAt) || cachedAt <= 0 || !Number.isFinite(now) || now < cachedAt) {
+    return { state: 'invalid', value: null };
+  }
+  if (now - cachedAt >= HEARTBEAT_FAILURE_THRESHOLD_CACHE_TTL_MS) {
+    return { state: 'expired', value: null };
+  }
+  return { state: 'fresh', value };
+}
+
+function cacheHeartbeatFailureThreshold(value) {
+  const normalized = normalizeHeartbeatFailureThreshold(value);
+  const cachedAt = Date.now();
+  if (normalized == null || !Number.isFinite(cachedAt)) return false;
+  try {
+    localStorage.setItem(HEARTBEAT_FAILURE_THRESHOLD_CACHE_KEY, JSON.stringify({ value: normalized, cachedAt }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function readHeartbeatFailureThreshold() {
+  const cached = readHeartbeatFailureThresholdCache();
+  if (cached.state === 'fresh') return cached.value;
+  if (cached.state !== 'missing' && cached.state !== 'expired') {
+    return HEARTBEAT_FAILURE_THRESHOLD_DEFAULT;
+  }
   try {
     const config = await readRuntimeConfig(true);
-    return resolveHeartbeatFailureThreshold(config);
+    const threshold = resolveHeartbeatFailureThreshold(config);
+    if (threshold == null || !cacheHeartbeatFailureThreshold(threshold)) {
+      return HEARTBEAT_FAILURE_THRESHOLD_DEFAULT;
+    }
+    return threshold;
   } catch {
     return HEARTBEAT_FAILURE_THRESHOLD_DEFAULT;
   }
@@ -46960,48 +47069,38 @@ async function checkHeartbeat() {
   const svg = document.getElementById('logoSvg');
   if (!svg) return;
   const heartbeatFailureThreshold = await readHeartbeatFailureThreshold();
+  let resp = null;
   try {
-    const resp = await fetchExecApi('/api/heartbeat', { cache: 'no-store' });
-    if (!resp.ok) {
-      heartbeatFailCount += 1;
-      if (heartbeatFailCount >= heartbeatFailureThreshold) {
-        handleHeartbeatFailureAlert(`本地心跳状态接口异常：HTTP ${resp.status}`);
-        setLogoVisualState(logoVisualMode, 'hb-fail');
-      } else {
-        clearHeartbeatFailureAlert();
-      }
-      return;
-    }
-    const data = await resp.json();
-    if (data.lastTimestamp === 0) {
-      heartbeatFailCount = 0;
-      clearHeartbeatFailureAlert();
-      setLogoVisualState('report', 'hb-ok');
-      return;
-    }
-    if (data.status === 1) {
-      heartbeatFailCount += 1;
-      if (heartbeatFailCount >= heartbeatFailureThreshold) {
-        handleHeartbeatFailureAlert();
-        setLogoVisualState(logoVisualMode, 'hb-fail');
-      } else {
-        clearHeartbeatFailureAlert();
-      }
-      return;
-    }
-    heartbeatFailCount = 0;
-    clearHeartbeatFailureAlert();
-    if (data.status === 2) setLogoVisualState('default', 'hb-task');
-    else setLogoVisualState('report', 'hb-ok');
+    resp = await fetchExecApi('/api/heartbeat', { cache: 'no-store' });
   } catch {
-    heartbeatFailCount += 1;
-    if (heartbeatFailCount >= heartbeatFailureThreshold) {
-      handleHeartbeatFailureAlert('本地心跳状态接口不可达，请检查页面服务是否仍在运行。');
-      setLogoVisualState(logoVisualMode, 'hb-fail');
-    } else {
-      clearHeartbeatFailureAlert();
-    }
+    applyHeartbeatFailure(HEARTBEAT_ALERT_KIND_INTEGRATION_CLOSED, heartbeatFailureThreshold);
+    return;
   }
+  if (!resp.ok) {
+    applyHeartbeatFailure(HEARTBEAT_ALERT_KIND_REMOTE, heartbeatFailureThreshold);
+    return;
+  }
+  let data = null;
+  try {
+    data = await resp.json();
+  } catch {
+    applyHeartbeatFailure(HEARTBEAT_ALERT_KIND_REMOTE, heartbeatFailureThreshold);
+    return;
+  }
+  if (data.lastTimestamp === 0) {
+    resetHeartbeatFailures();
+    clearHeartbeatFailureAlert();
+    setLogoVisualState('report', 'hb-ok');
+    return;
+  }
+  if (data.status === 1) {
+    applyHeartbeatFailure(HEARTBEAT_ALERT_KIND_REMOTE, heartbeatFailureThreshold);
+    return;
+  }
+  resetHeartbeatFailures();
+  clearHeartbeatFailureAlert();
+  if (data.status === 2) setLogoVisualState('default', 'hb-task');
+  else setLogoVisualState('report', 'hb-ok');
 }
 
 function runPageTask(taskName, runner) {

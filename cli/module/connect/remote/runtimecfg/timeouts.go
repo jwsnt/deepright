@@ -1,12 +1,9 @@
 package runtimecfg
 
 import (
-	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -16,25 +13,17 @@ import (
 )
 
 const (
-	DefaultCommandTimeout = 30000 * time.Millisecond
-	DefaultSCPTimeout     = 30000 * time.Millisecond
-	metaLookupTimeout     = 5 * time.Second
-	pluginKeyRemote       = "remote"
+	DefaultCommandTimeout = 300 * time.Second
+	DefaultSCPTimeout     = 300 * time.Second
 )
 
 var (
-	ExecCommandContext = exec.CommandContext
-	OSExecutable       = os.Executable
+	OSExecutable = os.Executable
 )
 
 type Timeouts struct {
 	Exec time.Duration
 	SCP  time.Duration
-}
-
-type pluginMetaResponse struct {
-	Key  string         `json:"key"`
-	Meta pluginMetaBody `json:"meta"`
 }
 
 type pluginMetaBody map[string]any
@@ -81,49 +70,51 @@ func ResolvePluginTimeouts(flags map[string]string) Timeouts {
 		timeouts.SCP = value
 		return timeouts
 	}
-	meta, err := loadRemotePluginMeta(flags)
-	if err != nil || meta == nil {
+	config, err := loadRemoteTimeoutConfig(flags)
+	if err != nil || config == nil {
 		return timeouts
 	}
-	if value, ok := ParseTimeoutMS(meta.stringValue("exec_timeout")); ok {
+	if value, ok := ParseTimeoutSeconds(config.stringValue("exec_timeout")); ok {
 		timeouts.Exec = value
 	}
-	if value, ok := ParseTimeoutMS(meta.stringValue("scp_timeout")); ok {
+	if value, ok := ParseTimeoutSeconds(config.stringValue("scp_timeout")); ok {
 		timeouts.SCP = value
 	}
 	return timeouts
 }
 
-func loadRemotePluginMeta(flags map[string]string) (pluginMetaBody, error) {
-	connectBin, prefix := resolveMetaLookupCommand(flags)
-	if strings.TrimSpace(connectBin) == "" {
-		return nil, errors.New("connect-bin is required")
+func loadRemoteTimeoutConfig(flags map[string]string) (pluginMetaBody, error) {
+	configPath, ok := resolveRemoteConfigPath(flags)
+	if !ok {
+		return nil, fmt.Errorf("resolve config/config.json")
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), metaLookupTimeout)
-	defer cancel()
-
-	args := append([]string{}, prefix...)
-	args = append(args, "meta-get", "--key", pluginKeyRemote)
-	cmd := ExecCommandContext(ctx, connectBin, args...)
-	output, err := cmd.Output()
+	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, err
 	}
-
-	var response pluginMetaResponse
-	if err := json.Unmarshal(output, &response); err != nil {
+	decoder := json.NewDecoder(strings.NewReader(string(data)))
+	decoder.UseNumber()
+	var raw map[string]any
+	if err := decoder.Decode(&raw); err != nil {
 		return nil, err
 	}
-	return response.Meta, nil
+	remote, ok := raw["remote"].(map[string]any)
+	if !ok || remote == nil {
+		return nil, fmt.Errorf("remote config is missing")
+	}
+	return pluginMetaBody(remote), nil
 }
 
-func resolveMetaLookupCommand(flags map[string]string) (string, []string) {
-	explicit := strings.TrimSpace(connectsvc.FirstValue(flags, "connect-bin"))
-	if explicit != "" {
-		return normalizeBinaryPath(explicit), connectPrefixForBinary(explicit)
+func resolveRemoteConfigPath(flags map[string]string) (string, bool) {
+	if connectBin := strings.TrimSpace(connectsvc.FirstValue(flags, "connect-bin")); connectBin != "" {
+		if path, ok := connectsvc.ResolveRuntimeConfigPathFromConnectBin(normalizeBinaryPath(connectBin)); ok {
+			return path, true
+		}
 	}
-	return "", nil
+	if executable, err := OSExecutable(); err == nil && strings.TrimSpace(executable) != "" {
+		return connectsvc.ResolveRuntimeConfigPathNearBinary(executable)
+	}
+	return "", false
 }
 
 func normalizeBinaryPath(value string) string {
@@ -142,14 +133,6 @@ func normalizeBinaryPath(value string) string {
 	return value
 }
 
-func connectPrefixForBinary(binary string) []string {
-	base := strings.ToLower(filepath.Base(strings.TrimSpace(binary)))
-	if base == "integration" || base == "proxy" || strings.HasPrefix(base, "integration.") || strings.HasPrefix(base, "proxy.") {
-		return []string{"connect"}
-	}
-	return nil
-}
-
 func ParseTimeoutMS(raw string) (time.Duration, bool) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -160,4 +143,16 @@ func ParseTimeoutMS(raw string) (time.Duration, bool) {
 		return 0, false
 	}
 	return time.Duration(milliseconds) * time.Millisecond, true
+}
+
+func ParseTimeoutSeconds(raw string) (time.Duration, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0, false
+	}
+	seconds, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || seconds <= 0 || seconds > int64((1<<63-1)/int64(time.Second)) {
+		return 0, false
+	}
+	return time.Duration(seconds) * time.Second, true
 }

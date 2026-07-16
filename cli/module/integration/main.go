@@ -1324,7 +1324,7 @@ func getAgentOutput(root string, deviceID string, ttl time.Duration) (*AgentOutp
 	if err := syncIntegrationKnowledgeOutput(&cloned, root); err != nil {
 		return nil, err
 	}
-	cloned.Plugins = agentcore.DetectRunningPluginKeys("plugins", detectPluginRuntimes())
+	cloned.Plugins = detectPluginKeys()
 	return &cloned, nil
 }
 
@@ -1341,7 +1341,7 @@ func getAgentOutputForChat(root string, deviceID string, ttl time.Duration, chat
 	if err := syncIntegrationKnowledgeOutput(&cloned, root); err != nil {
 		return nil, err
 	}
-	cloned.Plugins = agentcore.DetectRunningPluginKeys("plugins", detectPluginRuntimes())
+	cloned.Plugins = detectPluginKeys()
 	return &cloned, nil
 }
 
@@ -1841,23 +1841,73 @@ func integrationDefaultAgentDir() string {
 }
 
 func detectPluginRuntimes() []agentcore.PluginRuntime {
-	svc, err := newIntegrationConnectService(integrationDefaultAgentDir())
-	if err != nil {
-		return nil
+	plugins := make([]agentcore.PluginRuntime, 0)
+	if svc, err := newIntegrationConnectService(integrationDefaultAgentDir()); err == nil {
+		defer svc.Close()
+		if items, err := listLocalPluginMeta(svc); err == nil {
+			plugins = integrationPluginRuntimesFromLocalMeta(items)
+		}
 	}
-	defer svc.Close()
+	return mergeIntegrationAssociatedPluginRuntimes(plugins)
+}
 
-	items, err := svc.ListMetaConfig(false)
-	if err != nil {
-		return nil
-	}
-
+func integrationPluginRuntimesFromLocalMeta(items []connectsvc.PluginMetaInfo) []agentcore.PluginRuntime {
+	pluginDir, dirErr := localPluginDirResolver()
+	seen := make(map[string]struct{}, len(items))
 	plugins := make([]agentcore.PluginRuntime, 0, len(items))
 	for _, item := range items {
-		plugins = append(plugins, agentcore.PluginRuntime{
-			Key:      strings.TrimSpace(item.Key),
-			Callback: strings.TrimSpace(item.Callback),
-		})
+		key := strings.TrimSpace(item.Key)
+		if key == "" {
+			continue
+		}
+		lookupKey := strings.ToLower(key)
+		if _, exists := seen[lookupKey]; exists {
+			continue
+		}
+		callback := strings.TrimSpace(item.Callback)
+		if dirErr == nil && strings.TrimSpace(pluginDir) != "" {
+			if callback == "" {
+				callback = filepath.Join(pluginDir, key)
+			} else if !filepath.IsAbs(callback) {
+				// Meta callbacks such as ./browser are relative to the local
+				// plugin directory, rather than Integration's current directory.
+				callback = filepath.Join(pluginDir, callback)
+			}
+		}
+		plugins = append(plugins, agentcore.PluginRuntime{Key: key, Callback: callback})
+		seen[lookupKey] = struct{}{}
+	}
+	return plugins
+}
+
+func mergeIntegrationAssociatedPluginRuntimes(plugins []agentcore.PluginRuntime) []agentcore.PluginRuntime {
+	associated, err := readIntegrationAssociatedPlugins()
+	if err != nil || len(associated) == 0 {
+		return plugins
+	}
+
+	seen := make(map[string]struct{}, len(plugins)+len(associated))
+	for _, plugin := range plugins {
+		if key := strings.ToLower(strings.TrimSpace(plugin.Key)); key != "" {
+			seen[key] = struct{}{}
+		}
+	}
+	pluginDir, dirErr := localPluginDirResolver()
+	for _, key := range associated {
+		normalizedKey := strings.TrimSpace(key)
+		if normalizedKey == "" {
+			continue
+		}
+		lookupKey := strings.ToLower(normalizedKey)
+		if _, exists := seen[lookupKey]; exists {
+			continue
+		}
+		callback := ""
+		if dirErr == nil && strings.TrimSpace(pluginDir) != "" {
+			callback = filepath.Join(pluginDir, normalizedKey)
+		}
+		plugins = append(plugins, agentcore.PluginRuntime{Key: normalizedKey, Callback: callback})
+		seen[lookupKey] = struct{}{}
 	}
 	return plugins
 }
@@ -1962,7 +2012,39 @@ func copyReleaseAssetWithPermissions(srcPath, dstPath string, mode os.FileMode) 
 }
 
 func detectPluginKeys() []string {
-	return agentcore.DetectRunningPluginKeys("plugins", detectPluginRuntimes())
+	return mergeDefaultRemotePluginKey(
+		agentcore.DetectRunningPluginKeys("plugins", detectPluginRuntimes()),
+	)
+}
+
+// mergeDefaultRemotePluginKey adds the built-in remote capability to the
+// runtime-discovered plugin list. remote is advertised even before its
+// associated process has created a PID file, while all other entries remain
+// strictly realtime discoveries.
+func mergeDefaultRemotePluginKey(running []string) []string {
+	plugins := make([]string, 0, len(running)+1)
+	seen := make(map[string]struct{}, len(running)+1)
+	for _, plugin := range running {
+		plugin = strings.TrimSpace(plugin)
+		if plugin == "" {
+			continue
+		}
+		lookupKey := strings.ToLower(plugin)
+		if _, exists := seen[lookupKey]; exists {
+			continue
+		}
+		seen[lookupKey] = struct{}{}
+		if lookupKey == "remote" {
+			plugins = append(plugins, "remote")
+			continue
+		}
+		plugins = append(plugins, plugin)
+	}
+	if _, exists := seen["remote"]; !exists {
+		plugins = append(plugins, "remote")
+	}
+	sort.Strings(plugins)
+	return plugins
 }
 
 func pluginStarted(key, callback string) bool {
@@ -11639,6 +11721,9 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 		// Merge request metadata onto the shared Agent metadata and forward the
 		// merged body as-is without any query-based metadata expansion.
 		sharedutil.MergeMetadataFields(metaMap, reqData["metadata"])
+		// plugins is runtime-owned metadata. A client request can contain a stale
+		// plugin list, but it must not replace the built-in remote capability.
+		metaMap["plugins"] = detectPluginKeys()
 		var selectedModelCfg tokenConfig
 		if db, err := sql.Open("sqlite", resolveIntegrationDBPath()); err != nil {
 			log.Printf("integration: provider config lookup failed: %v", err)
@@ -12426,6 +12511,56 @@ func readIntegrationStartupConfig() (map[string]interface{}, string, error) {
 		}
 	}
 	return out, path, nil
+}
+
+func normalizeIntegrationAssociatedPlugins(raw interface{}) []string {
+	values, ok := raw.([]interface{})
+	if !ok {
+		if stringValues, ok := raw.([]string); ok {
+			values = make([]interface{}, len(stringValues))
+			for index, value := range stringValues {
+				values[index] = value
+			}
+		} else {
+			return nil
+		}
+	}
+
+	seen := make(map[string]struct{}, len(values))
+	plugins := make([]string, 0, len(values))
+	for _, value := range values {
+		plugin, ok := value.(string)
+		if !ok {
+			continue
+		}
+		plugin = strings.TrimSpace(plugin)
+		if plugin == "" {
+			continue
+		}
+		key := strings.ToLower(plugin)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		plugins = append(plugins, plugin)
+	}
+	return plugins
+}
+
+func readIntegrationAssociatedPlugins() ([]string, error) {
+	raw, _, err := readIntegrationStartupConfigRaw()
+	if err != nil {
+		return nil, err
+	}
+	if raw == nil {
+		return nil, nil
+	}
+	for key, value := range raw {
+		if normalizeIntegrationStartupConfigKey(key) == "associated" {
+			return normalizeIntegrationAssociatedPlugins(value), nil
+		}
+	}
+	return nil, nil
 }
 
 func readIntegrationStartupConfigValue(key string) (string, bool) {
@@ -14828,10 +14963,28 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	}
 	defer os.Remove(pidFile)
 	_ = os.Remove(startupStatusFile)
+	associatedPlugins, associatedErr := readIntegrationAssociatedPlugins()
+	if associatedErr != nil {
+		log.Printf("associated plugins config read failed: %v", associatedErr)
+	}
 
 	ctx, stop := signalContext()
 	defer stop()
+	associatedStartCtx, cancelAssociatedStart := context.WithCancel(context.Background())
+	defer cancelAssociatedStart()
+	associatedStartDone := make(chan struct{})
+	var managedPluginStopOnce sync.Once
+	managedPluginStopWarnings := []string(nil)
+	stopManagedPlugins := func(logWriter io.Writer) []string {
+		managedPluginStopOnce.Do(func() {
+			cancelAssociatedStart()
+			<-associatedStartDone
+			managedPluginStopWarnings = stopIntegrationApplicationPlugins(associatedPlugins, logWriter)
+		})
+		return managedPluginStopWarnings
+	}
 	shutdownController := newIntegrationShutdownController(stop, nil)
+	shutdownController.stopPlugins = stopManagedPlugins
 	mux.HandleFunc("/api/shutdown", handleShutdown(shutdownController))
 	server := &http.Server{Handler: withStandaloneAPIProtection(mux, &cfg)}
 	defer func() {
@@ -14848,9 +15001,13 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	startCronCheck(ctx, &cfg)
 	startCronExecutor(ctx, &cfg, proxyClient, connectSvc)
 	startConnectPendingRequestSync(ctx, &cfg, connectSvc)
+	startIntegrationAssociatedPluginsAsync(associatedStartCtx, associatedPlugins, nil, associatedStartDone)
 
 	go func() {
 		<-ctx.Done()
+		for _, warning := range stopManagedPlugins(nil) {
+			log.Printf("plugin shutdown warning: %s", warning)
+		}
 		cancelAllActiveCmds()
 		closeHTTPClientIdleConnections(proxyClient)
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), integrationShutdownTimeout)
@@ -15037,7 +15194,13 @@ func stopIntegrationProcess(flags map[string]string, stdout, stderr io.Writer) i
 		fmt.Fprintf(stderr, "integration not running: %s\n", pidFile)
 		return 1
 	}
-	for _, warning := range stopIntegrationPlugins(logWriter) {
+	associatedPlugins, associatedErr := readIntegrationAssociatedPlugins()
+	if associatedErr != nil {
+		warning := fmt.Sprintf("stop associated plugins config read failed: %v", associatedErr)
+		integrationLifecycleLog(logWriter, "stop warning: %s", warning)
+		fmt.Fprintln(stderr, warning)
+	}
+	for _, warning := range stopIntegrationApplicationPlugins(associatedPlugins, logWriter) {
 		integrationLifecycleLog(logWriter, "stop warning: %s", warning)
 		fmt.Fprintln(stderr, warning)
 	}
@@ -15997,7 +16160,114 @@ var runConnectPluginStatus = func(target string, flags map[string]string) (*conn
 	return connectsvc.GetPluginStatus(target, flags)
 }
 
+func integrationAssociatedPluginFlags() map[string]string {
+	flags := map[string]string{}
+	ensureIntegrationPluginConnectBin(flags)
+	return flags
+}
+
+func startIntegrationAssociatedPluginsAsync(ctx context.Context, plugins []string, logWriter io.Writer, done chan<- struct{}) {
+	plugins = append([]string(nil), plugins...)
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	go func() {
+		if done != nil {
+			defer close(done)
+		}
+		if len(plugins) == 0 {
+			integrationStopLog(logWriter, "associated plugins start skipped: none configured")
+			return
+		}
+		startIntegrationAssociatedPluginsWithContext(ctx, plugins, logWriter)
+	}()
+}
+
+func startIntegrationAssociatedPlugins(plugins []string, logWriter io.Writer) {
+	startIntegrationAssociatedPluginsWithContext(context.Background(), plugins, logWriter)
+}
+
+func startIntegrationAssociatedPluginsWithContext(ctx context.Context, plugins []string, logWriter io.Writer) {
+	for _, plugin := range normalizeIntegrationAssociatedPlugins(plugins) {
+		select {
+		case <-ctx.Done():
+			integrationStopLog(logWriter, "associated plugins start canceled")
+			return
+		default:
+		}
+		flags := integrationAssociatedPluginFlags()
+		status, err := runConnectPluginStatus(plugin, flags)
+		if err == nil && status != nil && status.Started {
+			integrationStopLog(logWriter, "associated plugin start skipped: already started target=%s", plugin)
+			continue
+		}
+		if err != nil {
+			integrationStopLog(logWriter, "associated plugin status unavailable before start target=%s error=%v", plugin, err)
+		}
+		select {
+		case <-ctx.Done():
+			integrationStopLog(logWriter, "associated plugin start canceled target=%s", plugin)
+			return
+		default:
+		}
+		result, err := runConnectPluginAction(plugin, "start", flags)
+		if err != nil {
+			integrationStopLog(logWriter, "associated plugin start failed target=%s error=%v", plugin, err)
+			continue
+		}
+		commandText := ""
+		if result != nil {
+			commandText = strings.Join(result.Command, " ")
+		}
+		integrationStopLog(logWriter, "associated plugin started target=%s command=%s", plugin, strings.TrimSpace(commandText))
+	}
+}
+
+func stopIntegrationAssociatedPlugins(plugins []string, logWriter io.Writer) []string {
+	warnings := make([]string, 0)
+	for _, plugin := range normalizeIntegrationAssociatedPlugins(plugins) {
+		flags := integrationAssociatedPluginFlags()
+		status, err := runConnectPluginStatus(plugin, flags)
+		if err != nil {
+			warning := fmt.Sprintf("associated plugin %s status failed: %v", plugin, err)
+			integrationStopLog(logWriter, warning)
+			warnings = append(warnings, warning)
+			continue
+		}
+		if status == nil || !status.Started {
+			integrationStopLog(logWriter, "associated plugin stop skipped: not started target=%s", plugin)
+			continue
+		}
+		result, err := runConnectPluginAction(plugin, "stop", flags)
+		if err != nil {
+			warning := fmt.Sprintf("associated plugin %s stop failed: %v", plugin, err)
+			integrationStopLog(logWriter, warning)
+			warnings = append(warnings, warning)
+			continue
+		}
+		commandText := ""
+		if result != nil {
+			commandText = strings.Join(result.Command, " ")
+		}
+		integrationStopLog(logWriter, "associated plugin stopped target=%s command=%s", plugin, strings.TrimSpace(commandText))
+	}
+	return warnings
+}
+
+func stopIntegrationApplicationPlugins(associatedPlugins []string, logWriter io.Writer) []string {
+	warnings := stopIntegrationAssociatedPlugins(associatedPlugins, logWriter)
+	excluded := make(map[string]struct{}, len(associatedPlugins))
+	for _, plugin := range normalizeIntegrationAssociatedPlugins(associatedPlugins) {
+		excluded[strings.ToLower(plugin)] = struct{}{}
+	}
+	return append(warnings, stopIntegrationPluginsExcluding(logWriter, excluded)...)
+}
+
 func stopIntegrationPlugins(logWriter io.Writer) []string {
+	return stopIntegrationPluginsExcluding(logWriter, nil)
+}
+
+func stopIntegrationPluginsExcluding(logWriter io.Writer, excluded map[string]struct{}) []string {
 	var warnings []string
 	items, err := runConnectListMeta()
 	if err != nil {
@@ -16019,7 +16289,10 @@ func stopIntegrationPlugins(logWriter io.Writer) []string {
 		if target == "" {
 			continue
 		}
-
+		if _, skip := excluded[strings.ToLower(target)]; skip {
+			integrationStopLog(logWriter, "plugin stop skipped: associated lifecycle manages target=%s", target)
+			continue
+		}
 		dedupeKey := strings.ToLower(target)
 		if _, ok := seen[dedupeKey]; ok {
 			continue

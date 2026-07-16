@@ -9,7 +9,7 @@
 - 创建默认用户 `deepright`
 - 安装运行期所需 apt 依赖
 - 复制 Linux release 载荷到 WSL 用户目录
-- 启动 `integration start`
+- 通过 `sudo -n` 以 root 身份启动 `integration start`，同时保留 WSL 用户的数据目录
 
 ## 设计原则
 
@@ -50,9 +50,9 @@
 6. 创建用户 `deepright` 并设为默认用户
 7. 安装缺失依赖：`git`、`npm`、`python3`、`bubblewrap`
 8. 复制 release 目录到 `~/<TargetDirName>`
-9. 生成 `~/.integration` 与 `~/start-deepright.sh`
+9. 生成 `~/start-deepright.sh`；该脚本以非交互式 sudo 启动 root `integration`，并将启动命令、日志/PID 路径、退出码和服务 PID 记入 `~/deepright/integration.log`
 10. 生成桌面与开始菜单快捷方式，并统一使用 `DeepRight.ico`
-11. 默认执行 `~/.integration --start`
+11. 默认执行 `~/start-deepright.sh`
 
 ## 与主构建的关系
 

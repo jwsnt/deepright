@@ -490,6 +490,7 @@ func TestReadLiveAgentKnowledgePrefersUppercaseThenLowercase(t *testing.T) {
 
 func TestProxyChatCompletions(t *testing.T) {
 	disableIntegrationNotificationsForTest(t)
+	disableIntegrationManagedRuntimeForTest(t)
 	fixtureAgentDir, err := filepath.Abs("../agent/test-case")
 	if err != nil {
 		t.Fatalf("resolve agent dir: %v", err)
@@ -549,7 +550,7 @@ func TestProxyChatCompletions(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(handleChatCompletions(cfg, proxyClient)))
 	defer server.Close()
 
-	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"HELLO WORLD"}],"stream":true}`
+	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"HELLO WORLD"}],"stream":true,"metadata":{"plugins":["browser"]}}`
 	req, _ := http.NewRequest("POST", server.URL, strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer sk-test")
@@ -588,6 +589,9 @@ func TestProxyChatCompletions(t *testing.T) {
 	meta := capturedBody["metadata"].(map[string]interface{})
 	if meta["deviceId"] != "test-dev" {
 		t.Errorf("deviceId = %v", meta["deviceId"])
+	}
+	if gotPlugins, ok := meta["plugins"].([]interface{}); !ok || !reflect.DeepEqual(gotPlugins, []interface{}{"remote"}) {
+		t.Fatalf("metadata.plugins = %#v, want [remote] when request provides a stale browser list", meta["plugins"])
 	}
 	knowledge, ok := meta["knowledge"].(map[string]interface{})
 	if !ok {
@@ -1870,6 +1874,99 @@ func TestStopIntegrationPluginsUsesConnectPluginStatusAsSingleSourceOfTruth(t *t
 	}
 }
 
+func TestIntegrationAssociatedPluginLifecyclePassesConnectBin(t *testing.T) {
+	oldListMeta := runConnectListMeta
+	oldStatus := runConnectPluginStatus
+	oldAction := runConnectPluginAction
+	defer func() {
+		runConnectListMeta = oldListMeta
+		runConnectPluginStatus = oldStatus
+		runConnectPluginAction = oldAction
+	}()
+
+	started := false
+	runConnectListMeta = func() ([]connectMetaConfigListItem, error) {
+		return []connectMetaConfigListItem{{Key: "remote", Name: "远程"}}, nil
+	}
+	runConnectPluginStatus = func(target string, flags map[string]string) (*connectsvc.PluginStatus, error) {
+		if target != "remote" {
+			t.Fatalf("status target = %q, want remote", target)
+		}
+		if strings.TrimSpace(flags["connect-bin"]) == "" {
+			t.Fatal("remote lifecycle must pass --connect-bin")
+		}
+		return &connectsvc.PluginStatus{Key: "remote", Started: started}, nil
+	}
+	runConnectPluginAction = func(target, action string, flags map[string]string) (*connectsvc.PluginActionResult, error) {
+		if target != "remote" {
+			t.Fatalf("action target = %q, want remote", target)
+		}
+		if strings.TrimSpace(flags["connect-bin"]) == "" {
+			t.Fatal("remote lifecycle must pass --connect-bin")
+		}
+		switch action {
+		case "start":
+			started = true
+		case "stop":
+			started = false
+		default:
+			t.Fatalf("action = %q, want start or stop", action)
+		}
+		return &connectsvc.PluginActionResult{Command: []string{action, "--connect-bin", flags["connect-bin"]}}, nil
+	}
+
+	startIntegrationAssociatedPlugins([]string{"remote"}, nil)
+	if !started {
+		t.Fatal("remote plugin should be started")
+	}
+	if warnings := stopIntegrationApplicationPlugins([]string{"remote"}, nil); len(warnings) != 0 {
+		t.Fatalf("stopIntegrationApplicationPlugins() warnings = %v", warnings)
+	}
+	if started {
+		t.Fatal("remote plugin should be stopped")
+	}
+}
+
+func TestStartIntegrationAssociatedPluginsAsyncDoesNotBlock(t *testing.T) {
+	oldStatus := runConnectPluginStatus
+	oldAction := runConnectPluginAction
+	defer func() {
+		runConnectPluginStatus = oldStatus
+		runConnectPluginAction = oldAction
+	}()
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	done := make(chan struct{})
+	runConnectPluginStatus = func(string, map[string]string) (*connectsvc.PluginStatus, error) {
+		return &connectsvc.PluginStatus{Started: false}, nil
+	}
+	runConnectPluginAction = func(target, action string, flags map[string]string) (*connectsvc.PluginActionResult, error) {
+		if target != "remote" || action != "start" {
+			t.Fatalf("action target=%s action=%s, want remote/start", target, action)
+		}
+		if strings.TrimSpace(flags["connect-bin"]) == "" {
+			t.Fatal("associated async start must pass --connect-bin")
+		}
+		close(started)
+		<-release
+		return &connectsvc.PluginActionResult{}, nil
+	}
+
+	startIntegrationAssociatedPluginsAsync(nil, []string{"remote"}, nil, done)
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("associated plugin start was not started asynchronously")
+	}
+	close(release)
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("associated plugin start did not finish")
+	}
+}
+
 func TestProxyChatCompletionsKnowledgeLastUpdateRemovedWithinInterval(t *testing.T) {
 	disableIntegrationNotificationsForTest(t)
 	disableIntegrationManagedRuntimeForTest(t)
@@ -2990,6 +3087,7 @@ func TestDetectPluginKeysRequiresConfiguredAndStartedPlugins(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("plugin shell script test is not supported on windows")
 	}
+	disableIntegrationManagedRuntimeForTest(t)
 
 	restore := withIntegrationPluginSandbox(t, nil)
 	defer restore()
@@ -3042,13 +3140,13 @@ func TestDetectPluginKeysRequiresConfiguredAndStartedPlugins(t *testing.T) {
 		t.Fatalf("create meta: %v", err)
 	}
 
-	if got := detectPluginKeys(); got != nil {
-		t.Fatalf("plugins without pid = %#v, want nil", got)
+	if got := detectPluginKeys(); !reflect.DeepEqual(got, []string{"remote"}) {
+		t.Fatalf("plugins without pid = %#v, want [remote]", got)
 	}
 
 	writeIntegrationPluginPID(t, filepath.Join(pluginsDir, "browser.pid"), os.Getpid())
-	if got := detectPluginKeys(); len(got) != 1 || got[0] != "browser" {
-		t.Fatalf("plugins with pid = %#v, want [browser]", got)
+	if got := detectPluginKeys(); !reflect.DeepEqual(got, []string{"browser", "remote"}) {
+		t.Fatalf("plugins with pid = %#v, want [browser remote]", got)
 	}
 }
 
@@ -3056,6 +3154,7 @@ func TestDetectPluginKeysIgnoresBrowserPlaywrightPIDFallback(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("plugin shell script test is not supported on windows")
 	}
+	disableIntegrationManagedRuntimeForTest(t)
 
 	restore := withIntegrationPluginSandbox(t, nil)
 	defer restore()
@@ -3109,8 +3208,28 @@ func TestDetectPluginKeysIgnoresBrowserPlaywrightPIDFallback(t *testing.T) {
 	}
 
 	writeIntegrationPluginPID(t, filepath.Join(pluginsDir, ".browser_playwright", "browser_playwright.pid"), os.Getpid())
-	if got := detectPluginKeys(); len(got) != 0 {
-		t.Fatalf("plugins with browser_playwright pid = %#v, want []", got)
+	if got := detectPluginKeys(); !reflect.DeepEqual(got, []string{"remote"}) {
+		t.Fatalf("plugins with browser_playwright pid = %#v, want [remote]", got)
+	}
+}
+
+func TestMergeDefaultRemotePluginKeyAlwaysIncludesRemote(t *testing.T) {
+	tests := []struct {
+		name    string
+		running []string
+		want    []string
+	}{
+		{name: "no realtime plugins", want: []string{"remote"}},
+		{name: "one realtime plugin", running: []string{"plugin-a"}, want: []string{"plugin-a", "remote"}},
+		{name: "two realtime plugins", running: []string{"plugin-b", "plugin-a"}, want: []string{"plugin-a", "plugin-b", "remote"}},
+		{name: "deduplicates remote case insensitively", running: []string{" remote ", "PLUGIN-A", "plugin-a"}, want: []string{"PLUGIN-A", "remote"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := mergeDefaultRemotePluginKey(tt.running); !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("mergeDefaultRemotePluginKey(%#v) = %#v, want %#v", tt.running, got, tt.want)
+			}
+		})
 	}
 }
 
@@ -7122,6 +7241,68 @@ func TestLoadIntegrationStartupOptionsReadsConfigDirectoryConfig(t *testing.T) {
 	}
 	if opts.LogFile != "custom.log" {
 		t.Fatalf("log-file = %q, want custom.log", opts.LogFile)
+	}
+}
+
+func TestReadIntegrationAssociatedPluginsReadsAndNormalizesConfig(t *testing.T) {
+	tempDir := t.TempDir()
+	useIntegrationExecutableDir(t, tempDir)
+
+	configDir := filepath.Join(tempDir, "config")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(`{
+  "associated": [" remote ", "browser", "REMOTE", "", 1]
+}`), 0o644); err != nil {
+		t.Fatalf("write config.json: %v", err)
+	}
+
+	plugins, err := readIntegrationAssociatedPlugins()
+	if err != nil {
+		t.Fatalf("readIntegrationAssociatedPlugins() error = %v", err)
+	}
+	if want := []string{"remote", "browser"}; !reflect.DeepEqual(plugins, want) {
+		t.Fatalf("associated plugins = %#v, want %#v", plugins, want)
+	}
+}
+
+func TestRealtimePluginRuntimesMergeWithAssociatedRemoteInMetadata(t *testing.T) {
+	tempDir := t.TempDir()
+	useIntegrationExecutableDir(t, tempDir)
+
+	configDir := filepath.Join(tempDir, "config")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(`{"associated":["remote"]}`), 0o644); err != nil {
+		t.Fatalf("write config.json: %v", err)
+	}
+	pluginDir := filepath.Join(tempDir, "plugins")
+	if err := os.MkdirAll(pluginDir, 0o755); err != nil {
+		t.Fatalf("mkdir plugins dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(pluginDir, "remote.pid"), []byte(strconv.Itoa(os.Getpid())), 0o644); err != nil {
+		t.Fatalf("write remote pid: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(pluginDir, "feishu.pid"), []byte(strconv.Itoa(os.Getpid())), 0o644); err != nil {
+		t.Fatalf("write feishu pid: %v", err)
+	}
+	originalLocalPluginDirResolver := localPluginDirResolver
+	localPluginDirResolver = func() (string, error) { return pluginDir, nil }
+	defer func() { localPluginDirResolver = originalLocalPluginDirResolver }()
+
+	realtimePlugins := integrationPluginRuntimesFromLocalMeta([]connectsvc.PluginMetaInfo{{Key: "feishu"}})
+	runtimes := mergeIntegrationAssociatedPluginRuntimes(realtimePlugins)
+	if len(runtimes) != 2 {
+		t.Fatalf("runtimes = %#v, want feishu and remote", runtimes)
+	}
+	if keys := agentcore.DetectRunningPluginKeys("plugins", runtimes); !reflect.DeepEqual(keys, []string{"feishu", "remote"}) {
+		t.Fatalf("metadata plugins = %#v, want [feishu remote]", keys)
+	}
+	remote := runtimes[1]
+	if remote.Key != "remote" || remote.Callback != filepath.Join(pluginDir, "remote") {
+		t.Fatalf("remote runtime = %#v", remote)
 	}
 }
 

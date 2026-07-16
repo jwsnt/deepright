@@ -55,7 +55,7 @@ install.bat
 - 安装缺失依赖
 - 复制 release 文件到 WSL 中的 `~/deepright`
 - 在桌面和开始菜单创建带 `DeepRight.ico` 的启动快捷方式
-- 启动 `integration start`
+- 以 root 身份启动 `integration start`
 
 ### 3. 后续启动
 
@@ -67,11 +67,21 @@ start.bat
 
 也可以直接使用安装时自动创建的 `DeepRight` 桌面/开始菜单快捷方式，图标与应用主站点资源保持一致。
 
-该脚本会在 WSL 中执行：
+该脚本会在 WSL 中以非交互式 sudo 执行：
 
 ```sh
-~/.integration --start
+sudo -n /usr/bin/env HOME=/home/deepright /app/integration start
 ```
+
+安装器会为 `deepright` 配置免密 sudo；`-n` 确保启动过程不会等待密码输入。虽然进程以 root 运行，HOME 保持为 `/home/deepright`，因此会继续使用原有的 agent 和运行时数据目录。
+
+每次启动会在以下日志文件记录包装脚本路径、完整启动命令、PID 文件路径、启动器 PID、退出码，以及最终 integration 进程的 PID、UID、用户名：
+
+```text
+/home/deepright/deepright/integration.log
+```
+
+启动完成行中的 `integration_uid=0 integration_user=root` 表示服务已实际以 root 身份运行。
 
 ## 幂等行为
 

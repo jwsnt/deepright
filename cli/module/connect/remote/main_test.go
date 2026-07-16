@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -294,44 +293,42 @@ func TestSCPPassthroughReusesManagedSession(t *testing.T) {
 	}
 }
 
-func TestResolvePluginTimeoutsFromMetaGet(t *testing.T) {
-	oldExec := runtimecfg.ExecCommandContext
-	oldSelf := runtimecfg.OSExecutable
-	t.Cleanup(func() {
-		runtimecfg.ExecCommandContext = oldExec
-		runtimecfg.OSExecutable = oldSelf
-	})
-
-	runtimecfg.OSExecutable = func() (string, error) { return "/tmp/remote", nil }
-	runtimecfg.ExecCommandContext = func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		script := "printf '%s' '{\"key\":\"remote\",\"meta\":{\"exec_timeout\":12,\"scp_timeout\":\"34\"}}'"
-		return exec.CommandContext(ctx, "sh", "-c", script)
+func TestResolvePluginTimeoutsFromConfig(t *testing.T) {
+	tempDir := t.TempDir()
+	connectBin := filepath.Join(tempDir, "integration")
+	if err := os.WriteFile(connectBin, nil, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(tempDir, "config"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tempDir, "config", "config.json"), []byte(`{"remote":{"exec_timeout":12,"scp_timeout":"34"}}`), 0o644); err != nil {
+		t.Fatal(err)
 	}
 
-	timeouts := runtimecfg.ResolvePluginTimeouts(map[string]string{"connect-bin": "/tmp/integration"})
-	if timeouts.Exec != 12*time.Millisecond {
+	timeouts := runtimecfg.ResolvePluginTimeouts(map[string]string{"connect-bin": connectBin})
+	if timeouts.Exec != 12*time.Second {
 		t.Fatalf("exec timeout = %v", timeouts.Exec)
 	}
-	if timeouts.SCP != 34*time.Millisecond {
+	if timeouts.SCP != 34*time.Second {
 		t.Fatalf("scp timeout = %v", timeouts.SCP)
 	}
 }
 
 func TestResolvePluginTimeoutsFallsBackToDefault(t *testing.T) {
-	oldExec := runtimecfg.ExecCommandContext
-	oldSelf := runtimecfg.OSExecutable
-	t.Cleanup(func() {
-		runtimecfg.ExecCommandContext = oldExec
-		runtimecfg.OSExecutable = oldSelf
-	})
-
-	runtimecfg.OSExecutable = func() (string, error) { return "/tmp/remote", nil }
-	runtimecfg.ExecCommandContext = func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		script := "printf '%s' '{\"key\":\"remote\",\"meta\":{\"exec_timeout\":\"\",\"scp_timeout\":\"0\"}}'"
-		return exec.CommandContext(ctx, "sh", "-c", script)
+	tempDir := t.TempDir()
+	connectBin := filepath.Join(tempDir, "integration")
+	if err := os.WriteFile(connectBin, nil, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(tempDir, "config"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tempDir, "config", "config.json"), []byte(`{"remote":{"exec_timeout":"","scp_timeout":0}}`), 0o644); err != nil {
+		t.Fatal(err)
 	}
 
-	timeouts := runtimecfg.ResolvePluginTimeouts(map[string]string{"connect-bin": "/tmp/integration"})
+	timeouts := runtimecfg.ResolvePluginTimeouts(map[string]string{"connect-bin": connectBin})
 	if timeouts.Exec != runtimecfg.DefaultCommandTimeout {
 		t.Fatalf("exec timeout = %v", timeouts.Exec)
 	}

@@ -3,17 +3,27 @@
   "version": "1.0",
   "skills": [
     "__internal_cron",
-    "__internal_token"
+    "__internal_remote",
+    "__internal_miniapp",
+    "__internal_creator",
+    "__internal_deepright"
   ],
   "http": {
     "heartbeat": 3,
     "debug": false
   },
+  "associated": [
+    "remote"
+  ],
   "knowledge": {
     "interval": 60
   },
   "browser": {
     "init_timeout": 300
+  },
+  "remote": {
+    "exec_timeout": 300,
+    "scp_timeout": 300
   },
   "install_app": {
     "mac": [

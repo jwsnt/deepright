@@ -1,16 +1,12 @@
 package instance
 
 import (
-	"context"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
-
-	"connect/remote/runtimecfg"
 )
 
 func stubRuntime(t *testing.T) {
@@ -430,18 +426,24 @@ func TestPruneIdleSessionsClosesAndLogs(t *testing.T) {
 func TestExecViaManagerPassesConfiguredTimeout(t *testing.T) {
 	oldRequest := managerRequestFn
 	oldStart := startManagerDaemonFn
-	oldExec := runtimecfg.ExecCommandContext
-	oldSelf := runtimecfg.OSExecutable
 	t.Cleanup(func() {
 		managerRequestFn = oldRequest
 		startManagerDaemonFn = oldStart
-		runtimecfg.ExecCommandContext = oldExec
-		runtimecfg.OSExecutable = oldSelf
 	})
 
 	tempDir := t.TempDir()
 	selfPath := filepath.Join(tempDir, "remote")
 	if err := os.WriteFile(selfPath, []byte("binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	connectBin := filepath.Join(tempDir, "integration")
+	if err := os.WriteFile(connectBin, []byte("binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(tempDir, "config"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tempDir, "config", "config.json"), []byte(`{"remote":{"exec_timeout":9}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	executablePathFn = func() (string, error) { return selfPath, nil }
@@ -452,12 +454,6 @@ func TestExecViaManagerPassesConfiguredTimeout(t *testing.T) {
 		return 0, nil
 	}
 
-	runtimecfg.OSExecutable = func() (string, error) { return selfPath, nil }
-	runtimecfg.ExecCommandContext = func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		script := "printf '%s' '{\"key\":\"remote\",\"meta\":{\"exec_timeout\":\"9\"}}'"
-		return exec.CommandContext(ctx, "sh", "-c", script)
-	}
-
 	managerRequestFn = func(socketPath string, req managerRequest, timeout time.Duration) (managerResponse, error) {
 		switch req.Action {
 		case "ping":
@@ -465,13 +461,13 @@ func TestExecViaManagerPassesConfiguredTimeout(t *testing.T) {
 				OK:          true,
 				PID:         321,
 				Version:     managerProtocolVersion,
-				Fingerprint: fingerprintString(map[string]string{"self": selfPath}),
+				Fingerprint: fingerprintString(map[string]string{"self": selfPath, "connect-bin": connectBin}),
 			}, nil
 		case "exec":
-			if req.TimeoutMillisecs != 9 {
+			if req.TimeoutMillisecs != 9000 {
 				t.Fatalf("timeout milliseconds = %d", req.TimeoutMillisecs)
 			}
-			if timeout != 5009*time.Millisecond {
+			if timeout != 14*time.Second {
 				t.Fatalf("manager timeout = %v", timeout)
 			}
 			return managerResponse{OK: true, Stdout: "ok", ExitCode: 0}, nil
@@ -481,7 +477,7 @@ func TestExecViaManagerPassesConfiguredTimeout(t *testing.T) {
 		}
 	}
 
-	result, err := ExecViaManager(map[string]string{"self": selfPath, "connect-bin": "/tmp/integration"}, "echo ok")
+	result, err := ExecViaManager(map[string]string{"self": selfPath, "connect-bin": connectBin}, "echo ok")
 	if err != nil {
 		t.Fatal(err)
 	}

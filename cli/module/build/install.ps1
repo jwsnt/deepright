@@ -308,6 +308,7 @@ if ($distroExists) {
     } else {
         L_OK "User deepright already exists"
         & wsl.exe -d $DISTRO_NAME -u root -- bash -c "printf '[user]\ndefault=deepright\n' > /etc/wsl.conf" 2>&1 | Out-Null
+        & wsl.exe -d $DISTRO_NAME -u root -- bash -c "echo 'deepright ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/deepright && chmod 440 /etc/sudoers.d/deepright" 2>&1 | Out-Null
         L_OK "Default user set to deepright"
     }
 
@@ -534,7 +535,44 @@ if (Test-Path $APP_DIR) {
 #   CREATE START WRAPPER SCRIPT (used by start.bat)
 # ====================================================================
 L_Info "Creating WSL start wrapper script..."
-& wsl.exe -d $DISTRO_NAME -u deepright -- bash -c "printf '#!/bin/bash`nTERM=xterm-256color setsid /app/integration start`n' > /home/deepright/start-deepright.sh"
+$startWrapper = @'
+#!/bin/bash
+set -u
+
+LOG_PATH="/home/deepright/deepright/integration.log"
+PID_FILE="/home/deepright/deepright/integration.pid"
+WRAPPER_PATH="/home/deepright/start-deepright.sh"
+LAUNCH_COMMAND="sudo -n /usr/bin/env HOME=/home/deepright TERM=xterm-256color /app/integration start"
+
+if ! mkdir -p "$(dirname "$LOG_PATH")"; then
+  printf '%s\n' "failed to create integration log directory" >&2
+  exit 1
+fi
+
+log_launch() {
+  printf '%s [integration launcher] %s\n' "$(date --iso-8601=seconds)" "$*" >> "$LOG_PATH"
+}
+
+log_launch "start requested wrapper=$WRAPPER_PATH command=$LAUNCH_COMMAND log_path=$LOG_PATH pid_file=$PID_FILE launcher_pid=$$ launcher_uid=$(id -u)"
+setsid sudo -n /usr/bin/env HOME=/home/deepright TERM=xterm-256color /app/integration start >> "$LOG_PATH" 2>&1
+status=$?
+pid=""
+integration_uid="unknown"
+integration_user="unknown"
+if [ "$status" -eq 0 ] && [ -r "$PID_FILE" ]; then
+  pid="$(tr -cd '0-9' < "$PID_FILE")"
+  if [ -n "$pid" ]; then
+    detected_uid="$(ps -o uid= -p "$pid" 2>/dev/null | tr -d '[:space:]')"
+    detected_user="$(ps -o user= -p "$pid" 2>/dev/null | xargs)"
+    if [ -n "$detected_uid" ]; then integration_uid="$detected_uid"; fi
+    if [ -n "$detected_user" ]; then integration_user="$detected_user"; fi
+  fi
+fi
+log_launch "start completed exit_code=$status integration_pid=${pid:-unknown} integration_uid=$integration_uid integration_user=$integration_user pid_file=$PID_FILE"
+exit "$status"
+'@
+$startWrapperBase64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($startWrapper))
+& wsl.exe -d $DISTRO_NAME -u deepright -- bash -c "printf '%s' '$startWrapperBase64' | base64 -d > /home/deepright/start-deepright.sh"
 & wsl.exe -d $DISTRO_NAME -u deepright -- chmod +x /home/deepright/start-deepright.sh
 L_OK "Wrapper script: /home/deepright/start-deepright.sh"
 
