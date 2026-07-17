@@ -8076,6 +8076,7 @@ type cronMetaFilter struct {
 	Model         string
 	Content       string
 	Cycle         *int
+	Status        *int
 	RecurringOnly bool
 	StartFrom     *time.Time
 	StartTo       *time.Time
@@ -8090,6 +8091,7 @@ type cronDetailFilter struct {
 	Model    string
 	Content  string
 	Cycle    *int
+	Status   *int
 	ExecFrom *time.Time
 	ExecTo   *time.Time
 }
@@ -8108,6 +8110,7 @@ type cronMetaResult struct {
 	Content        string `json:"content"`
 	ResponseSchema string `json:"responseSchema"`
 	ChatID         string `json:"chatId,omitempty"`
+	DetailStatuses string `json:"detailStatuses,omitempty"`
 }
 
 type cronDetailResult struct {
@@ -8205,6 +8208,17 @@ func parseOptionalIntValue(value string) (*int, error) {
 		return nil, fmt.Errorf("invalid integer value: %s", value)
 	}
 	return &parsed, nil
+}
+
+func parseCronStatusFilter(value string) (*int, error) {
+	status, err := parseOptionalIntValue(value)
+	if err != nil || status == nil {
+		return status, err
+	}
+	if *status < 0 || *status > 3 {
+		return nil, fmt.Errorf("status must be one of 0,1,2,3")
+	}
+	return status, nil
 }
 
 func parseCronMetaIDValue(value string) (*int, error) {
@@ -8979,6 +8993,10 @@ func parseCronMetaFilterFromRequest(r *http.Request) (cronMetaFilter, error) {
 	if err != nil {
 		return cronMetaFilter{}, err
 	}
+	status, err := parseCronStatusFilter(q.Get("status"))
+	if err != nil {
+		return cronMetaFilter{}, err
+	}
 	filter, err := buildCronMetaFilter(cronQueryOptions{
 		AgentID:  firstNonEmpty(q.Get("agentId"), q.Get("agent")),
 		ChatID:   firstNonEmpty(q.Get("chatId"), q.Get("chat")),
@@ -8995,6 +9013,7 @@ func parseCronMetaFilterFromRequest(r *http.Request) (cronMetaFilter, error) {
 		return cronMetaFilter{}, err
 	}
 	filter.RecurringOnly = q.Get("recurringOnly") == "1"
+	filter.Status = status
 	return filter, nil
 }
 
@@ -9004,7 +9023,11 @@ func parseCronDetailFilterFromRequest(r *http.Request) (cronDetailFilter, error)
 	if err != nil {
 		return cronDetailFilter{}, err
 	}
-	return buildCronDetailFilter(cronQueryOptions{
+	status, err := parseCronStatusFilter(q.Get("status"))
+	if err != nil {
+		return cronDetailFilter{}, err
+	}
+	filter, err := buildCronDetailFilter(cronQueryOptions{
 		MetaID:         firstNonEmpty(q.Get("metaId"), q.Get("meta"), q.Get("id")),
 		AgentID:        firstNonEmpty(q.Get("agentId"), q.Get("agent")),
 		ChatID:         firstNonEmpty(q.Get("chatId"), q.Get("chat")),
@@ -9018,6 +9041,11 @@ func parseCronDetailFilterFromRequest(r *http.Request) (cronDetailFilter, error)
 		To:             firstNonEmpty(q.Get("to"), q.Get("execTo"), q.Get("exec-to")),
 		IncludeHistory: q.Get("history") == "1",
 	})
+	if err != nil {
+		return cronDetailFilter{}, err
+	}
+	filter.Status = status
+	return filter, nil
 }
 
 func parseCronDetailDeleteFilterFromRequest(r *http.Request) (cronDetailFilter, error) {
@@ -9050,7 +9078,9 @@ func queryCronMetas(db *sql.DB, filter cronMetaFilter) ([]cronMetaResult, error)
 	if !hasTableColumn(db, "task_meta", "response_schema") {
 		selectResponseSchema = `'' AS response_schema`
 	}
-	query := fmt.Sprintf(`SELECT id, cycle, raw_time, agent_id, model, thinking, %s, %s, cron, content, %s, chat_id, task_type FROM task_meta WHERE 1=1`, cronVerifySelect(db, "task_meta"), cronRouterDisableSelect(db, "task_meta"), selectResponseSchema)
+	query := fmt.Sprintf(`SELECT id, cycle, raw_time, agent_id, model, thinking, %s, %s, cron, content, %s, chat_id, task_type,
+		COALESCE((SELECT GROUP_CONCAT(DISTINCT status_detail.started) FROM task_detail status_detail WHERE status_detail.meta_id = task_meta.id), '')
+		FROM task_meta WHERE 1=1`, cronVerifySelect(db, "task_meta"), cronRouterDisableSelect(db, "task_meta"), selectResponseSchema)
 	args := make([]interface{}, 0, 10)
 	if filter.AgentID != "" {
 		query += ` AND agent_id = ?`
@@ -9075,6 +9105,10 @@ func queryCronMetas(db *sql.DB, filter cronMetaFilter) ([]cronMetaResult, error)
 	if filter.RecurringOnly {
 		query += ` AND cycle <> 0`
 	}
+	if filter.Status != nil {
+		query += ` AND EXISTS (SELECT 1 FROM task_detail status_detail WHERE status_detail.meta_id = task_meta.id AND status_detail.started = ?)`
+		args = append(args, *filter.Status)
+	}
 	if filter.Cycle != nil {
 		query += ` AND cycle = ?`
 		args = append(args, *filter.Cycle)
@@ -9090,7 +9124,7 @@ func queryCronMetas(db *sql.DB, filter cronMetaFilter) ([]cronMetaResult, error)
 		query += ` AND raw_time <= ?`
 		args = append(args, filter.StartTo.Format("2006-01-02 15:04"))
 	}
-	query += ` ORDER BY id`
+	query += ` ORDER BY raw_time DESC, id DESC`
 
 	rows, err := db.Query(query, args...)
 	if err != nil {
@@ -9105,7 +9139,7 @@ func queryCronMetas(db *sql.DB, filter cronMetaFilter) ([]cronMetaResult, error)
 			verify        int
 			routerDisable int
 		)
-		if err := rows.Scan(&item.ID, &item.Cycle, &item.RawTime, &item.AgentID, &item.Model, &th, &verify, &routerDisable, &item.Cron, &item.Content, &item.ResponseSchema, &item.ChatID, &item.Type); err != nil {
+		if err := rows.Scan(&item.ID, &item.Cycle, &item.RawTime, &item.AgentID, &item.Model, &th, &verify, &routerDisable, &item.Cron, &item.Content, &item.ResponseSchema, &item.ChatID, &item.Type, &item.DetailStatuses); err != nil {
 			return nil, err
 		}
 		item.Type = sharedutil.NormalizeTaskType(item.Type)
@@ -9194,6 +9228,10 @@ func queryCronDetails(db *sql.DB, filter cronDetailFilter) ([]cronDetailResult, 
 		query += ` AND m.cycle = ?`
 		args = append(args, *filter.Cycle)
 	}
+	if filter.Status != nil {
+		query += ` AND d.started = ?`
+		args = append(args, *filter.Status)
+	}
 	if filter.ExecFrom != nil {
 		query += ` AND d.exec_time >= ?`
 		args = append(args, filter.ExecFrom.Unix())
@@ -9202,7 +9240,7 @@ func queryCronDetails(db *sql.DB, filter cronDetailFilter) ([]cronDetailResult, 
 		query += ` AND d.exec_time <= ?`
 		args = append(args, filter.ExecTo.Unix())
 	}
-	query += ` ORDER BY d.exec_time, d.id`
+	query += ` ORDER BY d.exec_time DESC, d.id DESC`
 
 	rows, err := db.Query(query, args...)
 	if err != nil {
@@ -9465,6 +9503,15 @@ func ensureCronSchema(db *sql.DB) {
 		`DROP INDEX IF EXISTS idx_detail_agent_chat_time`,
 		`DROP INDEX IF EXISTS idx_detail_agent_chat_time_type`,
 		`CREATE INDEX IF NOT EXISTS idx_detail_agent_chat_time_type ON task_detail(agent_id, chat_id, exec_time, task_type)`,
+		`CREATE INDEX IF NOT EXISTS idx_meta_agent_raw_time_id ON task_meta(agent_id, raw_time DESC, id DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_meta_model_raw_time_id ON task_meta(model, raw_time DESC, id DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_meta_cycle_raw_time_id ON task_meta(cycle, raw_time DESC, id DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_meta_agent_model_cycle_raw_time_id ON task_meta(agent_id, model, cycle, raw_time DESC, id DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_detail_agent_exec_time_id ON task_detail(agent_id, exec_time DESC, id DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_detail_model_exec_time_id ON task_detail(model, exec_time DESC, id DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_detail_status_exec_time_id ON task_detail(started, exec_time DESC, id DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_detail_agent_model_status_exec_time_id ON task_detail(agent_id, model, started, exec_time DESC, id DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_detail_meta_status ON task_detail(meta_id, started)`,
 		`CREATE INDEX IF NOT EXISTS idx_meta_agent ON task_meta(agent_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_cron_meta_log_agent_chat_time ON cron_meta_log(agent_id, chat_id, created_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_cron_meta_log_meta_time ON cron_meta_log(meta_id, created_at)`,

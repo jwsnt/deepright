@@ -471,6 +471,10 @@ a{color:var(--accent);text-decoration:none}
 [data-energy-saver="on"] .consume-overlay,
 [data-energy-saver="on"] .consume-card,
 [data-energy-saver="on"] .consume-lock,
+[data-energy-saver="on"] .chat-storage-stats-overlay,
+[data-energy-saver="on"] .chat-storage-stats-card,
+[data-energy-saver="on"] .memo-query-overlay,
+[data-energy-saver="on"] .memo-query-panel,
 [data-energy-saver="on"] .delete-confirm.delete-confirm-centered,
 [data-energy-saver="on"] .delete-confirm-overlay,
 [data-energy-saver="on"] .vfs-repair-overlay,
@@ -498,6 +502,8 @@ a{color:var(--accent);text-decoration:none}
 [data-energy-saver="on"] .plugin-modal-panel,
 [data-energy-saver="on"] .browser-instance-init-card,
 [data-energy-saver="on"] .consume-card,
+[data-energy-saver="on"] .chat-storage-stats-card,
+[data-energy-saver="on"] .memo-query-panel,
 [data-energy-saver="on"] .delete-confirm,
 [data-energy-saver="on"] .new-chat-id-panel,
 [data-energy-saver="on"] .vfs-repair-popover,
@@ -522,6 +528,8 @@ a{color:var(--accent);text-decoration:none}
 [data-energy-saver="on"] .browser-instance-init-lock,
 [data-energy-saver="on"] .consume-overlay,
 [data-energy-saver="on"] .consume-lock,
+[data-energy-saver="on"] .chat-storage-stats-overlay,
+[data-energy-saver="on"] .memo-query-overlay,
 [data-energy-saver="on"] .delete-confirm-overlay,
 [data-energy-saver="on"] .vfs-repair-overlay,
 [data-energy-saver="on"] .skill-extract-overlay,
@@ -3480,7 +3488,7 @@ body.quick-fan-transition-active{cursor:progress}
 .chat-storage-stats-table thead th{position:sticky;top:0;z-index:1;padding:9px 10px;border-bottom:1px solid color-mix(in srgb,var(--border) 86%,transparent);background:rgba(248,251,255,.96);font-size:11px;font-weight:600;letter-spacing:.04em;text-align:left;color:var(--text-muted);white-space:nowrap}
 .chat-storage-stats-table tbody td{padding:10px 10px;border-bottom:1px solid color-mix(in srgb,var(--border) 88%,transparent);background:rgba(255,255,255,.42);vertical-align:middle}
 .chat-storage-stats-table tbody tr:last-child td{border-bottom:none}
-.chat-storage-stats-table tbody tr.active td{background:rgba(var(--accent-rgb),.08)}
+.chat-storage-stats-table tbody tr.largest td{background:rgba(var(--accent-rgb),.08)}
 .chat-storage-stats-table th.num,.chat-storage-stats-table td.num{text-align:right;font-variant-numeric:tabular-nums}
 .chat-storage-stats-session-main{display:flex;align-items:center;gap:8px;min-width:0}
 .chat-storage-stats-session-name{min-width:0;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:var(--text-primary)}
@@ -3534,7 +3542,7 @@ body.quick-fan-transition-active{cursor:progress}
 [data-theme="dark"] .chat-storage-stats-shell{background:linear-gradient(180deg,rgba(8,18,34,.78),rgba(11,21,40,.88));border-color:rgba(169,190,227,.14)}
 [data-theme="dark"] .chat-storage-stats-table thead th{background:rgba(10,20,38,.96);border-bottom-color:rgba(169,190,227,.14);color:#b7caeb}
 [data-theme="dark"] .chat-storage-stats-table tbody td{background:rgba(255,255,255,.03);border-bottom-color:rgba(169,190,227,.12)}
-[data-theme="dark"] .chat-storage-stats-table tbody tr.active td{background:rgba(var(--accent-soft-rgb),.08)}
+[data-theme="dark"] .chat-storage-stats-table tbody tr.largest td{background:rgba(var(--accent-soft-rgb),.08)}
 [data-theme="dark"] .chat-storage-stats-session-name{color:#f3f9fd}
 [data-theme="dark"] .chat-storage-stats-session-btn{background:linear-gradient(180deg,rgba(16,29,52,.92),rgba(11,21,39,.9));border-color:rgba(169,190,227,.18);box-shadow:inset 0 1px 0 rgba(255,255,255,.08);color:#f3f9fd}
 [data-theme="dark"] .chat-storage-stats-session-btn:hover,[data-theme="dark"] .chat-storage-stats-session-btn:focus-visible{border-color:rgba(159,196,255,.34);color:#9fe3ff;box-shadow:0 10px 20px rgba(0,0,0,.26),inset 0 1px 0 rgba(255,255,255,.1)}
@@ -8631,6 +8639,7 @@ function renderChatStorageStatsChatList(stats) {
   const el = document.getElementById('chatStorageStatsSessionList');
   if (!el) return;
   const items = stats && Array.isArray(stats.chatRows) ? stats.chatRows : [];
+  const largestChatId = String(stats && stats.largestChat && stats.largestChat.chatId || '');
   if (!items.length) {
     el.innerHTML = '<div class="chat-storage-stats-empty">当前没有可分析的会话持久化数据。</div>';
     return;
@@ -8650,7 +8659,8 @@ function renderChatStorageStatsChatList(stats) {
       ${items.map(item => {
     const scopedTotal = Math.max(item.scopedBytes, 1);
     const metaBytes = Math.max(0, Number(item.metaGroupBytes) || 0);
-    return `<tr${item.active ? ' class="active"' : ''}>
+    const largest = largestChatId && String(item.chatId || '') === largestChatId;
+    return `<tr${largest ? ' class="largest"' : ''}>
         <td><div class="chat-storage-stats-session-main"><div class="chat-storage-stats-session-name" title="${esc(item.label).replace(/"/g, '&quot;')}">${esc(item.label)}</div><div class="chat-storage-stats-session-actions"><button class="chat-storage-stats-session-btn" type="button" onclick='openChatStorageStatsSession(${JSON.stringify(String(item.chatId || ''))})'>查看</button><button class="chat-storage-stats-session-btn danger" type="button" onclick='deleteChatStorageStatsSession(${JSON.stringify(String(item.chatId || ''))})'>删除</button></div></div></td>
         <td class="num">${esc(formatUploadBytes(item.scopedBytes))}</td>
         <td class="num">${esc(formatStorageShare(item.contentGroupBytes, scopedTotal))}</td>
@@ -49022,7 +49032,7 @@ function memoQueryMatchesRecord(record, dimension, form, metaStatusMap) {
     if (Number(item.cycle) === 0) return false;
     if (normalized.cycle && Number(item.cycle) !== Number(normalized.cycle)) return false;
     const statusSet = metaStatusMap && metaStatusMap[String(item.id)] || null;
-    if (normalized.status && !(statusSet && statusSet.has(Number(normalized.status)))) return false;
+    if (normalized.status && statusSet && !statusSet.has(Number(normalized.status))) return false;
     const value = memoQueryDateMs(item.rawTime);
     const start = memoQueryDateMs(normalized.start);
     const end = memoQueryDateMs(normalized.end, true);
@@ -49044,6 +49054,7 @@ function memoQueryBuildURL(dimension, form) {
   if (normalized.agent) params.set('agentId', normalized.agent);
   if (normalized.model) params.set('model', normalized.model);
   if (normalized.content) params.set('content', normalized.content);
+  if (normalized.status) params.set('status', normalized.status);
   if (dimension === 'meta') {
     params.set('recurringOnly', '1');
     if (normalized.cycle) params.set('cycle', normalized.cycle);
@@ -49083,14 +49094,11 @@ async function memoQueryRun() {
     if (requestSeq !== memoQueryState.requestSeq) return;
     let metaStatusMap = null;
     if (dimension === 'meta') {
-      const detailRows = await memoQueryFetch('/api/cron/detail/list' + (form.agent ? ('?agentId=' + encodeURIComponent(form.agent)) : ''), controller.signal);
-      if (requestSeq !== memoQueryState.requestSeq) return;
       metaStatusMap = Object.create(null);
-      detailRows.forEach(detail => {
-        const metaId = String(detail && detail.metaId || '');
-        if (!metaId) return;
-        if (!metaStatusMap[metaId]) metaStatusMap[metaId] = new Set();
-        metaStatusMap[metaId].add(Number(detail.started));
+      records.forEach(record => {
+        const metaId = String(record && record.id || '');
+        const statuses = String(record && record.detailStatuses || '').split(',').map(value => Number(value)).filter(Number.isFinite);
+        if (metaId && statuses.length) metaStatusMap[metaId] = new Set(statuses);
       });
     }
     const filtered = records.filter(record => memoQueryMatchesRecord(record, dimension, form, metaStatusMap));
