@@ -1509,7 +1509,23 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 .tl-popup .tl-popup-row{display:flex;justify-content:space-between;padding:1px 0}
 .tl-popup .tl-popup-row span:first-child{color:var(--text-muted)}
 .right-sidebar .rs-top .rs-cell:nth-child(2){border-top:none;border-right:none;display:flex;flex-direction:column;overflow:visible;min-height:0;max-height:100%}
+#rsMemoCell{position:relative}
 .rs-note-upper{flex:1;display:flex;flex-direction:column;overflow:visible;padding:4px;min-height:0}
+.rs-memo-query-trigger{position:absolute;top:0;left:-2px;width:28px;height:28px;padding:0;border:none;border-radius:6px;background:transparent;color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:4;box-shadow:none;transition:var(--transition);flex-shrink:0}
+.rs-memo-query-trigger:hover,.rs-memo-query-trigger:focus-visible{background:var(--bg-card);color:var(--text-primary);outline:none}
+.rs-memo-query-trigger svg{width:18px;height:18px}
+.memo-query-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;background:var(--modal-overlay-bg);backdrop-filter:blur(var(--modal-overlay-blur));-webkit-backdrop-filter:blur(var(--modal-overlay-blur));opacity:0;visibility:hidden;pointer-events:none;transition:opacity .22s ease,visibility 0s linear .22s}
+.memo-query-overlay.show{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .22s ease}
+.memo-query-panel{width:min(760px,calc(100vw - 40px));height:min(680px,calc(100vh - 40px));min-height:440px;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--modal-panel-border);border-radius:24px;background:linear-gradient(180deg,var(--modal-panel-bg-strong),var(--modal-panel-bg));box-shadow:0 24px 56px rgba(16,24,40,.18),inset 0 1px 0 rgba(255,255,255,.88);transform:translateY(10px) scale(.985);transition:transform .22s cubic-bezier(.22,1,.36,1);backdrop-filter:none;-webkit-backdrop-filter:none}
+.memo-query-overlay.show .memo-query-panel{transform:translateY(0) scale(1)}
+.memo-query-head{display:flex;align-items:center;gap:12px;padding:15px 18px 12px;border-bottom:1px solid color-mix(in srgb,var(--border) 84%,transparent);flex-shrink:0}.memo-query-head-copy{min-width:0;flex:1}.memo-query-kicker{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted)}.memo-query-title{margin-top:3px;font-size:17px;font-weight:700;color:var(--text-primary)}
+.memo-query-close{width:30px;height:30px;flex:0 0 30px;border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition)}.memo-query-close:hover,.memo-query-close:focus-visible{border-color:var(--accent);color:var(--text-primary);outline:none}
+.memo-query-tabs{display:flex;gap:7px;padding:10px 18px 0;flex-shrink:0}.memo-query-tab{border:1px solid color-mix(in srgb,var(--border) 82%,transparent);border-radius:999px;background:transparent;color:var(--text-secondary);padding:5px 11px;font-size:12px;cursor:pointer;transition:var(--transition)}.memo-query-tab.active{background:var(--accent);border-color:var(--accent);color:#fff}.memo-query-tab:hover:not(.active),.memo-query-tab:focus-visible:not(.active){background:rgba(var(--accent-rgb),.12);border-color:rgba(var(--accent-rgb),.3);color:var(--accent);outline:none}.memo-query-tab.active:focus-visible{outline:2px solid color-mix(in srgb,var(--accent) 44%,#fff);outline-offset:2px}
+.memo-query-conditions{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;padding:10px 18px 12px;flex-shrink:0}.memo-query-field{display:flex;flex-direction:column;gap:4px;min-width:0}.memo-query-field.wide{grid-column:1 / span 5}.memo-query-field label{font-size:10px;color:var(--text-muted)}.memo-query-field input,.memo-query-field select{width:100%;height:28px;box-sizing:border-box;border:1px solid color-mix(in srgb,var(--border) 86%,transparent);border-radius:8px;background:color-mix(in srgb,var(--bg-input) 90%,transparent);color:var(--text-primary);font:inherit;font-size:11px;padding:0 8px;outline:none}.memo-query-field input:focus,.memo-query-field select:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(var(--accent-rgb),.1)}
+.memo-query-actions{grid-column:6;grid-row:2;display:flex;align-items:flex-end;justify-content:flex-end;gap:7px}.memo-query-action{height:28px;padding:0 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg-input);color:var(--text-secondary);font-size:11px;font-weight:600;cursor:pointer;transition:var(--transition)}.memo-query-action.primary{background:var(--accent);border-color:var(--accent);color:#fff}.memo-query-action:hover:not(:disabled),.memo-query-action:focus-visible:not(:disabled){border-color:var(--accent);color:var(--accent);outline:none}.memo-query-action.primary:hover:not(:disabled),.memo-query-action.primary:focus-visible:not(:disabled){color:#fff;filter:brightness(1.06)}.memo-query-action:disabled{opacity:.55;cursor:wait}
+.memo-query-results{min-height:0;display:flex;flex-direction:column;border-top:1px solid color-mix(in srgb,var(--border) 88%,transparent);padding:11px 18px 15px;flex:1}.memo-query-results-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-shrink:0;margin-bottom:8px}.memo-query-results-title{font-size:12px;font-weight:700;color:var(--text-primary)}.memo-query-results-meta{font-size:10px;color:var(--text-muted);text-align:right}
+.memo-query-results-list{min-height:0;overflow-y:auto;overflow-x:hidden;border:1px solid color-mix(in srgb,var(--border) 86%,transparent);border-radius:14px;background:color-mix(in srgb,var(--bg-input) 45%,transparent);scrollbar-gutter:stable}.memo-query-results-list::-webkit-scrollbar{width:10px}.memo-query-results-list::-webkit-scrollbar-track{background:color-mix(in srgb,var(--bg-input) 45%,transparent);border-radius:0 14px 14px 0}.memo-query-results-list::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--border) 76%,var(--accent) 24%);border:2px solid transparent;border-radius:999px;background-clip:padding-box}.memo-query-empty{min-height:132px;padding:18px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--text-muted);font-size:12px;line-height:1.6}.memo-query-table{width:100%;min-width:0;table-layout:fixed;border-collapse:collapse;font-size:11px;color:var(--text-secondary)}.memo-query-table th{position:sticky;top:0;z-index:1;padding:8px 7px;border-bottom:1px solid color-mix(in srgb,var(--border) 80%,transparent);background:color-mix(in srgb,var(--bg-input) 72%,var(--modal-panel-bg));color:var(--text-muted);font-size:10px;font-weight:700;text-align:left;white-space:nowrap}.memo-query-table td{padding:9px 7px;border-bottom:1px solid color-mix(in srgb,var(--border) 90%,transparent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}.memo-query-table tbody tr:hover td{background:rgba(var(--accent-rgb),.06)}.memo-query-table tbody tr:last-child td{border-bottom:none}.memo-query-col-preview{width:42px;text-align:center!important}.memo-query-col-cycle{width:60px}.memo-query-col-time{width:140px;overflow:visible!important;text-overflow:clip!important}.memo-query-col-model{width:74px}.memo-query-col-thinking{width:52px}.memo-query-col-swarm{width:56px}.memo-query-col-verify{width:48px}.memo-query-col-agent{width:56px}.memo-query-col-status{width:66px}.memo-query-table .memo-query-status{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-flex;align-items:center;width:max-content;max-width:100%;padding:2px 6px;border-radius:999px;background:rgba(var(--accent-rgb),.1);font-size:10px}.memo-query-table .memo-query-content{color:var(--text-primary)}.memo-query-table .memo-query-preview{margin:auto}.memo-query-preview{width:24px;height:24px;padding:0;border:1px solid color-mix(in srgb,var(--border) 75%,var(--accent) 25%);border-radius:8px;background:transparent;color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition)}.memo-query-preview:hover,.memo-query-preview:focus-visible{border-color:var(--accent);color:var(--accent);outline:none}.memo-query-preview svg{width:13px;height:13px}.memo-query-load-more{padding:10px;text-align:center;color:var(--text-muted);font-size:11px}
+[data-theme="dark"] .rs-memo-query-trigger{background:transparent;border-color:transparent;color:var(--text-muted);box-shadow:none}[data-theme="dark"] .rs-memo-query-trigger:hover,[data-theme="dark"] .rs-memo-query-trigger:focus-visible{background:var(--bg-card);border-color:transparent;color:var(--text-primary)}[data-theme="dark"] .memo-query-panel{background:linear-gradient(180deg,var(--modal-panel-bg-strong),var(--modal-panel-bg));border-color:var(--modal-panel-border);box-shadow:0 28px 68px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.08)}[data-theme="dark"] .memo-query-tab.active{background:linear-gradient(180deg,#56e7ff,#1699ff);border-color:rgba(122,241,255,.34);color:#fff;box-shadow:0 0 0 1px rgba(122,241,255,.24),0 10px 24px rgba(0,212,255,.22),inset 0 1px 0 rgba(255,255,255,.18)}[data-theme="dark"] .memo-query-tab.active:focus-visible{outline-color:var(--brand-sky)}[data-theme="dark"] .memo-query-tab:hover:not(.active),[data-theme="dark"] .memo-query-tab:focus-visible:not(.active){background:rgba(0,212,255,.12);border-color:rgba(122,241,255,.34);color:var(--brand-sky);outline:none}[data-theme="dark"] .memo-query-field input,[data-theme="dark"] .memo-query-field select{background:rgba(5,16,30,.76);border-color:rgba(169,190,227,.2);color:#e5f2ff}[data-theme="dark"] .memo-query-results-list{background:rgba(5,16,30,.36);border-color:rgba(169,190,227,.16)}[data-theme="dark"] .memo-query-results-list::-webkit-scrollbar-track{background:rgba(5,16,30,.36)}[data-theme="dark"] .memo-query-table th{background:rgba(5,16,30,.88);border-bottom-color:rgba(169,190,227,.16)}[data-theme="dark"] .memo-query-table td{border-bottom-color:rgba(169,190,227,.12)}[data-theme="dark"] .memo-query-table tbody tr:hover td{background:rgba(84,220,255,.07)}[data-theme="dark"] .memo-query-action{background:rgba(255,255,255,.07);border-color:rgba(169,190,227,.2);color:#c6daf5}
 .rs-note-lower{display:flex;align-items:center;padding:8px 4px 0px 4px;gap:3px;flex-shrink:0;flex-wrap:nowrap}
 .rs-note-input{width:100%;flex:1;border:1px solid var(--border);border-radius:var(--radius-xs);background:var(--bg-input) !important;color:var(--text-primary);font-size:20px;padding:6px 8px;overflow-y:auto !important;outline:none;font-family:inherit;line-height:1.4;max-height:150px !important;min-height:0}
 .rs-note-input:empty{text-align:center !important}
@@ -3439,7 +3455,7 @@ body.quick-fan-transition-active{cursor:progress}
 .chat-storage-stats-chip{display:inline-flex;align-items:center;gap:6px;min-height:28px;padding:0 10px;border-radius:999px;background:rgba(80,112,184,.10);border:1px solid color-mix(in srgb,var(--border) 84%,rgba(80,112,184,.22));font-size:11px;color:var(--text-secondary)}
 .chat-storage-stats-chip strong{font-size:12px;color:var(--text-primary);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700}
 .chat-storage-stats-body{padding:12px 20px 16px;display:flex;flex-direction:column;gap:12px;min-height:0;overflow:auto;scrollbar-gutter:stable}
-.chat-storage-stats-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.chat-storage-stats-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
 .chat-storage-stats-summary-card{padding:11px 13px;border-radius:20px;border:1px solid color-mix(in srgb,var(--border) 84%,rgba(80,112,184,.18));background:linear-gradient(180deg,rgba(255,255,255,.72),rgba(248,250,255,.46));display:flex;flex-direction:column;gap:5px;min-width:0}
 .chat-storage-stats-summary-card.warn{border-color:rgba(224,120,78,.28);background:linear-gradient(180deg,rgba(255,247,242,.92),rgba(255,236,224,.62))}
 .chat-storage-stats-summary-card.info{border-color:rgba(80,112,184,.24)}
@@ -3449,8 +3465,8 @@ body.quick-fan-transition-active{cursor:progress}
 .chat-storage-stats-summary-note{font-size:11px;line-height:1.55;color:var(--text-muted)}
 .chat-storage-stats-summary-meta:empty,.chat-storage-stats-summary-note:empty,.chat-storage-stats-summary-action:empty{display:none}
 .chat-storage-stats-summary-inline{display:flex;align-items:center;gap:8px}
-.chat-storage-stats-summary-action{display:flex;align-items:center;margin-left:auto;justify-content:flex-end}
-.chat-storage-stats-summary-btn{display:inline-flex;align-items:center;justify-content:center;min-height:26px;padding:0 10px;border:1px solid rgba(var(--accent-rgb),.18);border-radius:999px;background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(244,248,255,.78));box-shadow:inset 0 1px 0 rgba(255,255,255,.82);font-size:12px;font-weight:600;color:var(--text-primary);cursor:pointer;transition:var(--transition);white-space:nowrap}
+.chat-storage-stats-summary-action{display:flex;align-items:center;justify-content:flex-start;margin-top:2px}
+.chat-storage-stats-summary-btn{display:inline-flex;align-items:center;justify-content:center;min-height:26px;padding:0 10px;border:1px solid rgba(var(--accent-rgb),.18);border-radius:999px;background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(244,248,255,.78));box-shadow:inset 0 1px 0 rgba(255,255,255,.82);font-size:12px;font-weight:600;color:var(--text-primary);cursor:pointer;transition:var(--transition);white-space:nowrap;flex:0 0 auto}
 .chat-storage-stats-summary-btn:hover,.chat-storage-stats-summary-btn:focus-visible{border-color:rgba(var(--accent-rgb),.32);color:var(--accent);box-shadow:0 8px 18px rgba(var(--accent-rgb),.12),inset 0 1px 0 rgba(255,255,255,.88);outline:none}
 .chat-storage-stats-grid{display:grid;grid-template-columns:minmax(0,1.02fr) minmax(0,.98fr);gap:14px}
 .chat-storage-stats-panel{display:flex;flex-direction:column;gap:10px;min-height:0}
@@ -3567,6 +3583,7 @@ body.quick-fan-transition-active{cursor:progress}
   .chat-storage-stats-card{width:min(100%,calc(100vw - 16px));max-height:min(88vh,780px);border-radius:24px}
   .chat-storage-stats-toolbar{align-items:flex-start}
   .chat-storage-stats-summary,.chat-storage-stats-grid,.chat-storage-stats-insights,.chat-storage-stats-breakdown{grid-template-columns:minmax(0,1fr)}
+  .memo-query-overlay{padding:8px}.memo-query-panel{width:100%;height:min(720px,calc(100vh - 16px));min-height:0;border-radius:18px}.memo-query-conditions{grid-template-columns:repeat(2,minmax(0,1fr));padding-left:12px;padding-right:12px}.memo-query-field.wide{grid-column:span 2}.memo-query-actions{grid-column:1 / -1;grid-row:auto}.memo-query-results{padding-left:12px;padding-right:12px}.memo-query-row{grid-template-columns:58px 66px 60px minmax(0,1fr) 26px}.memo-query-row .memo-query-kind{display:none}
   .chat-storage-stats-table{min-width:560px}
   .chat-storage-stats-row-head,.chat-storage-stats-section-head{align-items:flex-start}
   .consume-overlay{padding:12px}
@@ -3829,13 +3846,13 @@ body.quick-fan-transition-active{cursor:progress}
 .vfs-upload-toast.center-mode.show{transform:translateY(0)}
 .vfs-upload-toast.center-top-mode{transform:translateY(-130%)}
 .vfs-upload-toast.center-top-mode.show{transform:translateY(0)}
-.vfs-upload-toast.input-anchor-mode{height:28px;border:none;border-top:none;border-radius:12px;box-shadow:0 12px 28px rgba(16,24,40,.12);font-size:11px;line-height:28px;transform:translateX(-12px)}
-.vfs-upload-toast.input-anchor-mode.show{transform:translateX(0)}
+.vfs-upload-toast[data-toast-placement="input-anchor"]{position:fixed !important;height:28px;border:none;border-top:none;border-radius:12px;box-shadow:0 12px 28px rgba(16,24,40,.12);font-size:11px;line-height:28px;transform:translateX(-12px)}
+.vfs-upload-toast[data-toast-placement="input-anchor"].show{transform:translateX(0)}
 .vfs-upload-toast.center-mode.error{border:none}
 [data-theme="dark"] .vfs-upload-toast{background:rgba(16,27,49,.94);border-top-color:rgba(120,146,204,.34);color:#dfe9ff;box-shadow:0 -10px 24px rgba(0,0,0,.24)}
 [data-theme="dark"] .vfs-upload-toast.error{background:rgba(64,22,32,.94);border-top-color:rgba(255,120,134,.34);color:#ffd7dd}
 [data-theme="dark"] .vfs-upload-toast.center-mode{border:none;border-top:none;box-shadow:0 14px 30px rgba(0,0,0,.26)}
-[data-theme="dark"] .vfs-upload-toast.input-anchor-mode{border:none;border-top:none;box-shadow:0 14px 30px rgba(0,0,0,.26)}
+[data-theme="dark"] .vfs-upload-toast[data-toast-placement="input-anchor"]{border:none;border-top:none;box-shadow:0 14px 30px rgba(0,0,0,.26)}
 [data-theme="dark"] .vfs-upload-toast.center-mode.error{border:none}
 .vfs-warning-popover{position:absolute;min-width:220px;max-width:280px;padding:10px 12px;border-radius:14px;border:1px solid rgba(217,48,37,.24);background:linear-gradient(180deg,color-mix(in srgb,var(--bg-card) 94%,#fff 6%),color-mix(in srgb,var(--bg-sidebar) 88%,transparent));box-shadow:0 16px 36px rgba(16,24,40,.2);font-size:11px;line-height:1.55;color:var(--text-primary);opacity:0;visibility:hidden;pointer-events:none;transform:translateY(6px) scale(.98);transition:opacity .18s ease,transform .18s ease,visibility 0s linear .18s;z-index:3}
 .vfs-warning-popover.show{opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0) scale(1);transition:opacity .18s ease,transform .18s ease}
@@ -4543,6 +4560,9 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
         <div class="tl-popup" id="tlPopup" data-overlay-base data-overlay-domain="right" data-overlay-order="18" data-overlay-passive="1"></div>
       </div>
       <div class="rs-cell" id="rsMemoCell">
+        <button class="rs-memo-query-trigger" id="memoQueryTrigger" type="button" onclick="toggleMemoQueryOverlay(event)" title="查询备忘录" aria-label="查询备忘录">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4.2 4.2"></path></svg>
+        </button>
         <div class="rs-note-upper" id="rsNoteUpper">
           <div style="position:relative;flex:1;display:flex;flex-direction:column;min-height:0">
             <div class="at-menu" id="rsAtMenu">
@@ -4835,6 +4855,35 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     <p class="center-notice-title" id="modelSelectToastTitle">请先选择模型</p>
     <p class="center-notice-desc" id="modelSelectToastDesc">点击输入框左侧小地球选择模型</p>
   </div>
+</div>
+<div class="memo-query-overlay" id="memoQueryOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="27" aria-hidden="true" onclick="memoQueryOverlayBackdropClick(event)">
+  <section class="memo-query-panel" id="memoQueryPanel" role="dialog" aria-modal="true" aria-labelledby="memoQueryTitle" onclick="event.stopPropagation()">
+    <div class="memo-query-head">
+      <div class="memo-query-head-copy">
+        <div class="memo-query-kicker">Memo Search</div>
+        <div class="memo-query-title" id="memoQueryTitle">备忘录查询</div>
+      </div>
+      <button class="memo-query-close" type="button" onclick="closeMemoQueryOverlay()" aria-label="收起备忘录查询" title="收起备忘录查询"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="memo-query-tabs" role="tablist" aria-label="备忘录查询维度">
+      <button class="memo-query-tab active" id="memoQueryTabMeta" type="button" role="tab" aria-selected="true" onclick="setMemoQueryDimension('meta')">元数据</button>
+      <button class="memo-query-tab" id="memoQueryTabDetail" type="button" role="tab" aria-selected="false" onclick="setMemoQueryDimension('detail')">任务明细</button>
+    </div>
+    <form class="memo-query-conditions" id="memoQueryConditions" onsubmit="memoQuerySubmit(event)">
+      <div class="memo-query-field" id="memoQueryCycleField"><label for="memoQueryCycle">周期类型</label><select id="memoQueryCycle" data-memo-query-field="cycle" onchange="memoQueryMarkDirty()"><option value="">不限</option><option value="1">工作日</option><option value="2">自然日</option><option value="3">每小时</option><option value="4">每15分钟</option><option value="5">每30分钟</option></select></div>
+      <div class="memo-query-field"><label id="memoQueryStartLabel" for="memoQueryStart">原始时间（起）</label><input id="memoQueryStart" data-memo-query-field="start" type="datetime-local" step="60" onchange="memoQueryMarkDirty()"></div>
+      <div class="memo-query-field"><label id="memoQueryEndLabel" for="memoQueryEnd">原始时间（止）</label><input id="memoQueryEnd" data-memo-query-field="end" type="datetime-local" step="60" onchange="memoQueryMarkDirty()"></div>
+      <div class="memo-query-field"><label for="memoQueryAgent">Agent</label><select id="memoQueryAgent" data-memo-query-field="agent" onchange="memoQueryMarkDirty()"><option value="">不限</option></select></div>
+      <div class="memo-query-field"><label for="memoQueryModel">模型</label><select id="memoQueryModel" data-memo-query-field="model" onchange="memoQueryMarkDirty()"><option value="">不限</option></select></div>
+      <div class="memo-query-field"><label for="memoQueryStatus">状态</label><select id="memoQueryStatus" data-memo-query-field="status" onchange="memoQueryMarkDirty()"><option value="">不限</option><option value="0">待执行</option><option value="1">已启动</option><option value="2">无需启动</option><option value="3">已完成</option></select></div>
+      <div class="memo-query-field wide"><label for="memoQueryContent">任务内容（模糊）</label><input id="memoQueryContent" data-memo-query-field="content" type="search" autocomplete="off" placeholder="模糊匹配任务内容" oninput="memoQueryMarkDirty()"></div>
+      <div class="memo-query-actions"><button class="memo-query-action" type="button" onclick="memoQueryResetCurrent()">重置</button><button class="memo-query-action primary" id="memoQuerySubmitBtn" type="submit">查询</button></div>
+    </form>
+    <div class="memo-query-results">
+      <div class="memo-query-results-head"><div class="memo-query-results-title">结果列表</div><div class="memo-query-results-meta" id="memoQueryResultsMeta">填写条件后查询</div></div>
+      <div class="memo-query-results-list" id="memoQueryResults" onscroll="memoQueryHandleResultsScroll(this)"><div class="memo-query-empty">填写查询条件后，点击“查询”开始查找备忘录。</div></div>
+    </div>
+  </section>
 </div>
 <div class="rs-meta-center-overlay" id="rsMetaCenterPreview" data-overlay-base data-overlay-domain="center" data-overlay-order="23" data-overlay-passive="1" aria-hidden="true" onpointerdown="memoPreviewEditLockOverlayPointerDown(event)" onclick="memoPreviewEditLockOverlayClick(event)">
   <div class="rs-meta-center-card" onpointerenter="memoDetailPreviewCardEnter()" onpointerleave="memoDetailPreviewCardLeave()">
@@ -8538,6 +8587,7 @@ function renderChatStorageStatsSummary(stats) {
   const largestChat = stats && stats.largestChat ? stats.largestChat : null;
   const totalBytes = Math.max(0, Number(stats && stats.totalBytes) || 0);
   const chatsStoredValueBytes = Math.max(0, Number(stats && stats.chatsStoredValueBytes) || 0);
+  const memoQueryCache = memoQueryStorageStats();
   const cards = [
     {
       kicker: '总储存',
@@ -8559,15 +8609,20 @@ function renderChatStorageStatsSummary(stats) {
         ? `<button class="chat-storage-stats-summary-btn" type="button" onclick='openChatStorageStatsSession(${JSON.stringify(String(largestChat.chatId || ''))})'>查看会话</button>`
         : '',
       tone: largestChat && largestChat.scopedBytes > Math.max(0, chatsStoredValueBytes * 0.4) ? 'warn' : 'info'
+    },
+    {
+      kicker: '备忘录查询缓存',
+      value: formatUploadBytes(memoQueryCache.bytes),
+      meta: `占总存储 ${formatStorageShare(memoQueryCache.bytes, totalBytes)}`,
+      action: `<button class="chat-storage-stats-summary-btn" type="button" onclick="clearMemoQueryCacheNow()">立即清空</button>`,
+      tone: 'info'
     }
   ];
   el.innerHTML = cards.map(card => `<article class="chat-storage-stats-summary-card${card.tone ? (' ' + card.tone) : ''}">
     <div class="chat-storage-stats-summary-kicker">${esc(card.kicker)}</div>
     <div class="chat-storage-stats-summary-value">${esc(card.value)}</div>
-    <div class="chat-storage-stats-summary-inline">
-      <div class="chat-storage-stats-summary-meta">${esc(card.meta || '')}</div>
-      <div class="chat-storage-stats-summary-action">${card.action || ''}</div>
-    </div>
+    <div class="chat-storage-stats-summary-meta">${esc(card.meta || '')}</div>
+    <div class="chat-storage-stats-summary-action">${card.action || ''}</div>
     <div class="chat-storage-stats-summary-note">${esc(card.note || '')}</div>
   </article>`).join('');
 }
@@ -11983,7 +12038,7 @@ function syncLayoutVars() {
     if (modelIndicator) {
       const modelIndicatorRect = modelIndicator.getBoundingClientRect();
       if (modelIndicatorRect.width > 0 && modelIndicatorRect.height > 0) {
-        anchorToastTop = Math.round(modelIndicatorRect.top + (modelIndicatorRect.height - anchorToastHeight) / 2);
+        anchorToastTop = Math.round(modelIndicatorRect.top + (modelIndicatorRect.height - anchorToastHeight) / 2) - 2;
       }
     }
     anchorToastLeft = Math.min(anchorToastLeft, centerToastRight);
@@ -11998,6 +12053,32 @@ function syncLayoutVars() {
     root.style.setProperty('--toast-input-anchor-left', `${centerLeft}px`);
     root.style.setProperty('--toast-input-anchor-top', '24px');
     root.style.setProperty('--toast-input-anchor-max-width', Math.max(Math.min(centerWidth, 320), 160) + 'px');
+  }
+  // Low-power rendering skips the input-area branch above, but the toast must
+  // still follow the visible fullscreen button and Agent/model indicator.
+  if (inputFullscreenGroup || modelIndicator) {
+    const anchorToastHeight = 28;
+    const anchorRight = Math.max(Math.round(centerLeft + centerWidth - 24), 0);
+    let anchorToastLeft = Math.max(centerLeft + 24, 0);
+    let anchorToastTop = 24;
+    if (inputFullscreenGroup) {
+      const fullscreenRect = inputFullscreenGroup.getBoundingClientRect();
+      if (fullscreenRect.width > 0 && fullscreenRect.height > 0) {
+        anchorToastLeft = Math.max(anchorToastLeft, Math.round(fullscreenRect.right) + 12);
+        anchorToastTop = Math.round(fullscreenRect.top + (fullscreenRect.height - anchorToastHeight) / 2);
+      }
+    }
+    if (modelIndicator) {
+      const modelIndicatorRect = modelIndicator.getBoundingClientRect();
+      if (modelIndicatorRect.width > 0 && modelIndicatorRect.height > 0) {
+        anchorToastTop = Math.round(modelIndicatorRect.top + (modelIndicatorRect.height - anchorToastHeight) / 2) - 2;
+      }
+    }
+    anchorToastLeft = Math.min(anchorToastLeft, anchorRight);
+    const anchorToastMaxWidth = Math.max(anchorRight - anchorToastLeft, 0);
+    root.style.setProperty('--toast-input-anchor-left', anchorToastLeft + 'px');
+    root.style.setProperty('--toast-input-anchor-top', Math.min(Math.max(anchorToastTop, 8), Math.max(viewportHeight - anchorToastHeight - 8, 8)) + 'px');
+    root.style.setProperty('--toast-input-anchor-max-width', Math.max(Math.min(320, anchorToastMaxWidth), Math.min(160, anchorToastMaxWidth)) + 'px');
   }
   const vfsAnchor = sidebarFooter || document.getElementById('vfs');
   if (vfsAnchor && !lowPowerRendering) {
@@ -13075,6 +13156,7 @@ const ONBOARDING_CENTER_FLOAT_CONTAINER_SELECTORS = [
   '#vfsEditTourCreatePanel',
   '#vfsRepairPopover',
   '#rsMetaCenterPreview',
+  '#memoQueryOverlay',
   '#chatQueuePanel',
   '#mediaConfigOverlay',
   '#swarmPanel',
@@ -26401,8 +26483,15 @@ function syncSingleChatPayloadToRuntime(chatId, payload) {
 function maintainLocalStorageBudget(options) {
   const opts = options && typeof options === 'object' ? options : {};
   if (localStorageMaintenanceRunning || hasGlobalPendingSseResponse()) return false;
-  const totalBytes = estimateLocalStorageUsageBytes();
+  let totalBytes = estimateLocalStorageUsageBytes();
   if (totalBytes <= LOCAL_STORAGE_SOFT_LIMIT_BYTES) return false;
+  // Query pages are disposable cache data.  Evict them before compacting chat
+  // history so memo searching never consumes space reserved for conversations.
+  const queryCachePruned = memoQueryPruneCacheForBudget();
+  if (queryCachePruned) {
+    totalBytes = estimateLocalStorageUsageBytes();
+    if (totalBytes <= LOCAL_STORAGE_SOFT_LIMIT_BYTES) return true;
+  }
   const basePayload = buildChatsStoragePayload();
   const baseBytes = estimateLocalStorageUsageWithChatsPayload(basePayload);
   const result = findCompactedChatsPayloadForBudget(basePayload, LOCAL_STORAGE_COMPACT_TARGET_BYTES);
@@ -43322,15 +43411,26 @@ function vfsUploadCancel() {
 
 function isLeftSidebarCollapsed() {
   const sidebar = document.querySelector('.sidebar');
-  return !!(sidebar && sidebar.classList.contains('collapsed'));
+  if (!sidebar) return false;
+  if (sidebar.classList.contains('collapsed')) return true;
+  const rect = sidebar.getBoundingClientRect();
+  return rect.width > 0 && rect.width <= 60;
 }
 
 function getVfsUploadToastPlacement(options) {
-  const requested = String((options && options.placement) || vfsUploadToastState.placement || 'auto').trim().toLowerCase();
-  if (requested === 'center-top' && isLeftSidebarCollapsed() && !isSettingsOpen()) return 'input-anchor';
-  if (requested === 'center' || requested === 'center-top' || requested === 'input-anchor' || requested === 'vfs') return requested;
-  if (isSettingsOpen()) return 'center';
-  return isLeftSidebarCollapsed() ? 'input-anchor' : 'vfs';
+  if (isLeftSidebarCollapsed()) return 'input-anchor';
+  return 'vfs';
+}
+
+function moveVfsUploadToastForPlacement(toast, placement) {
+  if (!toast) return;
+  if (placement === 'input-anchor' || placement === 'center' || placement === 'center-top') {
+    if (toast.parentElement !== document.body) document.body.appendChild(toast);
+    return;
+  }
+  const sidebar = document.querySelector('.sidebar');
+  const footer = sidebar && sidebar.querySelector('.sidebar-footer');
+  if (sidebar && footer && toast.parentElement !== sidebar) sidebar.insertBefore(toast, footer);
 }
 
 function syncVfsUploadToastPlacement(options) {
@@ -43338,6 +43438,8 @@ function syncVfsUploadToastPlacement(options) {
   if (!toast) return;
   const root = document.documentElement;
   const placement = getVfsUploadToastPlacement(options);
+  moveVfsUploadToastForPlacement(toast, placement);
+  toast.dataset.toastPlacement = placement;
   const centerMode = placement === 'center' || placement === 'center-top';
   const centerTopMode = placement === 'center-top';
   const inputAnchorMode = placement === 'input-anchor';
@@ -47749,12 +47851,24 @@ let _cronRefreshTimer = null;
 let _cronRefreshInFlight = false;
 let _tlInteractive = false;
 let timelineDetailCache = Object.create(null);
+let timelineDetailStatusSnapshot = Object.create(null);
 let memoViewRecoveryState = Object.create(null);
 function renderTimeline() {
   clearTimeout(_tlTimer);
   _tlTimer = setTimeout(_doRenderTimeline, 200);
 }
 function setTimelineDetailCache(details) {
+  const nextStatusSnapshot = Object.create(null);
+  let statusChanged = false;
+  (Array.isArray(details) ? details : []).forEach(detail => {
+    if (!detail || detail.id == null) return;
+    const id = String(detail.id);
+    const status = Number(detail.started);
+    nextStatusSnapshot[id] = status;
+    if (Object.prototype.hasOwnProperty.call(timelineDetailStatusSnapshot, id) && timelineDetailStatusSnapshot[id] !== status) statusChanged = true;
+  });
+  timelineDetailStatusSnapshot = nextStatusSnapshot;
+  if (statusChanged) memoQueryClearCache({ render: false });
   timelineDetailCache = Object.create(null);
   (Array.isArray(details) ? details : []).forEach(detail => {
     if (!detail || detail.id == null) return;
@@ -48080,6 +48194,7 @@ async function tlIgnoreDo() {
     const resp = await fetch('/api/cron/detail/status?agentId=' + encodeURIComponent(agentId) + '&detailId=' + id + '&status=2', { method: 'POST' });
     const data = await resp.json();
     if (data.status === 0) {
+      memoQueryClearCache({ render: false });
       scheduleRefreshCronViews(0);
     } else {
       vfsShowUploadToast('操作失败: ' + (data.content || ''), true);
@@ -48569,6 +48684,7 @@ async function rsSubmitNote(options = {}) {
     const data = await resp.json();
     if (data.status === 0) {
       const queuedRecurringTour = maybeQueueMemoRecurringTour(payload, data);
+      memoQueryClearCache({ render: false });
       if (options.showToast !== false) vfsShowUploadToast('备忘录已保存', false);
       rsResetNote();
       rsHideConfirm({ force: true });
@@ -48704,6 +48820,448 @@ const RS_META_PREVIEW_FIELD_IDS = {
 const MEMO_DETAIL_CYCLE_LABELS = { 0: '仅一次', 1: '工作日', 2: '自然日', 3: '每小时', 4: '每15分钟', 5: '每30分钟' };
 const MEMO_DETAIL_STATUS_LABELS = { 0: '待执行', 1: '已启动', 2: '无需启动', 3: '已完成' };
 const MEMO_DETAIL_PREVIEW_CLOSE_DELAY_MS = 500;
+const MEMO_QUERY_CACHE_KEY = 'deepright.memo-query-cache.v1';
+const MEMO_QUERY_CACHE_TTL_MS = 5 * 60 * 1000;
+const MEMO_QUERY_CACHE_MAX_ENTRIES = 100;
+const MEMO_QUERY_PAGE_SIZE = 50;
+const MEMO_QUERY_EMPTY_FORM = () => ({ cycle: '', start: '', end: '', agent: '', model: '', status: '', content: '' });
+const memoQueryState = {
+  open: false,
+  minimized: false,
+  previewKind: '',
+  dimension: 'meta',
+  forms: { meta: MEMO_QUERY_EMPTY_FORM(), detail: MEMO_QUERY_EMPTY_FORM() },
+  records: { meta: [], detail: [] },
+  visibleCount: { meta: MEMO_QUERY_PAGE_SIZE, detail: MEMO_QUERY_PAGE_SIZE },
+  resultMeta: { meta: '', detail: '' },
+  loading: false,
+  dirty: false,
+  requestSeq: 0,
+  abortController: null,
+  agents: [],
+  agentsLoading: false,
+  scrollTop: { meta: 0, detail: 0 }
+};
+function memoQueryClone(value) {
+  return value && typeof value === 'object' ? JSON.parse(JSON.stringify(value)) : value;
+}
+function memoQueryNormalizeForm(value) {
+  const source = value && typeof value === 'object' ? value : {};
+  const cycle = String(source.cycle || '').trim();
+  return {
+    cycle: cycle === '-1' || cycle === '0' ? '' : cycle,
+    start: String(source.start || '').trim(),
+    end: String(source.end || '').trim(),
+    agent: String(source.agent || '').trim(),
+    model: normalizeModelName(source.model),
+    status: String(source.status || '').trim(),
+    content: String(source.content || '').trim()
+  };
+}
+function memoQueryCacheKey(dimension, form) {
+  return JSON.stringify({ v: 3, dimension: String(dimension || 'meta'), form: memoQueryNormalizeForm(form) });
+}
+function memoQueryReadPersistentCache() {
+  try {
+    const raw = localStorage.getItem(MEMO_QUERY_CACHE_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed && typeof parsed === 'object' && parsed.entries && typeof parsed.entries === 'object'
+      ? parsed
+      : { entries: {} };
+  } catch {
+    return { entries: {} };
+  }
+}
+function memoQueryWritePersistentCache(cache) {
+  const next = cache && typeof cache === 'object' ? cache : { entries: {} };
+  const entries = next.entries && typeof next.entries === 'object' ? next.entries : {};
+  const ordered = Object.entries(entries).sort(([, a], [, b]) => Number(b && b.usedAt || 0) - Number(a && a.usedAt || 0));
+  next.entries = Object.fromEntries(ordered.slice(0, MEMO_QUERY_CACHE_MAX_ENTRIES));
+  try {
+    localStorage.setItem(MEMO_QUERY_CACHE_KEY, JSON.stringify(next));
+    refreshChatStorageStatsOverlay();
+    return true;
+  } catch (error) {
+    if (!isStorageQuotaError(error)) return false;
+    // Query pages are disposable.  A quota hit must evict them entirely before
+    // any conversation history is compacted or another query page is retained.
+    try { localStorage.removeItem(MEMO_QUERY_CACHE_KEY); } catch {}
+    refreshChatStorageStatsOverlay();
+    return false;
+  }
+}
+function memoQueryGetCachedResult(key) {
+  const cache = memoQueryReadPersistentCache();
+  const item = cache.entries && cache.entries[key];
+  if (!item || !Array.isArray(item.records) || Date.now() - Number(item.createdAt || 0) > MEMO_QUERY_CACHE_TTL_MS) {
+    if (item) {
+      delete cache.entries[key];
+      memoQueryWritePersistentCache(cache);
+    }
+    return null;
+  }
+  item.usedAt = Date.now();
+  memoQueryWritePersistentCache(cache);
+  return memoQueryClone(item);
+}
+function memoQueryPutCachedResult(key, records, resultMeta) {
+  const cache = memoQueryReadPersistentCache();
+  cache.entries[key] = { createdAt: Date.now(), usedAt: Date.now(), records: memoQueryClone(records), resultMeta: String(resultMeta || '') };
+  memoQueryWritePersistentCache(cache);
+}
+function memoQueryClearCache(options = {}) {
+  try { localStorage.removeItem(MEMO_QUERY_CACHE_KEY); } catch {}
+  memoQueryState.records = { meta: [], detail: [] };
+  memoQueryState.visibleCount = { meta: MEMO_QUERY_PAGE_SIZE, detail: MEMO_QUERY_PAGE_SIZE };
+  memoQueryState.resultMeta = { meta: '', detail: '' };
+  if (options.render !== false && memoQueryState.open) memoQueryRenderResults();
+  refreshChatStorageStatsOverlay();
+}
+function clearMemoQueryCacheNow() {
+  memoQueryClearCache();
+  vfsShowUploadToast('备忘录查询缓存已清空', false);
+}
+function memoQueryStorageStats() {
+  const cache = memoQueryReadPersistentCache();
+  const entries = cache.entries && typeof cache.entries === 'object' ? Object.keys(cache.entries).length : 0;
+  let bytes = 0;
+  try { bytes = estimateLocalStorageTextBytes(MEMO_QUERY_CACHE_KEY) + estimateLocalStorageTextBytes(localStorage.getItem(MEMO_QUERY_CACHE_KEY)); } catch {}
+  return { entries, bytes };
+}
+function memoQueryPruneCacheForBudget() {
+  try {
+    if (localStorage.getItem(MEMO_QUERY_CACHE_KEY) == null) return false;
+    // Local-storage maintenance always removes this disposable cache first.
+    localStorage.removeItem(MEMO_QUERY_CACHE_KEY);
+    refreshChatStorageStatsOverlay();
+    return true;
+  } catch {
+    return false;
+  }
+}
+function memoQueryReadFormFromDom() {
+  const target = memoQueryState.forms[memoQueryState.dimension];
+  if (!target) return;
+  document.querySelectorAll('[data-memo-query-field]').forEach(node => {
+    const field = String(node.getAttribute('data-memo-query-field') || '');
+    if (field) target[field] = String(node.value == null ? '' : node.value);
+  });
+  memoQueryState.forms[memoQueryState.dimension] = memoQueryNormalizeForm(target);
+}
+function memoQueryWriteFormToDom() {
+  const dimension = memoQueryState.dimension;
+  const form = memoQueryState.forms[dimension] || MEMO_QUERY_EMPTY_FORM();
+  const meta = dimension === 'meta';
+  const cycleField = document.getElementById('memoQueryCycleField');
+  if (cycleField) cycleField.style.display = meta ? '' : 'none';
+  const startLabel = document.getElementById('memoQueryStartLabel');
+  const endLabel = document.getElementById('memoQueryEndLabel');
+  if (startLabel) startLabel.textContent = meta ? '原始时间（起）' : '执行时间（起）';
+  if (endLabel) endLabel.textContent = meta ? '原始时间（止）' : '执行时间（止）';
+  document.querySelectorAll('[data-memo-query-field]').forEach(node => {
+    const field = String(node.getAttribute('data-memo-query-field') || '');
+    if (field) node.value = String(form[field] || '');
+  });
+  const metaTab = document.getElementById('memoQueryTabMeta');
+  const detailTab = document.getElementById('memoQueryTabDetail');
+  if (metaTab) { metaTab.classList.toggle('active', meta); metaTab.setAttribute('aria-selected', meta ? 'true' : 'false'); }
+  if (detailTab) { detailTab.classList.toggle('active', !meta); detailTab.setAttribute('aria-selected', !meta ? 'true' : 'false'); }
+}
+async function memoQueryEnsureOptions() {
+  const agentSelect = document.getElementById('memoQueryAgent');
+  const modelSelect = document.getElementById('memoQueryModel');
+  if (modelSelect) {
+    const selected = String((memoQueryState.forms[memoQueryState.dimension] || {}).model || '');
+    const models = getSelectableConfiguredModelNames(state.settings.models || {});
+    const values = Array.from(new Set([selected].concat(models).filter(Boolean)));
+    modelSelect.innerHTML = '<option value="">不限</option>' + values.map(value => '<option value="' + esc(value) + '">' + esc(value) + '</option>').join('');
+    modelSelect.value = selected;
+  }
+  if (!agentSelect || memoQueryState.agentsLoading) return;
+  if (!memoQueryState.agents.length) {
+    memoQueryState.agentsLoading = true;
+    try {
+      const agents = await fetchAgentList();
+      memoQueryState.agents = Array.isArray(agents) ? agents : [];
+    } catch { memoQueryState.agents = []; }
+    memoQueryState.agentsLoading = false;
+  }
+  const selected = String((memoQueryState.forms[memoQueryState.dimension] || {}).agent || '');
+  const values = Array.from(new Set([selected, String(state.settings.agentId || '')].concat(memoQueryState.agents).filter(Boolean)));
+  agentSelect.innerHTML = '<option value="">不限</option>' + values.map(value => '<option value="' + esc(value) + '" title="' + esc(value) + '">' + esc(memoQueryAgentOptionLabel(value)) + '</option>').join('');
+  memoQueryWriteFormToDom();
+}
+function memoQueryAgentOptionLabel(value) {
+  const chars = Array.from(String(value || ''));
+  return chars.length > 10 ? chars.slice(0, 10).join('') + '...' : chars.join('');
+}
+function memoQueryMarkDirty() {
+  memoQueryReadFormFromDom();
+  memoQueryState.dirty = true;
+  const meta = document.getElementById('memoQueryResultsMeta');
+  if (meta && memoQueryState.records[memoQueryState.dimension].length) meta.textContent = '条件已变更，点击查询更新结果';
+}
+function memoQueryDateMs(value, end) {
+  const text = String(value || '').trim();
+  if (!text) return NaN;
+  const parsed = new Date(text.replace(' ', 'T')).getTime();
+  return Number.isFinite(parsed) ? (end ? parsed + 59999 : parsed) : NaN;
+}
+function memoQueryDisplayTime(record, dimension) {
+  if (dimension === 'detail') return memoDetailPreviewFormatTime(record && record.execTime, 'input').replace('T', ' ');
+  const raw = String(record && record.rawTime || '').trim();
+  return raw || (Number(record && record.cycle) === -1 ? 'Cron' : '-');
+}
+function memoQueryMatchesRecord(record, dimension, form, metaStatusMap) {
+  const item = record && typeof record === 'object' ? record : {};
+  const normalized = memoQueryNormalizeForm(form);
+  if (normalized.agent && String(item.agentId || '') !== normalized.agent) return false;
+  if (normalized.model && normalizeModelName(item.model) !== normalized.model) return false;
+  if (normalized.content && !String(item.content || '').includes(normalized.content)) return false;
+  if (dimension === 'meta') {
+    if (Number(item.cycle) === 0) return false;
+    if (normalized.cycle && Number(item.cycle) !== Number(normalized.cycle)) return false;
+    const statusSet = metaStatusMap && metaStatusMap[String(item.id)] || null;
+    if (normalized.status && !(statusSet && statusSet.has(Number(normalized.status)))) return false;
+    const value = memoQueryDateMs(item.rawTime);
+    const start = memoQueryDateMs(normalized.start);
+    const end = memoQueryDateMs(normalized.end, true);
+    if (Number.isFinite(start) && (!Number.isFinite(value) || value < start)) return false;
+    if (Number.isFinite(end) && (!Number.isFinite(value) || value > end)) return false;
+  } else {
+    if (normalized.status && Number(item.started) !== Number(normalized.status)) return false;
+    const value = Number(item.execTime) * 1000;
+    const start = memoQueryDateMs(normalized.start);
+    const end = memoQueryDateMs(normalized.end, true);
+    if (Number.isFinite(start) && (!Number.isFinite(value) || value < start)) return false;
+    if (Number.isFinite(end) && (!Number.isFinite(value) || value > end)) return false;
+  }
+  return true;
+}
+function memoQueryBuildURL(dimension, form) {
+  const params = new URLSearchParams();
+  const normalized = memoQueryNormalizeForm(form);
+  if (normalized.agent) params.set('agentId', normalized.agent);
+  if (normalized.model) params.set('model', normalized.model);
+  if (normalized.content) params.set('content', normalized.content);
+  if (dimension === 'meta') {
+    params.set('recurringOnly', '1');
+    if (normalized.cycle) params.set('cycle', normalized.cycle);
+  } else {
+    params.set('history', '1');
+  }
+  if (normalized.start) params.set('from', normalized.start.replace('T', ' '));
+  if (normalized.end) params.set('to', normalized.end.replace('T', ' '));
+  return '/api/cron/detail/' + (dimension === 'meta' ? 'metadata' : 'list') + (params.toString() ? ('?' + params.toString()) : '');
+}
+async function memoQueryFetch(url, signal) {
+  const response = await fetch(url, { method: 'POST', signal });
+  let data = null;
+  try { data = await response.json(); } catch {}
+  if (!response.ok || !data || data.status !== 0 || !Array.isArray(data.data)) throw new Error(String(data && data.content || '查询失败'));
+  return data.data;
+}
+async function memoQueryRun() {
+  memoQueryReadFormFromDom();
+  const dimension = memoQueryState.dimension;
+  const form = memoQueryNormalizeForm(memoQueryState.forms[dimension]);
+  const start = memoQueryDateMs(form.start);
+  const end = memoQueryDateMs(form.end, true);
+  if (Number.isFinite(start) && Number.isFinite(end) && start > end) {
+    vfsShowUploadToast('开始时间不能晚于结束时间', true);
+    return;
+  }
+  const key = memoQueryCacheKey(dimension, form);
+  if (memoQueryState.abortController) memoQueryState.abortController.abort();
+  const controller = new AbortController();
+  memoQueryState.abortController = controller;
+  const requestSeq = ++memoQueryState.requestSeq;
+  memoQueryState.loading = true;
+  memoQueryRenderResults();
+  try {
+    const records = await memoQueryFetch(memoQueryBuildURL(dimension, form), controller.signal);
+    if (requestSeq !== memoQueryState.requestSeq) return;
+    let metaStatusMap = null;
+    if (dimension === 'meta') {
+      const detailRows = await memoQueryFetch('/api/cron/detail/list' + (form.agent ? ('?agentId=' + encodeURIComponent(form.agent)) : ''), controller.signal);
+      if (requestSeq !== memoQueryState.requestSeq) return;
+      metaStatusMap = Object.create(null);
+      detailRows.forEach(detail => {
+        const metaId = String(detail && detail.metaId || '');
+        if (!metaId) return;
+        if (!metaStatusMap[metaId]) metaStatusMap[metaId] = new Set();
+        metaStatusMap[metaId].add(Number(detail.started));
+      });
+    }
+    const filtered = records.filter(record => memoQueryMatchesRecord(record, dimension, form, metaStatusMap));
+    if (dimension === 'meta') {
+      filtered.forEach(record => {
+        const statuses = metaStatusMap && metaStatusMap[String(record.id)];
+        record.__memoQueryStatus = statuses && statuses.size ? Array.from(statuses).sort().map(status => MEMO_DETAIL_STATUS_LABELS[status] || '未知').join('、') : '-';
+      });
+      filtered.sort((a, b) => memoQueryDateMs(b.rawTime) - memoQueryDateMs(a.rawTime) || Number(b.id) - Number(a.id));
+    } else {
+      filtered.sort((a, b) => Number(b.execTime) - Number(a.execTime) || Number(b.id) - Number(a.id));
+    }
+    const resultMeta = filtered.length + ' 条结果 · 已缓存 5 分钟';
+    memoQueryState.records[dimension] = filtered;
+    memoQueryState.visibleCount[dimension] = MEMO_QUERY_PAGE_SIZE;
+    memoQueryState.resultMeta[dimension] = resultMeta;
+    memoQueryState.dirty = false;
+    memoQueryPutCachedResult(key, filtered, resultMeta);
+  } catch (error) {
+    if (error && error.name === 'AbortError') return;
+    if (requestSeq !== memoQueryState.requestSeq) return;
+    memoQueryState.resultMeta[dimension] = String(error && error.message || '查询失败');
+  } finally {
+    if (requestSeq === memoQueryState.requestSeq) {
+      memoQueryState.loading = false;
+      memoQueryState.abortController = null;
+      memoQueryRenderResults();
+    }
+  }
+}
+function memoQueryResultStatus(record, dimension) {
+  return dimension === 'detail'
+    ? (MEMO_DETAIL_STATUS_LABELS[Number(record && record.started)] || '未知')
+    : String(record && record.__memoQueryStatus || '-');
+}
+function memoQueryRenderResults() {
+  const list = document.getElementById('memoQueryResults');
+  const meta = document.getElementById('memoQueryResultsMeta');
+  const submit = document.getElementById('memoQuerySubmitBtn');
+  if (!list || !meta) return;
+  const dimension = memoQueryState.dimension;
+  const all = Array.isArray(memoQueryState.records[dimension]) ? memoQueryState.records[dimension] : [];
+  const visibleCount = Math.max(MEMO_QUERY_PAGE_SIZE, Number(memoQueryState.visibleCount[dimension]) || MEMO_QUERY_PAGE_SIZE);
+  const records = all.slice(0, visibleCount);
+  const scrollTop = memoQueryState.scrollTop[dimension] || 0;
+  if (submit) { submit.disabled = memoQueryState.loading; submit.textContent = memoQueryState.loading ? '查询中…' : '查询'; }
+  if (memoQueryState.loading) {
+    meta.textContent = '正在查询…';
+    list.innerHTML = '<div class="memo-query-empty">正在查询备忘录…</div>';
+    return;
+  }
+  meta.textContent = memoQueryState.resultMeta[dimension] || (memoQueryState.dirty ? '条件已变更，点击查询更新结果' : '填写条件后查询');
+  if (!all.length) {
+    list.innerHTML = '<div class="memo-query-empty">' + esc(memoQueryState.resultMeta[dimension] ? '没有匹配的备忘录。' : '填写查询条件后，点击“查询”开始查找备忘录。') + '</div>';
+    return;
+  }
+  const icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4.2 4.2"></path></svg>';
+  const headers = dimension === 'meta'
+    ? [['预览', 'memo-query-col-preview'], ['周期', 'memo-query-col-cycle'], ['时间', 'memo-query-col-time'], ['模型', 'memo-query-col-model'], ['思考', 'memo-query-col-thinking'], ['SWARM', 'memo-query-col-swarm'], ['校验', 'memo-query-col-verify'], ['AGENT', 'memo-query-col-agent'], ['状态', 'memo-query-col-status'], ['任务内容', '']]
+    : [['预览', 'memo-query-col-preview'], ['时间', 'memo-query-col-time'], ['模型', 'memo-query-col-model'], ['思考', 'memo-query-col-thinking'], ['SWARM', 'memo-query-col-swarm'], ['校验', 'memo-query-col-verify'], ['AGENT', 'memo-query-col-agent'], ['状态', 'memo-query-col-status'], ['任务内容', '']];
+  const header = '<thead><tr>' + headers.map(([label, className]) => '<th' + (className ? ' class="' + className + '"' : '') + '>' + label + '</th>').join('') + '</tr></thead>';
+  const cell = (value, className = '') => {
+    const text = String(value == null || value === '' ? '-' : value);
+    const title = esc(text).replace(/"/g, '&quot;');
+    return '<td' + (className ? ' class="' + className + '"' : '') + ' title="' + title + '">' + esc(text) + '</td>';
+  };
+  const rows = records.map((record, index) => {
+    const agent = String(record && record.agentId || '-');
+    const model = normalizeModelName(record && record.model) || '-';
+    const content = String(record && record.content || '');
+    const contentChars = Array.from(content);
+    const contentSummary = contentChars.length > 10 ? contentChars.slice(0, 10).join('') + '...' : content;
+    const status = memoQueryResultStatus(record, dimension);
+    const cycle = MEMO_DETAIL_CYCLE_LABELS[Number(record && record.cycle)] || (Number(record && record.cycle) === -1 ? 'Cron' : '-');
+    const values = dimension === 'meta'
+      ? [cell(cycle, 'memo-query-col-cycle'), cell(memoQueryDisplayTime(record, dimension), 'memo-query-col-time'), cell(model, 'memo-query-col-model'), cell(record && record.thinking ? 'Thinking' : 'Auto', 'memo-query-col-thinking'), cell(formatSwarmStatus(record && record.router_disable), 'memo-query-col-swarm'), cell(formatVerifyStatus(!!(record && record.verify) && !!(record && record.thinking)), 'memo-query-col-verify'), cell(agent, 'memo-query-col-agent')]
+      : [cell(memoQueryDisplayTime(record, dimension), 'memo-query-col-time'), cell(model, 'memo-query-col-model'), cell(record && record.thinking ? 'Thinking' : 'Auto', 'memo-query-col-thinking'), cell(formatSwarmStatus(record && record.router_disable), 'memo-query-col-swarm'), cell(formatVerifyStatus(!!(record && record.verify) && !!(record && record.thinking)), 'memo-query-col-verify'), cell(agent, 'memo-query-col-agent')];
+    const statusTitle = esc(status).replace(/"/g, '&quot;');
+    const contentTitle = esc(content || '-').replace(/"/g, '&quot;');
+    const preview = '<td class="memo-query-col-preview"><button class="memo-query-preview" type="button" onclick="memoQueryOpenPreview(\'' + dimension + '\',' + index + ')" title="预览备忘录" aria-label="预览备忘录">' + icon + '</button></td>';
+    return '<tr>' + preview + values.join('') + '<td class="memo-query-col-status" title="' + statusTitle + '"><span class="memo-query-status">' + esc(status) + '</span></td><td class="memo-query-content" title="' + contentTitle + '">' + esc(contentSummary || '-') + '</td></tr>';
+  }).join('');
+  list.innerHTML = '<table class="memo-query-table memo-query-table-' + dimension + '">' + header + '<tbody>' + rows + '</tbody></table>' + (all.length > records.length ? '<div class="memo-query-load-more">继续向下滚动以加载更多（已显示 ' + records.length + '/' + all.length + '）</div>' : '');
+  requestAnimationFrame(() => { if (list && memoQueryState.dimension === dimension) list.scrollTop = scrollTop; });
+}
+function memoQueryHandleResultsScroll(element) {
+  const dimension = memoQueryState.dimension;
+  memoQueryState.scrollTop[dimension] = Number(element && element.scrollTop || 0);
+  const all = memoQueryState.records[dimension] || [];
+  if (!memoQueryState.loading && element && element.scrollTop + element.clientHeight >= element.scrollHeight - 40 && memoQueryState.visibleCount[dimension] < all.length) {
+    memoQueryState.visibleCount[dimension] += MEMO_QUERY_PAGE_SIZE;
+    memoQueryRenderResults();
+  }
+}
+function memoQueryRender() {
+  memoQueryWriteFormToDom();
+  void memoQueryEnsureOptions();
+  memoQueryRenderResults();
+}
+function setMemoQueryDimension(dimension) {
+  const next = dimension === 'detail' ? 'detail' : 'meta';
+  if (next === memoQueryState.dimension) return;
+  memoQueryReadFormFromDom();
+  memoQueryState.dimension = next;
+  memoQueryState.dirty = false;
+  memoQueryRender();
+}
+function memoQuerySubmit(event) {
+  if (event) event.preventDefault();
+  void memoQueryRun();
+}
+function memoQueryResetCurrent() {
+  memoQueryState.forms[memoQueryState.dimension] = MEMO_QUERY_EMPTY_FORM();
+  memoQueryState.records[memoQueryState.dimension] = [];
+  memoQueryState.visibleCount[memoQueryState.dimension] = MEMO_QUERY_PAGE_SIZE;
+  memoQueryState.resultMeta[memoQueryState.dimension] = '';
+  memoQueryState.scrollTop[memoQueryState.dimension] = 0;
+  memoQueryState.dirty = false;
+  memoQueryRender();
+}
+function memoQueryOverlayBackdropClick(event) {
+  if (event && event.target === event.currentTarget) closeMemoQueryOverlay();
+}
+function toggleMemoQueryOverlay(event) {
+  if (event) { event.preventDefault(); event.stopPropagation(); }
+  if (isMemoTourInteractionLocked()) return;
+  if (memoQueryState.open) { closeMemoQueryOverlay(); return; }
+  const overlay = document.getElementById('memoQueryOverlay');
+  if (!overlay) return;
+  memoQueryState.open = true;
+  memoQueryState.minimized = false;
+  showExclusiveOverlay(overlay, document.getElementById('memoQueryPanel'));
+  memoQueryRender();
+}
+function closeMemoQueryOverlay() {
+  if (memoQueryState.abortController) memoQueryState.abortController.abort();
+  memoQueryState.open = false;
+  memoQueryState.minimized = true;
+  setOverlayVisible(document.getElementById('memoQueryOverlay'), false, document.getElementById('memoQueryPanel'));
+}
+function memoQueryOpenPreview(kind, index) {
+  const dimension = kind === 'detail' ? 'detail' : 'meta';
+  const record = (memoQueryState.records[dimension] || [])[Number(index)];
+  if (!record) return;
+  memoQueryState.previewKind = dimension;
+  closeMemoQueryOverlay();
+  if (dimension === 'detail') {
+    memoMetaPreviewHide({ force: true });
+    memoDetailPreviewSourceEnter(record);
+  } else {
+    memoDetailPreviewHide({ force: true });
+    memoMetaPreviewSourceEnter(record);
+  }
+}
+function memoQueryClosePreview() {
+  if (!memoQueryState.previewKind) return;
+  memoQueryState.previewKind = '';
+  memoDetailPreviewHide({ force: true });
+  memoMetaPreviewHide({ force: true });
+  toggleMemoQueryOverlay();
+}
+document.addEventListener('keydown', event => {
+  if (!memoQueryState.open || event.key !== 'Escape' || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  closeMemoQueryOverlay();
+});
+function memoQueryPreviewCloseMarkup(editing) {
+  if (!memoQueryState.previewKind || editing) return '';
+  return '<button type="button" class="rs-meta-center-action" onclick="memoQueryClosePreview()" title="返回备忘录查询" aria-label="返回备忘录查询"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>';
+}
 const memoDetailPreviewState = {
   detailId: '',
   agentId: '',
@@ -48981,9 +49539,9 @@ function rsRenderMetaCenterPreview(meta, options = {}) {
   if (title) title.textContent = options.detail ? '备忘录明细预览' : (metadata ? '备忘录元数据预览' : '备忘录预览');
   memoPreviewSyncValidationMessage(metadata, editing);
   const actions = document.getElementById('rsMetaCenterPreviewActions');
-  if (actions) actions.innerHTML = options.detail
+  if (actions) actions.innerHTML = (options.detail
     ? memoDetailPreviewActionMarkup(editing, !!memoDetailPreviewState.saving)
-    : (metadata ? memoMetaPreviewActionMarkup(editing, !!memoMetaPreviewState.saving) : '');
+    : (metadata ? memoMetaPreviewActionMarkup(editing, !!memoMetaPreviewState.saving) : '')) + memoQueryPreviewCloseMarkup(editing);
   Object.keys(RS_META_PREVIEW_FIELD_IDS).forEach(key => {
     const node = document.getElementById(RS_META_PREVIEW_FIELD_IDS[key]);
     if (!node) return;
@@ -49314,6 +49872,7 @@ async function memoDetailPreviewSave(options = {}) {
     rsSetMetaPreviewEditLock(false);
     rsShowMetaCenterPreview(memoDetailPreviewBuildMeta(updated), { detail: true, editing: false });
     rsSetMetaPreviewInteractive(true);
+    memoQueryClearCache({ render: false });
     vfsShowUploadToast('备忘录明细已更新', false);
     scheduleRefreshCronViews(0);
   } catch (error) {
@@ -49585,6 +50144,7 @@ async function memoMetaPreviewSave(options = {}) {
     rsSetMetaPreviewEditLock(false);
     rsShowMetaCenterPreview(memoMetaPreviewBuildMeta(updated), { metadata: true, editing: false });
     rsSetMetaPreviewInteractive(true);
+    memoQueryClearCache({ render: false });
     vfsShowUploadToast('备忘录元数据已更新', false);
     scheduleRefreshCronViews(0);
   } catch (error) {
@@ -49669,6 +50229,7 @@ async function rsDoDelete() {
     const resp = await fetch('/api/cron/delete?id=' + id, { method: 'POST' });
     const data = await resp.json();
     if (data.status === 0) {
+      memoQueryClearCache({ render: false });
       scheduleRefreshCronViews(0);
     } else {
       vfsShowUploadToast('删除失败: ' + (data.content || ''), true);

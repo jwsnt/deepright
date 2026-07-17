@@ -5815,14 +5815,15 @@ func (p *ProxyServer) HandleCron(w http.ResponseWriter, r *http.Request) {
 }
 
 type cronMetaFilter struct {
-	AgentID   string
-	ChatID    string
-	TaskType  string
-	Model     string
-	Content   string
-	Cycle     *int
-	StartFrom *time.Time
-	StartTo   *time.Time
+	AgentID       string
+	ChatID        string
+	TaskType      string
+	Model         string
+	Content       string
+	Cycle         *int
+	RecurringOnly bool
+	StartFrom     *time.Time
+	StartTo       *time.Time
 }
 
 type cronDetailFilter struct {
@@ -5912,19 +5913,20 @@ type cronDetailLogEntry struct {
 }
 
 type cronQueryOptions struct {
-	MetaID   string
-	DetailID string
-	ID       string
-	AgentID  string
-	ChatID   string
-	TaskType string
-	Model    string
-	Content  string
-	Cycle    *int
-	Time     string
-	Date     string
-	From     string
-	To       string
+	MetaID         string
+	DetailID       string
+	ID             string
+	AgentID        string
+	ChatID         string
+	TaskType       string
+	Model          string
+	Content        string
+	Cycle          *int
+	Time           string
+	Date           string
+	From           string
+	To             string
+	IncludeHistory bool
 }
 
 func firstNonEmpty(values ...string) string {
@@ -6527,7 +6529,7 @@ func buildCronDetailFilter(opts cronQueryOptions) (cronDetailFilter, error) {
 	if err != nil {
 		return cronDetailFilter{}, err
 	}
-	execFrom, execTo, err := resolveTimeRange(opts.Time, opts.Date, opts.From, opts.To, true)
+	execFrom, execTo, err := resolveTimeRange(opts.Time, opts.Date, opts.From, opts.To, !opts.IncludeHistory)
 	if err != nil {
 		return cronDetailFilter{}, err
 	}
@@ -6572,7 +6574,7 @@ func parseCronMetaFilterFromRequest(r *http.Request) (cronMetaFilter, error) {
 	if err != nil {
 		return cronMetaFilter{}, err
 	}
-	return buildCronMetaFilter(cronQueryOptions{
+	filter, err := buildCronMetaFilter(cronQueryOptions{
 		AgentID:  firstNonEmpty(q.Get("agentId"), q.Get("agent")),
 		ChatID:   firstNonEmpty(q.Get("chatId"), q.Get("chat")),
 		TaskType: q.Get("type"),
@@ -6584,6 +6586,11 @@ func parseCronMetaFilterFromRequest(r *http.Request) (cronMetaFilter, error) {
 		From:     firstNonEmpty(q.Get("from"), q.Get("startFrom"), q.Get("start-from")),
 		To:       firstNonEmpty(q.Get("to"), q.Get("startTo"), q.Get("start-to")),
 	})
+	if err != nil {
+		return cronMetaFilter{}, err
+	}
+	filter.RecurringOnly = q.Get("recurringOnly") == "1"
+	return filter, nil
 }
 
 func parseCronDetailFilterFromRequest(r *http.Request) (cronDetailFilter, error) {
@@ -6593,17 +6600,18 @@ func parseCronDetailFilterFromRequest(r *http.Request) (cronDetailFilter, error)
 		return cronDetailFilter{}, err
 	}
 	return buildCronDetailFilter(cronQueryOptions{
-		MetaID:   firstNonEmpty(q.Get("metaId"), q.Get("meta"), q.Get("id")),
-		AgentID:  firstNonEmpty(q.Get("agentId"), q.Get("agent")),
-		ChatID:   firstNonEmpty(q.Get("chatId"), q.Get("chat")),
-		TaskType: q.Get("type"),
-		Model:    q.Get("model"),
-		Content:  q.Get("content"),
-		Cycle:    cycle,
-		Time:     firstNonEmpty(q.Get("time"), q.Get("execTime"), q.Get("exec-time")),
-		Date:     q.Get("date"),
-		From:     firstNonEmpty(q.Get("from"), q.Get("execFrom"), q.Get("exec-from")),
-		To:       firstNonEmpty(q.Get("to"), q.Get("execTo"), q.Get("exec-to")),
+		MetaID:         firstNonEmpty(q.Get("metaId"), q.Get("meta"), q.Get("id")),
+		AgentID:        firstNonEmpty(q.Get("agentId"), q.Get("agent")),
+		ChatID:         firstNonEmpty(q.Get("chatId"), q.Get("chat")),
+		TaskType:       q.Get("type"),
+		Model:          q.Get("model"),
+		Content:        q.Get("content"),
+		Cycle:          cycle,
+		Time:           firstNonEmpty(q.Get("time"), q.Get("execTime"), q.Get("exec-time")),
+		Date:           q.Get("date"),
+		From:           firstNonEmpty(q.Get("from"), q.Get("execFrom"), q.Get("exec-from")),
+		To:             firstNonEmpty(q.Get("to"), q.Get("execTo"), q.Get("exec-to")),
+		IncludeHistory: q.Get("history") == "1",
 	})
 }
 
@@ -6628,6 +6636,10 @@ func parseCronDetailDeleteFilterFromRequest(r *http.Request) (cronDetailFilter, 
 	})
 }
 
+func escapeCronLikeContains(value string) string {
+	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(value)
+}
+
 func queryCronMetas(db *sql.DB, filter cronMetaFilter) ([]cronMetaResult, error) {
 	query := fmt.Sprintf(`SELECT id, cycle, raw_time, agent_id, model, thinking, %s, %s, cron, content, response_schema, chat_id, task_type FROM task_meta WHERE 1=1`, cronVerifySelect(db, "task_meta"), cronRouterDisableSelect(db, "task_meta"))
 	args := make([]interface{}, 0, 10)
@@ -6648,8 +6660,11 @@ func queryCronMetas(db *sql.DB, filter cronMetaFilter) ([]cronMetaResult, error)
 		args = append(args, filter.Model)
 	}
 	if filter.Content != "" {
-		query += ` AND content LIKE ?`
-		args = append(args, "%"+filter.Content+"%")
+		query += ` AND content LIKE ? ESCAPE '\'`
+		args = append(args, "%"+escapeCronLikeContains(filter.Content)+"%")
+	}
+	if filter.RecurringOnly {
+		query += ` AND cycle <> 0`
 	}
 	if filter.Cycle != nil {
 		query += ` AND cycle = ?`
@@ -6758,8 +6773,8 @@ func queryCronDetails(db *sql.DB, filter cronDetailFilter) ([]cronDetailResult, 
 		args = append(args, filter.Model)
 	}
 	if filter.Content != "" {
-		query += ` AND d.content LIKE ?`
-		args = append(args, "%"+filter.Content+"%")
+		query += ` AND d.content LIKE ? ESCAPE '\'`
+		args = append(args, "%"+escapeCronLikeContains(filter.Content)+"%")
 	}
 	if filter.Cycle != nil {
 		query += ` AND m.cycle = ?`
