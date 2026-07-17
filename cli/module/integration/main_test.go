@@ -18434,3 +18434,50 @@ func TestExecuteExternalCommandTimeoutOutput(t *testing.T) {
 		})
 	}
 }
+
+func TestIntegrationModelProviderCatalogUsesStartupCache(t *testing.T) {
+	rawProvider := map[string]interface{}{
+		"openai": map[string]interface{}{
+			"__url":                "https://api.example.com/v1",
+			"__model":              "base-model",
+			"__model_multi_output": 3,
+		},
+		"empty": "not-an-object",
+	}
+	opts := defaultIntegrationStartupOptions()
+	if err := applyIntegrationStartupConfig(&opts, map[string]interface{}{"provider": rawProvider}); err != nil {
+		t.Fatalf("applyIntegrationStartupConfig: %v", err)
+	}
+	rawProvider["openai"].(map[string]interface{})["__model"] = "changed-after-startup"
+	if got := opts.Config.Provider["openai"]["__model"]; got != "base-model" {
+		t.Fatalf("cached provider model = %q, want base-model", got)
+	}
+	if _, ok := opts.Config.Provider["openai"]["__model_multi_output"]; ok {
+		t.Fatal("non-string provider field should not be exposed")
+	}
+	if _, ok := opts.Config.Provider["empty"]; !ok {
+		t.Fatal("provider key without an object config should still be present")
+	}
+
+	rec := httptest.NewRecorder()
+	handleModelProviderCatalog(&opts.Config).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/model_provider", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	var payload struct {
+		Status   int                          `json:"status"`
+		Provider map[string]map[string]string `json:"provider"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload.Status != 0 || payload.Provider["openai"]["__model"] != "base-model" {
+		t.Fatalf("unexpected response: %#v", payload)
+	}
+
+	methodRec := httptest.NewRecorder()
+	handleModelProviderCatalog(&opts.Config).ServeHTTP(methodRec, httptest.NewRequest(http.MethodPost, "/api/model_provider", nil))
+	if methodRec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("POST status = %d, want %d", methodRec.Code, http.StatusMethodNotAllowed)
+	}
+}

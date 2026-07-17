@@ -5978,14 +5978,12 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
 !function(e,t){"object"==typeof exports&&"object"==typeof module?module.exports=t(require("katex")):"function"==typeof define&&define.amd?define(["katex"],t):"object"==typeof exports?exports.renderMathInElement=t(require("katex")):e.renderMathInElement=t(e.katex)}("undefined"!=typeof self?self:this,(function(e){return function(){"use strict";var t={771:function(t){t.exports=e}},n={};function r(e){var o=n[e];if(void 0!==o)return o.exports;var i=n[e]={exports:{}};return t[e](i,i.exports,r),i.exports}r.n=function(e){var t=e&&e.__esModule?function(){return e.default}:function(){return e};return r.d(t,{a:t}),t},r.d=function(e,t){for(var n in t)r.o(t,n)&&!r.o(e,n)&&Object.defineProperty(e,n,{enumerable:!0,get:t[n]})},r.o=function(e,t){return Object.prototype.hasOwnProperty.call(e,t)};var o={};return function(){r.d(o,{default:function(){return d}});var e=r(771),t=r.n(e);const n=function(e,t,n){let r=n,o=0;const i=e.length;for(;r<t.length;){const n=t[r];if(o<=0&&t.slice(r,r+i)===e)return r;"\\"===n?r++:"{"===n?o++:"}"===n&&o--,r++}return-1},i=/^\\begin{/;var a=function(e,t){let r;const o=[],a=new RegExp("("+t.map((e=>e.left.replace(/[-/\\^$*+?.()|[\]{}]/g,"\\$&"))).join("|")+")");for(;r=e.search(a),-1!==r;){r>0&&(o.push({type:"text",data:e.slice(0,r)}),e=e.slice(r));const a=t.findIndex((t=>e.startsWith(t.left)));if(r=n(t[a].right,e,t[a].left.length),-1===r)break;const l=e.slice(0,r+t[a].right.length),s=i.test(l)?l:e.slice(t[a].left.length,r);o.push({type:"math",data:s,rawData:l,display:t[a].display}),e=e.slice(r+t[a].right.length)}return""!==e&&o.push({type:"text",data:e}),o};const l=function(e,n){const r=a(e,n.delimiters);if(1===r.length&&"text"===r[0].type)return null;const o=document.createDocumentFragment();for(let e=0;e<r.length;e++)if("text"===r[e].type)o.appendChild(document.createTextNode(r[e].data));else{const i=document.createElement("span");let a=r[e].data;n.displayMode=r[e].display;try{n.preProcess&&(a=n.preProcess(a)),t().render(a,i,n)}catch(i){if(!(i instanceof t().ParseError))throw i;n.errorCallback("KaTeX auto-render: Failed to parse `"+r[e].data+"` with ",i),o.appendChild(document.createTextNode(r[e].rawData));continue}o.appendChild(i)}return o},s=function(e,t){for(let n=0;n<e.childNodes.length;n++){const r=e.childNodes[n];if(3===r.nodeType){let o=r.textContent,i=r.nextSibling,a=0;for(;i&&i.nodeType===Node.TEXT_NODE;)o+=i.textContent,i=i.nextSibling,a++;const s=l(o,t);if(s){for(let e=0;e<a;e++)r.nextSibling.remove();n+=s.childNodes.length-1,e.replaceChild(s,r)}else n+=a}else if(1===r.nodeType){const e=" "+r.className+" ";-1===t.ignoredTags.indexOf(r.nodeName.toLowerCase())&&t.ignoredClasses.every((t=>-1===e.indexOf(" "+t+" ")))&&s(r,t)}}};var d=function(e,t){if(!e)throw new Error("No element provided to render");const n={};for(const e in t)t.hasOwnProperty(e)&&(n[e]=t[e]);n.delimiters=n.delimiters||[{left:"$$",right:"$$",display:!0},{left:"\\(",right:"\\)",display:!1},{left:"\\begin{equation}",right:"\\end{equation}",display:!0},{left:"\\begin{align}",right:"\\end{align}",display:!0},{left:"\\begin{alignat}",right:"\\end{alignat}",display:!0},{left:"\\begin{gather}",right:"\\end{gather}",display:!0},{left:"\\begin{CD}",right:"\\end{CD}",display:!0},{left:"\\[",right:"\\]",display:!0}],n.ignoredTags=n.ignoredTags||["script","noscript","style","textarea","pre","code","option"],n.ignoredClasses=n.ignoredClasses||[],n.errorCallback=n.errorCallback||console.error,n.macros=n.macros||{},s(e,n)}}(),o=o.default}()}));
 </script><script>
 // ===== State =====
-const MODELS = ['deepright','seedream','deepseek','bigmodel','gemini','openai','anthropic','kimi','minimax','qwen','xiaomi'];
 const MODEL_ALIASES = {
   aioright: 'deepright',
   aiorhight: 'deepright',
   aiohright: 'deepright',
   openai: 'openai'
 };
-const DIRECT_SELECTION_BLOCKED_MODELS = new Set(['seedream']);
 const MODEL_KEY_HELP_LINKS = {
   deepseek: 'https://www.deepseek.com/',
   bigmodel: 'https://www.zhipuai.cn/',
@@ -5997,125 +5995,26 @@ const MODEL_KEY_HELP_LINKS = {
   qwen: 'https://tongyi.aliyun.com/tongyi/landing/?family=qwen',
   xiaomi: 'https://mimo.xiaomi.com/zh'
 };
-const MODEL_CUSTOM_CONFIG_DEFAULTS = {
-  deepright: {
-    configurable: false
-  },
-  seedream: {
-    configurable: true,
-    outputOnly: true,
-    supportsBaseModel: false,
-    supportsFastModel: false,
-    supportsThinkingModel: false,
-    __url: 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
-    __model: '',
-    __model_fast: '',
-    __model_thinking: '',
-    __model_multi_input: '',
-    __model_multi_output: 'doubao-seedream-4.5',
-    supportsMultiInput: false,
-    supportsMultiOutput: true
-  },
-  deepseek: {
-    configurable: true,
-    __url: 'https://api.deepseek.com/chat/completions',
-    __model: 'deepseek-v4-flash',
-    __model_fast: 'deepseek-v4-flash',
-    __model_thinking: 'deepseek-v4-pro',
-    __model_multi_input: '',
-    __model_multi_output: '',
-    supportsMultiInput: false,
-    supportsMultiOutput: false
-  },
-  bigmodel: {
-    configurable: true,
-    __url: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
-    __model: 'glm-5.1',
-    __model_fast: 'glm-4.7-flashx',
-    __model_thinking: 'glm-5.1',
-    __model_multi_input: 'glm-5v-turbo',
-    __model_multi_output: '',
-    supportsMultiInput: true,
-    supportsMultiOutput: false
-  },
-  gemini: {
-    configurable: true,
-    __url: 'https://generativelanguage.googleapis.com/v1beta/models/#model:streamGenerateContent',
-    __model: 'gemini-3.5-flash',
-    __model_fast: 'gemini-3.5-flash',
-    __model_thinking: 'gemini-3.1-pro-preview',
-    __model_multi_input: 'gemini-3.5-flash',
-    __model_multi_output: 'gemini-3.1-flash-image-preview',
-    supportsMultiInput: true,
-    supportsMultiOutput: true
-  },
-  openai: {
-    configurable: true,
-    __url: 'https://api.openai.com/v1/chat/completions',
-    __model: 'gpt-5.4',
-    __model_fast: 'gpt-5.4',
-    __model_thinking: 'gpt-5.4',
-    __model_multi_input: 'gpt-5.4',
-    __model_multi_output: '',
-    supportsMultiInput: true,
-    supportsMultiOutput: false
-  },
-  anthropic: {
-    configurable: true,
-    __url: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
-    __model: 'claude-opus-4-6',
-    __model_fast: 'claude-haiku-4-5-20251001',
-    __model_thinking: 'claude-opus-4-6',
-    __model_multi_input: 'claude-opus-4-6',
-    __model_multi_output: '',
-    supportsMultiInput: true,
-    supportsMultiOutput: false
-  },
-  kimi: {
-    configurable: true,
-    __url: 'https://api.moonshot.cn/v1/chat/completions',
-    __model: 'kimi-k2.6',
-    __model_fast: 'kimi-k2-turbo-preview',
-    __model_thinking: 'kimi-k2.6',
-    __model_multi_input: 'kimi-k2.6',
-    __model_multi_output: '',
-    supportsMultiInput: true,
-    supportsMultiOutput: false
-  },
-  minimax: {
-    configurable: true,
-    __url: 'https://api.minimaxi.com/anthropic/v1/messages',
-    __model: 'MiniMax-M3',
-    __model_fast: 'MiniMax-M2.7-highspeed',
-    __model_thinking: 'MiniMax-M3',
-    __model_multi_input: '',
-    __model_multi_output: '',
-    supportsMultiInput: false,
-    supportsMultiOutput: false
-  },
-  qwen: {
-    configurable: true,
-    __url: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
-    __model: 'qwen3.5-flash',
-    __model_fast: 'qwen3.5-flash',
-    __model_thinking: 'qwen3.6-plus',
-    __model_multi_input: 'qwen3.5-flash',
-    __model_multi_output: 'qwen-image-plus',
-    supportsMultiInput: true,
-    supportsMultiOutput: true
-  },
-  xiaomi: {
-    configurable: true,
-    __url: 'https://api.xiaomimimo.com/v1/chat/completions',
-    __model: 'mimo-v2-flash',
-    __model_fast: 'mimo-v2-flash',
-    __model_thinking: 'mimo-v2.5-pro',
-    __model_multi_input: 'mimo-v2.5',
-    __model_multi_output: '',
-    supportsMultiInput: true,
-    supportsMultiOutput: false
-  }
-};
+const DEEPRIGHT_MODEL_PROVIDER_SPEC = Object.freeze({
+  configurable: false,
+  outputOnly: false,
+  supportsUrl: false,
+  editableUrl: false,
+  supportsBaseModel: false,
+  supportsFastModel: false,
+  supportsThinkingModel: false,
+  __url: '',
+  __model: '',
+  __model_fast: '',
+  __model_thinking: '',
+  __model_multi_input: '',
+  __model_multi_output: '',
+  supportsMultiInput: false,
+  supportsMultiOutput: false
+});
+let modelProviderCatalog = { deepright: DEEPRIGHT_MODEL_PROVIDER_SPEC };
+let modelProviderCatalogLoaded = false;
+let modelProviderCatalogRequest = null;
 const LEFT_SIDEBAR_COLLAPSED_KEY = 'deepright_left_sidebar_collapsed';
 const RIGHT_SIDEBAR_COLLAPSED_KEY = 'deepright_right_sidebar_collapsed';
 const rightSidebarUrlPreviewState = {
@@ -6256,8 +6155,6 @@ const LOCAL_STORAGE_SINGLE_CHAT_LIMIT_BYTES = Math.round(1 * 1024 * 1024);
 const MESSAGE_RENDER_CACHE_LIMIT = 240;
 const WIKI_RENDER_CACHE_LIMIT = 40;
 const LOW_POWER_RENDER_MESSAGE_MATH_LIMIT = 12;
-const MINIMAX_LEGACY_MODEL = 'MiniMax-M2.7';
-const MINIMAX_LATEST_MODEL = 'MiniMax-M3';
 const LOCAL_STORAGE_SIZE_ENCODER = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
 let runtimeModelTokenCache = Object.create(null);
 
@@ -6361,8 +6258,80 @@ function compareConfiguredModelNames(a, b) {
   return modelA.localeCompare(modelB, 'en', { sensitivity: 'base' });
 }
 
+function getModelProviderDefaultValue(rawProvider, key) {
+  if (!rawProvider || typeof rawProvider !== 'object' || Array.isArray(rawProvider)) return '';
+  const value = rawProvider[key];
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function buildModelProviderCatalog(runtimeConfig) {
+  const catalog = { deepright: DEEPRIGHT_MODEL_PROVIDER_SPEC };
+  const providers = runtimeConfig && typeof runtimeConfig === 'object' && !Array.isArray(runtimeConfig)
+    ? runtimeConfig.provider
+    : null;
+  if (!providers || typeof providers !== 'object' || Array.isArray(providers)) return catalog;
+  Object.keys(providers).forEach(providerName => {
+    const model = normalizeModelName(providerName);
+    if (!model || model === 'deepright') return;
+    const rawProvider = providers[providerName];
+    const spec = {
+      configurable: true,
+      __url: getModelProviderDefaultValue(rawProvider, '__url'),
+      __model: getModelProviderDefaultValue(rawProvider, '__model'),
+      __model_fast: getModelProviderDefaultValue(rawProvider, '__model_fast'),
+      __model_thinking: getModelProviderDefaultValue(rawProvider, '__model_thinking'),
+      __model_multi_input: getModelProviderDefaultValue(rawProvider, '__model_multi_input'),
+      __model_multi_output: getModelProviderDefaultValue(rawProvider, '__model_multi_output')
+    };
+    spec.supportsUrl = !!spec.__url;
+    spec.editableUrl = spec.supportsUrl;
+    spec.supportsBaseModel = !!spec.__model;
+    spec.supportsFastModel = !!spec.__model_fast;
+    spec.supportsThinkingModel = !!spec.__model_thinking;
+    spec.supportsMultiInput = !!spec.__model_multi_input;
+    spec.supportsMultiOutput = !!spec.__model_multi_output;
+    spec.outputOnly = !spec.supportsBaseModel && spec.supportsMultiOutput;
+    catalog[model] = spec;
+  });
+  return catalog;
+}
+
+async function loadModelProviderCatalog() {
+  if (modelProviderCatalogLoaded) return;
+  if (modelProviderCatalogRequest) return modelProviderCatalogRequest;
+  modelProviderCatalogRequest = (async () => {
+    let runtimeConfig = null;
+    try {
+      const resp = await fetch('/api/model_provider', { cache: 'no-store' });
+      const data = await resp.json();
+      if (resp.ok && data && data.status === 0 && data.provider && typeof data.provider === 'object' && !Array.isArray(data.provider)) {
+        runtimeConfig = { provider: data.provider };
+      }
+    } catch {}
+    modelProviderCatalog = buildModelProviderCatalog(runtimeConfig);
+    modelProviderCatalogLoaded = runtimeConfig !== null;
+  })();
+  try {
+    await modelProviderCatalogRequest;
+  } finally {
+    modelProviderCatalogRequest = null;
+  }
+}
+
+function isModelProviderAvailable(model) {
+  const normalized = normalizeModelName(model);
+  return !!normalized && Object.prototype.hasOwnProperty.call(modelProviderCatalog, normalized);
+}
+
+function getAvailableModelNames() {
+  return Object.keys(modelProviderCatalog).sort(compareConfiguredModelNames);
+}
+
 function getOrderedConfiguredModelNames(modelMap) {
-  return Object.keys(modelMap || {}).sort(compareConfiguredModelNames);
+  return Object.keys(modelMap || {})
+    .map(normalizeModelName)
+    .filter(isModelProviderAvailable)
+    .sort(compareConfiguredModelNames);
 }
 
 function isOutputOnlyModel(model) {
@@ -6371,7 +6340,8 @@ function isOutputOnlyModel(model) {
 
 function isDirectSelectionBlockedModel(model) {
   const normalizedModel = normalizeModelName(model);
-  return !!normalizedModel && DIRECT_SELECTION_BLOCKED_MODELS.has(normalizedModel);
+  if (!normalizedModel || normalizedModel === 'deepright') return false;
+  return !getModelCustomConfigSpec(normalizedModel).supportsBaseModel;
 }
 
 function getSelectableConfiguredModelNames(modelMap) {
@@ -6399,7 +6369,7 @@ function isSelectableConfiguredModel(model, modelMap) {
 }
 
 function getSelectableModelEmptyMessage(modelMap) {
-  return Object.keys(normalizeModelMap(modelMap || {})).length
+  return getOrderedConfiguredModelNames(normalizeModelMap(modelMap || {})).length
     ? '当前已配置模型仅支持多模态输出，请再配置一个对话模型'
     : '请先在设置中配置模型';
 }
@@ -6420,7 +6390,7 @@ function normalizeModelMap(input) {
     }
   });
   const ordered = {};
-  getOrderedConfiguredModelNames(output).forEach(key => {
+  Object.keys(output).sort(compareConfiguredModelNames).forEach(key => {
     ordered[key] = output[key];
   });
   return ordered;
@@ -6465,24 +6435,24 @@ function normalizeModelConfig(input) {
 
 function getModelCustomConfigSpec(model) {
   const normalized = normalizeModelName(model);
-  const spec = MODEL_CUSTOM_CONFIG_DEFAULTS[normalized];
+  const spec = modelProviderCatalog[normalized];
   if (!spec) {
     return {
-      configurable: true,
+      configurable: false,
       outputOnly: false,
-      supportsUrl: true,
-      editableUrl: true,
-      supportsBaseModel: true,
-      supportsFastModel: true,
-      supportsThinkingModel: true,
+      supportsUrl: false,
+      editableUrl: false,
+      supportsBaseModel: false,
+      supportsFastModel: false,
+      supportsThinkingModel: false,
       __url: '',
       __model: '',
       __model_fast: '',
       __model_thinking: '',
       __model_multi_input: '',
       __model_multi_output: '',
-      supportsMultiInput: true,
-      supportsMultiOutput: true
+      supportsMultiInput: false,
+      supportsMultiOutput: false
     };
   }
   return {
@@ -6504,47 +6474,8 @@ function getModelCustomConfigSpec(model) {
   };
 }
 
-function migrateLegacyMiniMaxConfig(rawConfig) {
-  const cfg = normalizeModelConfig(rawConfig);
-  let changed = false;
-  if (cfg.__model === MINIMAX_LEGACY_MODEL) {
-    cfg.__model = MINIMAX_LATEST_MODEL;
-    changed = true;
-  }
-  if (cfg.__model_thinking === MINIMAX_LEGACY_MODEL) {
-    cfg.__model_thinking = MINIMAX_LATEST_MODEL;
-    changed = true;
-  }
-  return { cfg, changed };
-}
-
-function migrateLegacyMiniMaxModelMap(input) {
-  const models = normalizeModelMap(input || {});
-  const current = models.minimax;
-  if (!current) return { models, changed: false };
-  const migrated = migrateLegacyMiniMaxConfig(current);
-  if (!migrated.changed) return { models, changed: false };
-  models.minimax = migrated.cfg;
-  return { models, changed: true };
-}
-
-async function persistMigratedMiniMaxModelMap(models) {
-  if (!models || typeof models !== 'object' || Array.isArray(models)) return;
-  try {
-    await fetch('/api/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ models })
-    });
-  } catch {}
-}
-
 function buildEffectiveModelConfig(model, rawConfig) {
-  const normalizedModel = normalizeModelName(model);
-  let cfg = normalizeModelConfig(rawConfig);
-  if (normalizedModel === 'minimax') {
-    cfg = migrateLegacyMiniMaxConfig(cfg).cfg;
-  }
+  const cfg = normalizeModelConfig(rawConfig);
   const spec = getModelCustomConfigSpec(model);
   if (!spec.configurable) {
     return {
@@ -26006,6 +25937,7 @@ async function loadSettings() {
     }
   } catch {}
   ensureKnowledgeDisableSettings();
+  await loadModelProviderCatalog();
   await loadTokenSettings();
 }
 function saveSettingsToStorage() {
@@ -26019,11 +25951,7 @@ async function loadTokenSettings() {
     const resp = await fetch('/api/token');
     const data = await resp.json();
     if (data && data.status === 0 && data.models && typeof data.models === 'object') {
-      const migrated = migrateLegacyMiniMaxModelMap(data.models);
-      state.settings.models = migrated.models;
-      if (migrated.changed) {
-        persistMigratedMiniMaxModelMap(migrated.models);
-      }
+      state.settings.models = normalizeModelMap(data.models);
     } else {
       state.settings.models = {};
     }
@@ -36838,6 +36766,7 @@ async function openSettings() {
     applyResolvedAgentSelection(state.settings.agentId || '', resolvedAgentId);
   }
   // Load model entries
+  await loadModelProviderCatalog();
   await loadTokenSettings();
   renderModelEntries();
   renderSettingsAccessNote();
@@ -40933,7 +40862,7 @@ function buildAvailableModelOptions(currentModel, currentEntry) {
     const selectedModel = normalizeModelName(entry.querySelector('select') && entry.querySelector('select').value);
     if (selectedModel) occupiedModels.add(selectedModel);
   });
-  const optionModels = MODELS.filter(modelName => modelName === currentModel || !occupiedModels.has(modelName));
+  const optionModels = getAvailableModelNames().filter(modelName => modelName === currentModel || !occupiedModels.has(modelName));
   if (currentModel && !optionModels.includes(currentModel)) {
     optionModels.unshift(currentModel);
   }
@@ -40958,7 +40887,8 @@ function modelEntryHtml(idx, model, rawConfig, originalModel) {
   const built = buildEffectiveModelConfig(model, rawConfig);
   const cfg = built.effective;
   const spec = built.spec;
-  const optionModels = MODELS.includes(model) || !model ? MODELS : [model].concat(MODELS);
+  const availableModels = getAvailableModelNames();
+  const optionModels = availableModels.includes(model) || !model ? availableModels : [model].concat(availableModels);
   const opts = optionModels.map(m => `<option value="${m}"${m === model ? ' selected' : ''}>${m}</option>`).join('');
   const rawCfg = normalizeModelConfig(rawConfig);
   const hasConfig = !!(rawCfg.__url || rawCfg.__model || rawCfg.__model_fast || rawCfg.__model_thinking || rawCfg.__model_multi_input || rawCfg.__model_multi_output);

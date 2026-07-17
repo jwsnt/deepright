@@ -240,7 +240,7 @@ http://127.0.0.1:9876/site/
   - 点击 `取消` 或未保存关闭设置时，这次切换会被丢弃
   - 如果保存为 `×`，页面会立即停止当前 onboarding、清掉待播 onboarding，并阻止后续 onboarding 再触发
 - **模型与密钥**：至少配置一组
-  - 可选模型：deepright、seedream、deepseek、bigmodel、gemini、openai、anthropic、kimi、minimax、qwen、xiaomi
+  - 应用启动时会读取并缓存运行时 `config/config.json.provider`，页面通过服务接口使用该缓存；`deepright` 固定第一，其余可选模型取 `provider` 的 key 并按英文首字母排序。修改配置文件后需重启应用并重新打开页面。
   - 密钥：密码输入框，最长 250 位，点击小眼睛图标可切换明文/密文
   - 同一模型不可重复配置
   - 添加或修改模型时，当前已配置的其它模型会自动从下拉列表中移除；即使密钥错误，也不会重复出现在候选列表里
@@ -263,9 +263,9 @@ http://127.0.0.1:9876/site/
   - 切换设置中的 Agent 后，这张多模态输出参数面板会自动重载新 Agent 的最新 `media` 配置
   - 当 `基础模型`、`快速响应`、`深度思考`、`多模态输入`、`多模态输出` 的输入内容超过输入框可见宽度时，把鼠标悬停在对应输入框上，会在该输入框下方浮出完整内容；鼠标移开后立即消失
   - 多模态输入与多模态输出现在是两条独立配置链路，不再共用旧的单一多模态字段
-  - `token` 仍为必填；`__url`、`__model`、`__model_fast`、`__model_thinking`、`__model_multi_input`、`__model_multi_output` 都允许为空
+  - `token` 仍为必填；`__url`、`__model`、`__model_fast`、`__model_thinking`、`__model_multi_input`、`__model_multi_output` 的默认值和是否可编辑均取自对应 provider 配置。字段缺失、非字符串或空字符串时会禁用编辑，保存时不会写入该字段
   - 同一时刻只会展开一条模型记录的客户化配置区，避免设置浮层内部出现多个重叠交互区
-  - 页面会按模型自动带出默认值，并把不支持配置的多模态项置为禁用态
+  - 页面会按 `provider` 配置自动带出默认值，并禁用所有不支持的字段
   - 如果当前模型已经存在任意客户化配置值，例如 `__url`、`__model`、`__model_fast`、`__model_thinking`、`__model_multi_input`、`__model_multi_output` 中任一项被实际自定义过，但当前面板仍处于收起状态，则小图标会持续闪动提示
   - 每条已支持客户化配置的模型记录，在展开区右下角都会提供 `重置` 和 `清空` 两个按钮
   - 点击 `重置` 后，会把当前模型的 URL 和各模型字段恢复为该模型默认值，但不会清空密钥
@@ -306,75 +306,12 @@ Seedream 特殊说明：
 - 这个内部技能只会在 Seedream 已完成可用配置时出现；未配置完成时，前端 `@技能` 菜单、后端 `/api/skills`、转发 `/v1/chat/completions` 的 `metadata.agents[].skills` 以及 `cli/get` 的 `metadata.agents[].skills` 都不会上报它
 - 可用配置的判定以 `integration token --provider seedream` 为准：必须拿到可用 `token`，并且 `__url` 与 `__model_multi_output` 在显式配置或默认值补全后都有效
 
-默认客户化配置如下：
+客户化配置默认值由 `config/config.json.provider.<模型>` 动态决定：
 
-- `seedream`
-  - `__url=https://ark.cn-beijing.volces.com/api/v3/images/generations`
-  - `__url` 可编辑，默认值为上面的地址
-  - 支持填写 `__url`、`__model_multi_output`
-  - `__model_multi_output=doubao-seedream-4.5`
-  - 不支持 `__model`、`__model_fast`、`__model_thinking`、`__model_multi_input`
-- `deepseek`
-  - `__url=https://api.deepseek.com/chat/completions`
-  - `__model=deepseek-v4-flash`
-  - `__model_fast=deepseek-v4-flash`
-  - `__model_thinking=deepseek-v4-pro`
-  - 不支持 `__model_multi_input`、`__model_multi_output`
-- `bigmodel`
-  - `__url=https://open.bigmodel.cn/api/paas/v4/chat/completions`
-  - `__model=glm-5.1`
-  - `__model_fast=glm-4.7-flashx`
-  - `__model_thinking=glm-5.1`
-  - `__model_multi_input=glm-5v-turbo`
-  - 不支持 `__model_multi_output`
-- `gemini`
-  - `__url=https://generativelanguage.googleapis.com/v1beta/models/#model:streamGenerateContent`
-  - `__model=gemini-3.5-flash`
-  - `__model_fast=gemini-3.5-flash`
-  - `__model_thinking=gemini-3.1-pro-preview`
-  - `__model_multi_input=gemini-3.5-flash`
-  - `__model_multi_output=gemini-3.1-flash-image-preview`
-- `openai`
-  - `__url=https://api.openai.com/v1/chat/completions`
-  - `__model=gpt-5.4`
-  - `__model_fast=gpt-5.4`
-  - `__model_thinking=gpt-5.4`
-  - `__model_multi_input=gpt-5.4`
-  - 不支持 `__model_multi_output`
-- `anthropic`
-  - `__url=https://dashscope-intl.aliyuncs.com/compatible-mode/v1`
-  - `__model=claude-opus-4-6`
-  - `__model_fast=claude-haiku-4-5-20251001`
-  - `__model_thinking=claude-opus-4-6`
-  - `__model_multi_input=claude-opus-4-6`
-  - 不支持 `__model_multi_output`
-- `kimi`
-  - `__url=https://api.moonshot.cn/v1/chat/completions`
-  - `__model=kimi-k2.6`
-  - `__model_fast=kimi-k2-turbo-preview`
-  - `__model_thinking=kimi-k2.6`
-  - `__model_multi_input=kimi-k2.6`
-  - 不支持 `__model_multi_output`
-- `minimax`
-  - `__url=https://api.minimaxi.com/anthropic/v1/messages`
-  - `__model=MiniMax-M2.7`
-  - `__model_fast=MiniMax-M2.7-highspeed`
-  - `__model_thinking=MiniMax-M2.7`
-  - 不支持 `__model_multi_input`、`__model_multi_output`
-- `qwen`
-  - `__url=https://dashscope-intl.aliyuncs.com/compatible-mode/v1`
-  - `__model=qwen3.5-flash`
-  - `__model_fast=qwen3.5-flash`
-  - `__model_thinking=qwen3.6-plus`
-  - `__model_multi_input=qwen3.5-flash`
-  - `__model_multi_output=qwen-image-plus`
-- `xiaomi`
-  - `__url=https://api.xiaomimimo.com/v1/chat/completions`
-  - `__model=mimo-v2-flash`
-  - `__model_fast=mimo-v2-flash`
-  - `__model_thinking=mimo-v2.5-pro`
-  - `__model_multi_input=mimo-v2.5`
-  - 不支持 `__model_multi_output`
+- `__url`、`__model`、`__model_fast`、`__model_thinking`、`__model_multi_input`、`__model_multi_output` 的非空字符串值分别是模型 URL、基础模型、快速响应、深度思考、多模态输入和多模态输出的默认值。
+- 字段未配置、不是字符串或为空字符串时，表示该模型不支持此项，页面会禁用该输入框。
+- 删除某个 provider 后，其已保存密钥和客户化配置会保留在服务端但在页面隐藏；将 provider 加回配置文件并重启后，原配置会重新显示。
+- 仅配置多模态输出且未配置基础模型的 provider 只能用于保存模型与密钥配置，不能作为普通会话、备忘录、插件或蜂群模型选择。
 
 ### 会话管理
 
@@ -1354,6 +1291,14 @@ Header 中 `Authorization` 为对应模型的密钥。
 - 冷历史恢复使用独立的 chat 级“向上恢复游标”，不会覆盖现有 `lastRestoreAt / lastRestoreId` 这类实时 `/api/restore` / 刷新恢复游标
 - 一旦当前 chat 已经有了前端展示内容，后续再次切回时会继续复用现有展示窗口与恢复状态，不会重新回到冷历史首屏逻辑
 - 正在执行中的会话、页面刷新后需要继续恢复中的会话，以及其他命中现有实时恢复链路的场景，都会立即让位给原有 `/api/restore` / SSE 恢复链路，不会把活跃任务误当成静态冷历史
+
+## 迭代 20260717-1：模型与密钥读取 Provider 配置
+
+- 应用会在启动时缓存 `config/config.json.provider`，设置页通过服务接口读取该缓存，不再维护固定模型清单或固定默认模型值
+- `deepright` 固定显示在首位；其余 provider key 按英文首字母排序
+- provider 中每个非空字符串的 `__url`、`__model`、`__model_fast`、`__model_thinking`、`__model_multi_input`、`__model_multi_output` 同时定义默认值和可编辑能力
+- 删除 provider 时，已保存密钥保留在服务端但在页面隐藏；重新加入并重启后会恢复显示
+- 仅多模态输出、没有基础模型的 provider 保持可配置，但不会进入普通对话、备忘录、插件或蜂群的模型选择
 
 ## 迭代 20260711-1：右侧 iframe 页内展开
 

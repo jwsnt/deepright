@@ -7736,6 +7736,24 @@ func handleToken() http.HandlerFunc {
 	}
 }
 
+func handleModelProviderCatalog(cfg *Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		providers := map[string]map[string]string{}
+		if cfg != nil && cfg.Provider != nil {
+			providers = cfg.Provider
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":   0,
+			"provider": providers,
+		})
+	}
+}
+
 func handleConsume() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodDelete {
@@ -12401,6 +12419,7 @@ type Config struct {
 	AgentCacheMs   int
 	ConnectCacheMs int
 	Site           string
+	Provider       map[string]map[string]string
 
 	// Proxy specific
 	ConnectTimeoutMs          int
@@ -12598,6 +12617,7 @@ var integrationStartupConfigKeys = map[string]string{
 	"resourcesdir":            "resources-dir",
 	"db":                      "db",
 	"site":                    "site",
+	"provider":                "provider",
 	"connecttimeout":          "connect_timeout",
 	"knowledgeupdateinterval": "knowledge_update_interval",
 	"knowledgeupdatelock":     "knowledge_update_lock",
@@ -12692,6 +12712,39 @@ func readIntegrationStartupConfig() (map[string]interface{}, string, error) {
 		}
 	}
 	return out, path, nil
+}
+
+var integrationProviderConfigKeys = []string{
+	"__url",
+	"__model",
+	"__model_fast",
+	"__model_thinking",
+	"__model_multi_input",
+	"__model_multi_output",
+}
+
+func normalizeIntegrationProviderCatalog(raw interface{}) map[string]map[string]string {
+	providers, ok := raw.(map[string]interface{})
+	if !ok {
+		return map[string]map[string]string{}
+	}
+	result := make(map[string]map[string]string, len(providers))
+	for name, value := range providers {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		config := make(map[string]string)
+		if source, ok := value.(map[string]interface{}); ok {
+			for _, key := range integrationProviderConfigKeys {
+				if field, ok := source[key].(string); ok {
+					config[key] = field
+				}
+			}
+		}
+		result[name] = config
+	}
+	return result
 }
 
 func normalizeIntegrationAssociatedPlugins(raw interface{}) []string {
@@ -12865,6 +12918,8 @@ func applyIntegrationStartupConfig(opts *integrationStartupOptions, values map[s
 			if value := strings.TrimSpace(fmt.Sprint(raw)); value != "" {
 				opts.Config.Site = value
 			}
+		case "provider":
+			opts.Config.Provider = normalizeIntegrationProviderCatalog(raw)
 		case "connect_timeout":
 			if err := assignIntegrationStartupConfigInt(raw, key, &opts.Config.ConnectTimeoutMs); err != nil {
 				return err
@@ -15128,6 +15183,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/upload", handleUpload(&cfg))
 	mux.HandleFunc("/api/config", handleSwarm(&cfg))
 	mux.HandleFunc("/api/token", handleToken())
+	mux.HandleFunc("/api/model_provider", handleModelProviderCatalog(&cfg))
 	mux.HandleFunc("/api/consume", handleConsume())
 	mux.HandleFunc("/api/message_insert/add", handleMessageInsertAdd())
 	mux.HandleFunc("/api/message_insert/del", handleMessageInsertDel())
