@@ -10506,6 +10506,204 @@ func TestApiSwarmAgentMethodNotAllowed(t *testing.T) {
 	}
 }
 
+func TestUpdateCronDetailOnlyUpdatesPendingDetail(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+	oldCronDB := cronDB
+	cronDB = db
+	defer func() { cronDB = oldCronDB }()
+	ensureCronSchema(db)
+	if err := writeTokenStore(db, map[string]string{"openai": "sk-test"}); err != nil {
+		t.Fatalf("write token store: %v", err)
+	}
+	metaRes, err := db.Exec(`INSERT INTO task_meta (cycle, raw_time, agent_id, model, thinking, verify, router_disable, cron, content, chat_id, task_type) VALUES (0, '2026-07-17 11:01', 'alpha', 'openai', 0, 0, 1, '', 'original', 'chat-1', 'cron')`)
+	if err != nil {
+		t.Fatalf("insert meta: %v", err)
+	}
+	metaID, _ := metaRes.LastInsertId()
+	detailRes, err := db.Exec(`INSERT INTO task_detail (meta_id, exec_time, agent_id, chat_id, task_type, model, thinking, verify, router_disable, content, started) VALUES (?, ?, 'alpha', 'chat-1', 'cron', 'openai', 0, 0, 1, 'original', 0)`, metaID, time.Date(2026, 7, 17, 11, 1, 0, 0, time.Local).Unix())
+	if err != nil {
+		t.Fatalf("insert detail: %v", err)
+	}
+	detailID, _ := detailRes.LastInsertId()
+
+	futureExecTime := time.Now().Add(2 * time.Hour).In(time.Local).Truncate(time.Minute)
+	updated, err := updateCronDetail("alpha", cronDetailUpdateRequest{
+		DetailID:      int(detailID),
+		AgentID:       "beta",
+		ExecTime:      futureExecTime.Format("2006-01-02 15:04"),
+		Content:       "updated memo",
+		Model:         "openai",
+		Thinking:      true,
+		Verify:        true,
+		RouterDisable: false,
+	})
+	if err != nil {
+		t.Fatalf("update pending detail: %v", err)
+	}
+	if updated.ID != int(detailID) || updated.AgentID != "beta" || updated.Content != "updated memo" || !updated.Thinking || !updated.Verify || updated.RouterDisable || updated.Started != 0 {
+		t.Fatalf("updated detail = %+v", updated)
+	}
+	var content string
+	var execTime int64
+	var thinking, verify, routerDisable, started int
+	var detailAgentID string
+	if err := db.QueryRow(`SELECT content, exec_time, agent_id, thinking, verify, router_disable, started FROM task_detail WHERE id = ?`, detailID).Scan(&content, &execTime, &detailAgentID, &thinking, &verify, &routerDisable, &started); err != nil {
+		t.Fatalf("query updated detail: %v", err)
+	}
+	if content != "updated memo" || execTime != futureExecTime.Unix() || detailAgentID != "beta" || thinking != 1 || verify != 1 || routerDisable != 0 || started != 0 {
+		t.Fatalf("stored detail = content=%q time=%d agent=%q thinking=%d verify=%d router=%d started=%d", content, execTime, detailAgentID, thinking, verify, routerDisable, started)
+	}
+	var updateLogs int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM cron_detail_log WHERE detail_id = ? AND action = 'update'`, detailID).Scan(&updateLogs); err != nil {
+		t.Fatalf("count update logs: %v", err)
+	}
+	if updateLogs != 1 {
+		t.Fatalf("update logs = %d, want 1", updateLogs)
+	}
+	if _, err := updateCronDetail("beta", cronDetailUpdateRequest{
+		DetailID: int(detailID), ExecTime: time.Now().Add(-time.Minute).Format("2006-01-02 15:04"), Content: "must not persist", Model: "openai", RouterDisable: true,
+	}); err == nil || !strings.Contains(err.Error(), "需要晚于当前时间") {
+		t.Fatalf("past execTime error = %v, want current-time rejection", err)
+	}
+	if err := db.QueryRow("SELECT content, exec_time FROM task_detail WHERE id = ?", detailID).Scan(&content, &execTime); err != nil {
+		t.Fatalf("query detail after past-time rejection: %v", err)
+	}
+	if content != "updated memo" || execTime != futureExecTime.Unix() {
+		t.Fatalf("past-time rejection changed detail: content=%q time=%d", content, execTime)
+	}
+
+	if _, err := db.Exec(`UPDATE task_detail SET started = 1 WHERE id = ?`, detailID); err != nil {
+		t.Fatalf("start detail: %v", err)
+	}
+	if _, err := updateCronDetail("beta", cronDetailUpdateRequest{
+		DetailID: int(detailID), ExecTime: time.Now().Add(3 * time.Hour).Format("2006-01-02 15:04"), Content: "must not persist", Model: "openai", RouterDisable: true,
+	}); err == nil || !strings.Contains(err.Error(), "任务已启动") {
+		t.Fatalf("started detail error = %v, want started rejection", err)
+	}
+	if err := db.QueryRow(`SELECT content, started FROM task_detail WHERE id = ?`, detailID).Scan(&content, &started); err != nil {
+		t.Fatalf("query protected detail: %v", err)
+	}
+	if content != "updated memo" || started != 1 {
+		t.Fatalf("started detail changed: content=%q started=%d", content, started)
+	}
+	if _, err := updateCronDetail("beta", cronDetailUpdateRequest{
+		DetailID: int(detailID), ExecTime: "not-a-time", Content: "invalid", Model: "openai", RouterDisable: true,
+	}); err == nil {
+		t.Fatal("invalid execTime should fail")
+	}
+}
+
+func TestUpdateCronMetaRebuildsOnlyPendingDetails(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+	oldCronDB := cronDB
+	cronDB = db
+	defer func() { cronDB = oldCronDB }()
+	ensureCronSchema(db)
+	if err := writeTokenStore(db, map[string]string{"openai": "sk-test"}); err != nil {
+		t.Fatalf("write token store: %v", err)
+	}
+	initialTime := time.Now().Add(2 * time.Hour).In(time.Local).Truncate(time.Minute)
+	updatedTime := time.Now().Add(3 * time.Hour).In(time.Local).Truncate(time.Minute)
+	metaRes, err := db.Exec(`INSERT INTO task_meta (cycle, raw_time, agent_id, model, thinking, verify, router_disable, cron, content, chat_id, task_type)
+		VALUES (3, ?, 'alpha', 'openai', 0, 0, 1, ?, 'original', 'chat-1', 'cron')`, initialTime.Format("2006-01-02 15:04"), cronBuildExpr(3, initialTime))
+	if err != nil {
+		t.Fatalf("insert meta: %v", err)
+	}
+	metaID, _ := metaRes.LastInsertId()
+	insertDetail := func(started int, content string, offset time.Duration) int64 {
+		res, err := db.Exec(`INSERT INTO task_detail (meta_id, exec_time, agent_id, chat_id, task_type, model, thinking, verify, router_disable, content, started)
+			VALUES (?, ?, 'alpha', 'chat-1', 'cron', 'openai', 0, 0, 1, ?, ?)`, metaID, initialTime.Add(offset).Unix(), content, started)
+		if err != nil {
+			t.Fatalf("insert detail started=%d: %v", started, err)
+		}
+		id, _ := res.LastInsertId()
+		return id
+	}
+	pendingID := insertDetail(0, "pending-old", 0)
+	runningID := insertDetail(1, "running-old", updatedTime.Sub(initialTime))
+	skippedID := insertDetail(2, "skipped-old", 2*time.Minute)
+	completedID := insertDetail(3, "completed-old", 3*time.Minute)
+
+	updated, err := updateCronMeta("alpha", cronMetaUpdateRequest{
+		MetaID:        int(metaID),
+		AgentID:       "beta",
+		RawTime:       updatedTime.Format("2006-01-02 15:04"),
+		Cycle:         2,
+		Content:       "updated metadata",
+		Model:         "openai",
+		Thinking:      true,
+		Verify:        true,
+		RouterDisable: false,
+	})
+	if err != nil {
+		t.Fatalf("update metadata: %v", err)
+	}
+	if updated.ID != int(metaID) || updated.AgentID != "beta" || updated.Cycle != 2 || updated.RawTime != updatedTime.Format("2006-01-02 15:04") || updated.Content != "updated metadata" || !updated.Thinking || !updated.Verify || updated.RouterDisable {
+		t.Fatalf("updated metadata = %+v", updated)
+	}
+	var count int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM task_detail WHERE id = ?`, pendingID).Scan(&count); err != nil {
+		t.Fatalf("query deleted pending detail: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("pending detail %d was not deleted", pendingID)
+	}
+	for _, detailID := range []int64{runningID, skippedID, completedID} {
+		var started int
+		var content string
+		if err := db.QueryRow(`SELECT started, content FROM task_detail WHERE id = ?`, detailID).Scan(&started, &content); err != nil {
+			t.Fatalf("query preserved detail %d: %v", detailID, err)
+		}
+		if started == 0 || !strings.HasSuffix(content, "-old") {
+			t.Fatalf("preserved detail %d = started=%d content=%q", detailID, started, content)
+		}
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM task_detail WHERE meta_id = ? AND started = 0`, metaID).Scan(&count); err != nil {
+		t.Fatalf("count rebuilt pending details: %v", err)
+	}
+	if count != 5 {
+		t.Fatalf("rebuilt pending details = %d, want 5 after changing to daily with one preserved running-detail time slot", count)
+	}
+	var rebuiltContent, rebuiltModel, rebuiltAgentID string
+	var rebuiltThinking, rebuiltVerify, rebuiltRouterDisable int
+	if err := db.QueryRow(`SELECT content, model, agent_id, thinking, verify, router_disable FROM task_detail WHERE meta_id = ? AND started = 0 ORDER BY exec_time LIMIT 1`, metaID).Scan(&rebuiltContent, &rebuiltModel, &rebuiltAgentID, &rebuiltThinking, &rebuiltVerify, &rebuiltRouterDisable); err != nil {
+		t.Fatalf("load rebuilt detail: %v", err)
+	}
+	if rebuiltContent != "updated metadata" || rebuiltModel != "openai" || rebuiltAgentID != "beta" || rebuiltThinking != 1 || rebuiltVerify != 1 || rebuiltRouterDisable != 0 {
+		t.Fatalf("rebuilt detail = content=%q model=%q agent=%q thinking=%d verify=%d router=%d", rebuiltContent, rebuiltModel, rebuiltAgentID, rebuiltThinking, rebuiltVerify, rebuiltRouterDisable)
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM cron_meta_log WHERE meta_id = ? AND action = 'update'`, metaID).Scan(&count); err != nil {
+		t.Fatalf("count update meta logs: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("update meta logs = %d, want 1", count)
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM cron_detail_log WHERE meta_id = ? AND action = 'delete'`, metaID).Scan(&count); err != nil {
+		t.Fatalf("count deleted detail logs: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("deleted detail logs = %d, want 1", count)
+	}
+	if _, err := updateCronMeta("beta", cronMetaUpdateRequest{
+		MetaID: int(metaID), RawTime: time.Now().Add(-time.Minute).Format("2006-01-02 15:04"), Cycle: 2, Content: "invalid time", Model: "openai",
+	}); err == nil || !strings.Contains(err.Error(), "需要晚于当前时间") {
+		t.Fatalf("past rawTime error = %v, want current-time rejection", err)
+	}
+	if _, err := updateCronMeta("beta", cronMetaUpdateRequest{
+		MetaID: int(metaID), RawTime: updatedTime.Format("2006-01-02 15:04"), Cycle: 0, Content: "must remain recurring", Model: "openai",
+	}); err == nil || !strings.Contains(err.Error(), "metadata cycle") {
+		t.Fatalf("one-time metadata cycle error = %v, want recurring-cycle rejection", err)
+	}
+}
+
 func TestHandleCronPersistsReuseChatIDToDetails(t *testing.T) {
 	oldwd, err := os.Getwd()
 	if err != nil {

@@ -8081,6 +8081,7 @@ type cronMetaFilter struct {
 }
 
 type cronDetailFilter struct {
+	DetailID *int
 	MetaID   *int
 	AgentID  string
 	ChatID   string
@@ -9146,6 +9147,10 @@ func queryCronDetails(db *sql.DB, filter cronDetailFilter) ([]cronDetailResult, 
 		LEFT JOIN task_meta m ON m.id = d.meta_id
 		WHERE 1=1`, cronVerifySelectExpr(db, "task_detail", "d.verify"), cronRouterDisableSelectExpr(db, "task_detail", "d.router_disable"), selectResponseSchema, selectResultContent, selectRepliedAt)
 	args := make([]interface{}, 0, 12)
+	if filter.DetailID != nil {
+		query += ` AND d.id = ?`
+		args = append(args, *filter.DetailID)
+	}
 	if filter.MetaID != nil {
 		query += ` AND d.meta_id = ?`
 		args = append(args, *filter.MetaID)
@@ -9727,6 +9732,507 @@ func handleCronDetailList() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{"status": 0, "data": details})
 	}
+}
+
+type cronDetailUpdateRequest struct {
+	DetailID      int    `json:"detailId"`
+	AgentID       string `json:"agentId"`
+	ExecTime      string `json:"execTime"`
+	Content       string `json:"content"`
+	Model         string `json:"model"`
+	Thinking      bool   `json:"thinking"`
+	Verify        bool   `json:"verify"`
+	RouterDisable bool   `json:"router_disable"`
+}
+
+func (r *cronDetailUpdateRequest) UnmarshalJSON(data []byte) error {
+	type rawCronDetailUpdateRequest struct {
+		DetailID      int    `json:"detailId"`
+		AgentID       string `json:"agentId"`
+		ExecTime      string `json:"execTime"`
+		Content       string `json:"content"`
+		Model         string `json:"model"`
+		Thinking      bool   `json:"thinking"`
+		Verify        bool   `json:"verify"`
+		RouterDisable *bool  `json:"router_disable"`
+	}
+	var raw rawCronDetailUpdateRequest
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	r.DetailID = raw.DetailID
+	r.AgentID = raw.AgentID
+	r.ExecTime = raw.ExecTime
+	r.Content = raw.Content
+	r.Model = raw.Model
+	r.Thinking = raw.Thinking
+	r.Verify = raw.Verify
+	r.RouterDisable = true
+	if raw.RouterDisable != nil {
+		r.RouterDisable = *raw.RouterDisable
+	}
+	return nil
+}
+
+// handleCronDetailUpdate updates one pending cron detail. The started = 0
+// predicate is deliberately part of the UPDATE, so a task that begins while
+// its editor is open cannot be overwritten by a stale browser view.
+func handleCronDetailUpdate(cfg *Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		agentID := strings.TrimSpace(r.URL.Query().Get("agentId"))
+		if agentID == "" {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "agentId is required"})
+			return
+		}
+		var req cronDetailUpdateRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "invalid request: " + err.Error()})
+			return
+		}
+		if err := validateIntegrationAgentExists(cfg.AgentDir, cfg.effectiveDeviceID(), agentID); err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": err.Error()})
+			return
+		}
+		targetAgentID := strings.TrimSpace(req.AgentID)
+		if targetAgentID == "" {
+			targetAgentID = agentID
+		}
+		if err := validateIntegrationAgentExists(cfg.AgentDir, cfg.effectiveDeviceID(), targetAgentID); err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": err.Error()})
+			return
+		}
+		req.AgentID = targetAgentID
+		if err := validateIntegrationRegisteredModel(req.Model); err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": err.Error()})
+			return
+		}
+		detail, err := updateCronDetail(agentID, req)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": err.Error()})
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{"status": 0, "data": detail})
+	}
+}
+
+type cronMetaUpdateRequest struct {
+	MetaID        int    `json:"metaId"`
+	AgentID       string `json:"agentId"`
+	RawTime       string `json:"rawTime"`
+	Cycle         int    `json:"cycle"`
+	Content       string `json:"content"`
+	Model         string `json:"model"`
+	Thinking      bool   `json:"thinking"`
+	Verify        bool   `json:"verify"`
+	RouterDisable bool   `json:"router_disable"`
+}
+
+func (r *cronMetaUpdateRequest) UnmarshalJSON(data []byte) error {
+	type rawCronMetaUpdateRequest struct {
+		MetaID        int    `json:"metaId"`
+		AgentID       string `json:"agentId"`
+		RawTime       string `json:"rawTime"`
+		Cycle         int    `json:"cycle"`
+		Content       string `json:"content"`
+		Model         string `json:"model"`
+		Thinking      bool   `json:"thinking"`
+		Verify        bool   `json:"verify"`
+		RouterDisable *bool  `json:"router_disable"`
+	}
+	var raw rawCronMetaUpdateRequest
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	r.MetaID = raw.MetaID
+	r.AgentID = raw.AgentID
+	r.RawTime = raw.RawTime
+	r.Cycle = raw.Cycle
+	r.Content = raw.Content
+	r.Model = raw.Model
+	r.Thinking = raw.Thinking
+	r.Verify = raw.Verify
+	r.RouterDisable = true
+	if raw.RouterDisable != nil {
+		r.RouterDisable = *raw.RouterDisable
+	}
+	return nil
+}
+
+func handleCronMetaUpdate(cfg *Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		agentID := strings.TrimSpace(r.URL.Query().Get("agentId"))
+		if agentID == "" {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "agentId is required"})
+			return
+		}
+		var req cronMetaUpdateRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "invalid request: " + err.Error()})
+			return
+		}
+		if err := validateIntegrationAgentExists(cfg.AgentDir, cfg.effectiveDeviceID(), agentID); err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": err.Error()})
+			return
+		}
+		targetAgentID := strings.TrimSpace(req.AgentID)
+		if targetAgentID == "" {
+			targetAgentID = agentID
+		}
+		if err := validateIntegrationAgentExists(cfg.AgentDir, cfg.effectiveDeviceID(), targetAgentID); err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": err.Error()})
+			return
+		}
+		req.AgentID = targetAgentID
+		detail, err := updateCronMeta(agentID, req)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": err.Error()})
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{"status": 0, "data": detail})
+	}
+}
+
+func loadCronMetaForUpdate(tx *sql.Tx, metaID int, agentID string) (cronMetaResult, error) {
+	var result cronMetaResult
+	var thinking, verify, routerDisable int
+	err := tx.QueryRow(`SELECT id, cycle, raw_time, agent_id, model, thinking, verify, router_disable, cron, content, response_schema, chat_id, task_type
+		FROM task_meta WHERE id = ? AND agent_id = ?`, metaID, agentID).Scan(
+		&result.ID, &result.Cycle, &result.RawTime, &result.AgentID, &result.Model, &thinking, &verify, &routerDisable,
+		&result.Cron, &result.Content, &result.ResponseSchema, &result.ChatID, &result.Type,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return cronMetaResult{}, fmt.Errorf("task metadata not found")
+	}
+	if err != nil {
+		return cronMetaResult{}, err
+	}
+	result.Thinking = thinking != 0
+	result.Verify = verify != 0
+	result.RouterDisable = routerDisable != 0
+	result.Type = sharedutil.NormalizeTaskType(result.Type)
+	return result, nil
+}
+
+func cronDetailTimesForMeta(cycle int, rawTime string) ([]time.Time, error) {
+	if cycle == -1 {
+		return nil, nil
+	}
+	start, err := time.ParseInLocation("2006-01-02 15:04", rawTime, time.Local)
+	if err != nil {
+		return nil, fmt.Errorf("invalid rawTime: %w", err)
+	}
+	switch cycle {
+	case 0:
+		return []time.Time{start}, nil
+	case 1, 2:
+		times := []time.Time{start}
+		end := start.Add(5 * 24 * time.Hour)
+		for day := start.AddDate(0, 0, 1); !day.After(end); day = day.AddDate(0, 0, 1) {
+			if cycle == 2 || (day.Weekday() >= time.Monday && day.Weekday() <= time.Friday) {
+				times = append(times, day)
+			}
+		}
+		return times, nil
+	case 3, 4, 5:
+		interval := cronCycleInterval(cycle)
+		times := make([]time.Time, 0, 5*24+1)
+		end := start.Add(5 * 24 * time.Hour)
+		for tick := start; !tick.After(end); tick = tick.Add(interval) {
+			times = append(times, tick)
+		}
+		return times, nil
+	default:
+		return nil, fmt.Errorf("cycle must be one of -1,0,1,2,3,4,5")
+	}
+}
+
+func loadPendingCronDetailLogs(tx *sql.Tx, metaID int) ([]cronDetailLogEntry, error) {
+	rows, err := tx.Query(`SELECT id, meta_id, exec_time, agent_id, chat_id, task_type, model, thinking, verify, router_disable, content, response_schema, started
+		FROM task_detail WHERE meta_id = ? AND started = 0 ORDER BY id`, metaID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	entries := make([]cronDetailLogEntry, 0)
+	for rows.Next() {
+		var entry cronDetailLogEntry
+		var thinking, verify, routerDisable int
+		if err := rows.Scan(&entry.DetailID, &entry.MetaID, &entry.ExecTime, &entry.AgentID, &entry.ChatID, &entry.TaskType, &entry.Model, &thinking, &verify, &routerDisable, &entry.Content, &entry.ResponseSchema, &entry.Started); err != nil {
+			return nil, err
+		}
+		entry.Thinking = thinking != 0
+		entry.Verify = verify != 0
+		entry.RouterDisable = routerDisable != 0
+		entry.TaskType = sharedutil.NormalizeTaskType(entry.TaskType)
+		entry.Action = "delete"
+		entry.OccurredAt = cronLogTimestamp()
+		entries = append(entries, entry)
+	}
+	return entries, rows.Err()
+}
+
+func rebuildPendingCronDetails(tx *sql.Tx, meta cronMetaResult) ([]cronDetailLogEntry, error) {
+	times, err := cronDetailTimesForMeta(meta.Cycle, meta.RawTime)
+	if err != nil {
+		return nil, err
+	}
+	entries := make([]cronDetailLogEntry, 0, len(times))
+	for _, execAt := range times {
+		res, err := tx.Exec(`INSERT OR IGNORE INTO task_detail (meta_id, exec_time, agent_id, chat_id, task_type, model, thinking, verify, router_disable, content, response_schema, started)
+			VALUES (?,?,?,?,?,?,?,?,?,?,?,0)`,
+			meta.ID, execAt.Unix(), meta.AgentID, meta.ChatID, meta.Type, meta.Model, boolToInt(meta.Thinking), boolToInt(meta.Verify), boolToInt(meta.RouterDisable), meta.Content, meta.ResponseSchema)
+		if err != nil {
+			return nil, err
+		}
+		if affected, _ := res.RowsAffected(); affected != 1 {
+			continue
+		}
+		detailID, err := res.LastInsertId()
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, cronDetailLogEntry{
+			DetailID:       int(detailID),
+			MetaID:         meta.ID,
+			AgentID:        meta.AgentID,
+			ChatID:         meta.ChatID,
+			TaskType:       meta.Type,
+			Action:         "insert",
+			ExecTime:       execAt.Unix(),
+			Model:          meta.Model,
+			Thinking:       meta.Thinking,
+			Verify:         meta.Verify,
+			RouterDisable:  meta.RouterDisable,
+			Content:        meta.Content,
+			ResponseSchema: meta.ResponseSchema,
+			Started:        0,
+			OccurredAt:     cronLogTimestamp(),
+		})
+	}
+	return entries, nil
+}
+
+func updateCronMeta(agentID string, req cronMetaUpdateRequest) (cronMetaResult, error) {
+	var empty cronMetaResult
+	if req.MetaID <= 0 {
+		return empty, fmt.Errorf("metaId is required")
+	}
+	agentID = strings.TrimSpace(agentID)
+	req.AgentID = strings.TrimSpace(req.AgentID)
+	if req.AgentID == "" {
+		req.AgentID = agentID
+	}
+	req.Content = strings.TrimSpace(req.Content)
+	req.Model = strings.TrimSpace(req.Model)
+	req.RawTime = strings.TrimSpace(req.RawTime)
+	if req.Content == "" {
+		return empty, fmt.Errorf("content is required")
+	}
+	if utf8.RuneCountInString(req.Content) > 5000 {
+		return empty, fmt.Errorf("content exceeds 5000 characters")
+	}
+	if req.Model == "" {
+		return empty, fmt.Errorf("model is required")
+	}
+	if req.Cycle < -1 || req.Cycle > 5 || req.Cycle == 0 {
+		return empty, fmt.Errorf("metadata cycle must be one of -1,1,2,3,4,5")
+	}
+	if !req.Thinking {
+		req.Verify = false
+	}
+	if err := validateIntegrationRegisteredModel(req.Model); err != nil {
+		return empty, err
+	}
+	if cronDB == nil {
+		return empty, fmt.Errorf("db not ready")
+	}
+	ensureCronSchema(cronDB)
+	tx, err := cronDB.Begin()
+	if err != nil {
+		return empty, err
+	}
+	defer tx.Rollback()
+	current, err := loadCronMetaForUpdate(tx, req.MetaID, agentID)
+	if err != nil {
+		return empty, err
+	}
+	rawTime := req.RawTime
+	cronExpr := current.Cron
+	if req.Cycle == -1 {
+		if strings.TrimSpace(cronExpr) == "" {
+			return empty, fmt.Errorf("custom cron expression is missing")
+		}
+		rawTime = current.RawTime
+	} else {
+		execAt, err := time.ParseInLocation("2006-01-02 15:04", rawTime, time.Local)
+		if err != nil {
+			return empty, fmt.Errorf("invalid rawTime: %w", err)
+		}
+		if !execAt.After(time.Now()) {
+			return empty, fmt.Errorf("执行时间需要晚于当前时间")
+		}
+		cronExpr = cronBuildExpr(req.Cycle, execAt)
+	}
+	deletedEntries, err := loadPendingCronDetailLogs(tx, current.ID)
+	if err != nil {
+		return empty, fmt.Errorf("load pending details: %w", err)
+	}
+	if _, err := tx.Exec(`UPDATE task_meta SET agent_id = ?, cycle = ?, raw_time = ?, model = ?, thinking = ?, verify = ?, router_disable = ?, cron = ?, content = ?
+		WHERE id = ? AND agent_id = ?`,
+		req.AgentID, req.Cycle, rawTime, req.Model, boolToInt(req.Thinking), boolToInt(req.Verify), boolToInt(req.RouterDisable), cronExpr, req.Content, current.ID, agentID); err != nil {
+		return empty, fmt.Errorf("update metadata: %w", err)
+	}
+	if _, err := tx.Exec(`DELETE FROM task_detail WHERE meta_id = ? AND started = 0`, current.ID); err != nil {
+		return empty, fmt.Errorf("delete pending details: %w", err)
+	}
+	updated := current
+	updated.AgentID = req.AgentID
+	updated.Cycle = req.Cycle
+	updated.RawTime = rawTime
+	updated.Model = req.Model
+	updated.Thinking = req.Thinking
+	updated.Verify = req.Verify
+	updated.RouterDisable = req.RouterDisable
+	updated.Cron = cronExpr
+	updated.Content = req.Content
+	createdEntries, err := rebuildPendingCronDetails(tx, updated)
+	if err != nil {
+		return empty, fmt.Errorf("rebuild pending details: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return empty, err
+	}
+	appendCronMetaLog(cronDB, cronMetaLogEntry{
+		MetaID:         updated.ID,
+		AgentID:        updated.AgentID,
+		ChatID:         updated.ChatID,
+		TaskType:       updated.Type,
+		Action:         "update",
+		Cycle:          updated.Cycle,
+		RawTime:        updated.RawTime,
+		Model:          updated.Model,
+		Thinking:       updated.Thinking,
+		Verify:         updated.Verify,
+		RouterDisable:  updated.RouterDisable,
+		Cron:           updated.Cron,
+		Content:        updated.Content,
+		ResponseSchema: updated.ResponseSchema,
+		CreatedAt:      cronLogTimestamp(),
+	})
+	for _, entry := range deletedEntries {
+		appendCronDetailLog(cronDB, entry)
+	}
+	for _, entry := range createdEntries {
+		appendCronDetailLog(cronDB, entry)
+	}
+	return updated, nil
+}
+
+func updateCronDetail(agentID string, req cronDetailUpdateRequest) (cronDetailResult, error) {
+	var empty cronDetailResult
+	if req.DetailID <= 0 {
+		return empty, fmt.Errorf("detailId is required")
+	}
+	agentID = strings.TrimSpace(agentID)
+	req.AgentID = strings.TrimSpace(req.AgentID)
+	if req.AgentID == "" {
+		req.AgentID = agentID
+	}
+	req.Content = strings.TrimSpace(req.Content)
+	req.Model = strings.TrimSpace(req.Model)
+	req.ExecTime = strings.TrimSpace(req.ExecTime)
+	if req.Content == "" {
+		return empty, fmt.Errorf("content is required")
+	}
+	if req.Model == "" {
+		return empty, fmt.Errorf("model is required")
+	}
+	if utf8.RuneCountInString(req.Content) > 5000 {
+		return empty, fmt.Errorf("content exceeds 5000 characters")
+	}
+	execAt, err := time.ParseInLocation("2006-01-02 15:04", req.ExecTime, time.Local)
+	if err != nil {
+		return empty, fmt.Errorf("invalid execTime: %w", err)
+	}
+	if !execAt.After(time.Now()) {
+		return empty, fmt.Errorf("执行时间需要晚于当前时间")
+	}
+	if !req.Thinking {
+		req.Verify = false
+	}
+	if err := validateIntegrationRegisteredModel(req.Model); err != nil {
+		return empty, err
+	}
+	if cronDB == nil {
+		return empty, fmt.Errorf("db not ready")
+	}
+	ensureCronSchema(cronDB)
+	res, err := cronDB.Exec(`UPDATE task_detail
+		SET agent_id = ?, exec_time = ?, content = ?, model = ?, thinking = ?, verify = ?, router_disable = ?
+		WHERE id = ? AND agent_id = ? AND started = 0`,
+		req.AgentID, execAt.Unix(), req.Content, req.Model, boolToInt(req.Thinking), boolToInt(req.Verify), boolToInt(req.RouterDisable), req.DetailID, agentID)
+	if err != nil {
+		return empty, fmt.Errorf("update error: %w", err)
+	}
+	if affected, _ := res.RowsAffected(); affected != 1 {
+		var started int
+		err := cronDB.QueryRow(`SELECT started FROM task_detail WHERE id = ? AND agent_id = ?`, req.DetailID, agentID).Scan(&started)
+		if errors.Is(err, sql.ErrNoRows) {
+			return empty, fmt.Errorf("task detail not found")
+		}
+		if err != nil {
+			return empty, fmt.Errorf("query detail state: %w", err)
+		}
+		return empty, fmt.Errorf("保存失败：任务已启动，无法修改")
+	}
+	detailID := req.DetailID
+	details, err := queryCronDetails(cronDB, cronDetailFilter{DetailID: &detailID, AgentID: req.AgentID})
+	if err != nil {
+		return empty, fmt.Errorf("load updated detail: %w", err)
+	}
+	if len(details) != 1 {
+		return empty, fmt.Errorf("updated detail not found")
+	}
+	detail := details[0]
+	appendCronDetailLog(cronDB, cronDetailLogEntry{
+		DetailID:       detail.ID,
+		MetaID:         detail.MetaID,
+		AgentID:        detail.AgentID,
+		ChatID:         detail.ChatID,
+		TaskType:       detail.Type,
+		Action:         "update",
+		ExecTime:       detail.ExecTime,
+		Model:          detail.Model,
+		Thinking:       detail.Thinking,
+		Verify:         detail.Verify,
+		RouterDisable:  detail.RouterDisable,
+		Content:        detail.Content,
+		ResponseSchema: detail.ResponseSchema,
+		Started:        detail.Started,
+		OccurredAt:     cronLogTimestamp(),
+	})
+	return detail, nil
 }
 
 func handleCronDetailStatus() http.HandlerFunc {
@@ -15204,6 +15710,8 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/cron/delete", handleCronDelete())
 	mux.HandleFunc("/api/cron/detail/delete", handleCronDetailDelete())
 	mux.HandleFunc("/api/cron/detail/list", handleCronDetailList())
+	mux.HandleFunc("/api/cron/detail/update", handleCronDetailUpdate(&cfg))
+	mux.HandleFunc("/api/cron/meta/update", handleCronMetaUpdate(&cfg))
 	mux.HandleFunc("/api/cron/detail/status", handleCronDetailStatus())
 	mux.HandleFunc("/api/cancel", handleCancel(&cfg))
 	mux.HandleFunc("/api/restore", handleRestore())

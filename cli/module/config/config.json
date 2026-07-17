@@ -61,11 +61,11 @@
       "__model": "gemini-3.5-flash"
     },
     "anthropic": {
-      "__url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
-      "__model_multi_input": "claude-opus-4-6",
-      "__model_thinking": "claude-opus-4-6",
+      "__url": "https://api.anthropic.com/v1/messages",
+      "__model_multi_input": "claude-sonnet-5",
+      "__model_thinking": "claude-sonnet-5",
       "__model_fast": "claude-haiku-4-5-20251001",
-      "__model": "claude-opus-4-6"
+      "__model": "claude-sonnet-5"
     },
     "kimi": {
       "__url": "https://api.moonshot.cn/v1/chat/completions",

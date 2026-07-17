@@ -250,6 +250,7 @@ a{color:var(--accent);text-decoration:none}
 @media (max-width:720px){.heartbeat-alert-overlay{padding:18px}.heartbeat-alert-panel{padding:28px 20px;border-radius:22px}.heartbeat-alert-badge{font-size:11px;letter-spacing:.28em}}
 .log-cleanup-lock{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;background:linear-gradient(180deg,rgba(252,242,234,.68),rgba(244,224,210,.84));backdrop-filter:blur(18px) saturate(155%);-webkit-backdrop-filter:blur(18px) saturate(155%);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .22s ease,visibility 0s linear .22s}
 .log-cleanup-lock.show{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .22s ease}
+#rsSaveLock{z-index:calc(var(--overlay-z-right) + 80) !important}
 .log-cleanup-lock::before{content:"";position:absolute;inset:-20%;background:radial-gradient(circle at 18% 18%,rgba(var(--accent-rgb),.24),transparent 40%),radial-gradient(circle at 82% 16%,rgba(var(--accent-soft-rgb),.22),transparent 38%),radial-gradient(circle at 50% 84%,rgba(var(--accent-rgb),.18),transparent 44%);opacity:.95;animation:pluginModalLockGlow 2.4s ease-in-out infinite}
 .log-cleanup-lock-card{position:relative;z-index:1;width:min(360px,calc(100vw - 40px));padding:24px 22px 20px;border-radius:24px;border:1px solid color-mix(in srgb,var(--border) 70%,var(--accent) 30%);background:linear-gradient(180deg,rgba(255,252,248,.9),rgba(251,235,223,.84));box-shadow:0 28px 72px rgba(91,34,29,.14);display:flex;flex-direction:column;align-items:center;text-align:center}
 .log-cleanup-lock-title{margin-top:14px;font-size:19px;font-weight:700;color:var(--text-primary);letter-spacing:.04em}
@@ -1157,6 +1158,36 @@ animation:queuedInsertExplosion .62s ease-out both}
 [data-theme="dark"] .assistant-explosion-beacon__item-body blockquote,[data-theme="dark"] .assistant-explosion-beacon__item-body details{background:rgba(255,255,255,.06);color:#bacef8;border-left-color:rgba(118,170,255,.38)}
 [data-theme="dark"] .assistant-explosion-beacon__item-body th{background:rgba(255,255,255,.08)}
 [data-theme="dark"] .assistant-explosion-beacon__item-body th,[data-theme="dark"] .assistant-explosion-beacon__item-body td{border-color:rgba(138,180,255,.16)}
+.assistant-explosion-beacon__bulb{background:radial-gradient(circle at 32% 30%,var(--glass-highlight),rgb(var(--accent-soft-rgb)) 34%,rgb(var(--accent-rgb)) 64%,color-mix(in srgb,rgb(var(--accent-rgb)) 62%,#071322) 100%);box-shadow:0 0 0 1px rgba(var(--accent-rgb),.38),0 0 14px rgba(var(--accent-rgb),.4),0 0 24px rgba(var(--accent-soft-rgb),.18),inset 0 1px 0 var(--glass-highlight)}
+.assistant-explosion-beacon__bulb::before{background:radial-gradient(circle,rgba(var(--accent-soft-rgb),.56),rgba(var(--accent-rgb),.16) 54%,rgba(var(--accent-rgb),0) 74%)}
+.assistant-explosion-beacon__bulb::after{border-color:rgba(var(--accent-soft-rgb),.72)}
+.assistant-explosion-beacon__bulb svg{color:var(--glass-highlight);filter:drop-shadow(0 0 5px rgba(var(--accent-soft-rgb),.88))}
+.assistant-explosion-beacon__count{background:color-mix(in srgb,var(--bg-main) 86%,var(--accent) 14%);border-color:rgba(var(--accent-soft-rgb),.42);color:var(--glass-highlight)}
+.assistant-explosion-floating-popover{background:linear-gradient(180deg,var(--modal-panel-bg-strong),var(--modal-panel-bg));border-color:var(--modal-panel-border);box-shadow:0 24px 56px rgba(var(--accent-rgb),.16),inset 0 1px 0 var(--glass-highlight)}
+.assistant-explosion-floating-popover::before{background:linear-gradient(180deg,var(--glass-highlight),rgba(255,255,255,0))}
+.assistant-explosion-beacon__item{background:linear-gradient(180deg,var(--modal-field-bg),var(--modal-field-bg-muted));border-color:var(--modal-field-border);box-shadow:0 10px 24px rgba(var(--accent-rgb),.1),inset 0 1px 0 var(--glass-highlight)}
+.assistant-explosion-beacon__item-label{color:rgb(var(--accent-rgb))}
+.assistant-explosion-beacon__item-time{color:var(--text-muted)}
+.assistant-explosion-beacon__item-body{color:var(--text-primary)}
+.assistant-explosion-beacon__item-body pre{background:color-mix(in srgb,var(--bg-main) 84%,rgb(var(--accent-rgb)) 16%);border-color:rgba(var(--accent-soft-rgb),.2);color:var(--glass-highlight)}
+.assistant-explosion-beacon__item-body code{background:rgba(var(--accent-rgb),.14)}
+.assistant-explosion-beacon__item-body blockquote,.assistant-explosion-beacon__item-body details{background:rgba(var(--accent-rgb),.08);border-left-color:rgba(var(--accent-soft-rgb),.42);color:var(--text-secondary)}
+.assistant-explosion-beacon__item-body th{background:rgba(var(--accent-rgb),.1)}
+.assistant-explosion-beacon__item-body th,.assistant-explosion-beacon__item-body td{border-color:rgba(var(--accent-rgb),.18)}
+.assistant-thinking-overlay{padding:20px;background:color-mix(in srgb,var(--bg-main) 34%,transparent);backdrop-filter:blur(12px) saturate(135%);-webkit-backdrop-filter:blur(12px) saturate(135%)}
+.assistant-thinking-panel{position:relative;width:min(680px,calc(100vw - 40px));max-height:min(76vh,720px);display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--modal-panel-border);border-radius:24px;background:linear-gradient(180deg,var(--modal-panel-bg-strong),var(--modal-panel-bg));box-shadow:0 28px 68px rgba(var(--accent-rgb),.2),inset 0 1px 0 var(--glass-highlight);transform:translateY(12px) scale(.97);transition:transform .24s cubic-bezier(.22,1,.36,1)}
+.overlay.show .assistant-thinking-panel{transform:translateY(0) scale(1)}
+.assistant-thinking-panel__head{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:18px 18px 14px;border-bottom:1px solid var(--modal-field-border)}
+.assistant-thinking-panel__title{min-width:0;margin:0;color:var(--text-primary);font-size:17px;line-height:1.3;font-weight:700;letter-spacing:.01em}
+.assistant-thinking-panel__close{width:28px;height:28px;flex:0 0 28px;padding:0;border:1px solid var(--modal-field-border);border-radius:999px;background:var(--modal-field-bg);color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .16s ease,color .16s ease,border-color .16s ease,background-color .16s ease}
+.assistant-thinking-panel__close svg{width:15px;height:15px;display:block;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round}
+.assistant-thinking-panel__close:hover,.assistant-thinking-panel__close:focus-visible{color:rgb(var(--accent-rgb));border-color:rgba(var(--accent-rgb),.42);background:rgba(var(--accent-rgb),.08);transform:translateY(-1px);outline:none}
+.assistant-thinking-panel__content{display:flex;flex-direction:column;gap:10px;min-height:0;max-height:min(62vh,580px);padding:16px 18px 18px;overflow-y:scroll;overscroll-behavior:contain;scrollbar-gutter:stable;scrollbar-color:rgba(var(--accent-rgb),.56) rgba(var(--accent-rgb),.12)}
+.assistant-thinking-panel__content::-webkit-scrollbar{width:10px}
+.assistant-thinking-panel__content::-webkit-scrollbar-track{background:rgba(var(--accent-rgb),.1);border-radius:999px}
+.assistant-thinking-panel__content::-webkit-scrollbar-thumb{background:rgba(var(--accent-rgb),.5);border:2px solid transparent;border-radius:999px;background-clip:padding-box}
+.assistant-thinking-panel__content::-webkit-scrollbar-thumb:hover{background-color:rgba(var(--accent-rgb),.72)}
+.assistant-thinking-panel__content .assistant-explosion-beacon__item{flex:0 0 auto}
 .message-footer{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:18px;padding:0 18px;box-sizing:border-box;pointer-events:none}
 .message-footer-process-slot{flex:1 1 auto;display:flex;align-items:center;min-width:0;box-sizing:border-box}
 .message.assistant.has-task-badges{padding-top:14px}
@@ -1190,14 +1221,15 @@ animation:queuedInsertExplosion .62s ease-out both}
 [data-theme="dark"] .message-task-badge{color:rgba(24,12,8,.84)}
 .message.error{background:linear-gradient(145deg,rgba(255,120,134,.18),rgba(255,255,255,.12));border:1px solid rgba(255,90,107,.38);color:var(--error)}
 .message-actions{position:static;display:flex;align-items:center;justify-content:flex-end;gap:6px;z-index:40;pointer-events:auto;max-width:100%;flex:0 0 auto}
-.message-copy-btn,.message-retry-btn,.message-edit-btn,.message-scroll-top-btn{width:15px;height:15px;padding:0;border:none;border-radius:999px;background:transparent;color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.55;transition:opacity .16s ease,transform .16s ease,color .16s ease,background-color .16s ease,box-shadow .16s ease;pointer-events:auto;appearance:none;-webkit-appearance:none;box-shadow:none}
+.message-copy-btn,.message-retry-btn,.message-edit-btn,.message-scroll-top-btn,.message-thinking-btn{width:15px;height:15px;padding:0;border:none;border-radius:999px;background:transparent;color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.55;transition:opacity .16s ease,transform .16s ease,color .16s ease,background-color .16s ease,box-shadow .16s ease;pointer-events:auto;appearance:none;-webkit-appearance:none;box-shadow:none}
 .message-scroll-top-btn{display:none}
 .message-scroll-top-btn.show{display:flex}
-.message-copy-btn:hover,.message-copy-btn:focus-visible,.message-retry-btn:hover,.message-retry-btn:focus-visible,.message-edit-btn:hover,.message-edit-btn:focus-visible,.message-scroll-top-btn:hover,.message-scroll-top-btn:focus-visible{opacity:1;transform:translateY(-1px);color:var(--text-primary);background:rgba(var(--accent-rgb),.08);box-shadow:0 0 0 1px rgba(var(--accent-rgb),.14);outline:none}
-.message-copy-btn svg,.message-retry-btn svg,.message-edit-btn svg,.message-scroll-top-btn svg{width:15px;height:15px;display:block;fill:currentColor}
+.message-copy-btn:hover,.message-copy-btn:focus-visible,.message-retry-btn:hover,.message-retry-btn:focus-visible,.message-edit-btn:hover,.message-edit-btn:focus-visible,.message-scroll-top-btn:hover,.message-scroll-top-btn:focus-visible,.message-thinking-btn:hover,.message-thinking-btn:focus-visible{opacity:1;transform:translateY(-1px);color:var(--text-primary);background:rgba(var(--accent-rgb),.08);box-shadow:0 0 0 1px rgba(var(--accent-rgb),.14);outline:none}
+.message-copy-btn svg,.message-retry-btn svg,.message-edit-btn svg,.message-scroll-top-btn svg,.message-thinking-btn svg{width:15px;height:15px;display:block;fill:currentColor}
 .message-scroll-top-btn svg{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.message-thinking-btn svg{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .message-retry-btn:disabled,.message-edit-btn:disabled,.message-scroll-top-btn:disabled{opacity:.22;cursor:not-allowed;pointer-events:none;transform:none}
-[data-theme="dark"] .message-copy-btn:hover,[data-theme="dark"] .message-copy-btn:focus-visible,[data-theme="dark"] .message-retry-btn:hover,[data-theme="dark"] .message-retry-btn:focus-visible,[data-theme="dark"] .message-edit-btn:hover,[data-theme="dark"] .message-edit-btn:focus-visible,[data-theme="dark"] .message-scroll-top-btn:hover,[data-theme="dark"] .message-scroll-top-btn:focus-visible{background:rgba(var(--accent-rgb),.14);box-shadow:0 0 0 1px rgba(var(--accent-soft-rgb),.18)}
+[data-theme="dark"] .message-copy-btn:hover,[data-theme="dark"] .message-copy-btn:focus-visible,[data-theme="dark"] .message-retry-btn:hover,[data-theme="dark"] .message-retry-btn:focus-visible,[data-theme="dark"] .message-edit-btn:hover,[data-theme="dark"] .message-edit-btn:focus-visible,[data-theme="dark"] .message-scroll-top-btn:hover,[data-theme="dark"] .message-scroll-top-btn:focus-visible,[data-theme="dark"] .message-thinking-btn:hover,[data-theme="dark"] .message-thinking-btn:focus-visible{background:rgba(var(--accent-rgb),.14);box-shadow:0 0 0 1px rgba(var(--accent-soft-rgb),.18)}
 .chat-scroll-bottom-btn{position:fixed;left:0;top:0;width:22px;height:22px;padding:0;border:none;border-radius:8px;background:linear-gradient(180deg,rgba(255,255,255,.94),rgba(255,236,224,.9));color:#8a544c;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 10px 24px rgba(91,34,29,.12),inset 0 1px 0 rgba(255,255,255,.94);transition:opacity .18s ease,transform .18s ease,filter .18s ease,color .18s ease,background-color .18s ease,box-shadow .18s ease;opacity:0;visibility:hidden;pointer-events:none;transform:translateY(8px) scale(.92);z-index:6}
 .chat-scroll-bottom-btn.show{opacity:.5;visibility:visible;pointer-events:auto;transform:translateY(0) scale(1)}
 .chat-scroll-bottom-btn:hover,.chat-scroll-bottom-btn:focus-visible{opacity:.72;color:var(--text-primary);background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(255,227,205,.96));box-shadow:0 14px 28px rgba(91,34,29,.16),inset 0 1px 0 rgba(255,255,255,.98);outline:none}
@@ -1781,6 +1813,8 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 .rs-confirm-actions button{padding:4px 14px;border-radius:var(--radius-xs);font-size:11px;cursor:pointer;border:1px solid var(--border);transition:var(--transition)}
 .rs-confirm-actions .rs-confirm-save{background:var(--accent);color:#fff;border-color:var(--accent)}
 .rs-confirm-actions .rs-confirm-save:hover{opacity:.9}
+.rs-confirm-actions button:disabled{cursor:wait;opacity:.58;transform:none}
+.right-sidebar #rsMemoCell.is-submitting{pointer-events:none}
 .rs-confirm-actions .rs-confirm-cancel{background:var(--bg-input);color:var(--text-secondary)}
 .rs-confirm-actions .rs-confirm-cancel:hover{background:var(--bg-sidebar)}
 [data-theme="dark"] .rs-confirm{background:linear-gradient(180deg,rgba(7,24,46,.97),rgba(4,16,31,.95));border-color:rgba(84,220,255,.24);box-shadow:0 24px 56px rgba(0,0,0,.38),inset 0 1px 0 rgba(220,251,255,.07),0 0 0 1px rgba(84,220,255,.06)}
@@ -2916,19 +2950,55 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .center-notice-desc{margin:0;font-size:12px;line-height:1.6;color:var(--text-secondary)}
 .rs-meta-center-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;opacity:0;visibility:hidden;transition:opacity .22s ease,visibility 0s linear .22s}
 .rs-meta-center-overlay.show{opacity:1;visibility:visible;transition:opacity .22s ease}
+.rs-meta-center-overlay.meta-preview-editing-lock{background:rgba(9,18,33,.16);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+/* Editing owns the entire overlay: clicks outside the card must be consumed
+   here and never reach the calendar or timeline underneath. */
+#rsMetaCenterPreview.meta-preview-editing-lock[data-overlay-active="1"]{pointer-events:auto !important}
 .rs-meta-center-card{width:min(460px,calc(100vw - 48px));max-width:min(460px,calc(100vw - 48px));max-height:min(68vh,560px);padding:20px 22px;border-radius:28px;border:1px solid color-mix(in srgb,var(--border) 80%,var(--accent) 20%);background:linear-gradient(180deg,color-mix(in srgb,var(--bg-card) 96%,#fff 4%),color-mix(in srgb,var(--bg-card) 98%,transparent));box-shadow:0 24px 60px rgba(16,24,40,.22);backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%);transform:translateY(10px) scale(.98);transition:transform .22s cubic-bezier(.22,1,.36,1),opacity .22s ease;display:flex;flex-direction:column;gap:14px;overflow:hidden}
 .rs-meta-center-overlay.show .rs-meta-center-card{transform:translateY(0) scale(1)}
 .rs-meta-center-head{display:flex;flex-direction:column;gap:6px}
 .rs-meta-center-kicker{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted)}
-.rs-meta-center-title{font-size:18px;font-weight:700;line-height:1.2;color:var(--text-primary)}
-.rs-meta-center-subtitle{font-size:12px;line-height:1.55;color:var(--text-secondary)}
+.rs-meta-center-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0}
+.rs-meta-center-title{flex:0 0 auto;min-width:0;white-space:nowrap;font-size:18px;font-weight:700;line-height:1.2;color:var(--text-primary)}
+.rs-meta-center-inline-tip{display:none;min-width:0;flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--error);font-size:11px;line-height:1.3}
+.rs-meta-center-inline-tip.show{display:block}
+.rs-meta-center-actions{display:flex;align-items:center;gap:6px;min-height:24px;flex-shrink:0}
+.rs-meta-center-action{width:24px;height:24px;border:0;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:color-mix(in srgb,var(--bg-sidebar) 74%,transparent);color:var(--text-secondary);cursor:pointer;transition:var(--transition)}
+.rs-meta-center-action:hover:not(:disabled),.rs-meta-center-action:focus-visible{background:color-mix(in srgb,var(--accent) 14%,var(--bg-sidebar) 86%);color:var(--accent);outline:none}
+.rs-meta-center-action:disabled{cursor:wait;opacity:.54}
+.rs-meta-center-action svg{width:13px;height:13px}
+.rs-meta-center-delete-action:hover:not(:disabled),.rs-meta-center-delete-action:focus-visible{background:color-mix(in srgb,var(--error) 14%,var(--bg-sidebar) 86%);color:var(--error)}
 .rs-meta-center-config{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px 12px;padding:14px 16px;border-radius:20px;background:color-mix(in srgb,var(--bg-sidebar) 72%,transparent);border:1px solid color-mix(in srgb,var(--border) 84%,transparent)}
 .rs-meta-center-row{display:flex;flex-direction:column;gap:4px;min-width:0}
 .rs-meta-center-label{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)}
 .rs-meta-center-value{font-size:12px;line-height:1.55;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* The cycle selector is rendered inside a metadata value cell.  Normal cells
+   ellipsize their content, but doing that here clips the absolutely-positioned
+   repeat menu so the button appears to do nothing. */
+.rs-meta-center-value.rs-meta-center-value-cycle-editor{position:relative;z-index:7;overflow:visible;white-space:normal;text-overflow:clip}
+.rs-meta-center-input,.rs-meta-center-select{width:100%;min-width:0;box-sizing:border-box;height:28px;padding:4px 8px;border:1px solid color-mix(in srgb,var(--border) 82%,transparent);border-radius:9px;background:color-mix(in srgb,var(--bg-input) 88%,transparent);color:var(--text-primary);font:inherit;outline:none}
+.rs-meta-center-input:focus,.rs-meta-center-select:focus{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 15%,transparent)}
+.rs-meta-center-field-toggle{height:28px;width:max-content;min-width:48px;padding:0 9px;border:1px solid color-mix(in srgb,var(--border) 82%,transparent);border-radius:9px;background:color-mix(in srgb,var(--bg-input) 88%,transparent);color:var(--text-secondary);font:inherit;font-size:11px;cursor:pointer;transition:var(--transition)}
+.rs-meta-center-field-toggle.on{border-color:color-mix(in srgb,var(--accent) 48%,var(--border) 52%);background:color-mix(in srgb,var(--accent) 14%,var(--bg-input) 86%);color:var(--accent)}
+.rs-meta-center-field-toggle:disabled{cursor:not-allowed;opacity:.52}
+.rs-meta-center-cycle-picker{position:relative;z-index:8;display:flex;align-items:center;min-width:0;gap:6px}
+.rs-meta-center-cycle-picker .rs-repeat-btn{width:28px;height:28px;flex:0 0 28px;justify-content:center;border:1px solid color-mix(in srgb,var(--border) 82%,transparent);border-radius:9px;background:color-mix(in srgb,var(--bg-input) 88%,transparent);color:var(--accent);animation:none}
+.rs-meta-center-cycle-picker .rs-repeat-btn:hover,.rs-meta-center-cycle-picker .rs-repeat-btn:focus-visible{border-color:var(--accent);outline:none}
+.rs-meta-center-cycle-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-primary);font-size:12px}
+.rs-meta-center-cycle-picker .rs-repeat-dd{top:calc(100% + 5px);bottom:auto;left:0;transform:none;z-index:9}
+.rs-meta-center-cycle-picker .rs-repeat-dd.show{transform:none}
+/* The preview card normally restores pointer events to all its descendants so
+   the hover bridge works.  A closed repeat menu is still absolutely positioned
+   over the fields below it, therefore it must explicitly give up its hit area. */
+#rsMetaCenterPreview.meta-preview-interactive .rs-meta-center-cycle-picker .rs-repeat-dd:not(.show),
+#rsMetaCenterPreview.meta-preview-interactive .rs-meta-center-cycle-picker .rs-repeat-dd:not(.show) *{pointer-events:none !important}
+#rsMetaCenterPreview.meta-preview-interactive .rs-meta-center-cycle-picker .rs-repeat-dd.show,
+#rsMetaCenterPreview.meta-preview-interactive .rs-meta-center-cycle-picker .rs-repeat-dd.show *{pointer-events:auto !important}
 .rs-meta-center-section{display:flex;flex-direction:column;gap:8px;min-height:0;flex:1}
 .rs-meta-center-section-label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)}
 .rs-meta-center-content{font-size:13px;line-height:1.7;color:var(--text-primary);white-space:pre-wrap;word-break:break-word;overflow:auto;min-height:96px;max-height:calc(min(68vh,560px) - 230px);padding:14px 16px;border-radius:20px;border:1px solid color-mix(in srgb,var(--border) 82%,transparent);background:linear-gradient(180deg,color-mix(in srgb,var(--bg-sidebar) 76%,transparent),color-mix(in srgb,var(--bg-input) 78%,transparent))}
+.rs-meta-center-content.editing{padding:0;overflow:hidden}
+.rs-meta-center-content textarea{display:block;width:100%;min-height:96px;height:100%;box-sizing:border-box;resize:vertical;border:0;border-radius:inherit;padding:14px 16px;background:transparent;color:inherit;font:inherit;line-height:inherit;outline:none}
 [data-theme="dark"] .rs-meta-center-card{background:linear-gradient(180deg,rgba(15,27,49,.96),rgba(10,20,38,.92));border-color:rgba(169,190,227,.2);box-shadow:0 24px 60px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.06)}
 [data-theme="dark"] .rs-meta-center-config{background:rgba(9,20,38,.68);border-color:rgba(169,190,227,.14)}
 [data-theme="dark"] .rs-meta-center-content{background:linear-gradient(180deg,rgba(7,16,30,.72),rgba(10,20,38,.86));border-color:rgba(169,190,227,.14)}
@@ -4043,6 +4113,12 @@ body.quick-fan-transition-active{cursor:progress}
 [data-overlay-base][data-overlay-front="1"]{pointer-events:auto}
 [data-overlay-base][data-overlay-front="0"],[data-overlay-base][data-overlay-front="0"] *{pointer-events:none !important}
 [data-overlay-base][data-overlay-passive="1"]{pointer-events:none !important}
+/* The memo detail preview is passive at the overlay-domain level, but its card
+   must remain a real hover/click target while editing or bridging list->card. */
+#rsMetaCenterPreview.meta-preview-interactive[data-overlay-front="0"] .rs-meta-center-card,
+#rsMetaCenterPreview.meta-preview-interactive[data-overlay-front="0"] .rs-meta-center-card *,
+#rsMetaCenterPreview.meta-preview-interactive[data-overlay-active="1"] .rs-meta-center-card,
+#rsMetaCenterPreview.meta-preview-interactive[data-overlay-active="1"] .rs-meta-center-card *{pointer-events:auto !important}
 [data-overlay-base][data-overlay-domain="center"].cmd-toast{left:50%}
 [data-overlay-base][data-overlay-domain="left"].delete-confirm:not(.delete-confirm-centered){left:calc(var(--sidebar-width-current) / 2)}
 
@@ -4108,6 +4184,14 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     <div class="domain-upload-lock-spinner" aria-hidden="true"></div>
     <div class="log-cleanup-lock-title" id="logCleanupLockTitle">日志清理中</div>
     <div class="log-cleanup-lock-desc" id="logCleanupLockDesc">正在清理过期日志，请稍后</div>
+    <div class="domain-upload-lock-progress"><span></span></div>
+  </div>
+</div>
+<div id="rsSaveLock" class="log-cleanup-lock" data-overlay-base data-overlay-domain="center" data-overlay-order="59" data-overlay-type="lock" aria-hidden="true" onclick="handleMemoSaveLockClick(event)">
+  <div class="log-cleanup-lock-card" role="dialog" aria-modal="true" aria-live="polite" aria-atomic="true" aria-labelledby="rsSaveLockTitle" aria-describedby="rsSaveLockDesc" tabindex="-1" onclick="event.stopPropagation()">
+    <div class="domain-upload-lock-spinner" aria-hidden="true"></div>
+    <div class="log-cleanup-lock-title" id="rsSaveLockTitle">创建备忘录中</div>
+    <div class="log-cleanup-lock-desc" id="rsSaveLockDesc">正在保存任务，请稍后</div>
     <div class="domain-upload-lock-progress"><span></span></div>
   </div>
 </div>
@@ -4511,7 +4595,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
               <div class="rs-repeat-opt" id="rsRepeatOptEvery30" data-mode="every30" onclick="rsSelectRepeat('every30',this)">每30分钟</div>
             </div>
           </div>
-          <button class="rs-cancel-btn" onclick="rsResetNote()" title="重置">
+          <button class="rs-cancel-btn" id="rsResetBtn" onclick="rsResetNote()" title="重置">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>
           </button>
           <button class="rs-save-btn" id="rsSaveBtn" onclick="rsSaveNote()" title="保存">
@@ -4738,12 +4822,15 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     <p class="center-notice-desc" id="modelSelectToastDesc">点击输入框左侧小地球选择模型</p>
   </div>
 </div>
-<div class="rs-meta-center-overlay" id="rsMetaCenterPreview" data-overlay-base data-overlay-domain="center" data-overlay-order="23" data-overlay-passive="1" aria-hidden="true">
-  <div class="rs-meta-center-card">
+<div class="rs-meta-center-overlay" id="rsMetaCenterPreview" data-overlay-base data-overlay-domain="center" data-overlay-order="23" data-overlay-passive="1" aria-hidden="true" onpointerdown="memoPreviewEditLockOverlayPointerDown(event)" onclick="memoPreviewEditLockOverlayClick(event)">
+  <div class="rs-meta-center-card" onpointerenter="memoDetailPreviewCardEnter()" onpointerleave="memoDetailPreviewCardLeave()">
     <div class="rs-meta-center-head">
       <div class="rs-meta-center-kicker">Memo Metadata</div>
-      <div class="rs-meta-center-title">备忘录配置预览</div>
-      <div class="rs-meta-center-subtitle">当前悬停元数据的配置与内容会同步显示在这里。</div>
+      <div class="rs-meta-center-title-row">
+        <div class="rs-meta-center-title" id="rsMetaCenterPreviewTitle">备忘录元数据预览</div>
+        <div class="rs-meta-center-inline-tip" id="rsMetaCenterPreviewTip" role="alert" aria-live="polite"></div>
+        <div class="rs-meta-center-actions" id="rsMetaCenterPreviewActions"></div>
+      </div>
     </div>
     <div class="rs-meta-center-config">
       <div class="rs-meta-center-row"><span class="rs-meta-center-label">周期</span><span class="rs-meta-center-value" id="rsMetaCenterPreviewCycle">-</span></div>
@@ -4807,6 +4894,17 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
       </div>
     </div>
   </div>
+</div>
+<div class="overlay assistant-thinking-overlay" id="assistantThinkingOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="33" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="assistantThinkingTitle" onclick="if(event.target===this)closeAssistantThinkingModal()">
+  <section class="assistant-thinking-panel" id="assistantThinkingPanel" onclick="event.stopPropagation()">
+    <header class="assistant-thinking-panel__head">
+      <h2 class="assistant-thinking-panel__title" id="assistantThinkingTitle">思考过程</h2>
+      <button class="assistant-thinking-panel__close" id="assistantThinkingCloseBtn" type="button" onclick="closeAssistantThinkingModal()" title="关闭" aria-label="关闭">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </header>
+    <div class="assistant-thinking-panel__content" id="assistantThinkingContent" tabindex="0"></div>
+  </section>
 </div>
 <div class="overlay input-agent-change-overlay" id="inputAgentChangeConfirm" data-overlay-base data-overlay-domain="center" data-overlay-order="23" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="inputAgentChangeConfirmTitle" onclick="if(event.target===this)cancelAgentChangeConfirm()">
   <div class="input-agent-change-panel" id="inputAgentChangeConfirmPanel" onclick="event.stopPropagation()">
@@ -12241,13 +12339,12 @@ function buildRightSidebarUrlPreviewFrameSrc(href, requestKey, chatId) {
 function extractHttpUrlsFromText(text) {
   const raw = String(text || '');
   if (!raw) return [];
-  const matches = raw.match(MESSAGE_LINK_MATCHER) || [];
+  const matches = findMessagePathMatches(raw).filter(match => match.kind === 'http');
   if (!matches.length) return [];
   const seen = new Set();
   const urls = [];
-  matches.forEach(token => {
-    const resolved = resolveMessageHttpLink(token);
-    const href = normalizeRightSidebarUrlPreviewHref(resolved && resolved.href);
+  matches.forEach(match => {
+    const href = normalizeRightSidebarUrlPreviewHref(match && match.href);
     if (!href || seen.has(href) || !isRightSidebarUrlPreviewEligibleHref(href)) return;
     seen.add(href);
     urls.push(href);
@@ -13033,6 +13130,9 @@ function hideExclusiveOverlayById(id) {
     case 'messageEditOverlay':
       closeCenterMessageEdit(true);
       return true;
+    case 'assistantThinkingOverlay':
+      closeAssistantThinkingModal({ restoreFocus: false });
+      return true;
     case 'pluginModalOverlay':
       closePluginModal(true);
       return true;
@@ -13149,6 +13249,38 @@ function focusLogCleanupLockCard() {
   } catch {
     cardEl.focus();
   }
+}
+
+function focusMemoSaveLockCard() {
+  const lockEl = document.getElementById('rsSaveLock');
+  const cardEl = lockEl ? lockEl.querySelector('.log-cleanup-lock-card') : null;
+  if (!(cardEl instanceof HTMLElement)) return;
+  try {
+    cardEl.focus({ preventScroll: true });
+  } catch {
+    cardEl.focus();
+  }
+}
+
+function setMemoSaveLock(locked, options = {}) {
+  const lockEl = document.getElementById('rsSaveLock');
+  const cardEl = lockEl ? lockEl.querySelector('.log-cleanup-lock-card') : null;
+  if (!lockEl) return;
+  if (locked) {
+    const titleEl = document.getElementById('rsSaveLockTitle');
+    const descEl = document.getElementById('rsSaveLockDesc');
+    if (titleEl) titleEl.textContent = String(options.title || '创建备忘录中');
+    if (descEl) descEl.textContent = String(options.description || '正在保存任务，请稍后');
+    setOverlayVisible(lockEl, true, cardEl);
+    if (document.activeElement instanceof HTMLElement) {
+      try {
+        document.activeElement.blur();
+      } catch {}
+    }
+    focusMemoSaveLockCard();
+    return;
+  }
+  setOverlayVisible(lockEl, false, cardEl);
 }
 
 function refreshOverlayStates() {
@@ -13378,6 +13510,14 @@ function handleLogCleanupOverlayClick(event) {
   focusLogCleanupLockCard();
 }
 
+function handleMemoSaveLockClick(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  focusMemoSaveLockCard();
+}
+
 function stopLogCleanupStatusPolling() {
   if (!logCleanupStatusState.timer) return;
   clearInterval(logCleanupStatusState.timer);
@@ -13416,12 +13556,17 @@ function startLogCleanupStatusPolling() {
 }
 
 document.addEventListener('focusin', event => {
-  if (!logCleanupStatusState.visible) return;
-  const lockEl = document.getElementById('logCleanupLock');
+  const lockEl = logCleanupStatusState.visible
+    ? document.getElementById('logCleanupLock')
+    : rsNoteSaveInFlight
+      ? document.getElementById('rsSaveLock')
+      : null;
   const target = event && event.target instanceof Element ? event.target : null;
   if (!lockEl || (target && lockEl.contains(target))) return;
-  focusLogCleanupLockCard();
+  if (lockEl.id === 'rsSaveLock') focusMemoSaveLockCard();
+  else focusLogCleanupLockCard();
 }, true);
+document.addEventListener('keydown', memoDetailPreviewHandleEscape, true);
 document.addEventListener('keydown', syncRightSidebarUrlPreviewExpandedEscape, true);
 
 function releaseSwitchedChatAutoReloadLock() {
@@ -26419,6 +26564,7 @@ function compactStoredChatPayload(payload, options) {
     const chat = payload.chats[candidate.chatId];
     const msg = chat && Array.isArray(chat.messages) ? chat.messages[candidate.messageIndex] : null;
     if (!msg || msg.role !== 'assistant') continue;
+    const removedThinkingSnapshots = Array.isArray(msg.explodedSnapshots) && normalizeAssistantExplosionSnapshots(msg.explodedSnapshots).length > 0;
     let removed = false;
     if (Object.prototype.hasOwnProperty.call(msg, 'explodedSnapshots')) {
       delete msg.explodedSnapshots;
@@ -26429,6 +26575,9 @@ function compactStoredChatPayload(payload, options) {
       removed = true;
     }
     if (!removed) continue;
+    if (removedThinkingSnapshots && msg.hadThinkingSnapshots === true) {
+      msg.thinkingSnapshotsClearedAt = toChatTimestamp(new Date());
+    }
     changed = true;
     if (maybeReachedTarget()) return true;
   }
@@ -27065,7 +27214,12 @@ function getLastNonErrorAssistantMessage(chat) {
 }
 
 function isAssistantCancelledMessage(msg) {
-  return !!(msg && msg.role === 'assistant' && !msg.error && (msg.cancelMarker || normalizeMessageText(msg.content) === '已取消'));
+  const content = normalizeMessageText(msg ? msg.content : '');
+  return !!(msg && msg.role === 'assistant' && !msg.error && (msg.cancelMarker || content === '已取消' || content === '未发送'));
+}
+
+function getCancellationMessageText(cancelState) {
+  return cancelState === 'not_sent' ? '未发送' : '已取消';
 }
 
 function getMessageAgentId(message) {
@@ -27087,15 +27241,17 @@ function getLastChatResponseAgentId(chatId) {
   return '';
 }
 
-function markAssistantCancelled(msg, ts) {
+function markAssistantCancelled(msg, ts, cancelState) {
   if (!msg || msg.role !== 'assistant' || msg.error) return;
+  const resolvedCancelState = cancelState === 'not_sent' ? 'not_sent' : 'cancelled';
   const normalized = normalizeMessageText(msg.content);
-  if (!normalized) msg.content = '已取消';
+  if (!normalized) msg.content = getCancellationMessageText(resolvedCancelState);
   addAssistantExplodedLogicalId(msg, msg.streamLogicalId);
   msg.streamStatus = '完成';
   msg.receivedAt = ts;
   msg.createdAt = ts;
   msg.cancelMarker = true;
+  msg.cancelState = resolvedCancelState;
   delete msg.streamPacketType;
   finalizeAssistantTransientFields(msg);
 }
@@ -28993,16 +29149,26 @@ function handleQueuedCenterListDrop(event, chatId, agentId) {
   return moved;
 }
 
-function markChatRequestCancelled(chatId, nowTs) {
+function markChatRequestCancelled(chatId, nowTs, cancelState, requestMessage) {
   const chat = state.chats[chatId];
   if (!chat) return;
+  const resolvedCancelState = cancelState === 'not_sent' ? 'not_sent' : 'cancelled';
   const ts = nowTs || toChatTimestamp(new Date());
-  const pending = getPendingRequestState(chat);
+  let requestStart = requestMessage ? chat.messages.indexOf(requestMessage) : -1;
+  if (requestStart < 0) requestStart = getPendingRequestState(chat).start;
   const lastMsg = chat.messages[chat.messages.length - 1];
-  const cancelledMessage = { role: 'assistant', content: '已取消', receivedAt: ts, createdAt: ts, streamStatus: '完成', cancelMarker: true };
-  if (pending.start >= 0) {
+  const cancelledMessage = {
+    role: 'assistant',
+    content: getCancellationMessageText(resolvedCancelState),
+    receivedAt: ts,
+    createdAt: ts,
+    streamStatus: '完成',
+    cancelMarker: true,
+    cancelState: resolvedCancelState
+  };
+  if (requestStart >= 0) {
     const removeIndexes = [];
-    for (let i = pending.start + 1; i < chat.messages.length; i++) {
+    for (let i = requestStart + 1; i < chat.messages.length; i++) {
       const msg = chat.messages[i];
       if (!msg) continue;
       if (msg.role === 'user') {
@@ -29014,7 +29180,7 @@ function markChatRequestCancelled(chatId, nowTs) {
     for (let i = removeIndexes.length - 1; i >= 0; i--) {
       chat.messages.splice(removeIndexes[i], 1);
     }
-    chat.messages.splice(pending.start + 1, 0, cancelledMessage);
+    chat.messages.splice(requestStart + 1, 0, cancelledMessage);
   } else if (!lastMsg || lastMsg.role === 'user' || lastMsg.error) {
     chat.messages.push(cancelledMessage);
   } else {
@@ -29238,6 +29404,23 @@ function normalizeLoadedChat(chat) {
     if (msg && msg.role === 'assistant' && !msg.error) {
       msg.explodedSnapshots = normalizeAssistantExplosionSnapshots(msg.explodedSnapshots);
       msg.explodedLogicalIds = normalizeAssistantExplodedLogicalIds(msg.explodedLogicalIds);
+      if (msg.explodedSnapshots.length && msg.hadThinkingSnapshots !== true) {
+        msg.hadThinkingSnapshots = true;
+        changed = true;
+      }
+      const clearedAt = toChatTimestamp(msg.thinkingSnapshotsClearedAt || '');
+      if (msg.explodedSnapshots.length && Object.prototype.hasOwnProperty.call(msg, 'thinkingSnapshotsClearedAt')) {
+        delete msg.thinkingSnapshotsClearedAt;
+        changed = true;
+      } else if (msg.hadThinkingSnapshots === true && clearedAt) {
+        if (msg.thinkingSnapshotsClearedAt !== clearedAt) {
+          msg.thinkingSnapshotsClearedAt = clearedAt;
+          changed = true;
+        }
+      } else if (Object.prototype.hasOwnProperty.call(msg, 'thinkingSnapshotsClearedAt')) {
+        delete msg.thinkingSnapshotsClearedAt;
+        changed = true;
+      }
       if (snapshotsBefore !== JSON.stringify(msg.explodedSnapshots || [])) changed = true;
       if (logicalIdsBefore !== JSON.stringify(msg.explodedLogicalIds || [])) changed = true;
     }
@@ -29570,6 +29753,7 @@ function switchChat(id) {
   closeInstallAppPopover();
   closeSoulTidyPopover();
   hideVfsRepairPopover();
+  closeAssistantThinkingModal({ restoreFocus: false });
   hideSandboxOverlay();
   cancelOpenFolder();
   // Force-end star animation if running
@@ -30939,6 +31123,7 @@ function messageActionsHtml(m) {
     actions.push(messageCopyButtonHtml(m));
   } else {
     actions.push(messageCopyButtonHtml(m));
+    if (shouldShowAssistantThinkingButton(m)) actions.push(messageThinkingButtonHtml());
   }
   return `<div class="message-actions">${actions.join('')}</div>`;
 }
@@ -30960,6 +31145,10 @@ function messageRetryButtonHtml(m) {
 function messageCopyButtonHtml(m) {
   const text = esc(String(m && m.content || '')).replace(/"/g, '&quot;');
   return `<button type="button" class="message-copy-btn" data-copy-text="${text}" onclick="copyCenterMessage(event)" title="复制" aria-label="复制"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M6.55 1.2a.7.7 0 0 0-.7.7v.35h-1.2a1.1 1.1 0 0 0-1.1 1.1v3.9c0 .61.49 1.1 1.1 1.1h3.2a1.1 1.1 0 0 0 1.1-1.1v-3.9a1.1 1.1 0 0 0-1.1-1.1h-1.2V1.9a.7.7 0 0 0-.7-.7h-.7Zm0 .7h.7v.7h-.7v-.7Zm-1.9 1.4h3.2a.4.4 0 0 1 .4.4v3.9a.4.4 0 0 1-.4.4h-3.2a.4.4 0 0 1-.4-.4v-3.9a.4.4 0 0 1 .4-.4ZM2.3 4.05a.35.35 0 0 1 .35.35v3.5c0 .08.07.15.15.15h3.5a.35.35 0 1 1 0 .7H2.8c-.47 0-.85-.38-.85-.85V4.4a.35.35 0 0 1 .35-.35Zm5.45-2.65.19.66.66.19-.66.19-.19.66-.19-.66-.66-.19.66-.19.19-.66Z"></path></svg></button>`;
+}
+
+function messageThinkingButtonHtml() {
+  return `<button type="button" class="message-thinking-btn" onclick="openLatestAssistantThinkingModal(event)" title="查看思考过程" aria-label="查看思考过程"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6"></path><path d="M10 21h4"></path><path d="M12 3a6 6 0 0 0-3.87 10.58c.77.67 1.37 1.5 1.68 2.42h4.38c.31-.92.91-1.75 1.68-2.42A6 6 0 0 0 12 3Z"></path></svg></button>`;
 }
 
 function unwrapStructuredResultSource(text) {
@@ -31067,6 +31256,8 @@ function syncAssistantExplosionSnapshots(message, snapshots) {
     delete message.explodedSnapshots;
     return [];
   }
+  message.hadThinkingSnapshots = true;
+  delete message.thinkingSnapshotsClearedAt;
   message._explodedSnapshots = normalized.map(item => ({ ...item }));
   message.explodedSnapshots = normalized.map(item => ({ ...item }));
   return message._explodedSnapshots;
@@ -31170,6 +31361,47 @@ function shouldShowAssistantExplosionBeacon(message) {
   );
 }
 
+function getLatestSuccessfulCenterAssistantResponseMessage(chat) {
+  if (!chat || !Array.isArray(chat.messages)) return null;
+  for (let i = chat.messages.length - 1; i >= 0; i--) {
+    const message = chat.messages[i];
+    if (!isAssistantThinkingResponseCompleted(message) || !shouldRenderAssistantCenterMessage(message)) continue;
+    return message;
+  }
+  return null;
+}
+
+function isAssistantThinkingResponseCompleted(message) {
+  return !!(
+    message &&
+    message.role === 'assistant' &&
+    !message.error &&
+    !message.cancelMarker &&
+    !isAssistantCliSubOnlyMessage(message) &&
+    String(message.streamStatus || '').trim() === '完成'
+  );
+}
+
+function hasAssistantThinkingSnapshotsCleared(message) {
+  return !!(
+    message &&
+    message.hadThinkingSnapshots === true &&
+    String(message.thinkingSnapshotsClearedAt || '').trim() &&
+    getAssistantExplosionSnapshots(message).length === 0
+  );
+}
+
+function shouldShowAssistantThinkingButton(message) {
+  const chat = state.chats[state.activeChat];
+  // A new request does not replace the current thought action until it has
+  // completed normally. This keeps the prior response available while the SSE
+  // runs and after a failed or cancelled replacement request.
+  const latest = getLatestSuccessfulCenterAssistantResponseMessage(chat);
+  if (!latest || latest !== message) return false;
+  if (latest.hadThinkingSnapshots !== true) return false;
+  return getAssistantExplosionSnapshots(latest).length > 0 || hasAssistantThinkingSnapshotsCleared(latest);
+}
+
 function restoreRenderedAssistantExplosionBeacons(container, messages) {
   if (!container || !Array.isArray(messages) || !messages.length) return;
   const assistantMessages = messages.filter(message => (
@@ -31228,11 +31460,58 @@ const ASSISTANT_EXPLOSION_POPOVER_ANCHOR_GAP = 14;
 let assistantExplosionFloatingPopover = null;
 let assistantExplosionActiveBeacon = null;
 let assistantExplosionRepositionQueued = false;
+let assistantThinkingModalTrigger = null;
 
 function assistantExplosionBeaconListHtml(snapshots) {
   return snapshots.map((item, index) => (
     `<article class="assistant-explosion-beacon__item"><div class="assistant-explosion-beacon__item-head"><span class="assistant-explosion-beacon__item-label">思考 ${index + 1}</span><span class="assistant-explosion-beacon__item-time"${String(formatMessageTime(item.capturedAt || '') || '').trim() ? ` title="${esc(formatMessageTime(item.capturedAt || '')).replace(/"/g, '&quot;')}"` : ''}>${esc(formatAssistantExplosionSnapshotTime(item.capturedAt || ''))}</span></div><div class="assistant-explosion-beacon__item-body">${renderAssistantExplosionSnapshotBody(item.content)}</div></article>`
   )).join('');
+}
+
+function closeAssistantThinkingModal(options) {
+  const opts = options && typeof options === 'object' ? options : {};
+  const overlay = document.getElementById('assistantThinkingOverlay');
+  const panel = document.getElementById('assistantThinkingPanel');
+  const content = document.getElementById('assistantThinkingContent');
+  const wasVisible = !!(overlay && overlay.classList.contains('show'));
+  setOverlayVisible(overlay, false, panel);
+  if (content) content.innerHTML = '';
+  const trigger = assistantThinkingModalTrigger;
+  assistantThinkingModalTrigger = null;
+  if (wasVisible && opts.restoreFocus !== false && trigger instanceof HTMLElement && trigger.isConnected) {
+    try { trigger.focus({ preventScroll: true }); } catch { trigger.focus(); }
+  }
+}
+
+function openLatestAssistantThinkingModal(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  const chat = state.chats[state.activeChat];
+  const message = getLatestSuccessfulCenterAssistantResponseMessage(chat);
+  if (!shouldShowAssistantThinkingButton(message)) return false;
+  const snapshots = getAssistantExplosionSnapshots(message);
+  if (!snapshots.length) {
+    if (hasAssistantThinkingSnapshotsCleared(message)) {
+      vfsShowUploadToast('思考过程已经被清理', false);
+    }
+    return false;
+  }
+  const overlay = document.getElementById('assistantThinkingOverlay');
+  const panel = document.getElementById('assistantThinkingPanel');
+  const content = document.getElementById('assistantThinkingContent');
+  if (!overlay || !panel || !content) return false;
+  assistantThinkingModalTrigger = event && event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+  content.innerHTML = assistantExplosionBeaconListHtml(snapshots);
+  content.scrollTop = 0;
+  content.querySelectorAll('.assistant-explosion-beacon__item-body').forEach(renderMathInRoot);
+  showExclusiveOverlay(overlay, panel);
+  requestAnimationFrame(() => {
+    if (!overlay.classList.contains('show')) return;
+    try { content.focus({ preventScroll: true }); } catch { content.focus(); }
+  });
+  return true;
 }
 
 function assistantExplosionBeaconHtml(message) {
@@ -31479,6 +31758,8 @@ function captureAssistantExplosionSnapshotContent(message, content, groupKey) {
       if (normalizeMessageText(mergedContent) === normalizeMessageText(existing.content)) return false;
       existing.content = mergedContent;
       existing.capturedAt = capturedAt;
+      message.hadThinkingSnapshots = true;
+      delete message.thinkingSnapshotsClearedAt;
       message.explodedSnapshots = snapshots.map(item => ({ ...item }));
       return true;
     }
@@ -31492,6 +31773,8 @@ function captureAssistantExplosionSnapshotContent(message, content, groupKey) {
     capturedAt
   });
   message._explodedSnapshots = snapshots;
+  message.hadThinkingSnapshots = true;
+  delete message.thinkingSnapshotsClearedAt;
   message.explodedSnapshots = snapshots.map(item => ({ ...item }));
   return true;
 }
@@ -31555,7 +31838,7 @@ function assistantMetaHtml(m) {
 function buildAssistantMetaText(message) {
   if (!message || !message.receivedAt) return '';
   const timeText = formatMessageTime(message.receivedAt);
-  if (message.cancelMarker) return `${timeText} 已取消`;
+  if (message.cancelMarker) return `${timeText} ${getCancellationMessageText(message.cancelState)}`;
   const statusText = String(message.streamStatus || '等待').trim() || '等待';
   const agentId = getMessageAgentId(message);
   if (statusText === '完成' && agentId) return `${timeText} 由 ${agentId} 完成`;
@@ -35419,6 +35702,8 @@ async function sendCenterMessage(rawText, options) {
       abortCtrl: abortCtrl,
       agentId: chatAgentId,
       cancelling: false,
+      requestDispatched: false,
+      requestMessage: userMsg,
       requestSource: requestSource,
       phase: 'preflight',
       sawTarget: false,
@@ -35805,7 +36090,6 @@ async function sendCenterMessage(rawText, options) {
     setChatPendingRequest(chatId, true, requestTs);
     ensureLiveCliEventPolling(chatId, { startTimeline: requestTs, restart: true });
     if (isActiveChat()) showWorking(true);
-    if (chatStreaming[chatId]) chatStreaming[chatId].phase = 'stream';
 
     let chatCompletionsUrl = '/v1/chat/completions';
     const query = opts.query && typeof opts.query === 'object' ? opts.query : null;
@@ -35824,6 +36108,10 @@ async function sendCenterMessage(rawText, options) {
       if (queryString) chatCompletionsUrl += '?' + queryString;
     }
 
+    if (chatStreaming[chatId]) {
+      chatStreaming[chatId].requestDispatched = true;
+      chatStreaming[chatId].phase = 'stream';
+    }
     const responsePromise = fetch(chatCompletionsUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': key },
@@ -35859,7 +36147,7 @@ async function sendCenterMessage(rawText, options) {
         if (data === '[DONE]') {
           if (lastAssistantEntry) appendLiveAssistantRawSse(trimmed, lastAssistantEntry);
           flushStreamingAutoUrlPreviewCandidates();
-          finishStreamingFor(chatId);
+          finishStreamingFor(chatId, { completedNormally: true });
           saveChats();
           return true;
         }
@@ -36082,7 +36370,7 @@ async function sendCenterMessage(rawText, options) {
     return true;
   } catch (err) {
     const csState = chatStreaming[chatId];
-    const isCancelling = !!(csState && csState.cancelling);
+    const isCancelling = !!((csState && csState.cancelling) || abortCtrl.signal.aborted);
     const isUnloadDisconnect = pageUnloading && !isCancelling;
     const fallbackEntry = lastAssistantEntry;
     if (err.name === 'AbortError') {
@@ -36107,11 +36395,15 @@ async function stopStreaming() {
   const poll = restorePolling[chatId];
   if ((!cs || !cs.streaming) && (!poll || !poll.active)) return;
   if ((cs && cs.cancelling) || (poll && poll.cancelling)) return;
+  // `requestDispatched` flips immediately before fetch. Treat pre-existing
+  // stream states without this field as dispatched so a hot reload cannot
+  // downgrade an in-flight request to "未发送".
+  const requestDispatched = !cs || cs.requestDispatched !== false;
   if (cs && cs.streaming) cs.cancelling = true;
   if (poll && poll.active) poll.cancelling = true;
   const preflight = preflightTimers[chatId];
   const nowTs = toChatTimestamp(new Date());
-  markChatRequestCancelled(chatId, nowTs);
+  markChatRequestCancelled(chatId, nowTs, requestDispatched ? 'cancelled' : 'not_sent', cs && cs.requestMessage);
   if (state.activeChat === chatId) {
     renderMessages({ forceScroll: true });
     clearChatTaskBadges(chatId);
@@ -36125,6 +36417,14 @@ async function stopStreaming() {
     delete preflightTimers[chatId];
   }
   if (cs && cs.abortCtrl) cs.abortCtrl.abort();
+  if (!requestDispatched) {
+    stopChatRestorePolling(chatId);
+    delete preflightTimers[chatId];
+    showPreflight(false);
+    finishStreamingFor(chatId);
+    vfsShowUploadToast('取消成功', false);
+    return;
+  }
   if (preflightTimers[chatId]) preflightTimers[chatId].mode = 'cancel';
   else preflightTimers[chatId] = { timer: null, reject: null, deadline: Date.now() + 3000, mode: 'cancel' };
   showPreflight(true, 'cancel');
@@ -36153,7 +36453,8 @@ async function requestChatCancel(chatId) {
   return false;
 }
 
-function finishStreamingFor(chatId) {
+function finishStreamingFor(chatId, options) {
+  const completedNormally = !!(options && options.completedNormally === true);
   void performLiveCliEventPoll(chatId).catch(() => {});
   stopLiveCliEventPolling(chatId);
   const streamState = chatStreaming[chatId];
@@ -36195,6 +36496,10 @@ function finishStreamingFor(chatId) {
       }
       if (!msg.receivedAt) msg.receivedAt = toChatTimestamp(new Date());
       if (!msg.createdAt) msg.createdAt = msg.receivedAt;
+      if (!completedNormally) {
+        delete msg.hadThinkingSnapshots;
+        delete msg.thinkingSnapshotsClearedAt;
+      }
       msg.streamStatus = '完成';
       delete msg.streamPacketType;
       finalizeAssistantTransientFields(msg);
@@ -36228,6 +36533,8 @@ function finishStreamingFor(chatId) {
     streamState.streaming = false;
     streamState.abortCtrl = null;
     streamState.cancelling = false;
+    streamState.requestDispatched = false;
+    streamState.requestMessage = null;
     streamState.requestSource = '';
     streamState.phase = '';
     streamState.sawTarget = false;
@@ -37826,8 +38133,10 @@ function findAssistantForRequestByLogicalIdOrFallback(chat, userIndex, logicalId
 
 function reviveCancelledAssistantForReplay(msg) {
   if (!msg || msg.role !== 'assistant' || msg.error || !isAssistantCancelledMessage(msg)) return msg;
+  const cancelledContent = normalizeMessageText(msg.content);
   delete msg.cancelMarker;
-  if (normalizeMessageText(msg.content) === '已取消') msg.content = '';
+  delete msg.cancelState;
+  if (cancelledContent === '已取消' || cancelledContent === '未发送') msg.content = '';
   msg.streamStatus = '等待';
   return msg;
 }
@@ -44446,10 +44755,13 @@ function handleOverlayKeyboardShortcuts(event) {
   const scope = getFrontKeyboardOverlay();
   if (!scope) return false;
   const scopeId = String(scope.id || '').trim();
-  if (scopeId === 'logCleanupLock') {
+  if (scopeId === 'logCleanupLock' || scopeId === 'rsSaveLock') {
     event.preventDefault();
     event.stopPropagation();
-    if (event.key === 'Tab') focusLogCleanupLockCard();
+    if (event.key === 'Tab') {
+      if (scopeId === 'rsSaveLock') focusMemoSaveLockCard();
+      else focusLogCleanupLockCard();
+    }
     return true;
   }
   if (scopeId === 'pluginModalOverlay' && pluginModalState.browserRestartConfirmVisible) {
@@ -44880,8 +45192,10 @@ function closestFromEventTarget(target, selector) {
 }
 
 const MESSAGE_PATH_SKIP_SELECTOR = 'a, pre, script, style, textarea, .katex, .message-inline-token-bubble';
-const MESSAGE_PATH_BOUNDARY_BEFORE = /[\s`"'([{<（【《“‘]/;
+const MESSAGE_PATH_BOUNDARY_BEFORE = /[\s`"'([{<（【《“‘,.:;!?，。；：！？、]/;
 const MESSAGE_PATH_BOUNDARY_AFTER = /[\s`"')\]}>,.:;!?，。；：！？、）】》”’]/;
+const MESSAGE_TARGET_TERMINATOR = /[,.!?;:，。；：！？、]/;
+const MESSAGE_TARGET_EMBEDDED_START = /[.:](?=(?:https?:\/\/|www\.|file:\/\/\/|~\/|\/|(?:skills|tmp)(?:\/|$)|(?:SOUL|USER)\.md))/i;
 const MESSAGE_HTTP_BASECASE = /^(?:https?:\/\/|www\.)[^\s`"'()[\]{}<>|,;!，。；：！？、（）【】《》“”‘’]+/i;
 const MESSAGE_LINK_MATCHER = /https?:\/\/[^\s`"'()[\]{}<>|,;!，。；：！？、（）【】《》“”‘’]+|www\.[^\s`"'()[\]{}<>|,;!，。；：！？、（）【】《》“”‘’]+|file:\/\/\/[^\s`"'()[\]{}<>|,:;!?，。；：！？、（）【】《》“”‘’]+|~\/[^\s`"'()[\]{}<>|,:;!?，。；：！？、（）【】《》“”‘’]*|\/[^\s`"'()[\]{}<>|,:;!?，。；：！？、（）【】《》“”‘’]+|(?:skills|tmp)(?:\/[^\s`"'()[\]{}<>|,:;!?，。；：！？、（）【】《》“”‘’]+)*|(?:SOUL|USER)\.md/g;
 const MESSAGE_FILE_TOKEN_MATCHER = /\[FILE:[^\]\n\r]+\]/gi;
@@ -44896,9 +45210,9 @@ const MESSAGE_MAC_SPACE_SEGMENTS = [
 ];
 
 function resolveMessageHttpLink(value) {
-  const raw = String(value || '').trim();
+  const raw = String(value || '').trim().replace(/[,.!?;:，。；：！？、](?=\p{Script=Han})[\s\S]*$/u, '');
   if (!raw) return null;
-  const appPathText = raw.replace(/[.:;!?]+$/, '');
+  const appPathText = raw.replace(/[,:;!?，。；：！？、]+$/, '');
   if (/^\/app(?:[/?#]|$)/i.test(appPathText)) {
     try {
       const url = new URL(appPathText, getExecApiBase() || location.href);
@@ -44911,7 +45225,7 @@ function resolveMessageHttpLink(value) {
   }
   const match = raw.match(MESSAGE_HTTP_BASECASE);
   if (!match) return null;
-  const text = String(match[0] || '').replace(/[.:;!?]+$/, '');
+  const text = String(match[0] || '').replace(/[.:;!?，。；：！？、]+$/, '');
   if (!text) return null;
   const href = /^www\./i.test(text) ? 'http://' + text : text;
   try {
@@ -44994,11 +45308,27 @@ function extendMessagePathCandidateEnd(source, start, end) {
 }
 
 function trimMessagePathCandidate(value) {
-  return String(value || '')
+  const raw = String(value || '')
     .trim()
     .replace(/^[`"'([{<（【《“‘]+/, '')
+    .replace(/[,.!?;:，。；：！？、](?=\p{Script=Han})[\s\S]*$/u, '');
+  return raw
     .replace(/[`"')\]}>.,:;!?，。；：！？、）】》”’]+$/, '')
     .trim();
+}
+
+function findMessageTargetEmbeddedTerminatorIndex(value) {
+  const source = String(value || '');
+  let searchFrom = 0;
+  while (searchFrom < source.length) {
+    const match = source.slice(searchFrom).match(MESSAGE_TARGET_EMBEDDED_START);
+    if (!match || !Number.isInteger(match.index)) return -1;
+    const index = searchFrom + match.index;
+    const isProtocolDelimiter = source[index] === ':' && /^(?:https?|file)$/i.test(source.slice(0, index));
+    if (!isProtocolDelimiter) return index;
+    searchFrom = index + 1;
+  }
+  return -1;
 }
 
 function isAllowedRelativeMessagePath(value) {
@@ -45016,14 +45346,16 @@ function isAllowedRelativeMessagePath(value) {
 }
 
 function extractMessageFilePath(value) {
-  const tokenValue = unwrapBracketedMessageFilePath(value);
+  const sourceValue = String(value || '').trim();
+  if (!sourceValue) return '';
+  const tokenValue = unwrapBracketedMessageFilePath(sourceValue);
   if (tokenValue) {
     const tokenAbsPath = extractAbsoluteFilePath(tokenValue);
     if (tokenAbsPath) return tokenAbsPath;
     if (!isAllowedRelativeMessagePath(tokenValue)) return '';
     return normalizeFsPath(tokenValue);
   }
-  const raw = trimMessagePathCandidate(value);
+  const raw = trimMessagePathCandidate(sourceValue);
   if (!raw) return '';
   const absPath = extractAbsoluteFilePath(raw);
   if (absPath) return absPath;
@@ -45368,6 +45700,11 @@ function findMessagePathMatches(text) {
     if (/^file:\/\/\/|^~\/|^\//i.test(initialCandidate)) {
       candidateEnd = extendMessagePathCandidateEnd(source, candidateStart, candidateEnd);
     }
+    const embeddedTerminatorIndex = findMessageTargetEmbeddedTerminatorIndex(source.slice(candidateStart, candidateEnd));
+    if (embeddedTerminatorIndex >= 0) {
+      candidateEnd = candidateStart + embeddedTerminatorIndex;
+      MESSAGE_LINK_MATCHER.lastIndex = candidateEnd + 1;
+    }
     const rawCandidate = trimMessagePathCandidate(source.slice(candidateStart, candidateEnd));
     if (!rawCandidate) continue;
     const start = candidateStart;
@@ -45597,9 +45934,38 @@ function decorateMessagePathTextNode(node) {
   node.parentNode.replaceChild(fragment, node);
 }
 
+function splitMessagePathAnchorAtTerminator(anchor) {
+  if (!anchor || !anchor.parentNode) return false;
+  const rawText = String(anchor.textContent || '');
+  const match = findMessagePathMatches(rawText).find(item => item.start === 0);
+  if (!match || match.end >= rawText.length || !MESSAGE_TARGET_TERMINATOR.test(rawText[match.end])) return false;
+  const ownerDoc = anchor.ownerDocument || document;
+  const fragment = ownerDoc.createDocumentFragment();
+  const pathAnchor = ownerDoc.createElement('a');
+  decorateMessagePathAnchor(pathAnchor, {
+    kind: match.kind,
+    rawValue: match.text,
+    href: match.href,
+    filePath: match.filePath
+  });
+  fragment.appendChild(pathAnchor);
+  fragment.appendChild(ownerDoc.createTextNode(rawText.slice(match.end)));
+  anchor.parentNode.replaceChild(fragment, anchor);
+  return true;
+}
+
+function unwrapMessagePathAnchor(anchor) {
+  if (!anchor || !anchor.parentNode) return;
+  const ownerDoc = anchor.ownerDocument || document;
+  const fragment = ownerDoc.createDocumentFragment();
+  while (anchor.firstChild) fragment.appendChild(anchor.firstChild);
+  anchor.parentNode.replaceChild(fragment, anchor);
+}
+
 function decorateExistingMessageAnchors(root) {
   if (!root || !root.querySelectorAll) return;
   root.querySelectorAll('a[href]').forEach(anchor => {
+    if (splitMessagePathAnchorAtTerminator(anchor)) return;
     const rawHref = String(anchor.getAttribute('href') || '').trim();
     const rawText = String(anchor.textContent || '').trim();
     const httpLink = resolveMessageHttpLink(rawHref);
@@ -45623,11 +45989,7 @@ function decorateExistingMessageAnchors(root) {
       });
       return;
     }
-    if (!anchor.parentNode) return;
-    const ownerDoc = anchor.ownerDocument || document;
-    const fragment = ownerDoc.createDocumentFragment();
-    while (anchor.firstChild) fragment.appendChild(anchor.firstChild);
-    anchor.parentNode.replaceChild(fragment, anchor);
+    unwrapMessagePathAnchor(anchor);
   });
 }
 
@@ -47316,7 +47678,7 @@ function renderCalendar() {
 }
 function calPrev() { if (isMemoTourInteractionLocked()) return; calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } renderCalendar(); }
 function calNext() { if (isMemoTourInteractionLocked()) return; calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } renderCalendar(); }
-function calSelectDay(d) { if (isMemoTourInteractionLocked()) return; calSelected = { y: calYear, m: calMonth, d: d }; renderCalendar(); renderTimeline(); }
+function calSelectDay(d) { if (isMemoTourInteractionLocked()) return; memoDetailPreviewHide(); calSelected = { y: calYear, m: calMonth, d: d }; renderCalendar(); renderTimeline(); }
 function localDateStr() { const n = new Date(); return n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0'); }
 function calDateStr() { return calSelected ? calSelected.y + '-' + String(calSelected.m + 1).padStart(2, '0') + '-' + String(calSelected.d).padStart(2, '0') : localDateStr(); }
 let _tlTimer = null;
@@ -47375,6 +47737,9 @@ function refreshCronViews() {
   if (_cronRefreshInFlight) {
     scheduleRefreshCronViews(180);
     return;
+  }
+  if (memoDetailPreviewState.detailId && String(memoDetailPreviewState.agentId || '') !== String(state.settings.agentId || '')) {
+    memoDetailPreviewHide();
   }
   _cronRefreshInFlight = true;
   renderTimeline();
@@ -47473,8 +47838,8 @@ function shouldClearTimelineCompletionBadgeOnReveal() {
 async function _doRenderTimeline() {
   const el = document.getElementById('rsTimeline');
   if (!el) return;
-  rsHideMetaCenterPreview();
   if (isMemoTourDetailListStep(onboardingState.step)) {
+    memoDetailPreviewHide();
     renderMemoTourTimeline();
     syncTimelineCompletionBadge('', '');
     return;
@@ -47482,6 +47847,7 @@ async function _doRenderTimeline() {
   const agentId = state.settings.agentId;
   if (!agentId) {
     setTimelineDetailCache([]);
+    memoDetailPreviewHide();
     el.innerHTML = getTimelineCompletionBadgeMarkup('', '') + '<ul class="rs-timeline"><li style="color:var(--text-muted)">--无任务明细--</li></ul>';
     syncTimelineCompletionBadge('', '');
     return;
@@ -47492,12 +47858,14 @@ async function _doRenderTimeline() {
     const data = await resp.json();
     if (data.status !== 0 || !data.data || data.data.length === 0) {
       setTimelineDetailCache([]);
+      memoDetailPreviewSyncAfterTimelineRefresh(agentId, date, []);
       syncMemoCompletionTourCandidate(agentId, date, []);
       updateTimelineCompletionBadge(agentId, date, []);
       el.innerHTML = getTimelineCompletionBadgeMarkup(agentId, date) + '<ul class="rs-timeline"><li style="color:var(--text-muted)">--无任务明细--</li></ul>';
       return;
     }
     setTimelineDetailCache(data.data);
+    memoDetailPreviewSyncAfterTimelineRefresh(agentId, date, data.data);
     const now = Date.now() / 1000;
     const soon = 30 * 60; // 30 minutes
     const startedLabels = { 0: '待执行', 1: '已启动', 2: '无需启动', 3: '已完成' };
@@ -47533,7 +47901,7 @@ async function _doRenderTimeline() {
       } else {
         actionBtn = '<span style="width:12px;flex-shrink:0;display:inline-block"></span>';
       }
-      return '<li' + cls + idAttr + ' data-meta="' + meta.replace(/"/g, '&quot;') + '" data-id="' + d.id + '" data-metaid="' + d.metaId + '" data-chatid="' + esc(d.chatId || '') + '" data-exectime="' + d.execTime + '" onmouseenter="tlHover(event,this)" onmouseleave="tlLeave()">' +
+      return '<li' + cls + idAttr + ' data-meta="' + meta.replace(/"/g, '&quot;') + '" data-id="' + d.id + '" data-metaid="' + d.metaId + '" data-chatid="' + esc(d.chatId || '') + '" data-exectime="' + d.execTime + '" onmouseenter="tlHover(event,this)" onmouseleave="tlLeave(event,this)">' +
         actionBtn + '<span class="tl-time">' + timeStr + '</span> <span class="tl-text">' + esc(d.content) + '</span> <span class="tl-status tl-status-' + startedClass + '">' + esc(startedLabel) + '</span></li>';
     }).join('') + '</ul>';
     queueMemoCompletionTourAutoStart();
@@ -47550,12 +47918,19 @@ async function _doRenderTimeline() {
     }
   } catch {
     setTimelineDetailCache([]);
+    memoDetailPreviewSyncAfterTimelineRefresh(agentId, date, []);
     el.innerHTML = getTimelineCompletionBadgeMarkup(agentId, date) + '<ul class="rs-timeline"><li style="color:var(--text-muted)">--无任务明细--</li></ul>';
     syncTimelineCompletionBadge(agentId, date);
   }
 }
 function tlHover(e, el) {
   if (isMemoTourInteractionLocked()) return;
+  if (memoMetaPreviewState.metaId) return;
+  const detail = getTimelineDetail(el && el.getAttribute('data-id'));
+  if (detail) {
+    memoDetailPreviewSourceEnter(detail);
+    return;
+  }
   try {
     const m = JSON.parse(el.getAttribute('data-meta'));
     rsShowMetaCenterPreview({
@@ -47571,8 +47946,20 @@ function tlHover(e, el) {
     });
   } catch { return; }
 }
-function tlLeave() {
-  rsHideMetaCenterPreview();
+function tlLeave(event, el) {
+  const nextTarget = event && event.relatedTarget;
+  const previewCard = document.querySelector('#rsMetaCenterPreview .rs-meta-center-card');
+  if (previewCard && nextTarget instanceof Node && previewCard.contains(nextTarget)) {
+    memoDetailPreviewState.sourceHovered = false;
+    memoDetailPreviewState.cardHovered = true;
+    memoDetailPreviewClearCloseTimer();
+    return;
+  }
+  if (!el) {
+    memoDetailPreviewHide();
+    return;
+  }
+  memoDetailPreviewSourceLeave(el && el.getAttribute('data-id'));
 }
 let tlIgnorePendingId = null;
 function tlCollapseCalendar(collapse, force) {
@@ -47591,7 +47978,7 @@ function tlCollapseCalendar(collapse, force) {
 function tlIgnoreShow(detailId, btn) {
   if (isMemoTourInteractionLocked()) return;
   clearTimelineCompletionBadge();
-  tlLeave();
+  memoDetailPreviewHide();
   tlIgnorePendingId = detailId;
   const li = btn.closest('li');
   const meta = li ? li.getAttribute('data-meta') : null;
@@ -47634,7 +48021,7 @@ let tlViewPending = null; // {detailId, metaId, agentId, model, thinking, chatId
 function tlViewShow(detailId, metaId, btn) {
   if (isMemoTourInteractionLocked() && !memoCompletionTourState.scriptMode) return;
   clearTimelineCompletionBadge();
-  tlLeave();
+  memoDetailPreviewHide();
   const li = btn.closest('li');
   const meta = li ? li.getAttribute('data-meta') : null;
   const execTime = li ? li.getAttribute('data-exectime') : '';
@@ -47754,6 +48141,7 @@ document.addEventListener('DOMContentLoaded', () => {
 let rsSelectedModel = '';
 let rsVerifyEnabledState = false;
 let rsTimeFocused = false;
+let rsNoteSaveInFlight = false;
 let rsValidationFlashTimers = {
   note: 0,
   model: 0
@@ -47908,12 +48296,24 @@ function rsInitNote() {
   });
 }
 
-function rsUpdateTime() {
-  const now = new Date();
+function rsSelectedScheduleIsFuture(now = new Date()) {
+  const h = document.getElementById('rsTimeH');
+  const m = document.getElementById('rsTimeM');
+  const hour = Number(h && h.value);
+  const minute = Number(m && m.value);
+  const dateParts = String(calDateStr() || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!dateParts || !Number.isInteger(hour) || !Number.isInteger(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) return false;
+  const selected = new Date(Number(dateParts[1]), Number(dateParts[2]) - 1, Number(dateParts[3]), hour, minute, 0, 0);
+  if (selected.getFullYear() !== Number(dateParts[1]) || selected.getMonth() !== Number(dateParts[2]) - 1 || selected.getDate() !== Number(dateParts[3])) return false;
+  return selected.getTime() > now.getTime();
+}
+function rsUpdateTime(now = new Date(), options = {}) {
+  if (!options.force && rsSelectedScheduleIsFuture(now)) return false;
   const h = document.getElementById('rsTimeH');
   const m = document.getElementById('rsTimeM');
   if (h) h.value = String(now.getHours()).padStart(2, '0');
   if (m) m.value = String(now.getMinutes()).padStart(2, '0');
+  return true;
 }
 function rsBuildSaveSchedule() {
   const hour = String(document.getElementById('rsTimeH')?.value || '').padStart(2, '0');
@@ -47974,6 +48374,7 @@ function rsSelectModel(m) {
   document.getElementById('rsModelDropdown').classList.remove('show');
 }
 function rsSaveNote(options = {}) {
+  if (rsNoteSaveInFlight) return false;
   if (isMemoTourInteractionLocked() && !options.force && !memoTaskTourState.scriptedWebSubmit) return false;
   const noteEl = document.getElementById('rsNoteInput');
   const content = getMemoInputText();
@@ -48003,8 +48404,28 @@ function rsSaveNote(options = {}) {
   showExclusiveOverlay(document.getElementById('rsConfirm'));
   return true;
 }
-function rsHideConfirm() {
+function rsSetNoteSaveInFlight(inFlight) {
+  rsNoteSaveInFlight = !!inFlight;
+  setMemoSaveLock(rsNoteSaveInFlight);
+  const memoCell = document.getElementById('rsMemoCell');
+  if (memoCell) memoCell.classList.toggle('is-submitting', rsNoteSaveInFlight);
+  ['rsSaveBtn', 'rsResetBtn', 'rsModelBtn', 'rsTimeH', 'rsTimeM', 'rsRepeatBtn', 'rsReuseChat'].forEach(id => {
+    const control = document.getElementById(id);
+    if (control instanceof HTMLButtonElement || control instanceof HTMLInputElement || control instanceof HTMLSelectElement) {
+      control.disabled = rsNoteSaveInFlight;
+    }
+  });
+  const confirm = document.getElementById('rsConfirm');
+  const confirmActions = confirm ? confirm.querySelectorAll('button') : [];
+  confirmActions.forEach(control => {
+    if (control instanceof HTMLButtonElement) control.disabled = rsNoteSaveInFlight;
+  });
+  if (confirm) confirm.setAttribute('aria-busy', rsNoteSaveInFlight ? 'true' : 'false');
+}
+function rsHideConfirm(options = {}) {
+  if (rsNoteSaveInFlight && !options.force) return false;
   setOverlayVisible(document.getElementById('rsConfirm'), false);
+  return true;
 }
 
 function maybeQueueMemoRecurringTour(payload, data) {
@@ -48019,7 +48440,7 @@ function maybeQueueMemoRecurringTour(payload, data) {
 }
 
 async function rsSubmitNote(options = {}) {
-  if (options.hideConfirm !== false) rsHideConfirm();
+  if (rsNoteSaveInFlight) return { ok: false, reason: 'save-pending' };
   const noteEl = document.getElementById('rsNoteInput');
   const content = getMemoInputText();
   if (!content) {
@@ -48046,6 +48467,7 @@ async function rsSubmitNote(options = {}) {
     else if (options.showToast !== false) vfsShowUploadToast(message, true);
     return { ok: false, reason: 'missing-agent' };
   }
+  rsSetNoteSaveInFlight(true);
   try {
     const routerRemote = await getAgentRouterRemoteConfig(agentId);
     const payload = {
@@ -48068,7 +48490,8 @@ async function rsSubmitNote(options = {}) {
     if (data.status === 0) {
       const queuedRecurringTour = maybeQueueMemoRecurringTour(payload, data);
       if (options.showToast !== false) vfsShowUploadToast('备忘录已保存', false);
-      if (options.resetNote !== false) rsResetNote();
+      rsResetNote();
+      rsHideConfirm({ force: true });
       if (options.refreshViews !== false) scheduleRefreshCronViews(0);
       if (options.openMetaViewOnSuccess !== false && !rsMetaViewActive && !queuedRecurringTour) rsToggleMetaView();
       return { ok: true, payload, data };
@@ -48080,6 +48503,8 @@ async function rsSubmitNote(options = {}) {
     const message = '保存失败: ' + e.message;
     if (options.showToast !== false) vfsShowUploadToast(message, true);
     return { ok: false, reason: 'save-error', message, error: e };
+  } finally {
+    rsSetNoteSaveInFlight(false);
   }
 }
 async function rsDoSave(options = {}) {
@@ -48109,7 +48534,7 @@ function rsResetNote() {
   t.classList.remove('on');
   rsVerifyEnabledState = false;
   rsUpdateThinkingUI();
-  rsUpdateTime();
+  rsUpdateTime(new Date(), { force: true });
   // Reset repeat
   rsRepeatMode = 'once';
   document.querySelectorAll('#rsRepeatDd .rs-repeat-opt').forEach(el => el.classList.toggle('active', el.getAttribute('data-mode') === 'once'));
@@ -48196,22 +48621,292 @@ const RS_META_PREVIEW_FIELD_IDS = {
   agent: 'rsMetaCenterPreviewAgent',
   status: 'rsMetaCenterPreviewStatus'
 };
+const MEMO_DETAIL_CYCLE_LABELS = { 0: '仅一次', 1: '工作日', 2: '自然日', 3: '每小时', 4: '每15分钟', 5: '每30分钟' };
+const MEMO_DETAIL_STATUS_LABELS = { 0: '待执行', 1: '已启动', 2: '无需启动', 3: '已完成' };
+const MEMO_DETAIL_PREVIEW_CLOSE_DELAY_MS = 500;
+const memoDetailPreviewState = {
+  detailId: '',
+  agentId: '',
+  date: '',
+  detail: null,
+  snapshot: null,
+  draft: null,
+  sourceHovered: false,
+  cardHovered: false,
+  editing: false,
+  saving: false,
+  deleting: false,
+  validationMessage: '',
+  agentOptions: [],
+  agentOptionsLoading: false,
+  keepOpenAfterSave: false,
+  closeTimer: 0,
+  closeGeneration: 0
+};
+const memoMetaPreviewState = {
+  metaId: '',
+  agentId: '',
+  meta: null,
+  snapshot: null,
+  draft: null,
+  sourceHovered: false,
+  cardHovered: false,
+  editing: false,
+  saving: false,
+  deleting: false,
+  validationMessage: '',
+  agentOptions: [],
+  agentOptionsLoading: false,
+  cycleMenuOpen: false,
+  keepOpenAfterSave: false,
+  closeTimer: 0,
+  closeGeneration: 0
+};
 function rsSetMetaPreviewFocus(active) {
   document.body.classList.toggle('meta-preview-focus', !!active);
 }
-function rsShowMetaCenterPreview(meta) {
+function rsSetMetaPreviewInteractive(active) {
   const overlay = document.getElementById('rsMetaCenterPreview');
-  const body = document.getElementById('rsMetaCenterPreviewContent');
-  if (!overlay || !body) return;
+  if (!overlay) return;
+  overlay.classList.toggle('meta-preview-interactive', !!active);
+}
+function rsSetMetaPreviewEditLock(locked) {
+  const overlay = document.getElementById('rsMetaCenterPreview');
+  if (!overlay) return;
+  overlay.classList.toggle('meta-preview-editing-lock', !!locked);
+  if (locked) overlay.removeAttribute('data-overlay-passive');
+  else overlay.setAttribute('data-overlay-passive', '1');
+  refreshOverlayStates();
+}
+function memoPreviewEditLockOverlayPointerDown(event) {
+  if (!event || event.target !== event.currentTarget) return;
+  if (!memoDetailPreviewState.editing && !memoMetaPreviewState.editing) return;
+  event.preventDefault();
+  event.stopPropagation();
+  memoDetailPreviewClearCloseTimer();
+  memoMetaPreviewClearCloseTimer();
+}
+function memoPreviewEditLockOverlayClick(event) {
+  if (!event || event.target !== event.currentTarget) return;
+  if (!memoDetailPreviewState.editing && !memoMetaPreviewState.editing) return;
+  event.preventDefault();
+  event.stopPropagation();
+}
+function memoDetailPreviewClone(value) {
+  return value && typeof value === 'object' ? JSON.parse(JSON.stringify(value)) : null;
+}
+function memoPreviewSetValidationMessage(message, metadata = false) {
+  const previewState = metadata ? memoMetaPreviewState : memoDetailPreviewState;
+  previewState.validationMessage = String(message || '').trim();
+  const tip = document.getElementById('rsMetaCenterPreviewTip');
+  if (!tip) return;
+  tip.textContent = previewState.validationMessage;
+  tip.classList.toggle('show', !!previewState.validationMessage);
+}
+function memoPreviewSyncValidationMessage(metadata, editing) {
+  const tip = document.getElementById('rsMetaCenterPreviewTip');
+  if (!tip) return;
+  const previewState = metadata ? memoMetaPreviewState : memoDetailPreviewState;
+  const message = editing ? String(previewState.validationMessage || '').trim() : '';
+  tip.textContent = message;
+  tip.classList.toggle('show', !!message);
+}
+function memoPreviewKnownAgentOptions(agents) {
+  const settingsOptions = Array.from(document.querySelectorAll('#agentSelect option')).map(option => String(option.value || '').trim());
+  return Array.from(new Set([].concat(Array.isArray(agents) ? agents : [], settingsOptions).map(value => String(value || '').trim()).filter(Boolean)));
+}
+function memoDetailPreviewClearCloseTimer() {
+  memoDetailPreviewState.closeGeneration += 1;
+  if (!memoDetailPreviewState.closeTimer) return;
+  clearTimeout(memoDetailPreviewState.closeTimer);
+  memoDetailPreviewState.closeTimer = 0;
+}
+function memoDetailPreviewCardIsHovered() {
+  const card = document.querySelector('#rsMetaCenterPreview .rs-meta-center-card');
+  return !!(card && card.matches(':hover'));
+}
+function memoDetailPreviewFormatTime(execTime, format = 'display') {
+  const ts = Number(execTime);
+  if (!Number.isFinite(ts) || ts <= 0) return '-';
+  const date = new Date(ts * 1000);
+  const yyyy = String(date.getFullYear());
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  const hh = String(date.getHours()).padStart(2, '0');
+  const min = String(date.getMinutes()).padStart(2, '0');
+  return format === 'input' ? (yyyy + '-' + mm + '-' + dd + 'T' + hh + ':' + min) : (mm + '-' + dd + ' ' + hh + ':' + min);
+}
+function memoDetailPreviewMinimumExecTime() {
+  // datetime-local is minute-granular, so start at the next whole minute to
+  // ensure the selected value is still in the future when it reaches the API.
+  return memoDetailPreviewFormatTime(Math.floor(Date.now() / 60000 + 1) * 60, 'input');
+}
+function memoDetailPreviewBuildMeta(detail) {
+  const source = detail && typeof detail === 'object' ? detail : {};
+  return {
+    cycle: MEMO_DETAIL_CYCLE_LABELS[Number(source.cycle)] || '-',
+    time: memoDetailPreviewFormatTime(source.execTime),
+    model: normalizeModelName(source.model),
+    thinking: source.thinking ? 'Thinking' : 'Auto',
+    swarm: formatSwarmStatus(source.router_disable),
+    verify: formatVerifyStatus(!!source.verify && !!source.thinking),
+    agent: source.agentId || '',
+    status: MEMO_DETAIL_STATUS_LABELS[Number(source.started)] || '未知',
+    content: source.content || ''
+  };
+}
+function memoDetailPreviewCreateDraft(detail) {
+  const source = detail && typeof detail === 'object' ? detail : {};
+  return {
+    execTime: memoDetailPreviewFormatTime(source.execTime, 'input'),
+    agentId: String(source.agentId || state.settings.agentId || '').trim(),
+    content: String(source.content || ''),
+    model: normalizeModelName(source.model),
+    thinking: !!source.thinking,
+    verify: !!source.verify && !!source.thinking,
+    routerDisable: readMetadataBoolean(source.router_disable) !== false
+  };
+}
+function memoMetaPreviewBuildMeta(meta) {
+  const source = meta && typeof meta === 'object' ? meta : {};
+  return {
+    cycle: MEMO_DETAIL_CYCLE_LABELS[Number(source.cycle)] || (Number(source.cycle) === -1 ? 'Cron' : '-'),
+    time: String(source.rawTime || '').trim() || (Number(source.cycle) === -1 ? 'Cron 自定义' : '-'),
+    model: normalizeModelName(source.model),
+    thinking: source.thinking ? 'Thinking' : 'Auto',
+    swarm: formatSwarmStatus(source.router_disable),
+    verify: formatVerifyStatus(!!source.verify && !!source.thinking),
+    agent: source.agentId || '',
+    status: '-',
+    content: source.content || ''
+  };
+}
+function memoMetaPreviewCreateDraft(meta) {
+  const source = meta && typeof meta === 'object' ? meta : {};
+  return {
+    rawTime: String(source.rawTime || '').trim().replace(' ', 'T'),
+    cycle: Number(source.cycle),
+    agentId: String(source.agentId || state.settings.agentId || '').trim(),
+    content: String(source.content || ''),
+    model: normalizeModelName(source.model),
+    thinking: !!source.thinking,
+    verify: !!source.verify && !!source.thinking,
+    routerDisable: readMetadataBoolean(source.router_disable) !== false
+  };
+}
+function memoDetailPreviewActionMarkup(editing, saving) {
+  if (!memoDetailPreviewState.detailId || Number(memoDetailPreviewState.detail && memoDetailPreviewState.detail.started) !== 0) return '';
+  const disabled = (saving || memoDetailPreviewState.deleting) ? ' disabled' : '';
+  if (!editing) {
+    return '<button type="button" class="rs-meta-center-action" onclick="memoDetailPreviewBeginEdit()" title="编辑备忘录" aria-label="编辑备忘录"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' +
+      '<button type="button" class="rs-meta-center-action rs-meta-center-delete-action" onclick="memoDetailPreviewDelete()" title="删除备忘录" aria-label="删除备忘录"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>';
+  }
+  return '<button type="button" class="rs-meta-center-action" onclick="memoDetailPreviewSave()" title="保存修改" aria-label="保存修改"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg></button>' +
+    '<button type="button" class="rs-meta-center-action" onclick="memoDetailPreviewCancelEdit()" title="取消编辑" aria-label="取消编辑"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>';
+}
+function memoDetailPreviewToggleMarkup(field, active, disabled) {
+  return '<button type="button" class="rs-meta-center-field-toggle' + (active ? ' on' : '') + '" role="switch" aria-checked="' + (active ? 'true' : 'false') + '" onclick="memoDetailPreviewToggleField(\'' + field + '\')"' + (disabled ? ' disabled' : '') + '>' + (active ? '开启' : '关闭') + '</button>';
+}
+function memoMetaPreviewActionMarkup(editing, saving) {
+  if (!memoMetaPreviewState.metaId) return '';
+  const disabled = (saving || memoMetaPreviewState.deleting) ? ' disabled' : '';
+  if (!editing) {
+    return '<button type="button" class="rs-meta-center-action" onclick="memoMetaPreviewBeginEdit()" title="编辑备忘录" aria-label="编辑备忘录"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' +
+      '<button type="button" class="rs-meta-center-action rs-meta-center-delete-action" onclick="memoMetaPreviewDelete()" title="删除备忘录" aria-label="删除备忘录"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>';
+  }
+  return '<button type="button" class="rs-meta-center-action" onclick="memoMetaPreviewSave()" title="保存修改" aria-label="保存修改"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg></button>' +
+    '<button type="button" class="rs-meta-center-action" onclick="memoMetaPreviewCancelEdit()" title="取消编辑" aria-label="取消编辑"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>';
+}
+function memoMetaPreviewToggleMarkup(field, active, disabled) {
+  return '<button type="button" class="rs-meta-center-field-toggle' + (active ? ' on' : '') + '" role="switch" aria-checked="' + (active ? 'true' : 'false') + '" onclick="memoMetaPreviewToggleField(\'' + field + '\')"' + (disabled ? ' disabled' : '') + '>' + (active ? '开启' : '关闭') + '</button>';
+}
+function memoMetaPreviewCycleMarkup(draft, disabled) {
+  const cycle = Number(draft.cycle);
+  const label = MEMO_DETAIL_CYCLE_LABELS[cycle] || (cycle === -1 ? 'Cron' : '选择周期');
+  const modes = [
+    [1, '工作日'],
+    [2, '自然日'],
+    [3, '每小时'],
+    [4, '每15分钟'],
+    [5, '每30分钟']
+  ];
+  const disabledAttr = disabled ? ' disabled' : '';
+  const options = modes.map(item => '<div class="rs-repeat-opt' + (cycle === item[0] ? ' active' : '') + '" data-cycle="' + item[0] + '" onclick="memoMetaPreviewSelectCycle(' + item[0] + ',event)" role="option" aria-selected="' + (cycle === item[0] ? 'true' : 'false') + '">' + item[1] + '</div>').join('');
+  return '<div class="rs-repeat-wrap rs-meta-center-cycle-picker"><button type="button" class="rs-repeat-btn" title="选择周期" aria-label="选择周期" aria-expanded="' + (memoMetaPreviewState.cycleMenuOpen ? 'true' : 'false') + '" onclick="memoMetaPreviewToggleCycleMenu(event)"' + disabledAttr + '><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></button><span class="rs-meta-center-cycle-label">' + esc(label) + '</span><div class="rs-repeat-dd' + (memoMetaPreviewState.cycleMenuOpen ? ' show' : '') + '" role="listbox">' + options + '</div></div>';
+}
+function memoPreviewAgentSelectMarkup(draft, stateForPreview, setter) {
+  const selected = String(draft.agentId || '').trim();
+  const agents = memoPreviewKnownAgentOptions(stateForPreview.agentOptions);
+  const agentValues = Array.from(new Set([selected].concat(agents).filter(Boolean)));
+  const disabled = stateForPreview.saving || stateForPreview.agentOptionsLoading || agentValues.length === 0;
+  const placeholder = stateForPreview.agentOptionsLoading ? '加载 Agent…' : '请选择 Agent';
+  const options = ['<option value="">' + placeholder + '</option>'].concat(agentValues.map(agentId => '<option value="' + esc(agentId) + '"' + (agentId === selected ? ' selected' : '') + '>' + esc(agentId) + '</option>')).join('');
+  return '<select class="rs-meta-center-select" aria-label="Agent" oninput="' + setter + '(\'agentId\',this.value)" onchange="' + setter + '(\'agentId\',this.value)"' + (disabled ? ' disabled' : '') + '>' + options + '</select>';
+}
+function rsRenderMetaCenterPreview(meta, options = {}) {
   const payload = meta && typeof meta === 'object' ? meta : {};
+  const metadata = !!options.metadata;
+  const editing = !!options.editing;
+  const previewState = metadata ? memoMetaPreviewState : memoDetailPreviewState;
+  const draft = previewState.draft || {};
   const normalizedContent = String(payload.content || '').trim() || '暂无内容';
+  const values = Object.assign({}, payload);
+  const title = document.getElementById('rsMetaCenterPreviewTitle');
+  if (title) title.textContent = options.detail ? '备忘录明细预览' : (metadata ? '备忘录元数据预览' : '备忘录预览');
+  memoPreviewSyncValidationMessage(metadata, editing);
+  const actions = document.getElementById('rsMetaCenterPreviewActions');
+  if (actions) actions.innerHTML = options.detail
+    ? memoDetailPreviewActionMarkup(editing, !!memoDetailPreviewState.saving)
+    : (metadata ? memoMetaPreviewActionMarkup(editing, !!memoMetaPreviewState.saving) : '');
   Object.keys(RS_META_PREVIEW_FIELD_IDS).forEach(key => {
     const node = document.getElementById(RS_META_PREVIEW_FIELD_IDS[key]);
     if (!node) return;
-    const value = String(payload[key] || '').trim();
-    node.textContent = value || '-';
+    node.classList.toggle('rs-meta-center-value-cycle-editor', editing && metadata && key === 'cycle');
+    if (!editing) {
+      const value = String(values[key] || '').trim();
+      node.textContent = value || '-';
+      return;
+    }
+    if (key === 'cycle' && metadata) {
+      node.innerHTML = memoMetaPreviewCycleMarkup(draft, memoMetaPreviewState.saving);
+    } else if (key === 'time') {
+      const timeField = metadata ? 'rawTime' : 'execTime';
+      const timeValue = metadata ? draft.rawTime : draft.execTime;
+      const setter = metadata ? 'memoMetaPreviewSetDraftField' : 'memoDetailPreviewSetDraftField';
+      node.innerHTML = '<input class="rs-meta-center-input" type="datetime-local" min="' + esc(memoDetailPreviewMinimumExecTime()) + '" value="' + esc(timeValue || '') + '" aria-label="执行时间，不能早于当前时间" onchange="' + setter + '(\'' + timeField + '\',this.value)">';
+    } else if (key === 'model') {
+      const currentModel = normalizeModelName(draft.model);
+      const models = getSelectableConfiguredModelNames(state.settings.models || {});
+      const optionsHtml = ['<option value="">选择模型</option>'].concat(models.map(model => '<option value="' + esc(model) + '"' + (model === currentModel ? ' selected' : '') + '>' + esc(model) + '</option>')).join('');
+      node.innerHTML = '<select class="rs-meta-center-select" aria-label="模型" onchange="' + (metadata ? 'memoMetaPreviewSetDraftField' : 'memoDetailPreviewSetDraftField') + '(\'model\',this.value)">' + optionsHtml + '</select>';
+    } else if (key === 'thinking') {
+      node.innerHTML = metadata ? memoMetaPreviewToggleMarkup('thinking', !!draft.thinking, memoMetaPreviewState.saving) : memoDetailPreviewToggleMarkup('thinking', !!draft.thinking, memoDetailPreviewState.saving);
+    } else if (key === 'swarm') {
+      node.innerHTML = metadata ? memoMetaPreviewToggleMarkup('routerDisable', !draft.routerDisable, memoMetaPreviewState.saving) : memoDetailPreviewToggleMarkup('routerDisable', !draft.routerDisable, memoDetailPreviewState.saving);
+    } else if (key === 'verify') {
+      node.innerHTML = metadata ? memoMetaPreviewToggleMarkup('verify', !!draft.verify, !draft.thinking || memoMetaPreviewState.saving) : memoDetailPreviewToggleMarkup('verify', !!draft.verify, !draft.thinking || memoDetailPreviewState.saving);
+    } else if (key === 'agent') {
+      node.innerHTML = metadata
+        ? memoPreviewAgentSelectMarkup(draft, memoMetaPreviewState, 'memoMetaPreviewSetDraftField')
+        : memoPreviewAgentSelectMarkup(draft, memoDetailPreviewState, 'memoDetailPreviewSetDraftField');
+    } else {
+      const value = String(values[key] || '').trim();
+      node.textContent = value || '-';
+    }
   });
-  body.textContent = normalizedContent;
+  const body = document.getElementById('rsMetaCenterPreviewContent');
+  if (!body) return;
+  body.classList.toggle('editing', editing);
+  if (editing) {
+    body.innerHTML = '<textarea id="rsMetaCenterPreviewContentInput" aria-label="备忘录内容" maxlength="' + EDITABLE_INPUT_MAX_CHARS + '" oninput="' + (metadata ? 'memoMetaPreviewSetDraftField' : 'memoDetailPreviewSetDraftField') + '(\'content\',this.value)">' + esc(String(draft.content || '')) + '</textarea>';
+  } else {
+    body.textContent = normalizedContent;
+  }
+}
+function rsShowMetaCenterPreview(meta, options = {}) {
+  const overlay = document.getElementById('rsMetaCenterPreview');
+  if (!overlay) return;
+  rsRenderMetaCenterPreview(meta, options);
   rsSetMetaPreviewFocus(true);
   showPassiveOverlay(overlay);
 }
@@ -48219,26 +48914,637 @@ function rsShowMetaCenterPreview(meta) {
 function rsHideMetaCenterPreview() {
   const overlay = document.getElementById('rsMetaCenterPreview');
   rsSetMetaPreviewFocus(false);
+  rsSetMetaPreviewInteractive(false);
+  rsSetMetaPreviewEditLock(false);
   if (!overlay) return;
   hidePassiveOverlay(overlay);
 }
 
+// Background timeline refreshes are allowed to repaint the list, but they must
+// never discard an in-progress edit.  Native select/date pickers move focus
+// outside the WebView while they are open, so relying on hover state alone is
+// not sufficient here.
+function memoDetailPreviewHide(options = {}) {
+  if (!options.force && (memoDetailPreviewState.editing || memoDetailPreviewState.saving)) {
+    memoDetailPreviewClearCloseTimer();
+    return false;
+  }
+  memoDetailPreviewClearCloseTimer();
+  memoDetailPreviewState.detailId = '';
+  memoDetailPreviewState.agentId = '';
+  memoDetailPreviewState.date = '';
+  memoDetailPreviewState.detail = null;
+  memoDetailPreviewState.snapshot = null;
+  memoDetailPreviewState.draft = null;
+  memoDetailPreviewState.sourceHovered = false;
+  memoDetailPreviewState.cardHovered = false;
+  memoDetailPreviewState.editing = false;
+  memoDetailPreviewState.saving = false;
+  memoDetailPreviewState.deleting = false;
+  memoDetailPreviewState.validationMessage = '';
+  memoDetailPreviewState.agentOptions = [];
+  memoDetailPreviewState.agentOptionsLoading = false;
+  memoDetailPreviewState.keepOpenAfterSave = false;
+  if (!memoMetaPreviewState.metaId) rsHideMetaCenterPreview();
+  return true;
+}
+function memoDetailPreviewScheduleClose() {
+  memoDetailPreviewClearCloseTimer();
+  if (memoDetailPreviewState.editing || memoDetailPreviewState.saving || memoDetailPreviewState.sourceHovered || memoDetailPreviewState.cardHovered || memoDetailPreviewCardIsHovered() || !memoDetailPreviewState.detailId) return;
+  const detailId = memoDetailPreviewState.detailId;
+  const closeGeneration = ++memoDetailPreviewState.closeGeneration;
+  memoDetailPreviewState.closeTimer = setTimeout(() => {
+    memoDetailPreviewState.closeTimer = 0;
+    if (memoDetailPreviewState.closeGeneration !== closeGeneration || memoDetailPreviewState.detailId !== detailId || memoDetailPreviewState.editing || memoDetailPreviewState.saving || memoDetailPreviewState.sourceHovered || memoDetailPreviewState.cardHovered || memoDetailPreviewCardIsHovered()) return;
+    memoDetailPreviewHide();
+  }, MEMO_DETAIL_PREVIEW_CLOSE_DELAY_MS);
+}
+function memoDetailPreviewSourceEnter(detail) {
+  if (!detail || isMemoTourInteractionLocked()) return;
+  const detailId = String(detail.id || '').trim();
+  if (!detailId) return;
+  if (memoMetaPreviewState.metaId) return;
+  if (memoDetailPreviewState.editing && memoDetailPreviewState.detailId !== detailId) return;
+  memoDetailPreviewClearCloseTimer();
+  memoDetailPreviewState.sourceHovered = true;
+  memoDetailPreviewState.cardHovered = false;
+  if (memoDetailPreviewState.detailId !== detailId) {
+    memoDetailPreviewState.detailId = detailId;
+    memoDetailPreviewState.agentId = String(detail.agentId || state.settings.agentId || '');
+    memoDetailPreviewState.date = calDateStr();
+    memoDetailPreviewState.detail = memoDetailPreviewClone(detail);
+    memoDetailPreviewState.snapshot = memoDetailPreviewClone(detail);
+    memoDetailPreviewState.draft = null;
+    memoDetailPreviewState.editing = false;
+    memoDetailPreviewState.saving = false;
+    memoDetailPreviewState.deleting = false;
+    memoDetailPreviewState.validationMessage = '';
+    memoDetailPreviewState.agentOptions = [];
+    memoDetailPreviewState.agentOptionsLoading = false;
+    memoDetailPreviewState.keepOpenAfterSave = false;
+  } else if (!memoDetailPreviewState.editing) {
+    memoDetailPreviewState.detail = memoDetailPreviewClone(detail);
+    memoDetailPreviewState.snapshot = memoDetailPreviewClone(detail);
+  }
+  rsShowMetaCenterPreview(memoDetailPreviewBuildMeta(memoDetailPreviewState.detail), { detail: true, editing: memoDetailPreviewState.editing });
+  rsSetMetaPreviewInteractive(true);
+}
+function memoDetailPreviewSourceLeave(detailId) {
+  if (String(detailId || '') !== memoDetailPreviewState.detailId) return;
+  memoDetailPreviewState.sourceHovered = false;
+  memoDetailPreviewScheduleClose();
+}
+function memoDetailPreviewCardEnter() {
+  if (memoMetaPreviewState.metaId) {
+    memoMetaPreviewState.cardHovered = true;
+    memoMetaPreviewClearCloseTimer();
+    return;
+  }
+  if (!memoDetailPreviewState.detailId) return;
+  memoDetailPreviewState.cardHovered = true;
+  memoDetailPreviewClearCloseTimer();
+}
+function memoDetailPreviewCardLeave() {
+  if (memoMetaPreviewState.metaId) {
+    memoMetaPreviewState.cardHovered = false;
+    memoMetaPreviewScheduleClose();
+    return;
+  }
+  if (!memoDetailPreviewState.detailId) return;
+  memoDetailPreviewState.cardHovered = false;
+  memoDetailPreviewScheduleClose();
+}
+function memoDetailPreviewBeginEdit() {
+  const detail = memoDetailPreviewState.detail;
+  if (!detail || Number(detail.started) !== 0 || memoDetailPreviewState.saving || memoDetailPreviewState.deleting) return;
+  memoDetailPreviewClearCloseTimer();
+  memoDetailPreviewState.snapshot = memoDetailPreviewClone(detail);
+  memoDetailPreviewState.draft = memoDetailPreviewCreateDraft(detail);
+  memoDetailPreviewState.editing = true;
+  memoDetailPreviewState.validationMessage = '';
+  memoDetailPreviewState.agentOptions = [];
+  memoDetailPreviewState.agentOptionsLoading = true;
+  rsShowMetaCenterPreview(memoDetailPreviewBuildMeta(detail), { detail: true, editing: true });
+  rsSetMetaPreviewInteractive(true);
+  rsSetMetaPreviewEditLock(true);
+  void memoDetailPreviewLoadAgentOptions(String(detail.id || ''));
+}
+async function memoDetailPreviewLoadAgentOptions(detailId) {
+  let agents = [];
+  try { agents = await fetchAgentList(); } catch {}
+  if (!memoDetailPreviewState.editing || memoDetailPreviewState.detailId !== String(detailId || '')) return;
+  memoDetailPreviewState.agentOptions = Array.isArray(agents) ? agents : [];
+  memoDetailPreviewState.agentOptionsLoading = false;
+  rsRenderMetaCenterPreview(memoDetailPreviewBuildMeta(memoDetailPreviewState.detail), { detail: true, editing: true });
+}
+function memoDetailPreviewSetDraftField(field, value) {
+  if (!memoDetailPreviewState.editing || memoDetailPreviewState.saving || !memoDetailPreviewState.draft) return;
+  if (field === 'model') memoDetailPreviewState.draft.model = normalizeModelName(value);
+  else memoDetailPreviewState.draft[field] = String(value == null ? '' : value);
+  memoPreviewSetValidationMessage('', false);
+}
+function memoDetailPreviewToggleField(field) {
+  if (!memoDetailPreviewState.editing || memoDetailPreviewState.saving || !memoDetailPreviewState.draft) return;
+  const draft = memoDetailPreviewState.draft;
+  if (field === 'thinking') {
+    draft.thinking = !draft.thinking;
+    if (!draft.thinking) draft.verify = false;
+  } else if (field === 'routerDisable') {
+    draft.routerDisable = !draft.routerDisable;
+  } else if (field === 'verify' && draft.thinking) {
+    draft.verify = !draft.verify;
+  }
+  rsRenderMetaCenterPreview(memoDetailPreviewBuildMeta(memoDetailPreviewState.detail), { detail: true, editing: true });
+}
+function memoDetailPreviewCancelEdit() {
+  if (!memoDetailPreviewState.editing || memoDetailPreviewState.saving) return;
+  memoDetailPreviewClearCloseTimer();
+  memoDetailPreviewState.detail = memoDetailPreviewClone(memoDetailPreviewState.snapshot);
+  memoDetailPreviewState.draft = null;
+  memoDetailPreviewState.editing = false;
+  memoDetailPreviewState.validationMessage = '';
+  memoDetailPreviewState.agentOptions = [];
+  memoDetailPreviewState.agentOptionsLoading = false;
+  rsSetMetaPreviewEditLock(false);
+  rsShowMetaCenterPreview(memoDetailPreviewBuildMeta(memoDetailPreviewState.detail), { detail: true, editing: false });
+  rsSetMetaPreviewInteractive(true);
+  memoDetailPreviewScheduleClose();
+}
+function memoDetailPreviewHandleEscape(event) {
+  if (
+    event.key !== 'Escape' ||
+    event.isComposing ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.altKey
+  ) return;
+  if (memoMetaPreviewState.editing && !memoMetaPreviewState.saving) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    memoMetaPreviewCancelEdit();
+    return;
+  }
+  if (!memoDetailPreviewState.editing || memoDetailPreviewState.saving) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  memoDetailPreviewCancelEdit();
+}
+function memoDetailPreviewNormalizeExecTime(value) {
+  const normalized = String(value || '').trim().replace('T', ' ');
+  if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(normalized)) return '';
+  const parsed = new Date(normalized.replace(' ', 'T'));
+  return Number.isNaN(parsed.getTime()) ? '' : normalized;
+}
+function memoDetailPreviewExecTimeIsFuture(execTime, now = Date.now()) {
+  const parsed = new Date(String(execTime || '').replace(' ', 'T'));
+  return !Number.isNaN(parsed.getTime()) && parsed.getTime() > now;
+}
+async function memoDetailPreviewSave() {
+  const detail = memoDetailPreviewState.detail;
+  const draft = memoDetailPreviewState.draft;
+  if (!memoDetailPreviewState.editing || memoDetailPreviewState.saving || memoDetailPreviewState.deleting || !detail || !draft) return;
+  const content = String(draft.content || '').trim();
+  const execTime = memoDetailPreviewNormalizeExecTime(draft.execTime);
+  const model = normalizeModelName(draft.model);
+  // Read the native select once more at submit time.  Some WebKit builds defer
+  // a select's change event until its popup is dismissed, while its value has
+  // already changed; submitting the DOM value prevents that choice being lost.
+  const agentSelect = document.querySelector('#rsMetaCenterPreviewAgent select');
+  const agentId = String(agentSelect && agentSelect.value || draft.agentId || '').trim();
+  draft.agentId = agentId;
+  if (!content) {
+    vfsShowUploadToast('请输入备忘录内容', true);
+    document.getElementById('rsMetaCenterPreviewContentInput')?.focus();
+    return;
+  }
+  if (countEditableInputChars(content) > EDITABLE_INPUT_MAX_CHARS) {
+    vfsShowUploadToast('备忘录内容最多 ' + EDITABLE_INPUT_MAX_CHARS + ' 个字符', true);
+    document.getElementById('rsMetaCenterPreviewContentInput')?.focus();
+    return;
+  }
+  if (!execTime) {
+    vfsShowUploadToast('请选择有效执行时间', true);
+    return;
+  }
+  if (!memoDetailPreviewExecTimeIsFuture(execTime)) {
+    memoPreviewSetValidationMessage('执行时间需要晚于当前时间', false);
+    return;
+  }
+  if (!isSelectableConfiguredModel(model, state.settings.models || {})) {
+    vfsShowUploadToast('请先选择模型', true);
+    return;
+  }
+  if (!agentId) {
+    vfsShowUploadToast('请选择有效 Agent', true);
+    return;
+  }
+  memoDetailPreviewState.saving = true;
+  rsRenderMetaCenterPreview(memoDetailPreviewBuildMeta(detail), { detail: true, editing: true });
+  try {
+    const resp = await fetch('/api/cron/detail/update?agentId=' + encodeURIComponent(String(detail.agentId || state.settings.agentId || '')), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        detailId: Number(detail.id),
+        agentId,
+        execTime,
+        content,
+        model,
+        thinking: !!draft.thinking,
+        verify: !!draft.verify && !!draft.thinking,
+        router_disable: !!draft.routerDisable
+      })
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data || data.status !== 0 || !data.data) {
+      throw new Error((data && data.content) || '保存失败');
+    }
+    const updated = data.data;
+    if (String(updated.agentId || '').trim() !== agentId) {
+      throw new Error('Agent 更新未生效，请重试');
+    }
+    timelineDetailCache[String(updated.id)] = updated;
+    memoDetailPreviewState.agentId = String(updated.agentId || agentId);
+    memoDetailPreviewState.detail = memoDetailPreviewClone(updated);
+    memoDetailPreviewState.snapshot = memoDetailPreviewClone(updated);
+    memoDetailPreviewState.draft = null;
+    memoDetailPreviewState.editing = false;
+    memoDetailPreviewState.agentOptions = [];
+    memoDetailPreviewState.agentOptionsLoading = false;
+    memoDetailPreviewState.keepOpenAfterSave = true;
+    rsSetMetaPreviewEditLock(false);
+    rsShowMetaCenterPreview(memoDetailPreviewBuildMeta(updated), { detail: true, editing: false });
+    rsSetMetaPreviewInteractive(true);
+    vfsShowUploadToast('备忘录明细已更新', false);
+    scheduleRefreshCronViews(0);
+  } catch (error) {
+    vfsShowUploadToast(String(error && error.message || '保存失败'), true);
+  } finally {
+    memoDetailPreviewState.saving = false;
+    if (memoDetailPreviewState.editing && memoDetailPreviewState.detailId) {
+      rsRenderMetaCenterPreview(memoDetailPreviewBuildMeta(memoDetailPreviewState.detail), { detail: true, editing: true });
+    } else {
+      memoDetailPreviewScheduleClose();
+    }
+  }
+}
+async function memoDetailPreviewDelete() {
+  const detail = memoDetailPreviewState.detail;
+  if (!detail || Number(detail.started) !== 0 || memoDetailPreviewState.editing || memoDetailPreviewState.saving || memoDetailPreviewState.deleting) return;
+  const detailId = Number(detail.id);
+  if (!Number.isInteger(detailId) || detailId <= 0) return;
+  memoDetailPreviewClearCloseTimer();
+  memoDetailPreviewState.deleting = true;
+  rsRenderMetaCenterPreview(memoDetailPreviewBuildMeta(detail), { detail: true, editing: false });
+  try {
+    const resp = await fetch('/api/cron/detail/delete?detailId=' + encodeURIComponent(String(detailId)), { method: 'POST' });
+    const data = await resp.json();
+    if (!resp.ok || !data || data.status !== 0 || Number(data.affected) !== 1) {
+      throw new Error((data && data.content) || '删除失败');
+    }
+    memoDetailPreviewHide();
+    vfsShowUploadToast('备忘录明细已删除', false);
+    scheduleRefreshCronViews(0);
+  } catch (error) {
+    memoDetailPreviewState.deleting = false;
+    rsRenderMetaCenterPreview(memoDetailPreviewBuildMeta(detail), { detail: true, editing: false });
+    vfsShowUploadToast(String(error && error.message || '删除失败'), true);
+  }
+}
+function memoDetailPreviewSyncAfterTimelineRefresh(agentId, date, details) {
+  if (!memoDetailPreviewState.detailId || memoDetailPreviewState.editing) return;
+  if (String(memoDetailPreviewState.agentId || '') !== String(agentId || '') || String(memoDetailPreviewState.date || '') !== String(date || '')) {
+    memoDetailPreviewHide();
+    return;
+  }
+  const refreshed = (Array.isArray(details) ? details : []).find(item => String(item && item.id || '') === memoDetailPreviewState.detailId);
+  if (refreshed) {
+    memoDetailPreviewState.detail = memoDetailPreviewClone(refreshed);
+    memoDetailPreviewState.snapshot = memoDetailPreviewClone(refreshed);
+    memoDetailPreviewState.keepOpenAfterSave = false;
+    return;
+  }
+  if (!memoDetailPreviewState.keepOpenAfterSave) memoDetailPreviewHide();
+}
+
+function memoMetaPreviewClearCloseTimer() {
+  memoMetaPreviewState.closeGeneration += 1;
+  if (!memoMetaPreviewState.closeTimer) return;
+  clearTimeout(memoMetaPreviewState.closeTimer);
+  memoMetaPreviewState.closeTimer = 0;
+}
+function memoMetaPreviewCardIsHovered() {
+  const card = document.querySelector('#rsMetaCenterPreview .rs-meta-center-card');
+  return !!(card && card.matches(':hover'));
+}
+function memoMetaPreviewHide(options = {}) {
+  if (!options.force && (memoMetaPreviewState.editing || memoMetaPreviewState.saving)) {
+    memoMetaPreviewClearCloseTimer();
+    return false;
+  }
+  memoMetaPreviewClearCloseTimer();
+  memoMetaPreviewState.metaId = '';
+  memoMetaPreviewState.agentId = '';
+  memoMetaPreviewState.meta = null;
+  memoMetaPreviewState.snapshot = null;
+  memoMetaPreviewState.draft = null;
+  memoMetaPreviewState.sourceHovered = false;
+  memoMetaPreviewState.cardHovered = false;
+  memoMetaPreviewState.editing = false;
+  memoMetaPreviewState.saving = false;
+  memoMetaPreviewState.deleting = false;
+  memoMetaPreviewState.validationMessage = '';
+  memoMetaPreviewState.agentOptions = [];
+  memoMetaPreviewState.agentOptionsLoading = false;
+  memoMetaPreviewState.cycleMenuOpen = false;
+  memoMetaPreviewState.keepOpenAfterSave = false;
+  rsHideMetaCenterPreview();
+  return true;
+}
+function memoMetaPreviewScheduleClose() {
+  memoMetaPreviewClearCloseTimer();
+  if (memoMetaPreviewState.editing || memoMetaPreviewState.saving || memoMetaPreviewState.sourceHovered || memoMetaPreviewState.cardHovered || memoMetaPreviewCardIsHovered() || !memoMetaPreviewState.metaId) return;
+  const metaId = memoMetaPreviewState.metaId;
+  const closeGeneration = ++memoMetaPreviewState.closeGeneration;
+  memoMetaPreviewState.closeTimer = setTimeout(() => {
+    memoMetaPreviewState.closeTimer = 0;
+    if (memoMetaPreviewState.closeGeneration !== closeGeneration || memoMetaPreviewState.metaId !== metaId || memoMetaPreviewState.editing || memoMetaPreviewState.saving || memoMetaPreviewState.sourceHovered || memoMetaPreviewState.cardHovered || memoMetaPreviewCardIsHovered()) return;
+    memoMetaPreviewHide();
+  }, MEMO_DETAIL_PREVIEW_CLOSE_DELAY_MS);
+}
+function memoMetaPreviewSourceEnter(meta) {
+  if (!meta || isMemoTourInteractionLocked()) return;
+  const metaId = String(meta.id || '').trim();
+  if (!metaId) return;
+  if (memoMetaPreviewState.editing && memoMetaPreviewState.metaId !== metaId) return;
+  if (memoDetailPreviewState.detailId) memoDetailPreviewHide();
+  memoMetaPreviewClearCloseTimer();
+  memoMetaPreviewState.sourceHovered = true;
+  memoMetaPreviewState.cardHovered = false;
+  if (memoMetaPreviewState.metaId !== metaId) {
+    memoMetaPreviewState.metaId = metaId;
+    memoMetaPreviewState.agentId = String(meta.agentId || state.settings.agentId || '');
+    memoMetaPreviewState.meta = memoDetailPreviewClone(meta);
+    memoMetaPreviewState.snapshot = memoDetailPreviewClone(meta);
+    memoMetaPreviewState.draft = null;
+    memoMetaPreviewState.editing = false;
+    memoMetaPreviewState.saving = false;
+    memoMetaPreviewState.deleting = false;
+    memoMetaPreviewState.validationMessage = '';
+    memoMetaPreviewState.agentOptions = [];
+    memoMetaPreviewState.agentOptionsLoading = false;
+    memoMetaPreviewState.cycleMenuOpen = false;
+    memoMetaPreviewState.keepOpenAfterSave = false;
+  } else if (!memoMetaPreviewState.editing) {
+    memoMetaPreviewState.meta = memoDetailPreviewClone(meta);
+    memoMetaPreviewState.snapshot = memoDetailPreviewClone(meta);
+  }
+  rsShowMetaCenterPreview(memoMetaPreviewBuildMeta(memoMetaPreviewState.meta), { metadata: true, editing: memoMetaPreviewState.editing });
+  rsSetMetaPreviewInteractive(true);
+}
+function memoMetaPreviewSourceLeave(metaId) {
+  if (String(metaId || '') !== memoMetaPreviewState.metaId) return;
+  memoMetaPreviewState.sourceHovered = false;
+  memoMetaPreviewScheduleClose();
+}
+function memoMetaPreviewBeginEdit() {
+  const meta = memoMetaPreviewState.meta;
+  if (!meta || memoMetaPreviewState.saving || memoMetaPreviewState.deleting) return;
+  memoMetaPreviewClearCloseTimer();
+  memoMetaPreviewState.snapshot = memoDetailPreviewClone(meta);
+  memoMetaPreviewState.draft = memoMetaPreviewCreateDraft(meta);
+  memoMetaPreviewState.editing = true;
+  memoMetaPreviewState.validationMessage = '';
+  memoMetaPreviewState.agentOptions = [];
+  memoMetaPreviewState.agentOptionsLoading = true;
+  memoMetaPreviewState.cycleMenuOpen = false;
+  rsShowMetaCenterPreview(memoMetaPreviewBuildMeta(meta), { metadata: true, editing: true });
+  rsSetMetaPreviewInteractive(true);
+  rsSetMetaPreviewEditLock(true);
+  void memoMetaPreviewLoadAgentOptions(String(meta.id || ''));
+}
+async function memoMetaPreviewLoadAgentOptions(metaId) {
+  let agents = [];
+  try { agents = await fetchAgentList(); } catch {}
+  if (!memoMetaPreviewState.editing || memoMetaPreviewState.metaId !== String(metaId || '')) return;
+  memoMetaPreviewState.agentOptions = Array.isArray(agents) ? agents : [];
+  memoMetaPreviewState.agentOptionsLoading = false;
+  rsRenderMetaCenterPreview(memoMetaPreviewBuildMeta(memoMetaPreviewState.meta), { metadata: true, editing: true });
+}
+function memoMetaPreviewSetDraftField(field, value) {
+  if (!memoMetaPreviewState.editing || memoMetaPreviewState.saving || !memoMetaPreviewState.draft) return;
+  if (field === 'model') memoMetaPreviewState.draft.model = normalizeModelName(value);
+  else memoMetaPreviewState.draft[field] = String(value == null ? '' : value);
+  memoPreviewSetValidationMessage('', true);
+}
+function memoMetaPreviewToggleField(field) {
+  if (!memoMetaPreviewState.editing || memoMetaPreviewState.saving || !memoMetaPreviewState.draft) return;
+  const draft = memoMetaPreviewState.draft;
+  if (field === 'thinking') {
+    draft.thinking = !draft.thinking;
+    if (!draft.thinking) draft.verify = false;
+  } else if (field === 'routerDisable') {
+    draft.routerDisable = !draft.routerDisable;
+  } else if (field === 'verify' && draft.thinking) {
+    draft.verify = !draft.verify;
+  }
+  rsRenderMetaCenterPreview(memoMetaPreviewBuildMeta(memoMetaPreviewState.meta), { metadata: true, editing: true });
+}
+function memoMetaPreviewToggleCycleMenu(event) {
+  if (!memoMetaPreviewState.editing || memoMetaPreviewState.saving) return;
+  if (event) event.stopPropagation();
+  memoMetaPreviewState.cycleMenuOpen = !memoMetaPreviewState.cycleMenuOpen;
+  rsRenderMetaCenterPreview(memoMetaPreviewBuildMeta(memoMetaPreviewState.meta), { metadata: true, editing: true });
+}
+function memoMetaPreviewSelectCycle(cycle, event) {
+  if (!memoMetaPreviewState.editing || memoMetaPreviewState.saving || !memoMetaPreviewState.draft) return;
+  if (event) event.stopPropagation();
+  memoMetaPreviewState.draft.cycle = Number(cycle);
+  memoMetaPreviewState.cycleMenuOpen = false;
+  rsRenderMetaCenterPreview(memoMetaPreviewBuildMeta(memoMetaPreviewState.meta), { metadata: true, editing: true });
+}
+function memoMetaPreviewCancelEdit() {
+  if (!memoMetaPreviewState.editing || memoMetaPreviewState.saving) return;
+  memoMetaPreviewClearCloseTimer();
+  memoMetaPreviewState.meta = memoDetailPreviewClone(memoMetaPreviewState.snapshot);
+  memoMetaPreviewState.draft = null;
+  memoMetaPreviewState.editing = false;
+  memoMetaPreviewState.validationMessage = '';
+  memoMetaPreviewState.agentOptions = [];
+  memoMetaPreviewState.agentOptionsLoading = false;
+  memoMetaPreviewState.cycleMenuOpen = false;
+  rsSetMetaPreviewEditLock(false);
+  rsShowMetaCenterPreview(memoMetaPreviewBuildMeta(memoMetaPreviewState.meta), { metadata: true, editing: false });
+  rsSetMetaPreviewInteractive(true);
+  memoMetaPreviewScheduleClose();
+}
+async function memoMetaPreviewSave() {
+  const meta = memoMetaPreviewState.meta;
+  const draft = memoMetaPreviewState.draft;
+  if (!memoMetaPreviewState.editing || memoMetaPreviewState.saving || memoMetaPreviewState.deleting || !meta || !draft) return;
+  const content = String(draft.content || '').trim();
+  const cycle = Number(draft.cycle);
+  const rawTime = memoDetailPreviewNormalizeExecTime(draft.rawTime);
+  const model = normalizeModelName(draft.model);
+  const agentSelect = document.querySelector('#rsMetaCenterPreviewAgent select');
+  const agentId = String(agentSelect && agentSelect.value || draft.agentId || '').trim();
+  draft.agentId = agentId;
+  if (!content) {
+    vfsShowUploadToast('请输入备忘录内容', true);
+    document.getElementById('rsMetaCenterPreviewContentInput')?.focus();
+    return;
+  }
+  if (countEditableInputChars(content) > EDITABLE_INPUT_MAX_CHARS) {
+    vfsShowUploadToast('备忘录内容最多 ' + EDITABLE_INPUT_MAX_CHARS + ' 个字符', true);
+    document.getElementById('rsMetaCenterPreviewContentInput')?.focus();
+    return;
+  }
+  if (!Number.isInteger(cycle) || cycle < -1 || cycle > 5) {
+    vfsShowUploadToast('请选择有效周期', true);
+    return;
+  }
+  if (cycle === 0) {
+    memoPreviewSetValidationMessage('元数据周期不能为仅一次', true);
+    return;
+  }
+  if (cycle !== -1 && !rawTime) {
+    vfsShowUploadToast('请选择有效执行时间', true);
+    return;
+  }
+  if (cycle !== -1 && !memoDetailPreviewExecTimeIsFuture(rawTime)) {
+    memoPreviewSetValidationMessage('执行时间需要晚于当前时间', true);
+    return;
+  }
+  if (!isSelectableConfiguredModel(model, state.settings.models || {})) {
+    vfsShowUploadToast('请先选择模型', true);
+    return;
+  }
+  if (!agentId) {
+    vfsShowUploadToast('请选择有效 Agent', true);
+    return;
+  }
+  memoMetaPreviewState.saving = true;
+  memoMetaPreviewState.cycleMenuOpen = false;
+  rsRenderMetaCenterPreview(memoMetaPreviewBuildMeta(meta), { metadata: true, editing: true });
+  setMemoSaveLock(true, { title: '更新备忘录中', description: '正在重建待执行任务，请稍后' });
+  try {
+    const resp = await fetch('/api/cron/meta/update?agentId=' + encodeURIComponent(String(meta.agentId || state.settings.agentId || '')), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        metaId: Number(meta.id),
+        agentId,
+        rawTime: cycle === -1 ? '' : rawTime,
+        cycle,
+        content,
+        model,
+        thinking: !!draft.thinking,
+        verify: !!draft.verify && !!draft.thinking,
+        router_disable: !!draft.routerDisable
+      })
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data || data.status !== 0 || !data.data) {
+      throw new Error((data && data.content) || '保存失败');
+    }
+    const updated = data.data;
+    if (String(updated.agentId || '').trim() !== agentId) {
+      throw new Error('Agent 更新未生效，请重试');
+    }
+    memoMetaPreviewState.agentId = String(updated.agentId || agentId);
+    memoMetaPreviewState.meta = memoDetailPreviewClone(updated);
+    memoMetaPreviewState.snapshot = memoDetailPreviewClone(updated);
+    memoMetaPreviewState.draft = null;
+    memoMetaPreviewState.editing = false;
+    memoMetaPreviewState.agentOptions = [];
+    memoMetaPreviewState.agentOptionsLoading = false;
+    memoMetaPreviewState.keepOpenAfterSave = true;
+    rsSetMetaPreviewEditLock(false);
+    rsShowMetaCenterPreview(memoMetaPreviewBuildMeta(updated), { metadata: true, editing: false });
+    rsSetMetaPreviewInteractive(true);
+    vfsShowUploadToast('备忘录元数据已更新', false);
+    scheduleRefreshCronViews(0);
+  } catch (error) {
+    vfsShowUploadToast(String(error && error.message || '保存失败'), true);
+  } finally {
+    memoMetaPreviewState.saving = false;
+    setMemoSaveLock(false);
+    if (memoMetaPreviewState.editing && memoMetaPreviewState.metaId) {
+      rsRenderMetaCenterPreview(memoMetaPreviewBuildMeta(memoMetaPreviewState.meta), { metadata: true, editing: true });
+    } else {
+      memoMetaPreviewScheduleClose();
+    }
+  }
+}
+async function memoMetaPreviewDelete() {
+  const meta = memoMetaPreviewState.meta;
+  if (!meta || memoMetaPreviewState.editing || memoMetaPreviewState.saving || memoMetaPreviewState.deleting) return;
+  const metaId = Number(meta.id);
+  if (!Number.isInteger(metaId) || metaId <= 0) return;
+  memoMetaPreviewClearCloseTimer();
+  memoMetaPreviewState.deleting = true;
+  rsRenderMetaCenterPreview(memoMetaPreviewBuildMeta(meta), { metadata: true, editing: false });
+  try {
+    const resp = await fetch('/api/cron/delete?id=' + encodeURIComponent(String(metaId)), { method: 'POST' });
+    const data = await resp.json();
+    if (!resp.ok || !data || data.status !== 0 || Number(data.affected) !== 1) {
+      throw new Error((data && data.content) || '删除失败');
+    }
+    memoMetaPreviewHide();
+    vfsShowUploadToast('备忘录元数据已删除', false);
+    scheduleRefreshCronViews(0);
+  } catch (error) {
+    memoMetaPreviewState.deleting = false;
+    rsRenderMetaCenterPreview(memoMetaPreviewBuildMeta(meta), { metadata: true, editing: false });
+    vfsShowUploadToast(String(error && error.message || '删除失败'), true);
+  }
+}
+function memoMetaPreviewSyncAfterMetadataRefresh(agentId, metas) {
+  if (!memoMetaPreviewState.metaId || memoMetaPreviewState.editing) return;
+  if (String(memoMetaPreviewState.agentId || '') !== String(agentId || '')) {
+    memoMetaPreviewHide();
+    return;
+  }
+  const refreshed = (Array.isArray(metas) ? metas : []).find(item => String(item && item.id || '') === memoMetaPreviewState.metaId);
+  if (refreshed) {
+    memoMetaPreviewState.meta = memoDetailPreviewClone(refreshed);
+    memoMetaPreviewState.snapshot = memoDetailPreviewClone(refreshed);
+    memoMetaPreviewState.keepOpenAfterSave = false;
+    return;
+  }
+  if (!memoMetaPreviewState.keepOpenAfterSave) memoMetaPreviewHide();
+}
+document.addEventListener('click', event => {
+  const target = event && event.target instanceof Element ? event.target : null;
+  if (!memoMetaPreviewState.cycleMenuOpen || (target && target.closest('#rsMetaCenterPreview .rs-meta-center-cycle-picker'))) return;
+  memoMetaPreviewState.cycleMenuOpen = false;
+  if (memoMetaPreviewState.editing && memoMetaPreviewState.meta) {
+    rsRenderMetaCenterPreview(memoMetaPreviewBuildMeta(memoMetaPreviewState.meta), { metadata: true, editing: true });
+  }
+});
+
 function rsMetaHover(e, el) {
   if (isMemoTourInteractionLocked()) return;
   if (!el) return;
-  rsShowMetaCenterPreview({
-    content: el.getAttribute('data-content') || '',
-    cycle: el.getAttribute('data-cycle') || '',
-    time: el.getAttribute('data-time') || '',
-    model: el.getAttribute('data-model') || '',
-    thinking: el.getAttribute('data-thinking') || '',
-    swarm: el.getAttribute('data-swarm') || '',
-    verify: el.getAttribute('data-verify') || '否',
-    agent: el.getAttribute('data-agent') || ''
-  });
+  try {
+    memoMetaPreviewSourceEnter(JSON.parse(el.getAttribute('data-meta') || '{}'));
+  } catch {}
 }
-function rsMetaLeave() {
-  rsHideMetaCenterPreview();
+function rsMetaLeave(event, el) {
+  const nextTarget = event && event.relatedTarget;
+  const previewCard = document.querySelector('#rsMetaCenterPreview .rs-meta-center-card');
+  if (previewCard && nextTarget instanceof Node && previewCard.contains(nextTarget)) {
+    memoMetaPreviewState.sourceHovered = false;
+    memoMetaPreviewState.cardHovered = true;
+    memoMetaPreviewClearCloseTimer();
+    return;
+  }
+  if (!el) {
+    if (memoMetaPreviewState.editing || memoMetaPreviewState.saving) return;
+    memoMetaPreviewHide();
+    return;
+  }
+  memoMetaPreviewSourceLeave(el.getAttribute('data-meta-id'));
 }
 let rsDelPendingId = null;
 function rsDeleteMeta(id, content) {
@@ -48277,22 +49583,28 @@ function rsToggleMetaView() {
 async function rsLoadMetadata() {
   const agentId = state.settings.agentId;
   const list = document.getElementById('rsMetaList');
-  rsHideMetaCenterPreview();
+  if (memoDetailPreviewState.detailId) memoDetailPreviewHide();
   if (isMemoTourMetaListStep(onboardingState.step)) {
     renderMemoTourMetadataList();
     return;
   }
-  if (!agentId) { list.innerHTML = '<div style="padding:8px;font-size:11px;color:var(--text-muted)">请先选择 Agent</div>'; return; }
+  if (!agentId) {
+    memoMetaPreviewSyncAfterMetadataRefresh('', []);
+    list.innerHTML = '<div style="padding:8px;font-size:11px;color:var(--text-muted)">请先选择 Agent</div>';
+    return;
+  }
   list.innerHTML = '<div style="padding:8px;font-size:11px;color:var(--text-muted)">加载中...</div>';
   try {
     const resp = await fetch('/api/cron/detail/metadata?agentId=' + encodeURIComponent(agentId), { method: 'POST' });
     const data = await resp.json();
     if (data.status !== 0 || !data.data || data.data.length === 0) {
-      list.innerHTML = '<div style="padding:8px;font-size:11px;color:var(--text-muted)">暂无周期备忘录</div>';
+      memoMetaPreviewSyncAfterMetadataRefresh(agentId, []);
+      list.innerHTML = '<div style="padding:8px;font-size:11px;color:var(--text-muted)">暂无备忘录元数据</div>';
       return;
     }
     const cycleLabels = { 1: '工作日', 2: '每天', 3: '每小时', 4: '每15分', 5: '每30分', '-1': 'Cron' };
-    const items = data.data.filter(m => m.cycle !== 0);
+    const items = data.data.filter(m => Number(m && m.cycle) !== 0);
+    memoMetaPreviewSyncAfterMetadataRefresh(agentId, items);
     if (items.length === 0) {
       list.innerHTML = '<div style="padding:8px;font-size:11px;color:var(--text-muted)">暂无周期备忘录</div>';
       return;
@@ -48309,7 +49621,8 @@ async function rsLoadMetadata() {
       const targetItemId = isMemoRecurringTarget && recurringTourActive ? ' id="memoRecurringTourMetaItem"' : '';
       const targetItemClass = isMemoRecurringTarget && recurringTourActive ? ' onboarding-memo-meta-item-target' : '';
       const targetDeleteId = isMemoRecurringTarget && recurringTourActive ? ' id="memoRecurringTourDeleteBtn"' : '';
-      return '<div class="rs-meta-item' + targetItemClass + '"' + targetItemId + ' data-content="' + esc(m.content).replace(/"/g, '&quot;') + '" data-agent="' + esc(m.agentId || '').replace(/"/g, '&quot;') + '" data-verify="' + esc(verify).replace(/"/g, '&quot;') + '" data-type="' + esc(m.type || 'cron').replace(/"/g, '&quot;') + '" data-cycle="' + esc(cycle).replace(/"/g, '&quot;') + '" data-time="' + esc(time).replace(/"/g, '&quot;') + '" data-model="' + esc(model).replace(/"/g, '&quot;') + '" data-thinking="' + esc(think).replace(/"/g, '&quot;') + '" data-swarm="' + esc(swarm).replace(/"/g, '&quot;') + '" onmouseenter="rsMetaHover(event,this)" onmouseleave="rsMetaLeave()"><div class="rs-meta-info"><span>' + esc(cycle) + '</span><span>' + esc(time) + '</span><span>' + esc(model) + '</span><span>' + esc(swarm) + '</span><span>' + esc(think) + '</span></div><button class="rs-meta-del"' + targetDeleteId + ' onclick="rsDeleteMeta(' + m.id + ',this.parentElement.getAttribute(\'data-content\'))" title="删除"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
+      const metaPayload = esc(JSON.stringify(m)).replace(/"/g, '&quot;');
+      return '<div class="rs-meta-item' + targetItemClass + '"' + targetItemId + ' data-meta-id="' + esc(m.id) + '" data-meta="' + metaPayload + '" data-content="' + esc(m.content).replace(/"/g, '&quot;') + '" data-agent="' + esc(m.agentId || '').replace(/"/g, '&quot;') + '" data-verify="' + esc(verify).replace(/"/g, '&quot;') + '" data-type="' + esc(m.type || 'cron').replace(/"/g, '&quot;') + '" data-cycle="' + esc(cycle).replace(/"/g, '&quot;') + '" data-time="' + esc(time).replace(/"/g, '&quot;') + '" data-model="' + esc(model).replace(/"/g, '&quot;') + '" data-thinking="' + esc(think).replace(/"/g, '&quot;') + '" data-swarm="' + esc(swarm).replace(/"/g, '&quot;') + '" onmouseenter="rsMetaHover(event,this)" onmouseleave="rsMetaLeave(event,this)"><div class="rs-meta-info"><span>' + esc(cycle) + '</span><span>' + esc(time) + '</span><span>' + esc(model) + '</span><span>' + esc(swarm) + '</span><span>' + esc(think) + '</span></div><button class="rs-meta-del"' + targetDeleteId + ' onclick="rsDeleteMeta(' + m.id + ',this.parentElement.getAttribute(\'data-content\'))" title="删除"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
     }).join('');
     list.scrollTop = 0;
   } catch (e) {

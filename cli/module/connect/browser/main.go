@@ -630,7 +630,7 @@ func browserIntegrationPluginsRootFromConnectBin(connectBin string) (string, boo
 		}
 	}
 	if appDir == "" {
-		return "", false, fmt.Errorf("resolve app-dir from %s", runtimePath)
+		return "", false, fmt.Errorf("browser runtime configuration is incomplete: app-dir is missing from %s; restart integration to initialize the runtime before starting Browser", runtimePath)
 	}
 	if abs, err := filepath.Abs(appDir); err == nil {
 		appDir = abs
