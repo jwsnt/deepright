@@ -52,6 +52,10 @@ func TestSubmitOnce(t *testing.T) {
 	if details[0].AgentID != "A" || details[0].Content != "查看天气" || !details[0].Thinking {
 		t.Errorf("detail mismatch: %+v", details[0])
 	}
+	wantExecTime := time.Date(2026, 4, 30, 12, 10, 0, 0, time.Local).Unix()
+	if details[0].ExecTime != wantExecTime {
+		t.Errorf("first detail exec time = %d, want %d", details[0].ExecTime, wantExecTime)
+	}
 	if !meta.RouterDisable {
 		t.Errorf("meta.RouterDisable = false, want true")
 	}
@@ -211,6 +215,10 @@ func TestSubmitEvery15CreatesWindow(t *testing.T) {
 	details := svc.GetDetails()
 	if len(details) < 96 {
 		t.Fatalf("expected many 15-min details, got %d", len(details))
+	}
+	wantExecTime := time.Date(2026, 4, 30, 12, 10, 0, 0, time.Local).Unix()
+	if details[0].ExecTime != wantExecTime {
+		t.Errorf("first detail exec time = %d, want selected time %d", details[0].ExecTime, wantExecTime)
 	}
 }
 

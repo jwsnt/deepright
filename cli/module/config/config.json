@@ -1,7 +1,7 @@
 {
   "host": "https://www.deepright.cn",
   "version": "1.0",
-  "port": 19876,
+  "port": 57896,
   "skills": [
     "__internal_cron",
     "__internal_remote",
@@ -32,5 +32,68 @@
       "git",
       "npm"
     ]
+  },
+  "provider": {
+    "openai": {
+      "__url": "https://api.openai.com/v1/chat/completions",
+      "__model_multi_input": "gpt-5.6-terra",
+      "__model_thinking": "gpt-5.6-sol",
+      "__model_fast": "gpt-5.6-luna",
+      "__model": "gpt-5.6-terra"
+    },
+    "seedream": {
+      "__url": "https://ark.cn-beijing.volces.com/api/v3/images/generations",
+      "__model_multi_output": "doubao-seedream-4.5"
+    },
+    "bigmodel": {
+      "__url": "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+      "__model_multi_input": "glm-5v-turbo",
+      "__model_thinking": "glm-5.2",
+      "__model_fast": "glm-4.7-flashx",
+      "__model": "glm-5.2"
+    },
+    "gemini": {
+      "__url": "https://generativelanguage.googleapis.com/v1beta/models/#model:streamGenerateContent",
+      "__model_multi_output": "gemini-3.1-flash-image-preview",
+      "__model_multi_input": "gemini-3.5-flash",
+      "__model_thinking": "gemini-3.1-pro-preview",
+      "__model_fast": "gemini-3.5-flash",
+      "__model": "gemini-3.5-flash"
+    },
+    "anthropic": {
+      "__url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+      "__model_multi_input": "claude-opus-4-6",
+      "__model_thinking": "claude-opus-4-6",
+      "__model_fast": "claude-haiku-4-5-20251001",
+      "__model": "claude-opus-4-6"
+    },
+    "kimi": {
+      "__url": "https://api.moonshot.cn/v1/chat/completions",
+      "__model_multi_input": "kimi-k2.6",
+      "__model_thinking": "kimi-k2.6",
+      "__model_fast": "kimi-k2-turbo-preview",
+      "__model": "kimi-k2.6"
+    },
+    "minimax": {
+      "__url": "https://api.minimaxi.com/anthropic/v1/messages",
+      "__model_thinking": "MiniMax-M3",
+      "__model_fast": "MiniMax-M2.7-highspeed",
+      "__model": "MiniMax-M3"
+    },
+    "xiaomi": {
+      "__url": "https://api.xiaomimimo.com/v1/chat/completions",
+      "__model_multi_input": "mimo-v2.5",
+      "__model_thinking": "mimo-v2.5-pro",
+      "__model_fast": "mimo-v2-flash",
+      "__model": "mimo-v2-flash"
+    },
+    "qwen": {
+      "__url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+      "__model_multi_output": "qwen-image-plus",
+      "__model_multi_input": "qwen3.5-flash",
+      "__model_thinking": "qwen3.6-plus",
+      "__model_fast": "qwen3.5-flash",
+      "__model": "qwen3.5-flash"
+    }
   }
 }

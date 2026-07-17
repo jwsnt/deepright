@@ -2707,6 +2707,7 @@ func TestProxyChatCompletionsPrunesRedundantTopLevelAgentFieldsFromRequestMetada
 }
 
 func TestProxyChatCompletionsInjectsConfiguredModelMetadata(t *testing.T) {
+	disableIntegrationNotificationsForTest(t)
 	agentDir, err := filepath.Abs("../agent/test-case")
 	if err != nil {
 		t.Fatalf("resolve agent dir: %v", err)
@@ -10521,7 +10522,7 @@ func TestHandleCronPersistsReuseChatIDToDetails(t *testing.T) {
 
 	cfg := &Config{AgentDir: agentRoot, Device: "dev"}
 	handler := handleCron(cfg)
-	rawTime := time.Now().Add(2 * time.Minute).Format("2006-01-02 15:04")
+	rawTime := time.Now().Add(-2 * time.Hour).Truncate(time.Minute).Format("2006-01-02 15:04")
 	req := httptest.NewRequest(http.MethodPost, "/api/cron/create?agentId=alpha",
 		strings.NewReader(fmt.Sprintf(`{"content":"我之前问了什么","model":"openai","thinking":false,"router_disable":true,"rawTime":"%s","cycle":0,"token":"sk-test","chatId":"chat-reuse-1"}`, rawTime)))
 	req.Header.Set("Content-Type", "application/json")
@@ -10544,12 +10545,16 @@ func TestHandleCronPersistsReuseChatIDToDetails(t *testing.T) {
 	}
 
 	var metaChatID, detailChatID string
+	var onceExecTime int64
 	var metaRouterDisable, detailRouterDisable int
 	if err := cronDB.QueryRow(`SELECT chat_id FROM task_meta WHERE id = ?`, resp.ID).Scan(&metaChatID); err != nil {
 		t.Fatalf("query task_meta: %v", err)
 	}
 	if err := cronDB.QueryRow(`SELECT chat_id FROM task_detail WHERE meta_id = ?`, resp.ID).Scan(&detailChatID); err != nil {
 		t.Fatalf("query task_detail: %v", err)
+	}
+	if err := cronDB.QueryRow(`SELECT exec_time FROM task_detail WHERE meta_id = ?`, resp.ID).Scan(&onceExecTime); err != nil {
+		t.Fatalf("query once task_detail exec_time: %v", err)
 	}
 	if err := cronDB.QueryRow(`SELECT router_disable FROM task_meta WHERE id = ?`, resp.ID).Scan(&metaRouterDisable); err != nil {
 		t.Fatalf("query task_meta router_disable: %v", err)
@@ -10568,6 +10573,38 @@ func TestHandleCronPersistsReuseChatIDToDetails(t *testing.T) {
 	}
 	if detailRouterDisable != 1 {
 		t.Fatalf("task_detail.router_disable = %d, want 1", detailRouterDisable)
+	}
+	wantOnceTime, _ := time.ParseInLocation("2006-01-02 15:04", rawTime, time.Local)
+	if onceExecTime != wantOnceTime.Unix() {
+		t.Fatalf("once task exec_time = %d, want selected time %d", onceExecTime, wantOnceTime.Unix())
+	}
+
+	periodicTime := time.Now().Add(2 * time.Hour).Truncate(time.Hour).Add(7 * time.Minute)
+	periodicRawTime := periodicTime.Format("2006-01-02 15:04")
+	periodicReq := httptest.NewRequest(http.MethodPost, "/api/cron/create?agentId=alpha",
+		strings.NewReader(fmt.Sprintf(`{"content":"定时任务","model":"openai","thinking":false,"router_disable":true,"rawTime":"%s","cycle":4}`, periodicRawTime)))
+	periodicReq.Header.Set("Content-Type", "application/json")
+	periodicRec := httptest.NewRecorder()
+	handler(periodicRec, periodicReq)
+	if periodicRec.Code != http.StatusOK {
+		t.Fatalf("periodic status = %d, body = %s", periodicRec.Code, periodicRec.Body.String())
+	}
+	var periodicResp struct {
+		Status int   `json:"status"`
+		ID     int64 `json:"id"`
+	}
+	if err := json.NewDecoder(periodicRec.Body).Decode(&periodicResp); err != nil {
+		t.Fatalf("decode periodic response: %v", err)
+	}
+	if periodicResp.Status != 0 {
+		t.Fatalf("periodic response status = %d", periodicResp.Status)
+	}
+	var periodicFirstExecTime int64
+	if err := cronDB.QueryRow(`SELECT MIN(exec_time) FROM task_detail WHERE meta_id = ?`, periodicResp.ID).Scan(&periodicFirstExecTime); err != nil {
+		t.Fatalf("query first periodic detail: %v", err)
+	}
+	if periodicFirstExecTime != periodicTime.Unix() {
+		t.Fatalf("first periodic exec_time = %d, want selected time %d", periodicFirstExecTime, periodicTime.Unix())
 	}
 
 	metaReq := httptest.NewRequest(http.MethodPost, "/api/cron/detail/metadata?agentId=alpha", nil)
@@ -10589,8 +10626,15 @@ func TestHandleCronPersistsReuseChatIDToDetails(t *testing.T) {
 	if metaResp.Status != 0 {
 		t.Fatalf("metadata status body = %d", metaResp.Status)
 	}
-	if len(metaResp.Data) != 1 || metaResp.Data[0].ID != int(resp.ID) || !metaResp.Data[0].RouterDisable {
-		t.Fatalf("metadata response = %+v, want one router_disable=true item for id %d", metaResp.Data, resp.ID)
+	foundOnceMeta := false
+	for _, meta := range metaResp.Data {
+		if meta.ID == int(resp.ID) && meta.RouterDisable {
+			foundOnceMeta = true
+			break
+		}
+	}
+	if !foundOnceMeta {
+		t.Fatalf("metadata response = %+v, want router_disable=true item for id %d", metaResp.Data, resp.ID)
 	}
 }
 
@@ -11293,6 +11337,155 @@ func TestCronExecuteOnceInjectsMetaIDAndCronTypeIntoRequestMetadata(t *testing.T
 	}
 	if metadata["META_ID"] != "12" {
 		t.Fatalf("metadata META_ID = %v, want 12", metadata["META_ID"])
+	}
+}
+
+func TestCronExecuteOnceInjectsCurrentModelConfigForAllTaskTypes(t *testing.T) {
+	disableIntegrationManagedRuntimeForTest(t)
+	disableIntegrationNotificationsForTest(t)
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	if cronDB != nil {
+		_ = cronDB.Close()
+		cronDB = nil
+	}
+	flushAgentCache()
+
+	agentRoot := filepath.Join(tmp, "agents")
+	agentDir := filepath.Join(agentRoot, "A")
+	if err := os.MkdirAll(agentDir, 0o755); err != nil {
+		t.Fatalf("mkdir agent: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(agentDir, "SOUL.md"), []byte("soul"), 0o644); err != nil {
+		t.Fatalf("write soul: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(agentDir, "USER.md"), []byte("user"), 0o644); err != nil {
+		t.Fatalf("write user: %v", err)
+	}
+
+	initCronDB()
+	if cronDB == nil {
+		t.Fatal("cronDB should not be nil")
+	}
+	defer func() {
+		if cronDB != nil {
+			_ = cronDB.Close()
+			cronDB = nil
+		}
+	}()
+
+	if err := writeTokenStoreConfigs(cronDB, map[string]tokenConfig{
+		"OpenAI": {
+			Token:           "Bearer scheduled-token",
+			BaseURL:         "https://previous.example/v1",
+			ModelBase:       "previous-base",
+			ModelFast:       "previous-fast",
+			ModelThinking:   "previous-thinking",
+			ModelMultiInput: "previous-vision",
+		},
+	}); err != nil {
+		t.Fatalf("seed initial token config: %v", err)
+	}
+
+	for _, taskType := range []string{"cron", "mail", "feishu"} {
+		chatID := "chat-" + taskType
+		metaRes, err := cronDB.Exec(`INSERT INTO task_meta (cycle, raw_time, agent_id, chat_id, task_type, model, thinking, cron, content) VALUES (0, ?, 'A', ?, ?, 'OpenAI', 0, '', '配置透传')`, time.Now().Format("2006-01-02 15:04"), chatID, taskType)
+		if err != nil {
+			t.Fatalf("insert %s meta: %v", taskType, err)
+		}
+		metaID, _ := metaRes.LastInsertId()
+		if _, err := cronDB.Exec(`INSERT INTO task_detail (meta_id, exec_time, agent_id, chat_id, task_type, model, thinking, content, started) VALUES (?, ?, 'A', ?, ?, 'OpenAI', 0, '配置透传', 0)`, metaID, time.Now().Unix(), chatID, taskType); err != nil {
+			t.Fatalf("insert %s detail: %v", taskType, err)
+		}
+	}
+
+	// Configuration changes after task creation must be used when the task runs.
+	if err := writeTokenStoreConfigs(cronDB, map[string]tokenConfig{
+		"OpenAI": {
+			Token:            "Bearer scheduled-token",
+			BaseURL:          "https://current.example/v1",
+			ModelBase:        "current-base",
+			ModelFast:        "current-fast",
+			ModelThinking:    "current-thinking",
+			ModelMultiInput:  "current-vision",
+			ModelMultiOutput: "current-image",
+		},
+	}); err != nil {
+		t.Fatalf("update token config: %v", err)
+	}
+
+	captured := make(chan map[string]interface{}, 3)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var request map[string]interface{}
+		_ = json.Unmarshal(body, &request)
+		captured <- request
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, "data: [DONE]\\n\\n")
+	}))
+	defer upstream.Close()
+
+	connectSvc, err := newIntegrationConnectService(agentRoot)
+	if err != nil {
+		t.Fatalf("new Integration connect service: %v", err)
+	}
+	defer connectSvc.Close()
+	cronExecuteOnce(&Config{Host: upstream.URL, AgentDir: agentRoot, Device: "dev", AgentCacheMs: 120000}, &http.Client{Timeout: 5 * time.Second}, connectSvc)
+
+	want := map[string]interface{}{
+		"__url":                "https://current.example/v1",
+		"__model":              "current-base",
+		"__model_fast":         "current-fast",
+		"__model_thinking":     "current-thinking",
+		"__model_multi_input":  "current-vision",
+		"__model_multi_output": "current-image",
+	}
+	seenTaskTypes := map[string]bool{}
+	for range 3 {
+		select {
+		case request := <-captured:
+			metadata, ok := request["metadata"].(map[string]interface{})
+			if !ok {
+				t.Fatalf("metadata missing: %#v", request)
+			}
+			taskType, _ := metadata["cron_type"].(string)
+			seenTaskTypes[taskType] = true
+			for key, expected := range want {
+				if actual := metadata[key]; actual != expected {
+					t.Fatalf("%s metadata.%s = %#v, want %#v", taskType, key, actual, expected)
+				}
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatalf("timed out waiting for scheduled task request; received %d", len(seenTaskTypes))
+		}
+	}
+	for _, taskType := range []string{"cron", "mail", "feishu"} {
+		if !seenTaskTypes[taskType] {
+			t.Fatalf("missing forwarded %s task: %#v", taskType, seenTaskTypes)
+		}
+	}
+	deadline := time.After(5 * time.Second)
+	for {
+		var completed int
+		if err := cronDB.QueryRow(`SELECT COUNT(*) FROM task_detail WHERE started = 3`).Scan(&completed); err != nil {
+			t.Fatalf("query completed tasks: %v", err)
+		}
+		if completed == 3 {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("completed task count = %d, want 3", completed)
+		case <-time.After(10 * time.Millisecond):
+		}
 	}
 }
 

@@ -8189,7 +8189,7 @@ func TestHandleCronPersistsReuseChatIDToDetails(t *testing.T) {
 	}
 
 	proxy := &ProxyServer{AgentDir: agentRoot, DeviceID: "dev", CacheTTL: time.Minute}
-	rawTime := time.Now().Add(2 * time.Minute).Format("2006-01-02 15:04")
+	rawTime := time.Now().Add(-2 * time.Hour).Truncate(time.Minute).Format("2006-01-02 15:04")
 	req := httptest.NewRequest(http.MethodPost, "/api/cron/create?agentId=alpha",
 		strings.NewReader(fmt.Sprintf(`{"content":"我之前问了什么","model":"openai","thinking":false,"router_disable":true,"rawTime":"%s","cycle":0,"token":"sk-test","chatId":"chat-reuse-1"}`, rawTime)))
 	req.Header.Set("Content-Type", "application/json")
@@ -8212,12 +8212,16 @@ func TestHandleCronPersistsReuseChatIDToDetails(t *testing.T) {
 	}
 
 	var metaChatID, detailChatID string
+	var onceExecTime int64
 	var metaRouterDisable, detailRouterDisable int
 	if err := db.QueryRow(`SELECT chat_id FROM task_meta WHERE id = ?`, resp.ID).Scan(&metaChatID); err != nil {
 		t.Fatalf("query task_meta: %v", err)
 	}
 	if err := db.QueryRow(`SELECT chat_id FROM task_detail WHERE meta_id = ?`, resp.ID).Scan(&detailChatID); err != nil {
 		t.Fatalf("query task_detail: %v", err)
+	}
+	if err := db.QueryRow(`SELECT exec_time FROM task_detail WHERE meta_id = ?`, resp.ID).Scan(&onceExecTime); err != nil {
+		t.Fatalf("query once task_detail exec_time: %v", err)
 	}
 	if err := db.QueryRow(`SELECT router_disable FROM task_meta WHERE id = ?`, resp.ID).Scan(&metaRouterDisable); err != nil {
 		t.Fatalf("query task_meta router_disable: %v", err)
@@ -8236,6 +8240,38 @@ func TestHandleCronPersistsReuseChatIDToDetails(t *testing.T) {
 	}
 	if detailRouterDisable != 1 {
 		t.Fatalf("task_detail.router_disable = %d, want 1", detailRouterDisable)
+	}
+	wantOnceTime, _ := time.ParseInLocation("2006-01-02 15:04", rawTime, time.Local)
+	if onceExecTime != wantOnceTime.Unix() {
+		t.Fatalf("once task exec_time = %d, want selected time %d", onceExecTime, wantOnceTime.Unix())
+	}
+
+	periodicTime := time.Now().Add(2 * time.Hour).Truncate(time.Hour).Add(7 * time.Minute)
+	periodicRawTime := periodicTime.Format("2006-01-02 15:04")
+	periodicReq := httptest.NewRequest(http.MethodPost, "/api/cron/create?agentId=alpha",
+		strings.NewReader(fmt.Sprintf(`{"content":"定时任务","model":"openai","thinking":false,"router_disable":true,"rawTime":"%s","cycle":4}`, periodicRawTime)))
+	periodicReq.Header.Set("Content-Type", "application/json")
+	periodicRec := httptest.NewRecorder()
+	proxy.HandleCron(periodicRec, periodicReq)
+	if periodicRec.Code != http.StatusOK {
+		t.Fatalf("periodic status = %d, body = %s", periodicRec.Code, periodicRec.Body.String())
+	}
+	var periodicResp struct {
+		Status int   `json:"status"`
+		ID     int64 `json:"id"`
+	}
+	if err := json.NewDecoder(periodicRec.Body).Decode(&periodicResp); err != nil {
+		t.Fatalf("decode periodic response: %v", err)
+	}
+	if periodicResp.Status != 0 {
+		t.Fatalf("periodic response status = %d", periodicResp.Status)
+	}
+	var periodicFirstExecTime int64
+	if err := db.QueryRow(`SELECT MIN(exec_time) FROM task_detail WHERE meta_id = ?`, periodicResp.ID).Scan(&periodicFirstExecTime); err != nil {
+		t.Fatalf("query first periodic detail: %v", err)
+	}
+	if periodicFirstExecTime != periodicTime.Unix() {
+		t.Fatalf("first periodic exec_time = %d, want selected time %d", periodicFirstExecTime, periodicTime.Unix())
 	}
 
 	metaReq := httptest.NewRequest(http.MethodPost, "/api/cron/detail/metadata?agentId=alpha", nil)
@@ -8257,8 +8293,15 @@ func TestHandleCronPersistsReuseChatIDToDetails(t *testing.T) {
 	if metaResp.Status != 0 {
 		t.Fatalf("metadata status body = %d", metaResp.Status)
 	}
-	if len(metaResp.Data) != 1 || metaResp.Data[0].ID != int(resp.ID) || !metaResp.Data[0].RouterDisable {
-		t.Fatalf("metadata response = %+v, want one router_disable=true item for id %d", metaResp.Data, resp.ID)
+	foundOnceMeta := false
+	for _, meta := range metaResp.Data {
+		if meta.ID == int(resp.ID) && meta.RouterDisable {
+			foundOnceMeta = true
+			break
+		}
+	}
+	if !foundOnceMeta {
+		t.Fatalf("metadata response = %+v, want router_disable=true item for id %d", metaResp.Data, resp.ID)
 	}
 }
 

@@ -97,7 +97,7 @@ cd /path/to/deepright/cli/module/integration
 | `--knowledge_update_interval` | 否 | `7200000` | knowledge `lastUpdate` 透传阈值（毫秒） | proxy |
 | `--knowledge_update_lock` | 否 | `1800000` | knowledge 更新申请锁窗口（毫秒） | proxy |
 | `--install_app` | 否 | 空 | 额外待安装应用，逗号分隔，会合并到 `/install_app` 返回中 | proxy |
-| `--reply` | 否 | `<开始执行>可通过新消息更新任务` | 三方插件开始执行时的推送文案 | proxy |
+| `--reply` | 否 | `<开始执行>可通过新消息更新任务内容` | 三方插件开始执行时的推送文案 | proxy |
 | `--sleep` | 否 | `3000` | cli-get 心跳请求失败或非 200 时的重试等待时间（毫秒） | cli-get |
 | `--thread` | 否 | `20` | 执行 Worker 数量 | cli-get |
 | `--queue` | 否 | `1000` | cli-get 本地任务队列容量；队列满时暂停发 `/cli/get` | cli-get |
@@ -310,7 +310,7 @@ module/release/
 - 发往上游 `/cli/get` 的心跳请求统一为 `{ "messages": [{"role":"user","content":""}], "metadata": ... }`
 - 这条链路不再依赖 URL Query 传递业务开关
 - 如果请求体中原本已经传了同名 `metadata` 字段，则默认保留请求体传入值；但 `lastResponse`、`sandbox_path` 等运行时收口字段仍会由 integration 按当前会话重新计算后覆盖
-- 当请求体中的 `model` 命中 `token_store` 中保存的模型配置时，还会把当前模型下已配置且非空的 `__url`、`__model`、`__model_fast`、`__model_thinking`、`__model_multi_input`、`__model_multi_output` 一并补充到转发 `metadata`
+- 当居中对话请求或 Integration 自动任务的 `model` 命中 `token_store` 中保存的模型配置时，还会把当前模型下已配置且非空的 `__url`、`__model`、`__model_fast`、`__model_thinking`、`__model_multi_input`、`__model_multi_output` 一并补充到转发 `metadata`
 - 这些 `__*` 字段只读取当前请求 `model` 命中的那一条配置；未配置或为空字符串的字段不会出现在转发 `metadata` 中
 - 如果某个 Agent 工作目录下的 `config.json.media` 非空，则会把同一份对象补充到 `metadata.agents[].media`
 - 如果某个 Agent 工作目录下存在 `Knowledge.md`，则在真正发送 `/v1/chat/completions`、`/cli/get` 或 integration 内部 cron 请求前，会把该文件内容实时补充到对应的 `metadata.agents[].knowledge`
@@ -2123,6 +2123,7 @@ data: log file not found: release/plugins/feishu.log
 - 创建时还会检查指定 `model` 是否已在 `/api/token` 注册，且 token 非空
 - `task_meta` 与 `task_detail` 都不会保存模型 Token
 - 后台执行器会在执行时根据 `model` 动态从 SQLite `token_store` 查询对应密钥，并设置到请求头 `Authorization`
+- 备忘录、邮件、飞书及其他自动任务在每次执行时，也会按该次任务的 `model` 从同一条 `token_store` 配置读取并补充已配置的模型 URL 与模型参数；创建任务后修改模型配置，下一次执行自动使用新配置，无需重建任务
 - 任务元数据查询支持 `AgentId / ChatId / model / content / cycle / 开始执行时间范围`
 - 任务元数据查询支持额外按 `type` 过滤
 - 任务明细查询支持 `metaId / AgentId / ChatId / model / content / cycle / 执行时间范围`
@@ -2933,3 +2934,42 @@ GET /api/files?path=/Users/demo/agent/A/skills&chatId=chat-1
 - Integration 主需求：`/path/to/deepright/cli/module/integration/REQUIREMENT.md`
 - Integration 手册：`/path/to/deepright/cli/module/integration/USER_GUIDE.md`
 - 日志表30天保留与启动异步清理：`/path/to/deepright/cli/module/integration/iteration/20260711-1/REQUIREMENT.md`
+
+---
+
+## 迭代 20260716-2：Windows WSL 依赖安装超时与降级
+
+通过 Windows WSL 安装包的 `install.bat` 安装 Integration 时，安装器会在 WSL 发行版内补齐运行依赖。每次 `apt-get update`、以及每个软件包在一个安装源中的单次尝试，最长执行 `10` 分钟。超时后，安装器会先结束命令并在 `30` 秒后强制清理仍存活的子进程，避免残留的 `apt`、`dpkg` 或安装脚本继续占用锁。
+
+### 安装顺序
+
+- 基础软件包会逐个从 Ubuntu apt 安装：`git`、`python3`、`python3-pip`、`curl`、`build-essential`、`bubblewrap`、`xdg-utils`。
+- Node.js 按顺序尝试：先安装 NodeSource 的 Node.js `20.x`，失败或超时后立即回退到 Ubuntu apt 的 `nodejs` 与 `npm`。
+- 任一基础软件包失败或超时后不会中断后续软件包；Node.js 的两个源都失败后同样继续后续安装流程。
+
+### 日志与后续行为
+
+- NodeSource 首次失败或超时时，控制台显示黄色 fallback 提示，并将软件包、安装源、`10` 分钟阈值和降级结果写入安装包目录的 `install.log`。
+- 无 fallback 的基础软件包失败或超时、以及 Node.js 的全部安装源失败时，控制台显示红色错误，同时写入 `install.log`；安装器不会因此提前退出。
+- 软件包安装结束后仍会执行既有的工具校验。缺失工具会在校验结果中可见，但不影响应用文件复制、启动脚本生成或后续启动 Integration。
+
+---
+
+## 迭代 20260717-1：自动任务模型配置透传
+
+备忘录、邮件、飞书及其他通过 `task_detail` 自动执行的任务，会在每次实际发送上游请求前，按任务选择的 `model` 读取当前 `token_store` 配置。
+
+- 已配置的非空 `__url`、`__model`、`__model_fast`、`__model_thinking`、`__model_multi_input` 与 `__model_multi_output` 会写入请求 `metadata`，规则与居中对话一致。
+- 模型配置在执行时读取；创建任务后更新模型 URL 或模型名称，下一次任务执行立即使用更新后的值，无需重建任务。
+- 仅配置 token 时任务仍按原方式执行，不会发送空的模型配置字段；认证及原有 `__provider`、`__token` 行为不变。
+- `task_meta`、`task_detail` 不会保存模型客户化配置或 token。
+
+本次迭代的完整说明见 [iteration/20260717-1/USER_GUIDE.md](iteration/20260717-1/USER_GUIDE.md)。
+
+---
+
+## 迭代 20260717-2：会话列表最终一致性刷新
+
+会话列表在同一浏览器配置文件、同一站点的多个窗口间采用最终一致性同步：本窗口写入会立即更新；其他窗口会响应浏览器本地存储变更，并在可见状态下每 30 秒检查一次。页面从后台切回前台时也会立即补拉，因此后台计时器被浏览器降频不会造成长期陈旧。
+
+此能力不覆盖不同浏览器配置文件、无痕窗口、不同 origin 或不同设备。完整说明见 [iteration/20260717-2/USER_GUIDE.md](iteration/20260717-2/USER_GUIDE.md)。

@@ -387,6 +387,9 @@ a{color:var(--accent);text-decoration:none}
 .sidebar-footer-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px}
 .settings-btn{width:100%;padding:10px;border-radius:var(--radius-xs);border:none;background:transparent;color:var(--text-secondary);cursor:pointer;font-size:14px;display:flex;align-items:center;gap:8px;transition:var(--transition);min-width:0}
 .settings-btn:hover{background:var(--bg-card);color:var(--text-primary)}
+.settings-btn.configuration-reminder{color:var(--completion-beacon-color);background:var(--completion-beacon-bg);box-shadow:0 0 0 1px var(--completion-beacon-ring),0 0 16px var(--completion-beacon-glow);animation:settingsConfigurationReminderFlash 1.1s ease-in-out infinite}
+.settings-btn.configuration-reminder svg{filter:drop-shadow(0 0 6px var(--completion-beacon-glow-strong))}
+@keyframes settingsConfigurationReminderFlash{0%,100%{box-shadow:0 0 0 1px var(--completion-beacon-bg),0 0 0 rgba(0,0,0,0);filter:brightness(.96)}50%{box-shadow:0 0 0 1px var(--completion-beacon-ring),0 0 22px var(--completion-beacon-glow-strong),0 0 34px var(--completion-beacon-glow);filter:brightness(1.22)}}
 .standalone-btn{position:relative;overflow:hidden;isolation:isolate;min-width:50px;height:32px;padding:0 10px;border-radius:11px;border:1px solid rgba(var(--accent-rgb),.18);background:linear-gradient(180deg,rgba(255,255,255,.78),rgba(255,238,227,.9));color:var(--text-secondary);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition);box-shadow:0 8px 18px rgba(var(--accent-rgb),.08),inset 0 1px 0 rgba(255,255,255,.88);font-size:12px;font-weight:700;letter-spacing:.08em}
 .standalone-btn::after{content:'';position:absolute;top:-1px;bottom:-1px;left:-55%;width:42%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.72),transparent);opacity:0;transform:skewX(-18deg);pointer-events:none}
 .standalone-btn:hover,.standalone-btn:focus-visible{border-color:rgba(var(--accent-rgb),.4);background:linear-gradient(180deg,rgba(255,255,255,.94),rgba(255,227,205,.98));color:var(--accent);transform:translateY(-1px);box-shadow:0 12px 24px rgba(var(--accent-rgb),.14),inset 0 1px 0 rgba(255,255,255,.92);outline:none}
@@ -2174,6 +2177,11 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .onboarding-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .onboarding-card-kicker{font-size:10px;line-height:1.2;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);opacity:.9}
 .onboarding-card-close{width:22px;height:22px;border:none;border-radius:999px;background:rgba(var(--accent-rgb),.1);color:var(--text-secondary);display:inline-flex;align-items:center;justify-content:center;padding:0;cursor:pointer;transition:var(--transition);flex:0 0 auto;font-size:14px;line-height:1;box-shadow:inset 0 0 0 1px rgba(124,152,214,.2)}
+.onboarding-card-close svg{width:13px;height:13px;fill:currentColor;flex:0 0 auto}
+.onboarding-card-close:not(.hidden){animation:onboardingCardCloseFlash 1.2s ease-in-out infinite}
+@keyframes onboardingCardCloseFlash{0%,100%{opacity:1;background:rgba(var(--accent-rgb),.1);box-shadow:inset 0 0 0 1px rgba(124,152,214,.2),0 0 0 rgba(var(--accent-rgb),0)}50%{opacity:.42;background:rgba(var(--accent-rgb),.28);box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.62),0 0 0 4px rgba(var(--accent-rgb),.2),0 0 16px rgba(var(--accent-rgb),.42)}}
+[data-energy-saver="on"] .onboarding-card-close:not(.hidden),[data-low-power-rendering="on"] .onboarding-card-close:not(.hidden){animation:none;opacity:1;background:rgba(var(--accent-rgb),.2);box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.48),0 0 0 3px rgba(var(--accent-rgb),.14)}
+@media (prefers-reduced-motion:reduce){.onboarding-card-close:not(.hidden){animation:none;opacity:1;background:rgba(var(--accent-rgb),.2);box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.48),0 0 0 3px rgba(var(--accent-rgb),.14)}}
 .onboarding-card-close:hover,.onboarding-card-close:focus-visible{background:rgba(var(--accent-rgb),.16);color:var(--text-primary);outline:none;transform:translateY(-1px)}
 .onboarding-card-close.hidden{display:none}
 .onboarding-card-text{margin-top:8px;font-size:13px;line-height:1.6;color:var(--text-primary);overflow-wrap:anywhere}
@@ -5256,7 +5264,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
   <div class="onboarding-card">
     <div class="onboarding-card-head">
       <div class="onboarding-card-kicker">新手引导</div>
-      <button class="onboarding-card-close hidden" type="button" onclick="handleOnboardingDismiss(event)" title="跳过当前引导" aria-label="跳过当前引导">×</button>
+      <button class="onboarding-card-close hidden" type="button" onclick="handleOnboardingDismiss(event)" title="跳过当前引导" aria-label="跳过当前引导"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5.25v13.5L15.2 12 5 5.25Zm10.8 0v13.5H19V5.25h-3.2Z"/></svg></button>
     </div>
     <div class="onboarding-card-text"></div>
     <div class="onboarding-card-actions">
@@ -5286,7 +5294,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
   <div class="onboarding-card">
     <div class="onboarding-card-head">
       <div class="onboarding-card-kicker">新手引导</div>
-      <button class="onboarding-card-close hidden" type="button" onclick="handleOnboardingDismiss(event)" title="跳过当前引导" aria-label="跳过当前引导">×</button>
+      <button class="onboarding-card-close hidden" type="button" onclick="handleOnboardingDismiss(event)" title="跳过当前引导" aria-label="跳过当前引导"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5.25v13.5L15.2 12 5 5.25Zm10.8 0v13.5H19V5.25h-3.2Z"/></svg></button>
     </div>
     <div class="onboarding-card-text"></div>
     <div class="onboarding-card-actions">
@@ -5316,7 +5324,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
   <div class="onboarding-card">
     <div class="onboarding-card-head">
       <div class="onboarding-card-kicker">新手引导</div>
-      <button class="onboarding-card-close hidden" type="button" onclick="handleOnboardingDismiss(event)" title="跳过当前引导" aria-label="跳过当前引导">×</button>
+      <button class="onboarding-card-close hidden" type="button" onclick="handleOnboardingDismiss(event)" title="跳过当前引导" aria-label="跳过当前引导"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5.25v13.5L15.2 12 5 5.25Zm10.8 0v13.5H19V5.25h-3.2Z"/></svg></button>
     </div>
     <div class="onboarding-card-text"></div>
     <div class="onboarding-card-actions">
@@ -5614,7 +5622,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
       <div class="onboarding-card">
         <div class="onboarding-card-head">
           <div class="onboarding-card-kicker">新手引导</div>
-          <button class="onboarding-card-close hidden" type="button" onclick="handleOnboardingDismiss(event)" title="跳过当前引导" aria-label="跳过当前引导">×</button>
+          <button class="onboarding-card-close hidden" type="button" onclick="handleOnboardingDismiss(event)" title="跳过当前引导" aria-label="跳过当前引导"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5.25v13.5L15.2 12 5 5.25Zm10.8 0v13.5H19V5.25h-3.2Z"/></svg></button>
         </div>
         <div class="onboarding-card-text"></div>
         <div class="onboarding-card-actions">
@@ -5831,7 +5839,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
       <div class="onboarding-card">
         <div class="onboarding-card-head">
           <div class="onboarding-card-kicker">新手引导</div>
-          <button class="onboarding-card-close hidden" type="button" onclick="handleOnboardingDismiss(event)" title="跳过当前引导" aria-label="跳过当前引导">×</button>
+          <button class="onboarding-card-close hidden" type="button" onclick="handleOnboardingDismiss(event)" title="跳过当前引导" aria-label="跳过当前引导"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5.25v13.5L15.2 12 5 5.25Zm10.8 0v13.5H19V5.25h-3.2Z"/></svg></button>
         </div>
         <div class="onboarding-card-text"></div>
         <div class="onboarding-card-actions">
@@ -5896,7 +5904,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
       <div class="onboarding-card">
         <div class="onboarding-card-head">
           <div class="onboarding-card-kicker">新手引导</div>
-          <button class="onboarding-card-close hidden" type="button" onclick="handleOnboardingDismiss(event)" title="跳过当前引导" aria-label="跳过当前引导">×</button>
+          <button class="onboarding-card-close hidden" type="button" onclick="handleOnboardingDismiss(event)" title="跳过当前引导" aria-label="跳过当前引导"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5.25v13.5L15.2 12 5 5.25Zm10.8 0v13.5H19V5.25h-3.2Z"/></svg></button>
         </div>
         <div class="onboarding-card-text"></div>
         <div class="onboarding-card-actions">
@@ -6147,6 +6155,7 @@ const rightSidebarUrlPreviewAutoOpenTokens = Object.create(null);
 let rightSidebarUrlPreviewRequestSeq = 0;
 const STORE_KEY = 'deepright_settings';
 const CHATS_KEY = 'deepright_chats';
+const CHAT_LIST_SYNC_INTERVAL_MS = 30000;
 const THEME_KEY = 'theme';
 const ENERGY_SAVER_KEY = 'deepright_energy_saver';
 const ONBOARDING_COMPLETE_KEY = 'deepright_onboarding_complete';
@@ -6319,17 +6328,6 @@ function isRemoteReadonlySiteAccess() {
   return !isLocalHostName(String(location.hostname || '').trim().toLowerCase());
 }
 
-let settingsPendingModelOrderSeq = 0;
-
-function getModelEntryPendingOrder(entry) {
-  if (!entry) return 0;
-  const raw = Number(entry.getAttribute('data-pending-order') || 0);
-  if (raw > 0) return raw;
-  settingsPendingModelOrderSeq += 1;
-  entry.setAttribute('data-pending-order', String(settingsPendingModelOrderSeq));
-  return settingsPendingModelOrderSeq;
-}
-
 function isModelEntryPending(entry) {
   if (!entry) return false;
   const model = normalizeModelName(entry.querySelector('select') && entry.querySelector('select').value);
@@ -6344,10 +6342,8 @@ function refreshModelEntryPendingState(entry) {
   entry.classList.toggle('pending', pending);
   entry.setAttribute('data-pending', pending ? '1' : '0');
   if (pending) {
-    getModelEntryPendingOrder(entry);
     entry.title = '待完成：填写密钥后再保存';
   } else {
-    entry.removeAttribute('data-pending-order');
     entry.removeAttribute('title');
   }
   return pending;
@@ -10061,7 +10057,7 @@ function getOnboardingStepConfig(step) {
         rectSelectorsByDomain: {
           left: ['#sidebarToggle']
         },
-        message: '全屏状态时会自动收起左右菜单。',
+        message: '全屏状态下会保留左右菜单当前的展开状态。',
         actionLabel: '',
         padding: 8,
         highlightPadding: 12,
@@ -10076,7 +10072,7 @@ function getOnboardingStepConfig(step) {
         rectSelectorsByDomain: {
           right: ['#rightSidebarToggle']
         },
-        message: '全屏状态时会自动收起左右菜单。',
+        message: '全屏状态下会保留左右菜单当前的展开状态。',
         actionLabel: '完成',
         padding: 8,
         highlightPadding: 12,
@@ -11991,8 +11987,8 @@ function updateRightSidebarToggleUI() {
 }
 
 function getInitialRightSidebarCollapsed() {
-  // Requirement: each browser open should start with both sidebars collapsed.
-  return true;
+  // Do not auto-collapse either sidebar when the page opens.
+  return false;
 }
 
 function updateLeftSidebarToggleUI() {
@@ -12014,8 +12010,8 @@ function updateLeftSidebarToggleUI() {
 }
 
 function getInitialLeftSidebarCollapsed() {
-  // Requirement: each browser open should start with both sidebars collapsed.
-  return true;
+  // Do not auto-collapse either sidebar when the page opens.
+  return false;
 }
 
 function applyLeftSidebarState(collapsed) {
@@ -12031,6 +12027,35 @@ function applyLeftSidebarState(collapsed) {
 
 function hasConfiguredModels() {
   return Object.keys(state.settings.models || {}).length > 0;
+}
+
+let configurationReminderState = {
+  hasConfiguredAgent: false
+};
+
+function syncConfigurationReminder(options = {}) {
+  const settingsTrigger = document.getElementById('settingsTrigger');
+  const missingModel = !hasSelectableConfiguredModels();
+  const missingAgent = !configurationReminderState.hasConfiguredAgent;
+  const needsConfiguration = missingModel || missingAgent;
+  if (settingsTrigger) {
+    const hint = missingModel && missingAgent
+      ? '请先配置模型和 Agent'
+      : (missingModel ? '请先配置模型' : '请先配置 Agent');
+    settingsTrigger.classList.toggle('configuration-reminder', needsConfiguration);
+    settingsTrigger.title = needsConfiguration ? hint : '设置';
+    settingsTrigger.setAttribute('aria-label', needsConfiguration ? ('设置（' + hint + '）') : '设置');
+  }
+  if (needsConfiguration && options.revealSidebar && isLeftSidebarCollapsed()) {
+    applyLeftSidebarState(false);
+  }
+  return needsConfiguration;
+}
+
+async function initializeConfigurationReminder() {
+  const agents = await fetchAgentList();
+  configurationReminderState.hasConfiguredAgent = agents.length > 0;
+  syncConfigurationReminder({ revealSidebar: true });
 }
 
 function revealLeftSidebarForModelSetup() {
@@ -19153,8 +19178,6 @@ function setOnboardingStep(step) {
   }
   if (isFullscreenTourOnboardingStep(next)) {
     closeCenterInputTransientUi();
-    applyLeftSidebarState(true);
-    applyRightSidebarState(true);
     if (next === 'fullscreen-tour-left-toggle') scheduleFullscreenTourAutoAdvance();
     else clearFullscreenTourAutoAdvanceTimer();
   } else {
@@ -22960,9 +22983,11 @@ async function init() {
   updateStandaloneButton();
   finalizeBootShell();
   releaseBootLoadingOverlay();
+  startChatListSync();
   startLocalStorageMaintenance();
   maintainLocalStorageBudget({ showNotice: false });
   await loadSettings();
+  await initializeConfigurationReminder();
   await loadStandaloneModeStatus({ silent: true });
   const perfProfile = await detectBrowserPerfProfile();
   state.browserPerfProfile = perfProfile;
@@ -22998,6 +23023,7 @@ async function init() {
   }
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
+      refreshChatListFromStorage();
       loadStandaloneModeStatus({ silent: true });
       maintainLocalStorageBudget({ showNotice: false });
     }
@@ -26030,9 +26056,11 @@ function applyChatsStoragePayload(payload) {
 
 function loadChats() {
   try {
-    const d = JSON.parse(localStorage.getItem(CHATS_KEY));
+    const raw = localStorage.getItem(CHATS_KEY);
+    const d = JSON.parse(raw);
     if (d) {
       applyChatsStoragePayload(d);
+      lastChatsStorageSnapshot = raw;
       let normalizedChanged = false;
       Object.values(state.chats).forEach(chat => {
         if (chat && Object.prototype.hasOwnProperty.call(chat, 'cliCommandHistory')) {
@@ -26044,6 +26072,51 @@ function loadChats() {
       if (normalizedChanged) saveChats();
     }
   } catch {}
+}
+let lastChatsStorageSnapshot = null;
+let chatListSyncTimer = 0;
+
+function rememberChatsStorageSnapshot(raw) {
+  lastChatsStorageSnapshot = raw == null ? '' : String(raw);
+}
+
+function refreshChatListFromStorage() {
+  let raw = '';
+  try {
+    raw = localStorage.getItem(CHATS_KEY) || '';
+  } catch {
+    return false;
+  }
+  if (raw === lastChatsStorageSnapshot) return false;
+  if (!raw) {
+    rememberChatsStorageSnapshot(raw);
+    return false;
+  }
+  let payload = null;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    rememberChatsStorageSnapshot(raw);
+    return false;
+  }
+  if (!payload || typeof payload !== 'object') {
+    rememberChatsStorageSnapshot(raw);
+    return false;
+  }
+  rememberChatsStorageSnapshot(raw);
+  syncChatsPayloadToRuntime(payload);
+  return true;
+}
+
+function startChatListSync() {
+  if (chatListSyncTimer) return;
+  window.addEventListener('storage', event => {
+    if (event.storageArea !== localStorage || event.key !== CHATS_KEY) return;
+    refreshChatListFromStorage();
+  });
+  chatListSyncTimer = window.setInterval(() => {
+    if (!document.hidden) refreshChatListFromStorage();
+  }, CHAT_LIST_SYNC_INTERVAL_MS);
 }
 let chatStoragePressureNoticeShown = false;
 let chatStorageFailureNoticeShown = false;
@@ -26308,7 +26381,9 @@ function buildChatsStoragePayload(sourceChats, sourceOrder) {
 }
 
 function tryPersistChatsPayload(payload) {
-  localStorage.setItem(CHATS_KEY, JSON.stringify(payload));
+  const raw = JSON.stringify(payload);
+  localStorage.setItem(CHATS_KEY, raw);
+  rememberChatsStorageSnapshot(raw);
   return true;
 }
 
@@ -33257,8 +33332,6 @@ async function toggleBrowserFullscreen(event) {
       await exitBrowserFullscreenMode();
     } else {
       await requestBrowserFullscreen();
-      applyLeftSidebarState(true);
-      applyRightSidebarState(true);
       window.setTimeout(() => {
         startFullscreenTourOnboarding();
       }, 120);
@@ -40853,28 +40926,6 @@ function renderModelEntries() {
   scheduleOnboardingSync();
 }
 
-function sortModelEntryElements() {
-  const container = document.getElementById('modelEntries');
-  if (!container) return;
-  const entries = Array.from(container.querySelectorAll('.model-entry'));
-  if (!entries.length) return;
-  entries.sort((entryA, entryB) => {
-    const pendingA = refreshModelEntryPendingState(entryA);
-    const pendingB = refreshModelEntryPendingState(entryB);
-    if (pendingA !== pendingB) return pendingA ? 1 : -1;
-    if (pendingA && pendingB) {
-      return getModelEntryPendingOrder(entryA) - getModelEntryPendingOrder(entryB);
-    }
-    const modelA = normalizeModelName(entryA.querySelector('select') && entryA.querySelector('select').value);
-    const modelB = normalizeModelName(entryB.querySelector('select') && entryB.querySelector('select').value);
-    return compareConfiguredModelNames(modelA, modelB);
-  });
-  entries.forEach((entry, idx) => {
-    entry.setAttribute('data-idx', String(idx));
-    container.appendChild(entry);
-  });
-}
-
 function buildAvailableModelOptions(currentModel, currentEntry) {
   const occupiedModels = new Set();
   document.querySelectorAll('#modelEntries .model-entry').forEach(entry => {
@@ -41033,7 +41084,6 @@ function addModelEntry() {
   const entry = div.firstElementChild;
   container.appendChild(entry);
   attachModelConfigInputListeners(entry);
-  sortModelEntryElements();
   refreshModelEntryOptions();
   refreshSwarmModelAvailability();
   scheduleOnboardingSync();
@@ -41187,7 +41237,6 @@ function attachModelConfigInputListeners(entry) {
     });
     tokenInput.addEventListener('blur', () => scheduleHideModelKeyHintPreview(tokenInput));
     tokenInput.addEventListener('input', () => {
-      const wasPending = entry.getAttribute('data-pending') === '1';
       if (String(tokenInput.value || '').trim()) {
         if (modelKeyHintPreviewState.trigger === tokenInput || modelKeyHintPreviewState.hoverTrigger === tokenInput) {
           hideModelKeyHintPreview();
@@ -41195,8 +41244,7 @@ function attachModelConfigInputListeners(entry) {
       } else if ((typeof tokenInput.matches === 'function' && tokenInput.matches(':focus')) || (typeof tokenInput.matches === 'function' && tokenInput.matches(':hover'))) {
         scheduleModelKeyHintPreview(tokenInput);
       }
-      const nextPending = refreshModelEntryPendingState(entry);
-      if (wasPending !== nextPending) sortModelEntryElements();
+      refreshModelEntryPendingState(entry);
     });
   }
   const configSelectors = [
@@ -41321,7 +41369,6 @@ function onModelChange(sel) {
   if (entry) {
     replaceModelEntry(entry, dup.length > 0 ? '' : nextModel, { token: draft.token });
   }
-  sortModelEntryElements();
   refreshModelEntryOptions();
   if (dup.length > 0) {
     setSettingsErrorMessage(`模型 ${dup[0]} 已存在，同一模型只能配置一次`);
@@ -41474,7 +41521,6 @@ async function saveSettingsAsync() {
         }
         refreshModelEntryPendingState(entry);
       });
-      sortModelEntryElements();
       refreshModelEntryOptions();
       refreshSwarmModelAvailability();
     } catch (e) {
@@ -41519,6 +41565,7 @@ async function saveSettingsAsync() {
   const agentChanged = agentId !== state.settings.agentId;
   const onboardingChanged = nextOnboardingEnabled !== isOnboardingEnabled();
   state.settings.agentId = agentId;
+  configurationReminderState.hasConfiguredAgent = true;
   saveSettingsToStorage();
   if (onboardingChanged) setOnboardingEnabled(nextOnboardingEnabled);
   renderWikiAutoTidyToggle();
@@ -41538,6 +41585,7 @@ async function saveSettingsAsync() {
   }
   saveChats();
   state.selectedModel = resolveSelectableConfiguredModelName(state.selectedModel, state.settings.models || {}) || null;
+  syncConfigurationReminder();
   if (state.activeChat && chatModels[state.activeChat]) {
     const activeChatModel = normalizeModelName(chatModels[state.activeChat]);
     if (!state.settings.models[activeChatModel]) {
@@ -47910,18 +47958,6 @@ function rsUpdateTime() {
   if (m) m.value = String(now.getMinutes()).padStart(2, '0');
 }
 function rsBuildSaveSchedule() {
-  if (rsRepeatMode === 'once') {
-    const now = new Date();
-    const date = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
-    const hour = String(now.getHours()).padStart(2, '0');
-    const minute = String(now.getMinutes()).padStart(2, '0');
-    return {
-      date,
-      hour,
-      minute,
-      rawTime: date + ' ' + hour + ':' + minute
-    };
-  }
   const hour = String(document.getElementById('rsTimeH')?.value || '').padStart(2, '0');
   const minute = String(document.getElementById('rsTimeM')?.value || '').padStart(2, '0');
   const date = calDateStr();

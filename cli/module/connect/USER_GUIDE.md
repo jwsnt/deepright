@@ -276,7 +276,7 @@ curl "http://127.0.0.1:18080/api/connect/health"
 
 ```bash
 ../plugins/feishu send --message '{"id":1,"original":"{\"schema\":\"2.0\",\"event\":{\"message\":{\"message_id\":\"om_xxx\",\"content\":\"{\\\"text\\\":\\\"你好\\\"}\",\"message_type\":\"text\"}}}"}' --content "收到"
-../plugins/feishu init --message '{"id":1,"original":"{\"schema\":\"2.0\",\"event\":{\"message\":{\"message_id\":\"om_xxx\",\"content\":\"{\\\"text\\\":\\\"你好\\\"}\",\"message_type\":\"text\"}}}"}' --content "<开始执行>可通过新消息更新任务"
+../plugins/feishu init --message '{"id":1,"original":"{\"schema\":\"2.0\",\"event\":{\"message\":{\"message_id\":\"om_xxx\",\"content\":\"{\\\"text\\\":\\\"你好\\\"}\",\"message_type\":\"text\"}}}"}' --content "<开始执行>可通过新消息更新任务内容"
 ../plugins/feishu send --message '{"message":{"raw":"{\"schema\":\"2.0\",\"event\":{\"message\":{\"message_id\":\"om_xxx\",\"content\":\"{\\\"text\\\":\\\"你好\\\"}\",\"message_type\":\"text\"}}}"}}' --image /tmp/a.png,/tmp/b.jpg
 ../plugins/feishu send --message '{"messageId":"om_xxx"}' --content "附件如下" --image /tmp/a.png,/tmp/b.jpg --file /tmp/a.pdf
 ```

@@ -173,7 +173,7 @@
 
 ```bash
 ../plugins/feishu send --message '{"id":1,"rawRequest":"{\"source\":\"feishu\",\"receivedAt\":\"2026-05-22T00:00:00+08:00\",\"message\":{\"messageId\":\"om_xxx\",\"chatId\":\"oc_xxx\",\"messageType\":\"text\",\"content\":\"你好\",\"rawContent\":\"{\\\"text\\\":\\\"你好\\\"}\",\"raw\":\"{\\\"schema\\\":\\\"2.0\\\",\\\"event\\\":{\\\"message\\\":{\\\"message_id\\\":\\\"om_xxx\\\"}}}\"},\"pending\":[],\"groupedBy\":\"chat_id\",\"windowSecs\":30,\"expireSecs\":600}"}' --content "收到"
-../plugins/feishu init --message '{"id":1,"rawRequest":"{\"source\":\"feishu\",\"receivedAt\":\"2026-05-22T00:00:00+08:00\",\"message\":{\"messageId\":\"om_xxx\",\"chatId\":\"oc_xxx\",\"messageType\":\"text\",\"content\":\"你好\",\"rawContent\":\"{\\\"text\\\":\\\"你好\\\"}\",\"raw\":\"{\\\"schema\\\":\\\"2.0\\\",\\\"event\\\":{\\\"message\\\":{\\\"message_id\\\":\\\"om_xxx\\\"}}}\"},\"pending\":[],\"groupedBy\":\"chat_id\",\"windowSecs\":30,\"expireSecs\":600}"}' --content "<开始执行>可通过新消息更新任务"
+../plugins/feishu init --message '{"id":1,"rawRequest":"{\"source\":\"feishu\",\"receivedAt\":\"2026-05-22T00:00:00+08:00\",\"message\":{\"messageId\":\"om_xxx\",\"chatId\":\"oc_xxx\",\"messageType\":\"text\",\"content\":\"你好\",\"rawContent\":\"{\\\"text\\\":\\\"你好\\\"}\",\"raw\":\"{\\\"schema\\\":\\\"2.0\\\",\\\"event\\\":{\\\"message\\\":{\\\"message_id\\\":\\\"om_xxx\\\"}}}\"},\"pending\":[],\"groupedBy\":\"chat_id\",\"windowSecs\":30,\"expireSecs\":600}"}' --content "<开始执行>可通过新消息更新任务内容"
 ```
 
 发送图片：

@@ -451,7 +451,7 @@ func (s *CronService) createInitialDetails(meta *TaskMeta, base time.Time) {
 		if start.Before(base) {
 			start = start.Add(interval)
 		}
-		s.createIntervalRange(meta, start, start.Add(5*24*time.Hour), interval)
+		s.createIntervalRange(meta, base, start, start.Add(5*24*time.Hour), interval)
 	}
 }
 
@@ -514,7 +514,7 @@ func (s *CronService) CheckAndCreate() {
 			case 3, 4, 5:
 				interval := cycleInterval(m.Cycle)
 				if interval > 0 {
-					s.createIntervalRange(&m, now.Truncate(time.Minute), end, interval)
+					s.createIntervalRange(&m, t, now, end, interval)
 				}
 			}
 		}
@@ -551,11 +551,18 @@ func (s *CronService) createRange(meta *TaskMeta, baseTime, now, end time.Time, 
 	}
 }
 
-func (s *CronService) createIntervalRange(meta *TaskMeta, now, end time.Time, interval time.Duration) {
+func (s *CronService) createIntervalRange(meta *TaskMeta, anchor, now, end time.Time, interval time.Duration) {
 	if interval <= 0 {
 		return
 	}
-	tick := now
+	tick := anchor
+	if tick.Before(now) {
+		steps := now.Sub(anchor) / interval
+		tick = anchor.Add(steps * interval)
+		if tick.Before(now) {
+			tick = tick.Add(interval)
+		}
+	}
 	for !tick.After(end) {
 		s.createDetail(meta, tick)
 		tick = tick.Add(interval)

@@ -11034,12 +11034,6 @@ func createCronTask(agentID string, req cronCreateRequest) (map[string]interface
 		}
 		cronExpr = cronBuildExpr(req.Cycle, t)
 		rawTime = req.RawTime
-		if req.Cycle == 0 {
-			nowTrunc := time.Now().Truncate(time.Minute)
-			if t.Before(nowTrunc) {
-				return nil, fmt.Errorf("一次性任务执行时间不能早于当前时间")
-			}
-		}
 	}
 
 	db := cronDB
@@ -11105,9 +11099,9 @@ func createCronTask(agentID string, req cronCreateRequest) (map[string]interface
 
 	if req.Cycle >= 3 && req.Cycle <= 5 {
 		interval := cronCycleInterval(req.Cycle)
-		now := time.Now().Truncate(time.Minute)
-		end := now.Add(5 * 24 * time.Hour)
-		tick := now
+		start, _ := time.ParseInLocation("2006-01-02 15:04", rawTime, time.Local)
+		end := start.Add(5 * 24 * time.Hour)
+		tick := start
 		for !tick.After(end) {
 			detailRes, _ := db.Exec(`INSERT OR IGNORE INTO task_detail (meta_id, exec_time, agent_id, chat_id, task_type, model, thinking, verify, router_disable, content, response_schema, started) VALUES (?,?,?,?,?,?,?,?,?,?,?,0)`,
 				metaID, tick.Unix(), agentID, req.ChatID, req.Type, req.Model, thinkInt, verifyInt, routerDisableInt, req.Content, req.ResponseSchema)
@@ -16600,7 +16594,7 @@ var runConnectPluginInit = func(callbackPath string, flags map[string]string) er
 	return connectsvc.RunPluginCallbackAction(callbackPath, "init", flags)
 }
 
-const defaultConnectAutoReply = "<开始执行>可通过新消息更新任务"
+const defaultConnectAutoReply = connectsvc.DefaultAutoReply
 
 func resolveServeReply(reply string) string {
 	return connectsvc.ResolveAutoReply(reply)
@@ -17347,6 +17341,16 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 			metaMap["META_ID"] = metaID
 		}
 		pruneForwardedKnowledgeCommit(metaMap)
+		modelCfg, err := lookupTokenConfigByModel(cronDB, t.Model)
+		if err != nil {
+			log.Printf("[cron] read task model config failed: detail=%d model=%s err=%v", t.ID, t.Model, err)
+			cronDB.Exec(`UPDATE task_detail SET started = 0 WHERE id = ?`, t.ID)
+			logCronDetailStatusByID(cronDB, t.ID, "reset_started")
+			continue
+		}
+		// Scheduled and Connect-triggered tasks bypass handleChatCompletions, so
+		// apply the same current model configuration used by centered chat here.
+		injectConfiguredModelMetadata(metaMap, modelCfg)
 
 		reqData := map[string]interface{}{
 			"model":    t.Model,
@@ -17370,12 +17374,7 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 		// Log Q to chat_log
 		appendChatLogDB(t.AgentID, chatID, chatTypeScheduledTask, "Q", "normal", string(body))
 
-		token, err := lookupTokenByModel(cronDB, t.Model)
-		if err != nil {
-			cronDB.Exec(`UPDATE task_detail SET started = 0 WHERE id = ?`, t.ID)
-			logCronDetailStatusByID(cronDB, t.ID, "reset_started")
-			continue
-		}
+		token := modelCfg.Token
 
 		// Send to upstream
 		detailID := t.ID
@@ -17562,6 +17561,28 @@ func cronCheckOnce(cfg *Config) {
 						}
 					}
 					day = day.AddDate(0, 0, 1)
+				}
+			case 3, 4, 5: // hourly / every 15 minutes / every 30 minutes
+				interval := cronCycleInterval(cycle)
+				tick := t
+				if tick.Before(now) {
+					steps := now.Sub(t) / interval
+					tick = t.Add(steps * interval)
+					if tick.Before(now) {
+						tick = tick.Add(interval)
+					}
+				}
+				for !tick.After(end) {
+					res, _ := cronDB.Exec(`INSERT OR IGNORE INTO task_detail (meta_id, exec_time, agent_id, chat_id, task_type, model, thinking, verify, router_disable, content, started) VALUES (?,?,?,?,?,?,?,?,?,?,0)`,
+						id, tick.Unix(), agentID, chatID, taskType, model, th, verify, routerDisable, content)
+					if res != nil {
+						if n, _ := res.RowsAffected(); n > 0 {
+							if detailID, err := res.LastInsertId(); err == nil {
+								appendCronDetailLog(cronDB, cronDetailLogEntry{DetailID: int(detailID), MetaID: id, AgentID: agentID, ChatID: chatID, TaskType: taskType, Action: "insert", ExecTime: tick.Unix(), Model: model, Thinking: th != 0, Verify: verify != 0, RouterDisable: routerDisable != 0, Content: content, Started: 0, OccurredAt: cronLogTimestamp()})
+							}
+						}
+					}
+					tick = tick.Add(interval)
 				}
 			}
 		}

@@ -369,7 +369,7 @@ cd cli/module/proxy
 如果希望自定义三方插件开始执行时的推送文案，可以追加：
 
 ```bash
-./proxy serve --agent-dir ./agents --reply "<开始执行>可通过新消息更新任务"
+./proxy serve --agent-dir ./agents --reply "<开始执行>可通过新消息更新任务内容"
 ```
 
 如果希望把新建 Agent 的默认模板改成其他目录，可以追加：
@@ -685,7 +685,7 @@ curl 'http://127.0.0.1:8080/file/lastUpdate?file=/abs/path/to/USER.md'
 - 如果最早待处理消息已超过 20 分钟，则会转成一条“无需启动”的备忘录明细，`task_detail.started = 2`
 - 如果最早待处理消息位于 10 到 20 分钟之间，则会转成一条立即执行的一次性任务内容
 - 如果本轮为某个插件至少生成了一条 `started=0` 的待执行明细，则会使用该插件的 `init` 命令，仅回复一次开始通知
-- 开始通知内容来自 `--reply`，默认值为 `<开始执行>可通过新消息更新任务`
+- 开始通知内容来自 `--reply`，默认值为 `<开始执行>可通过新消息更新任务内容`
 - `init` 的插件程序路径不会写死；proxy 会先读取 `connect meta-list` 对应配置里的 `callback` 绝对路径，再执行 `<callback> init ...`
 - 执行 `init` 或 `send` 前，proxy 会先调用 `<callback> command` 读取插件能力列表，确认插件声明支持对应命令后再执行
 - 为兼容尚未升级的旧插件，如果 `command` 不可用，proxy 仍会回退到 `<callback> --help` 检查
@@ -820,7 +820,7 @@ proxy --agent-dir ./agent
 | `--agent-cache` | 否 | `10000` | Agent 元数据缓存 TTL，单位毫秒 |
 | `--site` | 否 | `./site` | 静态站点目录 |
 | `--connect_timeout` | 否 | `15000` | 上游连接超时，单位毫秒 |
-| `--reply` | 否 | `<开始执行>可通过新消息更新任务` | 三方插件开始执行时的推送文案 |
+| `--reply` | 否 | `<开始执行>可通过新消息更新任务内容` | 三方插件开始执行时的推送文案 |
 
 ### `create` 参数
 

@@ -8431,12 +8431,6 @@ func createCronTask(agentID string, req cronCreateRequest) (map[string]interface
 		}
 		cronExpr = cronBuildExpr(req.Cycle, t)
 		rawTime = req.RawTime
-		if req.Cycle == 0 {
-			nowTrunc := time.Now().Truncate(time.Minute)
-			if t.Before(nowTrunc) {
-				return nil, fmt.Errorf("一次性任务执行时间不能早于当前时间")
-			}
-		}
 	}
 
 	res, err := db.Exec(`INSERT INTO task_meta (cycle, raw_time, agent_id, model, thinking, verify, router_disable, cron, content, response_schema, chat_id, task_type) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
@@ -8496,9 +8490,9 @@ func createCronTask(agentID string, req cronCreateRequest) (map[string]interface
 
 	if req.Cycle >= 3 && req.Cycle <= 5 {
 		interval := cronCycleInterval(req.Cycle)
-		now := time.Now().Truncate(time.Minute)
-		end := now.Add(5 * 24 * time.Hour)
-		tick := now
+		start, _ := time.ParseInLocation("2006-01-02 15:04", rawTime, time.Local)
+		end := start.Add(5 * 24 * time.Hour)
+		tick := start
 		for !tick.After(end) {
 			detailRes, _ := db.Exec(`INSERT OR IGNORE INTO task_detail (meta_id, exec_time, agent_id, chat_id, task_type, model, thinking, verify, router_disable, content, response_schema, started) VALUES (?,?,?,?,?,?,?,?,?,?,?,0)`,
 				metaID, tick.Unix(), agentID, req.ChatID, req.Type, req.Model, thinkInt, verifyInt, routerDisableInt, req.Content, req.ResponseSchema)
