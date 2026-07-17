@@ -17,9 +17,10 @@ import (
 )
 
 const (
-	browserKey             = "browser"
-	browserDisplayName     = "浏览器"
-	defaultChromeUserAgent = browserplaywrightsvc.DefaultChromeUserAgent
+	browserKey                            = "browser"
+	browserDisplayName                    = "浏览器"
+	defaultChromeUserAgent                = browserplaywrightsvc.DefaultChromeUserAgent
+	browserIgnoreInvalidRuntimeRecordFlag = "__browser-ignore-invalid-runtime-record"
 )
 
 var (
@@ -342,6 +343,10 @@ func runPluginLifecycleCommand(command string, args []string, stdout, stderr io.
 		fmt.Fprintln(stderr, err.Error())
 		return 1
 	}
+	if command == "start" {
+		flags = cloneFlags(flags)
+		flags[browserIgnoreInvalidRuntimeRecordFlag] = "true"
+	}
 	if err := browserEnsurePluginLogFile(); err != nil {
 		fmt.Fprintln(stderr, err.Error())
 		return 1
@@ -567,7 +572,7 @@ func browserRuntimeRoot(flags map[string]string) (string, string, error) {
 	if abs, err := filepath.Abs(browserPath); err == nil {
 		browserPath = abs
 	}
-	if root, ok, err := browserIntegrationPluginsRoot(); err != nil {
+	if root, ok, err := browserIntegrationPluginsRoot(flags); err != nil {
 		return "", "", err
 	} else if ok {
 		return root, filepath.Join(root, "browser"), nil
@@ -579,15 +584,33 @@ func browserRuntimeRoot(flags map[string]string) (string, string, error) {
 	return root, browserPath, nil
 }
 
-func browserIntegrationPluginsRoot() (string, bool, error) {
+func browserIntegrationPluginsRoot(flags map[string]string) (string, bool, error) {
+	if connectBin := strings.TrimSpace(flags["connect-bin"]); connectBin != "" {
+		connectBin, err := browserEnsureExecutablePath(connectBin)
+		if err != nil {
+			return "", false, err
+		}
+		return browserIntegrationPluginsRootFromConnectBin(connectBin)
+	}
 	connectBin, ok, err := browserReadRecordedConnectBin()
 	if err != nil {
+		if browserIgnoresInvalidRuntimeRecord(flags) {
+			return "", false, nil
+		}
 		return "", false, err
 	}
 	if !ok {
 		return "", false, nil
 	}
-	return browserIntegrationPluginsRootFromConnectBin(connectBin)
+	root, ok, err := browserIntegrationPluginsRootFromConnectBin(connectBin)
+	if err != nil && browserIgnoresInvalidRuntimeRecord(flags) {
+		return "", false, nil
+	}
+	return root, ok, err
+}
+
+func browserIgnoresInvalidRuntimeRecord(flags map[string]string) bool {
+	return strings.EqualFold(strings.TrimSpace(flags[browserIgnoreInvalidRuntimeRecordFlag]), "true")
 }
 
 func browserIntegrationPluginsRootFromConnectBin(connectBin string) (string, bool, error) {

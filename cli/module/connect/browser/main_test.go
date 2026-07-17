@@ -371,6 +371,80 @@ func TestPluginStartWritesBrowserRuntimeRecordOnSuccess(t *testing.T) {
 	}
 }
 
+func TestPluginStartReplacesStaleBrowserRuntimeRecord(t *testing.T) {
+	restore := stubBrowserRuntime()
+	defer restore()
+
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	t.Setenv("USERPROFILE", homeDir)
+
+	exeDir := t.TempDir()
+	browserExecutablePathFn = func() (string, error) {
+		return writeBrowserBinaryFixture(t, exeDir), nil
+	}
+	runtimeFilePath, err := browserRuntimeFilePath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	staleConnectBin := filepath.Join(t.TempDir(), "removed", "integration")
+	if err := os.WriteFile(runtimeFilePath, []byte(fmt.Sprintf("{\"connectBin\":%q}\n", staleConnectBin)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	currentConnectBin, _ := writeBundledConnectBinFixture(t, homeDir, map[string]string{
+		"app-dir": filepath.Join(t.TempDir(), "runtime-app"),
+	})
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	if code := runCLI([]string{"start", "--connect-bin", currentConnectBin}, stdout, stderr); code != 0 {
+		t.Fatalf("start exit code = %d, stderr = %s", code, stderr.String())
+	}
+
+	recorded, ok, err := browserReadRecordedConnectBin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("expected browser runtime record to exist")
+	}
+	if recorded != currentConnectBin {
+		t.Fatalf("recorded connect bin = %q, want %q", recorded, currentConnectBin)
+	}
+}
+
+func TestPluginStartIgnoresStaleBrowserRuntimeRecordWithoutConnectBin(t *testing.T) {
+	restore := stubBrowserRuntime()
+	defer restore()
+
+	runtimeRoot := t.TempDir()
+	pluginDir := filepath.Join(runtimeRoot, "plugins")
+	browserPath := writeBrowserBinaryFixture(t, pluginDir)
+	browserExecutablePathFn = func() (string, error) {
+		return browserPath, nil
+	}
+	if err := os.MkdirAll(filepath.Join(runtimeRoot, "config"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(runtimeRoot, "config", "config.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runtimeFilePath, err := browserRuntimeFilePath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	staleConnectBin := filepath.Join(t.TempDir(), "removed", "integration")
+	if err := os.WriteFile(runtimeFilePath, []byte(fmt.Sprintf("{\"connectBin\":%q}\n", staleConnectBin)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	if code := runCLI([]string{"start"}, stdout, stderr); code != 0 {
+		t.Fatalf("start exit code = %d, stderr = %s", code, stderr.String())
+	}
+}
+
 func TestPluginStartFailureDoesNotOverwriteBrowserRuntimeRecord(t *testing.T) {
 	restore := stubBrowserRuntime()
 	defer restore()

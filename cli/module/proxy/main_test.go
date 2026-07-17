@@ -2809,6 +2809,31 @@ func TestHandleAgentIDs(t *testing.T) {
 	}
 }
 
+func TestHandleAgentIDsListsDirectoriesWithoutReadingAgentMetadata(t *testing.T) {
+	root := t.TempDir()
+	for _, name := range []string{"zeta", "alpha"} {
+		if err := os.MkdirAll(filepath.Join(root, name), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", name, err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(root, "alpha", "config.json"), []byte(`{invalid`), 0o644); err != nil {
+		t.Fatalf("write invalid agent config: %v", err)
+	}
+
+	rec := httptest.NewRecorder()
+	(&ProxyServer{AgentDir: root}).HandleAgentIDs(rec, httptest.NewRequest(http.MethodGet, "/api/agentId", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var ids []string
+	if err := json.NewDecoder(rec.Body).Decode(&ids); err != nil {
+		t.Fatalf("decode IDs: %v", err)
+	}
+	if !reflect.DeepEqual(ids, []string{"alpha", "zeta"}) {
+		t.Fatalf("agent IDs = %#v, want [alpha zeta]", ids)
+	}
+}
+
 func TestHandleAgentIDsMethodNotAllowed(t *testing.T) {
 	proxy := &ProxyServer{
 		AgentDir: "iteration/20260419_1/test-case",
@@ -10167,22 +10192,8 @@ func TestSyncConnectPendingRequestsCreatesImmediateCronTask(t *testing.T) {
 	if started != 1 {
 		t.Fatalf("started = %d, want 1", started)
 	}
-	wantCallback := filepath.Join(tmp, "plugins", "feishu")
-	if notifiedCallback != wantCallback {
-		t.Fatalf("notified callback = %q, want %q", notifiedCallback, wantCallback)
-	}
-	if notifiedFlags["content"] != defaultConnectAutoReply {
-		t.Fatalf("notify content = %q, want %q", notifiedFlags["content"], defaultConnectAutoReply)
-	}
-	if strings.TrimSpace(notifiedFlags["message"]) == "" {
-		t.Fatal("notify message is empty")
-	}
-	var notifiedRequest connectsvc.Request
-	if err := json.Unmarshal([]byte(notifiedFlags["message"]), &notifiedRequest); err != nil {
-		t.Fatalf("decode notify message: %v raw=%s", err, notifiedFlags["message"])
-	}
-	if notifiedRequest.ID != r4.ID {
-		t.Fatalf("notify request id = %d, want %d", notifiedRequest.ID, r4.ID)
+	if notifiedCallback != "" || notifiedFlags != nil {
+		t.Fatalf("feishu should not receive a delayed start notification: callback=%q flags=%+v", notifiedCallback, notifiedFlags)
 	}
 
 	requests, err := svc.ListRequests(connectsvc.RequestFilter{Key: meta.Key, Limit: 10})
@@ -10325,8 +10336,8 @@ func TestSyncConnectPendingRequestsExecutesStartedDetailImmediately(t *testing.T
 	if metadata["chat"] != "chat-feishu" {
 		t.Fatalf("metadata chat = %v, want chat-feishu", metadata["chat"])
 	}
-	if notifiedFlags == nil || notifiedFlags["content"] != defaultConnectAutoReply {
-		t.Fatalf("notify flags = %+v", notifiedFlags)
+	if notifiedFlags != nil {
+		t.Fatalf("feishu should not receive a delayed start notification: %+v", notifiedFlags)
 	}
 }
 
@@ -10627,7 +10638,7 @@ func TestSyncConnectPendingRequestsCreatesMemoOnlyDetailAfterTwentyMinutes(t *te
 	}
 }
 
-func TestSyncConnectPendingRequestsUsesDefaultAutoReply(t *testing.T) {
+func TestSyncConnectPendingRequestsSkipsDefaultAutoReplyForFeishu(t *testing.T) {
 	oldwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("getwd: %v", err)
@@ -10709,15 +10720,12 @@ func TestSyncConnectPendingRequestsUsesDefaultAutoReply(t *testing.T) {
 	proxy := &ProxyServer{AgentDir: agentRoot, DeviceID: "dev", CacheTTL: time.Minute, ConnectCacheTTL: time.Second}
 	syncConnectPendingRequests(proxy)
 
-	if notifiedFlags == nil {
-		t.Fatal("expected notification flags")
-	}
-	if notifiedFlags["content"] != defaultConnectAutoReply {
-		t.Fatalf("notify content = %q, want %q", notifiedFlags["content"], defaultConnectAutoReply)
+	if notifiedFlags != nil {
+		t.Fatalf("feishu should not receive the default delayed start reply: %+v", notifiedFlags)
 	}
 }
 
-func TestSyncConnectPendingRequestsUsesCustomAutoReply(t *testing.T) {
+func TestSyncConnectPendingRequestsSkipsCustomAutoReplyForFeishu(t *testing.T) {
 	oldwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("getwd: %v", err)
@@ -10806,11 +10814,8 @@ func TestSyncConnectPendingRequestsUsesCustomAutoReply(t *testing.T) {
 	}
 	syncConnectPendingRequests(proxy)
 
-	if notifiedFlags == nil {
-		t.Fatal("expected notification flags")
-	}
-	if notifiedFlags["content"] != customReply {
-		t.Fatalf("notify content = %q, want %q", notifiedFlags["content"], customReply)
+	if notifiedFlags != nil {
+		t.Fatalf("feishu should not receive a delayed custom start reply: %+v", notifiedFlags)
 	}
 }
 

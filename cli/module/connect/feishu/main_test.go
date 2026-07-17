@@ -772,6 +772,166 @@ func TestLocalFeishuFlushPendingPushesPureTextMessage(t *testing.T) {
 	}
 }
 
+func TestLocalFeishuFlushPendingAcknowledgesImmediatelyAfterPersisting(t *testing.T) {
+	tempDir := t.TempDir()
+	client := &stubLocalFeishuConnectClient{}
+	acknowledged := make([]connectsvc.Request, 0, 1)
+	acknowledgementContent := ""
+	now := time.Date(2026, 7, 17, 12, 0, 0, 0, time.UTC)
+	svc := &localFeishuService{
+		name:         "feishu",
+		client:       client,
+		logger:       log.New(io.Discard, "", 0),
+		messageLog:   io.Discard,
+		downloadDir:  tempDir,
+		stateFile:    filepath.Join(tempDir, "feishu.pending.json"),
+		scanInterval: localFeishuScanInterval,
+		expireWindow: localFeishuExpireWindow,
+		nowFn:        func() time.Time { return now },
+		acknowledger: localFeishuAcknowledgementSenderFunc(func(_ context.Context, request connectsvc.Request, content string) error {
+			acknowledged = append(acknowledged, request)
+			acknowledgementContent = content
+			return nil
+		}),
+		state: localFeishuState{
+			Pending: map[string]localFeishuPendingMessage{
+				"text-1": {
+					ExternalID: "text-1",
+					MessageID:  "om-text-1",
+					ChatID:     "chat-1",
+					Type:       "text",
+					Content:    "请处理这条消息",
+					Raw:        `{"schema":"2.0","event":{"message":{"message_id":"om-text-1"}}}`,
+					MessageAt:  now.UnixMilli(),
+				},
+			},
+			Pushed: map[string]int64{},
+		},
+	}
+
+	if err := svc.flushPending(context.Background(), "feishu"); err != nil {
+		t.Fatal(err)
+	}
+	if len(client.Requests()) != 1 {
+		t.Fatalf("add-request calls = %d, want 1", len(client.Requests()))
+	}
+	if len(acknowledged) != 1 {
+		t.Fatalf("acknowledgements = %d, want 1", len(acknowledged))
+	}
+	if acknowledgementContent != localFeishuReceivedReply {
+		t.Fatalf("acknowledgement content = %q, want %q", acknowledgementContent, localFeishuReceivedReply)
+	}
+	if !strings.Contains(acknowledged[0].RawRequest, `"messageId":"om-text-1"`) {
+		t.Fatalf("acknowledgement did not retain original message target: %s", acknowledged[0].RawRequest)
+	}
+	if len(svc.state.Acknowledging) != 0 {
+		t.Fatalf("pending acknowledgements = %+v, want empty", svc.state.Acknowledging)
+	}
+	if _, ok := svc.state.Acknowledged["text-1"]; !ok {
+		t.Fatalf("missing persisted acknowledgement state: %+v", svc.state.Acknowledged)
+	}
+}
+
+func TestLocalFeishuFlushPendingRetriesAcknowledgementWithoutRepersistingRequest(t *testing.T) {
+	tempDir := t.TempDir()
+	client := &stubLocalFeishuConnectClient{}
+	now := time.Date(2026, 7, 17, 12, 0, 0, 0, time.UTC)
+	ackAttempts := 0
+	svc := &localFeishuService{
+		name:         "feishu",
+		client:       client,
+		logger:       log.New(io.Discard, "", 0),
+		messageLog:   io.Discard,
+		downloadDir:  tempDir,
+		stateFile:    filepath.Join(tempDir, "feishu.pending.json"),
+		scanInterval: localFeishuScanInterval,
+		expireWindow: localFeishuExpireWindow,
+		nowFn:        func() time.Time { return now },
+		acknowledger: localFeishuAcknowledgementSenderFunc(func(_ context.Context, _ connectsvc.Request, _ string) error {
+			ackAttempts++
+			if ackAttempts == 1 {
+				return errors.New("feishu unavailable")
+			}
+			return nil
+		}),
+		state: localFeishuState{
+			Pending: map[string]localFeishuPendingMessage{
+				"text-1": {
+					ExternalID: "text-1",
+					MessageID:  "om-text-1",
+					ChatID:     "chat-1",
+					Type:       "text",
+					Content:    "请处理这条消息",
+					Raw:        `{"schema":"2.0","event":{"message":{"message_id":"om-text-1"}}}`,
+					MessageAt:  now.UnixMilli(),
+				},
+			},
+			Pushed: map[string]int64{},
+		},
+	}
+
+	if err := svc.flushPending(context.Background(), "feishu"); err != nil {
+		t.Fatal(err)
+	}
+	if len(client.Requests()) != 1 {
+		t.Fatalf("add-request calls after failed acknowledgement = %d, want 1", len(client.Requests()))
+	}
+	if len(svc.state.Acknowledging) != 1 {
+		t.Fatalf("pending acknowledgements = %+v, want one", svc.state.Acknowledging)
+	}
+
+	if err := svc.flushPending(context.Background(), "feishu"); err != nil {
+		t.Fatal(err)
+	}
+	if len(client.Requests()) != 1 {
+		t.Fatalf("add-request calls after acknowledgement retry = %d, want 1", len(client.Requests()))
+	}
+	if ackAttempts != 2 {
+		t.Fatalf("acknowledgement attempts = %d, want 2", ackAttempts)
+	}
+	if len(svc.state.Acknowledging) != 0 {
+		t.Fatalf("pending acknowledgements = %+v, want empty", svc.state.Acknowledging)
+	}
+}
+
+func TestLocalFeishuFlushPendingDoesNotAcknowledgeWhenPersistingFails(t *testing.T) {
+	tempDir := t.TempDir()
+	client := &stubLocalFeishuConnectClient{addErr: errors.New("connect unavailable")}
+	acknowledged := false
+	now := time.Date(2026, 7, 17, 12, 0, 0, 0, time.UTC)
+	svc := &localFeishuService{
+		name:         "feishu",
+		client:       client,
+		logger:       log.New(io.Discard, "", 0),
+		messageLog:   io.Discard,
+		downloadDir:  tempDir,
+		stateFile:    filepath.Join(tempDir, "feishu.pending.json"),
+		scanInterval: localFeishuScanInterval,
+		expireWindow: localFeishuExpireWindow,
+		nowFn:        func() time.Time { return now },
+		acknowledger: localFeishuAcknowledgementSenderFunc(func(_ context.Context, _ connectsvc.Request, _ string) error {
+			acknowledged = true
+			return nil
+		}),
+		state: localFeishuState{
+			Pending: map[string]localFeishuPendingMessage{
+				"text-1": {ExternalID: "text-1", MessageID: "om-text-1", ChatID: "chat-1", Type: "text", Content: "请处理这条消息", MessageAt: now.UnixMilli()},
+			},
+			Pushed: map[string]int64{},
+		},
+	}
+
+	if err := svc.flushPending(context.Background(), "feishu"); err != nil {
+		t.Fatal(err)
+	}
+	if acknowledged {
+		t.Fatal("acknowledgement should not be sent when add-request fails")
+	}
+	if len(svc.state.Acknowledging) != 0 {
+		t.Fatalf("pending acknowledgements = %+v, want empty", svc.state.Acknowledging)
+	}
+}
+
 func TestLocalFeishuFlushPendingWaitsForText(t *testing.T) {
 	tempDir := t.TempDir()
 	filePath := filepath.Join(tempDir, "a.txt")
@@ -1022,6 +1182,7 @@ func parseFlagMap(args []string) (map[string]string, error) {
 type stubLocalFeishuConnectClient struct {
 	requests []connectsvc.RequestInput
 	metaErr  error
+	addErr   error
 }
 
 func (s *stubLocalFeishuConnectClient) GetMeta(_ context.Context, name string) (*connectsvc.Meta, error) {
@@ -1032,8 +1193,23 @@ func (s *stubLocalFeishuConnectClient) GetMeta(_ context.Context, name string) (
 }
 
 func (s *stubLocalFeishuConnectClient) AddRequest(_ context.Context, input connectsvc.RequestInput) (*connectsvc.Request, error) {
+	if s.addErr != nil {
+		return nil, s.addErr
+	}
 	s.requests = append(s.requests, input)
-	return &connectsvc.Request{ID: len(s.requests), Name: input.Name, Request: input.Request}, nil
+	return &connectsvc.Request{
+		ID:             len(s.requests),
+		Key:            input.Key,
+		Name:           input.Name,
+		ExternalID:     input.ExternalID,
+		Content:        input.Content,
+		Request:        input.Request,
+		Artifacts:      input.Artifacts,
+		Original:       input.Original,
+		RawRequest:     input.RawRequest,
+		ResponseSchema: input.ResponseSchema,
+		CreatedAt:      input.CreatedAt,
+	}, nil
 }
 
 func (s *stubLocalFeishuConnectClient) Requests() []connectsvc.RequestInput {

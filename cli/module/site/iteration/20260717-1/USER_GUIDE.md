@@ -2,6 +2,10 @@
 
 应用启动时会读取并缓存 `config/config.json` 的 `provider` 配置；“模型与密钥”从服务接口获取该缓存，不会再按文件路径读取配置。修改配置文件后，重启应用并重新打开页面即可生效。
 
+打开设置时，Agent 列表、模型目录和密钥会同时加载，避免其中一项等待另一项完成。
+
+Agent 列表接口只读取 Agent 根目录的一级目录名，不会为加载下拉框扫描技能、知识库或插件状态。
+
 - `deepright` 始终显示在第一位，可填写密钥，但不提供客户化模型配置。
 - 其他模型来自 `provider` 的 key，并按英文首字母排序。
 - `__url`、`__model`、`__model_fast`、`__model_thinking`、`__model_multi_input` 与 `__model_multi_output` 分别提供对应字段的默认值。

@@ -2293,16 +2293,11 @@ func (p *ProxyServer) HandleAgentIDs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	metadata, err := getAgentOutput(p.AgentDir, p.DeviceID, p.CacheTTL)
+	ids, err := agentcore.ListAgentIDs(p.AgentDir)
 	if err != nil {
-		log.Printf("agent scan error: %v", err)
-		http.Error(w, "Failed to get agent metadata", http.StatusInternalServerError)
+		log.Printf("agent directory read error: %v", err)
+		http.Error(w, "Failed to list agent IDs", http.StatusInternalServerError)
 		return
-	}
-
-	ids := make([]string, len(metadata.Agents))
-	for i, a := range metadata.Agents {
-		ids[i] = a.AgentID
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -9092,6 +9087,9 @@ func syncConnectPendingRequests(p *ProxyServer) {
 			return nil
 		},
 		NotifyStarted: func(callbacks map[string]string, meta connectsvc.Meta, request connectsvc.Request) error {
+			if sharedutil.NormalizeTaskType(firstNonEmpty(meta.Key, meta.Name)) == "feishu" {
+				return nil
+			}
 			return notifyConnectPluginStarted(callbacks, meta, request, p.AutoReply)
 		},
 		DispatchCompletedReplies: func(callbacks map[string]string, svc *connectsvc.Service) {

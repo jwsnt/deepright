@@ -10304,6 +10304,37 @@ func TestApiAgentId(t *testing.T) {
 	}
 }
 
+func TestApiAgentIDListsDirectoriesWithoutReadingAgentMetadata(t *testing.T) {
+	root := t.TempDir()
+	for _, name := range []string{"zeta", "alpha"} {
+		if err := os.MkdirAll(filepath.Join(root, name), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", name, err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(root, "alpha", "config.json"), []byte(`{invalid`), 0o644); err != nil {
+		t.Fatalf("write invalid agent config: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "alpha", "skills", "broken"), 0o755); err != nil {
+		t.Fatalf("mkdir invalid skill: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "alpha", "skills", "broken", "SKILL.md"), []byte("invalid skill"), 0o644); err != nil {
+		t.Fatalf("write invalid skill: %v", err)
+	}
+
+	rec := httptest.NewRecorder()
+	handleAgentIDs(&Config{AgentDir: root}).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/agentId", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var ids []string
+	if err := json.NewDecoder(rec.Body).Decode(&ids); err != nil {
+		t.Fatalf("decode IDs: %v", err)
+	}
+	if !reflect.DeepEqual(ids, []string{"alpha", "zeta"}) {
+		t.Fatalf("agent IDs = %#v, want [alpha zeta]", ids)
+	}
+}
+
 func TestApiAgentDeleteSucceedsWhenDirectoryAlreadyMissing(t *testing.T) {
 	flushAgentCache()
 

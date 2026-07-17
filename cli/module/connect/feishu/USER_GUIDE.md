@@ -9,7 +9,7 @@
 - `start` / `stop`：启动或停止飞书长连接接收服务，把收到的消息推入 `connect add-request`
 - `send` / `init`：基于 `connect add-request` 的原始报文回复飞书文本、图片、文件消息
 
-`2026-05-21` 的最新接收侧约束补充为：飞书插件会把 10 分钟内尚未推送的同会话待处理消息放入本地待处理队列，每 30 秒扫描一次；只要队列中已经出现文本消息，就会把同批次中的图片/文件资源归一化后和文本一起推送；如果 10 分钟内始终只有图片或文件，则标记过期并丢弃。
+接收侧会把 10 分钟内尚未推送的同会话待处理消息放入本地待处理队列。只要队列中已经出现文本消息，就会把同批次中的图片/文件资源归一化后和文本一起推送；如果 10 分钟内始终只有图片或文件，则标记过期并丢弃。成功推送 `connect add-request` 后，插件会立即回复 `<已收到>任务将在30秒内批量执行，可通过新消息更新内容。`。
 
 此外，插件始终提供六个固定元信息命令：
 
@@ -32,6 +32,8 @@
 
 - 主需求文档：[REQUIREMENT.md](REQUIREMENT.md)
 - 待处理聚合迭代需求：[iteration/20260521-1/REQUIREMENT.md](iteration/20260521-1/REQUIREMENT.md)
+- 入库即时回执迭代需求：[iteration/20260717-1/REQUIREMENT.md](iteration/20260717-1/REQUIREMENT.md)
+- 入库即时回执迭代手册：[iteration/20260717-1/USER_GUIDE.md](iteration/20260717-1/USER_GUIDE.md)
 - 当前用户手册：[USER_GUIDE.md](USER_GUIDE.md)
 
 ## 固定输出命令
@@ -160,6 +162,18 @@
 - `--log-file`：消息日志，默认 `./feishu.log`
 - `--pid-file`：进程 PID 文件，默认 `./feishu.pid`
 
+### 入库即时回执
+
+消息形成可处理的文本批次后，插件的处理顺序如下：
+
+1. 按同会话聚合规则调用 `connect add-request`，将消息和原始飞书报文可靠入库。
+2. 入库成功后立即回复原飞书消息：`<已收到>任务将在30秒内批量执行，可通过新消息更新内容。`。
+3. Proxy/Integration 仍按自身周期创建、执行任务和发送最终结果；它们不会再为同一条飞书请求发送旧的 `<开始执行>可通过新消息更新任务内容`。
+
+因此，“已收到”只表示消息已入库，不表示模型任务已经开始或完成。仅有图片/文件时，插件会继续等待同会话文本消息，不会先回复“已收到”。
+
+回执使用入库请求中保存的原始飞书报文，因此始终回复到对应的原消息。回执状态会写入 `feishu.pending.json`：重复事件、服务重连或重启不会重复回执；若飞书发送回执失败，插件会保留待回执记录，并在下一次 30 秒扫描时重试，而不会再次写入 `add-request`。
+
 ## 主动发送消息
 
 命令格式：
@@ -173,7 +187,7 @@
 
 ```bash
 ../plugins/feishu send --message '{"id":1,"rawRequest":"{\"source\":\"feishu\",\"receivedAt\":\"2026-05-22T00:00:00+08:00\",\"message\":{\"messageId\":\"om_xxx\",\"chatId\":\"oc_xxx\",\"messageType\":\"text\",\"content\":\"你好\",\"rawContent\":\"{\\\"text\\\":\\\"你好\\\"}\",\"raw\":\"{\\\"schema\\\":\\\"2.0\\\",\\\"event\\\":{\\\"message\\\":{\\\"message_id\\\":\\\"om_xxx\\\"}}}\"},\"pending\":[],\"groupedBy\":\"chat_id\",\"windowSecs\":30,\"expireSecs\":600}"}' --content "收到"
-../plugins/feishu init --message '{"id":1,"rawRequest":"{\"source\":\"feishu\",\"receivedAt\":\"2026-05-22T00:00:00+08:00\",\"message\":{\"messageId\":\"om_xxx\",\"chatId\":\"oc_xxx\",\"messageType\":\"text\",\"content\":\"你好\",\"rawContent\":\"{\\\"text\\\":\\\"你好\\\"}\",\"raw\":\"{\\\"schema\\\":\\\"2.0\\\",\\\"event\\\":{\\\"message\\\":{\\\"message_id\\\":\\\"om_xxx\\\"}}}\"},\"pending\":[],\"groupedBy\":\"chat_id\",\"windowSecs\":30,\"expireSecs\":600}"}' --content "<开始执行>可通过新消息更新任务内容"
+../plugins/feishu init --message '{"id":1,"rawRequest":"{\"source\":\"feishu\",\"receivedAt\":\"2026-05-22T00:00:00+08:00\",\"message\":{\"messageId\":\"om_xxx\",\"chatId\":\"oc_xxx\",\"messageType\":\"text\",\"content\":\"你好\",\"rawContent\":\"{\\\"text\\\":\\\"你好\\\"}\",\"raw\":\"{\\\"schema\\\":\\\"2.0\\\",\\\"event\\\":{\\\"message\\\":{\\\"message_id\\\":\\\"om_xxx\\\"}}}\"},\"pending\":[],\"groupedBy\":\"chat_id\",\"windowSecs\":30,\"expireSecs\":600}"}' --content "<已收到>任务将在30秒内批量执行，可通过新消息更新内容。"
 ```
 
 发送图片：

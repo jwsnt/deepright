@@ -3,6 +3,7 @@ package agentcore
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -106,6 +107,30 @@ func TestFlushCache(t *testing.T) {
 	// Just verify FlushCache does not panic
 	FlushCache()
 	FlushCache()
+}
+
+func TestListAgentIDsReadsImmediateSortedDirectoriesOnly(t *testing.T) {
+	root := t.TempDir()
+	for _, name := range []string{"zeta", "alpha", "nested"} {
+		if err := os.MkdirAll(filepath.Join(root, name), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", name, err)
+		}
+	}
+	if err := os.MkdirAll(filepath.Join(root, "nested", "child"), 0o755); err != nil {
+		t.Fatalf("mkdir nested child: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "README.md"), []byte("not an agent"), 0o644); err != nil {
+		t.Fatalf("write root file: %v", err)
+	}
+
+	ids, err := ListAgentIDs(root)
+	if err != nil {
+		t.Fatalf("ListAgentIDs: %v", err)
+	}
+	want := []string{"alpha", "nested", "zeta"}
+	if !reflect.DeepEqual(ids, want) {
+		t.Fatalf("agent IDs = %#v, want %#v", ids, want)
+	}
 }
 
 func TestGenerateDeviceID(t *testing.T) {

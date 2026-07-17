@@ -1538,9 +1538,18 @@ func browserResolveAgentWorkspace(flags map[string]string, agentID string) (stri
 }
 
 func browserResolveRuntimeConfigPath(flags map[string]string) (string, bool, error) {
-	_ = flags
+	if connectBin := strings.TrimSpace(flags["connect-bin"]); connectBin != "" {
+		connectBin, err := browserEnsureExecutablePath(connectBin)
+		if err != nil {
+			return "", false, err
+		}
+		runtimePath, ok := browserResolveIntegrationRuntimePath(connectBin)
+		return runtimePath, ok, nil
+	}
 	if runtimePath, ok, err := browserResolveRecordedRuntimeConfigPath(); err != nil {
-		return "", false, err
+		if !browserIgnoresInvalidRuntimeRecord(flags) {
+			return "", false, err
+		}
 	} else if ok {
 		return runtimePath, true, nil
 	}

@@ -3419,16 +3419,11 @@ func handleAgentIDs(cfg *Config) http.HandlerFunc {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
-		metadata, err := getAgentOutput(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL)
+		ids, err := agentcore.ListAgentIDs(cfg.AgentDir)
 		if err != nil {
-			log.Printf("api/agentId: agent scan error: %v", err)
-			http.Error(w, "Failed to get agent metadata", http.StatusInternalServerError)
+			log.Printf("api/agentId: agent directory read error: %v", err)
+			http.Error(w, "Failed to list agent IDs", http.StatusInternalServerError)
 			return
-		}
-		ids := make([]string, len(metadata.Agents))
-		for i, a := range metadata.Agents {
-			ids[i] = a.AgentID
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(ids)
@@ -17256,6 +17251,9 @@ func syncConnectPendingRequests(cfg *Config, svc *connectsvc.Service) {
 			return nil, lastRequestID, err
 		},
 		NotifyStarted: func(_ map[string]string, meta connectsvc.Meta, request connectsvc.Request) error {
+			if sharedutil.NormalizeTaskType(firstNonEmpty(meta.Key, meta.Name)) == "feishu" {
+				return nil
+			}
 			return notifyConnectPluginStartedWithReply(meta, request, cfg.Reply)
 		},
 		DispatchCompletedReplies: func(_ map[string]string, svc *connectsvc.Service) {

@@ -5611,7 +5611,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     </div>
   </div>
 </div>
-<div class="overlay" id="settingsOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="28" onclick="handleOverlayClick(event)">
+<div class="overlay" id="settingsOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="28" onpointerdown="captureSettingsOverlayPointerDown(event)" onclick="handleOverlayClick(event)">
   <div class="settings-panel" onclick="event.stopPropagation()">
     <div class="settings-onboarding-layer" id="settingsOnboardingLayer" aria-hidden="true">
       <div class="onboarding-blocker onboarding-blocker-top"></div>
@@ -36749,7 +36749,14 @@ async function openSettings() {
   // Load agents
   const sel = document.getElementById('agentSelect');
   sel.innerHTML = '<option value="">加载中...</option>';
-  const agents = await fetchAgentList();
+  // These three independent settings resources must start together. Agent
+  // discovery is comparatively expensive, so it must not delay provider and
+  // token loading behind a serial request chain.
+  const [agents] = await Promise.all([
+    fetchAgentList(),
+    loadModelProviderCatalog(),
+    loadTokenSettings()
+  ]);
   if (agents.length) {
     sel.innerHTML = '<option value="">请选择 Agent</option>' + agents.map(a => `<option value="${a}">${a}</option>`).join('');
   } else {
@@ -36765,9 +36772,7 @@ async function openSettings() {
   } else {
     applyResolvedAgentSelection(state.settings.agentId || '', resolvedAgentId);
   }
-  // Load model entries
-  await loadModelProviderCatalog();
-  await loadTokenSettings();
+  // Provider catalog and token settings were loaded in parallel with agents.
   renderModelEntries();
   renderSettingsAccessNote();
   renderSettingsOnboardingToggle();
@@ -36819,9 +36824,32 @@ function closeSettings(force) {
     updateThinkingUI();
   }
 }
+let settingsOverlayPointerDownHadEditableFocus = false;
+
+function isSettingsEditableControl(element) {
+  if (!(element instanceof HTMLElement) || element.matches(':disabled,[readonly]')) return false;
+  if (element.matches('textarea,[contenteditable="true"]')) return true;
+  if (!(element instanceof HTMLInputElement)) return false;
+  return !['button', 'checkbox', 'file', 'hidden', 'image', 'radio', 'reset', 'submit'].includes(String(element.type || 'text').toLowerCase());
+}
+
+function hasSettingsEditableFocus() {
+  const panel = getSettingsPanel();
+  const activeElement = document.activeElement;
+  return !!(panel && activeElement instanceof HTMLElement && panel.contains(activeElement) && isSettingsEditableControl(activeElement));
+}
+
+function captureSettingsOverlayPointerDown(e) {
+  settingsOverlayPointerDownHadEditableFocus = e.target === e.currentTarget && hasSettingsEditableFocus();
+  if (settingsOverlayPointerDownHadEditableFocus) e.preventDefault();
+}
+
 function handleOverlayClick(e) {
   if (isSettingsCopyTransitionLocked()) return;
-  if (e.target === e.currentTarget) closeSettings(false);
+  if (e.target !== e.currentTarget) return;
+  const shouldKeepOpen = settingsOverlayPointerDownHadEditableFocus || hasSettingsEditableFocus();
+  settingsOverlayPointerDownHadEditableFocus = false;
+  if (!shouldKeepOpen) closeSettings(false);
 }
 
 // ===== Open Folder =====

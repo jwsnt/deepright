@@ -48,8 +48,17 @@ func browserLookupPluginMeta(flags map[string]string, key string, allowInfer boo
 }
 
 func browserResolveMetaLookupCommand(flags map[string]string, allowInfer bool) (string, []string, error) {
+	if connectBin := strings.TrimSpace(flags["connect-bin"]); connectBin != "" {
+		connectBin, err := browserEnsureExecutablePath(connectBin)
+		if err != nil {
+			return "", nil, err
+		}
+		return browserNormalizeBinaryPath(connectBin), browserConnectPrefixForBinary(connectBin), nil
+	}
 	if connectBin, ok, err := browserReadRecordedConnectBin(); err != nil {
-		return "", nil, err
+		if !browserIgnoresInvalidRuntimeRecord(flags) {
+			return "", nil, err
+		}
 	} else if ok {
 		return browserNormalizeBinaryPath(connectBin), browserConnectPrefixForBinary(connectBin), nil
 	}

@@ -284,6 +284,17 @@ func listAgentDirNames(root string) ([]string, error) {
 	return names, nil
 }
 
+// ListAgentIDs returns the immediate Agent directory names only. It avoids
+// loading Agent metadata, skills, knowledge, plugins, or runtime state.
+func ListAgentIDs(root string) ([]string, error) {
+	names, err := listAgentDirNames(root)
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(names)
+	return names, nil
+}
+
 func cachedAgentDirNames(output *Output) []string {
 	if output == nil || len(output.Agents) == 0 {
 		return []string{}
@@ -973,15 +984,9 @@ func FlushCache() {
 }
 
 func GetAgentIDs(root string, deviceID string, ttl time.Duration) ([]string, error) {
-	output, err := GetOutput(root, deviceID, ttl)
-	if err != nil {
-		return nil, err
-	}
-	ids := make([]string, len(output.Agents))
-	for i, a := range output.Agents {
-		ids[i] = a.AgentID
-	}
-	return ids, nil
+	_ = deviceID
+	_ = ttl
+	return ListAgentIDs(root)
 }
 
 func GetAgentByID(root string, deviceID string, ttl time.Duration, agentID string) (*Agent, error) {

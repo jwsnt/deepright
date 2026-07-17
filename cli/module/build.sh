@@ -466,8 +466,14 @@ tell application "Finder"
     open
     delay 0.5
     set current view of container window to icon view
-    set toolbar visible of container window to false
-    set statusbar visible of container window to false
+    -- Recent macOS Finder versions can reject these cosmetic settings for
+    -- mounted disk windows. Keep styling the image when that happens.
+    try
+      set toolbar visible of container window to false
+    end try
+    try
+      set statusbar visible of container window to false
+    end try
     set bounds of container window to {150, 130, 950, 610}
 
     set viewOptions to the icon view options of container window

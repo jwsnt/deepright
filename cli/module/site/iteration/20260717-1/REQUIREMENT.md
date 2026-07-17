@@ -17,6 +17,8 @@
 ### 需求介绍
 + 设置中的“模型与密钥”模型清单、客户化配置默认值和可编辑能力必须由运行时 `config/config.json` 的 `provider` 属性提供，不再在页面中维护固定模型或固定默认值。
     + 服务启动时读取一次 `config/config.json` 并缓存 `provider` 元数据；`GET /api/model_provider` 返回该缓存，页面不得再通过文件读取接口重复读取配置文件。
+    + 每次打开设置时，`/api/agentId`、`/api/model_provider` 与 `/api/token` 必须并行请求；任一请求不得等待其余两项完成后才开始。
+    + `GET /api/agentId` 只读取 Agent 根目录的一级目录名并返回升序 JSON 数组；不得读取 Agent 配置、技能、知识库、SQLite 或插件运行状态。
     + 修改 `config.json` 后，需重启应用才会生效；重新打开页面后会读取新启动实例的缓存。
     + 模型列表由 `provider` 的所有 key 构成，另加特殊模型 `deepright`；`deepright` 不读取 `provider` 配置，始终排在第一位。
     + 除 `deepright` 外，模型 key 按英文首字母升序排列。
