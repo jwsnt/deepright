@@ -11718,6 +11718,196 @@ func TestCronExecuteOnceInjectsCurrentModelConfigForAllTaskTypes(t *testing.T) {
 	}
 }
 
+func TestCronExecuteOnceAgentStopKeepsLocalMemoPendingAndResumesBacklog(t *testing.T) {
+	tmp := t.TempDir()
+	agentRoot := filepath.Join(tmp, "agents")
+	agentDir := filepath.Join(agentRoot, "A")
+	if err := os.MkdirAll(agentDir, 0o755); err != nil {
+		t.Fatalf("mkdir agent: %v", err)
+	}
+	for name, content := range map[string]string{"SOUL.md": "soul", "USER.md": "user"} {
+		if err := os.WriteFile(filepath.Join(agentDir, name), []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+	db, err := sql.Open("sqlite", filepath.Join(tmp, "cron-stop.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+	oldCronDB := cronDB
+	cronDB = db
+	defer func() { cronDB = oldCronDB }()
+	ensureCronSchema(db)
+	if hasTableColumn(db, "task_meta", "session_disable") || hasTableColumn(db, "task_detail", "session_disable") {
+		t.Fatal("task tables must not retain session_disable")
+	}
+
+	metaRes, err := db.Exec(`INSERT INTO task_meta (cycle, raw_time, agent_id, chat_id, task_type, model, thinking, cron, content) VALUES (0, ?, 'A', '', 'cron', 'OpenAI', 0, '', '暂停期间的备忘录')`, time.Now().Format("2006-01-02 15:04"))
+	if err != nil {
+		t.Fatalf("insert memo metadata: %v", err)
+	}
+	metaID, _ := metaRes.LastInsertId()
+	dueAt := time.Now().Add(-90 * time.Minute)
+	detailRes, err := db.Exec(`INSERT INTO task_detail (meta_id, exec_time, agent_id, chat_id, task_type, model, thinking, content, started) VALUES (?, ?, 'A', '', 'cron', 'OpenAI', 0, '暂停期间的备忘录', 0)`, metaID, dueAt.Unix())
+	if err != nil {
+		t.Fatalf("insert memo detail: %v", err)
+	}
+	detailID, _ := detailRes.LastInsertId()
+	if _, err := setCronAgentStopState(db, "A", true, dueAt.Add(-time.Minute)); err != nil {
+		t.Fatalf("enable agent STOP: %v", err)
+	}
+
+	connectSvc, err := newIntegrationConnectService(agentRoot)
+	if err != nil {
+		t.Fatalf("new connect service: %v", err)
+	}
+	defer connectSvc.Close()
+	cronExecuteOnce(&Config{AgentDir: agentRoot, Device: "dev", AgentCacheMs: 120000}, &http.Client{}, connectSvc)
+
+	var started int
+	var chatID string
+	if err := db.QueryRow(`SELECT started, chat_id FROM task_detail WHERE id = ?`, detailID).Scan(&started, &chatID); err != nil {
+		t.Fatalf("query memo detail: %v", err)
+	}
+	if started != 0 {
+		t.Fatalf("started = %d, want 0 while Agent STOP is enabled", started)
+	}
+	if chatID != "" {
+		t.Fatalf("chat_id = %q, STOP must not create a session", chatID)
+	}
+
+	var skippedWhileStopped int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM cron_detail_log WHERE detail_id = ?`, detailID).Scan(&skippedWhileStopped); err != nil {
+		t.Fatalf("count STOP logs: %v", err)
+	}
+	if skippedWhileStopped != 0 {
+		t.Fatalf("STOP must not write task logs, got %d", skippedWhileStopped)
+	}
+
+	if _, err := setCronAgentStopState(db, "A", false, time.Now()); err != nil {
+		t.Fatalf("disable agent STOP: %v", err)
+	}
+	cronExecuteOnce(&Config{AgentDir: agentRoot, Device: "dev", AgentCacheMs: 120000}, &http.Client{}, connectSvc)
+
+	if err := db.QueryRow(`SELECT started, chat_id FROM task_detail WHERE id = ?`, detailID).Scan(&started, &chatID); err != nil {
+		t.Fatalf("query resumed memo detail: %v", err)
+	}
+	if started != 0 || chatID != "" {
+		t.Fatalf("resumed backlog should reach normal validation without state mutation, started=%d chat_id=%q", started, chatID)
+	}
+	var resumedScanLogs int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM cron_detail_log WHERE detail_id = ? AND action = 'skip_invalid_model'`, detailID).Scan(&resumedScanLogs); err != nil {
+		t.Fatalf("count resumed scan logs: %v", err)
+	}
+	if resumedScanLogs == 0 {
+		t.Fatal("STOP backlog was not scanned after Agent STOP was disabled")
+	}
+}
+
+func TestEnsureCronSchemaRemovesLegacySessionDisableColumns(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`CREATE TABLE task_meta (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		cycle INTEGER NOT NULL,
+		raw_time TEXT NOT NULL DEFAULT '',
+		agent_id TEXT NOT NULL,
+		model TEXT NOT NULL,
+		thinking INTEGER NOT NULL DEFAULT 0,
+		session_disable INTEGER NOT NULL DEFAULT 0,
+		cron TEXT NOT NULL,
+		content TEXT NOT NULL
+	)`); err != nil {
+		t.Fatalf("create legacy task_meta: %v", err)
+	}
+	if _, err := db.Exec(`CREATE TABLE task_detail (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		meta_id INTEGER NOT NULL,
+		exec_time INTEGER NOT NULL,
+		agent_id TEXT NOT NULL,
+		model TEXT NOT NULL,
+		thinking INTEGER NOT NULL DEFAULT 0,
+		session_disable INTEGER NOT NULL DEFAULT 0,
+		content TEXT NOT NULL
+	)`); err != nil {
+		t.Fatalf("create legacy task_detail: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO task_meta (cycle, raw_time, agent_id, model, thinking, session_disable, cron, content) VALUES (0, '2026-07-18 09:00', 'A', 'OpenAI', 0, 1, '', '保留的元数据')`); err != nil {
+		t.Fatalf("seed legacy metadata: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO task_detail (meta_id, exec_time, agent_id, model, thinking, session_disable, content) VALUES (1, 1, 'A', 'OpenAI', 0, 1, '保留的明细')`); err != nil {
+		t.Fatalf("seed legacy detail: %v", err)
+	}
+
+	ensureCronSchema(db)
+	if hasTableColumn(db, "task_meta", "session_disable") || hasTableColumn(db, "task_detail", "session_disable") {
+		t.Fatal("legacy session_disable columns should be removed")
+	}
+	var metaContent, detailContent string
+	if err := db.QueryRow(`SELECT content FROM task_meta WHERE id = 1`).Scan(&metaContent); err != nil {
+		t.Fatalf("read migrated metadata: %v", err)
+	}
+	if err := db.QueryRow(`SELECT content FROM task_detail WHERE id = 1`).Scan(&detailContent); err != nil {
+		t.Fatalf("read migrated detail: %v", err)
+	}
+	if metaContent != "保留的元数据" || detailContent != "保留的明细" {
+		t.Fatalf("legacy data was not preserved: meta=%q detail=%q", metaContent, detailContent)
+	}
+}
+
+func TestCronAgentStopHTTPPersistsByAgent(t *testing.T) {
+	tmp := t.TempDir()
+	agentRoot := filepath.Join(tmp, "agents")
+	if err := os.MkdirAll(filepath.Join(agentRoot, "A"), 0o755); err != nil {
+		t.Fatalf("mkdir agent: %v", err)
+	}
+	db, err := sql.Open("sqlite", filepath.Join(tmp, "cron-agent-stop.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+	oldCronDB := cronDB
+	cronDB = db
+	defer func() { cronDB = oldCronDB }()
+	ensureCronSchema(db)
+	handler := handleCronAgentStop(&Config{AgentDir: agentRoot, Device: "dev", AgentCacheMs: 120000})
+
+	patchReq := httptest.NewRequest(http.MethodPatch, "/api/cron/agent/stop?agentId=A", strings.NewReader(`{"enabled":true}`))
+	patchRec := httptest.NewRecorder()
+	handler.ServeHTTP(patchRec, patchReq)
+	if patchRec.Code != http.StatusOK {
+		t.Fatalf("PATCH status = %d, body=%s", patchRec.Code, patchRec.Body.String())
+	}
+	var patchData struct {
+		Status  int  `json:"status"`
+		Enabled bool `json:"enabled"`
+	}
+	if err := json.NewDecoder(patchRec.Body).Decode(&patchData); err != nil {
+		t.Fatalf("decode PATCH response: %v", err)
+	}
+	if patchData.Status != 0 || !patchData.Enabled {
+		t.Fatalf("PATCH response = %+v, want enabled success", patchData)
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/api/cron/agent/stop?agentId=A", nil)
+	getRec := httptest.NewRecorder()
+	handler.ServeHTTP(getRec, getReq)
+	var getData struct {
+		Status  int  `json:"status"`
+		Enabled bool `json:"enabled"`
+	}
+	if err := json.NewDecoder(getRec.Body).Decode(&getData); err != nil {
+		t.Fatalf("decode GET response: %v", err)
+	}
+	if getData.Status != 0 || !getData.Enabled {
+		t.Fatalf("GET response = %+v, want persisted enabled state", getData)
+	}
+}
+
 func TestCronExecuteOnceInjectsDefaultCronTypeIntoRequestMetadata(t *testing.T) {
 	oldwd, err := os.Getwd()
 	if err != nil {

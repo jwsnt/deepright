@@ -1535,6 +1535,22 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 .memo-query-results-list{min-height:0;overflow-y:auto;overflow-x:hidden;border:1px solid color-mix(in srgb,var(--border) 86%,transparent);border-radius:14px;background:color-mix(in srgb,var(--bg-input) 45%,transparent);scrollbar-gutter:stable}.memo-query-results-list::-webkit-scrollbar{width:10px}.memo-query-results-list::-webkit-scrollbar-track{background:color-mix(in srgb,var(--bg-input) 45%,transparent);border-radius:0 14px 14px 0}.memo-query-results-list::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--border) 76%,var(--accent) 24%);border:2px solid transparent;border-radius:999px;background-clip:padding-box}.memo-query-empty{min-height:132px;padding:18px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--text-muted);font-size:12px;line-height:1.6}.memo-query-table{width:100%;min-width:0;table-layout:fixed;border-collapse:collapse;font-size:11px;color:var(--text-secondary)}.memo-query-table th{position:sticky;top:0;z-index:1;padding:8px 7px;border-bottom:1px solid color-mix(in srgb,var(--border) 80%,transparent);background:color-mix(in srgb,var(--bg-input) 72%,var(--modal-panel-bg));color:var(--text-muted);font-size:10px;font-weight:700;text-align:left;white-space:nowrap}.memo-query-table td{padding:9px 7px;border-bottom:1px solid color-mix(in srgb,var(--border) 90%,transparent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}.memo-query-table tbody tr:hover td{background:rgba(var(--accent-rgb),.06)}.memo-query-table tbody tr:last-child td{border-bottom:none}.memo-query-col-preview{width:42px;text-align:center!important}.memo-query-col-cycle{width:60px}.memo-query-col-time{width:140px;overflow:visible!important;text-overflow:clip!important}.memo-query-col-model{width:74px}.memo-query-col-thinking{width:52px}.memo-query-col-swarm{width:56px}.memo-query-col-verify{width:48px}.memo-query-col-agent{width:56px}.memo-query-col-status{width:66px}.memo-query-table .memo-query-status{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-flex;align-items:center;width:max-content;max-width:100%;padding:2px 6px;border-radius:999px;background:rgba(var(--accent-rgb),.1);font-size:10px}.memo-query-table .memo-query-content{color:var(--text-primary)}.memo-query-table .memo-query-preview{margin:auto}.memo-query-preview{width:24px;height:24px;padding:0;border:1px solid color-mix(in srgb,var(--border) 75%,var(--accent) 25%);border-radius:8px;background:transparent;color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition)}.memo-query-preview:hover,.memo-query-preview:focus-visible{border-color:var(--accent);color:var(--accent);outline:none}.memo-query-preview svg{width:13px;height:13px}.memo-query-load-more{padding:10px;text-align:center;color:var(--text-muted);font-size:11px}
 [data-theme="dark"] .rs-memo-query-trigger{background:transparent;border-color:transparent;color:var(--text-muted);box-shadow:none}[data-theme="dark"] .rs-memo-query-trigger:hover,[data-theme="dark"] .rs-memo-query-trigger:focus-visible{background:var(--bg-card);border-color:transparent;color:var(--text-primary)}[data-theme="dark"] .memo-query-panel{background:linear-gradient(180deg,var(--modal-panel-bg-strong),var(--modal-panel-bg));border-color:var(--modal-panel-border);box-shadow:0 28px 68px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.08)}[data-theme="dark"] .memo-query-tab.active{background:linear-gradient(180deg,#56e7ff,#1699ff);border-color:rgba(122,241,255,.34);color:#fff;box-shadow:0 0 0 1px rgba(122,241,255,.24),0 10px 24px rgba(0,212,255,.22),inset 0 1px 0 rgba(255,255,255,.18)}[data-theme="dark"] .memo-query-tab.active:focus-visible{outline-color:var(--brand-sky)}[data-theme="dark"] .memo-query-tab:hover:not(.active),[data-theme="dark"] .memo-query-tab:focus-visible:not(.active){background:rgba(0,212,255,.12);border-color:rgba(122,241,255,.34);color:var(--brand-sky);outline:none}[data-theme="dark"] .memo-query-field input,[data-theme="dark"] .memo-query-field select{background:rgba(5,16,30,.76);border-color:rgba(169,190,227,.2);color:#e5f2ff}[data-theme="dark"] .memo-query-results-list{background:rgba(5,16,30,.36);border-color:rgba(169,190,227,.16)}[data-theme="dark"] .memo-query-results-list::-webkit-scrollbar-track{background:rgba(5,16,30,.36)}[data-theme="dark"] .memo-query-table th{background:rgba(5,16,30,.88);border-bottom-color:rgba(169,190,227,.16)}[data-theme="dark"] .memo-query-table td{border-bottom-color:rgba(169,190,227,.12)}[data-theme="dark"] .memo-query-table tbody tr:hover td{background:rgba(84,220,255,.07)}[data-theme="dark"] .memo-query-action{background:rgba(255,255,255,.07);border-color:rgba(169,190,227,.2);color:#c6daf5}
 .rs-note-lower{display:flex;align-items:center;padding:8px 4px 0px 4px;gap:3px;flex-shrink:0;flex-wrap:nowrap}
+.rs-memo-mode-slot{position:relative;display:flex;align-items:center;width:58px;height:21px;flex:0 0 58px;overflow:hidden}
+.rs-memo-stop-bar{position:absolute;inset:0 auto 0 0;display:inline-flex;align-items:center;gap:3px;min-width:0;max-width:58px;overflow:hidden;opacity:1;transform:translateX(0);transition:max-width .2s ease,opacity .18s ease,transform .2s ease}
+.rs-memo-stop-bar.hidden{max-width:0;opacity:0;transform:translateX(-4px);pointer-events:none}
+.rs-repeat-label{position:absolute;inset:0 auto 0 0;display:flex;align-items:center;width:58px;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:var(--text-muted);white-space:nowrap;pointer-events:none;transition:opacity .2s ease}
+.rs-memo-stop-toggle{width:21px;height:21px;padding:0;border:1px solid color-mix(in srgb,var(--border) 76%,transparent);border-radius:6px;background:color-mix(in srgb,var(--bg-input) 90%,transparent);color:var(--text-muted);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition);flex:0 0 21px}
+.rs-memo-stop-toggle svg{width:11px;height:11px}
+.rs-memo-stop-toggle:hover,.rs-memo-stop-toggle:focus-visible{border-color:color-mix(in srgb,var(--error) 55%,var(--border) 45%);color:var(--error);outline:none}
+.rs-memo-stop-label{font-size:8px;line-height:1;font-weight:700;letter-spacing:.04em;color:var(--text-muted);white-space:nowrap;transition:color .18s ease}
+.rs-memo-stop-toggle.on{border-color:color-mix(in srgb,var(--error) 76%,var(--border) 24%);background:color-mix(in srgb,var(--error) 18%,var(--bg-input) 82%);color:var(--error);box-shadow:0 0 0 1px color-mix(in srgb,var(--error) 18%,transparent),0 0 10px color-mix(in srgb,var(--error) 28%,transparent);animation:rsMemoStopPulse .9s ease-in-out infinite}
+.rs-memo-stop-bar.on .rs-memo-stop-label{color:var(--error);animation:rsMemoStopPulse .9s ease-in-out infinite}
+.rs-memo-stop-toggle:disabled{cursor:wait;opacity:.5;animation:none}
+[data-theme="dark"] .rs-memo-stop-toggle{border-color:rgba(169,190,227,.22);background:rgba(8,19,36,.8);color:#9eb3d3}
+[data-theme="dark"] .rs-memo-stop-toggle:hover,[data-theme="dark"] .rs-memo-stop-toggle:focus-visible{border-color:rgba(255,128,128,.72);color:#ff9b9b}
+[data-theme="dark"] .rs-memo-stop-toggle.on{border-color:rgba(255,121,121,.78);background:rgba(176,47,53,.25);color:#ffb1b1;box-shadow:0 0 0 1px rgba(255,121,121,.2),0 0 12px rgba(255,81,81,.34)}
+[data-theme="dark"] .rs-memo-stop-bar.on .rs-memo-stop-label{color:#ffb1b1}
+@keyframes rsMemoStopPulse{0%,100%{opacity:1;filter:brightness(1)}50%{opacity:.42;filter:brightness(1.32)}}
 .rs-note-input{width:100%;flex:1;border:1px solid var(--border);border-radius:var(--radius-xs);background:var(--bg-input) !important;color:var(--text-primary);font-size:20px;padding:6px 8px;overflow-y:auto !important;outline:none;font-family:inherit;line-height:1.4;max-height:150px !important;min-height:0}
 .rs-note-input:empty{text-align:center !important}
 .rs-note-input:not(:empty){text-align:left !important}
@@ -1825,7 +1841,8 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 .rs-meta-popup .rs-meta-popup-row span:first-child{color:var(--text-muted);flex-shrink:0}
 .rs-meta-popup .rs-meta-popup-row span:last-child{text-align:right}
 .rs-meta-popup .rs-meta-popup-content{margin-top:4px;color:var(--text-primary);word-break:break-all}
-.rs-meta-lower{display:flex;align-items:center;padding:4px 6px;gap:6px;flex-shrink:0;justify-content:flex-end}
+.rs-meta-lower{display:flex;align-items:center;padding:4px 6px;gap:6px;flex-shrink:0;justify-content:space-between}
+.rs-meta-stop-bar{position:static;max-width:none;flex:0 0 auto}
 .rs-confirm{position:absolute;bottom:0;right:0;width:250px;padding:12px;z-index:60;opacity:0;transform:translateY(100%);transition:transform .3s,opacity .3s;box-shadow:0 20px 44px rgba(91,34,29,.16),inset 0 1px 0 rgba(255,255,255,.72);border-radius:var(--radius-xs);background:linear-gradient(180deg,rgba(255,252,249,.96),rgba(249,236,226,.92));border:1px solid rgba(var(--accent-rgb),.2);backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%)}
 .rs-confirm.show{transform:translateY(0);opacity:1}
 .rs-confirm-row{display:flex;justify-content:space-between;font-size:11px;color:var(--text-secondary);padding:2px 0}
@@ -2570,11 +2587,20 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .form-select option:disabled,.model-entry select option:disabled,.center-notice-select option:disabled,.rs-time-picker select option:disabled{color:#6f85ad}
 .password-wrap{flex:1.5;position:relative}
 .password-wrap input{width:100%;padding:8px 34px 8px 12px;border:1px solid rgba(var(--accent-rgb),.18);border-radius:14px;background:rgba(255,252,248,.9);color:var(--text-primary);font-size:13px;outline:none;transition:var(--transition);box-shadow:inset 0 1px 0 rgba(255,255,255,.78)}
+.password-wrap.has-model-copy input{padding-right:62px}
 .password-wrap input.secret-masked{-webkit-text-security:disc}
 .password-wrap input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(var(--accent-soft-rgb),.14)}
 .password-wrap input[readonly]{opacity:.7;cursor:default}
 .eye-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;display:flex}
+.password-wrap.has-model-copy .eye-btn{right:33px}
 .eye-btn:hover{color:var(--text-primary)}
+.model-copy-btn{position:absolute;right:7px;top:50%;transform:translateY(-50%);width:24px;height:24px;padding:4px;border:none;border-radius:8px;background:transparent;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:var(--transition)}
+.model-copy-btn:hover,.model-copy-btn.active{background:rgba(var(--accent-soft-rgb),.1);color:var(--accent)}
+.model-copy-menu{position:absolute;z-index:48;top:calc(100% + 6px);right:0;display:none;min-width:156px;max-width:min(240px,calc(100vw - 48px));padding:5px;border:1px solid var(--modal-field-border);border-radius:12px;background:var(--modal-panel-bg-strong);box-shadow:0 14px 30px rgba(16,24,40,.18),inset 0 1px 0 rgba(255,255,255,.72)}
+.password-wrap.copy-open .model-copy-menu{display:flex;flex-direction:column;gap:2px}
+.model-copy-menu-label{padding:4px 7px 5px;color:var(--text-muted);font-size:11px;line-height:1.2;white-space:nowrap}
+.model-copy-option{width:100%;padding:7px 8px;border:none;border-radius:8px;background:transparent;color:var(--text-primary);font:inherit;font-size:12px;line-height:1.25;text-align:left;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.model-copy-option:hover,.model-copy-option:focus-visible{background:rgba(var(--accent-soft-rgb),.1);color:var(--accent);outline:none}
 .password-media-launch-btn{position:absolute;right:-8px;top:-3px;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;padding:0;border:none;background:transparent;cursor:pointer;color:#0a84eb;transition:var(--transition);z-index:2}
 .password-media-launch-btn:hover .media-output-launch-dot,.password-media-launch-btn:focus-visible .media-output-launch-dot{transform:scale(1.14);filter:brightness(1.08)}
 .password-media-launch-btn:focus-visible{outline:none}
@@ -4617,7 +4643,15 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
         </div>
         <div class="rs-cell-divider"></div>
         <div class="rs-note-lower" id="rsNoteLower">
-          <span id="rsRepeatLabel" style="font-size:12px;color:var(--text-muted);transition:opacity .3s;white-space:nowrap"></span>
+          <div class="rs-memo-mode-slot" id="rsMemoModeSlot">
+            <div class="rs-memo-stop-bar" id="rsMemoStopBar">
+              <button class="rs-memo-stop-toggle" id="rsMemoStopToggle" type="button" onclick="rsToggleSessionStop()" aria-pressed="false" title="STOP：任务到点后不转为会话">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5"></rect></svg>
+              </button>
+              <span class="rs-memo-stop-label" id="rsMemoStopLabel">STOP</span>
+            </div>
+            <span class="rs-repeat-label" id="rsRepeatLabel"></span>
+          </div>
           <div style="flex:1"></div>
           <div class="rs-time-picker" id="rsTimePicker">
             <select id="rsTimeH" title="小时" onchange="rsHideConfirm()"></select>
@@ -4652,6 +4686,12 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
           <div class="rs-meta-list" id="rsMetaList"></div>
           <div class="rs-cell-divider"></div>
           <div class="rs-meta-lower">
+            <div class="rs-memo-stop-bar rs-meta-stop-bar" id="rsMetaStopBar">
+              <button class="rs-memo-stop-toggle" id="rsMetaStopToggle" type="button" onclick="rsToggleSessionStop()" aria-pressed="false" title="STOP：当前 Agent 的定时备忘录暂不执行">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5"></rect></svg>
+              </button>
+              <span class="rs-memo-stop-label" id="rsMetaStopLabel">STOP</span>
+            </div>
             <button class="rs-toggle-btn" id="rsMetaBackBtn" onclick="rsToggleMetaView()" title="返回备忘录">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
             </button>
@@ -7146,6 +7186,7 @@ let modelConfigOverflowPreviewState = {
   input: null,
   hoverInput: null
 };
+let modelCopyDismissBound = false;
 let modelKeyHintPreviewState = {
   trigger: null,
   hoverTrigger: null,
@@ -15476,6 +15517,7 @@ function restoreMemoTaskTourDraftState(snapshot) {
   rsUpdateThinkingUI();
   if (thinkingLabel) thinkingLabel.classList.toggle('on', !!draft.thinkingLabelOn);
   document.querySelectorAll('#rsRepeatDd .rs-repeat-opt').forEach(el => el.classList.toggle('active', el.getAttribute('data-mode') === rsRepeatMode));
+  rsSyncSessionStopUI();
   rsSetModelDropdownOpen(!!draft.modelDropdownOpen);
   rsSetMetaViewOpen(!!draft.metaViewActive, { immediate: true, load: false });
 }
@@ -23367,6 +23409,7 @@ function applyEnergySaverMode(options = {}) {
     hideScreenSaverImmediate({ preserveInteractionAt: true });
   }
   if (options.restartScheduler !== false) startPageTaskScheduler();
+  if (typeof rsScheduleAgentStopSync === 'function') rsScheduleAgentStopSync();
 }
 
 function formatWikiRefreshTime(ts) {
@@ -41356,6 +41399,90 @@ function buildAvailableModelOptions(currentModel, currentEntry) {
     .join('');
 }
 
+function getModelCopySourceNames(currentModel, originalModel) {
+  const excludedModels = new Set([
+    normalizeModelName(currentModel),
+    normalizeModelName(originalModel)
+  ].filter(Boolean));
+  return getOrderedConfiguredModelNames(normalizeModelMap(state.settings.models || {}))
+    .filter(model => model !== 'deepright' && !excludedModels.has(model));
+}
+
+function closeModelCopyMenus(exceptEntry) {
+  document.querySelectorAll('#modelEntries .password-wrap.copy-open').forEach(wrap => {
+    const entry = wrap.closest('.model-entry');
+    if (exceptEntry && entry === exceptEntry) return;
+    wrap.classList.remove('copy-open');
+    const button = wrap.querySelector('.model-copy-btn');
+    if (button) {
+      button.classList.remove('active');
+      button.setAttribute('aria-expanded', 'false');
+    }
+  });
+}
+
+function ensureModelCopyDismissListener() {
+  if (modelCopyDismissBound) return;
+  modelCopyDismissBound = true;
+  document.addEventListener('click', event => {
+    if (event.target && event.target.closest && event.target.closest('.password-wrap')) return;
+    closeModelCopyMenus();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') return;
+    closeModelCopyMenus();
+  });
+}
+
+function toggleModelCopyMenu(btn) {
+  const wrap = btn && btn.closest('.password-wrap');
+  const entry = wrap && wrap.closest('.model-entry');
+  if (!wrap || !entry) return;
+  ensureModelCopyDismissListener();
+  const willOpen = !wrap.classList.contains('copy-open');
+  closeModelCopyMenus(willOpen ? entry : null);
+  wrap.classList.toggle('copy-open', willOpen);
+  btn.classList.toggle('active', willOpen);
+  btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+}
+
+function copyModelConfigFrom(btn) {
+  const entry = btn && btn.closest('.model-entry');
+  const sourceModel = normalizeModelName(btn && btn.getAttribute('data-copy-source'));
+  const targetModel = normalizeModelName(entry && entry.querySelector('select') && entry.querySelector('select').value);
+  if (!entry || !sourceModel || !targetModel || sourceModel === targetModel) return;
+  const sourceRawConfig = state.settings.models && state.settings.models[sourceModel];
+  if (!sourceRawConfig) return;
+
+  const source = buildEffectiveModelConfig(sourceModel, sourceRawConfig);
+  const target = buildEffectiveModelConfig(targetModel, { token: source.effective.token });
+  const setInputValue = (selector, value) => {
+    const input = entry.querySelector(selector);
+    if (input && !input.disabled) input.value = value || '';
+  };
+  const sourceValueOrTargetDefault = (sourceSupports, sourceValue, targetValue) => sourceSupports ? sourceValue : targetValue;
+
+  const tokenInput = entry.querySelector('.model-token-input');
+  if (tokenInput && !tokenInput.readOnly) tokenInput.value = source.effective.token || '';
+  if (target.spec.configurable) {
+    setInputValue('.model-base-url-input', sourceValueOrTargetDefault(source.spec.supportsUrl, source.effective.__url, target.effective.__url));
+    setInputValue('.model-base-model-input', sourceValueOrTargetDefault(source.spec.supportsBaseModel, source.effective.__model, target.effective.__model));
+    setInputValue('.model-fast-model-input', sourceValueOrTargetDefault(source.spec.supportsFastModel, source.effective.__model_fast, target.effective.__model_fast));
+    setInputValue('.model-thinking-model-input', sourceValueOrTargetDefault(source.spec.supportsThinkingModel, source.effective.__model_thinking, target.effective.__model_thinking));
+    setInputValue('.model-multi-input-input', sourceValueOrTargetDefault(source.spec.supportsMultiInput, source.effective.__model_multi_input, target.effective.__model_multi_input));
+    setInputValue('.model-multi-output-input', sourceValueOrTargetDefault(source.spec.supportsMultiOutput, source.effective.__model_multi_output, target.effective.__model_multi_output));
+    entry.setAttribute('data-custom-cleared', '0');
+  }
+  closeModelCopyMenus();
+  refreshModelEntryPendingState(entry);
+  updateModelConfigToggleState(entry);
+  if (target.spec.configurable) {
+    setOnboardingModelConfigEntryTarget(entry);
+    setModelConfigEntryOpen(entry, true);
+  }
+  scheduleOnboardingSync();
+}
+
 function refreshModelEntryOptions() {
   document.querySelectorAll('#modelEntries .model-entry').forEach(entry => {
     const select = entry.querySelector('select');
@@ -41379,23 +41506,29 @@ function modelEntryHtml(idx, model, rawConfig, originalModel) {
   const hasConfig = !!(rawCfg.__url || rawCfg.__model || rawCfg.__model_fast || rawCfg.__model_thinking || rawCfg.__model_multi_input || rawCfg.__model_multi_output);
   const canCustomize = spec.configurable;
   const normalizedOriginalModel = normalizeModelName(originalModel);
+  const copySourceNames = !normalizedOriginalModel && model && model !== 'deepright'
+    ? getModelCopySourceNames(model, normalizedOriginalModel)
+    : [];
   const originalAttr = normalizedOriginalModel ? ` data-original-model="${esc(normalizedOriginalModel).replace(/"/g, '&quot;')}"` : '';
   const remoteRestricted = isRemoteReadonlySiteAccess();
   const remotePersisted = remoteRestricted && !!normalizedOriginalModel;
+  const providerLocked = !!normalizedOriginalModel;
   const remoteMaskedToken = remotePersisted && isMaskedRemoteTokenValue(rawCfg.token || cfg.token);
   const tokenInputReadonlyAttr = remotePersisted ? ' readonly' : '';
   const urlAttr = !canCustomize || !spec.supportsUrl || !spec.editableUrl ? ' disabled' : (remotePersisted ? ' readonly' : '');
   const baseAttr = !canCustomize || !spec.supportsBaseModel ? ' disabled' : (remotePersisted ? ' readonly' : '');
   const fastAttr = !canCustomize || !spec.supportsFastModel ? ' disabled' : (remotePersisted ? ' readonly' : '');
   const thinkingAttr = !canCustomize || !spec.supportsThinkingModel ? ' disabled' : (remotePersisted ? ' readonly' : '');
-  const selectDisabledAttr = remotePersisted ? ' disabled' : '';
+  const selectDisabledAttr = providerLocked ? ' disabled title="已保存的模型服务商不可编辑"' : '';
   const multiInputAttr = !canCustomize || !spec.supportsMultiInput ? ' disabled' : (remotePersisted ? ' readonly' : '');
   const multiOutputAttr = !canCustomize || !spec.supportsMultiOutput ? ' disabled' : (remotePersisted ? ' readonly' : '');
   const tokenTitleAttr = remoteMaskedToken
     ? ' title="远程访问已隐藏真实密钥"'
     : '';
   const showDeeprightMediaLauncher = model === 'deepright';
-  const passwordWrapClass = 'password-wrap' + (showDeeprightMediaLauncher ? (' has-media-launcher' + (remoteMaskedToken ? ' no-eye' : '')) : '');
+  const passwordWrapClass = 'password-wrap'
+    + (copySourceNames.length ? ' has-model-copy' : '')
+    + (showDeeprightMediaLauncher ? (' has-media-launcher' + (remoteMaskedToken ? ' no-eye' : '')) : '');
   const removeDisabledAttr = remotePersisted
     ? ' disabled title="远程访问下不允许删除已保存模型配置"'
     : ' title="删除模型"';
@@ -41409,6 +41542,13 @@ function modelEntryHtml(idx, model, rawConfig, originalModel) {
         ${remoteMaskedToken ? '' : `<button class="eye-btn" onclick="toggleEye(this)" type="button">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
         </button>`}
+        ${copySourceNames.length ? `<button class="model-copy-btn" onclick="toggleModelCopyMenu(this)" type="button" title="复制已配置模型" aria-label="复制已配置模型" aria-expanded="false">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+        <div class="model-copy-menu" role="menu" aria-label="选择复制来源">
+          <div class="model-copy-menu-label">复制已保存模型</div>
+          ${copySourceNames.map(sourceModel => `<button class="model-copy-option" type="button" role="menuitem" data-copy-source="${esc(sourceModel).replace(/"/g, '&quot;')}" onclick="copyModelConfigFrom(this)">${esc(sourceModel)}</button>`).join('')}
+        </div>` : ''}
       </div>
       <span class="model-entry-status">待完成</span>
       ${canCustomize ? `<button class="model-config-toggle${hasConfig ? ' has-config' : ''}" onclick="toggleModelConfig(this)" type="button" title="${configToggleTitle}">
@@ -41772,6 +41912,12 @@ function resolveModelEntryTokenForSave(entry, model) {
 
 function onModelChange(sel) {
   const entry = sel && sel.closest('.model-entry');
+  const originalModel = normalizeModelName(entry && entry.getAttribute('data-original-model'));
+  if (originalModel) {
+    sel.value = originalModel;
+    setSettingsErrorMessage('已保存的模型服务商不可编辑，如需更换请删除后重新新增');
+    return;
+  }
   const draft = getCurrentModelEntryRawConfig(entry);
   const nextModel = normalizeModelName(sel && sel.value);
   const entries = Array.from(document.querySelectorAll('#modelEntries .model-entry'));
@@ -41853,6 +41999,10 @@ async function saveSettingsAsync() {
     if (err) return;
     const m = normalizeModelName(e.querySelector('select').value);
     const originalModel = normalizeModelName(e.getAttribute('data-original-model'));
+    if (originalModel && m !== originalModel) {
+      err = `已保存的模型服务商 ${originalModel} 不可编辑，如需更换请删除后重新新增`;
+      return;
+    }
     const spec = getModelCustomConfigSpec(m);
     const canCustomize = !!spec.configurable;
     const draftCfg = getCurrentModelEntryRawConfig(e);
@@ -41933,6 +42083,11 @@ async function saveSettingsAsync() {
         const token = String(entry.querySelector('.model-token-input') && entry.querySelector('.model-token-input').value || '').trim();
         if (model && token && Object.prototype.hasOwnProperty.call(state.settings.models || {}, model)) {
           entry.setAttribute('data-original-model', model);
+          const select = entry.querySelector('select');
+          if (select) {
+            select.disabled = true;
+            select.title = '已保存的模型服务商不可编辑';
+          }
         }
         refreshModelEntryPendingState(entry);
       });
@@ -47746,8 +47901,10 @@ document.addEventListener('visibilitychange', () => {
     refreshInstallAppIndicator();
     scheduleRefreshCronViews(0);
     syncCliGetQueueStatusPolling();
+    rsScheduleAgentStopSync({ immediate: true });
   } else {
     syncCliGetQueueStatusPolling({ refreshNow: false });
+    rsStopAgentStopPolling();
   }
 });
 
@@ -48338,6 +48495,119 @@ let rsSelectedModel = '';
 let rsVerifyEnabledState = false;
 let rsTimeFocused = false;
 let rsNoteSaveInFlight = false;
+const RS_AGENT_STOP_POLL_NORMAL_MS = 15 * 1000;
+const RS_AGENT_STOP_POLL_ENERGY_SAVER_MS = 30 * 1000;
+let rsAgentStopState = {
+  agentId: '',
+  enabled: false,
+  requestSeq: 0,
+  timer: 0,
+  inFlight: false,
+  writeInFlight: false
+};
+function rsSessionStopEnabled() {
+  return !!rsAgentStopState.enabled;
+}
+function rsSyncSessionStopUI() {
+  const controls = [
+    { toggle: document.getElementById('rsMemoStopToggle'), label: document.getElementById('rsMemoStopLabel'), bar: document.getElementById('rsMemoStopBar') },
+    { toggle: document.getElementById('rsMetaStopToggle'), label: document.getElementById('rsMetaStopLabel'), bar: document.getElementById('rsMetaStopBar') }
+  ].filter(control => control.toggle && control.bar);
+  const repeatLabel = document.getElementById('rsRepeatLabel');
+  if (!controls.length) return;
+  const on = rsSessionStopEnabled();
+  const cycleVisible = !!String(repeatLabel && repeatLabel.textContent || '').trim();
+  controls.forEach(({ toggle, label, bar }) => {
+    toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
+    toggle.title = on ? 'STOP 已开启：当前 Agent 的定时备忘录暂不执行' : 'STOP 已关闭：当前 Agent 的定时备忘录会执行';
+    toggle.classList.toggle('on', on);
+    bar.classList.toggle('on', on);
+    if (bar.id === 'rsMemoStopBar') bar.classList.toggle('hidden', cycleVisible);
+    if (label) label.textContent = 'STOP';
+  });
+}
+function rsApplyAgentStopState(agentId, enabled) {
+  const resolvedAgentId = String(agentId || '').trim();
+  if (resolvedAgentId !== String(state.settings && state.settings.agentId || '').trim()) return false;
+  rsAgentStopState.agentId = resolvedAgentId;
+  rsAgentStopState.enabled = !!enabled;
+  rsSyncSessionStopUI();
+  return true;
+}
+function rsStopAgentStopPolling() {
+  if (rsAgentStopState.timer) clearTimeout(rsAgentStopState.timer);
+  rsAgentStopState.timer = 0;
+}
+function rsAgentStopPollIntervalMs() {
+  return state.energySaver ? RS_AGENT_STOP_POLL_ENERGY_SAVER_MS : RS_AGENT_STOP_POLL_NORMAL_MS;
+}
+function rsScheduleAgentStopSync(options = {}) {
+  rsStopAgentStopPolling();
+  const agentId = String(state.settings && state.settings.agentId || '').trim();
+  if (!agentId || document.hidden) return;
+  const delay = options.immediate ? 0 : rsAgentStopPollIntervalMs();
+  rsAgentStopState.timer = window.setTimeout(() => {
+    rsAgentStopState.timer = 0;
+    rsSyncAgentStopState();
+  }, delay);
+}
+async function rsSyncAgentStopState(options = {}) {
+  const agentId = String(state.settings && state.settings.agentId || '').trim();
+  if (!agentId || document.hidden || rsAgentStopState.inFlight) {
+    if (!rsAgentStopState.inFlight) rsScheduleAgentStopSync();
+    return false;
+  }
+  const seq = ++rsAgentStopState.requestSeq;
+  rsAgentStopState.inFlight = true;
+  try {
+    const resp = await fetch('/api/cron/agent/stop?agentId=' + encodeURIComponent(agentId));
+    const data = await resp.json();
+    if (!resp.ok || !data || data.status !== 0) throw new Error((data && data.content) || '读取 STOP 状态失败');
+    const currentAgentId = String(state.settings && state.settings.agentId || '').trim();
+    if (seq === rsAgentStopState.requestSeq && currentAgentId === agentId) {
+      rsApplyAgentStopState(agentId, !!data.enabled);
+    }
+    return true;
+  } catch (err) {
+    if (options.showError) vfsShowUploadToast('STOP 状态同步失败: ' + (err && err.message ? err.message : '网络异常'), true);
+    return false;
+  } finally {
+    rsAgentStopState.inFlight = false;
+    if (options.reschedule !== false) rsScheduleAgentStopSync();
+  }
+}
+async function rsToggleSessionStop() {
+  if (rsAgentStopState.writeInFlight || isMemoTourInteractionLocked()) return;
+  rsHideConfirm();
+  const agentId = String(state.settings && state.settings.agentId || '').trim();
+  const toggles = [document.getElementById('rsMemoStopToggle'), document.getElementById('rsMetaStopToggle')].filter(Boolean);
+  if (!toggles.length || !agentId) {
+    vfsShowUploadToast('请先选择 Agent', true);
+    return;
+  }
+  const on = !rsSessionStopEnabled();
+  ++rsAgentStopState.requestSeq;
+  rsAgentStopState.writeInFlight = true;
+  toggles.forEach(toggle => { toggle.disabled = true; });
+  try {
+    const resp = await fetch('/api/cron/agent/stop?agentId=' + encodeURIComponent(agentId), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: on })
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data || data.status !== 0) throw new Error((data && data.content) || '保存 STOP 状态失败');
+    rsApplyAgentStopState(agentId, !!data.enabled);
+    vfsShowUploadToast(data.enabled ? '当前 Agent 已开启 STOP，定时备忘录暂不执行' : '当前 Agent 已关闭 STOP，定时备忘录会继续执行', false);
+  } catch (err) {
+    vfsShowUploadToast('STOP 状态保存失败: ' + (err && err.message ? err.message : '网络异常'), true);
+    rsSyncAgentStopState({ reschedule: false });
+  } finally {
+    rsAgentStopState.writeInFlight = false;
+    toggles.forEach(toggle => { if (toggle.isConnected) toggle.disabled = false; });
+    rsScheduleAgentStopSync();
+  }
+}
 let rsValidationFlashTimers = {
   note: 0,
   model: 0
@@ -48483,6 +48753,10 @@ function rsInitNote() {
   }
   rsUpdateTime();
   rsUpdateThinkingUI();
+  const agentStopAgentId = String(state.settings && state.settings.agentId || '').trim();
+  if (rsAgentStopState.agentId !== agentStopAgentId) rsApplyAgentStopState(agentStopAgentId, false);
+  rsSyncSessionStopUI();
+  rsScheduleAgentStopSync({ immediate: true });
   ['rsTimeH','rsTimeM'].forEach(id => {
     const el = document.getElementById(id);
     if (el) {
@@ -48521,6 +48795,25 @@ function rsBuildSaveSchedule() {
     minute,
     rawTime: date + ' ' + hour + ':' + minute
   };
+}
+function rsNormalizeOnceScheduleToNow(now = new Date()) {
+  if (rsRepeatMode !== 'once') return false;
+  const current = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes(), 0, 0);
+  calYear = current.getFullYear();
+  calMonth = current.getMonth();
+  calSelected = { y: current.getFullYear(), m: current.getMonth(), d: current.getDate() };
+  const hour = document.getElementById('rsTimeH');
+  const minute = document.getElementById('rsTimeM');
+  if (hour) hour.value = String(current.getHours()).padStart(2, '0');
+  if (minute) minute.value = String(current.getMinutes()).padStart(2, '0');
+  renderCalendar();
+  renderTimeline();
+  return true;
+}
+function rsResolveSaveSchedule(now = new Date()) {
+  if (rsSelectedScheduleIsFuture(now)) return { schedule: rsBuildSaveSchedule(), normalized: false };
+  if (rsNormalizeOnceScheduleToNow(now)) return { schedule: rsBuildSaveSchedule(), normalized: true };
+  return { schedule: rsBuildSaveSchedule(), normalized: false, invalid: true };
 }
 async function rsToggleThinking() {
   if (isMemoTourInteractionLocked()) return;
@@ -48588,8 +48881,9 @@ function rsSaveNote(options = {}) {
   if (!selectedModel) {
     return false;
   }
-  const schedule = rsBuildSaveSchedule();
-  if (!rsSelectedScheduleIsFuture()) {
+  const scheduleState = rsResolveSaveSchedule();
+  const schedule = scheduleState.schedule;
+  if (scheduleState.invalid) {
     vfsShowUploadToast('执行时间需要晚于当前时间', true);
     return false;
   }
@@ -48657,8 +48951,9 @@ async function rsSubmitNote(options = {}) {
   if (!selectedModel) {
     return { ok: false, reason: 'missing-model' };
   }
-  const schedule = rsBuildSaveSchedule();
-  if (!rsSelectedScheduleIsFuture()) {
+  const scheduleState = rsResolveSaveSchedule();
+  const schedule = scheduleState.schedule;
+  if (scheduleState.invalid) {
     const message = '执行时间需要晚于当前时间';
     if (options.showToast !== false) vfsShowUploadToast(message, true);
     return { ok: false, reason: 'past-exec-time', message };
@@ -48746,7 +49041,7 @@ function rsResetNote() {
   document.querySelectorAll('#rsRepeatDd .rs-repeat-opt').forEach(el => el.classList.toggle('active', el.getAttribute('data-mode') === 'once'));
   const rl = document.getElementById('rsRepeatLabel');
   rl.style.opacity = '0';
-  setTimeout(() => { rl.textContent = ''; rl.style.opacity = '1'; }, 150);
+  setTimeout(() => { rl.textContent = ''; rl.style.opacity = '1'; rsSyncSessionStopUI(); }, 150);
 }
 
 let rsRepeatMode = 'once';
@@ -48764,7 +49059,7 @@ function rsSelectRepeat(mode, el) {
   el.classList.add('active');
   const label = document.getElementById('rsRepeatLabel');
   label.style.opacity = '0';
-  setTimeout(() => { label.textContent = el.textContent; label.style.opacity = '1'; }, 150);
+  setTimeout(() => { label.textContent = el.textContent; label.style.opacity = '1'; rsSyncSessionStopUI(); }, 150);
   setTimeout(() => document.getElementById('rsRepeatDd').classList.remove('show'), 50);
 }
 document.addEventListener('click', e => {

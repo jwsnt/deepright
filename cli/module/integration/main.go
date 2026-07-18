@@ -8069,6 +8069,69 @@ func handleCron(cfg *Config) http.HandlerFunc {
 	}
 }
 
+type cronAgentStopRequest struct {
+	Enabled *bool `json:"enabled"`
+}
+
+func writeCronAgentStopResponse(w http.ResponseWriter, state cronAgentStopState) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":     0,
+		"agentId":    state.AgentID,
+		"enabled":    state.Enabled,
+		"updatedAt":  state.UpdatedAt,
+		"stoppedAt":  state.StoppedAt,
+		"resumeFrom": state.ResumeFrom,
+	})
+}
+
+func handleCronAgentStop(cfg *Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		agentID := strings.TrimSpace(r.URL.Query().Get("agentId"))
+		if agentID == "" {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "agentId is required"})
+			return
+		}
+		if err := validateIntegrationAgentExists(cfg.AgentDir, cfg.effectiveDeviceID(), agentID); err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": err.Error()})
+			return
+		}
+		if cronDB == nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "db not ready"})
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			state, err := getCronAgentStopState(cronDB, agentID)
+			if err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": err.Error()})
+				return
+			}
+			writeCronAgentStopResponse(w, state)
+		case http.MethodPatch:
+			var req cronAgentStopRequest
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Enabled == nil {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "enabled is required"})
+				return
+			}
+			state, err := setCronAgentStopState(cronDB, agentID, *req.Enabled, time.Now())
+			if err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": err.Error()})
+				return
+			}
+			writeCronAgentStopResponse(w, state)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}
+}
+
 type cronMetaFilter struct {
 	AgentID       string
 	ChatID        string
@@ -8710,6 +8773,9 @@ func deleteAgentCronData(db *sql.DB, agentID string) (int64, int64, error) {
 	}
 	metaAffected, err := metaRes.RowsAffected()
 	if err != nil {
+		return 0, 0, err
+	}
+	if _, err := tx.Exec(`DELETE FROM agent_cron_stop WHERE agent_id = ?`, agentID); err != nil {
 		return 0, 0, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -9387,6 +9453,15 @@ func cronRouterDisableSelect(queryer pragmaRowQueryer, tableName string) string 
 	return cronRouterDisableSelectExpr(queryer, tableName, "router_disable")
 }
 
+func dropCronLegacySessionDisableColumn(db *sql.DB, tableName string) {
+	if db == nil || !hasTableColumn(db, tableName, "session_disable") {
+		return
+	}
+	if _, err := db.Exec(fmt.Sprintf(`ALTER TABLE %s DROP COLUMN session_disable`, tableName)); err != nil {
+		log.Printf("[cron] remove legacy session_disable column failed: table=%s err=%v", tableName, err)
+	}
+}
+
 func cronVerifySelectExpr(queryer pragmaRowQueryer, tableName, expr string) string {
 	if hasTableColumn(queryer, tableName, "verify") {
 		return expr
@@ -9474,6 +9549,13 @@ func ensureCronSchema(db *sql.DB) {
 			started INTEGER NOT NULL DEFAULT 0,
 			occurred_at TEXT NOT NULL
 		);
+		CREATE TABLE IF NOT EXISTS agent_cron_stop (
+			agent_id TEXT PRIMARY KEY,
+			enabled INTEGER NOT NULL DEFAULT 0,
+			stopped_at INTEGER NOT NULL DEFAULT 0,
+			resume_from INTEGER NOT NULL DEFAULT 0,
+			updated_at INTEGER NOT NULL DEFAULT 0
+		);
 	`); err != nil {
 		log.Printf("[cron] ensure schema create failed: %v", err)
 	}
@@ -9530,6 +9612,134 @@ func ensureCronSchema(db *sql.DB) {
 		ensureCronVerifyColumn(db, tableName)
 		ensureCronRouterDisableColumn(db, tableName)
 	}
+	dropCronLegacySessionDisableColumn(db, "task_meta")
+	dropCronLegacySessionDisableColumn(db, "task_detail")
+}
+
+type cronAgentStopState struct {
+	AgentID    string
+	Enabled    bool
+	StoppedAt  int64
+	ResumeFrom int64
+	UpdatedAt  int64
+}
+
+func getCronAgentStopState(db *sql.DB, agentID string) (cronAgentStopState, error) {
+	state := cronAgentStopState{AgentID: strings.TrimSpace(agentID)}
+	if db == nil || state.AgentID == "" {
+		return state, nil
+	}
+	var enabled int
+	err := db.QueryRow(`SELECT enabled, stopped_at, resume_from, updated_at FROM agent_cron_stop WHERE agent_id = ?`, state.AgentID).Scan(&enabled, &state.StoppedAt, &state.ResumeFrom, &state.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return state, nil
+	}
+	if err != nil {
+		return state, err
+	}
+	state.Enabled = enabled != 0
+	return state, nil
+}
+
+func getCronAgentStopStateMap(db *sql.DB, agentIDs []string) (map[string]cronAgentStopState, error) {
+	states := make(map[string]cronAgentStopState)
+	unique := make([]string, 0, len(agentIDs))
+	seen := make(map[string]struct{}, len(agentIDs))
+	for _, rawAgentID := range agentIDs {
+		agentID := strings.TrimSpace(rawAgentID)
+		if agentID == "" {
+			continue
+		}
+		if _, ok := seen[agentID]; ok {
+			continue
+		}
+		seen[agentID] = struct{}{}
+		unique = append(unique, agentID)
+		states[agentID] = cronAgentStopState{AgentID: agentID}
+	}
+	if db == nil || len(unique) == 0 {
+		return states, nil
+	}
+	args := make([]interface{}, len(unique))
+	for i, agentID := range unique {
+		args[i] = agentID
+	}
+	rows, err := db.Query(fmt.Sprintf(`SELECT agent_id, enabled, stopped_at, resume_from, updated_at FROM agent_cron_stop WHERE agent_id IN (%s)`, placeholders(len(unique))), args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var state cronAgentStopState
+		var enabled int
+		if err := rows.Scan(&state.AgentID, &enabled, &state.StoppedAt, &state.ResumeFrom, &state.UpdatedAt); err != nil {
+			return nil, err
+		}
+		state.Enabled = enabled != 0
+		states[state.AgentID] = state
+	}
+	return states, rows.Err()
+}
+
+func setCronAgentStopState(db *sql.DB, agentID string, enabled bool, now time.Time) (cronAgentStopState, error) {
+	resolvedAgentID := strings.TrimSpace(agentID)
+	if db == nil || resolvedAgentID == "" {
+		return cronAgentStopState{}, fmt.Errorf("agent stop state is unavailable")
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return cronAgentStopState{}, err
+	}
+	defer tx.Rollback()
+	state := cronAgentStopState{AgentID: resolvedAgentID}
+	var storedEnabled int
+	err = tx.QueryRow(`SELECT enabled, stopped_at, resume_from, updated_at FROM agent_cron_stop WHERE agent_id = ?`, resolvedAgentID).Scan(&storedEnabled, &state.StoppedAt, &state.ResumeFrom, &state.UpdatedAt)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return cronAgentStopState{}, err
+	}
+	state.Enabled = storedEnabled != 0
+	nowUnix := now.Unix()
+	if enabled {
+		if !state.Enabled {
+			state.StoppedAt = nowUnix
+		}
+		state.Enabled = true
+	} else {
+		if state.Enabled && state.StoppedAt > 0 {
+			if state.ResumeFrom == 0 || state.StoppedAt < state.ResumeFrom {
+				state.ResumeFrom = state.StoppedAt
+			}
+		}
+		state.Enabled = false
+	}
+	state.UpdatedAt = nowUnix
+	if _, err := tx.Exec(`INSERT INTO agent_cron_stop (agent_id, enabled, stopped_at, resume_from, updated_at) VALUES (?,?,?,?,?)
+		ON CONFLICT(agent_id) DO UPDATE SET enabled = excluded.enabled, stopped_at = excluded.stopped_at, resume_from = excluded.resume_from, updated_at = excluded.updated_at`,
+		state.AgentID, boolToInt(state.Enabled), state.StoppedAt, state.ResumeFrom, state.UpdatedAt); err != nil {
+		return cronAgentStopState{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return cronAgentStopState{}, err
+	}
+	return state, nil
+}
+
+func clearDrainedCronAgentStopResumeWindows(db *sql.DB, nowUnix int64) {
+	if db == nil {
+		return
+	}
+	_, _ = db.Exec(`UPDATE agent_cron_stop
+		SET resume_from = 0
+		WHERE enabled = 0
+		  AND resume_from > 0
+		  AND NOT EXISTS (
+			SELECT 1 FROM task_detail d
+			WHERE d.agent_id = agent_cron_stop.agent_id
+			  AND d.task_type = 'cron'
+			  AND d.started = 0
+			  AND d.exec_time >= agent_cron_stop.resume_from
+			  AND d.exec_time <= ?
+		  )`, nowUnix)
 }
 
 func appendCronMetaLog(db *sql.DB, entry cronMetaLogEntry) {
@@ -11601,7 +11811,6 @@ func createCronTask(agentID string, req cronCreateRequest) (map[string]interface
 	if req.RouterDisable {
 		routerDisableInt = 1
 	}
-
 	if req.Cycle == -1 && req.Cron != "" {
 		cronExpr = req.Cron
 		rawTime = ""
@@ -15768,6 +15977,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.Handle("/api/connect/request", connectHandler)
 	mux.Handle("/api/connect/response", connectHandler)
 	mux.HandleFunc("/api/cron/create", handleCron(&cfg))
+	mux.HandleFunc("/api/cron/agent/stop", handleCronAgentStop(&cfg))
 	mux.HandleFunc("/api/cron/detail/metadata", handleCronMetadata())
 	mux.HandleFunc("/api/cron/delete", handleCronDelete())
 	mux.HandleFunc("/api/cron/detail/delete", handleCronDetailDelete())
@@ -17839,13 +18049,27 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 	cleanupDeletedAgentCronData(cfg)
 	now := time.Now()
 	oneHourAgo := now.Add(-1 * time.Hour)
+	clearDrainedCronAgentStopResumeWindows(cronDB, now.Unix())
 
 	selectMetaRef := `''`
 	if hasTableColumn(cronDB, "task_detail", "meta_ref") {
 		selectMetaRef = `d.meta_ref`
 	}
-	rows, err := cronDB.Query(fmt.Sprintf(`SELECT d.id, d.meta_id, d.exec_time, d.agent_id, d.chat_id, %s, d.task_type, d.model, d.thinking, %s, %s, d.content, d.response_schema FROM task_detail d WHERE d.started = 0 AND d.exec_time <= ? AND d.exec_time >= ?`,
-		selectMetaRef, cronVerifySelect(cronDB, "task_detail"), cronRouterDisableSelect(cronDB, "task_detail")), now.Unix(), oneHourAgo.Unix())
+	rows, err := cronDB.Query(fmt.Sprintf(`SELECT d.id, d.meta_id, d.exec_time, d.agent_id, d.chat_id, %s, d.task_type, d.model, d.thinking, %s, %s, d.content, d.response_schema
+		FROM task_detail d
+		WHERE d.started = 0
+		  AND d.exec_time <= ?
+		  AND (
+			d.exec_time >= ?
+			OR EXISTS (
+				SELECT 1 FROM agent_cron_stop stop
+				WHERE stop.agent_id = d.agent_id
+				  AND stop.enabled = 0
+				  AND stop.resume_from > 0
+				  AND d.task_type = 'cron'
+				  AND d.exec_time >= stop.resume_from
+			)
+		  )`, selectMetaRef, cronVerifySelect(cronDB, "task_detail"), cronRouterDisableSelect(cronDB, "task_detail")), now.Unix(), oneHourAgo.Unix())
 	if err != nil {
 		return
 	}
@@ -17877,8 +18101,29 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 		t.RouterDisable = routerDisable != 0
 		tasks = append(tasks, t)
 	}
+	if err := rows.Err(); err != nil {
+		return
+	}
+	if err := rows.Close(); err != nil {
+		return
+	}
+	agents := make([]string, 0, len(tasks))
+	for _, task := range tasks {
+		if task.TaskType == "cron" {
+			agents = append(agents, task.AgentID)
+		}
+	}
+	stopStates, err := getCronAgentStopStateMap(cronDB, agents)
+	if err != nil {
+		return
+	}
 
 	for _, t := range tasks {
+		if t.TaskType == "cron" && stopStates[t.AgentID].Enabled {
+			// STOP is an Agent-level runtime gate. Keep task metadata and detail
+			// untouched so the pending task can run after the Agent is resumed.
+			continue
+		}
 		if !agentExists(cfg.AgentDir, cfg.effectiveDeviceID(), t.AgentID) {
 			appendCronDetailLog(cronDB, cronDetailLogEntry{
 				DetailID:       t.ID,
