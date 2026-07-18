@@ -2176,16 +2176,14 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .onboarding-domain-overlay .onboarding-blocker{pointer-events:auto !important;z-index:0}
 .onboarding-domain-overlay .onboarding-card{pointer-events:auto}
 .onboarding-domain-overlay .onboarding-blocker{position:absolute;background:rgba(7,13,26,.56);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:all .24s ease}
-.onboarding-domain-overlay .onboarding-blocker-corner{--onboarding-mask-corner-radius:0px;pointer-events:none !important}
-.onboarding-domain-overlay .onboarding-blocker-corner-tl{-webkit-mask-image:radial-gradient(circle var(--onboarding-mask-corner-radius) at 100% 100%,transparent calc(var(--onboarding-mask-corner-radius) - .5px),#000 var(--onboarding-mask-corner-radius));mask-image:radial-gradient(circle var(--onboarding-mask-corner-radius) at 100% 100%,transparent calc(var(--onboarding-mask-corner-radius) - .5px),#000 var(--onboarding-mask-corner-radius))}
-.onboarding-domain-overlay .onboarding-blocker-corner-tr{-webkit-mask-image:radial-gradient(circle var(--onboarding-mask-corner-radius) at 0 100%,transparent calc(var(--onboarding-mask-corner-radius) - .5px),#000 var(--onboarding-mask-corner-radius));mask-image:radial-gradient(circle var(--onboarding-mask-corner-radius) at 0 100%,transparent calc(var(--onboarding-mask-corner-radius) - .5px),#000 var(--onboarding-mask-corner-radius))}
-.onboarding-domain-overlay .onboarding-blocker-corner-bl{-webkit-mask-image:radial-gradient(circle var(--onboarding-mask-corner-radius) at 100% 0,transparent calc(var(--onboarding-mask-corner-radius) - .5px),#000 var(--onboarding-mask-corner-radius));mask-image:radial-gradient(circle var(--onboarding-mask-corner-radius) at 100% 0,transparent calc(var(--onboarding-mask-corner-radius) - .5px),#000 var(--onboarding-mask-corner-radius))}
-.onboarding-domain-overlay .onboarding-blocker-corner-br{-webkit-mask-image:radial-gradient(circle var(--onboarding-mask-corner-radius) at 0 0,transparent calc(var(--onboarding-mask-corner-radius) - .5px),#000 var(--onboarding-mask-corner-radius));mask-image:radial-gradient(circle var(--onboarding-mask-corner-radius) at 0 0,transparent calc(var(--onboarding-mask-corner-radius) - .5px),#000 var(--onboarding-mask-corner-radius))}
 [data-theme="light"] .onboarding-domain-overlay .onboarding-blocker{background:rgba(228,236,248,.66)}
 .onboarding-domain-overlay .onboarding-spotlight{position:absolute;z-index:1;border-radius:20px;border:1px solid rgba(255,255,255,.88);box-shadow:0 0 0 1px rgba(var(--accent-soft-rgb),.46),0 22px 44px rgba(11,24,54,.24),0 0 0 999px rgba(0,0,0,0);pointer-events:none;opacity:0;transition:all .24s ease;overflow:hidden}
 .onboarding-domain-overlay .onboarding-spotlight::before{content:'';position:absolute;inset:0;border-radius:inherit;background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.06));box-shadow:none}
 [data-theme="dark"] .onboarding-domain-overlay .onboarding-spotlight{border-color:rgba(236,243,255,.82);box-shadow:0 0 0 1px rgba(160,188,255,.48),0 22px 44px rgba(0,0,0,.34),0 0 0 999px rgba(0,0,0,0)}
 .onboarding-domain-overlay.has-target .onboarding-spotlight{opacity:1}
+.onboarding-domain-overlay[data-onboarding-step="right-sidebar-url-preview-tour-close"] .onboarding-blocker{display:none}
+.onboarding-domain-overlay[data-onboarding-step="right-sidebar-url-preview-tour-close"] .onboarding-spotlight{box-shadow:0 0 0 1px rgba(var(--accent-soft-rgb),.46),0 22px 44px rgba(11,24,54,.24),0 0 0 9999px rgba(228,236,248,.66)}
+[data-theme="dark"] .onboarding-domain-overlay[data-onboarding-step="right-sidebar-url-preview-tour-close"] .onboarding-spotlight{box-shadow:0 0 0 1px rgba(160,188,255,.48),0 22px 44px rgba(0,0,0,.34),0 0 0 9999px rgba(7,13,26,.56)}
 .onboarding-domain-overlay[data-onboarding-step="chat-completion-tour-indicator"] .onboarding-blocker,.onboarding-domain-overlay[data-onboarding-step="chat-completion-tour-indicator"] .onboarding-spotlight{transition:all 2s cubic-bezier(.16,1,.3,1)}
 .onboarding-domain-overlay[data-onboarding-step="browser-instance-tour-lock"] .onboarding-blocker,
 .onboarding-domain-overlay[data-onboarding-step="browser-instance-tour-lock"] .onboarding-spotlight{
@@ -5502,10 +5500,6 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
   <div class="onboarding-blocker onboarding-blocker-left"></div>
   <div class="onboarding-blocker onboarding-blocker-right"></div>
   <div class="onboarding-blocker onboarding-blocker-bottom"></div>
-  <div class="onboarding-blocker onboarding-blocker-corner onboarding-blocker-corner-tl"></div>
-  <div class="onboarding-blocker onboarding-blocker-corner onboarding-blocker-corner-tr"></div>
-  <div class="onboarding-blocker onboarding-blocker-corner onboarding-blocker-corner-bl"></div>
-  <div class="onboarding-blocker onboarding-blocker-corner onboarding-blocker-corner-br"></div>
   <div class="onboarding-spotlight"></div>
   <div class="onboarding-vfs-drag-demo" id="onboardingVfsDragDemo" aria-hidden="true">
     <div class="onboarding-vfs-drag-demo-origin">系统文件 / 目录</div>
@@ -5542,10 +5536,6 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
   <div class="onboarding-blocker onboarding-blocker-left"></div>
   <div class="onboarding-blocker onboarding-blocker-right"></div>
   <div class="onboarding-blocker onboarding-blocker-bottom"></div>
-  <div class="onboarding-blocker onboarding-blocker-corner onboarding-blocker-corner-tl"></div>
-  <div class="onboarding-blocker onboarding-blocker-corner onboarding-blocker-corner-tr"></div>
-  <div class="onboarding-blocker onboarding-blocker-corner onboarding-blocker-corner-bl"></div>
-  <div class="onboarding-blocker onboarding-blocker-corner onboarding-blocker-corner-br"></div>
   <div class="onboarding-spotlight"></div>
   <div class="onboarding-agent-hint" id="onboardingAgentHint" aria-hidden="true"></div>
   <div class="vfs-edit-tour-cursor" id="vfsEditTourCursor" aria-hidden="true">
@@ -5576,10 +5566,6 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
   <div class="onboarding-blocker onboarding-blocker-left"></div>
   <div class="onboarding-blocker onboarding-blocker-right"></div>
   <div class="onboarding-blocker onboarding-blocker-bottom"></div>
-  <div class="onboarding-blocker onboarding-blocker-corner onboarding-blocker-corner-tl"></div>
-  <div class="onboarding-blocker onboarding-blocker-corner onboarding-blocker-corner-tr"></div>
-  <div class="onboarding-blocker onboarding-blocker-corner onboarding-blocker-corner-bl"></div>
-  <div class="onboarding-blocker onboarding-blocker-corner onboarding-blocker-corner-br"></div>
   <div class="onboarding-spotlight"></div>
   <div class="memo-task-tour-demo" id="memoTaskTourDemo" aria-hidden="true" data-phase="idle">
     <div class="memo-task-tour-demo-cursor" id="memoTaskTourCursor" aria-hidden="true">
@@ -6369,6 +6355,7 @@ const MEMO_TOUR_CLICK_KEY = 'deepright_memo_tour_clicked';
 const MEMO_TASK_TOUR_CLICK_KEY = 'deepright_memo_task_tour_clicked';
 const MEMO_COMPLETION_TOUR_CLICK_KEY = 'deepright_memo_completion_tour_clicked';
 const MEMO_RECURRING_TOUR_CLICK_KEY = 'deepright_memo_recurring_tour_clicked';
+const MEMO_STOP_TOUR_CLICK_KEY = 'deepright_memo_stop_tour_clicked';
 const SKILL_TOUR_CLICK_KEY = 'deepright_skill_tour_clicked';
 const SKILL_DISABLE_TOUR_CLICK_KEY = 'deepright_skill_disable_tour_clicked';
 const CLI_TOUR_CLICK_KEY = 'deepright_cli_tour_clicked';
@@ -9268,6 +9255,20 @@ function markMemoRecurringTourClickRecord() {
   } catch {}
 }
 
+function hasMemoStopTourClickRecord() {
+  try {
+    return localStorage.getItem(MEMO_STOP_TOUR_CLICK_KEY) === '1';
+  } catch {
+    return true;
+  }
+}
+
+function markMemoStopTourClickRecord() {
+  try {
+    localStorage.setItem(MEMO_STOP_TOUR_CLICK_KEY, '1');
+  } catch {}
+}
+
 function hasSkillTourClickRecord() {
   try {
     return localStorage.getItem(SKILL_TOUR_CLICK_KEY) === '1';
@@ -11169,6 +11170,19 @@ function getOnboardingStepConfig(step) {
         highlightPadding: 12,
         cardPlacement: 'above',
         cardWidth: 300,
+        cardMinHeight: 118,
+        cardOffsetY: 16
+      };
+    case 'memo-stop-tour-toggle':
+      return {
+        domain: 'right',
+        selector: '#rsMemoStopToggle',
+        message: '关闭后该Agent的备忘录任务将不在执行。',
+        actionLabel: '完成',
+        padding: 6,
+        highlightPadding: 10,
+        cardPlacement: 'above',
+        cardWidth: 320,
         cardMinHeight: 118,
         cardOffsetY: 16
       };
@@ -14350,6 +14364,10 @@ function isMemoTaskTourOnboardingStep(step) {
   return ['memo-task-tour-confirm', 'memo-task-tour-demo'].includes(String(step || '').trim());
 }
 
+function isMemoStopTourOnboardingStep(step) {
+  return String(step || '').trim() === 'memo-stop-tour-toggle';
+}
+
 function isMemoRecurringTourOnboardingStep(step) {
   return [
     'memo-recurring-tour-toggle',
@@ -14409,6 +14427,7 @@ function isMemoTourInteractionLocked() {
   return isOnboardingActive() && (
     isMemoTourOnboardingStep(onboardingState.step) ||
     isMemoTaskTourOnboardingStep(onboardingState.step) ||
+    isMemoStopTourOnboardingStep(onboardingState.step) ||
     isMemoRecurringTourOnboardingStep(onboardingState.step) ||
     isMemoCompletionTourOnboardingStep(onboardingState.step)
   );
@@ -14700,6 +14719,7 @@ function bindOnboardingEvents() {
   bindInstallAppTourTrigger();
   bindMemoTourTrigger();
   bindMemoTaskTourTrigger();
+  bindMemoStopTourTrigger();
   bindCliTourTrigger();
   bindWikiTourTrigger();
 }
@@ -14763,6 +14783,7 @@ function bindMemoTourTrigger() {
     if (isOnboardingStartLocked() || hasMemoTourClickRecord() || memoTourState.starting) return;
     const target = event.target;
     if (!(target instanceof Element)) return;
+    if (target.closest('#rsMemoStopToggle') || target.closest('#rsMetaStopToggle')) return;
     if (!target.closest('#rsCalendar') && !target.closest('#rsMemoCell')) return;
     event.preventDefault();
     event.stopPropagation();
@@ -14788,6 +14809,20 @@ function bindMemoTaskTourTrigger() {
   });
   noteInput.addEventListener('click', event => {
     Promise.resolve(tryStart(event)).catch(() => {});
+  }, true);
+}
+
+function bindMemoStopTourTrigger() {
+  const scope = document.getElementById('rsTopGrid');
+  if (!scope || scope.dataset.memoStopTourBound === '1') return;
+  scope.dataset.memoStopTourBound = '1';
+  scope.addEventListener('click', event => {
+    if (isOnboardingStartLocked() || hasMemoStopTourClickRecord()) return;
+    const target = event.target;
+    if (!(target instanceof Element) || !target.closest('#rsMemoStopToggle')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    startMemoStopTourOnboarding();
   }, true);
 }
 
@@ -14842,54 +14877,6 @@ function scheduleOnboardingStepResync(step, delays) {
   });
 }
 
-function resetOnboardingMaskCorners(overlay) {
-  if (!overlay) return;
-  overlay.querySelectorAll('.onboarding-blocker-corner').forEach(corner => {
-    Object.assign(corner.style, {
-      left: '0px',
-      top: '0px',
-      width: '0px',
-      height: '0px',
-      '--onboarding-mask-corner-radius': '0px'
-    });
-  });
-}
-
-function setOnboardingRoundedMask(overlay, overlayRect, maskLeft, maskTop, maskWidth, maskHeight) {
-  if (!overlay || !overlayRect) return;
-  const topBlocker = overlay.querySelector('.onboarding-blocker-top');
-  const leftBlocker = overlay.querySelector('.onboarding-blocker-left');
-  const rightBlocker = overlay.querySelector('.onboarding-blocker-right');
-  const bottomBlocker = overlay.querySelector('.onboarding-blocker-bottom');
-  const radius = Math.max(0, Math.min(20, maskWidth / 2, maskHeight / 2));
-  const middleTop = maskTop + radius;
-  const middleHeight = Math.max(0, maskHeight - radius * 2);
-  if (topBlocker) Object.assign(topBlocker.style, { left: '0px', top: '0px', width: `${overlayRect.width}px`, height: `${maskTop}px` });
-  if (leftBlocker) Object.assign(leftBlocker.style, { left: '0px', top: `${middleTop}px`, width: `${maskLeft}px`, height: `${middleHeight}px` });
-  if (rightBlocker) Object.assign(rightBlocker.style, { left: `${maskLeft + maskWidth}px`, top: `${middleTop}px`, width: `${Math.max(0, overlayRect.width - maskLeft - maskWidth)}px`, height: `${middleHeight}px` });
-  if (bottomBlocker) Object.assign(bottomBlocker.style, { left: '0px', top: `${maskTop + maskHeight}px`, width: `${overlayRect.width}px`, height: `${Math.max(0, overlayRect.height - maskTop - maskHeight)}px` });
-  const corners = {
-    tl: overlay.querySelector('.onboarding-blocker-corner-tl'),
-    tr: overlay.querySelector('.onboarding-blocker-corner-tr'),
-    bl: overlay.querySelector('.onboarding-blocker-corner-bl'),
-    br: overlay.querySelector('.onboarding-blocker-corner-br')
-  };
-  const applyCorner = (corner, left, top) => {
-    if (!corner) return;
-    Object.assign(corner.style, {
-      left: `${left}px`,
-      top: `${top}px`,
-      width: `${radius}px`,
-      height: `${radius}px`,
-      '--onboarding-mask-corner-radius': `${radius}px`
-    });
-  };
-  applyCorner(corners.tl, maskLeft, maskTop);
-  applyCorner(corners.tr, maskLeft + maskWidth - radius, maskTop);
-  applyCorner(corners.bl, maskLeft, maskTop + maskHeight - radius);
-  applyCorner(corners.br, maskLeft + maskWidth - radius, maskTop + maskHeight - radius);
-}
-
 function setOnboardingFullMask(overlay) {
   if (!overlay) return;
   const rect = overlay.getBoundingClientRect();
@@ -14903,7 +14890,6 @@ function setOnboardingFullMask(overlay) {
   if (right) Object.assign(right.style, { left: '0px', top: '0px', width: '0px', height: '0px' });
   if (bottom) Object.assign(bottom.style, { left: '0px', top: '0px', width: '0px', height: '0px' });
   if (spotlight) Object.assign(spotlight.style, { left: '0px', top: '0px', width: '0px', height: '0px' });
-  resetOnboardingMaskCorners(overlay);
   overlay.classList.remove('has-target');
 }
 
@@ -19423,8 +19409,15 @@ function syncOnboardingOverlayDomain(overlay, domain, config, target, targetRect
   overlay.style.setProperty('--onboarding-top', `${highlightTop}px`);
   overlay.style.setProperty('--onboarding-width', `${highlightWidth}px`);
   overlay.style.setProperty('--onboarding-height', `${highlightHeight}px`);
+  const topBlocker = overlay.querySelector('.onboarding-blocker-top');
+  const leftBlocker = overlay.querySelector('.onboarding-blocker-left');
+  const rightBlocker = overlay.querySelector('.onboarding-blocker-right');
+  const bottomBlocker = overlay.querySelector('.onboarding-blocker-bottom');
   const spotlight = overlay.querySelector('.onboarding-spotlight');
-  setOnboardingRoundedMask(overlay, overlayRect, maskLeft, maskTop, maskWidth, maskHeight);
+  if (topBlocker) Object.assign(topBlocker.style, { left: '0px', top: '0px', width: `${overlayRect.width}px`, height: `${maskTop}px` });
+  if (leftBlocker) Object.assign(leftBlocker.style, { left: '0px', top: `${maskTop}px`, width: `${maskLeft}px`, height: `${maskHeight}px` });
+  if (rightBlocker) Object.assign(rightBlocker.style, { left: `${maskLeft + maskWidth}px`, top: `${maskTop}px`, width: `${Math.max(0, overlayRect.width - maskLeft - maskWidth)}px`, height: `${maskHeight}px` });
+  if (bottomBlocker) Object.assign(bottomBlocker.style, { left: '0px', top: `${maskTop + maskHeight}px`, width: `${overlayRect.width}px`, height: `${Math.max(0, overlayRect.height - maskTop - maskHeight)}px` });
   if (spotlight) Object.assign(spotlight.style, { left: `${highlightLeft}px`, top: `${highlightTop}px`, width: `${highlightWidth}px`, height: `${highlightHeight}px` });
   overlay.classList.add('has-target');
   setOnboardingCard(overlay, showCard ? config : null, showCard);
@@ -19770,6 +19763,13 @@ function setOnboardingStep(step) {
     applyRightSidebarState(false);
     const ok = syncMemoTaskTourStep(next);
     if (!ok) {
+      stopOnboarding(false);
+      return;
+    }
+  }
+  if (isMemoStopTourOnboardingStep(next)) {
+    applyRightSidebarState(false);
+    if (!document.getElementById('rsMemoStopToggle')) {
       stopOnboarding(false);
       return;
     }
@@ -20637,6 +20637,17 @@ async function startMemoTaskTourOnboarding() {
   }
 }
 
+function startMemoStopTourOnboarding() {
+  if (isOnboardingStartLocked() || hasMemoStopTourClickRecord()) return false;
+  const toggle = document.getElementById('rsMemoStopToggle');
+  if (!toggle) return false;
+  markMemoStopTourClickRecord();
+  onboardingState.active = true;
+  applyRightSidebarState(false);
+  setOnboardingStep('memo-stop-tour-toggle');
+  return true;
+}
+
 async function startSkillTourOnboarding() {
   if (!isOnboardingEnabled() || isOnboardingActive() || hasSkillTourClickRecord() || skillTourState.starting) return false;
   skillTourState.starting = true;
@@ -21363,6 +21374,9 @@ function handleOnboardingAction(event) {
       return;
     case 'memo-task-tour-demo':
       if (!memoTaskTourState.demoDone) return;
+      stopOnboarding(false);
+      return;
+    case 'memo-stop-tour-toggle':
       stopOnboarding(false);
       return;
     case 'memo-recurring-tour-toggle':
