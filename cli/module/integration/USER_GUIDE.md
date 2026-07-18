@@ -2994,7 +2994,7 @@ GET /api/files?path=/Users/demo/agent/A/skills&chatId=chat-1
 
 ## 迭代 20260718-2：从 Git 安装 Skill
 
-在 Site 的「提炼 Skill」浮层中，点击「从Git安装」并输入 Git 地址后，页面会读取 `config/config.json` 的 `skills_git_install` 文案，将其中每一处 `$git_path` 替换为输入的原始文本，并作为当前 Agent 会话的一条消息自动发送。
+在 Site 的「提炼 Skill」浮层中，点击「从Git安装」并输入 Git 地址后，页面会通过 Integration 的 `/api/runtime_config` 读取应用实际 `config/config.json` 中的 `skills_git_install` 文案，将其中每一处 `$git_path` 替换为输入的原始文本，并作为当前 Agent 会话的一条消息自动发送。该接口使用应用资源目录解析配置，不依赖服务进程的当前目录：macOS 为 `integration.app/Contents/Resources/config/config.json`，WSL 默认为 `~/deepright/config/config.json`。
 
 - 页面只负责读取模板、文本替换和发送；仓库拉取、Skill 解析、资源安装与覆盖确认均由 Agent 处理。
 - 仅当输入 `trim()` 后为空时会阻止发送。HTTP/HTTPS 地址在会话中按既有样式显示为可点击 URL 气泡；SSH 等其他非空 Git 地址也会原样发送。

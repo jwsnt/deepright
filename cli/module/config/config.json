@@ -68,6 +68,12 @@
       "__model_fast": "claude-haiku-4-5-20251001",
       "__model": "claude-sonnet-5"
     },
+    "deepseek": {
+      "__url": "https://api.deepseek.com/v1/chat/completions",
+      "__model_thinking": "deepseek-v4-pro",
+      "__model_fast": "deepseek-v4-flash",
+      "__model": "deepseek-v4-flash"
+    },
     "kimi": {
       "__url": "https://api.moonshot.cn/v1/chat/completions",
       "__model_multi_input": "kimi-k2.6",

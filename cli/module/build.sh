@@ -417,7 +417,43 @@ render_mac_dmg_background() {
   fi
 
   mkdir -p "$(dirname "$out_png")"
-  mv "$rendered_png" "$out_png"
+  # qlmanage renders SVG thumbnails into a square canvas. Crop the declared
+  # DMG artwork area explicitly; otherwise the unused lower portion is white.
+  if command -v magick >/dev/null 2>&1; then
+    if ! magick "$rendered_png" -crop 800x480+0+0 +repage "$out_png"; then
+      return 1
+    fi
+  elif command -v convert >/dev/null 2>&1; then
+    if ! convert "$rendered_png" -crop 800x480+0+0 +repage "$out_png"; then
+      return 1
+    fi
+  elif command -v python3 >/dev/null 2>&1; then
+    if ! SRC_PNG="$rendered_png" OUT_PNG="$out_png" python3 - <<'PY'
+import os
+import sys
+
+try:
+    from PIL import Image
+except Exception:
+    sys.exit(1)
+
+with Image.open(os.environ["SRC_PNG"]) as image:
+    image.crop((0, 0, 800, 480)).save(os.environ["OUT_PNG"], "PNG")
+PY
+    then
+      return 1
+    fi
+  else
+    echo "ImageMagick or python3+Pillow is required to render the mac dmg background" >&2
+    return 1
+  fi
+
+  background_width="$(sips -g pixelWidth "$out_png" 2>/dev/null | awk '/pixelWidth:/ {print $2}')"
+  background_height="$(sips -g pixelHeight "$out_png" 2>/dev/null | awk '/pixelHeight:/ {print $2}')"
+  if [ "$background_width" != "800" ] || [ "$background_height" != "480" ]; then
+    echo "rendered mac dmg background has unexpected dimensions: ${background_width}x${background_height}" >&2
+    return 1
+  fi
 }
 
 create_plain_mac_dmg() {
@@ -620,7 +656,10 @@ create_mac_dmg() {
   app_dir="$target_release_dir/${MAC_APP_NAME}.app"
   dmg_path="$target_release_dir/${MAC_APP_NAME}-${target_name}.dmg"
   dmg_stage_dir="$BUILD_TMP_DIR/dmg-stage-$target_name"
-  dmg_volume_name="${MAC_APP_NAME} ${target_name}"
+  # Keep this equal to the final artifact name. sign.sh repackages DMGs using
+  # that name; a different build-time name invalidates Finder's background
+  # alias stored in .DS_Store and yields a white window after signing.
+  dmg_volume_name="${MAC_APP_NAME}-${target_name}"
 
   if [ ! -d "$app_dir" ]; then
     echo "missing mac app for dmg packaging (mac/$target_name): $app_dir" >&2

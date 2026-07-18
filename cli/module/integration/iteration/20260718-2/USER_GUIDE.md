@@ -4,7 +4,7 @@
 
 ## 配置
 
-主应用 `config/config.json` 使用 `skills_git_install` 保存发送给 Agent 的文案。文案中必须包含 `$git_path`，页面会用输入框的原始文本替换全部同名变量。
+主应用 `config/config.json` 使用 `skills_git_install` 保存发送给 Agent 的文案。文案中必须包含 `$git_path`，页面会用输入框的原始文本替换全部同名变量。页面通过 Integration 的 `/api/runtime_config` 读取该字段，不会依赖浏览器或服务进程的当前目录：macOS 使用 `integration.app/Contents/Resources/config/config.json`，WSL 使用可执行文件同级的 `config/config.json`（默认 `~/deepright/config/config.json`）。
 
 ```json
 {

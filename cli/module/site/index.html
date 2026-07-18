@@ -3881,6 +3881,8 @@ body.quick-fan-transition-active{cursor:progress}
 /* Virtual File System */
 .vfs{height:250px;border-top:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;position:relative}
 .vfs.hidden{display:none}
+.vfs-loading{height:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;color:var(--text-muted);font-size:12px}
+.vfs-loading::before{content:'';width:13px;height:13px;border:2px solid rgba(var(--accent-rgb),.18);border-top-color:var(--accent);border-radius:50%;animation:vfsSpin .8s linear infinite;flex:0 0 auto}
 .vfs-header{padding:6px 12px;font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:4px;border-bottom:1px solid var(--border);flex-shrink:0;min-width:0}
 .vfs-header .vfs-back{border:none;background:none;cursor:pointer;color:var(--text-muted);padding:0 4px;font-size:13px;display:flex;align-items:center;flex:0 0 auto;position:relative;z-index:1}
 .vfs-header .vfs-back:hover{color:var(--text-primary)}
@@ -23396,6 +23398,9 @@ function finalizeBootShell() {
 async function init() {
   setBootLoadingCopy('正在加载中', '请稍后', 'loading');
   startBootLoadingTimers();
+  // Restore the last selected Agent before any network request. VFS can use
+  // this local state immediately instead of waiting for unrelated boot APIs.
+  restoreSettingsFromStorage();
   registerMessageImageCache();
   registerOverlayElements();
   startLogCleanupStatusPolling();
@@ -23413,10 +23418,16 @@ async function init() {
   startLocalStorageMaintenance();
   maintainLocalStorageBudget({ showNotice: false });
   refreshChatStorageStatsIndicator();
-  await loadSettings();
-  await initializeConfigurationReminder();
-  await loadStandaloneModeStatus({ silent: true });
-  const perfProfile = await detectBrowserPerfProfile();
+  // VFS is the primary workspace surface. Start it before plugin discovery
+  // (which can spawn processes and take noticeable time on a cold launch).
+  vfsInit();
+
+  // Model settings and the browser profile are needed for the initial controls,
+  // but are independent of VFS and can run alongside its request.
+  const settingsPromise = loadSettings({ restore: false });
+  const perfProfilePromise = detectBrowserPerfProfile();
+  await settingsPromise;
+  const perfProfile = await perfProfilePromise;
   state.browserPerfProfile = perfProfile;
   if (state.energySaverPreference !== null) {
     state.energySaver = !!state.energySaverPreference;
@@ -23426,8 +23437,6 @@ async function init() {
     state.energySaverSource = state.energySaver ? 'auto' : '';
   }
   onboardingState.eligible = !hasLocalBrowserRecords();
-  await loadQuickPlugins({ silent: true });
-  await refreshQuickPluginStatuses({ silent: true });
   applyTheme();
   applyEnergySaverMode({ restartScheduler: true });
   renderChatList();
@@ -23435,7 +23444,13 @@ async function init() {
   queueChatCompletionTourAutoStart();
   if (onboardingState.eligible) startFirstRunOnboarding();
   else maybeStartPendingModelSaveVerifyTour();
-  vfsInit();
+
+  // These enrich secondary controls only. Keep them off the VFS critical path.
+  void initializeConfigurationReminder();
+  void loadStandaloneModeStatus({ silent: true });
+  void loadQuickPlugins({ silent: true })
+    .then(() => refreshQuickPluginStatuses({ silent: true }))
+    .catch(() => {});
   syncFullscreenToggleUI();
   renderWikiPanel();
   renderCliSubPanelExpandedState();
@@ -26426,7 +26441,7 @@ function toggleSidebar() {
 }
 
 // ===== Storage =====
-async function loadSettings() {
+function restoreSettingsFromStorage() {
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY));
     if (s && typeof s === 'object') {
@@ -26435,8 +26450,14 @@ async function loadSettings() {
     }
   } catch {}
   ensureKnowledgeDisableSettings();
-  await loadModelProviderCatalog();
-  await loadTokenSettings();
+}
+
+async function loadSettings(options = {}) {
+  if (options.restore !== false) restoreSettingsFromStorage();
+  await Promise.all([
+    loadModelProviderCatalog(),
+    loadTokenSettings()
+  ]);
 }
 function saveSettingsToStorage() {
   localStorage.setItem(STORE_KEY, JSON.stringify({
@@ -34185,14 +34206,13 @@ async function fetchDeviceIdFromMetadata() {
 }
 
 async function fetchRuntimeConfigFromFile() {
-  const resp = await fetch('/api/data?path=' + encodeURIComponent('config/config.json') + '&_=' + Date.now(), { cache: 'no-store' });
+  const resp = await fetch('/api/runtime_config?_=' + Date.now(), { cache: 'no-store' });
   let data = null;
   try { data = await resp.json(); } catch {}
   if (!resp.ok || !data || data.status !== 0) {
     throw new Error((data && data.content) || ('读取 config/config.json 失败: HTTP ' + resp.status));
   }
-  let raw = {};
-  try { raw = JSON.parse(data.content || '{}'); } catch {}
+  const raw = data.config;
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('config/config.json 格式错误');
   return raw;
 }
@@ -43437,9 +43457,37 @@ let vfsTimer = null;
 let vfsSelected = new Set();
 let vfsLastJson = '';
 let wikiKnowledgePath = '';
+let vfsLoadRequestSeq = 0;
+let vfsRefreshRequestSeq = 0;
+let vfsInitialized = false;
+
+function getVfsRequestedAgentId() {
+  const activeChatId = String(state.activeChat || '').trim();
+  const chatAgentId = activeChatId ? String(chatAgents[activeChatId] || '').trim() : '';
+  return chatAgentId || String(state.settings.agentId || '').trim();
+}
+
+function setVfsLoadingState(agentId) {
+  const vfs = document.getElementById('vfs');
+  const path = document.getElementById('vfsPath');
+  const list = document.getElementById('vfsList');
+  if (vfs) vfs.classList.remove('hidden');
+  if (path) {
+    path.textContent = agentId ? (agentId + ' · 加载中…') : '正在加载…';
+    path.classList.remove('warning-active');
+  }
+  if (list) list.innerHTML = '<div class="vfs-loading">正在加载工作区</div>';
+}
+
+function setVfsLoadFailure(message) {
+  const list = document.getElementById('vfsList');
+  if (list) list.innerHTML = '<div class="vfs-loading">' + esc(message || '工作区加载失败') + '</div>';
+}
 
 function vfsInit() {
-  vfsLoadWorkspace();
+  if (vfsInitialized) return vfsLoadWorkspace();
+  vfsInitialized = true;
+  const initialLoad = vfsLoadWorkspace();
   document.addEventListener('click', e => {
     const warningPop = document.getElementById('vfsWarningPopover');
     if (warningPop && vfsWarningPopoverState.visible) {
@@ -43448,11 +43496,18 @@ function vfsInit() {
       }
     }
   });
+  return initialLoad;
 }
 
 async function vfsLoadWorkspace() {
-  const requestedAgentId = String(state.settings.agentId || '').trim();
+  const requestSeq = ++vfsLoadRequestSeq;
+  const requestedAgentId = getVfsRequestedAgentId();
+  vfsCurrentPath = '';
+  vfsLastJson = '';
+  vfsSelected.clear();
+  if (requestedAgentId) setVfsLoadingState(requestedAgentId);
   const resolvedAgentId = applyResolvedAgentSelection(requestedAgentId, resolveAgentSelection(requestedAgentId, await fetchAgentList()));
+  if (requestSeq !== vfsLoadRequestSeq) return false;
   const agentId = resolvedAgentId || requestedAgentId;
   if (!agentId) {
     docTidyLastUpdateState = {};
@@ -43463,16 +43518,31 @@ async function vfsLoadWorkspace() {
     document.getElementById('vfs').classList.add('hidden');
     hideVfsRepairPopover();
     renderWikiTidyIndicator();
-    return;
+    return false;
   }
   try {
     const resp = await fetch('/api/workspace?agentId=' + encodeURIComponent(agentId));
-    if (!resp.ok) return;
+    if (requestSeq !== vfsLoadRequestSeq) return false;
+    if (!resp.ok) {
+      setVfsLoadFailure('工作区加载失败');
+      return false;
+    }
     vfsWorkspace = (await resp.text()).trim();
+    if (requestSeq !== vfsLoadRequestSeq) return false;
     vfsCurrentPath = vfsWorkspace;
     docTidyLastUpdateState = {};
     docTidyDismissedState = {};
+    document.getElementById('vfs').classList.remove('hidden');
+    hideVfsWarningPopover();
+    hideVfsRepairPopover();
+    vfsRefresh();
+    vfsStartTimer();
+    renderWikiTidyIndicator();
+
+    // Knowledge metadata is useful to the right sidebar but must not delay
+    // the file list becoming visible.
     await loadWikiKnowledgePath();
+    if (requestSeq !== vfsLoadRequestSeq) return false;
     const wikiState = ensureWikiPanelState();
     const homeDoc = getWikiHomeDoc(agentId);
     const agentChanged = String(wikiState.currentAgentId || '').trim() !== agentId;
@@ -43484,13 +43554,11 @@ async function vfsLoadWorkspace() {
       wikiState.lastRenderedHtml = '';
       loadWikiDoc(homeDoc, { silent: true, agentId }).catch(() => {});
     }
-    document.getElementById('vfs').classList.remove('hidden');
-    hideVfsWarningPopover();
-    hideVfsRepairPopover();
-    vfsRefresh();
-    vfsStartTimer();
-    renderWikiTidyIndicator();
-  } catch {}
+    return true;
+  } catch {
+    if (requestSeq === vfsLoadRequestSeq) setVfsLoadFailure('工作区加载失败');
+    return false;
+  }
 }
 
 function vfsStartTimer() {
@@ -43499,6 +43567,8 @@ function vfsStartTimer() {
 
 async function vfsRefresh() {
   if (!vfsCurrentPath) return;
+  const requestSeq = ++vfsRefreshRequestSeq;
+  const requestPath = vfsCurrentPath;
   vfsSelected.clear();
   hideVfsWarningPopover();
   hideVfsRepairPopover();
@@ -43509,18 +43579,21 @@ async function vfsRefresh() {
     const resp = await fetch(url);
     if (!resp.ok) return;
     const json = await resp.text();
+    if (requestSeq !== vfsRefreshRequestSeq || requestPath !== vfsCurrentPath) return;
     const entries = JSON.parse(json);
     const docTidyPaths = entries
       .filter(entry => getDocTidyFileName(entry && entry.name, entry && entry.type))
       .map(entry => vfsCurrentPath + '/' + entry.name);
     if (json === vfsLastJson) {
       await refreshDocTidyIndicators(docTidyPaths);
+      if (requestSeq !== vfsRefreshRequestSeq || requestPath !== vfsCurrentPath) return;
       return;
     }
     vfsLastJson = json;
     markDocTidyFilesUnknown(docTidyPaths);
     vfsRender(entries);
     await refreshDocTidyIndicators(docTidyPaths, { skipRender: true });
+    if (requestSeq !== vfsRefreshRequestSeq || requestPath !== vfsCurrentPath) return;
     vfsRender(entries);
   } catch {}
 }

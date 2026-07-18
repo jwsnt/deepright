@@ -7757,6 +7757,47 @@ func handleModelProviderCatalog(cfg *Config) http.HandlerFunc {
 	}
 }
 
+var integrationClientRuntimeConfigFields = []string{
+	"agent-dir",
+	"app-dir",
+	"app",
+	"default-dir",
+	"site",
+	"resources-dir",
+	"knowledge",
+	"skills_git_install",
+}
+
+func integrationClientRuntimeConfig(raw map[string]interface{}) map[string]interface{} {
+	config := make(map[string]interface{})
+	for _, key := range integrationClientRuntimeConfigFields {
+		if value, ok := raw[key]; ok {
+			config[key] = value
+		}
+	}
+	return config
+}
+
+func handleRuntimeConfig() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		raw, _, err := readIntegrationStartupConfigRaw()
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "读取 config/config.json 失败: " + err.Error()})
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"status": 0,
+			"config": integrationClientRuntimeConfig(raw),
+		})
+	}
+}
+
 func handleConsume() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodDelete {
@@ -15965,6 +16006,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/config", handleSwarm(&cfg))
 	mux.HandleFunc("/api/token", handleToken())
 	mux.HandleFunc("/api/model_provider", handleModelProviderCatalog(&cfg))
+	mux.HandleFunc("/api/runtime_config", handleRuntimeConfig())
 	mux.HandleFunc("/api/consume", handleConsume())
 	mux.HandleFunc("/api/message_insert/add", handleMessageInsertAdd())
 	mux.HandleFunc("/api/message_insert/del", handleMessageInsertDel())

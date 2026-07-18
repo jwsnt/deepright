@@ -24,15 +24,17 @@
 
 ### 技术实现
 + Git 地址输入框使用普通文本输入，允许 Git URL、SSH 地址和其他由 Agent 支持的地址格式；页面只保留关闭自动补全、自动大写、自动纠错及拼写检查的现有输入体验。
-+ 每次点击确认均重新读取 `config/config.json`，确保本次发送使用当前的 `skills_git_install` 文案；模板替换使用纯字符串全量替换，保留输入文本本身。
++ 新增只读 `GET /api/runtime_config`。该接口必须由 Integration 使用其已解析的应用资源目录读取主应用 `config/config.json`，不得通过 `/api/data?path=config/config.json` 依赖进程当前目录；macOS 读取 `integration.app/Contents/Resources/config/config.json`，WSL 读取 Integration 可执行文件同级的 `config/config.json`（默认 `~/deepright/config/config.json`）。响应只返回前端已有运行态需求的白名单字段及 `skills_git_install`，不暴露 token 或其他配置。
++ 每次点击确认均通过 `GET /api/runtime_config` 重新读取 `skills_git_install`，确保本次发送使用当前文案；模板替换使用纯字符串全量替换，保留输入文本本身。
 + 保持现有会话、Agent、忙碌状态、模型和密钥可用性校验。任何一项校验失败时不发消息；配置模板读取/校验失败同样遵循该原则。
 + 修改主应用 `config/config.json` 的默认模板，使 `$git_path` 以普通正文 URL 位置出现，避免其被渲染为代码文本而失去 URL 气泡。
-+ 不新增 HTTP 接口、后端 Git 操作、CLI 命令、Agent 工作目录写入或 Skill 解析逻辑。
++ 不新增后端 Git 操作、CLI 命令、Agent 工作目录写入或 Skill 解析逻辑；除只读 `GET /api/runtime_config` 外不新增接口。
 
 ### 测试要求
 + 覆盖非空 HTTP Git 地址：确认后发出的消息等于当前配置模板替换 `$git_path` 后的完整文本，且地址未被规范化或转义；消息渲染使用现有 URL 气泡链路。
 + 覆盖 SSH/非 HTTP 文本地址：只要 `trim()` 后非空，即可替换并发送，不执行前端 URL 格式校验。
 + 覆盖空白输入、配置读取失败、配置缺失/空值和缺少 `$git_path`：均在浮层显示错误，不关闭、不发送、不创建用户消息。
++ 覆盖 macOS App Resources 与 WSL 可执行文件目录两种配置布局：`GET /api/runtime_config` 均必须读取相应布局下的 `config/config.json`，且不受进程当前目录影响。
 
 ### 编写代码
 + 以Golang编写以上代码，要求：

@@ -1161,6 +1161,7 @@ sign_dmg() {
     local mount_path="${temp_root}/mount"
     local stage_path="${temp_root}/stage"
     local sign_temp_dir="${temp_root}/sign"
+    local dmg_volume_name=""
     local attached=0
 
     cleanup_sign_dmg() {
@@ -1174,6 +1175,11 @@ sign_dmg() {
     mkdir -p "${mount_path}" "${stage_path}" "${sign_temp_dir}"
     hdiutil attach "${dmg_path}" -readonly -nobrowse -mountpoint "${mount_path}" -quiet
     attached=1
+    dmg_volume_name="$(diskutil info -plist "${mount_path}" | plutil -extract VolumeName raw -)"
+    if [[ -z "${dmg_volume_name}" ]]; then
+      echo "Unable to determine disk image volume name: ${dmg_path}" >&2
+      exit 1
+    fi
     ditto "${mount_path}" "${stage_path}"
     hdiutil detach "${mount_path}" -quiet >/dev/null
     attached=0
@@ -1181,7 +1187,7 @@ sign_dmg() {
     sign_distribution_tree "${stage_path}" "${sign_temp_dir}"
 
     hdiutil create \
-      -volname "${dmg_name}" \
+      -volname "${dmg_volume_name}" \
       -srcfolder "${stage_path}" \
       -ov \
       -format UDZO \
