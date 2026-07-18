@@ -158,3 +158,17 @@ metadata 片段：
 - `SetLastUpdate` 不接受负数时间戳
 - `update-time` 写入和展示的 `lastUpdate` 统一使用 Unix 毫秒时间戳
 - `knowledgeCommit` 会按 Agent 独立保存最近一次显式提交值
+
+---
+
+## 迭代 20260622-01：按 Agent 隔离知识库
+
+知识库不再在多个 Agent 间共享：每个 Agent 使用其自身的 `knowledge/<agentId>` 目录、WIKI 首页和运行时状态。查询 metadata 时会返回当前 Agent 对应的路径、最后更新时间及提交状态；缺失目录会自动初始化。
+
+---
+
+## 迭代 20260622-01：按 Agent 隔离知识库
+
+知识库目录和运行状态现在按 Agent 独立维护。使用同一套运行目录的不同 Agent 不会共享 `lastUpdate`、`knowledgeCommit` 或 WIKI 首页；首次访问时会自动创建该 Agent 的知识库目录和 `index.md`。
+
+更新指定 Agent 的知识库状态时，可在 `knowledge update-time` 或 `knowledge update-commit` 命令中传入 `--agent-id`。

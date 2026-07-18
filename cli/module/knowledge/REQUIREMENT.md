@@ -18,6 +18,18 @@
 knowledge update-time 时间戳
 ```
 
+### Agent 维度知识库运行时
+> 新增自 ./iteration/20260622-01/REQUIREMENT.md
++ 知识库目录改为 `dirname(--agent-dir)/knowledge/<agentId>`，目标目录不存在时自动创建；各 Agent 的 WIKI 首页位于自身目录下的 `index.md`。
++ `last_update`、`knowledge_commit` 与 `metadata.knowledge` 均按 `agent_id` 独立维护和返回。
++ `knowledge update-time`、`knowledge update-commit` 支持 `--agent-id` 更新指定 Agent 的运行时状态。
+
+### Agent 维度知识库运行时
+> 新增自 ./iteration/20260622-01/REQUIREMENT.md
++ 知识库目录改为 `dirname(--agent-dir)/knowledge/<agentId>`，目标目录不存在时自动创建；各 Agent 的 WIKI 首页位于自身目录下的 `index.md`。
++ `last_update`、`knowledge_commit` 与 `metadata.knowledge` 均按 `agent_id` 独立维护和返回。
++ `knowledge update-time`、`knowledge update-commit` 支持 `--agent-id` 更新指定 Agent 的运行时状态。
+
 ### 编写代码
 + 以Golang编写以上代码，要求：
     + 与Proxy模块共享文件名为data的sqlite存储，使用连接池
@@ -32,4 +44,4 @@ knowledge update-time 时间戳
 + REQUIREMENT.md为需求文档，禁止编写
 + 相关迭代：iteration/日期/REQUIREMENT.md
 + 同步代码：../integration/REQUIREMENT.md
-> 合并截止：./iteration/20260510-1/REQUIREMENT.md，下次合并从此之后的新迭代开始
+> 合并截止：./iteration/20260622-01/REQUIREMENT.md，下次合并从此之后的新迭代开始

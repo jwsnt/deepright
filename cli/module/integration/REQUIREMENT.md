@@ -510,6 +510,94 @@
 + 统一收口$HOME/deepright/
 + 如果目录不存在则创建
 
+### 会话消息、资源与 Agent 工作区
+> 新增自 ./iteration/20260620-1/REQUIREMENT.md
++ 同步 Proxy 的 Agent `media` 配置转发能力。
+> 新增自 ./iteration/20260621-1/REQUIREMENT.md
++ 提供插入消息 add/del/delete 接口，并在 `cli/get -> cli/pub` 链路中按 `rag_insert` 响应确认上报完成。
+> 新增自 ./iteration/20260622-1/REQUIREMENT.md
++ 同步 Agent 维度知识库路径、运行时与转发元数据能力。
+> 新增自 ./iteration/20260627-1/REQUIREMENT.md
++ 新增 `/mapping/$agentId/*`，映射每个 Agent 的 `app` 静态资源。
+> 新增自 ./iteration/20260702-1/REQUIREMENT.md
++ 新增 `/api/copy`，复制指定 Agent 的工作区必要内容及知识库到目标 Agent。
+> 新增自 ./iteration/20260702-2/REQUIREMENT.md
++ 转发请求时读取每个 Agent 自身的 `knowledge.md` 并写入对应 metadata。
+> 新增自 ./iteration/20260703-1/REQUIREMENT.md
++ 转发时上报当前会话最后 SSE 响应时间 `metadata.lastResponse`，并为 SSE 日志增加查询索引。
+> 新增自 ./iteration/20260703-2/REQUIREMENT.md
++ 新增 `integration backup-clean`，清理历史根目录 User/Soul 备份及 `bak/` 中超过 72 小时的备份。
+
+### 会话级能力与运行维护
+> 新增自 ./iteration/20260704-1/REQUIREMENT.md
++ 支持按 `chatId` 禁用直属技能目录及其子孙技能；技能列表、文件状态和 Agent metadata 使用统一过滤规则并持久化会话状态。
+> 新增自 ./iteration/20260705-1/REQUIREMENT.md
++ `/api/restore` 合并返回 CLI 事件日志，保留原始内容并按时间统一排序，以恢复右侧 CLI 子任务历史。
+> 新增自 ./iteration/20260707-1/REQUIREMENT.md
++ 会话沙盒改为仅按非空 `chatId` 命中；转发 metadata 同步沙盒模式，保留 Agent/会话变更日志。
+> 新增自 ./iteration/20260707-2/REQUIREMENT.md
++ 统一收口会话相关 metadata 的注入层级、数据来源和兼容边界。
+> 新增自 ./iteration/20260707-3/REQUIREMENT.md
++ 优化 WSL “打开目录”链路及前台化、回退与用户提示。
+> 新增自 ./iteration/20260711-1/REQUIREMENT.md
++ 共享 SQLite 日志表统一物理清理超过 30 天的数据，清理期间站点可观测并提示用户。
+> 新增自 ./iteration/20260715-1/REQUIREMENT.md
++ 所有 `/v1/chat/completions` 与 `cli/get` 转发请求写入 `metadata.plugins_dir`（插件二进制绝对目录）。
+> 新增自 ./iteration/20260716-1/REQUIREMENT.md
++ Integration device 按统一优先级解析并每 60 秒检查 `config/config.json` 热更新，记录刷新结果。
+> 新增自 ./iteration/20260716-2/REQUIREMENT.md
++ WSL 安装中 `apt-get update` 与每个软件包安装均有 10 分钟超时；基础包逐个安装，Node.js 按多源回退。
+> 新增自 ./iteration/20260717-1/REQUIREMENT.md
++ 备忘录、邮件、飞书等自动任务转发模型客户化字段，与居中对话的模型配置规则一致。
+> 新增自 ./iteration/20260717-2/REQUIREMENT.md
++ 同源多窗口会话列表通过 storage 事件、可见时 30 秒补拉和回前台立即刷新，最终保持一致。
+> 新增自 ./iteration/20260718-1/REQUIREMENT.md
++ 启动时确定唯一生效端口（显式参数、配置、默认值顺序），全部上游请求在顶层 `metadata.port` 写入该整数端口。
+
+### 会话消息、资源与 Agent 工作区
+> 新增自 ./iteration/20260620-1/REQUIREMENT.md
++ 同步 Proxy 的 Agent `media` 配置转发能力。
+> 新增自 ./iteration/20260621-1/REQUIREMENT.md
++ 提供插入消息 add/del/delete 接口，并在 `cli/get -> cli/pub` 链路中按 `rag_insert` 响应确认上报完成。
+> 新增自 ./iteration/20260622-1/REQUIREMENT.md
++ 同步 Agent 维度知识库路径、运行时与转发元数据能力。
+> 新增自 ./iteration/20260627-1/REQUIREMENT.md
++ 新增 `/mapping/$agentId/*`，映射每个 Agent 的 `app` 静态资源。
+> 新增自 ./iteration/20260702-1/REQUIREMENT.md
++ 新增 `/api/copy`，复制指定 Agent 的工作区必要内容及知识库到目标 Agent。
+> 新增自 ./iteration/20260702-2/REQUIREMENT.md
++ 转发请求时读取每个 Agent 自身的 `knowledge.md` 并写入对应 metadata。
+> 新增自 ./iteration/20260703-1/REQUIREMENT.md
++ 转发时上报当前会话最后 SSE 响应时间 `metadata.lastResponse`，并为 SSE 日志增加查询索引。
+> 新增自 ./iteration/20260703-2/REQUIREMENT.md
++ 新增 `integration backup-clean`，清理历史根目录 User/Soul 备份及 `bak/` 中超过 72 小时的备份。
+
+### 会话级能力与运行维护
+> 新增自 ./iteration/20260704-1/REQUIREMENT.md
++ 支持按 `chatId` 禁用直属技能目录及其子孙技能；技能列表、文件状态和 Agent metadata 使用统一过滤规则并持久化会话状态。
+> 新增自 ./iteration/20260705-1/REQUIREMENT.md
++ `/api/restore` 合并返回 CLI 事件日志，保留原始内容并按时间统一排序，以恢复右侧 CLI 子任务历史。
+> 新增自 ./iteration/20260707-1/REQUIREMENT.md
++ 会话沙盒改为仅按非空 `chatId` 命中；转发 metadata 同步沙盒模式，保留 Agent/会话变更日志。
+> 新增自 ./iteration/20260707-2/REQUIREMENT.md
++ 统一收口会话相关 metadata 的注入层级、数据来源和兼容边界。
+> 新增自 ./iteration/20260707-3/REQUIREMENT.md
++ 优化 WSL “打开目录”链路及前台化、回退与用户提示。
+> 新增自 ./iteration/20260711-1/REQUIREMENT.md
++ 共享 SQLite 日志表统一物理清理超过 30 天的数据，清理期间站点可观测并提示用户。
+> 新增自 ./iteration/20260715-1/REQUIREMENT.md
++ 所有 `/v1/chat/completions` 与 `cli/get` 转发请求写入 `metadata.plugins_dir`（插件二进制绝对目录）。
+> 新增自 ./iteration/20260716-1/REQUIREMENT.md
++ Integration device 按统一优先级解析并每 60 秒检查 `config/config.json` 热更新，记录刷新结果。
+> 新增自 ./iteration/20260716-2/REQUIREMENT.md
++ WSL 安装中 `apt-get update` 与每个软件包安装均有 10 分钟超时；基础包逐个安装，Node.js 按多源回退。
+> 新增自 ./iteration/20260717-1/REQUIREMENT.md
++ 备忘录、邮件、飞书等自动任务转发模型客户化字段，与居中对话的模型配置规则一致。
+> 新增自 ./iteration/20260717-2/REQUIREMENT.md
++ 同源多窗口会话列表通过 storage 事件、可见时 30 秒补拉和回前台立即刷新，最终保持一致。
+> 新增自 ./iteration/20260718-1/REQUIREMENT.md
++ 启动时确定唯一生效端口（显式参数、配置、默认值顺序），全部上游请求在顶层 `metadata.port` 写入该整数端口。
+
 ### 编写代码
 + 以Golang编写以上代码，要求：
     + 整合所有模块为一个独立、完整的HTTP服务，唯一端口号由命令行参数--port指定（默认8080）
@@ -700,4 +788,4 @@
 ### 其他要求
 + REQUIREMENT.md为需求文档，禁止编写
 + 相关迭代：iteration/日期/REQUIREMENT.md
-> 合并截止：./iteration/20260619-1/REQUIREMENT.md，下次合并从此之后的新迭代开始
+> 合并截止：./iteration/20260718-1/REQUIREMENT.md，下次合并从此之后的新迭代开始

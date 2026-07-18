@@ -656,76 +656,82 @@ profile 由 `buildSandboxProfile(mode, pickedDir)` 动态生成。
 (deny file-read* file-write* (subpath "/Users") (subpath "/Volumes") (subpath "/private"))
 ```
 
-再通过：
+随后通过三类规则补足命令运行所需路径：
 
 ```scheme
-(allow file-read* file-write* ...)
+(allow file-read* <系统工具与运行时路径>)
+(allow file-read* file-write* <选择目录、状态目录与临时目录>)
+(deny file-write* <系统工具与运行时路径>)
 ```
 
-重放开若干路径。
+最后一条写入拒绝是必要的：基础 profile 使用 `(allow default)`，`/opt/homebrew`、`/usr/local` 等不在 `/Users`、`/Volumes`、`/private` 下的目录本来会继承默认写入权限。将拒绝规则放在可写工作目录规则之后，可保证系统、包管理器和开发工具目录始终只读，即使调用方选择了 `/opt` 或 `/usr/local` 这类父目录。
 
-### 11.5 重放开的路径组成
+### 11.5 特殊处理路径设计
 
-当前实现会放开以下路径：
+#### 11.5.1 系统 shell、工具和运行库（只读）
 
-1. **用户选中的目录**
-2. **用户选中目录解析 symlink 后的真实路径**
-3. `~/Library/Application Support/deepright`
-4. `os.UserConfigDir()/CLI_SANDBOX`
-5. 一组运行时系统目录
-   - `/private/etc`
-   - `/private/dev`
-   - `/private/var/select`
-   - `/private/var/run`
-   - `/private/var/db`
-   - `/private/tmp`
-   - `/tmp`
+- `/bin`
+- `/sbin`
+- `/usr/bin`
+- `/usr/sbin`
+- `/usr/lib`
+- `/usr/libexec`
+- `/System/Library`
+- `/Library/Apple/System/Library`
 
-### 11.5.1 当前文件权限中的“默认授权目录列表”
+这些目录用于启动 `/bin/sh` 等 shell、解析系统命令并加载动态运行库。profile 显式允许 `file-read*`，并在最后显式拒绝 `file-write*`。
 
-这里需要特别区分两类“允许访问”：
+#### 11.5.2 包管理器和开发工具（只读）
 
-1. **显式白名单目录**
-   - 这些目录是代码在 profile 中明确追加的
-2. **由于 `(allow default)` 仍然可访问的目录**
-   - 这些目录不是代码逐条白名单写进去的
-   - 而是因为当前 profile 采用了“默认允许，再局部 deny”的策略
+- Intel Homebrew：`/usr/local/bin`、`/usr/local/sbin`、`/usr/local/lib`
+- Apple Silicon Homebrew：`/opt/homebrew/bin`、`/opt/homebrew/sbin`、`/opt/homebrew/lib`
+- Command Line Tools：`/Library/Developer/CommandLineTools/usr/bin`
+- Xcode：`/Applications/Xcode.app/Contents/Developer/usr/bin`
 
-#### A. 显式白名单目录
+这些路径按已安装情况存在；不存在的子路径不会影响 profile 构造。路径放行不会修改 `PATH`，命令发现仍由宿主环境负责。
 
-当前代码会明确放开的目录列表如下：
+#### 11.5.3 `/private` 下的系统运行时路径（只读）
 
-- 用户本次选中的目录
-- 用户本次选中目录经 `filepath.EvalSymlinks()` 解析后的真实路径
-- `~/Library/Application Support/deepright`
-- `os.UserConfigDir()/CLI_SANDBOX`
 - `/private/etc`
 - `/private/dev`
 - `/private/var/select`
 - `/private/var/run`
 - `/private/var/db`
-- `/private/tmp`
-- `/tmp`
 
-其中前两项是**会话相关目录**，后面几项是**运行时依赖目录**。
+它们位于基础拒绝范围 `/private` 内，因此必须先由显式 `file-read*` 规则重放开；不会获得写权限。
 
-#### D. 不会额外放开的祖先目录
+#### 11.5.4 可读写的工作区、运行状态和临时路径
 
-当前实现**不会**为了改善某些命令表现而额外放开：
+- 用户本次选择目录。
+- 用户选择目录经 `filepath.EvalSymlinks()` 解析后的真实路径。
+- `~/Library/Containers/cn.deepright.integration/Data/Library/Application Support/deepright`。
+- `os.UserConfigDir()/CLI_SANDBOX`。
+- `/private/tmp`。
+- `/tmp`。
 
-- 用户选中目录的父目录
-- 更高层祖先目录
-- 这些祖先目录的 `file-read-metadata`
+只有这些路径允许 `file-read* file-write*`。不会为了支持工具运行而放开选择目录的父目录、祖先目录或其它用户目录。
 
-因此只要命令在运行时显式或隐式触碰：
+#### 11.5.5 临时目录收口
 
-- `..`
-- 祖先目录的条目枚举
-- 祖先目录的元数据读取
+macOS 默认 `TMPDIR` 通常位于 `/private/var/folders`。直接放开该目录会暴露同一临时根下的无关文件，因此文件选择模式会向子进程注入：
 
-就仍然会被 Seatbelt 拒绝。这是当前严格目录边界的一部分，而不是 bug。
+```text
+TMPDIR=/tmp
+```
 
-#### B. 当前默认仍可访问的系统目录
+并且只放开 `/private/tmp` 与 `/tmp`。`ZDOTDIR` 同时指向选择目录，降低 zsh 初始化阶段读取用户 home 配置文件的概率。
+
+### 11.6 三种模式的路径行为
+
+| 模式 | 目录规则 | 特殊路径 | 网络 | 环境变量 |
+| --- | --- | --- | --- | --- |
+| `filepick` | 要求选择目录；拒绝 `/Users`、`/Volumes`、`/private`，再精确重放开 | 系统/工具路径只读；工作区、状态目录和 `/tmp` 可读写 | 允许 | `ZDOTDIR=<选择目录>`、`TMPDIR=/tmp` |
+| `net` | 不要求选择目录，不注入文件选择路径规则 | 不额外建立本节白名单，继承基础文件策略 | 拒绝 | 不覆盖 |
+| `filepick_net` | 与 `filepick` 相同 | 与 `filepick` 相同 | 拒绝 | `ZDOTDIR=<选择目录>`、`TMPDIR=/tmp` |
+
+`filepick` 与 `filepick_net` 在未取得有效选择目录时必须拒绝执行。`net` 仅负责关闭网络，不提供文件选择隔离。
+
+### 11.7 默认策略和祖先目录边界
 
 由于 profile 顶部使用了：
 
@@ -733,7 +739,7 @@ profile 由 `buildSandboxProfile(mode, pickedDir)` 动态生成。
 (allow default)
 ```
 
-当前实现并没有把整个文件系统先全盘 deny 掉，因此除了显式 deny 的三大区域之外，很多系统路径仍然是默认可访问的。
+当前实现并没有把整个文件系统先全盘 deny 掉。因此除了显式 deny 的三大区域以及文件选择模式中新增加的系统工具写入拒绝外，很多系统路径仍继承默认访问策略。
 
 在当前实现下，常见的默认可访问目录通常包括：
 
@@ -751,14 +757,22 @@ profile 由 `buildSandboxProfile(mode, pickedDir)` 动态生成。
 - `/usr`
 - `/var`
 
-这几个目录之所以还能访问，不是因为它们被逐条加入了白名单，而是因为：
+这些目录中，除第 11.5 节明确列出的特殊路径外，其它路径之所以仍可访问，是因为：
 
 - 当前只显式 deny 了 `/Users`
 - 当前只显式 deny 了 `/Volumes`
 - 当前只显式 deny 了 `/private`
 - 其它路径仍继承 `(allow default)`
 
-#### C. 当前默认被拒绝的目录根
+文件选择模式也不会为了改善某些命令表现而额外放开：
+
+- 用户选中目录的父目录
+- 更高层祖先目录
+- 这些祖先目录的 `file-read-metadata`
+
+因此只要命令在运行时显式或隐式触碰 `..`、祖先目录条目枚举或元数据读取，就仍可能被 Seatbelt 拒绝。这是严格目录边界的一部分，而不是 bug。
+
+#### 当前默认被拒绝的目录根
 
 当前 profile 中被整体拦住的根目录是：
 
@@ -768,7 +782,7 @@ profile 由 `buildSandboxProfile(mode, pickedDir)` 动态生成。
 
 然后再通过前面的显式白名单，对这些根目录下面的少数子树做重放开。
 
-### 11.6 为什么要放开这些系统目录
+### 11.8 为什么要放开这些系统目录
 
 因为如果完全只放开用户目录，shell 和常见命令往往无法正常工作。当前白名单中的系统目录用于保证：
 
@@ -777,7 +791,7 @@ profile 由 `buildSandboxProfile(mode, pickedDir)` 动态生成。
 - 某些系统查询
 - 基础运行时依赖
 
-### 11.7 `pickedDirectoryVariants()` 的作用
+### 11.9 `pickedDirectoryVariants()` 的作用
 
 用户选中的路径会经过：
 
@@ -789,7 +803,7 @@ profile 由 `buildSandboxProfile(mode, pickedDir)` 动态生成。
 - 用户选择 alias/symlink 目录
 - 运行期访问真实路径时被误判 deny
 
-### 11.8 这不是字符串级拦截
+### 11.10 这不是字符串级拦截
 
 当前设计并不分析命令字符串，例如：
 
@@ -816,7 +830,7 @@ profile 由 `buildSandboxProfile(mode, pickedDir)` 动态生成。
 
 系统不会因为某个命令习惯顺带访问祖先目录，就自动扩大白名单。
 
-### 11.9 当前策略的实际语义
+### 11.11 当前策略的实际语义
 
 当前 profile 使用的是：
 
@@ -830,7 +844,7 @@ profile 由 `buildSandboxProfile(mode, pickedDir)` 动态生成。
 
 - 默认允许
 - 重点阻断 `/Users`、`/Volumes`、`/private`
-- 再对少量显式白名单目录做例外放开
+- 在文件选择模式中，对特殊路径重放开读取或读写权限，并显式拒绝系统/工具目录写入
 
 这会带来一个重要结果：
 
@@ -842,7 +856,7 @@ profile 由 `buildSandboxProfile(mode, pickedDir)` 动态生成。
 - 它能阻止越权访问大量用户数据
 - 但不是“目录可见性最小化”的严格设计
 
-### 11.10 当前策略对“穿透”的处理方式
+### 11.12 当前策略对“穿透”的处理方式
 
 以白名单目录 `/a/b` 为例：
 
@@ -859,7 +873,7 @@ profile 由 `buildSandboxProfile(mode, pickedDir)` 动态生成。
 - **在 syscall 层阻止进入被 deny 的子树**
 - **而不是把整个文件系统做成 only-allow `/a/b`**
 
-### 11.11 为什么没有使用“默认 deny”
+### 11.13 为什么没有使用“默认 deny”
 
 当前代码没有把 profile 写成：
 
@@ -887,12 +901,12 @@ profile 由 `buildSandboxProfile(mode, pickedDir)` 动态生成。
 
 因此子进程默认从用户授权目录启动。
 
-### 12.2 `ZDOTDIR`
+### 12.2 `ZDOTDIR` 与 `TMPDIR`
 
 还会额外设置：
 
 ```go
-extraEnv = append(extraEnv, "ZDOTDIR="+pickedDir)
+extraEnv = append(extraEnv, "ZDOTDIR="+pickedDir, "TMPDIR=/tmp")
 ```
 
 这是一个很有针对性的细节：
@@ -902,6 +916,8 @@ extraEnv = append(extraEnv, "ZDOTDIR="+pickedDir)
 - 在当前 deny `/Users` 的策略下，这些读取会很容易触发权限拒绝
 
 把 `ZDOTDIR` 指到白名单目录，可以降低 shell 初始化阶段的越权访问概率。
+
+`TMPDIR` 的默认值通常会落在 `/private/var/folders`。该目录包含无关的用户临时文件，不能为了让单个命令创建临时文件而整体放开；因此文件选择模式固定使用已授权的 `/tmp`。
 
 ### 12.3 shell 选择
 

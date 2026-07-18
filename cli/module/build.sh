@@ -632,11 +632,19 @@ create_mac_dmg() {
   fi
 
   echo "-> packaging ${MAC_APP_NAME}-${target_name}.dmg (mac/$target_name)"
-  if create_styled_mac_dmg "$target_name" "$dmg_volume_name" "$app_dir" "$dmg_path" "$dmg_stage_dir"; then
-    return 0
-  fi
+  styled_attempt=1
+  while [ "$styled_attempt" -le 3 ]; do
+    if create_styled_mac_dmg "$target_name" "$dmg_volume_name" "$app_dir" "$dmg_path" "$dmg_stage_dir"; then
+      return 0
+    fi
 
-  echo "warning: styled dmg packaging unavailable, falling back to plain layout (mac/$target_name)" >&2
+    if [ "$styled_attempt" -lt 3 ]; then
+      echo "warning: styled dmg packaging attempt ${styled_attempt}/3 failed; retrying (mac/$target_name)" >&2
+    fi
+    styled_attempt=$((styled_attempt + 1))
+  done
+
+  echo "warning: styled dmg packaging failed after 3 attempts; falling back to plain layout (mac/$target_name)" >&2
   rm -rf "$dmg_stage_dir"
   mkdir -p "$dmg_stage_dir"
   copy_release_asset "$app_dir" "$dmg_stage_dir/${MAC_APP_NAME}.app"

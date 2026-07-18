@@ -120,33 +120,89 @@ func buildSandboxProfile(mode, pickedDir string) string {
 	}
 	if requiresPickedDirectory(mode) {
 		builder.WriteString("(deny file-read* file-write* (subpath \"/Users\") (subpath \"/Volumes\") (subpath \"/private\"))\n")
-		builder.WriteString("(allow file-read* file-write*\n")
-		for _, variant := range pickedDirectoryVariants(pickedDir) {
-			builder.WriteString("  (subpath ")
-			builder.WriteString(quoteSandboxString(variant))
-			builder.WriteString(")\n")
-		}
-		for _, path := range sandboxAlwaysAllowedUserPaths() {
-			builder.WriteString("  (subpath ")
-			builder.WriteString(quoteSandboxString(path))
-			builder.WriteString(")\n")
-		}
-		for _, path := range []string{
-			"/private/etc",
-			"/private/dev",
-			"/private/var/select",
-			"/private/var/run",
-			"/private/var/db",
-			"/private/tmp",
-			"/tmp",
-		} {
-			builder.WriteString("  (subpath ")
-			builder.WriteString(quoteSandboxString(path))
-			builder.WriteString(")\n")
-		}
-		builder.WriteString(")\n")
+
+		// A file-picked workspace must still be able to start macOS system tools
+		// and load their runtime dependencies. These paths are read-only: granting
+		// write access to a system or package-manager directory would weaken the
+		// workspace boundary without being necessary for command execution.
+		appendSandboxPathRule(&builder, "allow", "file-read*", sandboxSystemToolReadPaths())
+
+		writablePaths := append(pickedDirectoryVariants(pickedDir), sandboxAlwaysAllowedUserPaths()...)
+		writablePaths = append(writablePaths, sandboxTemporaryPaths()...)
+		appendSandboxPathRule(&builder, "allow", "file-read* file-write*", uniqueSandboxPaths(writablePaths))
+
+		// This must follow the writable workspace rule. The default profile permits
+		// files outside /Users, /Volumes, and /private, so a final deny is needed to
+		// keep package-manager and system tool trees read-only even when a caller
+		// selects a parent directory such as /opt or /usr/local.
+		appendSandboxPathRule(&builder, "deny", "file-write*", sandboxSystemToolReadPaths())
 	}
 	return builder.String()
+}
+
+func appendSandboxPathRule(builder *strings.Builder, action, permissions string, paths []string) {
+	paths = uniqueSandboxPaths(paths)
+	if len(paths) == 0 {
+		return
+	}
+	builder.WriteString("(")
+	builder.WriteString(action)
+	builder.WriteString(" ")
+	builder.WriteString(permissions)
+	builder.WriteString("\n")
+	for _, path := range paths {
+		builder.WriteString("  (subpath ")
+		builder.WriteString(quoteSandboxString(path))
+		builder.WriteString(")\n")
+	}
+	builder.WriteString(")\n")
+}
+
+func sandboxSystemToolReadPaths() []string {
+	return []string{
+		"/bin",
+		"/sbin",
+		"/usr/bin",
+		"/usr/sbin",
+		"/usr/lib",
+		"/usr/libexec",
+		"/System/Library",
+		"/Library/Apple/System/Library",
+		"/usr/local/bin",
+		"/usr/local/sbin",
+		"/usr/local/lib",
+		"/opt/homebrew/bin",
+		"/opt/homebrew/sbin",
+		"/opt/homebrew/lib",
+		"/Library/Developer/CommandLineTools/usr/bin",
+		"/Applications/Xcode.app/Contents/Developer/usr/bin",
+		"/private/etc",
+		"/private/dev",
+		"/private/var/select",
+		"/private/var/run",
+		"/private/var/db",
+	}
+}
+
+func sandboxTemporaryPaths() []string {
+	return []string{"/private/tmp", "/tmp"}
+}
+
+func uniqueSandboxPaths(paths []string) []string {
+	seen := make(map[string]struct{}, len(paths))
+	result := make([]string, 0, len(paths))
+	for _, path := range paths {
+		path = filepath.Clean(strings.TrimSpace(path))
+		if path == "" {
+			continue
+		}
+		if _, ok := seen[path]; ok {
+			continue
+		}
+		seen[path] = struct{}{}
+		result = append(result, path)
+	}
+	return result
 }
 
 func quoteSandboxString(value string) string {

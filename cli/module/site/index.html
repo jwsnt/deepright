@@ -326,8 +326,12 @@ a{color:var(--accent);text-decoration:none}
 .sidebar-storage-indicator{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:none;padding:0;border-radius:999px;position:relative;flex-shrink:0;color:#a76824;opacity:1;background:linear-gradient(180deg,rgba(255,246,234,.98),rgba(247,221,187,.94));box-shadow:inset 0 1px 0 rgba(255,255,255,.78),0 4px 10px rgba(177,120,53,.16);appearance:none;-webkit-appearance:none;cursor:pointer;transition:transform .18s ease,filter .18s ease,box-shadow .18s ease}
 .sidebar-storage-indicator:hover,.sidebar-storage-indicator:focus-visible{transform:translateY(-1px);filter:brightness(1.03);box-shadow:inset 0 1px 0 rgba(255,255,255,.84),0 6px 14px rgba(177,120,53,.2),0 0 0 2px rgba(223,173,113,.18);outline:none}
 .sidebar-storage-indicator svg{width:13px;height:13px;display:block}
+.sidebar-storage-indicator.is-warning{color:#c53f36;background:linear-gradient(180deg,rgba(255,241,239,.98),rgba(255,203,197,.96));box-shadow:inset 0 1px 0 rgba(255,255,255,.86),0 4px 11px rgba(197,63,54,.24)}
+.sidebar-storage-indicator.is-warning:hover,.sidebar-storage-indicator.is-warning:focus-visible{box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 6px 15px rgba(197,63,54,.3),0 0 0 2px rgba(222,106,95,.2)}
 [data-theme="dark"] .sidebar-storage-indicator{color:#aec5ff;background:linear-gradient(180deg,rgba(57,74,118,.94),rgba(43,58,98,.92));box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 6px 14px rgba(0,0,0,.26)}
 [data-theme="dark"] .sidebar-storage-indicator:hover,[data-theme="dark"] .sidebar-storage-indicator:focus-visible{box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 8px 16px rgba(0,0,0,.28),0 0 0 2px rgba(174,197,255,.12)}
+[data-theme="dark"] .sidebar-storage-indicator.is-warning{color:#ffd0ca;background:linear-gradient(180deg,rgba(132,52,49,.96),rgba(92,37,39,.94));box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 6px 14px rgba(0,0,0,.3)}
+[data-theme="dark"] .sidebar-storage-indicator.is-warning:hover,[data-theme="dark"] .sidebar-storage-indicator.is-warning:focus-visible{box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 8px 16px rgba(0,0,0,.34),0 0 0 2px rgba(255,154,145,.16)}
 .install-app-indicator{display:none;align-items:center;justify-content:center;width:22px;height:22px;border:none;padding:0;border-radius:999px;position:relative;flex-shrink:0;color:#c7923d;opacity:1;background:radial-gradient(circle at 35% 35%,rgba(255,252,243,.98),rgba(var(--warm-rgb),.52) 42%,rgba(var(--warm-rgb),.18) 68%,transparent 82%);appearance:none;-webkit-appearance:none;cursor:pointer}
 .install-app-indicator.show{display:inline-flex;animation:installBulbPulse .9s ease-in-out infinite}
 .install-app-indicator svg{width:18px;height:18px;display:block;filter:drop-shadow(0 0 6px rgba(var(--warm-rgb),.62)) drop-shadow(0 0 14px rgba(var(--warm-rgb),.34))}
@@ -6129,7 +6133,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     <div class="skill-extract-form">
       <label class="skill-extract-field" id="skillExtractGitUrlField">
         <span>Git地址</span>
-        <input id="skillExtractGitUrlInput" type="url" placeholder="https://github.com/owner/repo" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+        <input id="skillExtractGitUrlInput" type="text" placeholder="https://github.com/owner/repo" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
       </label>
       <div class="skill-extract-error" id="skillExtractGitError"></div>
       <div class="skill-extract-actions">
@@ -6433,8 +6437,10 @@ const MESSAGE_IMAGE_STORE = 'images';
 const REMOTE_MASKED_TOKEN_VALUE = '**********';
 const MAX_STORE = 2000, MAX_SHOW = 500, LAZY_PAGE = 20, MAX_CLI_SUB_SHOW = 30, MAX_CLI_COMMAND_HISTORY = 30, COLD_HISTORY_RECORD_PAGE = 120;
 const LOCAL_STORAGE_SOFT_LIMIT_BYTES = Math.round(2.5 * 1024 * 1024);
-const LOCAL_STORAGE_COMPACT_TARGET_BYTES = Math.round(1.5 * 1024 * 1024);
+const LOCAL_STORAGE_COMPACT_TARGET_BYTES = Math.round(2 * 1024 * 1024);
 const LOCAL_STORAGE_MAINTENANCE_INTERVAL_MS = 30000;
+const LOCAL_STORAGE_STREAMING_PACKET_GROWTH_FACTOR = 3;
+const LOCAL_STORAGE_STREAMING_RECHECK_BYTES = 64 * 1024;
 const LOCAL_STORAGE_SINGLE_CHAT_LIMIT_BYTES = Math.round(1 * 1024 * 1024);
 const MESSAGE_RENDER_CACHE_LIMIT = 240;
 const WIKI_RENDER_CACHE_LIMIT = 40;
@@ -8523,6 +8529,23 @@ function formatStorageStatsTime(value) {
   return `${hh}:${mm}:${ss}`;
 }
 
+function refreshChatStorageStatsIndicator(totalBytes) {
+  const button = document.getElementById('chatStorageStatsBtn');
+  if (!button) return;
+  const usedBytes = Number.isFinite(Number(totalBytes))
+    ? Math.max(0, Number(totalBytes))
+    : estimateLocalStorageUsageBytes();
+  const isWarning = usedBytes > LOCAL_STORAGE_SOFT_LIMIT_BYTES;
+  const used = formatUploadBytes(usedBytes);
+  const limit = formatUploadBytes(LOCAL_STORAGE_SOFT_LIMIT_BYTES);
+  const label = isWarning
+    ? `本地存储告警：已使用 ${used}，超过 ${limit}`
+    : `本地存储统计：已使用 ${used} / ${limit}`;
+  button.classList.toggle('is-warning', isWarning);
+  button.title = label;
+  button.setAttribute('aria-label', label);
+}
+
 function createEmptyChatsStoragePayload() {
   return {
     chats: {},
@@ -8790,6 +8813,7 @@ function renderChatStorageStatsOverlay() {
 function refreshChatStorageStatsOverlay() {
   chatStorageStatsState.stats = collectChatStorageStats();
   chatStorageStatsState.refreshedAt = Date.now();
+  refreshChatStorageStatsIndicator(chatStorageStatsState.stats.totalBytes);
   if (chatStorageStatsState.visible) renderChatStorageStatsOverlay();
 }
 
@@ -22747,20 +22771,23 @@ function setSkillExtractGitError(message) {
   if (el) el.textContent = message || '';
 }
 
-function normalizeSkillExtractGitUrl(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return '';
-  try {
-    const url = new URL(raw);
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') return '';
-    return url.href;
-  } catch {
-    return '';
+function getSkillExtractGitInstallTemplate(runtimeConfig) {
+  const template = runtimeConfig && typeof runtimeConfig === 'object' && !Array.isArray(runtimeConfig)
+    ? runtimeConfig.skills_git_install
+    : '';
+  if (typeof template !== 'string' || !template.trim()) {
+    throw new Error('未配置 skills_git_install');
   }
+  if (!template.includes('$git_path')) {
+    throw new Error('skills_git_install 未包含 $git_path 变量');
+  }
+  return template;
 }
 
-function buildSkillExtractGitPrompt(url) {
-  return '安装 ' + String(url || '').trim() + ' 到当前Agent工作目录的skills下';
+async function buildSkillExtractGitPrompt(gitPath) {
+  const runtimeConfig = await readRuntimeConfig(true);
+  const template = getSkillExtractGitInstallTemplate(runtimeConfig);
+  return template.split('$git_path').join(String(gitPath || ''));
 }
 
 function closeSkillExtractRangePopover(force) {
@@ -22777,7 +22804,7 @@ function closeSkillExtractGitPopover(force) {
   const overlay = document.getElementById('skillExtractGitOverlay');
   if (!overlay) return;
   const input = document.getElementById('skillExtractGitUrlInput');
-  if (input) skillExtractState.gitInstallUrl = String(input.value || '').trim();
+  if (input) skillExtractState.gitInstallUrl = String(input.value || '');
   setOverlayVisible(overlay, false);
   skillExtractState.gitInstallOpen = false;
   setSkillExtractGitError('');
@@ -23067,15 +23094,10 @@ async function submitSkillExtractGitPrompt() {
   if (isOnboardingActive() && isSkillTourOnboardingStep(onboardingState.step)) return;
   if (skillExtractState.exporting) return;
   const input = document.getElementById('skillExtractGitUrlInput');
-  const rawUrl = String(input && input.value || '').trim();
+  const rawUrl = String(input && input.value || '');
   skillExtractState.gitInstallUrl = rawUrl;
-  if (!rawUrl) {
+  if (!rawUrl.trim()) {
     setSkillExtractGitError('Git地址不能为空');
-    return;
-  }
-  const normalizedUrl = normalizeSkillExtractGitUrl(rawUrl);
-  if (!normalizedUrl) {
-    setSkillExtractGitError('请输入有效的http/https地址');
     return;
   }
   const binding = getActiveSkillExtractBinding();
@@ -23108,10 +23130,17 @@ async function submitSkillExtractGitPrompt() {
     setSkillExtractGitError(getModelTokenErrorMessage(state.selectedModel));
     return;
   }
-  if (input) input.value = normalizedUrl;
+  let prompt = '';
+  try {
+    prompt = await buildSkillExtractGitPrompt(rawUrl);
+  } catch (err) {
+    const message = String(err && err.message || err || '读取安装配置失败');
+    setSkillExtractGitError('无法发起安装请求：' + message);
+    return;
+  }
   closeSkillExtractGitPopover();
   skillExtractState.gitInstallUrl = '';
-  await sendCenterMessage(buildSkillExtractGitPrompt(normalizedUrl), {
+  await sendCenterMessage(prompt, {
     clearInputAfterSend: false,
     toastOnSuccess: '',
     requestSource: 'install_skill_git'
@@ -23383,6 +23412,7 @@ async function init() {
   startChatListSync();
   startLocalStorageMaintenance();
   maintainLocalStorageBudget({ showNotice: false });
+  refreshChatStorageStatsIndicator();
   await loadSettings();
   await initializeConfigurationReminder();
   await loadStandaloneModeStatus({ silent: true });
@@ -23423,6 +23453,7 @@ async function init() {
       refreshChatListFromStorage();
       loadStandaloneModeStatus({ silent: true });
       maintainLocalStorageBudget({ showNotice: false });
+      refreshChatStorageStatsIndicator();
     }
   });
   document.addEventListener('click', e => {
@@ -26506,7 +26537,9 @@ function refreshChatListFromStorage() {
 function startChatListSync() {
   if (chatListSyncTimer) return;
   window.addEventListener('storage', event => {
-    if (event.storageArea !== localStorage || event.key !== CHATS_KEY) return;
+    if (event.storageArea !== localStorage) return;
+    refreshChatStorageStatsIndicator();
+    if (event.key !== CHATS_KEY) return;
     refreshChatListFromStorage();
   });
   chatListSyncTimer = window.setInterval(() => {
@@ -26525,13 +26558,70 @@ const CHAT_STORAGE_COMPACTION_CONFIGS = [
   { stripRawSse: true, stripCompletedExplosionSnapshots: true, inactiveCliLimit: 10, activeCliLimit: 30, inactiveMessageLimit: 60, activeMessageLimit: 160 },
   { stripRawSse: true, stripExplosionSnapshots: true, inactiveCliLimit: 0, activeCliLimit: 20, inactiveMessageLimit: 24, activeMessageLimit: 80 },
   { stripRawSse: true, stripExplosionSnapshots: true, inactiveCliLimit: 0, activeCliLimit: 10, inactiveMessageLimit: 12, activeMessageLimit: 60 },
-  { stripRawSse: true, stripExplosionSnapshots: true, inactiveCliLimit: 0, activeCliLimit: 0, inactiveMessageLimit: 0, activeMessageLimit: 40 }
+  { stripRawSse: true, stripExplosionSnapshots: true, inactiveCliLimit: 0, activeCliLimit: 0, inactiveMessageLimit: 0, activeMessageLimit: 40 },
+  // Last-resort storage projection: preserve what is already rendered in
+  // memory, while retaining only a compact recovery window on disk.
+  { stripRawSse: true, stripExplosionSnapshots: true, inactiveCliLimit: 0, activeCliLimit: 0, inactiveMessageLimit: 0, activeMessageLimit: 4, trimPendingMessages: true, maxMessageContentBytes: 48 * 1024 },
+  { stripRawSse: true, stripExplosionSnapshots: true, inactiveCliLimit: 0, activeCliLimit: 0, inactiveMessageLimit: 0, activeMessageLimit: 2, trimPendingMessages: true, maxMessageContentBytes: 12 * 1024 }
 ];
 const SINGLE_CHAT_POST_SSE_COMPACTION_CONFIGS = [
   { stripCompletedRawSse: true, stripCompletedExplosionSnapshots: true },
   { stripRawSse: true, stripCompletedExplosionSnapshots: true },
   { stripRawSse: true, stripExplosionSnapshots: true }
 ];
+
+const CHAT_STORAGE_PROJECTION = '__deeprightStorageProjection';
+
+function truncateStoredTextToBytes(value, maxBytes) {
+  const text = String(value || '');
+  const limit = Math.max(0, Number(maxBytes) || 0);
+  if (!text || !limit || estimateLocalStorageTextBytes(text) <= limit) return text;
+  const marker = '\n…[本地历史已压缩]…\n';
+  const markerBytes = estimateLocalStorageTextBytes(marker);
+  if (markerBytes >= limit) return marker.slice(0, Math.max(1, Math.floor(limit / 3)));
+  const chars = Array.from(text);
+  let head = Math.max(1, Math.floor(chars.length * 0.58));
+  let tail = Math.max(1, Math.floor(chars.length * 0.22));
+  let compacted = chars.slice(0, head).join('') + marker + chars.slice(-tail).join('');
+  while (estimateLocalStorageTextBytes(compacted) > limit && (head > 1 || tail > 1)) {
+    head = Math.max(1, Math.floor(head * 0.72));
+    tail = Math.max(1, Math.floor(tail * 0.72));
+    compacted = chars.slice(0, head).join('') + marker + chars.slice(-tail).join('');
+  }
+  return compacted;
+}
+
+function projectMessageForStorage(message, sourceMessage) {
+  const projection = sourceMessage && sourceMessage[CHAT_STORAGE_PROJECTION];
+  if (!projection || typeof projection !== 'object') return message;
+  if (projection.omitRawSse) delete message.rawSse;
+  if (projection.omitExplosionSnapshots) {
+    delete message.explodedSnapshots;
+    delete message.explodedLogicalIds;
+  }
+  if (projection.contentBytes) message.content = truncateStoredTextToBytes(message.content, projection.contentBytes);
+  if (projection.cliSubContentBytes) message.cliSubContent = truncateStoredTextToBytes(message.cliSubContent, projection.cliSubContentBytes);
+  return message;
+}
+
+function setMessageStorageProjection(message, compactedMessage) {
+  if (!message || !compactedMessage) return;
+  const projection = { ...(message[CHAT_STORAGE_PROJECTION] || {}) };
+  if (!Object.prototype.hasOwnProperty.call(compactedMessage, 'rawSse')) projection.omitRawSse = true;
+  if (!Object.prototype.hasOwnProperty.call(compactedMessage, 'explodedSnapshots')) projection.omitExplosionSnapshots = true;
+  if (String(compactedMessage.content || '') !== String(message.content || '')) {
+    projection.contentBytes = estimateLocalStorageTextBytes(compactedMessage.content || '');
+  }
+  if (String(compactedMessage.cliSubContent || '') !== String(message.cliSubContent || '')) {
+    projection.cliSubContentBytes = estimateLocalStorageTextBytes(compactedMessage.cliSubContent || '');
+  }
+  Object.defineProperty(message, CHAT_STORAGE_PROJECTION, {
+    value: projection,
+    configurable: true,
+    writable: true,
+    enumerable: false
+  });
+}
 
 function estimateLocalStorageTextBytes(value) {
   const text = String(value ?? '');
@@ -26671,26 +26761,81 @@ function syncSingleChatPayloadToRuntime(chatId, payload) {
   return true;
 }
 
+function applyLiveStorageCompactionToRuntime(compactedPayload) {
+  const payloadChats = compactedPayload && compactedPayload.chats && typeof compactedPayload.chats === 'object'
+    ? compactedPayload.chats
+    : null;
+  if (!payloadChats) return;
+  const protectedChatIds = new Set(Object.keys(state.chats || {}).filter(chatId => isChatBusy(chatId)));
+  const syncSideMap = (target, source) => {
+    const sourceMap = source && typeof source === 'object' ? source : {};
+    Object.keys(target || {}).forEach(chatId => {
+      if (!protectedChatIds.has(chatId) && !Object.prototype.hasOwnProperty.call(sourceMap, chatId)) delete target[chatId];
+    });
+    Object.keys(sourceMap).forEach(chatId => {
+      if (!protectedChatIds.has(chatId)) target[chatId] = sourceMap[chatId];
+    });
+  };
+  Object.keys(state.chats || {}).forEach(chatId => {
+    if (!protectedChatIds.has(chatId) && !Object.prototype.hasOwnProperty.call(payloadChats, chatId)) delete state.chats[chatId];
+  });
+  Object.keys(payloadChats).forEach(chatId => {
+    if (!protectedChatIds.has(chatId)) state.chats[chatId] = payloadChats[chatId];
+  });
+  syncSideMap(chatAgents, compactedPayload.agents);
+  syncSideMap(chatModels, compactedPayload.models);
+  syncSideMap(chatThinking, compactedPayload.thinking);
+  syncSideMap(chatVerify, compactedPayload.verify);
+  syncSideMap(chatHtmlOutput, compactedPayload.htmlOutput);
+  syncSideMap(chatSwarm, compactedPayload.swarm);
+  chatModels = normalizeChatModelMap(chatModels);
+  protectedChatIds.forEach(chatId => {
+    const liveChat = state.chats[chatId];
+    const compactedChat = payloadChats[chatId];
+    const liveMessages = liveChat && Array.isArray(liveChat.messages) ? liveChat.messages : null;
+    const compactedMessages = compactedChat && Array.isArray(compactedChat.messages) ? compactedChat.messages : null;
+    // A streaming sender holds references to its chat and message objects.
+    // Do not replace those objects while packets are arriving; only mirror
+    // storage fields the compactor deliberately removed.
+    if (!liveMessages || !compactedMessages || liveMessages.length !== compactedMessages.length) return;
+    liveMessages.forEach((liveMsg, index) => {
+      const compactedMsg = compactedMessages[index];
+      if (!liveMsg || !compactedMsg) return;
+      setMessageStorageProjection(liveMsg, compactedMsg);
+    });
+  });
+}
+
 function maintainLocalStorageBudget(options) {
   const opts = options && typeof options === 'object' ? options : {};
-  if (localStorageMaintenanceRunning || hasGlobalPendingSseResponse()) return false;
+  if (localStorageMaintenanceRunning) return false;
+  const hasPendingSseResponse = hasGlobalPendingSseResponse();
+  let basePayload = null;
   let totalBytes = estimateLocalStorageUsageBytes();
+  if (hasPendingSseResponse) {
+    basePayload = buildChatsStoragePayload();
+    totalBytes = estimateLocalStorageUsageWithChatsPayload(basePayload);
+  }
   if (totalBytes <= LOCAL_STORAGE_SOFT_LIMIT_BYTES) return false;
   // Query pages are disposable cache data.  Evict them before compacting chat
   // history so memo searching never consumes space reserved for conversations.
   const queryCachePruned = memoQueryPruneCacheForBudget();
   if (queryCachePruned) {
-    totalBytes = estimateLocalStorageUsageBytes();
+    totalBytes = hasPendingSseResponse
+      ? estimateLocalStorageUsageWithChatsPayload(basePayload)
+      : estimateLocalStorageUsageBytes();
     if (totalBytes <= LOCAL_STORAGE_SOFT_LIMIT_BYTES) return true;
   }
-  const basePayload = buildChatsStoragePayload();
+  if (!basePayload) basePayload = buildChatsStoragePayload();
   const baseBytes = estimateLocalStorageUsageWithChatsPayload(basePayload);
   const result = findCompactedChatsPayloadForBudget(basePayload, LOCAL_STORAGE_COMPACT_TARGET_BYTES);
   if (!result || !result.payload || result.bytes >= baseBytes || result.bytes >= totalBytes) return false;
   localStorageMaintenanceRunning = true;
   try {
     tryPersistChatsPayload(result.payload);
-    syncChatsPayloadToRuntime(result.payload);
+    if (hasPendingSseResponse) applyLiveStorageCompactionToRuntime(result.payload);
+    else syncChatsPayloadToRuntime(result.payload);
+    refreshChatStorageStatsIndicator();
     if (opts.showNotice !== false && !localStorageMaintenanceNoticeShown) {
       localStorageMaintenanceNoticeShown = true;
       maybeShowChatStorageNotice('本地存储超过 2.5 MB，已自动压缩本地历史', false);
@@ -26720,7 +26865,46 @@ function startLocalStorageMaintenance() {
   localStorageMaintenanceTimer = window.setInterval(() => {
     if (document.hidden) return;
     maintainLocalStorageBudget();
+    refreshChatStorageStatsIndicator();
   }, LOCAL_STORAGE_MAINTENANCE_INTERVAL_MS);
+}
+
+function initializeStreamingStorageBudget(streamState) {
+  if (!streamState) return;
+  let exactBytes = estimateLocalStorageUsageWithChatsPayload(buildChatsStoragePayload());
+  if (exactBytes > LOCAL_STORAGE_SOFT_LIMIT_BYTES) {
+    maintainLocalStorageBudget({ showNotice: false });
+    exactBytes = estimateLocalStorageUsageWithChatsPayload(buildChatsStoragePayload());
+  }
+  streamState.storageEstimatedBytes = exactBytes;
+  streamState.storageNextCheckBytes = LOCAL_STORAGE_SOFT_LIMIT_BYTES;
+}
+
+function maintainStreamingStorageBudgetForPacket(chatId, assistantMsg, rawLine) {
+  const streamState = chatStreaming[chatId];
+  if (!streamState || !streamState.streaming) return;
+  const projection = assistantMsg && assistantMsg[CHAT_STORAGE_PROJECTION];
+  const rawBytes = estimateLocalStorageTextBytes(rawLine);
+  const storedContentIsCapped = projection && projection.omitRawSse && projection.contentBytes;
+  const growthBytes = storedContentIsCapped ? 0 : (rawBytes * LOCAL_STORAGE_STREAMING_PACKET_GROWTH_FACTOR + 256);
+  const estimatedBytes = Math.max(0, Number(streamState.storageEstimatedBytes) || 0) + growthBytes;
+  streamState.storageEstimatedBytes = estimatedBytes;
+  const nextCheckBytes = Math.max(LOCAL_STORAGE_SOFT_LIMIT_BYTES, Number(streamState.storageNextCheckBytes) || 0);
+  if (estimatedBytes < nextCheckBytes) return;
+
+  // Serialization is intentionally deferred until the lightweight per-packet
+  // estimate reaches the budget.  This keeps normal token rendering smooth.
+  const exactBytes = estimateLocalStorageUsageWithChatsPayload(buildChatsStoragePayload());
+  if (exactBytes > LOCAL_STORAGE_SOFT_LIMIT_BYTES) {
+    maintainLocalStorageBudget({ showNotice: false });
+  }
+  const settledBytes = estimateLocalStorageUsageWithChatsPayload(buildChatsStoragePayload());
+  streamState.storageEstimatedBytes = settledBytes;
+  streamState.storageNextCheckBytes = Math.max(
+    LOCAL_STORAGE_SOFT_LIMIT_BYTES,
+    settledBytes + LOCAL_STORAGE_STREAMING_RECHECK_BYTES
+  );
+  refreshChatStorageStatsIndicator();
 }
 
 function shouldPersistAssistantRawSse(msg) {
@@ -26752,7 +26936,7 @@ function finalizeAssistantTransientFields(msg) {
 
 function cloneMessageForStorage(msg) {
   if (!msg || typeof msg !== 'object') return msg;
-  return finalizeAssistantTransientFields({ ...msg });
+  return projectMessageForStorage(finalizeAssistantTransientFields({ ...msg }), msg);
 }
 
 function cloneChatForStorage(chat) {
@@ -26811,6 +26995,25 @@ function trimStoredChatMessages(chat, limit) {
     chat.messages.shift();
   }
   return true;
+}
+
+function trimStoredMessageTextFields(chat, maxBytes, includePending) {
+  if (!chat || !Array.isArray(chat.messages) || (chat.pendingRequest && !includePending)) return false;
+  const limit = Math.max(0, Number(maxBytes) || 0);
+  if (!limit) return false;
+  let changed = false;
+  chat.messages.forEach(msg => {
+    if (!msg || typeof msg !== 'object') return;
+    ['content', 'cliSubContent'].forEach(field => {
+      if (typeof msg[field] !== 'string' || estimateLocalStorageTextBytes(msg[field]) <= limit) return;
+      const compacted = truncateStoredTextToBytes(msg[field], limit);
+      if (compacted !== msg[field]) {
+        msg[field] = compacted;
+        changed = true;
+      }
+    });
+  });
+  return changed;
 }
 
 function getStoredCompactionCandidateTimestamp(msg) {
@@ -26943,6 +27146,10 @@ function createQuotaCompactedChatsPayload(basePayload, options) {
     if (Number.isFinite(opts.targetBytes) && opts.targetBytes > 0 && estimateLocalStorageUsageWithChatsPayload(payload) <= opts.targetBytes) {
       return changed ? payload : null;
     }
+    if (trimStoredMessageTextFields(chat, opts.maxMessageContentBytes, !!opts.trimPendingMessages)) changed = true;
+    if (Number.isFinite(opts.targetBytes) && opts.targetBytes > 0 && estimateLocalStorageUsageWithChatsPayload(payload) <= opts.targetBytes) {
+      return changed ? payload : null;
+    }
   }
   return changed ? payload : null;
 }
@@ -26959,6 +27166,7 @@ function saveChats() {
     chatStorageFailureNoticeShown = false;
     tryPersistChatsPayload(basePayload);
     maintainLocalStorageBudget({ showNotice: false });
+    refreshChatStorageStatsIndicator();
     if (chatStorageStatsState.visible) refreshChatStorageStatsOverlay();
     return true;
   } catch (err) {
@@ -26978,6 +27186,7 @@ function saveChats() {
         maybeShowChatStorageNotice('本地存储空间不足，已仅保存最近部分会话历史', false);
       }
       chatStorageFailureNoticeShown = false;
+      refreshChatStorageStatsIndicator();
       if (chatStorageStatsState.visible) refreshChatStorageStatsOverlay();
       return true;
     } catch (err) {
@@ -26988,6 +27197,7 @@ function saveChats() {
     chatStorageFailureNoticeShown = true;
     maybeShowChatStorageNotice('本地存储已满，新的会话历史暂未保存', true);
   }
+  refreshChatStorageStatsIndicator();
   return false;
 }
 
@@ -36038,6 +36248,7 @@ async function sendCenterMessage(rawText, options) {
       sawTarget: false,
       sessionToken: streamSessionToken
     };
+    initializeStreamingStorageBudget(chatStreaming[chatId]);
     syncGlobalStreamingVisualState();
     syncCliGetQueueStatusPolling();
     // Once the chat enters the async lifecycle, busy/streaming should own the UI.
@@ -36293,6 +36504,7 @@ async function sendCenterMessage(rawText, options) {
     if (!lineText) return;
     const assistantMsg = entry.assistantMsg;
     assistantMsg.rawSse = String(assistantMsg.rawSse || '') + lineText + '\n';
+    maintainStreamingStorageBudgetForPacket(chatId, assistantMsg, lineText);
   }
 
   function removeEmptyStreamingEntry(entry) {

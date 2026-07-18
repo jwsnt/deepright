@@ -722,6 +722,22 @@ integration token get --help
 + Agent名单中不能包含当前Agent
 + Agent需求：../agent/iteration/20260524-1/REQUIREMENT.md
 
+### Agent 配置、知识库与会话沙盒
+> 新增自 ./iteration/20260620-1/REQUIREMENT.md
++ Agent 配置接口支持 `media` JSON 对象；转发 `/v1/chat/completions` 和 `/cli/get` 时读取最新配置并传递给对应 Agent。
+> 新增自 ./iteration/20260622-1/REQUIREMENT.md
++ 知识库运行时改为 Agent 维度，支持按 `agentId` 查询路径与更新时间；转发时补齐该 Agent 的知识库元数据且不覆盖调用方已有字段。
+> 新增自 ./iteration/20260709-1/REQUIREMENT.md
++ 会话沙盒状态改为仅按非空 `chatId` 命中；转发 metadata 同步当前沙盒模式，日志保留 Agent 与会话信息。
+
+### Agent 配置、知识库与会话沙盒
+> 新增自 ./iteration/20260620-1/REQUIREMENT.md
++ Agent 配置接口支持 `media` JSON 对象；转发 `/v1/chat/completions` 和 `/cli/get` 时读取最新配置并传递给对应 Agent。
+> 新增自 ./iteration/20260622-1/REQUIREMENT.md
++ 知识库运行时改为 Agent 维度，支持按 `agentId` 查询路径与更新时间；转发时补齐该 Agent 的知识库元数据且不覆盖调用方已有字段。
+> 新增自 ./iteration/20260709-1/REQUIREMENT.md
++ 会话沙盒状态改为仅按非空 `chatId` 命中；转发 metadata 同步当前沙盒模式，日志保留 Agent 与会话信息。
+
 ### 编写代码
 + 以Golang编写以上代码，要求：
     + 所有API请求必须使用相对路径(如/v1/chat/completions), 禁止硬编码IP或域名, 确保非本地访问时请求自动指向当前Host
@@ -895,4 +911,4 @@ data: [DONE]
 + REQUIREMENT.md为需求文档，禁止编写
 + 相关迭代：iteration/日期/REQUIREMENT.md
 + 同步代码：../integration/REQUIREMENT.md（每次都要同步更新代码）
-> 合并截止：./iteration/20260618-1/REQUIREMENT.md，下次合并从此之后的新迭代开始
+> 合并截止：./iteration/20260709-1/REQUIREMENT.md，下次合并从此之后的新迭代开始

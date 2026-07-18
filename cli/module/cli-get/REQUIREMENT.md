@@ -240,6 +240,26 @@ curl --location 'http://127.0.0.1:9998/cli/pub' \
 + 如果cli/get响应报文开启了豁免（subOps.exempted=true）则不使用沙盒
     + 响应JSON SCHEMA中新增 `"subOps":{"exempted": boolean}`
 
+### 插入消息、任务队列与执行收口
+> 新增自 ./iteration/20260621-1/REQUIREMENT.md
++ `cli/pub` 可随任务最多上报 5 条当前会话待上传插入消息；仅收到匹配 `rag_insert` 响应后确认完成，避免重复上报。
+> 新增自 ./iteration/20260707-1/REQUIREMENT.md
++ 新增内存有界任务队列参数 `--queue`（默认 1000）；主循环仅在队列有容量时拉取任务，worker 在出队执行前校验 `ddl`，过期任务记录日志后丢弃。
+> 新增自 ./iteration/20260709-1/REQUIREMENT.md
++ 沙盒状态改为仅按非空 `chatId` 命中和持久化，`agentId` 仅用于日志和执行观测；与 Integration、Proxy 保持一致。
+> 新增自 ./iteration/20260716-1/REQUIREMENT.md
++ 命令超时时保留已采集的合并 stdout/stderr 并追加不完整警告；无输出时返回超时警告。规则覆盖本地、外部/独立沙盒、WSL 与页面 `/api/cmd`。
+
+### 插入消息、任务队列与执行收口
+> 新增自 ./iteration/20260621-1/REQUIREMENT.md
++ `cli/pub` 可随任务最多上报 5 条当前会话待上传插入消息；仅收到匹配 `rag_insert` 响应后确认完成，避免重复上报。
+> 新增自 ./iteration/20260707-1/REQUIREMENT.md
++ 新增内存有界任务队列参数 `--queue`（默认 1000）；主循环仅在队列有容量时拉取任务，worker 在出队执行前校验 `ddl`，过期任务记录日志后丢弃。
+> 新增自 ./iteration/20260709-1/REQUIREMENT.md
++ 沙盒状态改为仅按非空 `chatId` 命中和持久化，`agentId` 仅用于日志和执行观测；与 Integration、Proxy 保持一致。
+> 新增自 ./iteration/20260716-1/REQUIREMENT.md
++ 命令超时时保留已采集的合并 stdout/stderr 并追加不完整警告；无输出时返回超时警告。规则覆盖本地、外部/独立沙盒、WSL 与页面 `/api/cmd`。
+
 ### 编写代码
 + 以Golang编写以上代码，要求：
     + 启动一根master线程上报cli/get，如果有待执行任务则交由命令行参数--thread指定的work线程池执行（默认为20）
@@ -345,4 +365,4 @@ curl --location 'http://127.0.0.1:9998/cli/pub' \
 + REQUIREMENT.md为需求文档，禁止编写
 + 相关迭代：iteration/日期/REQUIREMENT.md
 + 同步代码：../integration/REQUIREMENT.md
-> 合并截止：./iteration/20260609-1/REQUIREMENT.md，下次合并从此之后的新迭代开始
+> 合并截止：./iteration/20260716-1/REQUIREMENT.md，下次合并从此之后的新迭代开始

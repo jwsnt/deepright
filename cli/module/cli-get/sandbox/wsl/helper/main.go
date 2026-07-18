@@ -29,6 +29,8 @@ const (
 
 	defaultTaskTimeout = 180 * time.Second
 	pickerTimeout      = 60 * time.Second
+
+	sandboxCommandPath = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 )
 
 var defaultMode string
@@ -45,6 +47,20 @@ var helperReadProcVersionFn = func() ([]byte, error) { return os.ReadFile("/proc
 var helperOpenFileFn = os.OpenFile
 var helperCreateTempFn = os.CreateTemp
 var helperExecutableFn = os.Executable
+
+// sandboxSystemReadOnlyPaths is the complete runtime/tool mount allowlist.
+// Every path is mounted read-only for every sandbox mode, so commands can use
+// the WSL system toolchain without obtaining write access to the host runtime.
+var sandboxSystemReadOnlyPaths = []string{
+	"/usr",
+	"/bin",
+	"/sbin",
+	"/lib",
+	"/lib64",
+	"/etc",
+	"/run/current-system/sw",
+	"/nix/store",
+}
 
 var helperDebugMu sync.Mutex
 var helperDebugWriter io.WriteCloser
@@ -676,6 +692,11 @@ func buildBubblewrapArgs(shellPath, cmdText, mode, pickedDir string) ([]string, 
 	if err != nil {
 		return nil, err
 	}
+	if requiresPickedDirectory(mode) {
+		if err := validatePickedDirectoryMount(pickedDir); err != nil {
+			return nil, err
+		}
+	}
 	scratchHome := "/home/sandbox"
 	chdir := "/tmp"
 	if requiresPickedDirectory(mode) {
@@ -721,16 +742,7 @@ func buildBubblewrapArgs(shellPath, cmdText, mode, pickedDir string) ([]string, 
 		args = append(args, flagName, src, dest)
 	}
 
-	for _, path := range []string{
-		"/usr",
-		"/bin",
-		"/sbin",
-		"/lib",
-		"/lib64",
-		"/etc",
-		"/run/current-system/sw",
-		"/nix/store",
-	} {
+	for _, path := range sandboxSystemReadOnlyPaths {
 		addBind("--ro-bind", path, path)
 	}
 
@@ -743,9 +755,14 @@ func buildBubblewrapArgs(shellPath, cmdText, mode, pickedDir string) ([]string, 
 	if deeprightRuntimeDir := helperDeepRightRuntimeDir(); deeprightRuntimeDir != "" {
 		addBind("--bind", deeprightRuntimeDir, deeprightRuntimeDir)
 	}
-	addBind("--bind", "/var/tmp", "/var/tmp")
-	for _, variant := range pickedDirectoryVariants(pickedDir) {
-		addBind("--bind", variant, variant)
+	// Do not expose the host's shared /var/tmp. A private directory preserves
+	// compatibility for tools that use it while keeping temporary files inside
+	// this bubblewrap instance.
+	createDir("/var/tmp")
+	if requiresPickedDirectory(mode) {
+		for _, variant := range pickedDirectoryVariants(pickedDir) {
+			addBind("--bind", variant, variant)
+		}
 	}
 
 	args = append(args,
@@ -756,7 +773,7 @@ func buildBubblewrapArgs(shellPath, cmdText, mode, pickedDir string) ([]string, 
 		"--setenv", "XDG_STATE_HOME", filepath.Join(scratchHome, ".local", "state"),
 		"--setenv", "ZDOTDIR", scratchHome,
 		"--setenv", "TMPDIR", "/tmp",
-		"--setenv", "PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+		"--setenv", "PATH", sandboxCommandPath,
 		"--setenv", "SHELL", shellPath,
 		shellPath, "-c", cmdText,
 	)
@@ -778,6 +795,40 @@ func helperDeepRightRuntimeDir() string {
 		return ""
 	}
 	return filepath.Clean(path)
+}
+
+func validatePickedDirectoryMount(pickedDir string) error {
+	for _, variant := range pickedDirectoryVariants(pickedDir) {
+		for _, systemPath := range sandboxSystemReadOnlyPaths {
+			if sandboxPathsOverlap(variant, systemPath) {
+				return fmt.Errorf("授权目录不能覆盖系统工具路径: %s", variant)
+			}
+		}
+		if variant == "/home" || variant == "/mnt" || variant == "/opt" || filepath.Dir(variant) == "/mnt" {
+			return fmt.Errorf("授权目录范围过大: %s", variant)
+		}
+		if home, err := helperUserHomeDirFn(); err == nil && strings.TrimSpace(home) != "" && filepath.Clean(home) == variant {
+			return fmt.Errorf("授权目录不能是用户Home目录: %s", variant)
+		}
+	}
+	return nil
+}
+
+func sandboxPathsOverlap(first, second string) bool {
+	return sandboxPathContains(first, second) || sandboxPathContains(second, first)
+}
+
+func sandboxPathContains(parent, child string) bool {
+	parent = filepath.Clean(strings.TrimSpace(parent))
+	child = filepath.Clean(strings.TrimSpace(child))
+	if parent == "" || child == "" {
+		return false
+	}
+	rel, err := filepath.Rel(parent, child)
+	if err != nil {
+		return false
+	}
+	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))
 }
 
 func pickedDirectoryVariants(path string) []string {

@@ -170,6 +170,75 @@ func TestBuildBubblewrapArgsFilePickNet(t *testing.T) {
 	}
 }
 
+func TestBuildBubblewrapArgsSpecialPathsAcrossModes(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	picked := filepath.Join(home, "workspace")
+	if err := os.MkdirAll(picked, 0o755); err != nil {
+		t.Fatalf("mkdir picked: %v", err)
+	}
+
+	for _, tc := range []struct {
+		mode             string
+		wantPickedBind   bool
+		wantShareNetwork bool
+		wantChdir        string
+	}{
+		{mode: sandboxModeFilePick, wantPickedBind: true, wantShareNetwork: true, wantChdir: picked},
+		{mode: sandboxModeNet, wantPickedBind: false, wantShareNetwork: false, wantChdir: "/tmp"},
+		{mode: sandboxModeFilePickNet, wantPickedBind: true, wantShareNetwork: false, wantChdir: picked},
+	} {
+		t.Run(tc.mode, func(t *testing.T) {
+			args, err := buildBubblewrapArgs("/bin/sh", "pwd", tc.mode, picked)
+			if err != nil {
+				t.Fatalf("buildBubblewrapArgs: %v", err)
+			}
+			text := strings.Join(args, "\n")
+			for _, path := range sandboxSystemReadOnlyPaths {
+				if _, err := os.Stat(path); err != nil {
+					continue
+				}
+				if !strings.Contains(text, "--ro-bind\n"+path+"\n"+path) {
+					t.Fatalf("system path %s should be read-only mounted: %v", path, args)
+				}
+				if strings.Contains(text, "--bind\n"+path+"\n"+path) {
+					t.Fatalf("system path %s must not be writable mounted: %v", path, args)
+				}
+			}
+			if strings.Contains(text, "--bind\n/var/tmp\n/var/tmp") {
+				t.Fatalf("host /var/tmp must not be mounted: %v", args)
+			}
+			if !strings.Contains(text, "--dir\n/var/tmp") {
+				t.Fatalf("sandbox-private /var/tmp should be created: %v", args)
+			}
+			if !strings.Contains(text, "--setenv\nTMPDIR\n/tmp") {
+				t.Fatalf("TMPDIR should use private /tmp: %v", args)
+			}
+			if !strings.Contains(text, "--setenv\nPATH\n"+sandboxCommandPath) {
+				t.Fatalf("PATH should match mounted standard tool roots: %v", args)
+			}
+			if got := strings.Contains(text, "--bind\n"+picked+"\n"+picked); got != tc.wantPickedBind {
+				t.Fatalf("picked bind = %t, want %t: %v", got, tc.wantPickedBind, args)
+			}
+			if got := strings.Contains(text, "--share-net"); got != tc.wantShareNetwork {
+				t.Fatalf("share network = %t, want %t: %v", got, tc.wantShareNetwork, args)
+			}
+			if !strings.Contains(text, "--chdir\n"+tc.wantChdir) {
+				t.Fatalf("chdir should be %s: %v", tc.wantChdir, args)
+			}
+		})
+	}
+}
+
+func TestBuildBubblewrapArgsRejectsSelectedSystemToolRoot(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	_, err := buildBubblewrapArgs("/bin/sh", "pwd", sandboxModeFilePick, "/usr")
+	if err == nil || !strings.Contains(err.Error(), "系统工具路径") {
+		t.Fatalf("selected system tool root error = %v, want a system tool path rejection", err)
+	}
+}
+
 func TestRunCommandWithModeUsesBubblewrapBinary(t *testing.T) {
 	tmp := t.TempDir()
 	argsPath := filepath.Join(tmp, "args.txt")

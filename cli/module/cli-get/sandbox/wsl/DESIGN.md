@@ -749,7 +749,8 @@ bwrap
 3. `--ro-bind` 运行时必须目录
 4. `--bind` 用户授权目录
 5. `--bind` deepright 状态目录
-6. `--chdir` 到授权目录
+6. 创建私有 `/tmp` 与 `/var/tmp`
+7. `--chdir` 到授权目录
 
 ### 11.5 `net` 的禁网实现
 
@@ -764,8 +765,9 @@ bwrap
 1. 保留 `--unshare-all`
 2. 不追加 `--share-net`
 3. 不挂用户业务目录
-4. 仅挂 shell 运行所需目录
-5. `cwd` 落到 `/tmp`
+4. 仅只读挂 shell、运行库和基础配置目录
+5. 使用私有 `/tmp` 与 `/var/tmp`
+6. `cwd` 落到 `/tmp`
 
 ### 11.6 `filepick_net` 的组合实现
 
@@ -779,11 +781,13 @@ bwrap
 - 文件系统挂载策略与 `filepick` 相同
 - 网络策略与 `net` 相同
 
-### 11.7 运行时必须挂入的默认目录
+### 11.7 特殊处理目录与挂载方案
 
-为保证 shell 和常见命令可运行，建议把默认目录拆成两类：
+Bubblewrap 从空根文件系统启动；所有模式共用同一组系统只读根，以保证 shell 和常用命令可运行，但不会给工具目录写权限。
 
-#### A. 默认只读目录
+#### A. 系统 shell、工具、运行库和基础配置（只读）
+
+以下目录在宿主存在时使用 `--ro-bind <path> <path>` 挂入：
 
 - `/usr`
 - `/bin`
@@ -792,25 +796,51 @@ bwrap
 - `/lib64`
 - `/etc`
 
-如存在，则按宿主布局动态挂入：
+`/usr` 覆盖大多数发行版的 `/usr/bin`、`/usr/sbin`、`/usr/lib` 和 `/usr/local`。沙箱内 `PATH` 固定为：
 
-- `/usr/bin`
-- `/usr/lib`
+```text
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+```
+
+#### B. 按宿主存在情况挂入的包管理器运行时根（只读）
+
 - `/run/current-system/sw`
 - `/nix/store`
 
-原则不是写死发行版，而是：
+它们同样使用 `--ro-bind`。路径不存在时不生成 mount 参数，从而兼容 Debian/Ubuntu、NixOS 和其它 WSL 发行版。
 
-1. 先探测路径是否存在
-2. 再生成 mount 列表
+#### C. 精确可读写目录
 
-#### B. 默认读写目录
+以下目录使用 `--bind`：
 
-- helper 状态目录
-- deepright 状态目录
-- `/tmp`
-- 必要时 `/var/tmp`
-- scratch home
+- `os.UserConfigDir()/CLI_SANDBOX`
+- 已存在的 `~/deepright`
+- 仅在 `filepick` / `filepick_net` 中：用户选择目录及其 `filepath.EvalSymlinks()` 解析后的真实路径
+
+`net` 不挂入业务目录；即使内部调用误传 `pickedDir`，参数构造也必须忽略该目录。
+
+#### D. 私有临时目录
+
+- `/tmp` 使用 `--tmpfs /tmp` 创建，子进程设置 `TMPDIR=/tmp`。
+- `/var/tmp` 使用 `--dir /var/tmp` 在沙箱内创建。
+- 不再使用 `--bind /var/tmp /var/tmp`；宿主共享临时目录不得进入任一模式。
+- scratch home、`HOME`、`XDG_*` 与 `ZDOTDIR` 均使用沙箱内目录，避免读取真实用户 home 的配置和缓存。
+
+#### E. 明确不豁免的路径
+
+- `/home`或任何用户 Home 根目录。
+- `/mnt`、`/mnt/c`、`/mnt/c/Program Files`和Windows系统目录。
+- 整棵`/opt`。
+
+若用户选择 `/mnt/c/...` 目录，只精确挂入该选择子路径及其真实路径，不能因而暴露整块Windows磁盘。`filepick` / `filepick_net` 还必须拒绝与 `/usr`、`/bin`、`/sbin`、`/lib`、`/lib64`、`/etc` 重叠的选择目录，避免后续可写业务 bind 覆盖只读系统挂载。Linuxbrew、pyenv、nvm、Cargo、Conda等用户Home工具根不默认挂入；未来必须通过可信宿主配置精确选择并只读挂载，不能由环境变量扩权。
+
+#### F. 三种模式的挂载行为
+
+| 模式 | 只读系统/工具根 | 业务目录 | 状态目录 | 临时目录 | 网络 |
+| --- | --- | --- | --- | --- | --- |
+| `filepick` | 挂入 | 选择目录及其真实路径可读写 | 精确可读写挂入 | 私有 `/tmp`、`/var/tmp` | `--share-net` |
+| `net` | 挂入 | 不挂入 | 精确可读写挂入 | 私有 `/tmp`、`/var/tmp` | 保持 `--unshare-all` 的禁网 |
+| `filepick_net` | 挂入 | 选择目录及其真实路径可读写 | 精确可读写挂入 | 私有 `/tmp`、`/var/tmp` | 保持 `--unshare-all` 的禁网 |
 
 ### 11.8 Windows 驱动器路径的处理
 

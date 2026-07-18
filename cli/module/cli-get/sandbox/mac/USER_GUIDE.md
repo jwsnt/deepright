@@ -69,6 +69,47 @@ CLI_SANDBOX.app
 - 当前版本真正的限制能力来自 runner + helper + `sandbox-exec`
 - 构建过程虽然会生成 `app.entitlements.plist` / `inherit.entitlements.plist`，但默认内容为空，现阶段主要用于统一签名产物结构，不承担实际权限收口
 
+## 文件选择模式的路径权限
+
+`filepick` 和 `filepick_net` 会先拒绝访问 `/Users`、`/Volumes`、`/private`，再按最小范围重放开运行命令所需路径。选择工作目录不意味着只能运行该目录中的可执行文件；系统工具和已安装开发工具仍可启动，但它们保持只读。
+
+| 路径类别 | `filepick` | `net` | `filepick_net` |
+| --- | --- | --- | --- |
+| 用户选择目录及其 symlink 真实路径 | 可读写 | 不适用 | 可读写 |
+| 系统工具、运行库、Homebrew、Xcode | 只读 | 基础默认文件策略 | 只读 |
+| `/private/etc`、`/private/dev`、`/private/var/{select,run,db}` | 只读 | 基础默认文件策略 | 只读 |
+| `/private/tmp`、`/tmp` | 可读写 | 基础默认文件策略 | 可读写 |
+| 网络 | 允许 | 拒绝 | 拒绝 |
+
+### 特殊路径清单
+
+以下系统和工具路径在文件选择模式下允许读取、加载依赖和执行，但明确拒绝写入：
+
+- `/bin`、`/sbin`、`/usr/bin`、`/usr/sbin`
+- `/usr/lib`、`/usr/libexec`、`/System/Library`、`/Library/Apple/System/Library`
+- Intel Homebrew：`/usr/local/bin`、`/usr/local/sbin`、`/usr/local/lib`
+- Apple Silicon Homebrew：`/opt/homebrew/bin`、`/opt/homebrew/sbin`、`/opt/homebrew/lib`
+- Command Line Tools：`/Library/Developer/CommandLineTools/usr/bin`
+- Xcode：`/Applications/Xcode.app/Contents/Developer/usr/bin`
+- `/private/etc`、`/private/dev`、`/private/var/select`、`/private/var/run`、`/private/var/db`
+
+以下路径在文件选择模式下可读写：
+
+- 本次 `--allowed-dir` 指定或在目录选择器中选中的目录
+- 该目录经符号链接解析后的真实路径
+- `~/Library/Containers/cn.deepright.integration/Data/Library/Application Support/deepright`
+- `os.UserConfigDir()/CLI_SANDBOX`
+- `/private/tmp`、`/tmp`
+
+为避免 macOS 默认 `TMPDIR` 指向 `/private/var/folders` 而扩大可访问范围，`filepick` 和 `filepick_net` 的子进程会使用：
+
+```text
+ZDOTDIR=<选择目录>
+TMPDIR=/tmp
+```
+
+不要依赖选中目录的父目录访问；`..`、父目录枚举或祖先目录元数据读取仍可能被拒绝。路径放行也不会修改 `PATH`，若要直接调用 Homebrew 工具，宿主环境仍应包含 `/opt/homebrew/bin` 或 `/usr/local/bin`。
+
 ## 打包并签名
 
 ```bash
@@ -198,4 +239,6 @@ data
 
 - `filepick` 目录选择依赖桌面会话；无界面环境建议用 `CLI_SANDBOX_ALLOWED_DIR=/absolute/path` 或 `--allowed-dir` 直接提供已选目录
 - `net` / `filepick_net` 的网络关闭依赖系统自带 `/usr/bin/sandbox-exec`
+- `net` 模式只关闭网络，不启用文件选择路径限制，也不会覆盖 `ZDOTDIR` 或 `TMPDIR`
+- `filepick` / `filepick_net` 即使允许读取系统工具目录，也会拒绝写入这些工具目录
 - `--verify-only` 只能验证已有 bundle；完整签名验证仍需要本机存在可用证书或 keychain

@@ -188,6 +188,46 @@ func TestBuildSandboxProfileAllowsDeepRightRuntimePath(t *testing.T) {
 	}
 }
 
+func TestBuildSandboxProfileAllowsSystemToolsReadOnly(t *testing.T) {
+	profile := buildSandboxProfile(SandboxModeFilePick, "/tmp/picked")
+	for _, path := range sandboxSystemToolReadPaths() {
+		entry := "(subpath " + quoteSandboxString(path) + ")"
+		if !strings.Contains(profile, entry) {
+			t.Fatalf("profile should allow system tool path %s, got %q", path, profile)
+		}
+	}
+	writableBlockStart := strings.Index(profile, "(allow file-read* file-write*")
+	if writableBlockStart < 0 {
+		t.Fatalf("profile should contain its writable path rule, got %q", profile)
+	}
+	writableBlock := profile[writableBlockStart:]
+	writableBlockEnd := strings.Index(writableBlock, "\n)\n(deny file-write*")
+	if writableBlockEnd < 0 {
+		t.Fatalf("profile should close its writable path rule before the system write deny rule, got %q", profile)
+	}
+	writableBlock = writableBlock[:writableBlockEnd]
+	deniedWriteBlockStart := strings.Index(profile, "(deny file-write*")
+	if deniedWriteBlockStart < 0 {
+		t.Fatalf("profile should contain its system write deny rule, got %q", profile)
+	}
+	deniedWriteBlock := profile[deniedWriteBlockStart:]
+	for _, path := range []string{"/bin", "/usr/bin", "/opt/homebrew/bin", "/usr/local/bin"} {
+		if strings.Contains(writableBlock, "(subpath "+quoteSandboxString(path)+")") {
+			t.Fatalf("profile must not allow writes to system tool path %s, got %q", path, profile)
+		}
+		if !strings.Contains(deniedWriteBlock, "(subpath "+quoteSandboxString(path)+")") {
+			t.Fatalf("profile must explicitly deny writes to system tool path %s, got %q", path, profile)
+		}
+	}
+}
+
+func TestSandboxTemporaryPathsAreScoped(t *testing.T) {
+	paths := sandboxTemporaryPaths()
+	if len(paths) != 2 || paths[0] != "/private/tmp" || paths[1] != "/tmp" {
+		t.Fatalf("temporary paths = %q, want only the dedicated /tmp tree", paths)
+	}
+}
+
 func TestSetPickedDirectoryReturnsNormalizedDirectory(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

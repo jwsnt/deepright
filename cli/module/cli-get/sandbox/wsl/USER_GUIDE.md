@@ -63,3 +63,42 @@ cd /path/to/deepright/cli/module/cli-get/sandbox/wsl
 - `net`：不绑定业务目录，并通过 `bubblewrap` 隔离网络
 - `filepick_net`：同时启用目录白名单和禁网
 - shell 内部会使用独立的 `HOME` / `XDG_*` / `ZDOTDIR`，避免读取真实用户目录下的 dotfiles
+
+## 系统工具与特殊路径
+
+WSL 版使用 Bubblewrap 的空根文件系统。未被显式挂入的宿主路径默认不可见；常用系统工具通过只读挂载提供给三种模式，而不是把用户目录或 Windows 磁盘加入白名单。
+
+| 路径类别 | `filepick` | `net` | `filepick_net` |
+| --- | --- | --- | --- |
+| 系统工具、运行库和基础配置 | 只读 | 只读 | 只读 |
+| `/run/current-system/sw`、`/nix/store`（存在时） | 只读 | 只读 | 只读 |
+| 用户选择目录及其 realpath | 可读写 | 不挂入 | 可读写 |
+| CLI_SANDBOX / DeepRight 精确状态目录 | 可读写 | 可读写 | 可读写 |
+| `/tmp`、`/var/tmp` | 沙箱私有可读写 | 沙箱私有可读写 | 沙箱私有可读写 |
+| 网络 | 允许 | 拒绝 | 拒绝 |
+
+### 只读工具根
+
+以下路径仅在宿主存在时使用 `--ro-bind` 挂入：
+
+- `/usr`、`/bin`、`/sbin`
+- `/lib`、`/lib64`、`/etc`
+- `/run/current-system/sw`、`/nix/store`
+
+`/usr` 已覆盖大多数发行版的 `/usr/bin`、`/usr/sbin`、`/usr/lib` 和 `/usr/local`。沙箱内 `PATH` 固定为：
+
+```text
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+```
+
+### 工作区、临时目录与禁止路径
+
+- `filepick` 与 `filepick_net` 仅以可读写方式挂入本次 `--allowed-dir` 及其 `filepath.EvalSymlinks()` 解析路径。
+- `net` 不挂入业务工作目录；即使内部调用误传目录，也不会生成该目录的 bind mount。
+- `filepick` / `filepick_net` 不接受与 `/usr`、`/bin`、`/sbin`、`/lib`、`/lib64`、`/etc` 重叠的选择目录，防止可写工作区覆盖只读系统工具根。
+- `/tmp` 通过 `--tmpfs /tmp` 创建，`TMPDIR` 固定为 `/tmp`。
+- `/var/tmp` 是沙箱内创建的私有目录，不再 bind 宿主 `/var/tmp`。
+- 不会默认挂入 `/home`、`/mnt`、`/mnt/c`、`/opt`、`/mnt/c/Program Files` 或 Windows 系统目录。
+- 若用户选择的是 `/mnt/c/...`，仅精确挂入被选择的子目录及其 realpath，不会暴露整块 Windows 磁盘。
+
+位于用户 Home 的 Linuxbrew、pyenv、nvm、Cargo、Conda 等目录不会默认豁免。需要这类工具时，应通过受信任的后续配置挂入精确工具根；不要通过环境变量放大路径权限。

@@ -150,7 +150,11 @@ func executeShellCommand(shell string, task *TaskContent, mode string) (int, str
 				}
 				return 1, "CLI_SANDBOX权限拒绝"
 			}
-			extraEnv = append(extraEnv, "ZDOTDIR="+pickedDir)
+			// macOS normally points TMPDIR at /private/var/folders. Keep command
+			// temporary files in the dedicated sandbox-approved /tmp tree instead of
+			// opening the parent temporary directory, which could contain unrelated
+			// user files.
+			extraEnv = append(extraEnv, "ZDOTDIR="+pickedDir, "TMPDIR=/tmp")
 		}
 		cmd = exec.CommandContext(ctx, "/usr/bin/sandbox-exec", "-p", buildSandboxProfile(mode, pickedDir), shell, "-c", task.Cmd)
 		if pickedDir != "" {

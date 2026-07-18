@@ -1929,6 +1929,50 @@ data: [DONE]
 + 下载小气泡右侧增加一个平行小气泡，展示名叫打开目录，点击后打开该文件所在的目录
 + 居中对话框渲染SSE响应时，识别所有文件路径（绝对路径和相对路径）并使用蓝色字体加下划线着重强调
 
+### 站点引导、侧栏与本地数据治理
+> 新增自 ./iteration/20260711-5/REQUIREMENT.md
++ 设置提供保存后生效的新手引导总开关；各引导卡片（最后一步除外）可整条跳过，关闭总开关后不再触发引导。
+> 新增自 ./iteration/20260714-1/REQUIREMENT.md
++ 明确本地存储压缩与丢弃顺序，区分持久化裁剪和运行时展示，限制 CLI 子任务历史及单条数据体积。
+> 新增自 ./iteration/20260714-2/REQUIREMENT.md
++ 右侧“正在执行的系统指令”支持展开/还原，与知识库展开态互斥并绑定当前会话。
+> 新增自 ./iteration/20260716-1/REQUIREMENT.md
++ 心跳告警阈值持久化至浏览器本地缓存，明确区分转发服务异常与 Integration 已关闭。
+> 新增自 ./iteration/20260716-2/REQUIREMENT.md
++ 页面初始保持左右侧栏展开；模型或 Agent 尚未有效保存时，设置按钮按主题色持续提示。
+> 新增自 ./iteration/20260717-1/REQUIREMENT.md
++ “模型与密钥”由运行时 `config/config.json` 的 provider 配置驱动，按 provider 能力控制默认值、可编辑性与仅多模态输出模型的可选范围。
+> 新增自 ./iteration/20260717-2/REQUIREMENT.md
++ 最近一条正常结束的 assistant SSE 可查看思考过程；思考片段支持恢复，并在本地压缩清理后明确呈现边界。
+> 新增自 ./iteration/20260717-3/REQUIREMENT.md
++ 备忘录明细预览优化悬停关闭语义；未启动明细可通过服务端保护接口原位编辑。
+> 新增自 ./iteration/20260717-4/REQUIREMENT.md
++ 新建备忘录任务表单仅在保存成功后重置。
+> 新增自 ./iteration/20260717-5/REQUIREMENT.md
++ 补齐当前站点迭代的 SSE、备忘录与配置交互收口。
+
+### 站点引导、侧栏与本地数据治理
+> 新增自 ./iteration/20260711-5/REQUIREMENT.md
++ 设置提供保存后生效的新手引导总开关；各引导卡片（最后一步除外）可整条跳过，关闭总开关后不再触发引导。
+> 新增自 ./iteration/20260714-1/REQUIREMENT.md
++ 明确本地存储压缩与丢弃顺序，区分持久化裁剪和运行时展示，限制 CLI 子任务历史及单条数据体积。
+> 新增自 ./iteration/20260714-2/REQUIREMENT.md
++ 右侧“正在执行的系统指令”支持展开/还原，与知识库展开态互斥并绑定当前会话。
+> 新增自 ./iteration/20260716-1/REQUIREMENT.md
++ 心跳告警阈值持久化至浏览器本地缓存，明确区分转发服务异常与 Integration 已关闭。
+> 新增自 ./iteration/20260716-2/REQUIREMENT.md
++ 页面初始保持左右侧栏展开；模型或 Agent 尚未有效保存时，设置按钮按主题色持续提示。
+> 新增自 ./iteration/20260717-1/REQUIREMENT.md
++ “模型与密钥”由运行时 `config/config.json` 的 provider 配置驱动，按 provider 能力控制默认值、可编辑性与仅多模态输出模型的可选范围。
+> 新增自 ./iteration/20260717-2/REQUIREMENT.md
++ 最近一条正常结束的 assistant SSE 可查看思考过程；思考片段支持恢复，并在本地压缩清理后明确呈现边界。
+> 新增自 ./iteration/20260717-3/REQUIREMENT.md
++ 备忘录明细预览优化悬停关闭语义；未启动明细可通过服务端保护接口原位编辑。
+> 新增自 ./iteration/20260717-4/REQUIREMENT.md
++ 新建备忘录任务表单仅在保存成功后重置。
+> 新增自 ./iteration/20260717-5/REQUIREMENT.md
++ 补齐当前站点迭代的 SSE、备忘录与配置交互收口。
+
 ### 编写代码
 > 新增自 iteration/20260419_18/REQUIREMENT.md
 + 如果范围文字是一个文件相对路径链接，则先在Agent工作目录（workspace）查找文件名，不存在使用绝对路径查找
@@ -3170,7 +3214,7 @@ data: [DONE]
 + 本地存储预算判断必须按当前 origin 下 `localStorage` 总占用估算，而不是只看 `deepright_chats` 单个 key
 + 当前正式收口阈值如下：
     + 超限触发阈值：`2.5 MB`
-    + 自动压缩目标：约 `1.5 MB`
+    + 自动压缩目标：约 `2 MB`
     + 定时巡检周期：`30s`
     + 每个 chat 保留的 `cliCommandHistory` 上限：最近 `30` 条
     + 右侧 CLI 子面板可展示/恢复的 CLI 历史上限：最近 `30` 条
@@ -3181,7 +3225,9 @@ data: [DONE]
     + 若写入阶段直接触发 quota error，则继续走现有 fallback 压缩链路
 + 自动压缩的核心目标是优先保留最近、可见、当前仍有用的历史，牺牲重复、冗余、低价值的本地副本
 + 自动压缩会先统一规整 chat payload，使 `cliCommandHistory` 只保留最近 `30` 条，再优先删除已完成 assistant 消息中的 `rawSse`，再优先压缩非活跃 chat 的 CLI 历史和消息条数；若仍未满足预算目标，才允许继续压缩活跃 chat 的冗余本地历史
-+ 当存在全局进行中的 SSE / restore 流式响应时，自动治理暂不执行；一旦自动治理生效，压缩后的 chat payload 必须同步回运行时状态并刷新当前 chat 相关 UI
++ 当存在全局进行中的 SSE / restore 流式响应时，自动治理不得直接跳过：每个可持久化 SSE 包只做轻量增长估算，预估触及预算线才进行精确序列化与压缩；没有新包时不得为此新增高频定时任务
++ 流中压缩只能更新 `localStorage` 持久化投影，优先清理 `rawSse`、快照和冗余历史；不得替换当前流式 chat/message 对象、调用 `renderMessages()` 或改动已经显示的 DOM。压缩后的投影必须在后续 `saveChats()` 中继续生效，不能重新膨胀
++ 非流式会话可按既有规则同步压缩后的 chat payload；流式会话结束后仍保留单会话预算回收作为补充治理
 + 自动治理默认静默运行，只在首次真实发生“超过 `2.5 MB` 后自动压缩”时提示一次轻量 toast
 + 验收口径更新为：
     + 前端在高频使用、反复恢复、频繁执行 CLI 命令的情况下，不能再把本地存储无限推高
@@ -3209,4 +3255,4 @@ data: [DONE]
 + REQUIREMENT.md为需求文档，禁止编写
 + 相关迭代：iteration/日期/REQUIREMENT.md
 > 新增自 iteration/20260509-3/REQUIREMENT.md
-> 合并截止：./iteration/20260711-4/REQUIREMENT.md，下次合并从此之后的新迭代开始
+> 合并截止：./iteration/20260717-5/REQUIREMENT.md，下次合并从此之后的新迭代开始

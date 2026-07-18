@@ -180,6 +180,22 @@
     + --key固定为name命令返回的key（email）
 + 保持模块独立，不自行操作数据库或调用非模块内代码
 
+### 插件生命周期与飞书可靠回执
+> 新增自 ./iteration/20260716-1/REQUIREMENT.md
++ 右上角插件扇形开关统一管理关联插件的启停生命周期与配置，支持 Remote 超时配置。
+> 新增自 feishu/iteration/20260716-1/REQUIREMENT.md
++ 飞书可处理消息成功入队并经 `connect add-request` 落库后，立即向原会话回执“`<已收到>任务将在30秒内批量执行，可通过新消息更新内容。`”。
++ 回执按稳定外部消息标识持久化去重，跨重启、重投和重连不重复；发送失败不标记成功并允许重试。附件仅在合并形成并成功入库的请求后回执一次。
++ “已收到”仅代表可靠入库，任务创建、执行和最终结果仍由既有 Proxy/Connect 流程回复。
+
+### 插件生命周期与飞书可靠回执
+> 新增自 ./iteration/20260716-1/REQUIREMENT.md
++ 右上角插件扇形开关统一管理关联插件的启停生命周期与配置，支持 Remote 超时配置。
+> 新增自 feishu/iteration/20260716-1/REQUIREMENT.md
++ 飞书可处理消息成功入队并经 `connect add-request` 落库后，立即向原会话回执“`<已收到>任务将在30秒内批量执行，可通过新消息更新内容。`”。
++ 回执按稳定外部消息标识持久化去重，跨重启、重投和重连不重复；发送失败不标记成功并允许重试。附件仅在合并形成并成功入库的请求后回执一次。
++ “已收到”仅代表可靠入库，任务创建、执行和最终结果仍由既有 Proxy/Connect 流程回复。
+
 ### 编写代码
 + 以Golang编写以上代码，要求：
     + 能用开源包的就用开源包
@@ -221,7 +237,7 @@
 + 同步代码：../integration/REQUIREMENT.md
 
 > 合并截止：
-    - Connect模块迭代：./iteration/20260518-1/REQUIREMENT.md
-    - 飞书插件迭代：feishu/iteration/20260612-2/REQUIREMENT.md
+    - Connect模块迭代：./iteration/20260716-1/REQUIREMENT.md
+    - 飞书插件迭代：feishu/iteration/20260716-1/REQUIREMENT.md
     - 邮件插件迭代：email/iteration/20260612-3/REQUIREMENT.md
 下次合并从此之后的新迭代开始
