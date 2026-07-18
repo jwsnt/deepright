@@ -2171,10 +2171,16 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .onboarding-domain-overlay[data-overlay-domain="left"]{left:0;right:calc(100vw - var(--sidebar-width-current))}
 .onboarding-domain-overlay[data-overlay-domain="center"]{left:var(--center-domain-left);right:var(--center-domain-right)}
 .onboarding-domain-overlay[data-overlay-domain="right"]{left:calc(100vw - var(--right-sidebar-width-current));right:0}
+.onboarding-domain-overlay[data-onboarding-viewport="1"]{left:0;right:0}
 .onboarding-domain-overlay[data-overlay-front="1"]{pointer-events:none !important}
 .onboarding-domain-overlay .onboarding-blocker{pointer-events:auto !important;z-index:0}
 .onboarding-domain-overlay .onboarding-card{pointer-events:auto}
 .onboarding-domain-overlay .onboarding-blocker{position:absolute;background:rgba(7,13,26,.56);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:all .24s ease}
+.onboarding-domain-overlay .onboarding-blocker-corner{--onboarding-mask-corner-radius:0px;pointer-events:none !important}
+.onboarding-domain-overlay .onboarding-blocker-corner-tl{-webkit-mask-image:radial-gradient(circle var(--onboarding-mask-corner-radius) at 100% 100%,transparent calc(var(--onboarding-mask-corner-radius) - .5px),#000 var(--onboarding-mask-corner-radius));mask-image:radial-gradient(circle var(--onboarding-mask-corner-radius) at 100% 100%,transparent calc(var(--onboarding-mask-corner-radius) - .5px),#000 var(--onboarding-mask-corner-radius))}
+.onboarding-domain-overlay .onboarding-blocker-corner-tr{-webkit-mask-image:radial-gradient(circle var(--onboarding-mask-corner-radius) at 0 100%,transparent calc(var(--onboarding-mask-corner-radius) - .5px),#000 var(--onboarding-mask-corner-radius));mask-image:radial-gradient(circle var(--onboarding-mask-corner-radius) at 0 100%,transparent calc(var(--onboarding-mask-corner-radius) - .5px),#000 var(--onboarding-mask-corner-radius))}
+.onboarding-domain-overlay .onboarding-blocker-corner-bl{-webkit-mask-image:radial-gradient(circle var(--onboarding-mask-corner-radius) at 100% 0,transparent calc(var(--onboarding-mask-corner-radius) - .5px),#000 var(--onboarding-mask-corner-radius));mask-image:radial-gradient(circle var(--onboarding-mask-corner-radius) at 100% 0,transparent calc(var(--onboarding-mask-corner-radius) - .5px),#000 var(--onboarding-mask-corner-radius))}
+.onboarding-domain-overlay .onboarding-blocker-corner-br{-webkit-mask-image:radial-gradient(circle var(--onboarding-mask-corner-radius) at 0 0,transparent calc(var(--onboarding-mask-corner-radius) - .5px),#000 var(--onboarding-mask-corner-radius));mask-image:radial-gradient(circle var(--onboarding-mask-corner-radius) at 0 0,transparent calc(var(--onboarding-mask-corner-radius) - .5px),#000 var(--onboarding-mask-corner-radius))}
 [data-theme="light"] .onboarding-domain-overlay .onboarding-blocker{background:rgba(228,236,248,.66)}
 .onboarding-domain-overlay .onboarding-spotlight{position:absolute;z-index:1;border-radius:20px;border:1px solid rgba(255,255,255,.88);box-shadow:0 0 0 1px rgba(var(--accent-soft-rgb),.46),0 22px 44px rgba(11,24,54,.24),0 0 0 999px rgba(0,0,0,0);pointer-events:none;opacity:0;transition:all .24s ease;overflow:hidden}
 .onboarding-domain-overlay .onboarding-spotlight::before{content:'';position:absolute;inset:0;border-radius:inherit;background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.06));box-shadow:none}
@@ -2588,14 +2594,21 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .password-wrap{flex:1.5;position:relative}
 .password-wrap input{width:100%;padding:8px 34px 8px 12px;border:1px solid rgba(var(--accent-rgb),.18);border-radius:14px;background:rgba(255,252,248,.9);color:var(--text-primary);font-size:13px;outline:none;transition:var(--transition);box-shadow:inset 0 1px 0 rgba(255,255,255,.78)}
 .password-wrap.has-model-copy input{padding-right:62px}
+.password-wrap.has-model-curl input{padding-right:62px}
+.password-wrap.has-model-copy.has-model-curl input{padding-right:88px}
 .password-wrap input.secret-masked{-webkit-text-security:disc}
 .password-wrap input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(var(--accent-soft-rgb),.14)}
 .password-wrap input[readonly]{opacity:.7;cursor:default}
 .eye-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;display:flex}
 .password-wrap.has-model-copy .eye-btn{right:33px}
+.password-wrap.has-model-curl .eye-btn{right:33px}
+.password-wrap.has-model-copy.has-model-curl .eye-btn{right:59px}
 .eye-btn:hover{color:var(--text-primary)}
-.model-copy-btn{position:absolute;right:7px;top:50%;transform:translateY(-50%);width:24px;height:24px;padding:4px;border:none;border-radius:8px;background:transparent;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:var(--transition)}
-.model-copy-btn:hover,.model-copy-btn.active{background:rgba(var(--accent-soft-rgb),.1);color:var(--accent)}
+.model-copy-btn{position:absolute;right:7px;top:50%;transform:translateY(-50%);width:24px;height:24px;padding:4px;border:none;border-radius:8px;background:transparent;color:#a66b5b;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:var(--transition)}
+.password-wrap.has-model-curl .model-copy-btn{right:33px}
+.model-copy-btn:hover,.model-copy-btn.active{background:rgba(205,112,76,.1);color:#8d513e}
+.model-curl-btn{position:absolute;right:7px;top:50%;transform:translateY(-50%);width:24px;height:24px;padding:0;border:none;border-radius:8px;background:transparent;color:#0b78dd;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;letter-spacing:-.03em;line-height:1;transition:var(--transition)}
+.model-curl-btn:hover,.model-curl-btn:focus-visible{background:rgba(10,157,255,.1);color:#0670ce;outline:none}
 .model-copy-menu{position:absolute;z-index:48;top:calc(100% + 6px);right:0;display:none;min-width:156px;max-width:min(240px,calc(100vw - 48px));padding:5px;border:1px solid var(--modal-field-border);border-radius:12px;background:var(--modal-panel-bg-strong);box-shadow:0 14px 30px rgba(16,24,40,.18),inset 0 1px 0 rgba(255,255,255,.72)}
 .password-wrap.copy-open .model-copy-menu{display:flex;flex-direction:column;gap:2px}
 .model-copy-menu-label{padding:4px 7px 5px;color:var(--text-muted);font-size:11px;line-height:1.2;white-space:nowrap}
@@ -2654,12 +2667,32 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .settings-form{transition:opacity .22s ease,transform .22s cubic-bezier(.22,1,.36,1),filter .22s ease,max-height .24s ease,margin .24s ease}
 .settings-panel.media-config-active{width:min(450px,calc(100vw - 40px));max-height:none;padding:0;background:transparent;border-color:transparent;box-shadow:none;overflow:visible}
 .settings-panel.media-config-active .settings-form{opacity:0;transform:translateY(-12px) scale(.985);filter:blur(7px);pointer-events:none;user-select:none;max-height:0;overflow:hidden;margin:0}
+.settings-panel.curl-import-active{width:min(450px,calc(100vw - 40px));max-height:none;padding:0;background:transparent;border-color:transparent;box-shadow:none;overflow:visible}
+.settings-panel.curl-import-active .settings-form{opacity:0;transform:translateY(-12px) scale(.985);filter:blur(7px);pointer-events:none;user-select:none;max-height:0;overflow:hidden;margin:0}
 .settings-media-overlay{position:absolute;inset:14px;display:flex;align-items:center;justify-content:center;padding:8px;box-sizing:border-box;background:linear-gradient(180deg,rgba(238,246,255,.74),rgba(228,239,255,.78));backdrop-filter:blur(10px) saturate(138%);-webkit-backdrop-filter:blur(10px) saturate(138%);border-radius:20px;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .22s ease,visibility 0s linear .22s;z-index:38}
 .settings-media-overlay.show{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .22s ease}
 .settings-media-card{width:min(450px,100%);height:min(51vh,390px);max-height:min(51vh,390px);display:flex;flex-direction:column;gap:12px;padding:18px 18px 16px;border-radius:24px;border:1px solid rgba(var(--accent-rgb),.18);background:linear-gradient(180deg,rgba(255,252,249,.96),rgba(249,236,226,.92));box-shadow:0 24px 60px rgba(91,34,29,.16),inset 0 1px 0 rgba(255,255,255,.82);transform:translateY(10px) scale(.98);transition:transform .24s cubic-bezier(.22,1,.36,1),opacity .24s ease;overflow:hidden}
 .settings-media-overlay.show .settings-media-card{transform:translateY(0) scale(1)}
 .settings-panel.media-config-active .settings-media-overlay{position:relative;inset:auto;padding:0;background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;border-radius:0}
 .settings-panel.media-config-active .settings-media-card{width:100%;height:min(51vh,390px);max-height:min(51vh,390px)}
+.settings-curl-overlay{position:absolute;inset:14px;display:flex;align-items:center;justify-content:center;padding:8px;box-sizing:border-box;background:linear-gradient(180deg,rgba(238,246,255,.74),rgba(252,235,222,.78));backdrop-filter:blur(10px) saturate(138%);-webkit-backdrop-filter:blur(10px) saturate(138%);border-radius:20px;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .22s ease,visibility 0s linear .22s;z-index:39}
+.settings-curl-overlay.show{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .22s ease}
+.settings-curl-card{width:min(450px,100%);display:flex;flex-direction:column;gap:12px;padding:18px 18px 16px;border-radius:24px;border:1px solid rgba(10,157,255,.22);background:linear-gradient(180deg,rgba(247,252,255,.97),rgba(255,244,236,.94));box-shadow:0 24px 60px rgba(45,76,115,.16),inset 0 1px 0 rgba(255,255,255,.84);transform:translateY(10px) scale(.98);transition:transform .24s cubic-bezier(.22,1,.36,1),opacity .24s ease}
+.settings-curl-overlay.show .settings-curl-card{transform:translateY(0) scale(1)}
+.settings-panel.curl-import-active .settings-curl-overlay{position:relative;inset:auto;padding:0;background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;border-radius:0}
+.settings-panel.curl-import-active .settings-curl-card{width:100%}
+.settings-curl-head{display:flex;flex-direction:column;gap:4px}
+.settings-curl-kicker{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#0a9dff}
+.settings-curl-title{font-size:18px;font-weight:700;color:var(--text-primary)}
+.settings-curl-subtitle{font-size:12px;line-height:1.55;color:var(--text-secondary)}
+.settings-curl-input{width:100%;height:100px;min-height:100px;max-height:100px;box-sizing:border-box;resize:none;padding:10px 12px;border:1px solid rgba(10,157,255,.26);border-radius:14px;background:rgba(247,252,255,.88);color:var(--text-primary);font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;outline:none;transition:var(--transition);box-shadow:inset 0 1px 0 rgba(255,255,255,.78)}
+.settings-curl-input:focus{border-color:#0a9dff;box-shadow:0 0 0 3px rgba(10,157,255,.13)}
+.settings-curl-error{min-height:18px;color:var(--error);font-size:12px;line-height:1.45}
+.settings-curl-footer{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding-top:2px}
+.settings-curl-cancel{border-color:rgba(203,119,79,.24)!important;background:rgba(255,244,236,.78)!important;color:#9d5638!important}
+.settings-curl-cancel:hover,.settings-curl-cancel:focus-visible{background:rgba(255,232,215,.96)!important;color:#81412a!important}
+.settings-curl-parse{border-color:rgba(10,157,255,.24)!important;background:linear-gradient(135deg,#149fe9,#397ee8)!important;box-shadow:0 8px 18px rgba(10,122,214,.2)!important}
+.settings-curl-parse:hover,.settings-curl-parse:focus-visible{filter:brightness(1.05);outline:none}
 .settings-media-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 .settings-media-kicker{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#0a9dff}
 .settings-media-title{margin-top:4px;font-size:18px;font-weight:700;color:var(--text-primary)}
@@ -2708,6 +2741,7 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 [data-theme="dark"] .media-output-launch-btn:hover,[data-theme="dark"] .media-output-launch-btn:focus-visible{border-color:rgba(84,215,255,.42);background:rgba(39,180,255,.2);color:#c5eeff}
 [data-theme="dark"] .settings-media-overlay{background:linear-gradient(180deg,rgba(8,16,30,.82),rgba(7,15,29,.86))}
 [data-theme="dark"] .settings-panel.media-config-active{background:transparent;border-color:transparent;box-shadow:none}
+[data-theme="dark"] .settings-panel.curl-import-active{background:transparent;border-color:transparent;box-shadow:none}
 [data-theme="dark"] .settings-media-card{border-color:rgba(169,190,227,.18);background:linear-gradient(180deg,rgba(16,27,46,.96),rgba(10,20,38,.92));box-shadow:0 28px 64px rgba(0,0,0,.36),inset 0 1px 0 rgba(255,255,255,.08)}
 [data-theme="dark"] .settings-media-kicker{color:#78d9ff}
 [data-theme="dark"] .settings-media-close{background:rgba(255,255,255,.08);color:#d4def2;box-shadow:none}
@@ -2721,6 +2755,15 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 [data-theme="dark"] .settings-media-row-del:hover,[data-theme="dark"] .settings-media-row-del:focus-visible{background:rgba(255,90,107,.14)}
 [data-theme="dark"] .settings-media-add{border-color:rgba(84,215,255,.32);background:rgba(39,180,255,.1);color:#8fdcff}
 [data-theme="dark"] .settings-media-add:hover,[data-theme="dark"] .settings-media-add:focus-visible{background:rgba(39,180,255,.16)}
+[data-theme="dark"] .model-copy-btn{color:#ffc0a9}
+[data-theme="dark"] .model-copy-btn:hover,[data-theme="dark"] .model-copy-btn.active{background:rgba(255,146,100,.16);color:#ffd3c1}
+[data-theme="dark"] .model-curl-btn{color:#8fdcff}
+[data-theme="dark"] .model-curl-btn:hover,[data-theme="dark"] .model-curl-btn:focus-visible{background:rgba(39,180,255,.16);color:#b4e8ff}
+[data-theme="dark"] .settings-curl-overlay{background:linear-gradient(180deg,rgba(8,16,30,.84),rgba(28,16,24,.86))}
+[data-theme="dark"] .settings-curl-card{border-color:rgba(84,215,255,.24);background:linear-gradient(180deg,rgba(13,29,49,.97),rgba(34,20,30,.94));box-shadow:0 28px 64px rgba(0,0,0,.36),inset 0 1px 0 rgba(255,255,255,.08)}
+[data-theme="dark"] .settings-curl-kicker{color:#78d9ff}
+[data-theme="dark"] .settings-curl-input{border-color:rgba(84,215,255,.24);background:rgba(255,255,255,.07);color:#ecf3ff;box-shadow:none}
+[data-theme="dark"] .settings-curl-cancel{border-color:rgba(255,178,143,.2)!important;background:rgba(255,158,111,.12)!important;color:#ffc4a8!important}
 [data-theme="dark"] .form-select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23dce7ff' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
 [data-theme="dark"] .form-select,[data-theme="dark"] .model-entry select,[data-theme="dark"] .center-notice-select,[data-theme="dark"] .rs-time-picker select{color-scheme:dark}
 [data-theme="dark"] .model-entry select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23dce7ff' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;background-size:12px 12px}
@@ -5461,6 +5504,10 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
   <div class="onboarding-blocker onboarding-blocker-left"></div>
   <div class="onboarding-blocker onboarding-blocker-right"></div>
   <div class="onboarding-blocker onboarding-blocker-bottom"></div>
+  <div class="onboarding-blocker onboarding-blocker-corner onboarding-blocker-corner-tl"></div>
+  <div class="onboarding-blocker onboarding-blocker-corner onboarding-blocker-corner-tr"></div>
+  <div class="onboarding-blocker onboarding-blocker-corner onboarding-blocker-corner-bl"></div>
+  <div class="onboarding-blocker onboarding-blocker-corner onboarding-blocker-corner-br"></div>
   <div class="onboarding-spotlight"></div>
   <div class="onboarding-vfs-drag-demo" id="onboardingVfsDragDemo" aria-hidden="true">
     <div class="onboarding-vfs-drag-demo-origin">系统文件 / 目录</div>
@@ -5497,6 +5544,10 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
   <div class="onboarding-blocker onboarding-blocker-left"></div>
   <div class="onboarding-blocker onboarding-blocker-right"></div>
   <div class="onboarding-blocker onboarding-blocker-bottom"></div>
+  <div class="onboarding-blocker onboarding-blocker-corner onboarding-blocker-corner-tl"></div>
+  <div class="onboarding-blocker onboarding-blocker-corner onboarding-blocker-corner-tr"></div>
+  <div class="onboarding-blocker onboarding-blocker-corner onboarding-blocker-corner-bl"></div>
+  <div class="onboarding-blocker onboarding-blocker-corner onboarding-blocker-corner-br"></div>
   <div class="onboarding-spotlight"></div>
   <div class="onboarding-agent-hint" id="onboardingAgentHint" aria-hidden="true"></div>
   <div class="vfs-edit-tour-cursor" id="vfsEditTourCursor" aria-hidden="true">
@@ -5527,6 +5578,10 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
   <div class="onboarding-blocker onboarding-blocker-left"></div>
   <div class="onboarding-blocker onboarding-blocker-right"></div>
   <div class="onboarding-blocker onboarding-blocker-bottom"></div>
+  <div class="onboarding-blocker onboarding-blocker-corner onboarding-blocker-corner-tl"></div>
+  <div class="onboarding-blocker onboarding-blocker-corner onboarding-blocker-corner-tr"></div>
+  <div class="onboarding-blocker onboarding-blocker-corner onboarding-blocker-corner-bl"></div>
+  <div class="onboarding-blocker onboarding-blocker-corner onboarding-blocker-corner-br"></div>
   <div class="onboarding-spotlight"></div>
   <div class="memo-task-tour-demo" id="memoTaskTourDemo" aria-hidden="true" data-phase="idle">
     <div class="memo-task-tour-demo-cursor" id="memoTaskTourCursor" aria-hidden="true">
@@ -5979,6 +6034,21 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
         </div>
       </div>
     </div>
+    <div class="settings-curl-overlay" id="modelCurlImportOverlay" aria-hidden="true">
+      <div class="settings-curl-card" id="modelCurlImportCard" onclick="event.stopPropagation()">
+        <div class="settings-curl-head">
+          <div class="settings-curl-kicker">CURL Import</div>
+          <div class="settings-curl-title">从 CURL 导入模型配置</div>
+          <div class="settings-curl-subtitle" id="modelCurlImportSubtitle">粘贴请求命令后解析 URL、模型和 API Key</div>
+        </div>
+        <textarea class="settings-curl-input" id="modelCurlImportInput" rows="4" placeholder="curl https://api.example.com/v1/chat/completions ..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+        <div class="settings-curl-error" id="modelCurlImportError" aria-live="polite"></div>
+        <div class="settings-curl-footer">
+          <button class="btn btn-secondary settings-curl-cancel" id="modelCurlImportCancelBtn" type="button" onclick="closeModelCurlImportPanel()">取消</button>
+          <button class="btn btn-primary settings-curl-parse" id="modelCurlImportParseBtn" type="button" onclick="parseModelCurlImport()">解析</button>
+        </div>
+      </div>
+    </div>
   </div>
   <div class="plugin-modal-transition-lock settings-copy-transition-lock" id="settingsCopyTransitionLock" aria-hidden="true" data-tone="progress">
     <div class="plugin-modal-transition-card">
@@ -6230,6 +6300,16 @@ const DEEPRIGHT_MODEL_PROVIDER_SPEC = Object.freeze({
   __model_multi_output: '',
   supportsMultiInput: false,
   supportsMultiOutput: false
+});
+const MODEL_CURL_IMPORT_PROTOCOLS = Object.freeze({
+  gemini: 'gemini',
+  openai: 'openai',
+  kimi: 'openai',
+  bigmodel: 'openai',
+  xiaomi: 'openai',
+  deepseek: 'openai',
+  anthropic: 'anthropic',
+  minimax: 'anthropic'
 });
 let modelProviderCatalog = { deepright: DEEPRIGHT_MODEL_PROVIDER_SPEC };
 let modelProviderCatalogLoaded = false;
@@ -10243,6 +10323,7 @@ function getOnboardingStepConfig(step) {
     case 'right-sidebar-url-preview-tour-close':
       return {
         domain: 'center',
+        viewportOverlay: true,
         selector: '#rsUrlPreviewFloatingSwitch',
         message: '点击关闭网站浏览。',
         actionLabel: '完成',
@@ -14763,6 +14844,54 @@ function scheduleOnboardingStepResync(step, delays) {
   });
 }
 
+function resetOnboardingMaskCorners(overlay) {
+  if (!overlay) return;
+  overlay.querySelectorAll('.onboarding-blocker-corner').forEach(corner => {
+    Object.assign(corner.style, {
+      left: '0px',
+      top: '0px',
+      width: '0px',
+      height: '0px',
+      '--onboarding-mask-corner-radius': '0px'
+    });
+  });
+}
+
+function setOnboardingRoundedMask(overlay, overlayRect, maskLeft, maskTop, maskWidth, maskHeight) {
+  if (!overlay || !overlayRect) return;
+  const topBlocker = overlay.querySelector('.onboarding-blocker-top');
+  const leftBlocker = overlay.querySelector('.onboarding-blocker-left');
+  const rightBlocker = overlay.querySelector('.onboarding-blocker-right');
+  const bottomBlocker = overlay.querySelector('.onboarding-blocker-bottom');
+  const radius = Math.max(0, Math.min(20, maskWidth / 2, maskHeight / 2));
+  const middleTop = maskTop + radius;
+  const middleHeight = Math.max(0, maskHeight - radius * 2);
+  if (topBlocker) Object.assign(topBlocker.style, { left: '0px', top: '0px', width: `${overlayRect.width}px`, height: `${maskTop}px` });
+  if (leftBlocker) Object.assign(leftBlocker.style, { left: '0px', top: `${middleTop}px`, width: `${maskLeft}px`, height: `${middleHeight}px` });
+  if (rightBlocker) Object.assign(rightBlocker.style, { left: `${maskLeft + maskWidth}px`, top: `${middleTop}px`, width: `${Math.max(0, overlayRect.width - maskLeft - maskWidth)}px`, height: `${middleHeight}px` });
+  if (bottomBlocker) Object.assign(bottomBlocker.style, { left: '0px', top: `${maskTop + maskHeight}px`, width: `${overlayRect.width}px`, height: `${Math.max(0, overlayRect.height - maskTop - maskHeight)}px` });
+  const corners = {
+    tl: overlay.querySelector('.onboarding-blocker-corner-tl'),
+    tr: overlay.querySelector('.onboarding-blocker-corner-tr'),
+    bl: overlay.querySelector('.onboarding-blocker-corner-bl'),
+    br: overlay.querySelector('.onboarding-blocker-corner-br')
+  };
+  const applyCorner = (corner, left, top) => {
+    if (!corner) return;
+    Object.assign(corner.style, {
+      left: `${left}px`,
+      top: `${top}px`,
+      width: `${radius}px`,
+      height: `${radius}px`,
+      '--onboarding-mask-corner-radius': `${radius}px`
+    });
+  };
+  applyCorner(corners.tl, maskLeft, maskTop);
+  applyCorner(corners.tr, maskLeft + maskWidth - radius, maskTop);
+  applyCorner(corners.bl, maskLeft, maskTop + maskHeight - radius);
+  applyCorner(corners.br, maskLeft + maskWidth - radius, maskTop + maskHeight - radius);
+}
+
 function setOnboardingFullMask(overlay) {
   if (!overlay) return;
   const rect = overlay.getBoundingClientRect();
@@ -14776,6 +14905,7 @@ function setOnboardingFullMask(overlay) {
   if (right) Object.assign(right.style, { left: '0px', top: '0px', width: '0px', height: '0px' });
   if (bottom) Object.assign(bottom.style, { left: '0px', top: '0px', width: '0px', height: '0px' });
   if (spotlight) Object.assign(spotlight.style, { left: '0px', top: '0px', width: '0px', height: '0px' });
+  resetOnboardingMaskCorners(overlay);
   overlay.classList.remove('has-target');
 }
 
@@ -19240,9 +19370,12 @@ function syncOnboardingOverlayDomain(overlay, domain, config, target, targetRect
   const step = String(onboardingState.step || '').trim();
   const needsPassive = !!(active && config && config.domain === domain && step === 'select-agent');
   const isPrimaryDomain = !!(active && config && config.domain === domain);
+  const usesViewportBounds = !!(isPrimaryDomain && config && config.viewportOverlay);
   if (needsPassive) overlay.setAttribute('data-overlay-passive', '1');
   else overlay.removeAttribute('data-overlay-passive');
   overlay.setAttribute('data-onboarding-primary', isPrimaryDomain ? '1' : '0');
+  if (usesViewportBounds) overlay.setAttribute('data-onboarding-viewport', '1');
+  else overlay.removeAttribute('data-onboarding-viewport');
   const showCard = !!(active && config && config.domain === domain && !config.hideCard);
   const hasTarget = !!targetRect;
   overlay.setAttribute('data-onboarding-active', active && (showCard || hasTarget) ? '1' : '0');
@@ -19292,15 +19425,8 @@ function syncOnboardingOverlayDomain(overlay, domain, config, target, targetRect
   overlay.style.setProperty('--onboarding-top', `${highlightTop}px`);
   overlay.style.setProperty('--onboarding-width', `${highlightWidth}px`);
   overlay.style.setProperty('--onboarding-height', `${highlightHeight}px`);
-  const topBlocker = overlay.querySelector('.onboarding-blocker-top');
-  const leftBlocker = overlay.querySelector('.onboarding-blocker-left');
-  const rightBlocker = overlay.querySelector('.onboarding-blocker-right');
-  const bottomBlocker = overlay.querySelector('.onboarding-blocker-bottom');
   const spotlight = overlay.querySelector('.onboarding-spotlight');
-  if (topBlocker) Object.assign(topBlocker.style, { left: '0px', top: '0px', width: `${overlayRect.width}px`, height: `${maskTop}px` });
-  if (leftBlocker) Object.assign(leftBlocker.style, { left: '0px', top: `${maskTop}px`, width: `${maskLeft}px`, height: `${maskHeight}px` });
-  if (rightBlocker) Object.assign(rightBlocker.style, { left: `${maskLeft + maskWidth}px`, top: `${maskTop}px`, width: `${Math.max(0, overlayRect.width - maskLeft - maskWidth)}px`, height: `${maskHeight}px` });
-  if (bottomBlocker) Object.assign(bottomBlocker.style, { left: '0px', top: `${maskTop + maskHeight}px`, width: `${overlayRect.width}px`, height: `${Math.max(0, overlayRect.height - maskTop - maskHeight)}px` });
+  setOnboardingRoundedMask(overlay, overlayRect, maskLeft, maskTop, maskWidth, maskHeight);
   if (spotlight) Object.assign(spotlight.style, { left: `${highlightLeft}px`, top: `${highlightTop}px`, width: `${highlightWidth}px`, height: `${highlightHeight}px` });
   overlay.classList.add('has-target');
   setOnboardingCard(overlay, showCard ? config : null, showCard);
@@ -37239,6 +37365,7 @@ async function openSettings() {
   clearSettingsErrorState();
   initSettingsOnboardingDraft();
   closeMediaConfigPanel({ force: true, restoreEntry: false, preserveDraft: false });
+  closeModelCurlImportPanel({ restoreFocus: false });
   clearPendingSwarmConfigSave();
   clearPendingRemoteConfigSave();
   // Hide memo reset tip
@@ -37297,6 +37424,7 @@ function closeSettings(force) {
   hideModelKeyHintPreview();
   hideModelConfigOverflowPreview();
   closeMediaConfigPanel({ force: true, restoreEntry: false, preserveDraft: false });
+  closeModelCurlImportPanel({ restoreFocus: false });
   closeRuntimeHostPanel();
   resetRuntimeHostSecretTapState();
   hideNewAgentInput();
@@ -40156,6 +40284,7 @@ let mediaConfigDraft = {};
 let mediaConfigDraftRows = [];
 let mediaConfigRowSeq = 0;
 let mediaConfigPanelState = { visible: false, entry: null, trigger: null, model: '', saving: false };
+let modelCurlImportPanelState = { visible: false, entry: null, trigger: null, model: '' };
 
 function defaultSwarmConfig() {
   return { description: '', thinking: false, swarm: false, model: '' };
@@ -41408,6 +41537,285 @@ function getModelCopySourceNames(currentModel, originalModel) {
     .filter(model => model !== 'deepright' && !excludedModels.has(model));
 }
 
+function getModelCurlImportProtocol(model) {
+  return String(MODEL_CURL_IMPORT_PROTOCOLS[normalizeModelName(model)] || '');
+}
+
+function setModelCurlImportError(message) {
+  const el = document.getElementById('modelCurlImportError');
+  if (el) el.textContent = message || '';
+}
+
+function tokenizeModelCurlCommand(command) {
+  const source = String(command || '').replace(/\\\r?\n/g, '');
+  const tokens = [];
+  let token = '';
+  let quote = '';
+  const push = () => {
+    if (token) tokens.push(token);
+    token = '';
+  };
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+    if (quote) {
+      if (char === quote) {
+        quote = '';
+        continue;
+      }
+      if (quote === '"' && char === '\\' && index + 1 < source.length) {
+        token += source[index + 1];
+        index += 1;
+        continue;
+      }
+      token += char;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      continue;
+    }
+    if (/\s/.test(char)) {
+      push();
+      continue;
+    }
+    if (char === '\\' && index + 1 < source.length) {
+      token += source[index + 1];
+      index += 1;
+      continue;
+    }
+    token += char;
+  }
+  if (quote) throw new Error('CURL 命令中的引号未闭合');
+  push();
+  return tokens;
+}
+
+function parseModelCurlCommand(command) {
+  const tokens = tokenizeModelCurlCommand(command);
+  if (!tokens.length || !/(^|[\\/])curl(?:\.exe)?$/i.test(tokens[0])) {
+    throw new Error('请输入以 curl 开头的请求命令');
+  }
+  let url = '';
+  const headers = {};
+  const dataValues = [];
+  const readValue = (index, label) => {
+    const value = String(tokens[index + 1] || '').trim();
+    if (!value) throw new Error(`${label} 缺少值`);
+    return value;
+  };
+  const addHeader = value => {
+    const divider = String(value || '').indexOf(':');
+    if (divider < 1) return;
+    const name = String(value).slice(0, divider).trim().toLowerCase();
+    const headerValue = String(value).slice(divider + 1).trim();
+    if (name && headerValue) headers[name] = headerValue;
+  };
+  for (let index = 1; index < tokens.length; index += 1) {
+    const token = String(tokens[index] || '');
+    if (token === '--url') {
+      url = readValue(index, '--url');
+      index += 1;
+      continue;
+    }
+    if (token.startsWith('--url=')) {
+      url = token.slice('--url='.length).trim();
+      continue;
+    }
+    if (token === '-H' || token === '--header') {
+      addHeader(readValue(index, token));
+      index += 1;
+      continue;
+    }
+    if (token.startsWith('--header=')) {
+      addHeader(token.slice('--header='.length));
+      continue;
+    }
+    if (token.startsWith('-H') && token.length > 2) {
+      addHeader(token.slice(2));
+      continue;
+    }
+    if (['-d', '--data', '--data-raw', '--data-binary', '--data-ascii', '--json'].includes(token)) {
+      dataValues.push(readValue(index, token));
+      index += 1;
+      continue;
+    }
+    const dataFlag = ['--data=', '--data-raw=', '--data-binary=', '--data-ascii=', '--json='].find(flag => token.startsWith(flag));
+    if (dataFlag) {
+      dataValues.push(token.slice(dataFlag.length));
+      continue;
+    }
+    if (token.startsWith('-d') && token.length > 2) {
+      dataValues.push(token.slice(2));
+      continue;
+    }
+    if (!url && /^https?:\/\//i.test(token)) url = token;
+  }
+  if (!url) throw new Error('未找到请求 URL');
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    throw new Error('请求 URL 无效');
+  }
+  if (!/^https?:$/.test(parsedUrl.protocol)) throw new Error('仅支持 HTTP 或 HTTPS 请求 URL');
+  return { url: parsedUrl, headers, dataValues };
+}
+
+function getModelFromCurlJsonData(dataValues) {
+  if (!Array.isArray(dataValues) || dataValues.length === 0) {
+    throw new Error('未找到包含 model 的 JSON 请求体');
+  }
+  let hasJson = false;
+  for (const rawValue of dataValues) {
+    const value = String(rawValue || '').trim();
+    if (!value || value.startsWith('@')) continue;
+    try {
+      const body = JSON.parse(value);
+      hasJson = true;
+      const model = String(body && body.model || '').trim();
+      if (model) return model;
+    } catch {}
+  }
+  if (!hasJson) throw new Error('请求体不是可解析的 JSON');
+  throw new Error('JSON 请求体中未找到 model');
+}
+
+function getCurlHeaderApiKey(headers, options) {
+  const source = headers || {};
+  const keys = options && Array.isArray(options.headerNames) ? options.headerNames : [];
+  for (const name of keys) {
+    const value = String(source[String(name || '').toLowerCase()] || '').trim();
+    if (value) return value;
+  }
+  const authorization = String(source.authorization || '').trim();
+  const bearerMatch = authorization.match(/^Bearer\s+(.+)$/i);
+  return bearerMatch ? String(bearerMatch[1] || '').trim() : '';
+}
+
+function isCurlShellVariable(value) {
+  return /^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$/.test(String(value || '').trim());
+}
+
+function requireConcreteCurlValue(value, label) {
+  const normalized = String(value || '').trim();
+  if (!normalized) throw new Error(`未找到 ${label}`);
+  if (isCurlShellVariable(normalized)) {
+    throw new Error(`${label} 使用了 shell 变量，请粘贴实际值后再解析`);
+  }
+  return normalized;
+}
+
+function getSafeGeminiCurlUrl(parsedUrl) {
+  const url = new URL(parsedUrl.toString());
+  url.searchParams.delete('key');
+  return url.toString();
+}
+
+function parseModelCurlImportConfig(provider, command) {
+  const protocol = getModelCurlImportProtocol(provider);
+  if (!protocol) throw new Error('当前服务商不支持 CURL 导入');
+  const parsed = parseModelCurlCommand(command);
+  if (protocol === 'gemini') {
+    const match = parsed.url.pathname.match(/(?:^|\/)models\/([^/:?#]+)(?::[^/?#]+)?/i);
+    const model = requireConcreteCurlValue(match && match[1], 'Gemini 请求 URL 中的模型');
+    const apiKey = requireConcreteCurlValue(parsed.url.searchParams.get('key') || parsed.headers['x-goog-api-key'], 'Gemini 请求中的 API Key');
+    return { url: getSafeGeminiCurlUrl(parsed.url), model, apiKey };
+  }
+  const model = requireConcreteCurlValue(getModelFromCurlJsonData(parsed.dataValues), 'JSON 请求体中的 model');
+  const apiKey = requireConcreteCurlValue(protocol === 'anthropic'
+    ? getCurlHeaderApiKey(parsed.headers, { headerNames: ['x-api-key'] })
+    : getCurlHeaderApiKey(parsed.headers, { headerNames: ['api-key', 'x-api-key'] }), '请求头中的 API Key');
+  return { url: parsed.url.toString(), model, apiKey };
+}
+
+function openModelCurlImportPanel(btn) {
+  const entry = btn && btn.closest('.model-entry');
+  const model = normalizeModelName(entry && entry.querySelector('select') && entry.querySelector('select').value);
+  const settingsPanel = getSettingsPanel();
+  const overlay = document.getElementById('modelCurlImportOverlay');
+  const input = document.getElementById('modelCurlImportInput');
+  if (!entry || !model || !settingsPanel || !overlay || !input || entry.getAttribute('data-original-model') || !getModelCurlImportProtocol(model)) return;
+  closeMediaConfigPanel({ force: true, restoreEntry: false, preserveDraft: true });
+  closeModelCopyMenus();
+  hideModelKeyHintPreview();
+  hideModelConfigOverflowPreview();
+  modelCurlImportPanelState.visible = true;
+  modelCurlImportPanelState.entry = entry;
+  modelCurlImportPanelState.trigger = btn;
+  modelCurlImportPanelState.model = model;
+  input.value = '';
+  setModelCurlImportError('');
+  const subtitle = document.getElementById('modelCurlImportSubtitle');
+  if (subtitle) subtitle.textContent = `将导入到 ${model} 的当前新增配置，解析后仍需保存`;
+  settingsPanel.classList.add('curl-import-active');
+  overlay.classList.add('show');
+  overlay.setAttribute('aria-hidden', 'false');
+  window.setTimeout(() => input.focus(), 30);
+}
+
+function closeModelCurlImportPanel(options) {
+  const opts = options || {};
+  const overlay = document.getElementById('modelCurlImportOverlay');
+  const settingsPanel = getSettingsPanel();
+  const input = document.getElementById('modelCurlImportInput');
+  const returnTrigger = opts.restoreFocus === false ? null : modelCurlImportPanelState.trigger;
+  if (overlay) {
+    overlay.classList.remove('show');
+    overlay.setAttribute('aria-hidden', 'true');
+  }
+  if (settingsPanel) settingsPanel.classList.remove('curl-import-active');
+  if (input) input.value = '';
+  setModelCurlImportError('');
+  modelCurlImportPanelState.visible = false;
+  modelCurlImportPanelState.entry = null;
+  modelCurlImportPanelState.trigger = null;
+  modelCurlImportPanelState.model = '';
+  if (returnTrigger && returnTrigger.isConnected && typeof returnTrigger.focus === 'function') {
+    window.setTimeout(() => returnTrigger.focus(), 30);
+  }
+}
+
+function applyModelCurlImportConfig(entry, imported) {
+  const model = normalizeModelName(entry && entry.querySelector('select') && entry.querySelector('select').value);
+  const spec = getModelCustomConfigSpec(model);
+  if (!entry || !model || !spec.configurable) throw new Error('当前模型配置已失效，请重新选择服务商');
+  const setValue = (selector, enabled, value) => {
+    const input = entry.querySelector(selector);
+    if (input && enabled && !input.disabled && !input.readOnly) input.value = value;
+  };
+  const tokenInput = entry.querySelector('.model-token-input');
+  if (tokenInput && !tokenInput.readOnly) tokenInput.value = imported.apiKey;
+  setValue('.model-base-url-input', spec.supportsUrl && spec.editableUrl, imported.url);
+  setValue('.model-base-model-input', spec.supportsBaseModel, imported.model);
+  setValue('.model-fast-model-input', spec.supportsFastModel, imported.model);
+  setValue('.model-thinking-model-input', spec.supportsThinkingModel, imported.model);
+  setValue('.model-multi-input-input', spec.supportsMultiInput, imported.model);
+  setValue('.model-multi-output-input', spec.supportsMultiOutput, imported.model);
+  entry.setAttribute('data-custom-cleared', '0');
+  refreshModelEntryPendingState(entry);
+  updateModelConfigToggleState(entry);
+  setOnboardingModelConfigEntryTarget(entry);
+  setModelConfigEntryOpen(entry, true);
+}
+
+function parseModelCurlImport() {
+  const entry = modelCurlImportPanelState.entry;
+  const model = modelCurlImportPanelState.model;
+  const input = document.getElementById('modelCurlImportInput');
+  if (!entry || !entry.isConnected || !model || !input) {
+    closeModelCurlImportPanel({ restoreFocus: false });
+    return;
+  }
+  try {
+    const imported = parseModelCurlImportConfig(model, input.value);
+    applyModelCurlImportConfig(entry, imported);
+    closeModelCurlImportPanel({ restoreFocus: false });
+    scheduleOnboardingSync();
+  } catch (error) {
+    setModelCurlImportError((error && error.message) || '解析失败，请检查 CURL 命令');
+  }
+}
+
 function closeModelCopyMenus(exceptEntry) {
   document.querySelectorAll('#modelEntries .password-wrap.copy-open').forEach(wrap => {
     const entry = wrap.closest('.model-entry');
@@ -41509,6 +41917,7 @@ function modelEntryHtml(idx, model, rawConfig, originalModel) {
   const copySourceNames = !normalizedOriginalModel && model && model !== 'deepright'
     ? getModelCopySourceNames(model, normalizedOriginalModel)
     : [];
+  const canImportCurl = !normalizedOriginalModel && !!getModelCurlImportProtocol(model);
   const originalAttr = normalizedOriginalModel ? ` data-original-model="${esc(normalizedOriginalModel).replace(/"/g, '&quot;')}"` : '';
   const remoteRestricted = isRemoteReadonlySiteAccess();
   const remotePersisted = remoteRestricted && !!normalizedOriginalModel;
@@ -41528,6 +41937,7 @@ function modelEntryHtml(idx, model, rawConfig, originalModel) {
   const showDeeprightMediaLauncher = model === 'deepright';
   const passwordWrapClass = 'password-wrap'
     + (copySourceNames.length ? ' has-model-copy' : '')
+    + (canImportCurl ? ' has-model-curl' : '')
     + (showDeeprightMediaLauncher ? (' has-media-launcher' + (remoteMaskedToken ? ' no-eye' : '')) : '');
   const removeDisabledAttr = remotePersisted
     ? ' disabled title="远程访问下不允许删除已保存模型配置"'
@@ -41549,6 +41959,7 @@ function modelEntryHtml(idx, model, rawConfig, originalModel) {
           <div class="model-copy-menu-label">复制已保存模型</div>
           ${copySourceNames.map(sourceModel => `<button class="model-copy-option" type="button" role="menuitem" data-copy-source="${esc(sourceModel).replace(/"/g, '&quot;')}" onclick="copyModelConfigFrom(this)">${esc(sourceModel)}</button>`).join('')}
         </div>` : ''}
+        ${canImportCurl ? `<button class="model-curl-btn" onclick="openModelCurlImportPanel(this)" type="button" title="从 CURL 导入配置" aria-label="从 CURL 导入配置">CURL</button>` : ''}
       </div>
       <span class="model-entry-status">待完成</span>
       ${canCustomize ? `<button class="model-config-toggle${hasConfig ? ' has-config' : ''}" onclick="toggleModelConfig(this)" type="button" title="${configToggleTitle}">

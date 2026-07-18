@@ -2167,8 +2167,16 @@ func integrationHTTPTimeoutError(err error) bool {
 	return errors.As(err, &netErr) && netErr.Timeout()
 }
 
+func integrationMetadataPort(cfg *Config) int {
+	if cfg != nil && cfg.Port > 0 {
+		return cfg.Port
+	}
+	return integrationServicePort
+}
+
 func heartbeat(client *http.Client, host string, metadata *AgentOutput, cfg *Config) (*TaskContent, error) {
 	metaMap := buildCLIRequestMetadataMap(metadata)
+	metaMap["port"] = integrationMetadataPort(cfg)
 	currentChatID := resolveCurrentPageSessionChatID()
 	injectLastResponseMetadata(metaMap, currentChatID)
 	injectSandboxPathMetadata(metaMap, currentChatID)
@@ -12506,6 +12514,7 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 		// Merge request metadata onto the shared Agent metadata and forward the
 		// merged body as-is without any query-based metadata expansion.
 		sharedutil.MergeMetadataFields(metaMap, reqData["metadata"])
+		metaMap["port"] = integrationMetadataPort(cfg)
 		// plugins is runtime-owned metadata. A client request can contain a stale
 		// plugin list, but it must not replace the built-in remote capability.
 		metaMap["plugins"] = detectPluginKeys()
@@ -18191,6 +18200,7 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 		metaBytes, _ := json.Marshal(metadata)
 		var metaMap map[string]interface{}
 		json.Unmarshal(metaBytes, &metaMap)
+		metaMap["port"] = integrationMetadataPort(cfg)
 		metaMap["agentId"] = t.AgentID
 		metaMap["chat"] = chatID
 		metaMap["type"] = chatTypeScheduledTask

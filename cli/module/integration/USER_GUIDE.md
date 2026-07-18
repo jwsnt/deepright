@@ -108,6 +108,22 @@ cd /path/to/deepright/cli/module/integration
 | `--http_socket_timeout` | 否 | `45000` | HTTP 读取超时（毫秒） | cli-get |
 | `--idle_timeout` | 否 | `90` | 连接池空闲超时（秒） | cli-get |
 
+### 上游请求 `metadata.port`
+
+Integration 每次启动会确定一个最终生效的监听端口，并在所有发往上游的请求顶层 `metadata` 中写入整数 `port`。端口解析优先级与服务启动一致：显式 `--port` > `config/config.json` 的 `port` > 内置默认值 `8080`。
+
+覆盖普通 `/v1/chat/completions` 转发、`/cli/get` 心跳，以及备忘录、邮件、飞书等自动任务最终发往上游的 `/v1/chat/completions` 请求。该字段由 Integration 运行时覆盖外部传入的同名值，不会写入 `metadata.agent`、`metadata.agents[]` 或任务持久化数据。
+
+例如，使用 `./integration --port 18080` 启动后，上游会收到：
+
+```json
+{
+  "metadata": {
+    "port": 18080
+  }
+}
+```
+
 ### `device` 解析与热更新
 
 Integration 服务使用同一个全局 `deviceId` 快照构建 Agent 元数据，优先级如下：

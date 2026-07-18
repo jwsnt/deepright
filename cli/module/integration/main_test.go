@@ -541,6 +541,7 @@ func TestProxyChatCompletions(t *testing.T) {
 	defer upstream.Close()
 
 	cfg := &Config{
+		Port:         18765,
 		Host:         upstream.URL,
 		AgentDir:     agentDir,
 		Device:       "test-dev",
@@ -551,7 +552,7 @@ func TestProxyChatCompletions(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(handleChatCompletions(cfg, proxyClient)))
 	defer server.Close()
 
-	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"HELLO WORLD"}],"stream":true,"metadata":{"plugins":["browser"]}}`
+	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"HELLO WORLD"}],"stream":true,"metadata":{"plugins":["browser"],"port":9999}}`
 	req, _ := http.NewRequest("POST", server.URL, strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer sk-test")
@@ -590,6 +591,9 @@ func TestProxyChatCompletions(t *testing.T) {
 	meta := capturedBody["metadata"].(map[string]interface{})
 	if meta["deviceId"] != "test-dev" {
 		t.Errorf("deviceId = %v", meta["deviceId"])
+	}
+	if got, ok := meta["port"].(float64); !ok || got != 18765 {
+		t.Errorf("metadata.port = %#v, want 18765", meta["port"])
 	}
 	if gotPlugins, ok := meta["plugins"].([]interface{}); !ok || !reflect.DeepEqual(gotPlugins, []interface{}{"remote"}) {
 		t.Fatalf("metadata.plugins = %#v, want [remote] when request provides a stale browser list", meta["plugins"])
@@ -8402,7 +8406,7 @@ func TestCliGetHeartbeatAndExecute(t *testing.T) {
 	}
 
 	// Test heartbeat
-	task, err := heartbeat(client, server.URL, metadata, nil)
+	task, err := heartbeat(client, server.URL, metadata, &Config{Port: 18766})
 	if err != nil {
 		t.Fatalf("heartbeat: %v", err)
 	}
@@ -8431,6 +8435,9 @@ func TestCliGetHeartbeatAndExecute(t *testing.T) {
 	getMeta := capturedGet["metadata"].(map[string]interface{})
 	if getMeta["deviceId"] != "d" {
 		t.Errorf("get deviceId = %v", getMeta["deviceId"])
+	}
+	if got, ok := getMeta["port"].(float64); !ok || got != 18766 {
+		t.Errorf("get metadata.port = %#v, want 18766", getMeta["port"])
 	}
 	if getMeta["git"] != metadata.Git {
 		t.Errorf("get git = %v, want %q", getMeta["git"], metadata.Git)
@@ -11667,7 +11674,7 @@ func TestCronExecuteOnceInjectsCurrentModelConfigForAllTaskTypes(t *testing.T) {
 		t.Fatalf("new Integration connect service: %v", err)
 	}
 	defer connectSvc.Close()
-	cronExecuteOnce(&Config{Host: upstream.URL, AgentDir: agentRoot, Device: "dev", AgentCacheMs: 120000}, &http.Client{Timeout: 5 * time.Second}, connectSvc)
+	cronExecuteOnce(&Config{Port: 18767, Host: upstream.URL, AgentDir: agentRoot, Device: "dev", AgentCacheMs: 120000}, &http.Client{Timeout: 5 * time.Second}, connectSvc)
 
 	want := map[string]interface{}{
 		"__url":                "https://current.example/v1",
@@ -11687,6 +11694,9 @@ func TestCronExecuteOnceInjectsCurrentModelConfigForAllTaskTypes(t *testing.T) {
 			}
 			taskType, _ := metadata["cron_type"].(string)
 			seenTaskTypes[taskType] = true
+			if got, ok := metadata["port"].(float64); !ok || got != 18767 {
+				t.Fatalf("%s metadata.port = %#v, want 18767", taskType, metadata["port"])
+			}
 			for key, expected := range want {
 				if actual := metadata[key]; actual != expected {
 					t.Fatalf("%s metadata.%s = %#v, want %#v", taskType, key, actual, expected)

@@ -156,6 +156,7 @@ public class MixedSkillFetcher extends FileSystemFetcher {
         data = this.updateTerminal(workTask, name, path, data);
         data = this.updateProvider(workTask, name, path, data);
         data = this.updateDevice(workTask, name, path, data);
+        data = this.updateOrigin(workTask, name, path, data);
         data = this.updateAgent(workTask, name, path, data);
         data = this.updateChat(workTask, name, path, data);
         data = this.updateSoul(workTask, name, path, data);
@@ -184,6 +185,10 @@ public class MixedSkillFetcher extends FileSystemFetcher {
 
     protected String updateDevice(WorkflowTask workTask, String name, String path, String data) throws Exception {
         return data.replace("#device", workTask.getDevice());
+    }
+
+    protected String updateOrigin(WorkflowTask workTask, String name, String path, String data) throws Exception {
+        return data.replace("#origin", FeatureUtils.buildOrigin(workTask));
     }
 
     protected String updateAgent(WorkflowTask workTask, String name, String path, String data) throws Exception {

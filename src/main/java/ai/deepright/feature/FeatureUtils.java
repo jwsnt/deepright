@@ -15,6 +15,9 @@ public class FeatureUtils {
 
     public static final Pattern WINDOWS_URI_PATH = Pattern.compile("^/[A-Za-z]:[\\\\/].*");
 
+    // 可静态替换
+    public static final String KEY_LOCALHOST = "http://localhost";
+
     public static final String KEY_AGENTS = "agents";
 
     public static String escapePath(WorkflowTask workTask, String path) throws Exception {
@@ -127,10 +130,17 @@ public class FeatureUtils {
         return MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_AGENTID);
     }
 
+    public static String buildOrigin(WorkflowTask workTask) throws Exception {
+        return FeatureUtils.buildOrigin(workTask.getMetadata());
+    }
+
+    public static String buildOrigin(Map<String, Object> metadata) throws Exception {
+        return MapUtils.getString(metadata, FeatureField.KEY_ORIGIN, FeatureUtils.KEY_LOCALHOST + ":" + MapUtils.getString(metadata, FeatureField.KEY_PORT));
+    }
+
     public static String buildUser(Map<String, Object> metadata) throws Exception {
         return StringUtils.defaultIfEmpty(MapUtils.getString(metadata, FeatureField.KEY_USER), "");
     }
-
 
     public static String buildUser(WorkflowTask workTask) throws Exception {
         return FeatureUtils.buildUser(workTask.getMetadata());

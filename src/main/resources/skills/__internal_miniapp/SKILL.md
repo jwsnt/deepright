@@ -9,11 +9,11 @@ description: 在当前 Agent 的 app 目录中制作可通过站内 iframe 预�
     + `#workspace/app/API.md`：可调用的 Integration API、页面 URL 上下文约定与静态资源映射规则
 + 迷你应用及其资源必须放在当前Agent的`app/` 目录中，站内静态访问地址为：
 ```text
-http://localhost:8080/mapping/#agentId/<相对路径>
+#origin/mapping/#agentId/<相对路径>
 ```
 + 例如，`app/index.html` 对应：
 ```text
-http://localhost:8080/mapping/#agentId/index.html
+#origin/mapping/#agentId/index.html
 ```
 + 新建页面时，优先使用用户指定的文件名，未指定且`app/`为空时，可使用`index.html`
 + 修改已有页面前，先检查现有文件与资源引用，不要覆盖、移动或删除无关的用户文件
