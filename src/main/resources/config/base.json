@@ -11,6 +11,7 @@
             "provider": "#provider",
             "agentId": "#agentId",
             "device": "#device",
+            "origin": "#origin",
             "chat": "#chat",
             "user": "#user",
             "soul": "#soul",

@@ -223,7 +223,7 @@ curl 'http://127.0.0.1:8080/v1/chat/completions' \
 - `/v1/chat/completions` 的 SSE 响应仍保持“收到一段记录一段”的方式，不会聚合后再写
 - 如果统一日志里存在 `cli/pub` 记录，则其 `content` 会按压缩前原始执行结果保存或兼容解码，导出时可直接查看
 - 现有 `chat_log` 仍继续保留给 `/api/restore` 的历史页面/任务会话恢复使用
-- `/api/restore` 现在会额外合并返回同一 `agentId + chat` 下的 `cli/get` 与 `cli/pub` 日志，返回记录中的 `role` 分别为 `cli/get`、`cli/pub`
+- `/api/restore` 的前向恢复会额外合并返回同一 `agentId + chat` 下的 `cli/get` 与 `cli/pub` 日志，返回记录中的 `role` 分别为 `cli/get`、`cli/pub`；`history=1` 冷历史只返回中心正文所需的 `Q`、`A`、`X`
 
 ## 最近轮次日志导出
 

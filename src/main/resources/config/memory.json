@@ -101,6 +101,7 @@
             "identity": "#identity",
             "provider": "#provider",
             "agentId": "#agentId",
+            "origin": "#origin",
             "device": "#device",
             "chat": "#chat",
             "user": "#user",

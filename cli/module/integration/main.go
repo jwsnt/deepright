@@ -10718,21 +10718,14 @@ func sortRestoreRecords(records []restoreRecord) {
 	})
 }
 
-func queryRestoreHistoryRecords(agentID, chatID, beforeTimeline string, beforeID, limit int) ([]restoreRecord, *restoreHistoryMeta, error) {
-	if cronDB == nil {
-		return nil, nil, fmt.Errorf("db not ready")
-	}
-	if limit <= 0 {
-		limit = 120
-	}
+func restoreHistoryQueryBase(agentID, chatID, beforeTimeline string, beforeID int) (string, []interface{}) {
 	trimmedAgentID := strings.TrimSpace(agentID)
 	trimmedChatID := strings.TrimSpace(chatID)
 	trimmedBeforeTimeline := strings.TrimSpace(beforeTimeline)
-
-	query := `SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at FROM chat_log WHERE chat_id = ?`
+	query := ` FROM chat_log WHERE chat_id = ?`
 	args := []interface{}{trimmedChatID}
 	if trimmedAgentID != "" {
-		query = `SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at FROM chat_log WHERE agent_id = ? AND chat_id = ?`
+		query = ` FROM chat_log WHERE agent_id = ? AND chat_id = ?`
 		args = []interface{}{trimmedAgentID, trimmedChatID}
 	}
 	if trimmedBeforeTimeline != "" {
@@ -10744,58 +10737,85 @@ func queryRestoreHistoryRecords(agentID, chatID, beforeTimeline string, beforeID
 			args = append(args, trimmedBeforeTimeline)
 		}
 	}
-	query += ` ORDER BY created_at, id`
+	return query, args
+}
 
+func queryRestoreRecords(query string, args ...interface{}) ([]restoreRecord, error) {
+	if cronDB == nil {
+		return nil, fmt.Errorf("db not ready")
+	}
 	rows, err := cronDB.Query(query, args...)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	defer rows.Close()
 
-	allRecords := make([]restoreRecord, 0)
+	records := make([]restoreRecord, 0)
 	for rows.Next() {
 		var rec restoreRecord
 		if err := rows.Scan(&rec.ID, &rec.AgentID, &rec.ChatID, &rec.ChatType, &rec.Role, &rec.ResponseType, &rec.Content, &rec.CreatedAt); err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		normalizeRestoreRecord(&rec)
-		allRecords = append(allRecords, rec)
+		records = append(records, rec)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, nil, err
-	}
+	return records, rows.Err()
+}
 
-	entries, err := queryEventLogs(trimmedAgentID, trimmedChatID, logTypeCLIGet, logTypeCLIPub)
+func queryRestoreHistoryRecords(agentID, chatID, beforeTimeline string, beforeID, limit int) ([]restoreRecord, *restoreHistoryMeta, error) {
+	if cronDB == nil {
+		return nil, nil, fmt.Errorf("db not ready")
+	}
+	if limit <= 0 {
+		limit = 120
+	}
+	baseQuery, baseArgs := restoreHistoryQueryBase(agentID, chatID, beforeTimeline, beforeID)
+	tailArgs := append(append([]interface{}{}, baseArgs...), limit)
+	tail, err := queryRestoreRecords(
+		`SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at`+baseQuery+` ORDER BY created_at DESC, id DESC LIMIT ?`,
+		tailArgs...,
+	)
 	if err != nil {
 		return nil, nil, err
 	}
-	filtered := make([]eventLogEntry, 0, len(entries))
-	for _, item := range entries {
-		rec := restoreRecord{ID: item.ID, CreatedAt: item.CreatedAt}
-		if !restoreRecordBeforeCursor(rec, trimmedBeforeTimeline, beforeID) {
-			continue
-		}
-		filtered = append(filtered, item)
-	}
-	allRecords = appendRestoreCLIRecords(allRecords, filtered)
-
-	sortRestoreRecords(allRecords)
-	if len(allRecords) == 0 {
+	if len(tail) == 0 {
 		return []restoreRecord{}, &restoreHistoryMeta{HasMore: false}, nil
 	}
 
-	start := 0
-	if len(allRecords) > limit {
-		start = len(allRecords) - limit
+	oldestTail := tail[len(tail)-1]
+	firstRecord := oldestTail
+	if oldestTail.Role != "Q" {
+		anchorArgs := append(append([]interface{}{}, baseArgs...), "Q", oldestTail.CreatedAt, oldestTail.CreatedAt, oldestTail.ID)
+		anchor, err := queryRestoreRecords(
+			`SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at`+baseQuery+` AND role = ? AND (created_at < ? OR (created_at = ? AND id < ?)) ORDER BY created_at DESC, id DESC LIMIT 1`,
+			anchorArgs...,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		if len(anchor) > 0 {
+			firstRecord = anchor[0]
+		}
 	}
-	for start > 0 && allRecords[start].Role != "Q" {
-		start--
+
+	recordArgs := append(append([]interface{}{}, baseArgs...), firstRecord.CreatedAt, firstRecord.CreatedAt, firstRecord.ID)
+	records, err := queryRestoreRecords(
+		`SELECT id, agent_id, chat_id, chat_type, role, response_type, content, created_at`+baseQuery+` AND (created_at > ? OR (created_at = ? AND id >= ?)) ORDER BY created_at, id`,
+		recordArgs...,
+	)
+	if err != nil {
+		return nil, nil, err
 	}
-	records := append([]restoreRecord(nil), allRecords[start:]...)
-	meta := &restoreHistoryMeta{HasMore: start > 0}
-	if meta.HasMore && len(records) > 0 {
-		meta.BeforeTimeline = records[0].CreatedAt
-		meta.BeforeID = records[0].ID
+
+	hasMoreArgs := append(append([]interface{}{}, baseArgs...), firstRecord.CreatedAt, firstRecord.CreatedAt, firstRecord.ID)
+	var hasMore bool
+	if err := cronDB.QueryRow(`SELECT EXISTS(SELECT 1`+baseQuery+` AND (created_at < ? OR (created_at = ? AND id < ?)) LIMIT 1)`, hasMoreArgs...).Scan(&hasMore); err != nil {
+		return nil, nil, err
+	}
+	meta := &restoreHistoryMeta{HasMore: hasMore}
+	if hasMore {
+		meta.BeforeTimeline = firstRecord.CreatedAt
+		meta.BeforeID = firstRecord.ID
 	}
 	return records, meta, nil
 }
@@ -18374,8 +18394,10 @@ func initCronDB() {
 	cronDB.Exec(`ALTER TABLE chat_log ADD COLUMN response_type TEXT NOT NULL DEFAULT 'normal'`)
 	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_chat_agent_chat ON chat_log(agent_id, chat_id)`)
 	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_chat_agent_chat_time ON chat_log(agent_id, chat_id, created_at)`)
+	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_chat_chat_time_id ON chat_log(chat_id, created_at, id)`)
 	cronDB.Exec(`CREATE TABLE IF NOT EXISTS agent_message_log (id INTEGER PRIMARY KEY AUTOINCREMENT, agent_id TEXT NOT NULL DEFAULT '', chat_id TEXT NOT NULL DEFAULT '', content TEXT NOT NULL, log_type INTEGER NOT NULL, created_at TEXT NOT NULL)`)
 	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_agent_message_log_chat_type_time ON agent_message_log(chat_id, log_type, created_at)`)
+	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_agent_message_log_chat_time_id ON agent_message_log(chat_id, created_at, id)`)
 	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_agent_message_log_agent_chat_type_time ON agent_message_log(agent_id, chat_id, log_type, created_at)`)
 	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_agent_message_log_agent_chat_time ON agent_message_log(agent_id, chat_id, created_at)`)
 	cronDB.Exec(`CREATE TABLE IF NOT EXISTS cmd_log (id INTEGER PRIMARY KEY AUTOINCREMENT, agent_id TEXT NOT NULL, chat_id TEXT NOT NULL, tid TEXT NOT NULL, cmd TEXT NOT NULL, result TEXT NOT NULL DEFAULT '', status INTEGER NOT NULL DEFAULT -1, received_at TEXT NOT NULL, completed_at TEXT NOT NULL DEFAULT '')`)

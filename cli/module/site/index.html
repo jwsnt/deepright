@@ -30353,7 +30353,14 @@ function switchChat(id) {
   state.displayedCount = 0;
   setTimeout(() => {
     const useColdHistoryRestore = !!(state.chats[id] && shouldUseColdHistoryRestore(id));
-    const useSessionRestoreLock = !!(state.chats[id] && shouldLockChatRestoreOnSwitch(id));
+    const hasLiveChatStream = !!(chatStreaming[id] && chatStreaming[id].streaming);
+    const shouldResumeRestorePolling = shouldResumeChatPolling(id);
+    const useSessionRestoreLock = !!(
+      state.chats[id] &&
+      shouldLockChatRestoreOnSwitch(id) &&
+      !hasLiveChatStream &&
+      !shouldResumeRestorePolling
+    );
     if (useSessionRestoreLock) {
       holdSwitchedChatAutoReloadLock('正在恢复会话内容');
     } else {
@@ -30404,15 +30411,17 @@ function switchChat(id) {
     refreshChatSandboxStatus(id, { agentId: getChatAgentId(id), toastOnError: false }).catch(() => {});
     rsInitNote();
     refreshCronViews();
-    if (shouldResumeChatPolling(id)) ensureChatRestorePolling(id);
+    if (shouldResumeRestorePolling) ensureChatRestorePolling(id);
     else stopChatRestorePolling(id);
     updateChatAsyncUI(id);
     if (vfsCurrentPath) vfsRefresh();
     clearRestoreNoDataTip(id);
-    scheduleSwitchedChatAutoReload(id, {
-      delayMs: 120,
-      holdUiLockDesc: useSessionRestoreLock ? '正在恢复会话内容' : ''
-    });
+    if (!hasLiveChatStream && !shouldResumeRestorePolling) {
+      scheduleSwitchedChatAutoReload(id, {
+        delayMs: 120,
+        holdUiLockDesc: useSessionRestoreLock ? '正在恢复会话内容' : ''
+      });
+    }
     if (state.chats[id] && state.chats[id].pendingRequest) resetChatSkillIndicator(id, { agentId: getChatAgentId(id) });
     else refreshChatSkillIndicator(id, { agentId: getChatAgentId(id) }).catch(() => {});
     if (modelSwitchTourState.pendingStart && !hasModelSwitchTourClickRecord()) {
@@ -39864,6 +39873,14 @@ function canAutoReloadChat(chatId) {
   return true;
 }
 
+function shouldSkipSwitchedChatAutoReload(chatId) {
+  const resolvedChatId = String(chatId || '').trim();
+  if (!resolvedChatId) return true;
+  const stream = chatStreaming[resolvedChatId];
+  if (stream && stream.streaming) return true;
+  return isChatRestorePolling(resolvedChatId) || shouldResumeChatPolling(resolvedChatId);
+}
+
 function scheduleSwitchedChatAutoReload(chatId, options) {
   const resolvedChatId = String(chatId || '').trim();
   const opts = options || {};
@@ -39877,6 +39894,10 @@ function scheduleSwitchedChatAutoReload(chatId, options) {
   }
   if (!holdUiLockDesc) releaseSwitchedChatAutoReloadLock();
   if (!resolvedChatId) return;
+  if (shouldSkipSwitchedChatAutoReload(resolvedChatId)) {
+    releaseSwitchedChatAutoReloadLock();
+    return;
+  }
   const delay = Math.max(0, Number(opts.delayMs) || 120);
   const maxRetries = Math.max(0, Number(opts.maxRetries) || 6);
   const retryDelay = Math.max(80, Number(opts.retryDelayMs) || 180);

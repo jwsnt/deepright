@@ -165,7 +165,7 @@ func (s *Store) Query(agentID, chatID, timeline string, types ...int) ([]Entry, 
 		 FROM agent_message_log
 		 WHERE chat_id = ? AND created_at > ?
 		   AND log_type IN (` + strings.Join(holders, ",") + `)
-		 ORDER BY id`
+		 ORDER BY created_at, id`
 	if trimmedAgentID != "" {
 		args = append(args[:0], trimmedAgentID, trimmedChatID, strings.TrimSpace(timeline))
 		for _, item := range types {
@@ -175,7 +175,7 @@ func (s *Store) Query(agentID, chatID, timeline string, types ...int) ([]Entry, 
 		 FROM agent_message_log
 		 WHERE agent_id = ? AND chat_id = ? AND created_at > ?
 		   AND log_type IN (` + strings.Join(holders, ",") + `)
-		 ORDER BY id`
+		 ORDER BY created_at, id`
 	}
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
@@ -243,6 +243,8 @@ func (s *Store) ensureSchema() error {
 			ON agent_message_log(agent_id, chat_id, log_type, created_at);
 		CREATE INDEX IF NOT EXISTS idx_agent_message_log_agent_chat_time
 			ON agent_message_log(agent_id, chat_id, created_at);
+		CREATE INDEX IF NOT EXISTS idx_agent_message_log_chat_time_id
+			ON agent_message_log(chat_id, created_at, id);
 	`)
 	return err
 }

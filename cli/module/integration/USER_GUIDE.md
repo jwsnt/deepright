@@ -1436,7 +1436,7 @@ curl -X POST 'http://127.0.0.1:8080/api/cron/create?agentId=demo-agent' \
 说明：
 
 - 继续沿用现有 `/api/restore` 收口，不新增新的恢复接口；返回结构仍保持当前统一 `data[]` 记录数组格式
-- 在原有 `chat_log` 恢复结果之外，接口会继续尝试合并同一 `agentId + chatId` 下的 CLI 事件日志，把 `cli/get`、`cli/pub` 一并返回给前端
+- 前向恢复会在原有 `chat_log` 结果之外，继续尝试合并同一 `agentId + chatId` 下的 CLI 事件日志，把 `cli/get`、`cli/pub` 一并返回给前端；`history=1` 冷历史只读取并返回中心正文所需的 `Q`、`A`、`X`
 - CLI 日志查询范围会与消息 restore 保持一致；如果本次请求带有 `lastId`，CLI 日志也会按同一增量边界续拉，避免前端重复消费
 - 合并返回的 CLI 记录会保留 `id`、`agentId`、`chatId`、`content`、`logType`、`createdAt`，并通过 `role=cli/get`、`role=cli/pub` 明确标识类型
 - `cli/get` 的 `content` 会保留原始任务载荷，兼容直接 `cmd` 字段、嵌套 `message`、`messages[].content` 等既有格式
@@ -1444,6 +1444,7 @@ curl -X POST 'http://127.0.0.1:8080/api/cron/create?agentId=demo-agent' \
 - 最终返回结果会统一按 `createdAt` 升序排序；`createdAt` 相同时再按 `id` 升序排序，便于前端按单一时间线配对 `cli/get -> cli/pub`
 - 如果当前环境下 CLI 事件日志查询失败，不会影响原有 `chat_log` restore 主流程；接口会按现有容错语义继续返回已拿到的消息记录
 - 这次补充只覆盖 restore 对 CLI 子任务 `cmd` 的恢复能力，继续复用现有 CLI 日志写入链路和存储表，不新增新的日志表、消息表或额外后台任务
+- 冷历史分页由数据库按 `chatId + createdAt + id` 游标完成：先读取最近一批聊天记录，必要时向前补到该轮 `Q`，再正序返回；不会为冷历史读取、合并或排序 CLI 日志
 
 ## /api/cmd
 

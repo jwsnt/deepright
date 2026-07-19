@@ -4861,6 +4861,22 @@ func TestHandleFolderMissing(t *testing.T) {
 	resp2.Body.Close()
 }
 
+func configureProxyRestoreTestDB(t *testing.T) {
+	t.Helper()
+	sharedDataDB = pooledDB{}
+	sharedEventLogger = struct {
+		mu     sync.Mutex
+		path   string
+		logger *eventlog.Logger
+	}{}
+	if err := os.MkdirAll("config", 0o755); err != nil {
+		t.Fatalf("mkdir config: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join("config", "config.json"), []byte(`{"db":"data"}`), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+}
+
 func TestHandleRestoreExcludesTimelineBoundary(t *testing.T) {
 	oldwd, err := os.Getwd()
 	if err != nil {
@@ -4871,6 +4887,7 @@ func TestHandleRestoreExcludesTimelineBoundary(t *testing.T) {
 		t.Fatalf("chdir: %v", err)
 	}
 	defer os.Chdir(oldwd)
+	configureProxyRestoreTestDB(t)
 
 	db, err := sql.Open("sqlite", "data")
 	if err != nil {
@@ -4941,6 +4958,7 @@ func TestHandleRestoreReturnsIncrementalAssistantChunks(t *testing.T) {
 		t.Fatalf("chdir: %v", err)
 	}
 	defer os.Chdir(oldwd)
+	configureProxyRestoreTestDB(t)
 
 	db, err := sql.Open("sqlite", "data")
 	if err != nil {
@@ -5015,6 +5033,7 @@ func TestHandleRestoreIncludesCLIGetAndCLIPubLogs(t *testing.T) {
 		t.Fatalf("chdir: %v", err)
 	}
 	defer os.Chdir(oldwd)
+	configureProxyRestoreTestDB(t)
 
 	sharedDataDB = pooledDB{}
 	sharedEventLogger = struct {
@@ -5088,6 +5107,7 @@ func TestHandleRestoreUsesChatAcrossAgentSwitches(t *testing.T) {
 		t.Fatalf("chdir: %v", err)
 	}
 	defer os.Chdir(oldwd)
+	configureProxyRestoreTestDB(t)
 
 	sharedDataDB = pooledDB{}
 	sharedEventLogger = struct {
@@ -5185,6 +5205,7 @@ func TestHandleRestoreHistoryReturnsLatestCompleteRound(t *testing.T) {
 		t.Fatalf("chdir: %v", err)
 	}
 	defer os.Chdir(oldwd)
+	configureProxyRestoreTestDB(t)
 
 	sharedDataDB = pooledDB{}
 	sharedEventLogger = struct {
@@ -5258,23 +5279,22 @@ func TestHandleRestoreHistoryReturnsLatestCompleteRound(t *testing.T) {
 	if resp.Status != 0 {
 		t.Fatalf("status body = %d, want 0", resp.Status)
 	}
-	if len(resp.Data) != 5 {
-		t.Fatalf("len(data) = %d, want 5", len(resp.Data))
+	if len(resp.Data) != 3 {
+		t.Fatalf("len(data) = %d, want 3", len(resp.Data))
 	}
 	if resp.Data[0].Role != "Q" || !strings.Contains(resp.Data[0].Content, "round-2") {
 		t.Fatalf("first record = %#v, want second round Q", resp.Data[0])
 	}
-	if resp.Data[1].Role != "cli/get" {
-		t.Fatalf("second record role = %q, want cli/get", resp.Data[1].Role)
+	if resp.Data[1].Role != "A" || !strings.Contains(resp.Data[1].Content, `"new"`) {
+		t.Fatalf("second record = %#v, want second round A", resp.Data[1])
 	}
-	if resp.Data[2].Role != "A" || !strings.Contains(resp.Data[2].Content, `"new"`) {
-		t.Fatalf("third record = %#v, want second round A", resp.Data[2])
+	if resp.Data[2].Role != "A" || resp.Data[2].Content != "data: [DONE]\n" {
+		t.Fatalf("third record = %#v, want done marker", resp.Data[2])
 	}
-	if resp.Data[3].Role != "cli/pub" {
-		t.Fatalf("fourth record role = %q, want cli/pub", resp.Data[3].Role)
-	}
-	if resp.Data[4].Role != "A" || resp.Data[4].Content != "data: [DONE]\n" {
-		t.Fatalf("fifth record = %#v, want done marker", resp.Data[4])
+	for _, item := range resp.Data {
+		if item.Role == "cli/get" || item.Role == "cli/pub" {
+			t.Fatalf("cold history unexpectedly returned CLI record: %#v", item)
+		}
 	}
 	if !resp.History.HasMore {
 		t.Fatal("history.hasMore = false, want true")
@@ -5297,6 +5317,7 @@ func TestHandleRestoreHistoryBeforeCursorReturnsOlderRounds(t *testing.T) {
 		t.Fatalf("chdir: %v", err)
 	}
 	defer os.Chdir(oldwd)
+	configureProxyRestoreTestDB(t)
 
 	sharedDataDB = pooledDB{}
 	sharedEventLogger = struct {
