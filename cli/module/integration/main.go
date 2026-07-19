@@ -12670,8 +12670,10 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 		// Start async writer goroutine and register active connection early so
 		// /api/cancel can hit even before the first SSE chunk arrives.
 		var ch chan chatMsg
+		var active *activeConn
 		if chatID != "" {
 			ch = make(chan chatMsg, 64)
+			active = &activeConn{cancel: cancel, ch: ch, agentID: chatAgentID, chatID: chatID}
 			go func() {
 				for msg := range ch {
 					if msg.role == "X" {
@@ -12685,7 +12687,7 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 			}()
 
 			connMu.Lock()
-			connMap[key] = &activeConn{cancel: cancel, ch: ch, agentID: chatAgentID, chatID: chatID}
+			connMap[key] = active
 			connMu.Unlock()
 		}
 
@@ -12703,14 +12705,7 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 
 		resp, err := proxyClient.Do(proxyReq)
 		if err != nil {
-			if chatID != "" {
-				connMu.Lock()
-				if ac, exists := connMap[key]; exists {
-					delete(connMap, key)
-					closeActiveConn(ac)
-				}
-				connMu.Unlock()
-			}
+			releaseActiveConn(key, active)
 			cancel()
 			if chatID != "" {
 				appendChatLogDB(chatAgentID, chatID, chatType, "A", "abnormal", "Failed to forward: "+err.Error())
@@ -12786,15 +12781,6 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 				abnormalStream = true
 				sawAbnormalPacket = queueSSEStreamInterruptedLog(ch, io.EOF) || sawAbnormalPacket
 			}
-			if ch != nil {
-				connMu.Lock()
-				if ac, exists := connMap[key]; exists {
-					closeActiveConn(ac)
-				} else {
-					closeActiveConn(&activeConn{ch: ch})
-				}
-				connMu.Unlock()
-			}
 			if knowledgeCommit {
 				if err := updateKnowledgeManualTimestamps(time.Now(), chatAgentID); err != nil {
 					log.Printf("proxy: knowledge manual update failed: %v", err)
@@ -12803,11 +12789,7 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 			if !errors.Is(ctx.Err(), context.Canceled) {
 				sendSSECompletionNotification(chatType, "", extractCompletionNotificationPrompt(reqData), abnormalStream)
 			}
-			if chatID != "" {
-				connMu.Lock()
-				delete(connMap, key)
-				connMu.Unlock()
-			}
+			releaseActiveConn(key, active)
 			cancel()
 			return
 		}
@@ -12865,15 +12847,6 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 				sawAbnormalPacket = queueSSEStreamInterruptedLog(ch, streamErr) || sawAbnormalPacket
 			}
 		}
-		if ch != nil {
-			connMu.Lock()
-			if ac, exists := connMap[key]; exists {
-				closeActiveConn(ac)
-			} else {
-				closeActiveConn(&activeConn{ch: ch})
-			}
-			connMu.Unlock()
-		}
 		if knowledgeCommit {
 			if err := updateKnowledgeManualTimestamps(time.Now(), chatAgentID); err != nil {
 				log.Printf("proxy: knowledge manual update failed: %v", err)
@@ -12883,12 +12856,9 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 			sendSSECompletionNotification(chatType, "", extractCompletionNotificationPrompt(reqData), abnormalStream)
 		}
 
-		// Clean up connection
-		if chatID != "" {
-			connMu.Lock()
-			delete(connMap, key)
-			connMu.Unlock()
-		}
+		// Only the handler that registered a connection can remove or close it.
+		// A newer request for the same chat may already have replaced connMap[key].
+		releaseActiveConn(key, active)
 		cancel()
 	}
 }
@@ -13012,6 +12982,22 @@ func closeActiveConn(ac *activeConn) {
 			ac.ch = nil
 		}
 	})
+}
+
+// releaseActiveConn closes a handler's own log channel and removes its map
+// entry only when that handler still owns it. This prevents a finishing,
+// cancelled request from closing the channel installed by a newer request for
+// the same chat.
+func releaseActiveConn(key string, ac *activeConn) {
+	if ac == nil {
+		return
+	}
+	connMu.Lock()
+	if connMap[key] == ac {
+		delete(connMap, key)
+	}
+	connMu.Unlock()
+	closeActiveConn(ac)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -18876,6 +18876,47 @@ func TestCloseActiveConnIsIdempotent(t *testing.T) {
 	}
 }
 
+func TestReleaseActiveConnDoesNotCloseNewerChatConnection(t *testing.T) {
+	const key = "chat-overlap"
+	oldCh := make(chan chatMsg, 1)
+	newCh := make(chan chatMsg, 1)
+	oldConn := &activeConn{ch: oldCh}
+	newConn := &activeConn{ch: newCh}
+
+	connMu.Lock()
+	connMap = map[string]*activeConn{key: newConn}
+	connMu.Unlock()
+	defer func() {
+		connMu.Lock()
+		connMap = make(map[string]*activeConn)
+		connMu.Unlock()
+		closeActiveConn(newConn)
+	}()
+
+	// Simulate the first request finishing after a second request for the same
+	// chat has already replaced the active connection.
+	releaseActiveConn(key, oldConn)
+
+	connMu.Lock()
+	registered := connMap[key]
+	connMu.Unlock()
+	if registered != newConn {
+		t.Fatalf("registered connection = %p, want newer connection %p", registered, newConn)
+	}
+	if oldConn.ch != nil {
+		t.Fatal("expected the finished request channel to be closed")
+	}
+
+	select {
+	case newCh <- chatMsg{role: "A", content: "still-open"}:
+	case <-time.After(time.Second):
+		t.Fatal("newer connection channel was closed or blocked")
+	}
+	if msg := <-newCh; msg.content != "still-open" {
+		t.Fatalf("newer connection message = %#v", msg)
+	}
+}
+
 func TestExecuteExternalCommandTimeoutOutput(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("shell command is POSIX-specific")
