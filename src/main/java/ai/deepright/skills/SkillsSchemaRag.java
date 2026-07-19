@@ -68,6 +68,8 @@ public class SkillsSchemaRag extends RagSkills implements SkillsChecker {
 
     protected String skillCreator;
 
+    protected String skillFeishu;
+
     @PostConstruct
     public void init() throws Exception {
         super.init();
@@ -93,8 +95,10 @@ public class SkillsSchemaRag extends RagSkills implements SkillsChecker {
         WorkflowException.checkCondition(StringUtils.isEmpty(this.template4usage), "The template usage must not be empty");
         WorkflowException.checkCondition(StringUtils.isEmpty(this.template4html), "The template html must not be empty");
         WorkflowException.checkCondition(StringUtils.isEmpty(this.template4init), "The template init must not be empty");
-        this.activePlugins.put(SkillsChecker.PLUGIN_BROWSER_SKILL, SkillsChecker.PLUGIN_BROWSER_SWITCH);
-        this.activePlugins.put(SkillsChecker.PLUGIN_REMOTE_SKILL, SkillsChecker.PLUGIN_REMOTE_SWITCH);
+        this.activePlugins.put(SkillsChecker.PLUGIN_BROWSER_SKILL, SkillsChecker.PLUGIN_BROWSER_NAME);
+        this.activePlugins.put(SkillsChecker.PLUGIN_REMOTE_SKILL, SkillsChecker.PLUGIN_REMOTE_NAME);
+        this.activePlugins.put(SkillsChecker.PLUGIN_FEISHU_SKILL, SkillsChecker.PLUGIN_FEISHU_NAME);
+        this.activePlugins.put(SkillsChecker.PLUGIN_EMAIL_SKILL, SkillsChecker.PLUGIN_EMAIL_NAME);
     }
 
     @Override
@@ -142,11 +146,11 @@ public class SkillsSchemaRag extends RagSkills implements SkillsChecker {
     }
 
     protected String buildUsage(RagConfig ragConfig, RagData ragData, Skills skills, String query) throws Exception {
-        String usage = this.template4usage.replace("#browser", this.allowedSkill(ragConfig, ragData, SkillsChecker.PLUGIN_BROWSER_SKILL) ? this.template4browser.replace("#browser", SkillsChecker.PLUGIN_BROWSER_SKILL) : "");
+        String usage = this.template4usage.replace("#feishu", FeatureFlag.isActivePlugin(ragData.getQuery(), SkillsChecker.PLUGIN_FEISHU_NAME) ? this.template4feishu.replace("#deepright", this.skillDeepRight).replace("#feishu", this.skillFeishu) : "");
+        usage = usage.replace("#browser", this.allowedSkill(ragConfig, ragData, SkillsChecker.PLUGIN_BROWSER_SKILL) ? this.template4browser.replace("#browser", SkillsChecker.PLUGIN_BROWSER_SKILL) : "");
         usage = usage.replace("#remote", this.allowedSkill(ragConfig, ragData, SkillsChecker.PLUGIN_REMOTE_SKILL) ? this.template4remote.replace("#remote", SkillsChecker.PLUGIN_REMOTE_SKILL) : "");
-        usage = usage.replace("#feishu", FeatureFlag.isActivePlugin(ragData.getQuery(), SkillsChecker.PLUGIN_FEISHU_SWITCH) ? this.template4feishu.replace("#deepright", this.skillDeepRight) : "");
         usage = usage.replace("#miniapp", this.template4miniapp.replace("#miniapp", this.skillMiniApp).replace("#html", FeatureFlag.isHtml(ragData.getQuery()) ? this.template4html : ""));
-        usage = usage.replace("#email", FeatureFlag.isActivePlugin(ragData.getQuery(), SkillsChecker.PLUGIN_EMAIL_SWITCH) ? this.template4email.replace("#deepright", this.skillDeepRight) : "");
+        usage = usage.replace("#email", FeatureFlag.isActivePlugin(ragData.getQuery(), SkillsChecker.PLUGIN_EMAIL_NAME) ? this.template4email.replace("#deepright", this.skillDeepRight) : "");
         usage = usage.replace("#creator", this.isSkillExtract(ragConfig, ragData, skills) ? this.template4creator.replace("#creator", this.skillCreator) : "");
         usage = usage.replace("#image", RequestProviderUtils.isMultiOutputModel(ragData.getQuery()) ? this.template4image : "");
         query = query.replace("#skill_usage", usage);
@@ -155,7 +159,6 @@ public class SkillsSchemaRag extends RagSkills implements SkillsChecker {
         }
         return query;
     }
-
 
     protected Boolean isSkillExtract(RagConfig ragConfig, RagData ragData, Skills skills) throws Exception {
         return FeatureFlag.isSkillExtract(ragData.getQuery()) && MapUtils.getObject(skills.getSkills(), this.skillCreator) != null;
@@ -207,6 +210,9 @@ public class SkillsSchemaRag extends RagSkills implements SkillsChecker {
 
         @Value("${skills.schema.creator:__internal_creator}")
         protected String skillCreator;
+
+        @Value("${skills.schema.feishu:__internal_feishu}")
+        protected String skillFeishu;
 
         @Override
         @Bean(RagSkills.RAG_KEY)

@@ -9,11 +9,13 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"connect/connectsvc"
+	"connect/feishusvc"
 )
 
 func TestFeishuSchemaCommandOutput(t *testing.T) {
@@ -68,6 +70,9 @@ func TestFeishuHelpCommandOutput(t *testing.T) {
 	for _, want := range []string{
 		"feishu scope",
 		"feishu schema",
+		"feishu openid [options]",
+		"feishu search [--query TEXT] [--openid OPEN_ID] [options]",
+		"feishu search --query \"退款 已处理\" --limit 20 --offset 0 --connect-bin ./integration",
 		"--content TEXT|JSON",
 		"add-request                     forwarded with --schema automatically injected when missing",
 	} {
@@ -79,6 +84,125 @@ func TestFeishuHelpCommandOutput(t *testing.T) {
 		if strings.Contains(text, unwanted) {
 			t.Fatalf("help output should not contain %q:\n%s", unwanted, text)
 		}
+	}
+}
+
+func TestFeishuOpenIDQueriesGenericSnapshotCapability(t *testing.T) {
+	root := t.TempDir()
+	integration := filepath.Join(root, "integration")
+	if err := os.WriteFile(integration, []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "config"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "config", "config.json"), []byte(`{"feishu":{"lastMessage":72}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	original := runUpstreamQueryCommand
+	defer func() { runUpstreamQueryCommand = original }()
+	var gotBinary string
+	var gotArgs []string
+	runUpstreamQueryCommand = func(binary string, args []string) ([]byte, error) {
+		gotBinary = binary
+		gotArgs = append([]string(nil), args...)
+		return []byte(`[{"senderId":"ou_1","lastMessageAt":"2026-07-19T10:30:00Z"}]`), nil
+	}
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"openid", "--connect-bin", integration}, &stdout, &stderr); code != 0 {
+		t.Fatalf("openid code = %d, stderr = %s", code, stderr.String())
+	}
+	if gotBinary != integration {
+		t.Fatalf("binary = %q, want %q", gotBinary, integration)
+	}
+	wantArgs := []string{"connect", "message-snapshot-senders", "--source", "feishu", "--window-hours", "72"}
+	if !slices.Equal(gotArgs, wantArgs) {
+		t.Fatalf("args = %#v, want %#v", gotArgs, wantArgs)
+	}
+	if !strings.Contains(stdout.String(), `"openid": "ou_1"`) {
+		t.Fatalf("openid output = %s", stdout.String())
+	}
+}
+
+func TestFeishuSearchQueriesGenericSnapshotCapability(t *testing.T) {
+	root := t.TempDir()
+	integration := filepath.Join(root, "integration")
+	if err := os.WriteFile(integration, []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "config"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "config", "config.json"), []byte(`{"feishu":{"lastMessage":24}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	original := runUpstreamQueryCommand
+	defer func() { runUpstreamQueryCommand = original }()
+	var gotArgs []string
+	runUpstreamQueryCommand = func(_ string, args []string) ([]byte, error) {
+		gotArgs = append([]string(nil), args...)
+		return []byte(`{"total":1,"limit":20,"offset":5,"items":[{"messageId":"om_1","senderId":"ou_1","content":"退款已处理","sentAt":"2026-07-19T10:30:00Z"}]}`), nil
+	}
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"search", "--query", `"退款申请" 已处理`, "--limit", "20", "--offset", "5", "--connect-bin", integration}, &stdout, &stderr); code != 0 {
+		t.Fatalf("search code = %d, stderr = %s", code, stderr.String())
+	}
+	wantArgs := []string{"connect", "message-snapshot-search", "--source", "feishu", "--window-hours", "24", "--query", `"退款申请" 已处理`, "--limit", "20", "--offset", "5"}
+	if !slices.Equal(gotArgs, wantArgs) {
+		t.Fatalf("args = %#v, want %#v", gotArgs, wantArgs)
+	}
+	if !strings.Contains(stdout.String(), `"openid": "ou_1"`) || strings.Contains(stdout.String(), "senderId") {
+		t.Fatalf("search output = %s", stdout.String())
+	}
+}
+
+func TestFeishuSearchAllowsOmittedQueryAndFiltersOpenID(t *testing.T) {
+	root := t.TempDir()
+	integration := filepath.Join(root, "integration")
+	if err := os.WriteFile(integration, []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "config"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "config", "config.json"), []byte(`{"feishu":{"lastMessage":24}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	original := runUpstreamQueryCommand
+	defer func() { runUpstreamQueryCommand = original }()
+	var gotArgs []string
+	runUpstreamQueryCommand = func(_ string, args []string) ([]byte, error) {
+		gotArgs = append([]string(nil), args...)
+		return []byte(`{"total":0,"limit":20,"offset":0,"items":[]}`), nil
+	}
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"search", "--openid", "ou_1", "--limit", "20", "--connect-bin", integration}, &stdout, &stderr); code != 0 {
+		t.Fatalf("search code = %d, stderr = %s", code, stderr.String())
+	}
+	wantArgs := []string{"connect", "message-snapshot-search", "--source", "feishu", "--window-hours", "24", "--sender-id", "ou_1", "--limit", "20"}
+	if !slices.Equal(gotArgs, wantArgs) {
+		t.Fatalf("args = %#v, want %#v", gotArgs, wantArgs)
+	}
+}
+
+func TestFeishuOpenIDRejectsInvalidLastMessageConfig(t *testing.T) {
+	root := t.TempDir()
+	integration := filepath.Join(root, "integration")
+	if err := os.WriteFile(integration, []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "config"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "config", "config.json"), []byte(`{"feishu":{"lastMessage":0}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"openid", "--connect-bin", integration}, &stdout, &stderr); code == 0 {
+		t.Fatal("openid unexpectedly succeeded")
+	}
+	if !strings.Contains(stderr.String(), "feishu.lastMessage must be a positive integer") {
+		t.Fatalf("stderr = %s", stderr.String())
 	}
 }
 
@@ -720,6 +844,46 @@ func TestLocalFeishuFlushPendingPushesTextWithPriorArtifacts(t *testing.T) {
 	}
 	if len(svc.state.Pending) != 0 {
 		t.Fatalf("pending should be empty after push: %+v", svc.state.Pending)
+	}
+}
+
+func TestBuildMessageSnapshotLocalFeishuUsesNormalizedSourceMessages(t *testing.T) {
+	now := time.Date(2026, time.July, 19, 10, 0, 0, 0, time.UTC)
+	raw := buildMessageSnapshotLocalFeishu([]localFeishuPendingMessage{
+		{
+			ExternalID: "ext-text",
+			MessageID:  "om-text",
+			SenderID:   "ou_text",
+			SenderType: "user",
+			Type:       "text",
+			Content:    "归一化文本",
+			MessageAt:  now.UnixMilli(),
+		},
+		{
+			ExternalID: "ext-image",
+			MessageID:  "om-image",
+			SenderID:   "ou_image",
+			SenderType: "user",
+			Type:       "image",
+			Content:    "[image]/tmp/a.png",
+			MessageAt:  now.Add(time.Minute).UnixMilli(),
+		},
+	}, feishusvc.IncomingMessage{})
+	if raw == "" {
+		t.Fatal("snapshot is empty")
+	}
+	var snapshot connectsvc.MessageSnapshot
+	if err := json.Unmarshal([]byte(raw), &snapshot); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.Source != "feishu" || len(snapshot.Messages) != 2 {
+		t.Fatalf("snapshot = %+v", snapshot)
+	}
+	if snapshot.Messages[0].MessageID != "om-text" || snapshot.Messages[0].SenderID != "ou_text" || snapshot.Messages[0].MessageType != "text" {
+		t.Fatalf("text snapshot = %+v", snapshot.Messages[0])
+	}
+	if snapshot.Messages[1].MessageID != "om-image" || snapshot.Messages[1].MessageType != "image" {
+		t.Fatalf("image snapshot = %+v", snapshot.Messages[1])
 	}
 }
 

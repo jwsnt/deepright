@@ -170,6 +170,29 @@
 + 典型案例：前缀干扰文本+JSON，需提取纯净JSON部分
 + 如果依旧提取失败则使用原逻辑，全部发送
 
+### openid与search命令
+> 新增自 ./iteration/20260719-1/REQUIREMENT.md
++ 新增 `openid` 命令，查询 Integration / Connect 已保存的本地通用消息快照；不得调用飞书 Open API、读取飞书日志或直接连接 SQLite。
+```
+./feishu openid
+```
+    + 查询窗口从 Integration 运行目录 `config/config.json` 的 `feishu.lastMessage` 读取，单位为小时，必须为正整数。
+    + 配置文件不存在、JSON 非法、字段缺失或值非正整数时立即失败，不得回退默认值。
+    + 输出按最后发送时间倒序的 JSON 数组，元素固定为 `openid`、`lastMessageAt`；同一 `openid` 仅保留最后发送时间。
++ 新增 `search` 命令，查询同一窗口内归一化后的文本消息：
+```
+./feishu search --query "关键词"
+```
+    + `--query` 可省略；省略或为空时列出窗口内全部文本消息。多个空白分隔关键词为 AND；双引号内的连续内容是完整短语；匹配不区分大小写且为包含匹配。
+    + 支持 `--openid` 对发送者精确过滤，可与 `--query` 组合为 AND。
+    + 仅文本消息参与搜索，纯图片和纯文件消息不参与。
+    + 支持 `--limit`（默认 50、最大 200）与 `--offset`（默认 0）；非法参数必须立即失败。
+    + 返回 JSON 对象，字段为 `total`、`limit`、`offset`、`items`；每个 item 固定为 `messageId`、`openid`、`content`、`sentAt`，并按 `sentAt` 倒序。
++ 飞书插件在调用 `connect add-request` 时将自身归一化消息作为 `source=feishu` 的通用消息快照一并提交。
++ Integration / Connect 仅提供通用消息快照的存储、索引和查询能力，不得依赖飞书插件、解析飞书报文或包含飞书配置/`openid` 语义。
++ 通用能力为时间范围、发送者聚合建立索引，并使用 SQLite FTS5 trigram 优化文本包含查询；飞书插件只通过 Integration / Connect CLI 使用该能力。
++ `command` 必须列出 `openid`、`search`；全局帮助及两个子命令的 `--help` 必须包含参数、输出、错误条件和完整案例。
+
 ### 编写代码
 + 以Golang编写以上代码，要求：
     + 飞书内部如果需要调用Connect语义，必须统一通过integration代理执行，并遵循 connect <subcommand> [options...] 的命令格式，子命令必须固定放在第一个位置，禁止将通用参数排在子命令之前

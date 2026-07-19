@@ -24,7 +24,11 @@ const (
 	localFeishuScanInterval      = 30 * time.Second
 	localFeishuExpireWindow      = 10 * time.Minute
 	localFeishuMaxServiceRetries = 3
-	localFeishuReceivedReply     = "<已收到>任务将在30秒内批量执行，可通过新消息更新内容。"
+	// This is a total-attempt limit: the initial acknowledgement plus at most
+	// two later retries. It is persisted with the acknowledgement so a restart
+	// cannot reset the budget.
+	localFeishuMaxAcknowledgementAttempts = 3
+	localFeishuReceivedReply              = "<已收到>任务将在30秒内批量执行，可通过新消息更新内容。"
 )
 
 type localFeishuService struct {
@@ -50,10 +54,11 @@ type localFeishuService struct {
 }
 
 type localFeishuState struct {
-	Pending       map[string]localFeishuPendingMessage         `json:"pending"`
-	Pushed        map[string]int64                             `json:"pushed"`
-	Acknowledging map[string]localFeishuPendingAcknowledgement `json:"acknowledging"`
-	Acknowledged  map[string]int64                             `json:"acknowledged"`
+	Pending                 map[string]localFeishuPendingMessage         `json:"pending"`
+	Pushed                  map[string]int64                             `json:"pushed"`
+	Acknowledging           map[string]localFeishuPendingAcknowledgement `json:"acknowledging"`
+	Acknowledged            map[string]int64                             `json:"acknowledged"`
+	AcknowledgementFailures map[string]localFeishuFailedAcknowledgement  `json:"acknowledgementFailures"`
 }
 
 // localFeishuAcknowledgementSender sends the reply only after the corresponding
@@ -86,9 +91,22 @@ type localFeishuPendingMessage struct {
 }
 
 type localFeishuPendingAcknowledgement struct {
-	Request     connectsvc.Request `json:"request"`
-	ExternalIDs []string           `json:"externalIds"`
-	StoredAt    int64              `json:"storedAt"`
+	Request        connectsvc.Request `json:"request"`
+	ExternalIDs    []string           `json:"externalIds"`
+	StoredAt       int64              `json:"storedAt"`
+	Attempts       int                `json:"attempts"`
+	LastAttemptAt  int64              `json:"lastAttemptAt,omitempty"`
+	LastError      string             `json:"lastError,omitempty"`
+	IdempotencyKey string             `json:"idempotencyKey"`
+}
+
+type localFeishuFailedAcknowledgement struct {
+	Request        connectsvc.Request `json:"request"`
+	ExternalIDs    []string           `json:"externalIds"`
+	Attempts       int                `json:"attempts"`
+	FailedAt       int64              `json:"failedAt"`
+	LastError      string             `json:"lastError,omitempty"`
+	IdempotencyKey string             `json:"idempotencyKey"`
 }
 
 type localFeishuPushEnvelope struct {
@@ -142,10 +160,11 @@ func newLocalFeishuService(flags map[string]string, logger *log.Logger, messageL
 		expireWindow:      localFeishuExpireWindow,
 		nowFn:             time.Now,
 		state: localFeishuState{
-			Pending:       map[string]localFeishuPendingMessage{},
-			Pushed:        map[string]int64{},
-			Acknowledging: map[string]localFeishuPendingAcknowledgement{},
-			Acknowledged:  map[string]int64{},
+			Pending:                 map[string]localFeishuPendingMessage{},
+			Pushed:                  map[string]int64{},
+			Acknowledging:           map[string]localFeishuPendingAcknowledgement{},
+			Acknowledged:            map[string]int64{},
+			AcknowledgementFailures: map[string]localFeishuFailedAcknowledgement{},
 		},
 	}
 	svc.acknowledger = localFeishuAcknowledgementSenderFunc(svc.sendReceivedAcknowledgement)
@@ -411,6 +430,9 @@ func (s *localFeishuService) storePending(message feishusvc.IncomingMessage, rec
 	if _, acknowledged := s.state.Acknowledged[externalID]; acknowledged {
 		return nil
 	}
+	if _, failed := s.state.AcknowledgementFailures[externalID]; failed {
+		return nil
+	}
 	if existing, ok := s.state.Pending[externalID]; ok {
 		item = mergePendingMessageLocalFeishu(existing, item)
 	}
@@ -481,16 +503,17 @@ func (s *localFeishuService) pushRequest(ctx context.Context, name string, messa
 		return connectsvc.Request{}, err
 	}
 	input := connectsvc.RequestInput{
-		Key:            name,
-		ExternalID:     message.ExternalID,
-		Name:           name,
-		Content:        message.Content,
-		Request:        message.Content,
-		Artifacts:      strings.Join(message.Artifacts, ","),
-		Original:       string(rawPayload),
-		RawRequest:     string(rawPayload),
-		ResponseSchema: feishusvc.ResponseSchemaJSON(),
-		CreatedAt:      buildMessageCreatedAtLocalFeishu(message),
+		Key:             name,
+		ExternalID:      message.ExternalID,
+		Name:            name,
+		Content:         message.Content,
+		Request:         message.Content,
+		Artifacts:       strings.Join(message.Artifacts, ","),
+		Original:        string(rawPayload),
+		RawRequest:      string(rawPayload),
+		ResponseSchema:  feishusvc.ResponseSchemaJSON(),
+		MessageSnapshot: buildMessageSnapshotLocalFeishu(group, message),
+		CreatedAt:       buildMessageCreatedAtLocalFeishu(message),
 	}
 	request, err := s.client.AddRequest(ctx, input)
 	if err != nil {
@@ -516,6 +539,48 @@ func (s *localFeishuService) pushRequest(ctx context.Context, name string, messa
 	return completedRequest, nil
 }
 
+func buildMessageSnapshotLocalFeishu(group []localFeishuPendingMessage, fallback feishusvc.IncomingMessage) string {
+	items := append([]localFeishuPendingMessage(nil), group...)
+	if len(items) == 0 {
+		items = append(items, localFeishuPendingMessage{
+			ExternalID: fallback.ExternalID,
+			MessageID:  fallback.MessageID,
+			SenderID:   fallback.SenderID,
+			SenderType: fallback.SenderType,
+			Type:       fallback.MessageType,
+			Content:    fallback.Content,
+			MessageAt:  fallback.MessageAtMS,
+		})
+	}
+	snapshot := connectsvc.MessageSnapshot{Source: feishusvc.DefaultName}
+	seen := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		messageID := firstNonEmptyLocalFeishu(item.MessageID, item.ExternalID)
+		if messageID == "" || item.MessageAt <= 0 || !strings.HasPrefix(strings.TrimSpace(item.SenderID), "ou_") || shouldIgnoreSenderTypeLocalFeishu(item.SenderType) {
+			continue
+		}
+		if _, exists := seen[messageID]; exists {
+			continue
+		}
+		seen[messageID] = struct{}{}
+		snapshot.Messages = append(snapshot.Messages, connectsvc.MessageSnapshotRecord{
+			MessageID:   messageID,
+			SenderID:    strings.TrimSpace(item.SenderID),
+			Content:     strings.TrimSpace(item.Content),
+			MessageType: normalizePendingTypeLocalFeishu(item.Type, item.Content, item.Artifacts),
+			SentAt:      item.MessageAt,
+		})
+	}
+	if len(snapshot.Messages) == 0 {
+		return ""
+	}
+	body, err := json.Marshal(snapshot)
+	if err != nil {
+		return ""
+	}
+	return string(body)
+}
+
 func (s *localFeishuService) queueAcknowledgement(key string, request connectsvc.Request, group []localFeishuPendingMessage) error {
 	key = strings.TrimSpace(key)
 	if key == "" {
@@ -536,9 +601,10 @@ func (s *localFeishuService) queueAcknowledgement(key string, request connectsvc
 	defer s.stateMu.Unlock()
 	s.pruneStateLocked()
 	s.state.Acknowledging[key] = localFeishuPendingAcknowledgement{
-		Request:     request,
-		ExternalIDs: externalIDs,
-		StoredAt:    s.now().Unix(),
+		Request:        request,
+		ExternalIDs:    externalIDs,
+		StoredAt:       s.now().Unix(),
+		IdempotencyKey: newLocalFeishuAcknowledgementUUID(),
 	}
 	for _, externalID := range externalIDs {
 		s.state.Pushed[externalID] = s.now().Unix()
@@ -571,9 +637,32 @@ func (s *localFeishuService) flushAcknowledgements(ctx context.Context, queued [
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
+		attempt, allowed, err := s.beginAcknowledgementAttempt(item)
+		if err != nil {
+			s.logf("stage=received-ack-state-failed external_id=%s err=%v", item.Request.ExternalID, err)
+			s.writeMessageLog(s.now().Format(time.RFC3339), fmt.Sprintf("stage=received-ack-state-failed external_id=%s err=%s", quoteLogValueLocalFeishu(item.Request.ExternalID), quoteLogValueLocalFeishu(err.Error())))
+			continue
+		}
+		if !allowed {
+			s.writeAcknowledgementTerminateLog(item, attempt, item.LastError)
+			continue
+		}
 		if err := s.sendAcknowledgement(ctx, item); err != nil {
-			s.logf("stage=received-ack-failed external_id=%s err=%v", item.Request.ExternalID, err)
-			s.writeMessageLog(s.now().Format(time.RFC3339), fmt.Sprintf("stage=received-ack-failed external_id=%s err=%s", quoteLogValueLocalFeishu(item.Request.ExternalID), quoteLogValueLocalFeishu(err.Error())))
+			terminal, stateErr := s.recordAcknowledgementFailure(item, attempt, err)
+			if stateErr != nil {
+				s.logf("stage=received-ack-state-failed external_id=%s err=%v", item.Request.ExternalID, stateErr)
+			}
+			s.logf("stage=received-ack-failed external_id=%s attempt=%d max=%d err=%v", item.Request.ExternalID, attempt, localFeishuMaxAcknowledgementAttempts, err)
+			if terminal {
+				s.writeAcknowledgementTerminateLog(item, attempt, err.Error())
+			} else {
+				s.writeAcknowledgementRetryLog(item, attempt, err)
+			}
+			continue
+		}
+		if err := s.markAcknowledged(item); err != nil {
+			s.logf("stage=received-ack-state-failed external_id=%s err=%v", item.Request.ExternalID, err)
+			s.writeMessageLog(s.now().Format(time.RFC3339), fmt.Sprintf("stage=received-ack-state-failed external_id=%s err=%s", quoteLogValueLocalFeishu(item.Request.ExternalID), quoteLogValueLocalFeishu(err.Error())))
 		}
 	}
 	return nil
@@ -585,7 +674,58 @@ func (s *localFeishuService) sendAcknowledgement(ctx context.Context, item local
 			return err
 		}
 	}
+	return nil
+}
 
+func (s *localFeishuService) beginAcknowledgementAttempt(item localFeishuPendingAcknowledgement) (int, bool, error) {
+	key := strings.TrimSpace(item.Request.ExternalID)
+	if key == "" {
+		return 0, false, errors.New("acknowledgement request external id is required")
+	}
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+	stored, ok := s.state.Acknowledging[key]
+	if !ok {
+		return 0, false, nil
+	}
+	if stored.Attempts >= localFeishuMaxAcknowledgementAttempts {
+		if err := s.moveAcknowledgementToFailureLocked(key, stored, stored.LastError); err != nil {
+			return stored.Attempts, false, err
+		}
+		return stored.Attempts, false, nil
+	}
+	if strings.TrimSpace(stored.IdempotencyKey) == "" {
+		stored.IdempotencyKey = newLocalFeishuAcknowledgementUUID()
+	}
+	stored.Attempts++
+	stored.LastAttemptAt = s.now().Unix()
+	s.state.Acknowledging[key] = stored
+	if err := s.saveStateLocked(); err != nil {
+		return stored.Attempts, false, err
+	}
+	return stored.Attempts, true, nil
+}
+
+func (s *localFeishuService) recordAcknowledgementFailure(item localFeishuPendingAcknowledgement, attempt int, sendErr error) (bool, error) {
+	key := strings.TrimSpace(item.Request.ExternalID)
+	if key == "" {
+		return false, errors.New("acknowledgement request external id is required")
+	}
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+	stored, ok := s.state.Acknowledging[key]
+	if !ok {
+		return false, nil
+	}
+	stored.LastError = errorTextLocalFeishu(sendErr)
+	if attempt >= localFeishuMaxAcknowledgementAttempts {
+		return true, s.moveAcknowledgementToFailureLocked(key, stored, stored.LastError)
+	}
+	s.state.Acknowledging[key] = stored
+	return false, s.saveStateLocked()
+}
+
+func (s *localFeishuService) markAcknowledged(item localFeishuPendingAcknowledgement) error {
 	key := strings.TrimSpace(item.Request.ExternalID)
 	if key == "" {
 		return errors.New("acknowledgement request external id is required")
@@ -604,8 +744,56 @@ func (s *localFeishuService) sendAcknowledgement(ctx context.Context, item local
 	if err := s.saveStateLocked(); err != nil {
 		return err
 	}
-	s.writeMessageLog(s.now().Format(time.RFC3339), fmt.Sprintf("stage=received-ack-sent external_id=%s", quoteLogValueLocalFeishu(stored.Request.ExternalID)))
+	s.writeMessageLog(s.now().Format(time.RFC3339), fmt.Sprintf("stage=received-ack-sent external_id=%s attempt=%d", quoteLogValueLocalFeishu(stored.Request.ExternalID), stored.Attempts))
 	return nil
+}
+
+func (s *localFeishuService) moveAcknowledgementToFailureLocked(key string, item localFeishuPendingAcknowledgement, lastError string) error {
+	delete(s.state.Acknowledging, key)
+	failed := localFeishuFailedAcknowledgement{
+		Request:        item.Request,
+		ExternalIDs:    append([]string(nil), item.ExternalIDs...),
+		Attempts:       item.Attempts,
+		FailedAt:       s.now().Unix(),
+		LastError:      strings.TrimSpace(lastError),
+		IdempotencyKey: item.IdempotencyKey,
+	}
+	for _, externalID := range item.ExternalIDs {
+		s.state.AcknowledgementFailures[externalID] = failed
+	}
+	return s.saveStateLocked()
+}
+
+func (s *localFeishuService) writeAcknowledgementRetryLog(item localFeishuPendingAcknowledgement, attempt int, err error) {
+	s.writeMessageLog(s.now().Format(time.RFC3339), fmt.Sprintf(
+		"stage=received-ack-retry external_id=%s attempt=%d max=%d retry=%d err=%s",
+		quoteLogValueLocalFeishu(item.Request.ExternalID),
+		attempt,
+		localFeishuMaxAcknowledgementAttempts,
+		attempt-1,
+		quoteLogValueLocalFeishu(errorTextLocalFeishu(err)),
+	))
+}
+
+func (s *localFeishuService) writeAcknowledgementTerminateLog(item localFeishuPendingAcknowledgement, attempt int, lastError string) {
+	s.writeMessageLog(s.now().Format(time.RFC3339), fmt.Sprintf(
+		"stage=received-ack-terminate external_id=%s attempt=%d max=%d err=%s",
+		quoteLogValueLocalFeishu(item.Request.ExternalID),
+		attempt,
+		localFeishuMaxAcknowledgementAttempts,
+		quoteLogValueLocalFeishu(strings.TrimSpace(lastError)),
+	))
+}
+
+func newLocalFeishuAcknowledgementUUID() string {
+	return fmt.Sprintf("feishu-ack-%d", time.Now().UnixNano())
+}
+
+func errorTextLocalFeishu(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }
 
 func (s *localFeishuService) sendReceivedAcknowledgement(ctx context.Context, request connectsvc.Request, content string) error {
@@ -620,12 +808,24 @@ func (s *localFeishuService) sendReceivedAcknowledgement(ctx context.Context, re
 	ackCtx, cancel := context.WithTimeout(ctx, feishuSendTimeout)
 	defer cancel()
 	sender := feishusvc.NewSender(localFeishuStaticMetaLoader{meta: meta, cfg: cfg}, s.logger, s.messageLog)
+	idempotencyKey := s.acknowledgementIdempotencyKey(request)
 	_, err = sender.Send(ackCtx, feishusvc.SendInput{
-		Action:  "send",
-		Message: string(message),
-		Content: strings.TrimSpace(content),
+		Action:         "send",
+		Message:        string(message),
+		Content:        strings.TrimSpace(content),
+		IdempotencyKey: idempotencyKey,
 	})
 	return err
+}
+
+func (s *localFeishuService) acknowledgementIdempotencyKey(request connectsvc.Request) string {
+	key := strings.TrimSpace(request.ExternalID)
+	if key == "" {
+		return ""
+	}
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+	return s.state.Acknowledging[key].IdempotencyKey
 }
 
 type localFeishuStaticMetaLoader struct {
@@ -730,6 +930,9 @@ func (s *localFeishuService) pruneStateLocked() {
 	if s.state.Acknowledged == nil {
 		s.state.Acknowledged = map[string]int64{}
 	}
+	if s.state.AcknowledgementFailures == nil {
+		s.state.AcknowledgementFailures = map[string]localFeishuFailedAcknowledgement{}
+	}
 	cutoff := s.now().Add(-24 * time.Hour).Unix()
 	awaiting := make(map[string]struct{})
 	for _, item := range s.state.Acknowledging {
@@ -747,6 +950,11 @@ func (s *localFeishuService) pruneStateLocked() {
 			delete(s.state.Acknowledged, key)
 		}
 	}
+	for key, failed := range s.state.AcknowledgementFailures {
+		if strings.TrimSpace(key) == "" || failed.FailedAt < cutoff {
+			delete(s.state.AcknowledgementFailures, key)
+		}
+	}
 }
 
 func (s *localFeishuService) loadState() error {
@@ -756,10 +964,11 @@ func (s *localFeishuService) loadState() error {
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			s.state = localFeishuState{
-				Pending:       map[string]localFeishuPendingMessage{},
-				Pushed:        map[string]int64{},
-				Acknowledging: map[string]localFeishuPendingAcknowledgement{},
-				Acknowledged:  map[string]int64{},
+				Pending:                 map[string]localFeishuPendingMessage{},
+				Pushed:                  map[string]int64{},
+				Acknowledging:           map[string]localFeishuPendingAcknowledgement{},
+				Acknowledged:            map[string]int64{},
+				AcknowledgementFailures: map[string]localFeishuFailedAcknowledgement{},
 			}
 			return nil
 		}
@@ -780,6 +989,9 @@ func (s *localFeishuService) loadState() error {
 	}
 	if state.Acknowledged == nil {
 		state.Acknowledged = map[string]int64{}
+	}
+	if state.AcknowledgementFailures == nil {
+		state.AcknowledgementFailures = map[string]localFeishuFailedAcknowledgement{}
 	}
 	s.state = state
 	s.pruneStateLocked()

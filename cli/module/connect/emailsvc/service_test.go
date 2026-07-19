@@ -108,6 +108,21 @@ func TestCLIParamAndName(t *testing.T) {
 	}
 }
 
+func TestHelpHidesLifecycleCommands(t *testing.T) {
+	for _, args := range [][]string{{"--help"}, {"help"}} {
+		stdout := &bytes.Buffer{}
+		stderr := &bytes.Buffer{}
+		if code := RunCLI(args, stdout, stderr); code != 0 {
+			t.Fatalf("%v exit code = %d, stderr = %s", args, code, stderr.String())
+		}
+		for _, hidden := range []string{"email init", "email start", "email stop", "\"init\"", "\"start\"", "\"stop\""} {
+			if strings.Contains(stdout.String(), hidden) {
+				t.Fatalf("%v unexpectedly mentions %q\n%s", args, hidden, stdout.String())
+			}
+		}
+	}
+}
+
 func TestCLIConnectClientSupportsPrefixedConnectCommands(t *testing.T) {
 	runner := &stubRunner{}
 	client := &CLIConnectClient{
@@ -503,6 +518,59 @@ func TestServiceRunAllowsAllSendersWhenWhitelistEmpty(t *testing.T) {
 	}
 	if len(client.Requests()) != 1 {
 		t.Fatalf("expected request to be pushed when whitelist empty, got %+v", client.Requests())
+	}
+	var snapshot connectsvc.MessageSnapshot
+	if err := json.Unmarshal([]byte(client.Requests()[0].MessageSnapshot), &snapshot); err != nil {
+		t.Fatalf("decode message snapshot: %v raw=%s", err, client.Requests()[0].MessageSnapshot)
+	}
+	if snapshot.Source != DefaultName || len(snapshot.Messages) != 1 {
+		t.Fatalf("snapshot = %+v", snapshot)
+	}
+	item := snapshot.Messages[0]
+	if item.MessageID != "<allow-all@example.com>" || item.SenderID != "random@example.com" || item.MessageType != "text" || item.Content != "白名单为空也应放行" {
+		t.Fatalf("snapshot item = %+v", item)
+	}
+}
+
+func TestBuildEmailMessageSnapshotUsesDateAndNormalizesSender(t *testing.T) {
+	date := "Wed, 06 May 2026 11:00:00 +0800"
+	receivedAt := time.Date(2026, time.May, 6, 12, 0, 0, 0, time.FixedZone("CST", 8*3600))
+	raw := buildEmailMessageSnapshot(FetchedMail{
+		MessageID:  "<mail@example.com>",
+		DateHeader: date,
+		ReceivedAt: receivedAt,
+		From:       "Alice <ALICE@Example.com>",
+		Subject:    "退款申请",
+		TextBody:   "已处理",
+	}, receivedAt.Add(time.Hour))
+	var snapshot connectsvc.MessageSnapshot
+	if err := json.Unmarshal([]byte(raw), &snapshot); err != nil {
+		t.Fatalf("decode snapshot: %v raw=%s", err, raw)
+	}
+	if len(snapshot.Messages) != 1 {
+		t.Fatalf("snapshot = %+v", snapshot)
+	}
+	item := snapshot.Messages[0]
+	if item.SenderID != "alice@example.com" || item.Content != "退款申请\n已处理" || item.SentAt != time.Date(2026, time.May, 6, 11, 0, 0, 0, time.FixedZone("CST", 8*3600)).UnixMilli() {
+		t.Fatalf("snapshot item = %+v", item)
+	}
+}
+
+func TestBuildEmailMessageSnapshotFallsBackToReceivedAt(t *testing.T) {
+	receivedAt := time.Date(2026, time.May, 6, 12, 0, 0, 0, time.UTC)
+	raw := buildEmailMessageSnapshot(FetchedMail{
+		MessageID:  "<mail@example.com>",
+		DateHeader: "not-a-date",
+		ReceivedAt: receivedAt,
+		From:       "alice@example.com",
+		TextBody:   "正文",
+	}, time.Time{})
+	var snapshot connectsvc.MessageSnapshot
+	if err := json.Unmarshal([]byte(raw), &snapshot); err != nil {
+		t.Fatalf("decode snapshot: %v raw=%s", err, raw)
+	}
+	if got := snapshot.Messages[0].SentAt; got != receivedAt.UnixMilli() {
+		t.Fatalf("sentAt = %d, want %d", got, receivedAt.UnixMilli())
 	}
 }
 

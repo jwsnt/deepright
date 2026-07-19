@@ -37,11 +37,13 @@ func TestParseInstallApps(t *testing.T) {
 
 func TestSkillNames(t *testing.T) {
 	got := SkillNames([]Skill{
-		{Name: "alpha"},
-		{Name: "  "},
+		{Name: "__internal_cron"},
 		{Name: "beta"},
+		{Name: "  "},
+		{Name: "alpha"},
+		{Name: "__internal_browser"},
 	})
-	want := []string{"alpha", "beta"}
+	want := []string{"alpha", "beta", "__internal_browser", "__internal_cron"}
 	if len(got) != len(want) {
 		t.Fatalf("SkillNames() len = %d, want %d (%v)", len(got), len(want), got)
 	}
@@ -49,6 +51,28 @@ func TestSkillNames(t *testing.T) {
 		if got[i] != want[i] {
 			t.Fatalf("SkillNames()[%d] = %q, want %q", i, got[i], want[i])
 		}
+	}
+}
+
+func TestScanAgentsSortsByAgentID(t *testing.T) {
+	root := t.TempDir()
+	for _, name := range []string{"zeta", "Alpha", "beta"} {
+		if err := os.Mkdir(filepath.Join(root, name), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", name, err)
+		}
+	}
+
+	agents, err := scanAgents(root)
+	if err != nil {
+		t.Fatalf("scanAgents: %v", err)
+	}
+	got := make([]string, 0, len(agents))
+	for _, agent := range agents {
+		got = append(got, agent.AgentID)
+	}
+	want := []string{"Alpha", "beta", "zeta"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("agent IDs = %#v, want %#v", got, want)
 	}
 }
 

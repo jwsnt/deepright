@@ -17363,7 +17363,7 @@ func TestHandleSkillsIncludesInternalSkills(t *testing.T) {
 			t.Fatalf("decode response: %v", err)
 		}
 
-		want := []string{"__internal_F", "__internal_cron", "__internal_demo"}
+		want := []string{"__internal_cron", "__internal_demo", "__internal_F"}
 		if !reflect.DeepEqual(names, want) {
 			t.Fatalf("skills = %v, want %v", names, want)
 		}
@@ -17405,7 +17405,7 @@ func TestHandleSkillsIncludesInternalSkills(t *testing.T) {
 			t.Fatalf("decode response: %v", err)
 		}
 
-		want := []string{"__internal_F", "__internal_cron", "__internal_demo"}
+		want := []string{"__internal_cron", "__internal_demo", "__internal_F"}
 		if !reflect.DeepEqual(names, want) {
 			t.Fatalf("skills without started plugins = %v, want %v", names, want)
 		}
@@ -17436,11 +17436,50 @@ func TestHandleSkillsIncludesInternalSkills(t *testing.T) {
 			t.Fatalf("decode started response: %v", err)
 		}
 
-		wantStarted := []string{"__internal_F", "__internal_cron", "__internal_demo", "__internal_browser", "__internal_remote"}
+		wantStarted := []string{"__internal_browser", "__internal_cron", "__internal_demo", "__internal_F", "__internal_remote"}
 		if !reflect.DeepEqual(names, wantStarted) {
 			t.Fatalf("skills = %v, want %v", names, wantStarted)
 		}
 	})
+}
+
+func TestSortSkillNamesGroupsInternalSkillsLast(t *testing.T) {
+	names := []string{
+		"__internal_cron",
+		"gsap-utils",
+		"alpha",
+		"__internal_browser",
+		"gsap-core",
+	}
+
+	agentcore.SortSkillNames(names)
+
+	want := []string{
+		"alpha",
+		"gsap-core",
+		"gsap-utils",
+		"__internal_browser",
+		"__internal_cron",
+	}
+	if !reflect.DeepEqual(names, want) {
+		t.Fatalf("sorted skills = %v, want %v", names, want)
+	}
+
+	skills := []agentcore.Skill{
+		{Name: "__internal_cron"},
+		{Name: "gsap-utils"},
+		{Name: "alpha"},
+		{Name: "__internal_browser"},
+		{Name: "gsap-core"},
+	}
+	agentcore.SortSkills(skills)
+	gotSkillNames := make([]string, 0, len(skills))
+	for _, skill := range skills {
+		gotSkillNames = append(gotSkillNames, skill.Name)
+	}
+	if !reflect.DeepEqual(gotSkillNames, want) {
+		t.Fatalf("sorted skill metadata = %v, want %v", gotSkillNames, want)
+	}
 }
 
 func TestHandleSkillsReportsSeedreamOnlyWhenConfigured(t *testing.T) {

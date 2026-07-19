@@ -4,15 +4,25 @@
   "port": 57896,
   "skills": [
     "__internal_cron",
+    "__internal_email",
+    "__internal_feishu",
     "__internal_remote",
-    "__internal_miniapp",
     "__internal_creator",
-    "__internal_deepright"
+    "__internal_browser",
+    "__internal_deepright",
+    "__internal_miniapp_list",
+    "__internal_miniapp_creator"
   ],
   "skills_git_install": "请从 Git 仓库 $git_path 安装所有技能到当前 Agent 工作目录的`skills/`目录。递归查找仓库内全部`SKILL.md`，将每个`SKILL.md`所在目录视为一个独立技能，技能目录名优先使用`SKILL.md`中声明的名称，未声明时使用其父目录名。将该目录内运行所需的代码、资源和配置文件一并复制到`skills/<skill-name>/`，并保持相对路径结构。安装前校验每个技能的`SKILL.md`，若不存在有效技能则说明原因。若目标存在同名技能，先展示差异并等待用户明确确认后再覆盖。不要执行仓库中的安装脚本或未知命令。完成后输出已安装、跳过和待确认的技能及其路径。",
   "http": {
     "heartbeat": 3,
     "debug": false
+  },
+  "feishu": {
+    "lastMessage": 72
+  },
+  "email": {
+    "lastMessage": 72
   },
   "associated": [
     "remote"

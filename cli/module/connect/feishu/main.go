@@ -39,6 +39,14 @@ var runUpstreamCommand = func(name string, args []string, stdout, stderr io.Writ
 	cmd.Stderr = stderr
 	return cmd.Run()
 }
+var runUpstreamQueryCommand = func(name string, args []string) ([]byte, error) {
+	cmd := exec.Command(name, args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return output, fmt.Errorf("%w", err)
+	}
+	return output, nil
+}
 
 type localMetaParamDefinition struct {
 	AppID     string `json:"appId"`
@@ -50,7 +58,14 @@ func main() {
 }
 
 func run(args []string, stdout, stderr io.Writer) int {
+	if len(args) > 0 && connectsvc.IsHelpCommand(args[0]) {
+		printHelp(stdout)
+		return 0
+	}
 	if code, handled := handleProxyCommand(args, stdout, stderr); handled {
+		return code
+	}
+	if code, handled := handleSnapshotQueryCommand(args, stdout, stderr); handled {
 		return code
 	}
 	if handleLocalCommand(args, stdout) {
@@ -133,6 +148,202 @@ func handleProxyCommand(args []string, stdout, stderr io.Writer) (int, bool) {
 	return 0, true
 }
 
+func handleSnapshotQueryCommand(args []string, stdout, stderr io.Writer) (int, bool) {
+	if len(args) == 0 {
+		return 0, false
+	}
+	command := strings.TrimSpace(args[0])
+	if command != "openid" && command != "search" {
+		return 0, false
+	}
+	if len(args) > 1 && connectsvc.IsHelpCommand(args[1]) {
+		printSnapshotCommandHelp(stdout, command)
+		return 0, true
+	}
+	flags, err := connectsvc.ParseFlags(args[1:])
+	if err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1, true
+	}
+	if connectsvc.BoolValue(flags, "help", false) {
+		printSnapshotCommandHelp(stdout, command)
+		return 0, true
+	}
+	if err := validateSnapshotQueryFlags(command, flags); err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1, true
+	}
+
+	binary, prefix := resolveSnapshotQueryTarget(flags)
+	if binary == "" {
+		fmt.Fprintln(stderr, "upstream connect/integration binary not found")
+		return 1, true
+	}
+	hours, err := readFeishuLastMessageHours(binary)
+	if err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1, true
+	}
+
+	upstreamCommand := "message-snapshot-senders"
+	if command == "search" {
+		upstreamCommand = "message-snapshot-search"
+	}
+	upstreamArgs := append([]string{}, prefix...)
+	upstreamArgs = append(upstreamArgs, upstreamCommand, "--source", feishusvc.DefaultName, "--window-hours", strconv.Itoa(hours))
+	if command == "search" {
+		if value, ok := flags["query"]; ok {
+			upstreamArgs = append(upstreamArgs, "--query", value)
+		}
+		if value := connectsvc.FirstValue(flags, "openid"); value != "" {
+			upstreamArgs = append(upstreamArgs, "--sender-id", value)
+		}
+		if value, ok := flags["limit"]; ok {
+			upstreamArgs = append(upstreamArgs, "--limit", value)
+		}
+		if value, ok := flags["offset"]; ok {
+			upstreamArgs = append(upstreamArgs, "--offset", value)
+		}
+	}
+	output, err := runUpstreamQueryCommand(binary, upstreamArgs)
+	if err != nil {
+		if text := strings.TrimSpace(string(output)); text != "" {
+			fmt.Fprintln(stderr, text)
+		}
+		fmt.Fprintln(stderr, err.Error())
+		return 1, true
+	}
+	if err := writeSnapshotQueryResult(command, output, stdout); err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1, true
+	}
+	return 0, true
+}
+
+func writeSnapshotQueryResult(command string, output []byte, stdout io.Writer) error {
+	if command == "openid" {
+		var upstream []struct {
+			SenderID      string `json:"senderId"`
+			LastMessageAt string `json:"lastMessageAt"`
+		}
+		if err := json.Unmarshal(output, &upstream); err != nil {
+			return fmt.Errorf("decode Integration message snapshot result: %w", err)
+		}
+		items := make([]map[string]string, 0, len(upstream))
+		for _, item := range upstream {
+			items = append(items, map[string]string{"openid": item.SenderID, "lastMessageAt": item.LastMessageAt})
+		}
+		connectsvc.WriteJSON(stdout, items)
+		return nil
+	}
+	var upstream struct {
+		Total  int `json:"total"`
+		Limit  int `json:"limit"`
+		Offset int `json:"offset"`
+		Items  []struct {
+			MessageID string `json:"messageId"`
+			SenderID  string `json:"senderId"`
+			Content   string `json:"content"`
+			SentAt    string `json:"sentAt"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(output, &upstream); err != nil {
+		return fmt.Errorf("decode Integration message snapshot result: %w", err)
+	}
+	items := make([]map[string]string, 0, len(upstream.Items))
+	for _, item := range upstream.Items {
+		items = append(items, map[string]string{
+			"messageId": item.MessageID,
+			"openid":    item.SenderID,
+			"content":   item.Content,
+			"sentAt":    item.SentAt,
+		})
+	}
+	connectsvc.WriteJSON(stdout, map[string]any{
+		"total":  upstream.Total,
+		"limit":  upstream.Limit,
+		"offset": upstream.Offset,
+		"items":  items,
+	})
+	return nil
+}
+
+func validateSnapshotQueryFlags(command string, flags map[string]string) error {
+	if command != "search" {
+		return nil
+	}
+	if _, ok := flags["limit"]; ok {
+		limit, err := connectsvc.IntValue(flags, "limit", 50)
+		if err != nil {
+			return err
+		}
+		if limit <= 0 {
+			return fmt.Errorf("limit must be positive")
+		}
+		if limit > 200 {
+			return fmt.Errorf("limit must not exceed 200")
+		}
+	}
+	if _, ok := flags["offset"]; ok {
+		offset, err := connectsvc.IntValue(flags, "offset", 0)
+		if err != nil {
+			return err
+		}
+		if offset < 0 {
+			return fmt.Errorf("offset must not be negative")
+		}
+	}
+	if raw := connectsvc.FirstValue(flags, "query"); raw != "" {
+		if _, err := connectsvc.ParseMessageSnapshotSearchTerms(raw); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func resolveSnapshotQueryTarget(flags map[string]string) (string, []string) {
+	if explicit := strings.TrimSpace(connectsvc.FirstValue(flags, "connect-bin")); explicit != "" {
+		binary := normalizeBinaryPath(explicit)
+		if binary != "" && !sameExecutable(binary) {
+			return binary, prefixForBinary(binary)
+		}
+		return "", nil
+	}
+	return resolveProxyTarget()
+}
+
+func readFeishuLastMessageHours(connectBinary string) (int, error) {
+	configPath, ok := connectsvc.ResolveRuntimeConfigPathFromConnectBin(connectBinary)
+	if !ok {
+		return 0, fmt.Errorf("integration config/config.json not found for feishu query: %s", connectBinary)
+	}
+	body, err := os.ReadFile(configPath)
+	if err != nil {
+		return 0, fmt.Errorf("read config/config.json: %w", err)
+	}
+	var root map[string]json.RawMessage
+	if err := json.Unmarshal(body, &root); err != nil {
+		return 0, fmt.Errorf("parse config/config.json: %w", err)
+	}
+	feishuRaw, ok := root["feishu"]
+	if !ok {
+		return 0, fmt.Errorf("config/config.json feishu.lastMessage is required")
+	}
+	var feishu map[string]json.RawMessage
+	if err := json.Unmarshal(feishuRaw, &feishu); err != nil {
+		return 0, fmt.Errorf("config/config.json feishu.lastMessage must be a positive integer")
+	}
+	lastMessageRaw, ok := feishu["lastMessage"]
+	if !ok {
+		return 0, fmt.Errorf("config/config.json feishu.lastMessage is required")
+	}
+	var hours int
+	if err := json.Unmarshal(lastMessageRaw, &hours); err != nil || hours <= 0 {
+		return 0, fmt.Errorf("config/config.json feishu.lastMessage must be a positive integer")
+	}
+	return hours, nil
+}
+
 func normalizeArgs(args []string, logWriter io.Writer) ([]string, string) {
 	if len(args) == 0 {
 		return args, ""
@@ -210,7 +421,7 @@ func setProxyConnectBinaryEnv(value string) func() {
 }
 
 func supportedCommands() []string {
-	return []string{"command", "help", "name", "param", "scope", "schema", "init", "send", "start", "stop"}
+	return []string{"command", "help", "name", "param", "scope", "schema", "openid", "search", "init", "send", "start", "stop"}
 }
 
 func supportedScopes() []string {
@@ -632,6 +843,8 @@ func printHelp(w io.Writer) {
 	fmt.Fprintln(w, "  feishu param")
 	fmt.Fprintln(w, "  feishu scope")
 	fmt.Fprintln(w, "  feishu schema")
+	fmt.Fprintln(w, "  feishu openid [options]")
+	fmt.Fprintln(w, "  feishu search [--query TEXT] [--openid OPEN_ID] [options]")
 	fmt.Fprintln(w, "  feishu send [options]")
 	fmt.Fprintln(w, "  feishu init [options]")
 	fmt.Fprintln(w, "")
@@ -641,6 +854,26 @@ func printHelp(w io.Writer) {
 	fmt.Fprintln(w, "  param                           print required meta fields with descriptions for appId/appSecret")
 	fmt.Fprintln(w, "  scope                           print supported container scopes: [\"reuse\",\"agent\",\"provider\",\"thinking\",\"swarm\"]")
 	fmt.Fprintln(w, "  schema                          print response json schema for schema-backed send content")
+	fmt.Fprintln(w, "  openid                          list unique Feishu senders and their last message time in the configured window")
+	fmt.Fprintln(w, "  search                          search normalized text messages in the configured window")
+	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, "Message snapshot queries:")
+	fmt.Fprintln(w, "  Both commands query the local Integration/Connect Feishu message snapshot only; they never call Feishu APIs.")
+	fmt.Fprintln(w, "  The window comes from integration config/config.json: feishu.lastMessage (positive integer, hours).")
+	fmt.Fprintln(w, "  Missing/invalid config causes an immediate error; no default window is used.")
+	fmt.Fprintln(w, "  openid output: [{\"openid\":\"ou_xxx\",\"lastMessageAt\":\"2026-07-19T10:30:00Z\"}] (newest first)")
+	fmt.Fprintln(w, "  search output: {\"total\":1,\"limit\":50,\"offset\":0,\"items\":[{\"messageId\":\"om_xxx\",\"openid\":\"ou_xxx\",\"content\":\"...\",\"sentAt\":\"2026-07-19T10:30:00Z\"}]}")
+	fmt.Fprintln(w, "  search --query TEXT            optional; whitespace terms are AND, quoted text is one phrase, case-insensitive contains")
+	fmt.Fprintln(w, "  search --openid OPEN_ID        optional exact sender filter; combines with --query using AND")
+	fmt.Fprintln(w, "  search --limit N               result count, default 50, maximum 200")
+	fmt.Fprintln(w, "  search --offset N              zero-based result offset, default 0")
+	fmt.Fprintln(w, "  --connect-bin PATH             Integration/Connect binary used for the query and config/config.json lookup")
+	fmt.Fprintln(w, "  Examples:")
+	fmt.Fprintln(w, "    feishu openid --connect-bin ./integration")
+	fmt.Fprintln(w, "    feishu search --limit 20 --offset 0 --connect-bin ./integration")
+	fmt.Fprintln(w, "    feishu search --query \"退款 已处理\" --limit 20 --offset 0 --connect-bin ./integration")
+	fmt.Fprintln(w, "    feishu search --query '\"退款申请\" 已处理' --connect-bin ./integration")
+	fmt.Fprintln(w, "    feishu search --openid ou_xxx --limit 20 --connect-bin ./integration")
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "Message commands:")
 	fmt.Fprintln(w, "  send                            reply text/image/file to the original Feishu message")
@@ -661,4 +894,31 @@ func printHelp(w io.Writer) {
 	fmt.Fprintln(w, "Connect proxy behavior:")
 	fmt.Fprintln(w, "  meta-get                        forwarded to upstream connect/integration using the same binary contract")
 	fmt.Fprintln(w, "  add-request                     forwarded with --schema automatically injected when missing")
+}
+
+func printSnapshotCommandHelp(w io.Writer, command string) {
+	if command == "openid" {
+		fmt.Fprintln(w, "Usage: feishu openid [--connect-bin PATH]")
+		fmt.Fprintln(w, "")
+		fmt.Fprintln(w, "List unique openid values from the local Integration/Connect Feishu message snapshot.")
+		fmt.Fprintln(w, "The lastMessageAt value is each sender's latest message time in config/config.json feishu.lastMessage hours.")
+		fmt.Fprintln(w, "No Feishu API or plugin log is queried. Missing/invalid feishu.lastMessage fails immediately.")
+		fmt.Fprintln(w, "")
+		fmt.Fprintln(w, "Example:")
+		fmt.Fprintln(w, "  feishu openid --connect-bin ./integration")
+		return
+	}
+	fmt.Fprintln(w, "Usage: feishu search [--query TEXT] [--openid OPEN_ID] [--limit N] [--offset N] [--connect-bin PATH]")
+	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, "Search normalized text messages in the local Integration/Connect Feishu message snapshot.")
+	fmt.Fprintln(w, "Terms separated by whitespace are AND; quoted text is one phrase; matching is case-insensitive contains.")
+	fmt.Fprintln(w, "Without --query, all text messages in the configured window are listed. --openid is an exact sender filter and combines with --query using AND.")
+	fmt.Fprintln(w, "Pure image/file messages are excluded. --limit defaults to 50 and is capped at 200; --offset defaults to 0.")
+	fmt.Fprintln(w, "The time window is config/config.json feishu.lastMessage positive integer hours; invalid config fails immediately.")
+	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, "Examples:")
+	fmt.Fprintln(w, "  feishu search --limit 20 --offset 0 --connect-bin ./integration")
+	fmt.Fprintln(w, "  feishu search --query \"退款 已处理\" --limit 20 --offset 0 --connect-bin ./integration")
+	fmt.Fprintln(w, "  feishu search --query '\"退款申请\" 已处理' --connect-bin ./integration")
+	fmt.Fprintln(w, "  feishu search --openid ou_xxx --limit 20 --connect-bin ./integration")
 }

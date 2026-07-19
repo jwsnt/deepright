@@ -7,6 +7,7 @@ import (
 	"mime"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -16,9 +17,17 @@ import (
 	"connect/emailsvc"
 )
 
-var localSupportedCommands = emailsvc.SupportedCommands()
+var localSupportedCommands = []string{"command", "help", "name", "param", "scope", "schema", "sender", "search", "init", "send", "start", "stop"}
 var runEmailCLI = emailsvc.RunCLI
 var runLocalSendCommand = runSendCommand
+var runEmailSnapshotQueryCommand = func(name string, args []string) ([]byte, error) {
+	cmd := exec.Command(name, args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return output, fmt.Errorf("%w", err)
+	}
+	return output, nil
+}
 var localMetaParams = []localMetaParamDefinition{
 	{
 		Email:             "邮箱地址，如hello_world@gmail.com",
@@ -44,6 +53,13 @@ func main() {
 }
 
 func run(args []string, stdout, stderr io.Writer) int {
+	if len(args) > 0 && connectsvc.IsHelpCommand(args[0]) {
+		printHelpLocal(stdout)
+		return 0
+	}
+	if code, handled := handleSnapshotQueryCommandLocal(args, stdout, stderr); handled {
+		return code
+	}
 	if handleLocalCommand(args, stdout) {
 		return 0
 	}
@@ -57,6 +73,190 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return code
 	}
 	return runEmailCLI(normalizeSendArgs(args, stderr), stdout, stderr)
+}
+
+func handleSnapshotQueryCommandLocal(args []string, stdout, stderr io.Writer) (int, bool) {
+	if len(args) == 0 {
+		return 0, false
+	}
+	command := strings.TrimSpace(args[0])
+	if command != "sender" && command != "search" {
+		return 0, false
+	}
+	if len(args) > 1 && connectsvc.IsHelpCommand(args[1]) {
+		printSnapshotCommandHelpLocal(stdout, command)
+		return 0, true
+	}
+	flags, err := connectsvc.ParseFlags(args[1:])
+	if err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1, true
+	}
+	if connectsvc.BoolValue(flags, "help", false) {
+		printSnapshotCommandHelpLocal(stdout, command)
+		return 0, true
+	}
+	if err := validateSnapshotQueryFlagsLocal(command, flags); err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1, true
+	}
+
+	binary := resolveConnectBinaryLocal(flags)
+	if strings.TrimSpace(binary) == "" {
+		fmt.Fprintln(stderr, "upstream connect/integration binary not found")
+		return 1, true
+	}
+	hours, err := readEmailLastMessageHours(binary)
+	if err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1, true
+	}
+
+	upstreamCommand := "message-snapshot-senders"
+	if command == "search" {
+		upstreamCommand = "message-snapshot-search"
+	}
+	upstreamArgs := append([]string{}, resolveConnectPrefixLocal(flags)...)
+	upstreamArgs = append(upstreamArgs, upstreamCommand, "--source", emailsvc.DefaultName, "--window-hours", strconv.Itoa(hours))
+	if command == "search" {
+		if value, ok := flags["query"]; ok {
+			upstreamArgs = append(upstreamArgs, "--query", value)
+		}
+		if value := strings.ToLower(connectsvc.FirstValue(flags, "sender")); value != "" {
+			upstreamArgs = append(upstreamArgs, "--sender-id", value)
+		}
+		if value, ok := flags["limit"]; ok {
+			upstreamArgs = append(upstreamArgs, "--limit", value)
+		}
+		if value, ok := flags["offset"]; ok {
+			upstreamArgs = append(upstreamArgs, "--offset", value)
+		}
+	}
+	output, err := runEmailSnapshotQueryCommand(binary, upstreamArgs)
+	if err != nil {
+		if text := strings.TrimSpace(string(output)); text != "" {
+			fmt.Fprintln(stderr, text)
+		}
+		fmt.Fprintln(stderr, err.Error())
+		return 1, true
+	}
+	if err := writeSnapshotQueryResultLocal(command, output, stdout); err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1, true
+	}
+	return 0, true
+}
+
+func validateSnapshotQueryFlagsLocal(command string, flags map[string]string) error {
+	if command != "search" {
+		return nil
+	}
+	if _, ok := flags["limit"]; ok {
+		limit, err := connectsvc.IntValue(flags, "limit", 50)
+		if err != nil {
+			return err
+		}
+		if limit <= 0 {
+			return fmt.Errorf("limit must be positive")
+		}
+		if limit > 200 {
+			return fmt.Errorf("limit must not exceed 200")
+		}
+	}
+	if _, ok := flags["offset"]; ok {
+		offset, err := connectsvc.IntValue(flags, "offset", 0)
+		if err != nil {
+			return err
+		}
+		if offset < 0 {
+			return fmt.Errorf("offset must not be negative")
+		}
+	}
+	if raw := connectsvc.FirstValue(flags, "query"); raw != "" {
+		_, err := connectsvc.ParseMessageSnapshotSearchTerms(raw)
+		return err
+	}
+	return nil
+}
+
+func readEmailLastMessageHours(connectBinary string) (int, error) {
+	configPath, ok := connectsvc.ResolveRuntimeConfigPathFromConnectBin(connectBinary)
+	if !ok {
+		return 0, fmt.Errorf("integration config/config.json not found for email query: %s", connectBinary)
+	}
+	body, err := os.ReadFile(configPath)
+	if err != nil {
+		return 0, fmt.Errorf("read config/config.json: %w", err)
+	}
+	var root map[string]json.RawMessage
+	if err := json.Unmarshal(body, &root); err != nil {
+		return 0, fmt.Errorf("parse config/config.json: %w", err)
+	}
+	emailRaw, ok := root["email"]
+	if !ok {
+		return 0, fmt.Errorf("config/config.json email.lastMessage is required")
+	}
+	var email map[string]json.RawMessage
+	if err := json.Unmarshal(emailRaw, &email); err != nil {
+		return 0, fmt.Errorf("config/config.json email.lastMessage must be a positive integer")
+	}
+	lastMessageRaw, ok := email["lastMessage"]
+	if !ok {
+		return 0, fmt.Errorf("config/config.json email.lastMessage is required")
+	}
+	var hours int
+	if err := json.Unmarshal(lastMessageRaw, &hours); err != nil || hours <= 0 {
+		return 0, fmt.Errorf("config/config.json email.lastMessage must be a positive integer")
+	}
+	return hours, nil
+}
+
+func writeSnapshotQueryResultLocal(command string, output []byte, stdout io.Writer) error {
+	if command == "sender" {
+		var upstream []struct {
+			SenderID      string `json:"senderId"`
+			LastMessageAt string `json:"lastMessageAt"`
+		}
+		if err := json.Unmarshal(output, &upstream); err != nil {
+			return fmt.Errorf("decode Integration message snapshot result: %w", err)
+		}
+		items := make([]map[string]string, 0, len(upstream))
+		for _, item := range upstream {
+			items = append(items, map[string]string{"sender": item.SenderID, "lastMessageAt": item.LastMessageAt})
+		}
+		connectsvc.WriteJSON(stdout, items)
+		return nil
+	}
+	var upstream struct {
+		Total  int `json:"total"`
+		Limit  int `json:"limit"`
+		Offset int `json:"offset"`
+		Items  []struct {
+			MessageID string `json:"messageId"`
+			SenderID  string `json:"senderId"`
+			Content   string `json:"content"`
+			SentAt    string `json:"sentAt"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(output, &upstream); err != nil {
+		return fmt.Errorf("decode Integration message snapshot result: %w", err)
+	}
+	items := make([]map[string]string, 0, len(upstream.Items))
+	for _, item := range upstream.Items {
+		items = append(items, map[string]string{
+			"messageId": item.MessageID,
+			"sender":    item.SenderID,
+			"content":   item.Content,
+			"sentAt":    item.SentAt,
+		})
+	}
+	connectsvc.WriteJSON(stdout, map[string]any{
+		"total":  upstream.Total,
+		"limit":  upstream.Limit,
+		"offset": upstream.Offset,
+		"items":  items,
+	})
+	return nil
 }
 
 func handleLocalCommand(args []string, stdout io.Writer) bool {

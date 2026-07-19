@@ -6,12 +6,14 @@
 
 当前插件提供固定元信息命令、邮件接收能力和邮件发送能力：
 
-- `command` 固定返回 `["command","help","name","param","schema","init","send","start","stop"]`
+- `command` 固定返回 `["command","help","name","param","scope","schema","sender","search","init","send","start","stop"]`
 - `schema` 固定返回邮件插件响应 JSON Schema
 - `param` 固定返回带字段说明的示例对象数组，字段 key 固定为 `email`、`email_pop3`、`email_smtp`、`email_password`、`email_whitelist`、`email_pop3_interval`
 - `name` 固定返回 `{"key":"email","name":"邮件"}`
-- `send` 根据原始 `add-request` 报文回复邮件，并附带图片/文件附件
+- `send` 可根据原始 `add-request` 报文回复邮件，也可指定收件人与主题发送新邮件，并附带图片/文件附件
 - `init` 使用与 `send` 完全相同的参数和处理流程发送初始化消息
+- `sender` 返回配置时间窗口内、按最后发送时间去重的发件人邮箱
+- `search` 搜索配置时间窗口内归一化后的邮件主题与正文
 - `start` / `stop` 负责启动或停止邮件扫描进程
 
 邮件插件启动后，每个扫描周期都会重新建立一条新的 POP3 连接，完成认证、拉取 UIDL/邮件内容后立即主动断开，不再把上一轮轮询留下来的会话复用到下一轮。扫描期间仍会按周期读取 `connect` 中稳定主键 `key=email` 对应的元数据配置，通过 POP3 拉取邮件，并把符合准入规则的消息通过 `connect add-request` 推入 Integration 代理。为兼容旧环境，读取配置时也会回退尝试旧 key `email_smtp`。如果当前轮连接在 `UIDL`、`RETR` 等扫描步骤中被服务端主动断开并返回 `EOF`，插件会把它当成可恢复断链，在当前轮内自动重连并从中断位置继续；只有邮件真正被读取进入后续处理后，才会推进 `email.state.json` 的时间线。若个别邮件 MIME 结构异常导致标准解析失败，插件会退化为原始报文兜底读取，避免单封坏邮件拖垮整轮扫描。若 `email_pop3` 域名默认解析结果不可用、TLS 握手超时或单线路由抖动导致建连失败，插件会先按 10 秒超时中止当前建连，再自动切换到备用 DNS 解析结果继续建连，并在下一轮扫描继续自动重试，无需人工重启。若插件配置未启用“复用当前会话”，启动阶段会自动把空的 `chatId` 校正为固定值 `email`；若页面已经通过“复用当前会话”保存了当前 `chatId`，插件则直接沿用该 `chatId`。整个过程中 `agentId` 都保持页面选择值，不会因为复用当前会话而自动切换或锁定。
@@ -25,6 +27,10 @@
 - MIME 主题解码迭代需求：[iteration/20260521-3/REQUIREMENT.md](iteration/20260521-3/REQUIREMENT.md)
 - 发送日志增强迭代需求：[iteration/20260522-1/REQUIREMENT.md](iteration/20260522-1/REQUIREMENT.md)
 - 会话复用迭代需求：[iteration/20260612-1/REQUIREMENT.md](iteration/20260612-1/REQUIREMENT.md)
+- 自定义收件人与主题迭代需求：[iteration/20260718-1/REQUIREMENT.md](iteration/20260718-1/REQUIREMENT.md)
+- 自定义收件人与主题迭代手册：[iteration/20260718-1/USER_GUIDE.md](iteration/20260718-1/USER_GUIDE.md)
+- 邮件快照查询迭代需求：[iteration/20260719-1/REQUIREMENT.md](iteration/20260719-1/REQUIREMENT.md)
+- 邮件快照查询迭代手册：[iteration/20260719-1/USER_GUIDE.md](iteration/20260719-1/USER_GUIDE.md)
 - 当前用户手册：[USER_GUIDE.md](USER_GUIDE.md)
 
 `20260520-1` 迭代补齐了 POP3 建连与网络容错约束：
@@ -53,9 +59,9 @@
 `20260522-1` 迭代把 `send` / `init` 的发送日志补齐为完整链路：
 
 - `stage=send-request` 记录原始请求报文和附件参数
-- `stage=send-parse` 记录 `rawRequest` 解析结果，包括父消息 ID、目标邮箱、主题和原始 envelope
+- `stage=send-parse` 记录回复上下文或新邮件模式解析出的目标邮箱、主题及原始 envelope
 - `stage=send-result` 记录最终发送结果，以及实际 SMTP 顶层报文头
-- `stage=send-failed` 记录明确失败原因；`rawRequest` 缺失、非法 JSON、缺少 `messageId`、缺少 `from` 都会输出可直接定位的问题描述
+- `stage=send-failed` 记录明确失败原因；非法 `--message`、无效 `rawRequest`、缺少回复字段或新邮件模式缺少 `--to` / `--subject` 都会输出可直接定位的问题描述
 
 `20260612-1` 迭代补齐了插件页“复用当前会话”的会话语义：
 
@@ -77,13 +83,16 @@
 ../plugins/email command
 ../plugins/email schema
 ../plugins/email param
+../plugins/email scope
 ../plugins/email name
+../plugins/email sender --connect-bin ./integration
+../plugins/email search --query "退款 已处理" --limit 20 --offset 0 --connect-bin ./integration
 ```
 
 返回示例：
 
 ```json
-["command","help","name","param","schema","init","send","start","stop"]
+["command","help","name","param","scope","schema","sender","search","init","send","start","stop"]
 ```
 
 ```json
@@ -146,6 +155,66 @@
 - `../plugins/email schema`、`send` 对结构化 `--content` 的校验、以及邮件插件调用 `integration connect add-request --schema` 时透传的值，三者复用同一份共享 schema 定义
 - `schema` 中的 `content` 描述以“纯文本正文”作为对外约定；发送阶段如果传入的是 HTML，插件仍会自动生成 HTML 正文并尽量保留结构
 - `param` 返回的是字段说明示例，真正写入 `meta-create` / `meta-update` 的仍然是同名字段对应的真实值
+
+## 邮件快照查询
+
+`sender` 和 `search` 只查询 Integration / Connect 的本地通用消息快照：邮件插件以 `source=email` 写入快照，Integration 不解析邮件报文或依赖邮件插件。命令不会连接 POP3/SMTP，也不会读取 `email.log`。
+
+查询时间窗口来自 Integration 运行目录的 `config/config.json`：
+
+```json
+{
+  "email": {
+    "lastMessage": 72
+  }
+}
+```
+
+`email.lastMessage` 必须是大于 0 的整数，单位为小时。缺少配置文件、JSON 非法、字段缺失或值无效时，命令立即失败，不会默认使用 72 小时。
+
+查询最近窗口内每个发件人的最后一次邮件：
+
+```bash
+../plugins/email sender --connect-bin ./integration
+```
+
+```json
+[
+  {
+    "sender": "alice@example.com",
+    "lastMessageAt": "2026-07-19T10:30:00Z"
+  }
+]
+```
+
+`From` 会被解析成第一个有效邮箱地址、去除显示名并转小写。结果中 `sender` 唯一，按 `lastMessageAt` 从新到旧排序。邮件时间优先使用 `Date` 头；该头无效时使用插件接收时间。
+
+搜索归一化后的主题和正文：
+
+```bash
+../plugins/email search --query "退款 已处理" --limit 20 --offset 0 --connect-bin ./integration
+../plugins/email search --query '"退款申请" 已处理' --connect-bin ./integration
+../plugins/email search --limit 20 --offset 0 --connect-bin ./integration
+../plugins/email search --sender alice@example.com --limit 20 --connect-bin ./integration
+```
+
+空白分隔的关键词采用 AND；双引号中的连续内容为一个短语。搜索不区分大小写，采用包含匹配；不会搜索附件内容或附件路径。省略或传入空 `--query` 时列出窗口内全部文本邮件；`--sender` 先转小写后作精确过滤，可与关键词取 AND。`--limit` 默认 50、最大 200，`--offset` 默认 0。
+
+```json
+{
+  "total": 1,
+  "limit": 20,
+  "offset": 0,
+  "items": [
+    {
+      "messageId": "<mail@example.com>",
+      "sender": "alice@example.com",
+      "content": "退款申请\n已处理",
+      "sentAt": "2026-07-19T10:30:00Z"
+    }
+  ]
+}
+```
 
 ## 配置方式
 
@@ -224,6 +293,16 @@
   --file /tmp/a.pdf,/tmp/b.txt
 ```
 
+发送新邮件（不传 `--message`）：
+
+```bash
+../plugins/email send \
+  --to 'Alice <alice@example.com>,bob@example.com' \
+  --subject '任务完成通知' \
+  --content '任务已完成，请查收附件。' \
+  --file /tmp/report.pdf
+```
+
 最小示例：
 
 ```bash
@@ -247,7 +326,9 @@
 - `--scan-seconds`：扫描周期，默认 `300`
 - `--log-file`：消息日志，默认 `./email.log`
 - `--pid-file`：PID 文件，默认 `./email.pid`
-- `--message`：`send` / `init` 必填，值必须为 `add-request` 返回的请求 JSON，且其中的 `rawRequest` 必须符合最新 envelope 协议
+- `--message`：`send` / `init` 可选；用于承载 `add-request` 返回的请求 JSON 和其中的 `rawRequest`，不作为邮件正文
+- `--to`：未提供 `rawRequest` 时必填，以 `,` 分隔多个收件人
+- `--subject`：未提供 `rawRequest` 时必填，作为新邮件主题
 - `--content`：消息正文内容；普通文本会自动生成 HTML 正文，如果内容本身看起来像 HTML，则会保留 HTML 并同时生成纯文本副本
 - `--content`：如果传入的是一个 JSON Object，或者整段文本里包含一段可提取的 JSON Object，并且结构符合 `email schema` 返回的 Schema，则会先解析再发送
 - `email schema` 中的 `content` 字段仍按纯文本正文对外声明；发送实现同时兼容普通文本和 HTML
@@ -306,16 +387,22 @@
 - `send` / `init` 真正进入 SMTP 发送后，单次失败最多自动重试 3 次；超过 3 次会直接终止本次发送，不再继续切换其他发送兜底
 - 对应日志会写入 `email.log`：重试阶段为 `stage=send-retry`，超过上限终止为 `stage=send-terminate`
 
+- `rawRequest` 存在时始终进入回复模式，CLI 中的 `--to`、`--subject` 会被忽略
 - 回复目标邮箱只从 `rawRequest.message.from` 识别
-- `In-Reply-To` 使用原始报文头里的 `Message-ID`
+- `In-Reply-To` 使用 `rawRequest.message.messageId`
 - `References` 会保留原有 `References` / `In-Reply-To`，并追加父消息 `Message-ID`
 - `Subject` 只从 `rawRequest.message.subject` 识别，并自动补齐为 `Re: 原主题`
+- 未提供 `rawRequest` 时进入新邮件模式，必须同时指定非空 `--to` 与 `--subject`；此模式不生成 `In-Reply-To` 和 `References`
 - `--image` 指定的图片会作为普通附件发送
 - 如果 HTML 正文中的 `<img>` 命中本地图片路径，则对应图片会以内嵌 `CID (Content-ID)` 资源发送；其他文件仍作为普通附件发送
 
-`--message` 只支持一种结构：
+`--message` 的校验规则：
 
-- `connect add-request` 的完整 JSON，其中 `rawRequest` 为最新 email envelope JSON，回复只从 `rawRequest.message.messageId`、`rawRequest.message.from`、`rawRequest.message.subject` 识别
+- 未传 `--message` 时可直接使用 `--to` 和 `--subject` 发送新邮件
+- 显式传入 `--message` 时必须是合法 JSON；JSON 非法会立即失败，即使 `--to`、`--subject` 已完整传入
+- `--message` 为合法 JSON 但未包含 `rawRequest` 时可发送新邮件，仍必须同时传入 `--to` 与 `--subject`
+- `rawRequest` 字段一旦存在，必须是非空 JSON 字符串；`null`、空字符串、纯空白、非字符串、JSON 非法或缺少字段都会立即失败，不会回退为新邮件
+- 回复用 `rawRequest` 必须有非空的 `message.messageId`、`message.from`、`message.subject`
 
 ## 消息映射
 
@@ -374,7 +461,7 @@ POP3 / SMTP 的明细日志和失败信息都会落到 `email.log`，同时复�
 其中：
 
 - `stage=send-request` 记录原始请求报文和发送参数
-- `stage=send-parse` 记录从 `rawRequest` 提取出的回复锚点和目标邮箱
+- `stage=send-parse` 记录回复上下文或新邮件模式确定的目标邮箱、主题；回复模式额外记录回复锚点
 - `stage=send-result` 记录最终发送结果，以及实际报送的顶层邮件报文头 `smtp_header`
 - `stage=send-failed` 记录失败阶段、失败原因；如果已经组装出待发送邮件，也会附带 `smtp_header`
 - `stage=send-retry` 记录 SMTP 发送失败后的第 N 次自动重试

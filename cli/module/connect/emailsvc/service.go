@@ -111,6 +111,9 @@ func (c *CLIConnectClient) AddRequest(ctx context.Context, input connectsvc.Requ
 	if strings.TrimSpace(input.ResponseSchema) != "" {
 		args = append(args, "--schema", input.ResponseSchema)
 	}
+	if strings.TrimSpace(input.MessageSnapshot) != "" {
+		args = append(args, "--message-snapshot", input.MessageSnapshot)
+	}
 	var out connectsvc.Request
 	if err := c.runJSON(ctx, &out, args...); err != nil {
 		return nil, err
@@ -596,21 +599,78 @@ func (s *Service) pushRequest(ctx context.Context, mailItem FetchedMail) error {
 		return err
 	}
 	_, err = s.client.AddRequest(ctx, connectsvc.RequestInput{
-		Key:            DefaultName,
-		ExternalID:     buildExternalID(mailItem),
-		Name:           DefaultName,
-		Content:        content,
-		Request:        content,
-		Artifacts:      strings.Join(mailItem.Artifacts, ","),
-		Original:       string(rawPayload),
-		RawRequest:     string(rawPayload),
-		ResponseSchema: ResponseSchemaJSON(),
-		CreatedAt:      buildMailCreatedAt(mailItem),
+		Key:             DefaultName,
+		ExternalID:      buildExternalID(mailItem),
+		Name:            DefaultName,
+		Content:         content,
+		Request:         content,
+		Artifacts:       strings.Join(mailItem.Artifacts, ","),
+		Original:        string(rawPayload),
+		RawRequest:      string(rawPayload),
+		ResponseSchema:  ResponseSchemaJSON(),
+		MessageSnapshot: buildEmailMessageSnapshot(mailItem, s.nowFn()),
+		CreatedAt:       buildMailCreatedAt(mailItem),
 	})
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func buildEmailMessageSnapshot(mailItem FetchedMail, receivedAt time.Time) string {
+	sender := strings.ToLower(strings.TrimSpace(firstNonEmpty(mailItem.FromAddress, extractMailAddress(mailItem.From))))
+	messageID := strings.TrimSpace(buildExternalID(mailItem))
+	if sender == "" || messageID == "" {
+		return ""
+	}
+	sentAt := parseMailDate(mailItem.DateHeader)
+	if sentAt.IsZero() {
+		sentAt = mailItem.ReceivedAt
+	}
+	if sentAt.IsZero() {
+		sentAt = receivedAt
+	}
+	if sentAt.IsZero() {
+		return ""
+	}
+	content := normalizeMailSnapshotContent(mailItem)
+	messageType := "attachment"
+	if content != "" {
+		messageType = "text"
+	}
+	body, err := json.Marshal(connectsvc.MessageSnapshot{
+		Source: DefaultName,
+		Messages: []connectsvc.MessageSnapshotRecord{{
+			MessageID:   messageID,
+			SenderID:    sender,
+			Content:     content,
+			MessageType: messageType,
+			SentAt:      sentAt.UnixMilli(),
+		}},
+	})
+	if err != nil {
+		return ""
+	}
+	return string(body)
+}
+
+func normalizeMailSnapshotContent(mailItem FetchedMail) string {
+	subject := strings.TrimSpace(decodeHeaderValue(mailItem.Subject))
+	content := strings.TrimSpace(mailItem.TextBody)
+	if content == "" {
+		content = strings.TrimSpace(htmlToText(mailItem.HTMLBody))
+	}
+	return strings.TrimSpace(strings.Join(nonEmptyStrings(subject, content), "\n"))
+}
+
+func nonEmptyStrings(values ...string) []string {
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			out = append(out, value)
+		}
+	}
+	return out
 }
 
 func buildMailMessage(mailItem FetchedMail) MailMessage {

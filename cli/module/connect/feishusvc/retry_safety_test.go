@@ -1,0 +1,56 @@
+package feishusvc
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"io"
+	"log"
+	"testing"
+
+	"connect/connectsvc"
+	larkcore "github.com/larksuite/oapi-sdk-go/v3/core"
+	larkim "github.com/larksuite/oapi-sdk-go/v3/service/im/v1"
+)
+
+func TestTextRetryReusesIdempotencyKey(t *testing.T) {
+	messageAPI := &stubMessageAPI{
+		replyResps: []*larkim.ReplyMessageResp{
+			{CodeError: larkcore.CodeError{Code: 230099}},
+			{CodeError: larkcore.CodeError{Code: 230099}},
+			{CodeError: larkcore.CodeError{Code: 0}, Data: &larkim.ReplyMessageRespData{MessageId: stringPtr("om_reply")}},
+		},
+	}
+	sender := NewSender(
+		stubMetaLoader{
+			meta: &connectsvc.Meta{Name: DefaultName, ChatID: "oc_test_chat"},
+			cfg:  Config{AppID: "app", AppSecret: "secret"},
+		},
+		log.New(io.Discard, "", 0),
+		&bytes.Buffer{},
+	)
+	sender.apis = LarkAPISet{Message: messageAPI, Image: &stubImageAPI{}, File: &stubFileAPI{}}
+
+	const idempotencyKey = "feishu-ack-idempotency-test"
+	if _, err := sender.Send(context.Background(), SendInput{
+		Message:        latestConnectRequestMessageJSON("om_origin"),
+		Content:        "ack",
+		IdempotencyKey: idempotencyKey,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(messageAPI.replyReqs) != maxSendRetries {
+		t.Fatalf("reply attempts = %d, want %d", len(messageAPI.replyReqs), maxSendRetries)
+	}
+	for index, raw := range messageAPI.replyJSON {
+		var body struct {
+			UUID string `json:"uuid"`
+		}
+		if err := json.Unmarshal([]byte(raw), &body); err != nil {
+			t.Fatalf("decode reply %d: %v; raw=%s", index+1, err, raw)
+		}
+		if got := body.UUID; got != idempotencyKey {
+			t.Fatalf("reply %d uuid = %q, want %q", index+1, got, idempotencyKey)
+		}
+	}
+}

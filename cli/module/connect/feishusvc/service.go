@@ -106,6 +106,9 @@ func (c *CLIConnectClient) AddRequest(ctx context.Context, input connectsvc.Requ
 	if strings.TrimSpace(input.ResponseSchema) != "" {
 		args = append(args, "--schema", input.ResponseSchema)
 	}
+	if strings.TrimSpace(input.MessageSnapshot) != "" {
+		args = append(args, "--message-snapshot", input.MessageSnapshot)
+	}
 	var out connectsvc.Request
 	if err := c.runJSON(ctx, &out, args...); err != nil {
 		return nil, err
@@ -218,11 +221,12 @@ type PushPayload struct {
 }
 
 type SendInput struct {
-	Action  string
-	Message string
-	Content string
-	Images  []string
-	Files   []string
+	Action         string
+	Message        string
+	Content        string
+	Images         []string
+	Files          []string
+	IdempotencyKey string
 }
 
 type normalizedSendPayload struct {
@@ -1212,10 +1216,10 @@ func (s *Sender) Send(ctx context.Context, input SendInput) (*SendResult, error)
 	}
 
 	if content != "" {
-		record, err := s.sendText(ctx, apis, "", messageID, content)
+		record, err := s.sendText(ctx, apis, "", messageID, content, input.IdempotencyKey)
 		if err != nil {
 			if fallbackTriggered && !isSendRetryExhaustedError(err) {
-				fallbackRecord, fallbackErr := s.sendText(ctx, apis, "", messageID, "<消息异常>请登录客户端查看")
+				fallbackRecord, fallbackErr := s.sendText(ctx, apis, "", messageID, "<消息异常>请登录客户端查看", "")
 				if fallbackErr == nil {
 					result.Sent = append(result.Sent, fallbackRecord)
 					s.writeMessageLog(at, formatSendResultLog(action, result))
@@ -1270,8 +1274,12 @@ func appendAttachmentFailureNotice(content string) string {
 	return strings.TrimRight(content, "\n") + "\n" + notice
 }
 
-func (s *Sender) sendText(ctx context.Context, apis LarkAPISet, target, messageID, content string) (SentRecord, error) {
+func (s *Sender) sendText(ctx context.Context, apis LarkAPISet, target, messageID, content, idempotencyKey string) (SentRecord, error) {
 	var record SentRecord
+	idempotencyKey = strings.TrimSpace(idempotencyKey)
+	if idempotencyKey == "" {
+		idempotencyKey = newSendUUID()
+	}
 	err := s.retrySendOperation(ctx, "send-text", func() error {
 		payload, err := buildFeishuMarkdownCardContent(content)
 		if err != nil {
@@ -1284,7 +1292,7 @@ func (s *Sender) sendText(ctx context.Context, apis LarkAPISet, target, messageI
 					MsgType("interactive").
 					Content(payload).
 					ReplyInThread(false).
-					Uuid(newSendUUID()).
+					Uuid(idempotencyKey).
 					Build()).
 				Build()
 			resp, err := apis.Message.Reply(ctx, req)
@@ -1303,7 +1311,7 @@ func (s *Sender) sendText(ctx context.Context, apis LarkAPISet, target, messageI
 				ReceiveId(strings.TrimSpace(target)).
 				MsgType("interactive").
 				Content(payload).
-				Uuid(newSendUUID()).
+				Uuid(idempotencyKey).
 				Build()).
 			Build()
 		resp, err := apis.Message.Create(ctx, req)
@@ -1446,6 +1454,7 @@ func buildFeishuMarkdownCardContent(content string) (string, error) {
 
 func (s *Sender) sendImage(ctx context.Context, apis LarkAPISet, target, messageID, imagePath string) (SentRecord, error) {
 	var record SentRecord
+	idempotencyKey := newSendUUID()
 	err := s.retrySendOperation(ctx, "send-image", func() error {
 		attachmentCtx, cancel := attachmentTimeoutContext(ctx)
 		defer cancel()
@@ -1458,7 +1467,7 @@ func (s *Sender) sendImage(ctx context.Context, apis LarkAPISet, target, message
 		if err != nil {
 			return err
 		}
-		record, err = s.sendByMessageIDOrTarget(attachmentCtx, apis.Message, target, messageID, "image", string(payload))
+		record, err = s.sendByMessageIDOrTarget(attachmentCtx, apis.Message, target, messageID, "image", string(payload), idempotencyKey)
 		if err != nil {
 			return err
 		}
@@ -1797,6 +1806,7 @@ func (s *Sender) writeSchemaLogs(payload normalizedSendPayload) {
 
 func (s *Sender) sendFile(ctx context.Context, apis LarkAPISet, target, messageID, filePath string) (SentRecord, error) {
 	var record SentRecord
+	idempotencyKey := newSendUUID()
 	err := s.retrySendOperation(ctx, "send-file", func() error {
 		attachmentCtx, cancel := attachmentTimeoutContext(ctx)
 		defer cancel()
@@ -1821,7 +1831,7 @@ func (s *Sender) sendFile(ctx context.Context, apis LarkAPISet, target, messageI
 		if err != nil {
 			return err
 		}
-		record, err = s.sendByMessageIDOrTarget(attachmentCtx, apis.Message, target, messageID, "file", string(payload))
+		record, err = s.sendByMessageIDOrTarget(attachmentCtx, apis.Message, target, messageID, "file", string(payload), idempotencyKey)
 		if err != nil {
 			return err
 		}
@@ -1857,10 +1867,11 @@ func (s *Sender) writeRetryLog(step string, attempt, max int, err error) {
 		return
 	}
 	line := fmt.Sprintf(
-		"stage=send-retry step=%s attempt=%d max=%d err=%s",
+		"stage=send-retry step=%s attempt=%d max=%d retry=%d err=%s",
 		quoteLogValue(strings.TrimSpace(step)),
 		attempt,
 		max,
+		attempt-1,
 		quoteLogValue(err.Error()),
 	)
 	s.writeMessageLog(s.clock().Format(time.RFC3339), line)
@@ -1886,7 +1897,11 @@ func isSendRetryExhaustedError(err error) bool {
 	return errors.As(err, &target)
 }
 
-func (s *Sender) sendByMessageIDOrTarget(ctx context.Context, api MessageAPI, target, messageID, msgType, content string) (SentRecord, error) {
+func (s *Sender) sendByMessageIDOrTarget(ctx context.Context, api MessageAPI, target, messageID, msgType, content, idempotencyKey string) (SentRecord, error) {
+	idempotencyKey = strings.TrimSpace(idempotencyKey)
+	if idempotencyKey == "" {
+		idempotencyKey = newSendUUID()
+	}
 	if strings.TrimSpace(messageID) != "" {
 		req := larkim.NewReplyMessageReqBuilder().
 			MessageId(strings.TrimSpace(messageID)).
@@ -1894,7 +1909,7 @@ func (s *Sender) sendByMessageIDOrTarget(ctx context.Context, api MessageAPI, ta
 				MsgType(msgType).
 				Content(content).
 				ReplyInThread(false).
-				Uuid(newSendUUID()).
+				Uuid(idempotencyKey).
 				Build()).
 			Build()
 		resp, err := api.Reply(ctx, req)
@@ -1912,7 +1927,7 @@ func (s *Sender) sendByMessageIDOrTarget(ctx context.Context, api MessageAPI, ta
 			ReceiveId(strings.TrimSpace(target)).
 			MsgType(msgType).
 			Content(content).
-			Uuid(newSendUUID()).
+			Uuid(idempotencyKey).
 			Build()).
 		Build()
 	resp, err := api.Create(ctx, req)

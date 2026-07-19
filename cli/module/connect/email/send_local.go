@@ -51,6 +51,12 @@ type localReplyEnvelope struct {
 	References []string
 }
 
+type localSendInput struct {
+	emailsvc.SendInput
+	To      string
+	Subject string
+}
+
 type localMetaLoader interface {
 	Load(ctx context.Context) (*connectsvc.Meta, emailsvc.Config, error)
 }
@@ -195,24 +201,32 @@ func runLocalSend(action string, flags map[string]string, stderr io.Writer) (*lo
 
 	service, err := buildLocalService(flags, logger, messageFile)
 	if err != nil {
-		writeTimestampedLocalMessageLog(messageFile, logger, time.Now().Format(time.RFC3339), formatSendRequestLogLocal(action, emailsvc.SendInput{
-			Action:  action,
-			Message: connectsvc.FirstValue(flags, "message"),
-			Content: connectsvc.FirstValue(flags, "content"),
-			Images:  splitCSVFlag(connectsvc.FirstValue(flags, "image", "images")),
-			Files:   splitCSVFlag(connectsvc.FirstValue(flags, "file", "files")),
+		writeTimestampedLocalMessageLog(messageFile, logger, time.Now().Format(time.RFC3339), formatSendRequestLogLocal(action, localSendInput{
+			SendInput: emailsvc.SendInput{
+				Action:  action,
+				Message: connectsvc.FirstValue(flags, "message"),
+				Content: connectsvc.FirstValue(flags, "content"),
+				Images:  splitCSVFlag(connectsvc.FirstValue(flags, "image", "images")),
+				Files:   splitCSVFlag(connectsvc.FirstValue(flags, "file", "files")),
+			},
+			To:      connectsvc.FirstValue(flags, "to"),
+			Subject: connectsvc.FirstValue(flags, "subject"),
 		}))
 		writeTimestampedLocalMessageLog(messageFile, logger, time.Now().Format(time.RFC3339), formatSendFailureLogLocal(action, "build-service", nil, err))
 		return nil, err
 	}
 	sender := newLocalSender(emailMetaLoader{service: service}, logger, messageFile)
 	sender.baseDir = downloadDirForLogLocal(connectsvc.FirstValue(flags, "log-file"))
-	result, err := sender.Send(context.Background(), emailsvc.SendInput{
-		Action:  action,
-		Message: connectsvc.FirstValue(flags, "message"),
-		Content: connectsvc.FirstValue(flags, "content"),
-		Images:  splitCSVFlag(connectsvc.FirstValue(flags, "image", "images")),
-		Files:   splitCSVFlag(connectsvc.FirstValue(flags, "file", "files")),
+	result, err := sender.SendWithOptions(context.Background(), localSendInput{
+		SendInput: emailsvc.SendInput{
+			Action:  action,
+			Message: connectsvc.FirstValue(flags, "message"),
+			Content: connectsvc.FirstValue(flags, "content"),
+			Images:  splitCSVFlag(connectsvc.FirstValue(flags, "image", "images")),
+			Files:   splitCSVFlag(connectsvc.FirstValue(flags, "file", "files")),
+		},
+		To:      connectsvc.FirstValue(flags, "to"),
+		Subject: connectsvc.FirstValue(flags, "subject"),
 	})
 	if err != nil {
 		logger.Printf("stage=%s err=%v", strings.TrimSpace(action), err)
@@ -255,6 +269,10 @@ func splitCSVFlag(value string) []string {
 }
 
 func (s *localSender) Send(ctx context.Context, input emailsvc.SendInput) (*localSendResult, error) {
+	return s.SendWithOptions(ctx, localSendInput{SendInput: input})
+}
+
+func (s *localSender) SendWithOptions(ctx context.Context, input localSendInput) (*localSendResult, error) {
 	if s == nil || s.loader == nil {
 		return nil, errors.New("sender loader is required")
 	}
@@ -264,24 +282,17 @@ func (s *localSender) Send(ctx context.Context, input emailsvc.SendInput) (*loca
 	}
 	at := s.clock().Format(time.RFC3339)
 	writeTimestampedLocalMessageLog(s.messageLog, s.logger, at, formatSendRequestLogLocal(action, input))
-	meta, cfg, err := s.loader.Load(ctx)
-	if err != nil {
-		writeTimestampedLocalMessageLog(s.messageLog, s.logger, at, formatSendFailureLogLocal(action, "load-meta", nil, err))
-		return nil, err
-	}
-
-	reply, err := extractLocalReplyEnvelope(input.Message)
+	reply, err := resolveLocalReplyEnvelope(input.Message, input.To, input.Subject)
 	if err != nil {
 		writeTimestampedLocalMessageLog(s.messageLog, s.logger, at, formatSendFailureLogLocal(action, "parse-message", nil, err))
 		return nil, err
 	}
 	writeTimestampedLocalMessageLog(s.messageLog, s.logger, at, formatSendParseLogLocal(action, &reply))
-	if len(reply.To) == 0 {
-		err := errors.New("message.rawRequest.message.from not found")
-		writeTimestampedLocalMessageLog(s.messageLog, s.logger, at, formatSendFailureLogLocal(action, "parse-message", nil, err))
+	meta, cfg, err := s.loader.Load(ctx)
+	if err != nil {
+		writeTimestampedLocalMessageLog(s.messageLog, s.logger, at, formatSendFailureLogLocal(action, "load-meta", nil, err))
 		return nil, err
 	}
-
 	normalized, normalizationErr := normalizeSendInputForDeliveryLocal(ctx, localSendNormalizeInput{
 		Action:      action,
 		Content:     input.Content,
@@ -295,7 +306,7 @@ func (s *localSender) Send(ctx context.Context, input emailsvc.SendInput) (*loca
 	if normalizationErr != nil {
 		s.logf("stage=%s mode=structured-normalize err=%v", action, normalizationErr)
 		fallback := normalized.fallbackPayload()
-		fallbackResult, fallbackErr := s.deliverLocalMail(ctx, meta, cfg, reply.localReplyEnvelope, action, fallback)
+		fallbackResult, fallbackErr := s.deliverLocalMail(ctx, meta, cfg, reply, action, fallback)
 		if fallbackErr == nil {
 			writeTimestampedLocalMessageLog(s.messageLog, s.logger, at, formatSendResultLogLocal(action, fallbackResult, reply.MessageID))
 			return fallbackResult, nil
@@ -306,7 +317,7 @@ func (s *localSender) Send(ctx context.Context, input emailsvc.SendInput) (*loca
 		}
 		s.logf("stage=%s mode=fallback err=%v", action, fallbackErr)
 		exception := normalized.exceptionPayload()
-		exceptionResult, exceptionErr := s.deliverLocalMail(ctx, meta, cfg, reply.localReplyEnvelope, action, exception)
+		exceptionResult, exceptionErr := s.deliverLocalMail(ctx, meta, cfg, reply, action, exception)
 		if exceptionErr == nil {
 			writeTimestampedLocalMessageLog(s.messageLog, s.logger, at, formatSendResultLogLocal(action, exceptionResult, reply.MessageID))
 			return exceptionResult, nil
@@ -315,7 +326,7 @@ func (s *localSender) Send(ctx context.Context, input emailsvc.SendInput) (*loca
 		return nil, fallbackErr
 	}
 
-	result, sendErr := s.deliverLocalMail(ctx, meta, cfg, reply.localReplyEnvelope, action, normalized)
+	result, sendErr := s.deliverLocalMail(ctx, meta, cfg, reply, action, normalized)
 	if sendErr == nil {
 		writeTimestampedLocalMessageLog(s.messageLog, s.logger, at, formatSendResultLogLocal(action, result, reply.MessageID))
 		return result, nil
@@ -327,7 +338,7 @@ func (s *localSender) Send(ctx context.Context, input emailsvc.SendInput) (*loca
 
 	s.logf("stage=%s mode=structured-fallback err=%v", action, sendErr)
 	fallback := normalized.fallbackPayload()
-	fallbackResult, fallbackErr := s.deliverLocalMail(ctx, meta, cfg, reply.localReplyEnvelope, action, fallback)
+	fallbackResult, fallbackErr := s.deliverLocalMail(ctx, meta, cfg, reply, action, fallback)
 	if fallbackErr == nil {
 		writeTimestampedLocalMessageLog(s.messageLog, s.logger, at, formatSendResultLogLocal(action, fallbackResult, reply.MessageID))
 		return fallbackResult, nil
@@ -339,7 +350,7 @@ func (s *localSender) Send(ctx context.Context, input emailsvc.SendInput) (*loca
 
 	s.logf("stage=%s mode=fallback err=%v", action, fallbackErr)
 	exception := normalized.exceptionPayload()
-	exceptionResult, exceptionErr := s.deliverLocalMail(ctx, meta, cfg, reply.localReplyEnvelope, action, exception)
+	exceptionResult, exceptionErr := s.deliverLocalMail(ctx, meta, cfg, reply, action, exception)
 	if exceptionErr == nil {
 		writeTimestampedLocalMessageLog(s.messageLog, s.logger, at, formatSendResultLogLocal(action, exceptionResult, reply.MessageID))
 		return exceptionResult, nil
@@ -545,7 +556,7 @@ func (d localNormalizedDelivery) exceptionPayload() localNormalizedDelivery {
 	}
 }
 
-func (s *localSender) deliverLocalMail(ctx context.Context, meta *connectsvc.Meta, cfg emailsvc.Config, reply localReplyEnvelope, action string, payload localNormalizedDelivery) (*localSendResult, error) {
+func (s *localSender) deliverLocalMail(ctx context.Context, meta *connectsvc.Meta, cfg emailsvc.Config, reply localReplyParseContext, action string, payload localNormalizedDelivery) (*localSendResult, error) {
 	content := strings.TrimSpace(payload.Content)
 	images := uniqueStrings(cleanCSVItems(payload.Images))
 	files := uniqueStrings(cleanCSVItems(payload.Files))
@@ -567,15 +578,17 @@ func (s *localSender) deliverLocalMail(ctx context.Context, meta *connectsvc.Met
 	outgoing := localOutgoingMail{
 		From:        strings.TrimSpace(cfg.Email),
 		To:          append([]string(nil), reply.To...),
-		Subject:     replySubjectLocal(reply.Subject),
+		Subject:     strings.TrimSpace(reply.Subject),
 		TextBody:    textBody,
 		HTMLBody:    htmlBody,
-		InReplyTo:   strings.TrimSpace(reply.MessageID),
 		MessageID:   buildOutgoingMessageIDLocal(cfg.Email),
 		Date:        s.clock(),
 		Attachments: attachments,
 	}
-	outgoing.References = append([]string(nil), reply.References...)
+	if reply.IsReply {
+		outgoing.InReplyTo = strings.TrimSpace(reply.MessageID)
+		outgoing.References = append([]string(nil), reply.References...)
+	}
 	if outgoing.From == "" {
 		return nil, errors.New("meta.email is required")
 	}
@@ -1440,6 +1453,42 @@ func normalizeSMTPAddressLocal(value string) (string, int, error) {
 type localReplyParseContext struct {
 	localReplyEnvelope
 	EnvelopeRaw string
+	IsReply     bool
+}
+
+func resolveLocalReplyEnvelope(raw, to, subject string) (localReplyParseContext, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return newLocalOutgoingEnvelope(to, subject)
+	}
+
+	var requestPayload any
+	if err := json.Unmarshal([]byte(raw), &requestPayload); err != nil {
+		return localReplyParseContext{}, errors.New("message must be valid json")
+	}
+	request, _ := requestPayload.(map[string]any)
+	_, hasRawRequest := localRawRequestValue(request)
+	if !hasRawRequest {
+		return newLocalOutgoingEnvelope(to, subject)
+	}
+	return extractLocalReplyEnvelope(raw)
+}
+
+func newLocalOutgoingEnvelope(to, subject string) (localReplyParseContext, error) {
+	recipients := dedupeStringsLocal(parseAddressCandidatesLocal(to))
+	if len(recipients) == 0 {
+		return localReplyParseContext{}, errors.New("--to is required when message.rawRequest is not provided")
+	}
+	subject = strings.TrimSpace(subject)
+	if subject == "" {
+		return localReplyParseContext{}, errors.New("--subject is required when message.rawRequest is not provided")
+	}
+	return localReplyParseContext{
+		localReplyEnvelope: localReplyEnvelope{
+			To:      recipients,
+			Subject: subject,
+		},
+	}, nil
 }
 
 func extractLocalReplyEnvelope(raw string) (localReplyParseContext, error) {
@@ -1448,17 +1497,17 @@ func extractLocalReplyEnvelope(raw string) (localReplyParseContext, error) {
 		return localReplyParseContext{}, errors.New("message is required")
 	}
 
-	var requestPayload map[string]any
+	var requestPayload any
 	if err := json.Unmarshal([]byte(raw), &requestPayload); err != nil {
 		return localReplyParseContext{}, errors.New("message must be valid json")
 	}
-
-	envelopeRaw := strings.TrimSpace(firstNonEmptyLocal(
-		stringPathLocal(requestPayload, "rawRequest"),
-		stringPathLocal(requestPayload, "raw_request"),
-	))
-	if envelopeRaw == "" {
+	request, _ := requestPayload.(map[string]any)
+	envelopeRaw, hasRawRequest := localRawRequestValue(request)
+	if !hasRawRequest {
 		return localReplyParseContext{}, errors.New("message.rawRequest not found")
+	}
+	if strings.TrimSpace(envelopeRaw) == "" {
+		return localReplyParseContext{}, errors.New("message.rawRequest must be a non-empty json string")
 	}
 
 	var payload map[string]any
@@ -1466,22 +1515,57 @@ func extractLocalReplyEnvelope(raw string) (localReplyParseContext, error) {
 		return localReplyParseContext{}, errors.New("message.rawRequest must be valid json")
 	}
 
-	var envelope localReplyEnvelope
-	collectLocalReplyEnvelope(&envelope, payload)
-	envelope.MessageID = normalizeReplyMessageIDLocal(envelope.MessageID)
-	if strings.TrimSpace(envelope.MessageID) == "" {
+	message, _ := payload["message"].(map[string]any)
+	messageID := normalizeReplyMessageIDLocal(stringPathLocal(message, "messageId"))
+	if messageID == "" {
 		return localReplyParseContext{}, errors.New("message.rawRequest.message.messageId not found")
 	}
-	envelope.To = dedupeStringsLocal(cleanCSVItems(envelope.To))
+	from := strings.TrimSpace(stringPathLocal(message, "from"))
+	if from == "" {
+		return localReplyParseContext{}, errors.New("message.rawRequest.message.from not found")
+	}
+	subject := strings.TrimSpace(stringPathLocal(message, "subject"))
+	if subject == "" {
+		return localReplyParseContext{}, errors.New("message.rawRequest.message.subject not found")
+	}
+
+	envelope := localReplyEnvelope{
+		To:        dedupeStringsLocal(parseAddressCandidatesLocal(from)),
+		Subject:   replySubjectLocal(subject),
+		MessageID: messageID,
+	}
 	if len(envelope.To) == 0 {
 		return localReplyParseContext{}, errors.New("message.rawRequest.message.from not found")
 	}
-	envelope.Subject = replySubjectLocal(envelope.Subject)
+	collectLocalReplyEnvelope(&envelope, payload)
+	envelope.To = dedupeStringsLocal(cleanCSVItems(envelope.To))
 	envelope.References = appendReferenceIDsLocal(normalizeReplyMessageIDsLocal(envelope.References), envelope.MessageID)
 	return localReplyParseContext{
 		localReplyEnvelope: envelope,
 		EnvelopeRaw:        envelopeRaw,
+		IsReply:            true,
 	}, nil
+}
+
+func localRawRequestValue(request map[string]any) (string, bool) {
+	if request == nil {
+		return "", false
+	}
+	if value, ok := request["rawRequest"]; ok {
+		raw, ok := value.(string)
+		if !ok {
+			return "", true
+		}
+		return strings.TrimSpace(raw), true
+	}
+	if value, ok := request["raw_request"]; ok {
+		raw, ok := value.(string)
+		if !ok {
+			return "", true
+		}
+		return strings.TrimSpace(raw), true
+	}
+	return "", false
 }
 
 func collectLocalReplyEnvelope(envelope *localReplyEnvelope, payload map[string]any) {
@@ -1537,10 +1621,6 @@ func mergeReplyEnvelopeHeadersLocal(envelope *localReplyEnvelope, raw any) {
 			if strings.TrimSpace(envelope.Subject) == "" {
 				envelope.Subject = decodeHeaderValueLocal(value)
 			}
-		case strings.EqualFold(name, "Reply-To"):
-			envelope.To = append(envelope.To, parseAddressCandidatesLocal(value)...)
-		case strings.EqualFold(name, "From"):
-			envelope.To = append(envelope.To, parseAddressCandidatesLocal(value)...)
 		case strings.EqualFold(name, "References"):
 			envelope.References = append(envelope.References, extractReplyMessageIDsLocal(value)...)
 		case strings.EqualFold(name, "In-Reply-To"):
@@ -1741,7 +1821,7 @@ func buildOutgoingMessageIDLocal(email string) string {
 	return "<" + uuid.NewString() + "@" + domain + ">"
 }
 
-func formatSendRequestLogLocal(action string, input emailsvc.SendInput) string {
+func formatSendRequestLogLocal(action string, input localSendInput) string {
 	action = strings.TrimSpace(strings.ToLower(action))
 	if action == "" {
 		action = "send"
@@ -1757,6 +1837,12 @@ func formatSendRequestLogLocal(action string, input emailsvc.SendInput) string {
 	}
 	if files := strings.Join(cleanCSVItems(input.Files), ","); files != "" {
 		parts = append(parts, "files="+quoteLogValueLocal(files))
+	}
+	if to := strings.TrimSpace(input.To); to != "" {
+		parts = append(parts, "to="+quoteLogValueLocal(to))
+	}
+	if subject := strings.TrimSpace(input.Subject); subject != "" {
+		parts = append(parts, "subject="+quoteLogValueLocal(subject))
 	}
 	return strings.Join(parts, " ")
 }

@@ -1,6 +1,6 @@
 ---
 name: __internal_deepright
-description: 使用 DeepRight 内置命令管理当前 Agent、插件、Connect 配置、定时任务及运行时设置。触发关键字：deepright、dr
+description: 使用App内置命令管理当前Agent、插件、Connect配置、定时任务及运行时设置。触发关键字：deepright、dr
 ---
 
 ### 命令入口与默认上下文

@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -477,16 +478,147 @@ func TestHandleLocalCommandHelp(t *testing.T) {
 	if !strings.Contains(text, "plain text body content") {
 		t.Fatalf("help output should mention plain text content: %s", text)
 	}
+	for _, want := range []string{
+		"email sender [options]",
+		"email search [--query TEXT] [--sender EMAIL] [options]",
+		"email search --query \"退款 已处理\" --limit 20 --offset 0 --connect-bin ./integration",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("help output missing %q: %s", want, text)
+		}
+	}
 	if !strings.Contains(text, "default 300") {
 		t.Fatalf("help output should mention 300 second default: %s", text)
 	}
 	if !strings.Contains(text, "邮箱的smtp地址，如smtp.gmail.com") {
 		t.Fatalf("help output should mention descriptive param schema: %s", text)
 	}
+	if !strings.Contains(text, "--to ADDRESSES") || !strings.Contains(text, "--subject TEXT") {
+		t.Fatalf("help output should mention new mail options: %s", text)
+	}
 	for _, unwanted := range []string{"email start [options]", "email stop [options]", "\"start\",\"stop\""} {
 		if strings.Contains(text, unwanted) {
 			t.Fatalf("help output should not contain %q: %s", unwanted, text)
 		}
+	}
+}
+
+func TestEmailSenderQueriesGenericSnapshotCapability(t *testing.T) {
+	root := t.TempDir()
+	integration := filepath.Join(root, "integration")
+	if err := os.WriteFile(integration, []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "config"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "config", "config.json"), []byte(`{"email":{"lastMessage":72}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	original := runEmailSnapshotQueryCommand
+	defer func() { runEmailSnapshotQueryCommand = original }()
+	var gotBinary string
+	var gotArgs []string
+	runEmailSnapshotQueryCommand = func(binary string, args []string) ([]byte, error) {
+		gotBinary = binary
+		gotArgs = append([]string(nil), args...)
+		return []byte(`[{"senderId":"alice@example.com","lastMessageAt":"2026-07-19T10:30:00Z"}]`), nil
+	}
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"sender", "--connect-bin", integration}, &stdout, &stderr); code != 0 {
+		t.Fatalf("sender code = %d, stderr = %s", code, stderr.String())
+	}
+	if gotBinary != integration {
+		t.Fatalf("binary = %q, want %q", gotBinary, integration)
+	}
+	wantArgs := []string{"connect", "message-snapshot-senders", "--source", "email", "--window-hours", "72"}
+	if !slices.Equal(gotArgs, wantArgs) {
+		t.Fatalf("args = %#v, want %#v", gotArgs, wantArgs)
+	}
+	if !strings.Contains(stdout.String(), `"sender": "alice@example.com"`) {
+		t.Fatalf("sender output = %s", stdout.String())
+	}
+}
+
+func TestEmailSearchQueriesGenericSnapshotCapability(t *testing.T) {
+	root := t.TempDir()
+	integration := filepath.Join(root, "integration")
+	if err := os.WriteFile(integration, []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "config"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "config", "config.json"), []byte(`{"email":{"lastMessage":24}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	original := runEmailSnapshotQueryCommand
+	defer func() { runEmailSnapshotQueryCommand = original }()
+	var gotArgs []string
+	runEmailSnapshotQueryCommand = func(_ string, args []string) ([]byte, error) {
+		gotArgs = append([]string(nil), args...)
+		return []byte(`{"total":1,"limit":20,"offset":5,"items":[{"messageId":"<mail@example.com>","senderId":"alice@example.com","content":"退款已处理","sentAt":"2026-07-19T10:30:00Z"}]}`), nil
+	}
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"search", "--query", `"退款申请" 已处理`, "--limit", "20", "--offset", "5", "--connect-bin", integration}, &stdout, &stderr); code != 0 {
+		t.Fatalf("search code = %d, stderr = %s", code, stderr.String())
+	}
+	wantArgs := []string{"connect", "message-snapshot-search", "--source", "email", "--window-hours", "24", "--query", `"退款申请" 已处理`, "--limit", "20", "--offset", "5"}
+	if !slices.Equal(gotArgs, wantArgs) {
+		t.Fatalf("args = %#v, want %#v", gotArgs, wantArgs)
+	}
+	if !strings.Contains(stdout.String(), `"sender": "alice@example.com"`) || strings.Contains(stdout.String(), "senderId") {
+		t.Fatalf("search output = %s", stdout.String())
+	}
+}
+
+func TestEmailSearchAllowsOmittedQueryAndFiltersSender(t *testing.T) {
+	root := t.TempDir()
+	integration := filepath.Join(root, "integration")
+	if err := os.WriteFile(integration, []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "config"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "config", "config.json"), []byte(`{"email":{"lastMessage":24}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	original := runEmailSnapshotQueryCommand
+	defer func() { runEmailSnapshotQueryCommand = original }()
+	var gotArgs []string
+	runEmailSnapshotQueryCommand = func(_ string, args []string) ([]byte, error) {
+		gotArgs = append([]string(nil), args...)
+		return []byte(`{"total":0,"limit":20,"offset":0,"items":[]}`), nil
+	}
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"search", "--sender", "Alice@Example.COM", "--limit", "20", "--connect-bin", integration}, &stdout, &stderr); code != 0 {
+		t.Fatalf("search code = %d, stderr = %s", code, stderr.String())
+	}
+	wantArgs := []string{"connect", "message-snapshot-search", "--source", "email", "--window-hours", "24", "--sender-id", "alice@example.com", "--limit", "20"}
+	if !slices.Equal(gotArgs, wantArgs) {
+		t.Fatalf("args = %#v, want %#v", gotArgs, wantArgs)
+	}
+}
+
+func TestEmailSenderRejectsInvalidLastMessageConfig(t *testing.T) {
+	root := t.TempDir()
+	integration := filepath.Join(root, "integration")
+	if err := os.WriteFile(integration, []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "config"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "config", "config.json"), []byte(`{"email":{"lastMessage":0}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"sender", "--connect-bin", integration}, &stdout, &stderr); code == 0 {
+		t.Fatal("sender unexpectedly succeeded")
+	}
+	if !strings.Contains(stderr.String(), "email.lastMessage must be a positive integer") {
+		t.Fatalf("stderr = %s", stderr.String())
 	}
 }
 
@@ -894,11 +1026,191 @@ func TestLocalSenderLogsSpecificParseFailureReason(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected parse failure")
 	}
-	if err.Error() != "message.rawRequest not found" {
+	if err.Error() != "--to is required when message.rawRequest is not provided" {
 		t.Fatalf("err = %q", err.Error())
 	}
-	if !strings.Contains(messageLog.String(), `原因：message.rawRequest not found`) {
+	if !strings.Contains(messageLog.String(), `原因：--to is required when message.rawRequest is not provided`) {
 		t.Fatalf("expected parse failure log, got: %s", messageLog.String())
+	}
+}
+
+func TestLocalSenderSendsNewMailWithoutMessage(t *testing.T) {
+	transport := &stubLocalSMTPTransport{}
+	sender := newStubLocalSenderForTest(io.Discard, transport)
+
+	result, err := sender.SendWithOptions(context.Background(), localSendInput{
+		SendInput: emailsvc.SendInput{
+			Action:  "init",
+			Content: "新的邮件正文",
+		},
+		To:      "Alice <alice@example.com>, bob@example.com",
+		Subject: "新邮件主题",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.To != "alice@example.com,bob@example.com" {
+		t.Fatalf("result to = %q", result.To)
+	}
+	if len(transport.calls) != 1 {
+		t.Fatalf("smtp calls = %d, want 1", len(transport.calls))
+	}
+	mail := transport.calls[0].mail
+	if got := strings.Join(mail.To, ","); got != "alice@example.com,bob@example.com" {
+		t.Fatalf("mail to = %q", got)
+	}
+	if mail.Subject != "新邮件主题" {
+		t.Fatalf("subject = %q", mail.Subject)
+	}
+	if mail.InReplyTo != "" || len(mail.References) != 0 {
+		t.Fatalf("new mail must not have reply headers: %+v", mail)
+	}
+}
+
+func TestLocalSenderSendsNewMailWithMessageWithoutRawRequest(t *testing.T) {
+	transport := &stubLocalSMTPTransport{}
+	sender := newStubLocalSenderForTest(io.Discard, transport)
+
+	_, err := sender.SendWithOptions(context.Background(), localSendInput{
+		SendInput: emailsvc.SendInput{
+			Message: `{"id":1,"name":"email"}`,
+			Content: "新的邮件正文",
+		},
+		To:      "recipient@example.com",
+		Subject: "新邮件主题",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(transport.calls) != 1 {
+		t.Fatalf("smtp calls = %d, want 1", len(transport.calls))
+	}
+}
+
+func TestLocalSenderRequiresToAndSubjectForNewMail(t *testing.T) {
+	cases := []struct {
+		name    string
+		to      string
+		subject string
+		wantErr string
+	}{
+		{name: "missing to", subject: "主题", wantErr: "--to is required when message.rawRequest is not provided"},
+		{name: "missing subject", to: "recipient@example.com", wantErr: "--subject is required when message.rawRequest is not provided"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			sender := newStubLocalSenderForTest(io.Discard, &stubLocalSMTPTransport{})
+			_, err := sender.SendWithOptions(context.Background(), localSendInput{
+				SendInput: emailsvc.SendInput{Content: "新的邮件正文"},
+				To:        tc.to,
+				Subject:   tc.subject,
+			})
+			if err == nil || err.Error() != tc.wantErr {
+				t.Fatalf("err = %v, want %q", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestLocalSenderRawRequestTakesPrecedenceOverToAndSubject(t *testing.T) {
+	transport := &stubLocalSMTPTransport{}
+	sender := newStubLocalSenderForTest(io.Discard, transport)
+
+	_, err := sender.SendWithOptions(context.Background(), localSendInput{
+		SendInput: emailsvc.SendInput{
+			Action:  "send",
+			Message: latestEmailConnectRequestMessageJSONLocal("<origin@example.com>", "原始主题", "Sender <sender@example.com>", "<root@example.com>"),
+			Content: "回复正文",
+		},
+		To:      "other@example.com",
+		Subject: "不应使用的主题",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(transport.calls) != 1 {
+		t.Fatalf("smtp calls = %d, want 1", len(transport.calls))
+	}
+	mail := transport.calls[0].mail
+	if got := strings.Join(mail.To, ","); got != "sender@example.com" {
+		t.Fatalf("mail to = %q", got)
+	}
+	if mail.Subject != "Re: 原始主题" {
+		t.Fatalf("subject = %q", mail.Subject)
+	}
+	if mail.InReplyTo != "<origin@example.com>" {
+		t.Fatalf("in-reply-to = %q", mail.InReplyTo)
+	}
+	if got := strings.Join(mail.References, ","); got != "<root@example.com>,<origin@example.com>" {
+		t.Fatalf("references = %q", got)
+	}
+}
+
+func TestLocalSenderRejectsInvalidMessageAndRawRequest(t *testing.T) {
+	cases := []struct {
+		name    string
+		message string
+		wantErr string
+	}{
+		{
+			name:    "invalid message json",
+			message: "{",
+			wantErr: "message must be valid json",
+		},
+		{
+			name:    "empty raw request",
+			message: `{"rawRequest":""}`,
+			wantErr: "message.rawRequest must be a non-empty json string",
+		},
+		{
+			name:    "null raw request",
+			message: `{"rawRequest":null}`,
+			wantErr: "message.rawRequest must be a non-empty json string",
+		},
+		{
+			name:    "invalid raw request json",
+			message: `{"rawRequest":"{"}`,
+			wantErr: "message.rawRequest must be valid json",
+		},
+		{
+			name: "missing raw request subject",
+			message: mustJSONTextLocal(map[string]any{
+				"rawRequest": mustJSONTextLocal(map[string]any{
+					"message": map[string]any{
+						"messageId": "<origin@example.com>",
+						"from":      "sender@example.com",
+					},
+				}),
+			}),
+			wantErr: "message.rawRequest.message.subject not found",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			sender := newStubLocalSenderForTest(io.Discard, &stubLocalSMTPTransport{})
+			_, err := sender.SendWithOptions(context.Background(), localSendInput{
+				SendInput: emailsvc.SendInput{Message: tc.message, Content: "正文"},
+				To:        "recipient@example.com",
+				Subject:   "新主题",
+			})
+			if err == nil || err.Error() != tc.wantErr {
+				t.Fatalf("err = %v, want %q", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestLocalSenderValidatesMessageBeforeLoadingConfig(t *testing.T) {
+	sender := newLocalSender(stubLocalMetaLoader{err: errors.New("load config should not run first")}, nil, io.Discard)
+	_, err := sender.SendWithOptions(context.Background(), localSendInput{
+		SendInput: emailsvc.SendInput{Message: "{", Content: "正文"},
+		To:        "recipient@example.com",
+		Subject:   "新主题",
+	})
+	if err == nil || err.Error() != "message must be valid json" {
+		t.Fatalf("err = %v", err)
 	}
 }
 

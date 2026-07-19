@@ -239,6 +239,21 @@ func TestRunCLIReturnsFixedParamAndName(t *testing.T) {
 	}
 }
 
+func TestHelpHidesLifecycleCommands(t *testing.T) {
+	for _, args := range [][]string{{"--help"}, {"help"}} {
+		stdout := &bytes.Buffer{}
+		stderr := &bytes.Buffer{}
+		if code := RunCLI(args, stdout, stderr); code != 0 {
+			t.Fatalf("%v exit code = %d, stderr = %s", args, code, stderr.String())
+		}
+		for _, hidden := range []string{"feishu init", "feishu start", "feishu stop", "\"init\"", "\"start\"", "\"stop\""} {
+			if strings.Contains(stdout.String(), hidden) {
+				t.Fatalf("%v unexpectedly mentions %q\n%s", args, hidden, stdout.String())
+			}
+		}
+	}
+}
+
 func TestValidateConfigReturnsCompatSetupError(t *testing.T) {
 	originalBuilder := newFeishuLarkClient
 	defer func() { newFeishuLarkClient = originalBuilder }()

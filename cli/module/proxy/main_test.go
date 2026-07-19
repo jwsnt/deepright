@@ -6194,8 +6194,8 @@ func TestHandleSkills(t *testing.T) {
 	}
 	var namesA []string
 	json.NewDecoder(resp.Body).Decode(&namesA)
-	if !reflect.DeepEqual(namesA, []string{"__internal_F", "__internal_cron", "__internal_demo"}) {
-		t.Errorf("agentId=a skills = %v, want [__internal_F __internal_cron __internal_demo]", namesA)
+	if !reflect.DeepEqual(namesA, []string{"__internal_cron", "__internal_demo", "__internal_F"}) {
+		t.Errorf("agentId=a skills = %v, want [__internal_cron __internal_demo __internal_F]", namesA)
 	}
 
 	// agentId=b → [__internal_A, __internal_F] (requirement) — actual test-case may include __internal_c
@@ -6456,7 +6456,7 @@ func TestHandleSkillsIncludesPluginInternalSkillsOnlyWhenStarted(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	want := []string{"__internal_F", "__internal_cron", "__internal_demo"}
+	want := []string{"__internal_cron", "__internal_demo", "__internal_F"}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("skills without started plugins = %v, want %v", names, want)
 	}
@@ -6491,7 +6491,7 @@ func TestHandleSkillsIncludesPluginInternalSkillsOnlyWhenStarted(t *testing.T) {
 		t.Fatalf("decode started response: %v", err)
 	}
 
-	wantStarted := []string{"__internal_F", "__internal_cron", "__internal_demo", "__internal_browser", "__internal_remote"}
+	wantStarted := []string{"__internal_browser", "__internal_cron", "__internal_demo", "__internal_F", "__internal_remote"}
 	if !reflect.DeepEqual(names, wantStarted) {
 		t.Fatalf("skills = %v, want %v", names, wantStarted)
 	}

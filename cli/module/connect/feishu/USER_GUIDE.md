@@ -11,14 +11,16 @@
 
 接收侧会把 10 分钟内尚未推送的同会话待处理消息放入本地待处理队列。只要队列中已经出现文本消息，就会把同批次中的图片/文件资源归一化后和文本一起推送；如果 10 分钟内始终只有图片或文件，则标记过期并丢弃。成功推送 `connect add-request` 后，插件会立即回复 `<已收到>任务将在30秒内批量执行，可通过新消息更新内容。`。
 
-此外，插件始终提供六个固定元信息命令：
+此外，插件始终提供八个固定元信息与本地查询命令：
 
-- `command` 固定返回 `["command","help","name","param","scope","schema","init","send","start","stop"]`
+- `command` 固定返回 `["command","help","name","param","scope","schema","openid","search","init","send","start","stop"]`
 - `help` 打印插件使用手册
 - `param` 固定返回带字段说明的示例对象数组，字段 key 固定为 `appId`、`appSecret`
 - `name` 固定返回 `{"key":"feishu","name":"飞书"}`
 - `scope` 固定返回 `["reuse","agent","provider","thinking","swarm"]`
 - `schema` 固定返回飞书插件响应 JSON Schema
+- `openid` 返回配置时间窗口内、按最后发送时间去重的发送者 openid
+- `search` 搜索配置时间窗口内的归一化文本消息
 
 ## 编译
 
@@ -34,6 +36,8 @@
 - 待处理聚合迭代需求：[iteration/20260521-1/REQUIREMENT.md](iteration/20260521-1/REQUIREMENT.md)
 - 入库即时回执迭代需求：[iteration/20260717-1/REQUIREMENT.md](iteration/20260717-1/REQUIREMENT.md)
 - 入库即时回执迭代手册：[iteration/20260717-1/USER_GUIDE.md](iteration/20260717-1/USER_GUIDE.md)
+- 消息快照查询迭代需求：[iteration/20260719-1/REQUIREMENT.md](iteration/20260719-1/REQUIREMENT.md)
+- 消息快照查询迭代手册：[iteration/20260719-1/USER_GUIDE.md](iteration/20260719-1/USER_GUIDE.md)
 - 当前用户手册：[USER_GUIDE.md](USER_GUIDE.md)
 
 ## 固定输出命令
@@ -47,12 +51,27 @@
 ../plugins/feishu param
 ../plugins/feishu scope
 ../plugins/feishu schema
+../plugins/feishu openid --connect-bin ./integration
+../plugins/feishu search --query "退款 已处理" --limit 20 --offset 0 --connect-bin ./integration
 ```
 
 返回示例：
 
 ```json
-["command","help","name","param","scope","schema","init","send","start","stop"]
+[
+  "command",
+  "help",
+  "name",
+  "param",
+  "scope",
+  "schema",
+  "openid",
+  "search",
+  "init",
+  "send",
+  "start",
+  "stop"
+]
 ```
 
 ```json
@@ -109,6 +128,66 @@
 
 ```json
 {"key":"feishu","name":"飞书"}
+```
+
+## 消息快照查询
+
+`openid` 和 `search` 只查询 Integration / Connect 的本地通用消息快照：飞书插件以 `source=feishu` 写入快照，Integration 不解析飞书报文或依赖飞书插件。命令不会调用飞书 Open API，也不会读取 `feishu.log`。
+
+查询时间窗口来自 Integration 运行目录的 `config/config.json`：
+
+```json
+{
+  "feishu": {
+    "lastMessage": 72
+  }
+}
+```
+
+`feishu.lastMessage` 必须是大于 0 的整数，单位为小时。缺少配置文件、JSON 非法、字段缺失或值无效时，命令立即失败，不会默认使用 72 小时。
+
+查询最近窗口内每个发送者最后一次消息：
+
+```bash
+../plugins/feishu openid --connect-bin ./integration
+```
+
+```json
+[
+  {
+    "openid": "ou_7a8b",
+    "lastMessageAt": "2026-07-19T10:30:00Z"
+  }
+]
+```
+
+结果中 `openid` 唯一，按 `lastMessageAt` 从新到旧排序。文本、图片和文件消息都可更新一个 openid 的最后发送时间。
+
+搜索归一化后的文本消息：
+
+```bash
+../plugins/feishu search --query "退款 已处理" --limit 20 --offset 0 --connect-bin ./integration
+../plugins/feishu search --query '"退款申请" 已处理' --connect-bin ./integration
+../plugins/feishu search --limit 20 --offset 0 --connect-bin ./integration
+../plugins/feishu search --openid ou_7a8b --limit 20 --connect-bin ./integration
+```
+
+空白分隔的关键词采用 AND；双引号中的连续内容为一个短语。搜索不区分大小写，采用包含匹配；纯图片和纯文件消息不会被返回。省略或传入空 `--query` 时列出窗口内全部文本消息；`--openid` 对发送者作精确过滤，可与关键词取 AND。`--limit` 默认 50、最大 200，`--offset` 默认 0。
+
+```json
+{
+  "total": 1,
+  "limit": 20,
+  "offset": 0,
+  "items": [
+    {
+      "messageId": "om_xxx",
+      "openid": "ou_7a8b",
+      "content": "退款申请已处理",
+      "sentAt": "2026-07-19T10:30:00Z"
+    }
+  ]
+}
 ```
 
 ## 配置方式

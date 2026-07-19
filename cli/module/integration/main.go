@@ -1460,7 +1460,9 @@ func hydrateAgentOutput(output *AgentOutput, chatID string) {
 	seedreamSkill, seedreamEnabled := integrationSeedreamSkillDefinition()
 	mode := readIntegrationSandboxMode(chatID)
 	for i := range output.Agents {
-		output.Agents[i].Skills = integrationApplySeedreamSkill(output.Agents[i].Skills, seedreamSkill, seedreamEnabled)
+		skills := integrationApplySeedreamSkill(output.Agents[i].Skills, seedreamSkill, seedreamEnabled)
+		agentcore.SortSkills(skills)
+		output.Agents[i].Skills = skills
 		output.Agents[i].Sandbox = mode
 	}
 }
@@ -4184,6 +4186,7 @@ func buildIntegrationRuntimeSkillNames(base []string) []string {
 		status, err := connectsvc.PluginStatusByKey(item.key, nil)
 		appendIfMissing(item.skill, err == nil && status != nil && status.Started)
 	}
+	agentcore.SortSkillNames(out)
 	return out
 }
 

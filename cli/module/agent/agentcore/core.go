@@ -25,6 +25,54 @@ import (
 
 type Skill = skillscore.Skill
 
+const internalSkillPrefix = "__internal"
+
+func alphabeticalNameLess(left, right string) bool {
+	left = strings.TrimSpace(left)
+	right = strings.TrimSpace(right)
+	leftFolded := strings.ToLower(left)
+	rightFolded := strings.ToLower(right)
+	if leftFolded == rightFolded {
+		return left < right
+	}
+	return leftFolded < rightFolded
+}
+
+func isInternalSkillName(name string) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(name)), internalSkillPrefix)
+}
+
+// SortSkillNames orders regular skills before internal skills. Each group is
+// ordered alphabetically so every API exposing skill names has a stable order.
+func SortSkillNames(names []string) {
+	sort.SliceStable(names, func(i, j int) bool {
+		leftInternal := isInternalSkillName(names[i])
+		rightInternal := isInternalSkillName(names[j])
+		if leftInternal != rightInternal {
+			return !leftInternal
+		}
+		return alphabeticalNameLess(names[i], names[j])
+	})
+}
+
+// SortSkills orders skill metadata using the same order as SortSkillNames.
+func SortSkills(skills []Skill) {
+	sort.SliceStable(skills, func(i, j int) bool {
+		leftInternal := isInternalSkillName(skills[i].Name)
+		rightInternal := isInternalSkillName(skills[j].Name)
+		if leftInternal != rightInternal {
+			return !leftInternal
+		}
+		return alphabeticalNameLess(skills[i].Name, skills[j].Name)
+	})
+}
+
+func sortAgents(agents []Agent) {
+	sort.SliceStable(agents, func(i, j int) bool {
+		return alphabeticalNameLess(agents[i].AgentID, agents[j].AgentID)
+	})
+}
+
 func SkillNames(skills []Skill) []string {
 	names := make([]string, 0, len(skills))
 	for _, skill := range skills {
@@ -34,6 +82,7 @@ func SkillNames(skills []Skill) []string {
 		}
 		names = append(names, name)
 	}
+	SortSkillNames(names)
 	return names
 }
 
@@ -243,6 +292,7 @@ func scanAgents(root string) ([]Agent, error) {
 		if skills == nil {
 			skills = []Skill{}
 		}
+		SortSkills(skills)
 
 		cfg := readAgentConfig(agentDir)
 
@@ -260,6 +310,7 @@ func scanAgents(root string) ([]Agent, error) {
 			Skills:        skills,
 		})
 	}
+	sortAgents(agents)
 	return agents, nil
 }
 
@@ -291,7 +342,9 @@ func ListAgentIDs(root string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	sort.Strings(names)
+	sort.SliceStable(names, func(i, j int) bool {
+		return alphabeticalNameLess(names[i], names[j])
+	})
 	return names, nil
 }
 
@@ -780,6 +833,7 @@ func refreshAgentSkills(output *Output) error {
 		if skills == nil {
 			skills = []Skill{}
 		}
+		SortSkills(skills)
 		output.Agents[i].Skills = skills
 	}
 	return nil

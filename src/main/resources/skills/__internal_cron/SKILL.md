@@ -1,6 +1,6 @@
 ---
 name: __internal_cron
-description: 创建、查询、修改和删除当前 Agent 范围内的一次性或周期性定时任务
+description: 创建、查询、修改和删除当前Agent范围内的一次性或周期性定时任务
 ---
 
 ### 命令与默认上下文

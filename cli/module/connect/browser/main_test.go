@@ -270,13 +270,13 @@ func writeBrowserRuntimeRecordFixture(t *testing.T, connectBin string) string {
 	return runtimeFilePath
 }
 
-func TestHelpOmitsLegacyWSLBootstrapDetails(t *testing.T) {
+func TestHelpHidesLifecycleCommands(t *testing.T) {
 	restore := stubBrowserRuntime()
 	defer restore()
 
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
-	if code := runCLI([]string{"help"}, stdout, stderr); code != 0 {
+	if code := runCLI([]string{"--help"}, stdout, stderr); code != 0 {
 		t.Fatalf("help exit code = %d, stderr = %s", code, stderr.String())
 	}
 
@@ -287,14 +287,16 @@ func TestHelpOmitsLegacyWSLBootstrapDetails(t *testing.T) {
 		"./browser shutdown --agentId agent-a --chatId chat-001",
 		"/mnt/c/Program Files/Google/Chrome/Application/chrome.exe",
 		"C:\\ProgramData\\deepright\\chrome_def",
-		"browser start refreshes chrome_def without restarting integration or opening a new page",
-		"browser stop only deletes C:\\ProgramData\\deepright\\chrome_def; managed chrome_* directories are preserved",
 	} {
 		if !strings.Contains(text, wanted) {
 			t.Fatalf("help output missing %q\n%s", wanted, text)
 		}
 	}
 	for _, hidden := range []string{
+		"browser start [",
+		"browser stop\n",
+		"browser instance init",
+		"browser instance stop",
 		"localhost:29876",
 		"browser start logs the full fixed-port Chrome launch command",
 		"browser start also runs one fixed Chrome CDP",
@@ -302,6 +304,19 @@ func TestHelpOmitsLegacyWSLBootstrapDetails(t *testing.T) {
 	} {
 		if strings.Contains(text, hidden) {
 			t.Fatalf("help output should not expose %q\n%s", hidden, text)
+		}
+	}
+
+	for _, args := range [][]string{{"daemon", "--help"}, {"instance", "--help"}} {
+		stdout.Reset()
+		stderr.Reset()
+		if code := runCLI(args, stdout, stderr); code != 0 {
+			t.Fatalf("%v exit code = %d, stderr = %s", args, code, stderr.String())
+		}
+		for _, hidden := range []string{" start", " stop", " init"} {
+			if strings.Contains(stdout.String(), hidden) {
+				t.Fatalf("%v unexpectedly mentions %q\n%s", args, hidden, stdout.String())
+			}
 		}
 	}
 }
@@ -621,13 +636,13 @@ func TestRunCLIDirectCommandRejectsConnectBin(t *testing.T) {
 	}
 }
 
-func TestRunInstanceHelpHidesInitCommand(t *testing.T) {
+func TestRunInstanceHelpHidesLifecycleCommands(t *testing.T) {
 	restore := stubBrowserRuntime()
 	defer restore()
 
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
-	if code := runInstanceCommand([]string{"help"}, stdout, stderr); code != 0 {
+	if code := runInstanceCommand([]string{"--help"}, stdout, stderr); code != 0 {
 		t.Fatalf("instance help exit code = %d, stderr = %s", code, stderr.String())
 	}
 	text := stdout.String()
@@ -640,17 +655,19 @@ func TestRunInstanceHelpHidesInitCommand(t *testing.T) {
 			t.Fatalf("instance help missing %q\n%s", wanted, text)
 		}
 	}
-	if strings.Contains(text, "init") {
-		t.Fatalf("instance help unexpectedly mentions init\n%s", text)
+	for _, hidden := range []string{"init", " stop"} {
+		if strings.Contains(text, hidden) {
+			t.Fatalf("instance help unexpectedly mentions %q\n%s", hidden, text)
+		}
 	}
 
 	topLevelStdout := &bytes.Buffer{}
 	topLevelStderr := &bytes.Buffer{}
-	if code := runCLI([]string{"help"}, topLevelStdout, topLevelStderr); code != 0 {
+	if code := runCLI([]string{"--help"}, topLevelStdout, topLevelStderr); code != 0 {
 		t.Fatalf("top-level help exit code = %d, stderr = %s", code, topLevelStderr.String())
 	}
 	topLevelHelp := topLevelStdout.String()
-	for _, hidden := range []string{"browser instance init", "<create|init|"} {
+	for _, hidden := range []string{"browser instance init", "browser instance stop", "<create|init|", "<create|restart|stop|"} {
 		if strings.Contains(topLevelHelp, hidden) {
 			t.Fatalf("top-level help unexpectedly mentions %q\n%s", hidden, topLevelHelp)
 		}
