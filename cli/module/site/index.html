@@ -36,7 +36,7 @@
   --chat-frame-side-gap:72px;--chat-content-max-width:780px;--chat-shell-max-width:1040px;--chat-greeting-card-max-width:780px;--chat-greeting-text-max-width:560px;
   --plugin-log-delay-ms:2000ms;
   --rs-url-preview-expanded-inset:15px;
-  --overlay-z-left:120;--overlay-z-center:180;--overlay-z-right:240;
+  --overlay-z-left:120;--overlay-z-center:180;--overlay-z-right:240;--overlay-z-global:360;
   --modal-overlay-bg:rgba(18,18,18,.1);--modal-overlay-blur:5px;
   --modal-panel-bg:#fff4ea;--modal-panel-bg-strong:#fffaf5;--modal-panel-border:rgba(18,18,18,.12);
   --modal-field-bg:#fffaf5;--modal-field-bg-muted:#f8e7db;--modal-field-border:rgba(18,18,18,.12);
@@ -4218,6 +4218,7 @@ body.quick-fan-transition-active{cursor:progress}
 [data-overlay-base][data-overlay-domain="left"]{--overlay-domain-z:var(--overlay-z-left)}
 [data-overlay-base][data-overlay-domain="center"]{--overlay-domain-z:var(--overlay-z-center)}
 [data-overlay-base][data-overlay-domain="right"]{--overlay-domain-z:var(--overlay-z-right)}
+[data-overlay-base][data-overlay-domain="global"]{--overlay-domain-z:var(--overlay-z-global)}
 [data-overlay-base]{z-index:calc(var(--overlay-domain-z,100) + var(--overlay-order,0)) !important}
 [data-overlay-base][data-overlay-active="1"]{pointer-events:none}
 [data-overlay-base][data-overlay-front="1"]{pointer-events:auto}
@@ -5037,7 +5038,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     </div>
   </div>
 </div>
-<div class="overlay message-edit-overlay" id="messageEditOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="32" onclick="handleCenterMessageEditOverlayClick(event)" aria-hidden="true">
+<div class="overlay message-edit-overlay" id="messageEditOverlay" data-overlay-base data-overlay-domain="global" data-overlay-order="32" onclick="handleCenterMessageEditOverlayClick(event)" aria-hidden="true">
   <div class="message-edit-panel" id="messageEditPanel" onclick="event.stopPropagation()">
     <div class="message-edit-shell">
       <div class="message-edit-input-wrap" id="messageEditInputWrap">
@@ -5061,7 +5062,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     </div>
   </div>
 </div>
-<div class="overlay assistant-thinking-overlay" id="assistantThinkingOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="33" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="assistantThinkingTitle" onclick="if(event.target===this)closeAssistantThinkingModal()">
+<div class="overlay assistant-thinking-overlay" id="assistantThinkingOverlay" data-overlay-base data-overlay-domain="global" data-overlay-order="33" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="assistantThinkingTitle" onclick="if(event.target===this)closeAssistantThinkingModal()">
   <section class="assistant-thinking-panel" id="assistantThinkingPanel" onclick="event.stopPropagation()">
     <header class="assistant-thinking-panel__head">
       <h2 class="assistant-thinking-panel__title" id="assistantThinkingTitle">思考过程</h2>
@@ -13585,7 +13586,7 @@ function setMemoSaveLock(locked, options = {}) {
 }
 
 function refreshOverlayStates() {
-  const domainTopRank = { left: -Infinity, center: -Infinity, right: -Infinity };
+  const domainTopRank = { left: -Infinity, center: -Infinity, right: -Infinity, global: -Infinity };
   overlayRegistry.forEach(el => {
     const order = Number(el.getAttribute('data-overlay-order') || 0);
     const active = overlayShowState(el);
@@ -13637,7 +13638,7 @@ function refreshOverlayStates() {
     el.getAttribute('data-overlay-active') === '1' &&
     el.getAttribute('data-overlay-front') === '1' &&
     !el.hasAttribute('data-overlay-passive') &&
-    String(el.getAttribute('data-overlay-domain') || 'center') === 'center'
+    ['center', 'global'].includes(String(el.getAttribute('data-overlay-domain') || 'center'))
   ));
   document.body.classList.toggle('center-overlay-focus', hasCenterFrontOverlay);
 }

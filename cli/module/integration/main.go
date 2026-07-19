@@ -16093,6 +16093,17 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	shutdownController.stopPlugins = stopManagedPlugins
 	mux.HandleFunc("/api/shutdown", handleShutdown(shutdownController))
 	server := &http.Server{Handler: withStandaloneAPIProtection(mux, &cfg)}
+	sleepAssertion, sleepAssertionErr := startIntegrationSleepAssertion()
+	if sleepAssertionErr != nil {
+		log.Printf("integration: start macOS sleep assertion failed: %v", sleepAssertionErr)
+	} else if sleepAssertion != nil {
+		log.Printf("integration: macOS sleep assertion started")
+		defer func() {
+			if err := sleepAssertion.Stop(); err != nil {
+				log.Printf("integration: stop macOS sleep assertion failed: %v", err)
+			}
+		}()
+	}
 	defer func() {
 		if removed, err := cleanupStartupPIDFiles(pidFile); err != nil {
 			log.Printf("serve cleanup startup pid files failed: %v", err)
@@ -16112,6 +16123,11 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 
 	go func() {
 		<-ctx.Done()
+		if sleepAssertion != nil {
+			if err := sleepAssertion.Stop(); err != nil {
+				log.Printf("integration: stop macOS sleep assertion failed: %v", err)
+			}
+		}
 		for _, warning := range stopManagedPlugins(nil) {
 			log.Printf("plugin shutdown warning: %s", warning)
 		}

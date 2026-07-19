@@ -79,6 +79,14 @@ cd /path/to/deepright/cli/module/integration
 
 `config/config.json` 只作为主应用启动配置使用；同目录下其余模板文件或目录（如 `SOUL.md`、`USER.md`、`skills/`）才会在创建新 Agent 或补齐 `DEF_AGENT` 时复制到 Agent 工作目录。新建出来的 Agent `config.json` 会固定初始化为空对象 `{}`，不会继承主应用配置内容。
 
+### macOS 防止空闲睡眠
+
+在 macOS 上运行 Integration 服务时，Integration 会自动启动并持有一个 `caffeinate -d -i -m -s` 子进程，以避免显示器因空闲关闭或系统进入空闲睡眠而中断任务。该行为适用于直接启动、`serve`、`start` 和 `restart` 后的服务进程，不需要额外配置或命令行参数。
+
+服务通过 `integration stop`、`SIGINT`、`SIGTERM` 或本机 `/api/shutdown` 关闭时，会先终止该子进程；若 `caffeinate` 无法启动，只会记录日志，Integration 仍会正常提供服务。
+
+此功能不会修改屏幕保护程序、自动锁屏等系统偏好，也不支持合上笔记本盖子后继续运行。
+
 ### 参数说明
 
 | 参数 | 必填 | 默认值 | 说明 | 模块 |
