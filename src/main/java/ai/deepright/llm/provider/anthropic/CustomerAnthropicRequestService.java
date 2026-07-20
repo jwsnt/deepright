@@ -24,6 +24,10 @@ public class CustomerAnthropicRequestService extends AnthropicRequestService {
 
     public static final String MAX_TOKENS = "__max_tokens";
 
+    protected String thinkingMedium;
+
+    protected String thinkingHigh;
+
     protected Integer maxTokens;
 
     protected String multiInput;
@@ -43,13 +47,9 @@ public class CustomerAnthropicRequestService extends AnthropicRequestService {
 
     @Override
     public AnthropicRequest config(LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
+        RequestContextUtils.thinking(llmQuery, this.thinkingMedium, this.thinkingHigh);
         AnthropicRequest request = super.config(llmConfig, llmQuery);
-        request.setModel(RequestModelSelect.select(llmQuery, RequestModelSelect.RequestModel.builder()
-                .multiInput(this.multiInput)
-                .thinking(this.thinking)
-                .fast(this.fast)
-                .base(this.base)
-                .build()));
+        request.setModel(RequestModelSelect.select(llmQuery, RequestModelSelect.RequestModel.builder().multiInput(this.multiInput).thinking(this.thinking).fast(this.fast).base(this.base).build()));
         // 优先客户端配置，如果没配置则取推算值和Max_tokens的最小值
         request.setMaxTokens(MapUtils.getInteger(llmQuery.getMetadata(), CustomerAnthropicRequestService.MAX_TOKENS, Math.min(this.maxTokens, (int) (RequestContextUtils.limit(llmQuery, request.getModel()) * this.rate))));
         return request;
@@ -59,6 +59,12 @@ public class CustomerAnthropicRequestService extends AnthropicRequestService {
     @Setter
     @Getter
     public static class CustomerInitConfig extends InitConfig {
+
+        @Value("${anthropic.model.thinkingMedium:medium}")
+        protected String thinkingMedium;
+
+        @Value("${anthropic.model.thinkingHigh:high}")
+        protected String thinkingHigh;
 
         @Value("${anthropic.model.max_tokens:128000}")
         protected Integer maxTokens;

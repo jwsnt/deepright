@@ -7,9 +7,9 @@ import lombok.Getter;
 @AllArgsConstructor
 public enum ComplexityMode {
 
-    TASK_PLANNING("TASK_PLANNING", 0.65D),
+    DEEP_THINKING("DEEP_THINKING", 0.65D),
 
-    DEEP_THINKING("DEEP_THINKING", 0.45D),
+    TASK_PLANNING("TASK_PLANNING", 0.45D),
 
     FAST_REPLY("FAST_REPLY", 0.35D);
 

@@ -1,11 +1,12 @@
 package ai.deepright.llm.provider.xiaomi;
 
+import ai.deepright.llm.RetryUtils;
+import ai.deepright.llm.provider.RequestContextUtils;
+import ai.deepright.llm.provider.RequestModelSelect;
 import ai.open.right.workflow.flow.llm.LLMQuery;
 import ai.open.right.workflow.flow.llm.config.LLMConfig;
 import ai.open.right.workflow.flow.llm.provider.openai.OpenAiRequest;
 import ai.open.right.workflow.flow.llm.provider.xiaomi.XiaomiRequestService;
-import ai.deepright.llm.RetryUtils;
-import ai.deepright.llm.provider.RequestModelSelect;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,10 @@ import org.springframework.context.annotation.Configuration;
 @Getter
 @Setter
 public class CustomerXiaomiRequestService extends XiaomiRequestService {
+
+    protected String thinkingMedium;
+
+    protected String thinkingHigh;
 
     protected String multiInput;
 
@@ -35,6 +40,7 @@ public class CustomerXiaomiRequestService extends XiaomiRequestService {
 
     @Override
     public OpenAiRequest config(LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
+        RequestContextUtils.thinking(llmQuery, this.thinkingMedium, this.thinkingHigh);
         OpenAiRequest request = super.config(llmConfig, llmQuery);
         request.setModel(RequestModelSelect.select(llmQuery, RequestModelSelect.RequestModel.builder()
                 .multiInput(this.multiInput)
@@ -49,6 +55,12 @@ public class CustomerXiaomiRequestService extends XiaomiRequestService {
     @Setter
     @Getter
     public static class CustomerInitConfig extends InitConfig {
+
+        @Value("${xiaomi.model.thinkingMedium:medium}")
+        protected String thinkingMedium;
+
+        @Value("${xiaomi.model.thinkingHigh:high}")
+        protected String thinkingHigh;
 
         @Value("${xiaomi.model.thinking:mimo-v2.5}")
         protected String multiInput;

@@ -3,6 +3,8 @@ package ai.deepright.llm.provider;
 import ai.deepright.complex.ComplexityMode;
 import ai.deepright.complex.ComplexityUtils;
 import ai.open.right.workflow.flow.WorkflowTask;
+import ai.open.right.workflow.flow.llm.provider.ProviderRequestService;
+import com.google.common.collect.ImmutableMap;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.LinkedHashMap;
@@ -30,6 +32,14 @@ public class RequestContextUtils {
         RequestContextUtils.MODEL.put("kimi", 1024 * 256);
         RequestContextUtils.MODEL.put("gpt", 1024 * 256);
         RequestContextUtils.MODEL.put("glm", 1024 * 200);
+    }
+
+    public static void thinking(WorkflowTask workTask, String medium, String high) throws Exception {
+        ComplexityMode complexity = ComplexityUtils.result(workTask);
+        if (!ComplexityMode.FAST_REPLY.is(complexity)) {
+            workTask.putMetadata(ProviderRequestService.KEY_INTERNAL + ProviderRequestService.KEY_REASONING_EFFORT, ComplexityMode.TASK_PLANNING.is(complexity) ? medium : high);
+            workTask.putMetadata(ProviderRequestService.KEY_INTERNAL + ProviderRequestService.KEY_THINKING, ImmutableMap.of("type", "enabled"));
+        }
     }
 
     public static Integer limit(WorkflowTask workTask, String model) throws Exception {

@@ -1,14 +1,12 @@
 package ai.deepright.llm.provider.deepseek;
 
+import ai.deepright.llm.RetryUtils;
+import ai.deepright.llm.provider.RequestContextUtils;
+import ai.deepright.llm.provider.RequestModelSelect;
 import ai.open.right.workflow.flow.llm.LLMQuery;
 import ai.open.right.workflow.flow.llm.config.LLMConfig;
 import ai.open.right.workflow.flow.llm.provider.deepseek.DeepSeekRequestService;
 import ai.open.right.workflow.flow.llm.provider.openai.OpenAiRequest;
-import ai.deepright.complex.ComplexityMode;
-import ai.deepright.complex.ComplexityUtils;
-import ai.deepright.llm.RetryUtils;
-import ai.deepright.llm.provider.RequestModelSelect;
-import com.google.common.collect.ImmutableMap;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -18,13 +16,14 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.util.HashMap;
-import java.util.Map;
-
 @Slf4j
 @Getter
 @Setter
 public class CustomerDeepSeekRequestService extends DeepSeekRequestService {
+
+    protected String thinkingMedium;
+
+    protected String thinkingHigh;
 
     protected String thinking;
 
@@ -39,6 +38,7 @@ public class CustomerDeepSeekRequestService extends DeepSeekRequestService {
 
     @Override
     public OpenAiRequest config(LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
+        RequestContextUtils.thinking(llmQuery, this.thinkingMedium, this.thinkingHigh);
         OpenAiRequest request = super.config(llmConfig, llmQuery);
         request.setModel(RequestModelSelect.select(llmQuery, RequestModelSelect.RequestModel.builder()
                 .thinking(this.thinking)
@@ -48,23 +48,16 @@ public class CustomerDeepSeekRequestService extends DeepSeekRequestService {
         return request;
     }
 
-    @Override
-    protected void extra(OpenAiRequest request, LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
-        super.extra(request, llmConfig, llmQuery);
-        ComplexityMode lastResult = ComplexityUtils.result(request.getMessage());
-        if (lastResult.is(ComplexityMode.DEEP_THINKING, ComplexityMode.TASK_PLANNING)) {
-            Map<String, Object> extra = request.getExtraBody();
-            extra = extra != null ? extra : new HashMap<String, Object>();
-            extra.put("reasoning_effort", lastResult.is(ComplexityMode.TASK_PLANNING, ComplexityMode.DEEP_THINKING) ? "high" : "max");
-            extra.put("thinking", ImmutableMap.of("type", "enabled"));
-            request.setExtraBody(extra);
-        }
-    }
-
     @Configuration
     @Setter
     @Getter
     public static class CustomerInitConfig extends InitConfig {
+
+        @Value("${deepseek.model.thinkingMedium:medium}")
+        protected String thinkingMedium;
+
+        @Value("${deepseek.model.thinkingHigh:high}")
+        protected String thinkingHigh;
 
         @Value("${deepseek.model.thinking:deepseek-v4-pro}")
         protected String thinking;

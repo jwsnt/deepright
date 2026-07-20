@@ -24,6 +24,10 @@ public class CustomerMiniMaxRequestService extends MiniMaxRequestService {
 
     public static final String MAX_TOKENS = "__max_tokens";
 
+    protected String thinkingMedium;
+
+    protected String thinkingHigh;
+
     protected Integer maxTokens;
 
     protected String thinking;
@@ -51,6 +55,7 @@ public class CustomerMiniMaxRequestService extends MiniMaxRequestService {
 
     @Override
     public AnthropicRequest config(LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
+        RequestContextUtils.thinking(llmQuery, this.thinkingMedium, this.thinkingHigh);
         AnthropicRequest request = super.config(llmConfig, llmQuery);
         request.setModel(RequestModelSelect.select(llmQuery, RequestModelSelect.RequestModel.builder()
                 .thinking(this.thinking)
@@ -66,6 +71,12 @@ public class CustomerMiniMaxRequestService extends MiniMaxRequestService {
     @Setter
     @Getter
     public static class CustomerInitConfig extends InitConfig {
+
+        @Value("${minimax.model.thinkingMedium:medium}")
+        protected String thinkingMedium;
+
+        @Value("${minimax.model.thinkingHigh:high}")
+        protected String thinkingHigh;
 
         @Value("${minimax.model.max_tokens:128000}")
         protected Integer maxTokens;

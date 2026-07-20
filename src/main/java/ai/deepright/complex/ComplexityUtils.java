@@ -1,7 +1,5 @@
 package ai.deepright.complex;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
 import ai.deepright.complex.utils.*;
 import ai.deepright.feature.FeatureField;
 import ai.open.right.workflow.flow.WorkflowTask;
@@ -88,9 +86,12 @@ public class ComplexityUtils {
     }
 
     public static ComplexityMode build(double total, double structure) throws Exception {
-        if (total > ComplexityMode.TASK_PLANNING.getScore() || (total > ComplexityMode.DEEP_THINKING.getScore() && structure > 0.7))
+        if (total > ComplexityMode.DEEP_THINKING.getScore() || (total > ComplexityMode.TASK_PLANNING.getScore() && structure > 0.7)) {
+            return ComplexityMode.DEEP_THINKING;
+        }
+        if (total > ComplexityMode.FAST_REPLY.getScore()) {
             return ComplexityMode.TASK_PLANNING;
-        if (total > ComplexityMode.FAST_REPLY.getScore()) return ComplexityMode.DEEP_THINKING;
+        }
         return ComplexityMode.FAST_REPLY;
     }
 

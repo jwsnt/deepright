@@ -1,11 +1,12 @@
 package ai.deepright.llm.provider.kimi;
 
+import ai.deepright.llm.RetryUtils;
+import ai.deepright.llm.provider.RequestContextUtils;
+import ai.deepright.llm.provider.RequestModelSelect;
 import ai.open.right.workflow.flow.llm.LLMQuery;
 import ai.open.right.workflow.flow.llm.config.LLMConfig;
 import ai.open.right.workflow.flow.llm.provider.kimi.KimiRequestService;
 import ai.open.right.workflow.flow.llm.provider.openai.OpenAiRequest;
-import ai.deepright.llm.RetryUtils;
-import ai.deepright.llm.provider.RequestModelSelect;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,10 @@ import org.springframework.context.annotation.Configuration;
 @Getter
 @Setter
 public class CustomerKimiRequestService extends KimiRequestService {
+
+    protected String thinkingMedium;
+
+    protected String thinkingHigh;
 
     protected String multiInput;
 
@@ -35,6 +40,7 @@ public class CustomerKimiRequestService extends KimiRequestService {
 
     @Override
     public OpenAiRequest config(LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
+        RequestContextUtils.thinking(llmQuery, this.thinkingMedium, this.thinkingHigh);
         OpenAiRequest request = super.config(llmConfig, llmQuery);
         request.setModel(RequestModelSelect.select(llmQuery, RequestModelSelect.RequestModel.builder()
                 .multiInput(this.multiInput)
@@ -50,16 +56,22 @@ public class CustomerKimiRequestService extends KimiRequestService {
     @Getter
     public static class CustomerInitConfig extends InitConfig {
 
-        @Value("${kimi.model.multiInput:kimi-k2.6}")
+        @Value("${kimi.model.thinkingMedium:medium}")
+        protected String thinkingMedium;
+
+        @Value("${kimi.model.thinkingHigh:high}")
+        protected String thinkingHigh;
+
+        @Value("${kimi.model.multiInput:kimi-k3}")
         protected String multiInput;
 
-        @Value("${kimi.model.thinking:kimi-k2.6}")
+        @Value("${kimi.model.thinking:kimi-k3}")
         protected String thinking;
 
-        @Value("${kimi.model.fast:kimi-k2-turbo-preview}")
+        @Value("${kimi.model.fast:kimi-k2.7-code-highspeed}")
         protected String fast;
 
-        @Value("${kimi.model.base:kimi-k2.6}")
+        @Value("${kimi.model.base:kimi-k3}")
         protected String base;
 
         @Override

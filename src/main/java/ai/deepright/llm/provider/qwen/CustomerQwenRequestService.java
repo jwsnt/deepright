@@ -1,5 +1,6 @@
 package ai.deepright.llm.provider.qwen;
 
+import ai.deepright.llm.provider.RequestContextUtils;
 import ai.open.right.workflow.flow.llm.LLMQuery;
 import ai.open.right.workflow.flow.llm.config.LLMConfig;
 import ai.open.right.workflow.flow.llm.provider.openai.OpenAiRequest;
@@ -20,6 +21,10 @@ import org.springframework.context.annotation.Configuration;
 @Setter
 public class CustomerQwenRequestService extends QwenRequestService {
 
+    protected String thinkingMedium;
+
+    protected String thinkingHigh;
+
     protected String multiInput;
 
     protected String thinking;
@@ -35,6 +40,7 @@ public class CustomerQwenRequestService extends QwenRequestService {
 
     @Override
     public OpenAiRequest config(LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
+        RequestContextUtils.thinking(llmQuery, this.thinkingMedium, this.thinkingHigh);
         OpenAiRequest request = super.config(llmConfig, llmQuery);
         request.setModel(RequestModelSelect.select(llmQuery, RequestModelSelect.RequestModel.builder()
                 .multiInput(this.multiInput)
@@ -49,6 +55,12 @@ public class CustomerQwenRequestService extends QwenRequestService {
     @Setter
     @Getter
     public static class CustomerInitConfig extends InitConfig {
+
+        @Value("${qwen.model.thinkingMedium:medium}")
+        protected String thinkingMedium;
+
+        @Value("${qwen.model.thinkingHigh:high}")
+        protected String thinkingHigh;
 
         @Value("${qwen.model.multiInput:qwen3.6-plus}")
         protected String multiInput;

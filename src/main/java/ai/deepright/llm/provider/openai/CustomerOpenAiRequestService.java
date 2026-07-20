@@ -1,11 +1,12 @@
 package ai.deepright.llm.provider.openai;
 
+import ai.deepright.llm.RetryUtils;
+import ai.deepright.llm.provider.RequestContextUtils;
+import ai.deepright.llm.provider.RequestModelSelect;
 import ai.open.right.workflow.flow.llm.LLMQuery;
 import ai.open.right.workflow.flow.llm.config.LLMConfig;
 import ai.open.right.workflow.flow.llm.provider.openai.OpenAiRequest;
 import ai.open.right.workflow.flow.llm.provider.openai.OpenAiRequestService;
-import ai.deepright.llm.RetryUtils;
-import ai.deepright.llm.provider.RequestModelSelect;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,10 @@ import org.springframework.context.annotation.Configuration;
 @Getter
 @Setter
 public class CustomerOpenAiRequestService extends OpenAiRequestService {
+
+    protected String thinkingMedium;
+
+    protected String thinkingHigh;
 
     protected String multiInput;
 
@@ -35,6 +40,7 @@ public class CustomerOpenAiRequestService extends OpenAiRequestService {
 
     @Override
     public OpenAiRequest config(LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
+        RequestContextUtils.thinking(llmQuery, this.thinkingMedium, this.thinkingHigh);
         OpenAiRequest request = super.config(llmConfig, llmQuery);
         request.setModel(RequestModelSelect.select(llmQuery, RequestModelSelect.RequestModel.builder()
                 .multiInput(this.multiInput)
@@ -49,6 +55,12 @@ public class CustomerOpenAiRequestService extends OpenAiRequestService {
     @Setter
     @Getter
     public static class CustomerInitConfig extends InitConfig {
+
+        @Value("${openai.model.thinkingMedium:medium}")
+        protected String thinkingMedium;
+
+        @Value("${openai.model.thinkingHigh:high}")
+        protected String thinkingHigh;
 
         @Value("${openai.model.multiInput:gpt-5.4}")
         protected String multiInput;
