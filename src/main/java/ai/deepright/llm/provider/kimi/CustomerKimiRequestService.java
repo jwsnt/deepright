@@ -5,11 +5,14 @@ import ai.deepright.llm.provider.RequestContextUtils;
 import ai.deepright.llm.provider.RequestModelSelect;
 import ai.open.right.workflow.flow.llm.LLMQuery;
 import ai.open.right.workflow.flow.llm.config.LLMConfig;
+import ai.open.right.workflow.flow.llm.provider.ProviderRequestService;
 import ai.open.right.workflow.flow.llm.provider.kimi.KimiRequestService;
 import ai.open.right.workflow.flow.llm.provider.openai.OpenAiRequest;
+import com.google.common.collect.ImmutableMap;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -41,14 +44,22 @@ public class CustomerKimiRequestService extends KimiRequestService {
     @Override
     public OpenAiRequest config(LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
         RequestContextUtils.thinking(llmQuery, this.thinkingMedium, this.thinkingHigh);
-        OpenAiRequest request = super.config(llmConfig, llmQuery);
+        return super.config(llmConfig, llmQuery);
+    }
+
+    @Override
+    protected void request(OpenAiRequest request, LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
+        super.request(request, llmConfig, llmQuery);
         request.setModel(RequestModelSelect.select(llmQuery, RequestModelSelect.RequestModel.builder()
                 .multiInput(this.multiInput)
                 .thinking(this.thinking)
                 .fast(this.fast)
                 .base(this.base)
                 .build()));
-        return request;
+        // 存在ReasoningEffort且不为K3, 强制补充enabled
+        if (!StringUtils.isEmpty(request.getReasoningEffort()) && !StringUtils.containsIgnoreCase(request.getModel(), KimiRequestService.MODEL)) {
+            request.putExtra(ProviderRequestService.KEY_THINKING, ImmutableMap.of("type", "enabled"));
+        }
     }
 
     @Configuration

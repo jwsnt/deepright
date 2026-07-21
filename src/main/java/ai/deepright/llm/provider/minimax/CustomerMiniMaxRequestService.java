@@ -56,7 +56,12 @@ public class CustomerMiniMaxRequestService extends MiniMaxRequestService {
     @Override
     public AnthropicRequest config(LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
         RequestContextUtils.thinking(llmQuery, this.thinkingMedium, this.thinkingHigh);
-        AnthropicRequest request = super.config(llmConfig, llmQuery);
+        return super.config(llmConfig, llmQuery);
+    }
+
+    @Override
+    protected void request(AnthropicRequest request, LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
+        super.request(request, llmConfig, llmQuery);
         request.setModel(RequestModelSelect.select(llmQuery, RequestModelSelect.RequestModel.builder()
                 .thinking(this.thinking)
                 .fast(this.fast)
@@ -64,7 +69,6 @@ public class CustomerMiniMaxRequestService extends MiniMaxRequestService {
                 .build()));
         // 优先客户端配置，如果没配置则取推算值和Max_tokens的最小值
         request.setMaxTokens(MapUtils.getInteger(llmQuery.getMetadata(), CustomerMiniMaxRequestService.MAX_TOKENS, Math.min(this.maxTokens, (int) (RequestContextUtils.limit(llmQuery, request.getModel()) * this.rate))));
-        return request;
     }
 
     @Configuration

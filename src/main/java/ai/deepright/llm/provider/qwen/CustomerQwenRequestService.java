@@ -1,12 +1,12 @@
 package ai.deepright.llm.provider.qwen;
 
+import ai.deepright.llm.RetryUtils;
 import ai.deepright.llm.provider.RequestContextUtils;
+import ai.deepright.llm.provider.RequestModelSelect;
 import ai.open.right.workflow.flow.llm.LLMQuery;
 import ai.open.right.workflow.flow.llm.config.LLMConfig;
 import ai.open.right.workflow.flow.llm.provider.openai.OpenAiRequest;
 import ai.open.right.workflow.flow.llm.provider.qwen.QwenRequestService;
-import ai.deepright.llm.RetryUtils;
-import ai.deepright.llm.provider.RequestModelSelect;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -41,15 +41,20 @@ public class CustomerQwenRequestService extends QwenRequestService {
     @Override
     public OpenAiRequest config(LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
         RequestContextUtils.thinking(llmQuery, this.thinkingMedium, this.thinkingHigh);
-        OpenAiRequest request = super.config(llmConfig, llmQuery);
+        return super.config(llmConfig, llmQuery);
+    }
+
+    @Override
+    protected void request(OpenAiRequest request, LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
+        super.request(request, llmConfig, llmQuery);
         request.setModel(RequestModelSelect.select(llmQuery, RequestModelSelect.RequestModel.builder()
                 .multiInput(this.multiInput)
                 .thinking(this.thinking)
                 .fast(this.fast)
                 .base(this.base)
                 .build()));
-        return request;
     }
+
 
     @Configuration
     @Setter

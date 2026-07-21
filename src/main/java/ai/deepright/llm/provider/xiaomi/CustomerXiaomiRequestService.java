@@ -41,14 +41,18 @@ public class CustomerXiaomiRequestService extends XiaomiRequestService {
     @Override
     public OpenAiRequest config(LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
         RequestContextUtils.thinking(llmQuery, this.thinkingMedium, this.thinkingHigh);
-        OpenAiRequest request = super.config(llmConfig, llmQuery);
+        return super.config(llmConfig, llmQuery);
+    }
+
+    @Override
+    protected void request(OpenAiRequest request, LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
+        super.request(request, llmConfig, llmQuery);
         request.setModel(RequestModelSelect.select(llmQuery, RequestModelSelect.RequestModel.builder()
                 .multiInput(this.multiInput)
                 .thinking(this.thinking)
                 .fast(this.fast)
                 .base(this.base)
                 .build()));
-        return request;
     }
 
     @Configuration
@@ -62,7 +66,7 @@ public class CustomerXiaomiRequestService extends XiaomiRequestService {
         @Value("${xiaomi.model.thinkingHigh:high}")
         protected String thinkingHigh;
 
-        @Value("${xiaomi.model.thinking:mimo-v2.5}")
+        @Value("${xiaomi.model.multiInput:mimo-v2.5}")
         protected String multiInput;
 
         @Value("${xiaomi.model.thinking:mimo-v2.5-pro}")
