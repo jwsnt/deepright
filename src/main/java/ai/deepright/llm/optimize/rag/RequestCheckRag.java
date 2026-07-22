@@ -54,6 +54,12 @@ public class RequestCheckRag extends RagCondition implements RagService {
         return new RagAtOnce(ragConfig);
     }
 
+    @Override
+    protected Boolean allowed(RagConfig ragConfig, RagData ragData) throws Exception {
+        // 跳过测试请求
+        return super.allowed(ragConfig, ragData) && !FeatureFlag.isTest(ragData.getQuery());
+    }
+
     protected void checkOriginalQuery(RagConfig ragConfig, RagData ragData) throws Exception {
         // 不为Task或后台线程时需要包含原始请求内容
         if (StringUtils.containsIgnoreCase(MultiSourceNotifier.MAIN, SplitUtils.join(ragData.getQuery())) && !FeatureFlag.isTask(ragData.getQuery()) && !FeatureFlag.isDaemon(ragData.getQuery())) {

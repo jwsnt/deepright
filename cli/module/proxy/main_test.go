@@ -12511,3 +12511,16 @@ func TestExecuteExternalCommandTimeoutOutput(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateProxyCronCreateScheduleAcceptsPastFormattedTime(t *testing.T) {
+	past := time.Now().Add(-time.Hour).In(time.Local).Format("2006-01-02 15:04")
+	if _, err := validateProxyCronCreateSchedule(2, past, ""); err != nil {
+		t.Fatalf("past formatted time rejected: %v", err)
+	}
+	if _, err := validateProxyCronCreateSchedule(2, "Cron", ""); err == nil {
+		t.Fatal("display label should not be accepted as rawTime")
+	}
+	if _, err := validateProxyCronCreateSchedule(-1, "Cron", "10 12 * * 1-5"); err == nil {
+		t.Fatal("custom cron must reject rawTime")
+	}
+}

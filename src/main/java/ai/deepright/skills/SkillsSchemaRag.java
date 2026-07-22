@@ -145,6 +145,12 @@ public class SkillsSchemaRag extends RagSkills implements SkillsChecker {
         RagService.updatePrompt(ragConfig, ragData, ragConfig.getReplace(), this.buildSkills(ragConfig, ragData, skills));
     }
 
+    @Override
+    protected Boolean allowed(RagConfig ragConfig, RagData ragData) throws Exception {
+        // 跳过测试请求
+        return super.allowed(ragConfig, ragData) && !FeatureFlag.isTest(ragData.getQuery());
+    }
+
     protected String buildUsage(RagConfig ragConfig, RagData ragData, Skills skills, String query) throws Exception {
         String usage = this.template4usage.replace("#feishu", FeatureFlag.isActivePlugin(ragData.getQuery(), SkillsChecker.PLUGIN_FEISHU_NAME) ? this.template4feishu.replace("#deepright", this.skillDeepRight).replace("#feishu", this.skillFeishu) : "");
         usage = usage.replace("#browser", this.allowedSkill(ragConfig, ragData, SkillsChecker.PLUGIN_BROWSER_SKILL) ? this.template4browser.replace("#browser", SkillsChecker.PLUGIN_BROWSER_SKILL) : "");

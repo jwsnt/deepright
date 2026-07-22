@@ -10,6 +10,7 @@ import (
 	"connect/sandboxstate"
 	"connect/skillstate"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -31,6 +32,7 @@ import (
 	"os/signal"
 	"path"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -936,6 +938,18 @@ func integrationBundleBrowserReuseMarkerPath(layout *integrationBundlePaths) (st
 		return "", err
 	}
 	return filepath.Join(runtimeBase, "state", "browser-reuse", fingerprint+".seen"), nil
+}
+
+// cleanupIntegrationBrowserReuseState removes the per-bundle browser launch
+// markers when the integration service exits. They only influence the first
+// browser-open behavior for a running app and do not need to persist after it
+// has been closed.
+func cleanupIntegrationBrowserReuseState() error {
+	runtimeBase := strings.TrimSpace(integrationBundleRuntimeBaseDir())
+	if runtimeBase == "" {
+		return nil
+	}
+	return os.RemoveAll(filepath.Join(runtimeBase, "state", "browser-reuse"))
 }
 
 func integrationBundleLaunchFingerprint(layout *integrationBundlePaths) (string, error) {
@@ -7760,6 +7774,436 @@ func handleModelProviderCatalog(cfg *Config) http.HandlerFunc {
 	}
 }
 
+const (
+	modelTestMaxSSEEventBytes = 64 * 1024
+	modelTestMaxErrorRunes    = 500
+)
+
+var modelTestSensitiveValuePattern = regexp.MustCompile(`(?i)(["']?(?:authorization|api[-_ ]?key|token|secret)["']?\s*[:=]\s*["']?)([^\s,"';&}]+)`)
+
+// modelTestRequest deliberately contains only transient provider material. It
+// is never written to token_store or any of the chat/agent persistence paths.
+type modelTestRequest struct {
+	Model            string `json:"model"`
+	Token            string `json:"token"`
+	BaseURL          string `json:"__url"`
+	ModelBase        string `json:"__model"`
+	ModelFast        string `json:"__model_fast"`
+	ModelThinking    string `json:"__model_thinking"`
+	ModelMultiInput  string `json:"__model_multi_input"`
+	ModelMultiOutput string `json:"__model_multi_output"`
+}
+
+type modelTestConfig struct {
+	Content string
+	Timeout time.Duration
+}
+
+// handleModelTest runs an isolated, non-persistent provider probe. It does
+// not use handleChatCompletions: that path expands Agent metadata and stores
+// request/response history, which is expressly not valid for configuration
+// tests.
+func handleModelTest(cfg *Config, proxyClient *http.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if !isLocalManagementRequest(r) {
+			writeModelTestJSONError(w, http.StatusForbidden, "仅允许本机测试模型配置")
+			return
+		}
+
+		request, err := decodeModelTestRequest(r.Body)
+		if err != nil {
+			writeModelTestJSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		testConfig, err := readModelTestConfig()
+		if err != nil {
+			writeModelTestJSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		sessionID, err := newModelTestUUID()
+		if err != nil {
+			writeModelTestJSONError(w, http.StatusInternalServerError, "创建测试会话失败")
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), testConfig.Timeout)
+		defer cancel()
+		requestBody, err := json.Marshal(buildModelTestUpstreamRequest(cfg, request, sessionID, testConfig.Content))
+		if err != nil {
+			writeModelTestJSONError(w, http.StatusInternalServerError, "创建测试请求失败")
+			return
+		}
+		targetURL := strings.TrimRight(cfg.currentHost(), "/") + "/v1/chat/completions"
+		upstreamReq, err := http.NewRequestWithContext(ctx, http.MethodPost, targetURL, bytes.NewReader(requestBody))
+		if err != nil {
+			writeModelTestJSONError(w, http.StatusInternalServerError, "创建测试请求失败")
+			return
+		}
+		upstreamReq.Header.Set("Content-Type", "application/json")
+		upstreamReq.Header.Set("Accept", "text/event-stream")
+		upstreamReq.Header.Set("Authorization", request.Token)
+
+		client := proxyClient
+		if client == nil {
+			client = http.DefaultClient
+		}
+		resp, err := client.Do(upstreamReq)
+		if err != nil {
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				writeModelTestJSONError(w, http.StatusGatewayTimeout, "配置错误：测试超时")
+				return
+			}
+			if errors.Is(ctx.Err(), context.Canceled) {
+				return
+			}
+			writeModelTestJSONError(w, http.StatusBadGateway, "配置错误：无法连接测试服务："+sanitizeModelTestError(err.Error(), request.Token))
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(io.LimitReader(resp.Body, modelTestMaxSSEEventBytes))
+			message := modelTestHTTPError(resp.StatusCode, string(body), request.Token)
+			writeModelTestJSONError(w, http.StatusBadGateway, message)
+			return
+		}
+		if !strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "text/event-stream") {
+			body, _ := io.ReadAll(io.LimitReader(resp.Body, modelTestMaxSSEEventBytes))
+			message := "配置错误：服务商未返回 SSE 响应"
+			if detail := sanitizeModelTestError(string(body), request.Token); detail != "" {
+				message += "：" + detail
+			}
+			writeModelTestJSONError(w, http.StatusBadGateway, message)
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("X-Accel-Buffering", "no")
+		if err := consumeModelTestSSE(ctx, resp.Body, request.Token); err != nil {
+			if errors.Is(ctx.Err(), context.Canceled) && !errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				return
+			}
+			writeModelTestSSEResult(w, false, modelTestErrorMessage(err, request.Token))
+			return
+		}
+		writeModelTestSSEResult(w, true, "配置成功")
+	}
+}
+
+func decodeModelTestRequest(body io.ReadCloser) (modelTestRequest, error) {
+	var request modelTestRequest
+	if body == nil {
+		return request, fmt.Errorf("配置错误：测试请求为空")
+	}
+	defer body.Close()
+	decoder := json.NewDecoder(io.LimitReader(body, modelTestMaxSSEEventBytes))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&request); err != nil {
+		return request, fmt.Errorf("配置错误：测试请求无效")
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return request, fmt.Errorf("配置错误：测试请求无效")
+	}
+	request.Model = sharedutil.NormalizeTokenModelName(request.Model)
+	request.Token = strings.TrimSpace(request.Token)
+	request.BaseURL = strings.TrimSpace(request.BaseURL)
+	request.ModelBase = strings.TrimSpace(request.ModelBase)
+	request.ModelFast = strings.TrimSpace(request.ModelFast)
+	request.ModelThinking = strings.TrimSpace(request.ModelThinking)
+	request.ModelMultiInput = strings.TrimSpace(request.ModelMultiInput)
+	request.ModelMultiOutput = strings.TrimSpace(request.ModelMultiOutput)
+	if request.Model == "" {
+		return request, fmt.Errorf("配置错误：未选择模型服务商")
+	}
+	if request.Token == "" || request.Token == maskedTokenValue {
+		return request, fmt.Errorf("配置错误：模型密钥不能为空")
+	}
+	if request.ModelBase == "" {
+		return request, fmt.Errorf("配置错误：基础模型 __model 不能为空")
+	}
+	return request, nil
+}
+
+func readModelTestConfig() (modelTestConfig, error) {
+	raw, _, err := readIntegrationStartupConfigRaw()
+	if err != nil {
+		return modelTestConfig{}, fmt.Errorf("配置错误：读取 config.json.test 失败")
+	}
+	if raw == nil {
+		return modelTestConfig{}, fmt.Errorf("配置错误：config.json.test 缺失")
+	}
+	testRaw, ok := raw["test"].(map[string]interface{})
+	if !ok || testRaw == nil {
+		return modelTestConfig{}, fmt.Errorf("配置错误：config.json.test 缺失")
+	}
+	content, ok := testRaw["content"].(string)
+	content = strings.TrimSpace(content)
+	if !ok || content == "" {
+		return modelTestConfig{}, fmt.Errorf("配置错误：config.json.test.content 缺失")
+	}
+	timeoutSeconds, ok := modelTestTimeoutSeconds(testRaw["timeout"])
+	if !ok || timeoutSeconds <= 0 || timeoutSeconds > int64((1<<63-1)/int64(time.Second)) {
+		return modelTestConfig{}, fmt.Errorf("配置错误：config.json.test.timeout 必须为正整数秒")
+	}
+	return modelTestConfig{Content: content, Timeout: time.Duration(timeoutSeconds) * time.Second}, nil
+}
+
+func modelTestTimeoutSeconds(raw interface{}) (int64, bool) {
+	switch value := raw.(type) {
+	case json.Number:
+		parsed, err := value.Int64()
+		return parsed, err == nil
+	case int:
+		return int64(value), true
+	case int64:
+		return value, true
+	case float64:
+		if value != float64(int64(value)) {
+			return 0, false
+		}
+		return int64(value), true
+	default:
+		return 0, false
+	}
+}
+
+func buildModelTestUpstreamRequest(cfg *Config, request modelTestRequest, sessionID, content string) map[string]interface{} {
+	metadata := map[string]interface{}{
+		"test":     true,
+		"type":     "test",
+		"chat":     sessionID,
+		"device":   cfg.effectiveDeviceID(),
+		"port":     integrationMetadataPort(cfg),
+		"provider": request.Model,
+		"__model":  request.ModelBase,
+	}
+	if request.BaseURL != "" {
+		metadata["__url"] = request.BaseURL
+	}
+	if request.ModelFast != "" {
+		metadata["__model_fast"] = request.ModelFast
+	}
+	if request.ModelThinking != "" {
+		metadata["__model_thinking"] = request.ModelThinking
+	}
+	if request.ModelMultiInput != "" {
+		metadata["__model_multi_input"] = request.ModelMultiInput
+	}
+	if request.ModelMultiOutput != "" {
+		metadata["__model_multi_output"] = request.ModelMultiOutput
+	}
+	return map[string]interface{}{
+		"model":    request.Model,
+		"messages": []map[string]string{{"role": "user", "content": content}},
+		"stream":   true,
+		"metadata": metadata,
+	}
+}
+
+func newModelTestUUID() (string, error) {
+	var value [16]byte
+	if _, err := rand.Read(value[:]); err != nil {
+		return "", err
+	}
+	value[6] = (value[6] & 0x0f) | 0x40
+	value[8] = (value[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
+		value[0:4], value[4:6], value[6:8], value[8:10], value[10:16]), nil
+}
+
+func consumeModelTestSSE(ctx context.Context, body io.Reader, token string) error {
+	buffer := make([]byte, 0, 4096)
+	chunk := make([]byte, 2048)
+	sawBusinessData := false
+	sawDone := false
+	for {
+		count, readErr := body.Read(chunk)
+		if count > 0 {
+			buffer = append(buffer, chunk[:count]...)
+			if len(buffer) > modelTestMaxSSEEventBytes {
+				return fmt.Errorf("配置错误：SSE 事件过大或未正常分帧")
+			}
+			for _, event := range splitCompleteSSEEvents(&buffer) {
+				business, done, err := inspectModelTestSSEEvent(event, token)
+				if err != nil {
+					return err
+				}
+				sawBusinessData = sawBusinessData || business
+				sawDone = sawDone || done
+			}
+		}
+		if readErr == nil {
+			continue
+		}
+		if !errors.Is(readErr, io.EOF) {
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				return fmt.Errorf("配置错误：测试超时")
+			}
+			return fmt.Errorf("配置错误：SSE 响应中断：%s", sanitizeModelTestError(readErr.Error(), token))
+		}
+		break
+	}
+	for _, event := range flushTrailingSSEBytes(&buffer) {
+		business, done, err := inspectModelTestSSEEvent(event, token)
+		if err != nil {
+			return err
+		}
+		sawBusinessData = sawBusinessData || business
+		sawDone = sawDone || done
+	}
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return fmt.Errorf("配置错误：测试超时")
+	}
+	if !sawBusinessData {
+		return fmt.Errorf("配置错误：SSE 响应未包含有效业务数据")
+	}
+	if !sawDone {
+		return fmt.Errorf("配置错误：SSE 响应未正常结束（缺少 [DONE]）")
+	}
+	return nil
+}
+
+func inspectModelTestSSEEvent(event, token string) (bool, bool, error) {
+	if strings.Contains(strings.ToLower(event), "event: error") {
+		return false, false, fmt.Errorf("配置错误：服务商返回错误：%s", modelTestSSEErrorDetail(event, token))
+	}
+	business := false
+	done := false
+	for _, line := range strings.Split(event, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		payload := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if payload == "" {
+			continue
+		}
+		if payload == "[DONE]" {
+			done = true
+			continue
+		}
+		var raw map[string]interface{}
+		if err := json.Unmarshal([]byte(payload), &raw); err != nil {
+			return false, done, fmt.Errorf("配置错误：SSE 响应包含无效数据")
+		}
+		if modelTestPayloadIsError(raw) {
+			return false, done, fmt.Errorf("配置错误：服务商返回错误：%s", modelTestPayloadErrorDetail(raw, token))
+		}
+		if choices, ok := raw["choices"].([]interface{}); ok && len(choices) > 0 {
+			business = true
+		}
+	}
+	return business, done, nil
+}
+
+func modelTestPayloadIsError(raw map[string]interface{}) bool {
+	if responseValueIsAbnormal(raw) {
+		return true
+	}
+	if value, exists := raw["error"]; exists && value != nil {
+		switch typed := value.(type) {
+		case string:
+			return strings.TrimSpace(typed) != ""
+		case map[string]interface{}:
+			return len(typed) > 0
+		}
+	}
+	return false
+}
+
+func modelTestSSEErrorDetail(event, token string) string {
+	for _, payload := range extractResponsePayloads(event) {
+		var raw map[string]interface{}
+		if json.Unmarshal([]byte(payload), &raw) == nil {
+			return modelTestPayloadErrorDetail(raw, token)
+		}
+	}
+	return sanitizeModelTestError(event, token)
+}
+
+func modelTestPayloadErrorDetail(raw map[string]interface{}, token string) string {
+	for _, key := range []string{"error", "message", "detail", "content"} {
+		if value, ok := raw[key]; ok && value != nil {
+			if text := modelTestErrorValueText(value); text != "" {
+				return sanitizeModelTestError(text, token)
+			}
+		}
+	}
+	encoded, _ := json.Marshal(raw)
+	return sanitizeModelTestError(string(encoded), token)
+}
+
+func modelTestErrorValueText(value interface{}) string {
+	switch typed := value.(type) {
+	case string:
+		return typed
+	case map[string]interface{}:
+		for _, key := range []string{"message", "detail", "content", "type", "code"} {
+			if nested, ok := typed[key]; ok {
+				if text := modelTestErrorValueText(nested); text != "" {
+					return text
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func modelTestHTTPError(status int, body, token string) string {
+	message := fmt.Sprintf("配置错误：服务商返回 HTTP %d", status)
+	if detail := sanitizeModelTestError(body, token); detail != "" {
+		message += "：" + detail
+	}
+	return message
+}
+
+func modelTestErrorMessage(err error, token string) string {
+	if err == nil {
+		return "配置错误：测试失败"
+	}
+	return sanitizeModelTestError(err.Error(), token)
+}
+
+func sanitizeModelTestError(raw, token string) string {
+	message := strings.TrimSpace(raw)
+	if token = strings.TrimSpace(token); token != "" {
+		message = strings.ReplaceAll(message, token, "[REDACTED]")
+		message = strings.ReplaceAll(message, "Bearer "+token, "Bearer [REDACTED]")
+	}
+	message = modelTestSensitiveValuePattern.ReplaceAllString(message, "${1}[REDACTED]")
+	message = strings.Join(strings.Fields(message), " ")
+	if message == "" {
+		return "测试服务返回了未知错误"
+	}
+	runes := []rune(message)
+	if len(runes) > modelTestMaxErrorRunes {
+		return string(runes[:modelTestMaxErrorRunes]) + "…"
+	}
+	return message
+}
+
+func writeModelTestJSONError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": message})
+}
+
+func writeModelTestSSEResult(w http.ResponseWriter, success bool, message string) {
+	payload, _ := json.Marshal(map[string]interface{}{
+		"status":  map[bool]int{true: 0, false: 1}[success],
+		"content": message,
+	})
+	_, _ = fmt.Fprintf(w, "event: result\ndata: %s\n\n", payload)
+	if flusher, ok := w.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
 var integrationClientRuntimeConfigFields = []string{
 	"agent-dir",
 	"app-dir",
@@ -9874,6 +10318,21 @@ func appendCronDetailLog(db *sql.DB, entry cronDetailLogEntry) {
 	}
 }
 
+// appendCronDetailLogTx is used by mutations that require the detail and its
+// audit entry to commit or roll back together. ensureCronSchema has already
+// materialized every selected column before the transaction starts.
+func appendCronDetailLogTx(tx *sql.Tx, entry cronDetailLogEntry) error {
+	if tx == nil {
+		return fmt.Errorf("transaction is required")
+	}
+	_, err := tx.Exec(`INSERT INTO cron_detail_log (detail_id, meta_id, agent_id, chat_id, task_type, action, exec_time, model, thinking, verify, router_disable, content, response_schema, started, occurred_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		entry.DetailID, entry.MetaID, entry.AgentID, entry.ChatID, entry.TaskType, entry.Action, entry.ExecTime,
+		entry.Model, boolToInt(entry.Thinking), boolToInt(entry.Verify), boolToInt(entry.RouterDisable), entry.Content,
+		entry.ResponseSchema, entry.Started, entry.OccurredAt)
+	return err
+}
+
 func logCronDetailStatusByID(db *sql.DB, detailID int, action string) {
 	if db == nil {
 		return
@@ -10150,6 +10609,220 @@ func handleCronDetailUpdate(cfg *Config) http.HandlerFunc {
 	}
 }
 
+type cronDetailRunRequest struct {
+	SourceType string `json:"sourceType"`
+	DetailID   int    `json:"detailId"`
+	MetaID     int    `json:"metaId"`
+	ReuseChat  *bool  `json:"reuseChat"`
+}
+
+// handleCronDetailRun creates a pending detail from an existing detail or
+// metadata record. Execution remains owned by cronExecuteOnce, so this handler
+// must never mark the new task as started or call the model directly.
+func handleCronDetailRun(cfg *Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		agentID := strings.TrimSpace(r.URL.Query().Get("agentId"))
+		if agentID == "" {
+			writeCronDetailRunError(w, "agentId is required")
+			return
+		}
+		if cronDB == nil {
+			writeCronDetailRunError(w, "db not ready")
+			return
+		}
+		var req cronDetailRunRequest
+		decoder := json.NewDecoder(r.Body)
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&req); err != nil {
+			writeCronDetailRunError(w, "invalid request: "+err.Error())
+			return
+		}
+		if req.ReuseChat == nil {
+			writeCronDetailRunError(w, "reuseChat is required")
+			return
+		}
+		if err := validateIntegrationAgentExists(cfg.AgentDir, cfg.effectiveDeviceID(), agentID); err != nil {
+			writeCronDetailRunError(w, err.Error())
+			return
+		}
+		detail, err := createCronDetailRun(agentID, req, time.Now())
+		if err != nil {
+			writeCronDetailRunError(w, err.Error())
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{"status": 0, "data": detail})
+	}
+}
+
+func writeCronDetailRunError(w http.ResponseWriter, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": message})
+}
+
+func createCronDetailRun(agentID string, req cronDetailRunRequest, now time.Time) (cronDetailResult, error) {
+	var empty cronDetailResult
+	if cronDB == nil {
+		return empty, fmt.Errorf("db not ready")
+	}
+	agentID = strings.TrimSpace(agentID)
+	req.SourceType = strings.ToLower(strings.TrimSpace(req.SourceType))
+	if req.ReuseChat == nil {
+		return empty, fmt.Errorf("reuseChat is required")
+	}
+	if req.SourceType != "detail" && req.SourceType != "meta" {
+		return empty, fmt.Errorf("sourceType must be detail or meta")
+	}
+	if (req.SourceType == "detail" && (req.DetailID <= 0 || req.MetaID != 0)) ||
+		(req.SourceType == "meta" && (req.MetaID <= 0 || req.DetailID != 0)) {
+		return empty, fmt.Errorf("source ID is invalid")
+	}
+
+	ensureCronSchema(cronDB)
+	tx, err := cronDB.Begin()
+	if err != nil {
+		return empty, err
+	}
+	defer tx.Rollback()
+
+	var source cronDetailResult
+	if req.SourceType == "detail" {
+		source, err = loadCronDetailRunSource(tx, req.DetailID, agentID)
+		if err == nil && source.Started == 1 {
+			err = fmt.Errorf("已启动的任务不能重跑")
+		}
+		if err == nil && source.Started != 0 && source.Started != 2 && source.Started != 3 {
+			err = fmt.Errorf("task detail cannot be run")
+		}
+	} else {
+		source, err = loadCronMetaRunSource(tx, req.MetaID, agentID)
+	}
+	if err != nil {
+		return empty, err
+	}
+	if err := validateCronDetailRunSource(source); err != nil {
+		return empty, err
+	}
+	if !*req.ReuseChat {
+		source.ChatID = ""
+	}
+	source.Type = sharedutil.NormalizeTaskType(source.Type)
+
+	const maxExecTimeCollisionRetries = 60
+	baseExecTime := now.Unix()
+	var detailID int64
+	for offset := int64(0); offset < maxExecTimeCollisionRetries; offset++ {
+		source.ExecTime = baseExecTime + offset
+		res, insertErr := tx.Exec(`INSERT INTO task_detail (meta_id, exec_time, agent_id, chat_id, task_type, model, thinking, verify, router_disable, content, response_schema, started)
+			VALUES (?,?,?,?,?,?,?,?,?,?,?,0)`,
+			source.MetaID, source.ExecTime, source.AgentID, source.ChatID, source.Type, source.Model,
+			boolToInt(source.Thinking), boolToInt(source.Verify), boolToInt(source.RouterDisable), source.Content, source.ResponseSchema)
+		if insertErr == nil {
+			detailID, insertErr = res.LastInsertId()
+			if insertErr != nil {
+				return empty, fmt.Errorf("read created task detail: %w", insertErr)
+			}
+			break
+		}
+		if !isCronDetailExecTimeConflict(insertErr) {
+			return empty, fmt.Errorf("create task detail: %w", insertErr)
+		}
+	}
+	if detailID == 0 {
+		return empty, fmt.Errorf("create task detail: execution time is busy")
+	}
+	source.ID = int(detailID)
+	source.Started = 0
+	source.ResultContent = ""
+	source.RepliedAt = ""
+	if err := appendCronDetailLogTx(tx, cronDetailLogEntry{
+		DetailID:       source.ID,
+		MetaID:         source.MetaID,
+		AgentID:        source.AgentID,
+		ChatID:         source.ChatID,
+		TaskType:       source.Type,
+		Action:         "run",
+		ExecTime:       source.ExecTime,
+		Model:          source.Model,
+		Thinking:       source.Thinking,
+		Verify:         source.Verify,
+		RouterDisable:  source.RouterDisable,
+		Content:        source.Content,
+		ResponseSchema: source.ResponseSchema,
+		Started:        0,
+		OccurredAt:     cronLogTimestamp(),
+	}); err != nil {
+		return empty, fmt.Errorf("write task detail audit log: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return empty, err
+	}
+	return source, nil
+}
+
+func loadCronDetailRunSource(tx *sql.Tx, detailID int, agentID string) (cronDetailResult, error) {
+	var source cronDetailResult
+	var thinking, verify, routerDisable int
+	err := tx.QueryRow(`SELECT d.id, d.meta_id, d.exec_time, d.agent_id, d.chat_id, d.task_type, d.model, d.thinking, d.verify, d.router_disable, d.content, d.response_schema, d.started,
+		COALESCE(m.cycle, 0), COALESCE(m.raw_time, ''), COALESCE(m.cron, '')
+		FROM task_detail d
+		LEFT JOIN task_meta m ON m.id = d.meta_id
+		WHERE d.id = ? AND d.agent_id = ?`, detailID, agentID).Scan(
+		&source.ID, &source.MetaID, &source.ExecTime, &source.AgentID, &source.ChatID, &source.Type, &source.Model,
+		&thinking, &verify, &routerDisable, &source.Content, &source.ResponseSchema, &source.Started,
+		&source.Cycle, &source.RawTime, &source.Cron,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return cronDetailResult{}, fmt.Errorf("task detail or metadata not found")
+	}
+	if err != nil {
+		return cronDetailResult{}, err
+	}
+	source.Thinking = thinking != 0
+	source.Verify = verify != 0
+	source.RouterDisable = routerDisable != 0
+	return source, nil
+}
+
+func loadCronMetaRunSource(tx *sql.Tx, metaID int, agentID string) (cronDetailResult, error) {
+	var source cronDetailResult
+	var thinking, verify, routerDisable int
+	err := tx.QueryRow(`SELECT id, cycle, raw_time, agent_id, chat_id, task_type, model, thinking, verify, router_disable, cron, content, response_schema
+		FROM task_meta WHERE id = ? AND agent_id = ?`, metaID, agentID).Scan(
+		&source.MetaID, &source.Cycle, &source.RawTime, &source.AgentID, &source.ChatID, &source.Type, &source.Model,
+		&thinking, &verify, &routerDisable, &source.Cron, &source.Content, &source.ResponseSchema,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return cronDetailResult{}, fmt.Errorf("task metadata not found")
+	}
+	if err != nil {
+		return cronDetailResult{}, err
+	}
+	source.Thinking = thinking != 0
+	source.Verify = verify != 0
+	source.RouterDisable = routerDisable != 0
+	return source, nil
+}
+
+func validateCronDetailRunSource(source cronDetailResult) error {
+	if source.MetaID <= 0 || strings.TrimSpace(source.AgentID) == "" || strings.TrimSpace(source.Model) == "" || strings.TrimSpace(source.Content) == "" {
+		return fmt.Errorf("task source is incomplete")
+	}
+	return nil
+}
+
+func isCronDetailExecTimeConflict(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "unique constraint failed") && strings.Contains(message, "task_detail.meta_id") && strings.Contains(message, "task_detail.exec_time")
+}
+
 type cronMetaUpdateRequest struct {
 	MetaID        int    `json:"metaId"`
 	AgentID       string `json:"agentId"`
@@ -10404,17 +11077,17 @@ func updateCronMeta(agentID string, req cronMetaUpdateRequest) (cronMetaResult, 
 	rawTime := req.RawTime
 	cronExpr := current.Cron
 	if req.Cycle == -1 {
-		if strings.TrimSpace(cronExpr) == "" {
-			return empty, fmt.Errorf("custom cron expression is missing")
+		if current.Cycle != -1 {
+			return empty, fmt.Errorf("cannot convert a built-in cycle to custom cron")
 		}
-		rawTime = current.RawTime
+		if _, err := validateCronCreateSchedule(-1, rawTime, cronExpr); err != nil {
+			return empty, err
+		}
+		rawTime = ""
 	} else {
-		execAt, err := time.ParseInLocation("2006-01-02 15:04", rawTime, time.Local)
+		execAt, err := validateCronCreateSchedule(req.Cycle, rawTime, "")
 		if err != nil {
-			return empty, fmt.Errorf("invalid rawTime: %w", err)
-		}
-		if !execAt.After(time.Now()) {
-			return empty, fmt.Errorf("执行时间需要晚于当前时间")
+			return empty, err
 		}
 		cronExpr = cronBuildExpr(req.Cycle, execAt)
 	}
@@ -10498,9 +11171,6 @@ func updateCronDetail(agentID string, req cronDetailUpdateRequest) (cronDetailRe
 	execAt, err := time.ParseInLocation("2006-01-02 15:04", req.ExecTime, time.Local)
 	if err != nil {
 		return empty, fmt.Errorf("invalid execTime: %w", err)
-	}
-	if !execAt.After(time.Now()) {
-		return empty, fmt.Errorf("执行时间需要晚于当前时间")
 	}
 	if !req.Thinking {
 		req.Verify = false
@@ -11799,6 +12469,42 @@ func cronCycleInterval(cycle int) time.Duration {
 	}
 }
 
+// validateCronCreateSchedule keeps the persisted scheduling fields in one
+// canonical shape. A task is either a built-in cycle with a first execution
+// time, or a custom cron expression; mixing the two produces ambiguous UI
+// values such as "Cron" for both cycle and time.
+func validateCronCreateSchedule(cycle int, rawTime, cronExpr string) (time.Time, error) {
+	rawTime = strings.TrimSpace(rawTime)
+	cronExpr = strings.TrimSpace(cronExpr)
+	if cycle == -1 {
+		if rawTime != "" {
+			return time.Time{}, fmt.Errorf("custom cron must not include rawTime")
+		}
+		if cronExpr == "" {
+			return time.Time{}, fmt.Errorf("custom cron expression is required")
+		}
+		parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+		if _, err := parser.Parse(strings.ReplaceAll(cronExpr, "?", "*")); err != nil {
+			return time.Time{}, fmt.Errorf("invalid custom cron expression: %w", err)
+		}
+		return time.Time{}, nil
+	}
+	if cycle < 0 || cycle > 5 {
+		return time.Time{}, fmt.Errorf("cycle must be one of -1,0,1,2,3,4,5")
+	}
+	if cronExpr != "" {
+		return time.Time{}, fmt.Errorf("built-in cycle must not include cron")
+	}
+	if rawTime == "" {
+		return time.Time{}, fmt.Errorf("rawTime is required for built-in cycle")
+	}
+	execAt, err := time.ParseInLocation("2006-01-02 15:04", rawTime, time.Local)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid time: %w", err)
+	}
+	return execAt, nil
+}
+
 type cronCreateRequest struct {
 	Content        string `json:"content"`
 	Model          string `json:"model"`
@@ -11883,18 +12589,15 @@ func createCronTask(agentID string, req cronCreateRequest) (map[string]interface
 	if req.RouterDisable {
 		routerDisableInt = 1
 	}
-	if req.Cycle == -1 && req.Cron != "" {
+	execAt, err := validateCronCreateSchedule(req.Cycle, req.RawTime, req.Cron)
+	if err != nil {
+		return nil, err
+	}
+	if req.Cycle == -1 {
 		cronExpr = req.Cron
 		rawTime = ""
 	} else {
-		if req.Cycle < 0 || req.Cycle > 5 {
-			return nil, fmt.Errorf("cycle must be one of 0,1,2,3,4,5")
-		}
-		t, err := time.ParseInLocation("2006-01-02 15:04", req.RawTime, time.Local)
-		if err != nil {
-			return nil, fmt.Errorf("invalid time: %w", err)
-		}
-		cronExpr = cronBuildExpr(req.Cycle, t)
+		cronExpr = cronBuildExpr(req.Cycle, execAt)
 		rawTime = req.RawTime
 	}
 
@@ -12515,6 +13218,10 @@ func pruneForwardedChatMetadata(metaMap map[string]interface{}) {
 		"soul",
 		"user",
 		"dir",
+		// `test` is reserved for the isolated /api/model/test forwarding
+		// path. Ordinary /v1/chat/completions requests must never be able to
+		// opt into the test-only execution behavior.
+		"test",
 	} {
 		delete(metaMap, key)
 	}
@@ -15856,6 +16563,11 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	}
 	log.SetOutput(logOutput)
 	defer log.SetOutput(originalLogWriter)
+	defer func() {
+		if err := cleanupIntegrationBrowserReuseState(); err != nil {
+			log.Printf("integration: clear browser reuse state failed: %v", err)
+		}
+	}()
 
 	reportStartupFailure := func(format string, args ...interface{}) int {
 		message := fmt.Sprintf(format, args...)
@@ -16015,6 +16727,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/config", handleSwarm(&cfg))
 	mux.HandleFunc("/api/token", handleToken())
 	mux.HandleFunc("/api/model_provider", handleModelProviderCatalog(&cfg))
+	mux.HandleFunc("/api/model/test", handleModelTest(&cfg, proxyClient))
 	mux.HandleFunc("/api/runtime_config", handleRuntimeConfig())
 	mux.HandleFunc("/api/consume", handleConsume())
 	mux.HandleFunc("/api/message_insert/add", handleMessageInsertAdd())
@@ -16043,6 +16756,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/cron/detail/delete", handleCronDetailDelete())
 	mux.HandleFunc("/api/cron/detail/list", handleCronDetailList())
 	mux.HandleFunc("/api/cron/detail/update", handleCronDetailUpdate(&cfg))
+	mux.HandleFunc("/api/cron/detail/run", handleCronDetailRun(&cfg))
 	mux.HandleFunc("/api/cron/meta/update", handleCronMetaUpdate(&cfg))
 	mux.HandleFunc("/api/cron/detail/status", handleCronDetailStatus())
 	mux.HandleFunc("/api/cancel", handleCancel(&cfg))

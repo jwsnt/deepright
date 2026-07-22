@@ -39,6 +39,8 @@ import java.nio.file.Paths;
 @Slf4j
 public class CliRag extends RagCondition implements RagService {
 
+    public static final String KEY_FILE_SYSTEM = "file_system";
+
     public static final String KEY_DEVICE = "device";
 
     public static final String KEY_CHAT = "chat";
@@ -89,6 +91,12 @@ public class CliRag extends RagCondition implements RagService {
         return new RagAtOnce(ragConfig);
     }
 
+    @Override
+    protected Boolean allowed(RagConfig ragConfig, RagData ragData) throws Exception {
+        // 跳过测试请求
+        return super.allowed(ragConfig, ragData) && !FeatureFlag.isTest(ragData.getQuery());
+    }
+
     protected void fetchAgentFromId(RagConfig ragConfig, RagData ragData) throws Exception {
         // 获取当前Agent信息
         RouterAgent agent = this.buildAgent(ragData.getQuery());
@@ -105,7 +113,7 @@ public class CliRag extends RagCondition implements RagService {
     }
 
     protected void updateFileSystem(RagConfig ragConfig, RagData ragData) throws Exception {
-        String replace = MapUtils.getString(ragConfig.getGlobalConfig(), FeatureField.KEY_FILE_SYSTEM);
+        String replace = MapUtils.getString(ragConfig.getGlobalConfig(), CliRag.KEY_FILE_SYSTEM);
         if (!StringUtils.isEmpty(replace)) {
             String fileSystem = (FeatureFlag.isSandbox(ragData.getQuery()) ? this.template4sandbox : this.template4workspace);
             WorkflowException.checkCondition(StringUtils.isEmpty(fileSystem), "The cli file system can not be empty");

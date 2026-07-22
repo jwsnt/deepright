@@ -48,6 +48,10 @@
         {
           "key": "rag_check",
           "sort": 0
+        },
+        {
+          "key": "rag_test",
+          "sort": 0
         }
       ],
       "funCall": [

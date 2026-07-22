@@ -37,8 +37,11 @@ public class HistoryCloseAssistant extends PassageAssistant {
 
     @Override
     public void execute(WorkflowConfig workflowConfig, WorkflowTask workTask) throws Exception {
-        // Cron、Task、Daemon、普通会话所有场景均触发commit
-        this.commit(workflowConfig, workTask);
+        // 测试请求只用于连通性探测，绝不能提交或更新记忆。
+        if (!FeatureFlag.isTest(workTask)) {
+            // Cron、Task、Daemon、普通会话所有场景均触发commit
+            this.commit(workflowConfig, workTask);
+        }
         if (FeatureFlag.isDaemon(workTask)) {
             // 后台任务标记不关闭通道，@See CliTaskFunction && KnowledgeService
             this.chainOr2Endpoint(workflowConfig, workTask, workTask.getQuery());

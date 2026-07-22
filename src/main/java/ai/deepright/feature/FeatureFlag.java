@@ -22,13 +22,14 @@ public class FeatureFlag {
     // 是否为技能提取
     public static final String KEY_SKILL_EXTRACT = "skill_extract";
 
-    // 定时任务类型
-    public static final String KEY_CRON_TYPE = "cron_type";
-
     public static final String KEY_PLUGINS = "plugins";
+
+    public static final String KEY_VERIFY = "verify";
 
     // 是否开启了HTML输出
     public static final String KEY_HTML = "html";
+
+    public static final String KEY_TEST = "test";
 
     // 是否激活指定插件
     public static Boolean isActivePlugin(WorkflowTask workTask, String plugin) throws Exception {
@@ -93,7 +94,7 @@ public class FeatureFlag {
     }
 
     public static Boolean isVerify(WorkflowTask workTask) throws Exception {
-        return MapUtils.getBoolean(workTask.getMetadata(), FeatureField.KEY_VERIFY, false);
+        return MapUtils.getBoolean(workTask.getMetadata(), FeatureFlag.KEY_VERIFY, false);
     }
 
     public static Boolean isMacOs(WorkflowTask workTask) throws Exception {
@@ -142,8 +143,13 @@ public class FeatureFlag {
 
     // 是否来自周期任务
     public static Boolean isCron(WorkflowTask workTask) throws Exception {
-        String cron = MapUtils.getString(workTask.getMetadata(), FeatureFlag.KEY_CRON_TYPE);
+        String cron = MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_CRON_TYPE);
         // 存在cron_type标记，如果来自插件名则为插件名，如feishu
         return !StringUtils.isEmpty(cron);
+    }
+
+    // 是否是测试请求
+    public static Boolean isTest(WorkflowTask workTask) throws Exception {
+        return MapUtils.getBoolean(workTask.getMetadata(), FeatureFlag.KEY_TEST, false);
     }
 }

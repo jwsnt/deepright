@@ -20,6 +20,8 @@ public class FeatureUtils {
 
     public static final String KEY_AGENTS = "agents";
 
+    public static final String KEY_PORT = "port";
+
     public static String escapePath(WorkflowTask workTask, String path) throws Exception {
         return FeatureUtils.escapePath(FeatureFlag.isWindows(workTask), path);
     }
@@ -135,7 +137,7 @@ public class FeatureUtils {
     }
 
     public static String buildOrigin(Map<String, Object> metadata) throws Exception {
-        return MapUtils.getString(metadata, FeatureField.KEY_ORIGIN, FeatureUtils.KEY_LOCALHOST + ":" + MapUtils.getString(metadata, FeatureField.KEY_PORT));
+        return MapUtils.getString(metadata, FeatureField.KEY_ORIGIN, FeatureUtils.KEY_LOCALHOST + ":" + MapUtils.getString(metadata, FeatureUtils.KEY_PORT));
     }
 
     public static String buildUser(Map<String, Object> metadata) throws Exception {

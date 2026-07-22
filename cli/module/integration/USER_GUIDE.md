@@ -1385,6 +1385,7 @@ curl -X POST 'http://127.0.0.1:8080/api/cron/create?agentId=demo-agent' \
 | POST | `/api/cron/delete` | 删除定时任务 |
 | POST | `/api/cron/detail/delete` | 删除任务明细 |
 | POST | `/api/cron/detail/list` | 查询任务明细 |
+| POST | `/api/cron/detail/run` | 从明细或元数据创建待执行任务 |
 | POST | `/api/cron/detail/status` | 更新任务明细状态 |
 | POST | `/api/cancel` | 取消指定会话流 |
 | POST | `/api/restore` | 恢复指定会话日志 |
@@ -2102,6 +2103,40 @@ data: log file not found: release/plugins/feishu.log
 
 - `metaId` 支持传 `1` 或 `cron_1`
 - 未指定时间条件时，默认优先返回当前时间之后的明细；已保留的已完成明细也会返回
+
+### `/api/cron/detail/run`
+
+`POST /api/cron/detail/run?agentId=xxx`
+
+从一条任务明细或任务元数据创建当前时间的待执行任务。接口不会直接调用模型；新任务由既有轮询执行器处理。
+
+请求体使用明细来源时：
+
+```json
+{
+  "sourceType": "detail",
+  "detailId": 123,
+  "reuseChat": false
+}
+```
+
+请求体使用元数据来源时：
+
+```json
+{
+  "sourceType": "meta",
+  "metaId": 45,
+  "reuseChat": true
+}
+```
+
+说明：
+
+- `sourceType` 只能是 `detail` 或 `meta`；必须传入与来源类型对应的唯一 ID，`reuseChat` 为必填布尔值。
+- 明细来源仅允许 `started = 0`、`2`、`3`；`started = 1` 的已启动任务会被拒绝。
+- 新明细继承来源的 Agent、模型、Thinking、校验、SWARM、内容、响应结构、任务类型和 `metaId`。仅在 `reuseChat = true` 时继承 `chatId`；新任务始终以 `started = 0` 创建，不继承结果或完成信息。
+- 元数据来源只创建这一条当前时间的明细，不会解析 Cron、展开周期窗口或修改元数据。
+- 创建与审计日志在同一事务提交。如同一 `metaId` 的当前秒已有任务，服务端会递增秒级执行时间后重试。
 
 ### `/api/cron/delete`
 
@@ -2998,6 +3033,45 @@ GET /api/files?path=/Users/demo/agent/A/skills&chatId=chat-1
 会话列表在同一浏览器配置文件、同一站点的多个窗口间采用最终一致性同步：本窗口写入会立即更新；其他窗口会响应浏览器本地存储变更，并在可见状态下每 30 秒检查一次。页面从后台切回前台时也会立即补拉，因此后台计时器被浏览器降频不会造成长期陈旧。
 
 此能力不覆盖不同浏览器配置文件、无痕窗口、不同 origin 或不同设备。完整说明见 [iteration/20260717-2/USER_GUIDE.md](iteration/20260717-2/USER_GUIDE.md)。
+
+---
+
+
+## 迭代 20260722-1：立即运行任务明细创建
+
+Integration 新增受保护的单一“立即运行”创建接口 `POST /api/cron/detail/run?agentId=xxx`。接口不直接调用模型或立即启动任务，仅负责在单个事务中创建一条当前时间的待执行明细（`started = 0`）并记录审计日志。
+
+- 接口接收 `sourceType`（`detail` 或 `meta`）、`detailId` 或 `metaId`、`reuseChat` 和 `agentId`。
+- 新明细继承源任务或元数据的 Agent、模型、Thinking、校验、SWARM、内容、响应结构和任务类型。
+- 源明细仅在 `started` 为 `0`（待执行）、`2`（无需启动）或 `3`（已完成）时允许触发；处于 `1`（已启动）时服务端将拒绝请求。
+- `reuseChat = true` 时新明细继承源 `chat_id`；`reuseChat = false` 时新明细 `chat_id` 为空。
+- 服务端在同一数据库事务内验证归属、读取继承字段、插入新明细和写入审计记录。若在同一秒发生主键/唯一约束冲突，服务端会在事务内自动以递增秒数重试直至插入成功。
+
+完整说明见 [iteration/20260722-1/USER_GUIDE.md](iteration/20260722-1/USER_GUIDE.md)。
+
+---
+
+## 迭代 20260722-2：模型配置测试
+
+Integration 新增本机接口 `POST /api/model/test`，供设置页测试尚未保存的单行模型配置。接口只读取运行时 `config/config.json.test.content` 和 `config/config.json.test.timeout`，并以 UUID、`metadata.test = true` 的最小 SSE 请求调用服务商。
+
+- 测试固定使用 `__model`，不回退到快速、思考或多模态模型。
+- 测试配置、Token 与 UUID 均不写入 token_store、Agent 配置、聊天日志、连接表、记忆、技能、任务或通知。
+- 成功必须同时满足 HTTP 200、有效 SSE 业务数据和 `[DONE]`；HTTP/SSE 错误、超时、空流、流中断或缺少 `[DONE]` 都会返回脱敏后的错误。
+- 只有该测试转发携带 `metadata.test = true`，并会原样传至 `--host` 指定的最终处理服务器；普通 `/v1/chat/completions` 会在转发前移除客户端伪造的同名字段。
+
+完整说明见 [iteration/20260722-2/USER_GUIDE.md](iteration/20260722-2/USER_GUIDE.md)。
+
+---
+
+## 迭代 20260723-1：Agent 切换时的备忘录请求隔离
+
+切换 Agent 后，页面按既有 Agent 标识重新读取备忘录任务明细和元数据；Integration 不新增接口、数据库字段或任何持久化状态。
+
+- 连续切换时，浏览器可取消旧的读取请求；服务端只结束对应请求上下文，不写入或修改任务、聊天、Agent、记忆、技能或通知数据。
+- 即使旧读取请求在取消后仍返回，页面只会使用最新 Agent 的响应，因此不会覆盖当前备忘录内容。
+
+完整说明见 [iteration/20260723-1/USER_GUIDE.md](iteration/20260723-1/USER_GUIDE.md)。
 
 ---
 

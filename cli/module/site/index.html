@@ -1467,6 +1467,14 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 [data-low-power-rendering="on"] .rs-url-preview.is-loading .rs-url-preview-frame{opacity:.54;filter:none}
 .rs-url-preview-empty{position:absolute;inset:0;width:100%;height:100%;min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px;font-size:12px;line-height:1.7;color:var(--text-muted);text-align:center}
 .right-sidebar .rs-top{position:relative;flex:0 0 auto;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:220px auto 250px;border-bottom:1px solid var(--border);overflow:hidden;min-height:0;max-height:1000px;opacity:1;transition:max-height .38s cubic-bezier(.22,1,.36,1),opacity .28s ease,border-color .28s ease,padding .28s ease,margin .28s ease,filter .32s ease,transform .32s ease}
+.memo-agent-switch-overlay{position:absolute;inset:0 0 auto;z-index:240;height:220px;display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;opacity:0;visibility:hidden;pointer-events:none;background:color-mix(in srgb,var(--bg-sidebar) 42%,transparent);backdrop-filter:blur(8px) saturate(118%);-webkit-backdrop-filter:blur(8px) saturate(118%);transition:opacity .16s ease,visibility 0s linear .16s}
+.memo-agent-switch-overlay.show{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .16s ease}
+.memo-agent-switch-overlay-card{display:flex;align-items:center;gap:9px;padding:10px 14px;border:1px solid color-mix(in srgb,var(--accent) 48%,var(--border));border-radius:14px;background:color-mix(in srgb,var(--modal-panel-bg-strong) 88%,transparent);box-shadow:0 12px 28px rgba(16,24,40,.18),inset 0 1px 0 rgba(255,255,255,.55);color:var(--text-primary);font-size:12px;font-weight:700;letter-spacing:.02em}
+.memo-agent-switch-overlay-spinner{width:13px;height:13px;box-sizing:border-box;border:2px solid color-mix(in srgb,var(--accent) 26%,transparent);border-top-color:var(--accent);border-radius:50%;animation:memoAgentSwitchSpin .72s linear infinite}
+@keyframes memoAgentSwitchSpin{to{transform:rotate(360deg)}}
+[data-theme="dark"] .memo-agent-switch-overlay{background:rgba(5,16,30,.42)}
+[data-theme="dark"] .memo-agent-switch-overlay-card{background:rgba(8,24,41,.82);border-color:rgba(84,220,255,.32);box-shadow:0 16px 32px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.1)}
+.right-sidebar.cli-sub-expanded .memo-agent-switch-overlay{display:none}
 .right-sidebar .rs-top.memo-tour-controls-locked{pointer-events:none}
 .right-sidebar.wiki-expanded .rs-top{max-height:0;opacity:0;border-bottom-color:transparent;pointer-events:none}
 .right-sidebar.cli-sub-expanded .rs-top{flex:1 1 100%;grid-template-columns:minmax(0,1fr);grid-template-rows:30px minmax(0,1fr);max-height:none;border-bottom-color:transparent}
@@ -2627,6 +2635,17 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .model-config-toggle.active{border-color:var(--accent);color:var(--accent);background:rgba(var(--accent-soft-rgb),.12)}
 .model-config-toggle.has-config{border-color:rgba(var(--accent-soft-rgb),.42);color:var(--accent);background:rgba(var(--accent-soft-rgb),.1);animation:modelConfigGlow 1.15s ease-in-out infinite}
 .model-config-toggle.active.has-config{animation:none}
+.model-test-btn{width:28px;height:28px;border-radius:50%;border:1px solid var(--border);background:transparent;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:var(--transition);flex-shrink:0;padding:0}
+.model-test-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.model-test-btn:hover:not(:disabled),.model-test-btn:focus-visible:not(:disabled){border-color:var(--accent);color:var(--accent);background:rgba(var(--accent-soft-rgb),.08);outline:none}
+.model-test-btn:disabled{opacity:.38;cursor:not-allowed}
+.model-test-btn .model-test-cancel{display:none;font-size:17px;line-height:1;font-weight:500}
+.model-test-btn.is-running{border-color:rgba(255,150,83,.62);color:#e06b3f;background:rgba(255,150,83,.1);animation:modelTestSpin .85s linear infinite}
+.model-test-btn.is-running svg{display:none}
+.model-test-btn.is-running .model-test-cancel{display:block;animation:modelTestCounterSpin .85s linear infinite}
+@keyframes modelTestSpin{to{transform:rotate(360deg)}}
+@keyframes modelTestCounterSpin{to{transform:rotate(-360deg)}}
+.model-entry.model-test-running{box-shadow:0 0 0 1px rgba(255,150,83,.18),0 10px 24px rgba(255,150,83,.08)}
 .remove-model-btn{width:32px;height:32px;border-radius:50%;border:1px solid var(--border);background:transparent;color:var(--error);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:var(--transition);flex-shrink:0}
 .remove-model-btn:hover{background:var(--error-bg)}
 .remove-model-btn:disabled{opacity:.4;cursor:not-allowed;pointer-events:none;background:transparent}
@@ -2737,6 +2756,7 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 [data-theme="dark"] .model-config-clear-btn:hover{background:rgba(255,90,107,.14);border-color:rgba(255,90,107,.5);color:#ffd5db}
 [data-theme="dark"] .model-entry-status{border-color:rgba(245,166,35,.32);background:rgba(245,166,35,.14);color:#ffcf83}
 [data-theme="dark"] .model-config-toggle.has-config{border-color:rgba(127,165,255,.48);background:rgba(var(--accent-soft-rgb),.18);color:#9fc4ff}
+[data-theme="dark"] .model-test-btn.is-running{border-color:rgba(255,172,117,.68);color:#ffbd8b;background:rgba(255,154,90,.16)}
 [data-theme="dark"] .model-config-overflow-preview{box-shadow:0 20px 44px rgba(0,0,0,.36),inset 0 1px 0 rgba(255,255,255,.08)}
 [data-theme="dark"] .model-key-hint-preview{border-color:rgba(127,165,255,.34);background:linear-gradient(180deg,rgba(15,27,49,.98),rgba(10,20,38,.94));color:#a9c7ff;box-shadow:0 22px 46px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.08)}
 [data-theme="dark"] .media-output-launch-btn{border-color:rgba(84,215,255,.24);background:rgba(39,180,255,.14);color:#8fdcff;box-shadow:none}
@@ -3057,6 +3077,13 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .memo-preview-delete-confirm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
 .memo-preview-delete-confirm-actions button{min-width:64px;padding:6px 12px;border:1px solid var(--border);border-radius:9px;background:var(--bg-input);color:var(--text-secondary);font:inherit;font-size:12px;cursor:pointer}
 .memo-preview-delete-confirm-actions .danger{border-color:var(--error);background:var(--error);color:#fff}
+.memo-preview-delete-confirm-actions .primary{border-color:var(--accent);background:var(--accent);color:#fff}
+.memo-preview-delete-confirm-actions button:disabled{cursor:wait;opacity:.56}
+.memo-preview-run-confirm-card{border-color:color-mix(in srgb,var(--border) 72%,var(--accent) 28%)}
+.memo-preview-run-options{display:grid;gap:8px;margin-top:14px}
+.memo-preview-run-option{display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid color-mix(in srgb,var(--border) 82%,transparent);border-radius:10px;background:color-mix(in srgb,var(--bg-input) 84%,transparent);color:var(--text-secondary);font-size:12px;cursor:pointer;transition:var(--transition)}
+.memo-preview-run-option:has(input:checked){border-color:color-mix(in srgb,var(--accent) 50%,var(--border) 50%);background:color-mix(in srgb,var(--accent) 12%,var(--bg-input) 88%);color:var(--text-primary)}
+.memo-preview-run-option input{margin:0;accent-color:var(--accent)}
 [data-theme="dark"] .memo-preview-delete-confirm-card{background:linear-gradient(180deg,rgba(15,27,49,.98),rgba(10,20,38,.96));border-color:rgba(255,126,135,.32)}
 .rs-meta-center-card{width:min(460px,calc(100vw - 48px));max-width:min(460px,calc(100vw - 48px));max-height:min(68vh,560px);padding:20px 22px;border-radius:28px;border:1px solid color-mix(in srgb,var(--border) 80%,var(--accent) 20%);background:linear-gradient(180deg,color-mix(in srgb,var(--bg-card) 96%,#fff 4%),color-mix(in srgb,var(--bg-card) 98%,transparent));box-shadow:0 24px 60px rgba(16,24,40,.22);backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%);transform:translateY(10px) scale(.98);transition:transform .22s cubic-bezier(.22,1,.36,1),opacity .22s ease;display:flex;flex-direction:column;gap:14px;overflow:hidden}
 .rs-meta-center-overlay.show .rs-meta-center-card{transform:translateY(0) scale(1)}
@@ -4745,6 +4772,12 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
         </div>
         <div class="rs-meta-popup" id="rsMetaPopup" data-overlay-base data-overlay-domain="right" data-overlay-order="18" data-overlay-passive="1"></div>
       </div>
+      <div class="memo-agent-switch-overlay" id="memoAgentSwitchOverlay" role="status" aria-live="polite" aria-hidden="true" tabindex="-1">
+        <div class="memo-agent-switch-overlay-card">
+          <span class="memo-agent-switch-overlay-spinner" aria-hidden="true"></span>
+          <span>正在切换Agent</span>
+        </div>
+      </div>
       <div class="rs-row-divider" id="rsCliSubHeader">
         <div class="rs-row-title">
           <span>正在执行的系统指令</span>
@@ -5012,6 +5045,20 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     <div class="memo-preview-delete-confirm-actions">
       <button type="button" onclick="memoPreviewAgentChangeAcknowledge()">知道了</button>
       <button type="button" onclick="memoPreviewAgentChangeCancel()">取消</button>
+    </div>
+  </div>
+</div>
+<div class="memo-preview-delete-confirm-overlay" id="memoPreviewRunConfirm" data-overlay-base data-overlay-domain="center" data-overlay-order="26" aria-hidden="true" onclick="event.stopPropagation()">
+  <div class="memo-preview-delete-confirm-card memo-preview-run-confirm-card" id="memoPreviewRunConfirmCard" role="dialog" aria-modal="true" aria-labelledby="memoPreviewRunConfirmTitle" aria-describedby="memoPreviewRunConfirmDesc" tabindex="-1">
+    <p class="memo-preview-delete-confirm-title" id="memoPreviewRunConfirmTitle">运行备忘录</p>
+    <p class="memo-preview-delete-confirm-desc" id="memoPreviewRunConfirmDesc">将创建一条新的待执行任务明细。</p>
+    <div class="memo-preview-run-options" role="radiogroup" aria-label="会话复用方式">
+      <label class="memo-preview-run-option"><input type="radio" name="memoPreviewRunReuseChat" value="false" checked onchange="memoPreviewRunSetReuseChat(false)">不复用原会话</label>
+      <label class="memo-preview-run-option"><input type="radio" name="memoPreviewRunReuseChat" value="true" onchange="memoPreviewRunSetReuseChat(true)">复用原会话</label>
+    </div>
+    <div class="memo-preview-delete-confirm-actions">
+      <button type="button" id="memoPreviewRunCancelBtn" onclick="memoPreviewRunCancel()">取消</button>
+      <button type="button" class="primary" id="memoPreviewRunSubmitBtn" onclick="memoPreviewRunSubmit()">确认运行</button>
     </div>
   </div>
 </div>
@@ -6453,6 +6500,8 @@ const WIKI_RENDER_CACHE_LIMIT = 40;
 const LOW_POWER_RENDER_MESSAGE_MATH_LIMIT = 12;
 const LOCAL_STORAGE_SIZE_ENCODER = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
 let runtimeModelTokenCache = Object.create(null);
+const modelTestRequests = new Set();
+let modelTestRequestSequence = 0;
 
 function getStoredOnboardingEnabled() {
   try {
@@ -13528,6 +13577,9 @@ function hideExclusiveOverlayById(id) {
       return true;
     case 'cliKillConfirm':
       cliKillCancelConfirm();
+      return true;
+    case 'memoPreviewRunConfirm':
+      memoPreviewRunCancel();
       return true;
     default:
       return false;
@@ -30395,6 +30447,10 @@ function switchChat(id) {
     }
     syncCenterComposerState(id);
     // Restore agent and model for this chat
+    const previousAgentId = String(state.settings.agentId || '').trim();
+    const nextAgentId = String(chatAgents[id] || '').trim();
+    const agentChanged = previousAgentId !== nextAgentId;
+    if (agentChanged) startMemoAgentSwitchOverlay();
     if (chatAgents[id]) {
       state.settings.agentId = chatAgents[id];
       saveSettingsToStorage();
@@ -30420,7 +30476,7 @@ function switchChat(id) {
     void syncQueuedCenterInsertedMessagesFromServer(id, getChatAgentId(id), { silent: true });
     refreshChatSandboxStatus(id, { agentId: getChatAgentId(id), toastOnError: false }).catch(() => {});
     rsInitNote();
-    refreshCronViews();
+    refreshCronViews({ force: agentChanged });
     if (shouldResumeRestorePolling) ensureChatRestorePolling(id);
     else stopChatRestorePolling(id);
     updateChatAsyncUI(id);
@@ -30688,6 +30744,8 @@ function bindAgentToChat(chatId, agentId) {
   if (!resolvedChatId) return;
   const resolvedAgentId = String(agentId || '').trim();
   const previousAgentId = String(chatAgents[resolvedChatId] || '').trim();
+  const shouldRefreshMemoForAgentSwitch = state.activeChat === resolvedChatId && previousAgentId !== resolvedAgentId;
+  if (shouldRefreshMemoForAgentSwitch) startMemoAgentSwitchOverlay();
   chatAgents[chatId] = resolvedAgentId;
   if (!Object.prototype.hasOwnProperty.call(chatThinking, chatId)) {
     chatThinking[chatId] = false;
@@ -30715,6 +30773,8 @@ function bindAgentToChat(chatId, agentId) {
     syncQueuedCenterInputUI(chatId, resolvedAgentId);
     updateSandboxUI();
     refreshChatSandboxStatus(chatId, { agentId: resolvedAgentId, toastOnError: false }).catch(() => {});
+    rsInitNote();
+    refreshCronViews({ force: shouldRefreshMemoForAgentSwitch });
   }
   if (state.activeChat === chatId) {
     if (state.chats[chatId] && state.chats[chatId].pendingRequest) resetChatSkillIndicator(chatId, { agentId: resolvedAgentId });
@@ -37735,6 +37795,7 @@ async function openSettings() {
 function closeSettings(force) {
   if (!force && isOnboardingActive() && isSettingsOnboardingStep(onboardingState.step)) return;
   if (!force && isSettingsCopyTransitionLocked()) return;
+  cancelAllModelConfigurationTests({ silent: true });
   hideModelKeyHintPreview();
   hideModelConfigOverflowPreview();
   closeMediaConfigPanel({ force: true, restoreEntry: false, preserveDraft: false });
@@ -40460,12 +40521,16 @@ async function activateImportedAgentIfNeeded(agentId) {
     hideAgentSelectOverlay();
     return;
   }
+  const agentChanged = String(state.settings.agentId || '').trim() !== importedAgentId;
+  if (agentChanged) startMemoAgentSwitchOverlay();
   state.settings.agentId = importedAgentId;
   saveSettingsToStorage();
   renderWikiAutoTidyToggle();
   updateModelIndicator();
   updateBeeIcons();
   updateThinkingUI();
+  rsInitNote();
+  refreshCronViews({ force: agentChanged });
   hideAgentSelectOverlay();
   await vfsLoadWorkspace();
 }
@@ -41821,6 +41886,7 @@ function renderModelEntries() {
     addBtn.title = remoteRestricted ? '远程访问下不允许新增模型配置' : '';
   }
   const keys = getOrderedConfiguredModelNames(models);
+  cancelAllModelConfigurationTests({ silent: true });
   hideModelKeyHintPreview();
   hideModelConfigOverflowPreview();
   if (keys.length === 0) {
@@ -42212,6 +42278,7 @@ function copyModelConfigFrom(btn) {
   closeModelCopyMenus();
   refreshModelEntryPendingState(entry);
   updateModelConfigToggleState(entry);
+  refreshModelEntryTestButton(entry);
   if (target.spec.configurable) {
     setOnboardingModelConfigEntryTarget(entry);
     setModelConfigEntryOpen(entry, true);
@@ -42229,6 +42296,189 @@ function refreshModelEntryOptions() {
       select.value = currentModel;
     }
   });
+}
+
+function getModelTestUnavailableReason(model, config) {
+  if (isRemoteReadonlySiteAccess()) return '远程访问下不可测试配置';
+  const normalizedModel = normalizeModelName(model);
+  if (!normalizedModel) return '请先选择模型服务商';
+  const current = normalizeModelConfig(config);
+  if (!String(current.token || '').trim() || isMaskedRemoteTokenValue(current.token)) return '请先填写模型密钥';
+  if (!String(current.__model || '').trim()) return '请先填写基础模型 __model';
+  return '';
+}
+
+function getModelConfigurationTestRequest(entry) {
+  if (!entry) return null;
+  const model = normalizeModelName(entry.querySelector('select') && entry.querySelector('select').value);
+  const config = getCurrentModelEntryRawConfig(entry);
+  const reason = getModelTestUnavailableReason(model, config);
+  if (reason) return { reason };
+  return {
+    payload: {
+      model,
+      token: String(config.token || '').trim(),
+      __url: String(config.__url || '').trim(),
+      __model: String(config.__model || '').trim(),
+      __model_fast: String(config.__model_fast || '').trim(),
+      __model_thinking: String(config.__model_thinking || '').trim(),
+      __model_multi_input: String(config.__model_multi_input || '').trim(),
+      __model_multi_output: String(config.__model_multi_output || '').trim()
+    }
+  };
+}
+
+function getModelTestStateForEntry(entry) {
+  for (const state of modelTestRequests) {
+    if (state.entry === entry && !state.completed) return state;
+  }
+  return null;
+}
+
+function refreshModelEntryTestButton(entry) {
+  if (!entry) return;
+  const button = entry.querySelector('.model-test-btn');
+  if (!button) return;
+  const running = getModelTestStateForEntry(entry);
+  if (running) return;
+  const request = getModelConfigurationTestRequest(entry);
+  const reason = request && request.reason ? request.reason : '';
+  button.disabled = !!reason;
+  button.title = reason || '测试配置';
+  button.setAttribute('aria-label', reason || '测试配置');
+}
+
+function setModelConfigurationTestRunning(state) {
+  const entry = state && state.entry;
+  const button = state && state.button;
+  if (!entry || !button) return;
+  state.controls = Array.from(entry.querySelectorAll('select,input,button'))
+    .filter(control => control !== button)
+    .map(control => ({ control, disabled: !!control.disabled }));
+  state.controls.forEach(item => { item.control.disabled = true; });
+  entry.classList.add('model-test-running');
+  button.classList.add('is-running');
+  button.disabled = false;
+  button.title = '取消测试';
+  button.setAttribute('aria-label', '取消测试');
+}
+
+function finishModelConfigurationTest(state) {
+  if (!state || state.completed) return;
+  state.completed = true;
+  modelTestRequests.delete(state);
+  if (state.entry && state.entry.isConnected) {
+    state.entry.classList.remove('model-test-running');
+    (state.controls || []).forEach(item => {
+      if (item.control && item.control.isConnected) item.control.disabled = item.disabled;
+    });
+    if (state.button && state.button.isConnected) {
+      state.button.classList.remove('is-running');
+      refreshModelEntryTestButton(state.entry);
+    }
+  }
+}
+
+function cancelModelConfigurationTest(entry, options) {
+  const state = getModelTestStateForEntry(entry);
+  if (!state) return false;
+  state.cancelled = true;
+  if (state.controller) state.controller.abort();
+  finishModelConfigurationTest(state);
+  if (!(options && options.silent)) vfsShowUploadToast('测试已取消', false);
+  return true;
+}
+
+function cancelAllModelConfigurationTests(options) {
+  Array.from(modelTestRequests).forEach(state => cancelModelConfigurationTest(state.entry, options));
+}
+
+function limitModelTestMessage(value, fallback) {
+  const compact = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!compact) return fallback || '测试服务返回未知错误';
+  return compact.length > 500 ? compact.slice(0, 500) + '…' : compact;
+}
+
+async function readModelConfigurationTestResponse(response) {
+  const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+  if (!response.ok) {
+    let message = '';
+    try {
+      if (contentType.includes('application/json')) {
+        const data = await response.json();
+        message = data && (data.content || data.message);
+      } else {
+        message = await response.text();
+      }
+    } catch {}
+    throw new Error(limitModelTestMessage(message, '配置错误：测试请求失败（HTTP ' + response.status + '）'));
+  }
+  if (!contentType.includes('text/event-stream')) {
+    throw new Error('配置错误：测试服务未返回 SSE 结果');
+  }
+  const raw = await response.text();
+  const events = raw.split(/\r?\n\r?\n/);
+  for (const event of events) {
+    const lines = event.split(/\r?\n/);
+    const eventName = String(lines.find(line => /^event\s*:/.test(line)) || '').replace(/^event\s*:\s*/, '').trim();
+    if (eventName !== 'result') continue;
+    const payload = lines
+      .filter(line => /^data\s*:/.test(line))
+      .map(line => line.replace(/^data\s*:\s*/, ''))
+      .join('\n');
+    try {
+      const data = JSON.parse(payload);
+      if (data && data.status === 0) return;
+      throw new Error(limitModelTestMessage(data && data.content, '配置错误：测试失败'));
+    } catch (error) {
+      if (error instanceof Error) throw error;
+      throw new Error('配置错误：测试结果无效');
+    }
+  }
+  throw new Error('配置错误：测试 SSE 未返回完成结果');
+}
+
+async function toggleModelConfigurationTest(button) {
+  const entry = button && button.closest('.model-entry');
+  if (!entry) return;
+  const running = getModelTestStateForEntry(entry);
+  if (running) {
+    cancelModelConfigurationTest(entry);
+    return;
+  }
+  const request = getModelConfigurationTestRequest(entry);
+  if (!request || request.reason || !request.payload) {
+    if (request && request.reason) setSettingsErrorMessage(request.reason);
+    refreshModelEntryTestButton(entry);
+    return;
+  }
+  const state = {
+    id: ++modelTestRequestSequence,
+    entry,
+    button,
+    controller: new AbortController(),
+    completed: false,
+    cancelled: false,
+    controls: []
+  };
+  modelTestRequests.add(state);
+  setModelConfigurationTestRunning(state);
+  try {
+    const response = await fetch('/api/model/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request.payload),
+      signal: state.controller.signal
+    });
+    await readModelConfigurationTestResponse(response);
+    if (!state.completed && !state.cancelled) vfsShowUploadToast('配置成功', false);
+  } catch (error) {
+    if (!state.completed && !state.cancelled && !(error && error.name === 'AbortError')) {
+      vfsShowUploadToast(limitModelTestMessage(error && error.message, '配置错误：网络异常'), true);
+    }
+  } finally {
+    finishModelConfigurationTest(state);
+  }
 }
 
 function modelEntryHtml(idx, model, rawConfig, originalModel) {
@@ -42271,6 +42521,9 @@ function modelEntryHtml(idx, model, rawConfig, originalModel) {
     ? ' disabled title="远程访问下不允许删除已保存模型配置"'
     : ' title="删除模型"';
   const configToggleTitle = remotePersisted ? '客户化配置（只读）' : '客户化配置';
+  const testUnavailableReason = getModelTestUnavailableReason(model, cfg);
+  const testDisabledAttr = testUnavailableReason ? ' disabled' : '';
+  const testTitle = testUnavailableReason || '测试配置';
   return `<div class="model-entry" data-idx="${idx}"${originalAttr}>
     <div class="model-entry-main">
       <select onchange="onModelChange(this)"${selectDisabledAttr}>${'<option value="">选择模型</option>' + opts}</select>
@@ -42290,6 +42543,9 @@ function modelEntryHtml(idx, model, rawConfig, originalModel) {
         ${canImportCurl ? `<button class="model-curl-btn" onclick="openModelCurlImportPanel(this)" type="button" title="从 CURL 导入配置" aria-label="从 CURL 导入配置">CURL</button>` : ''}
       </div>
       <span class="model-entry-status">待完成</span>
+      <button class="model-test-btn" onclick="toggleModelConfigurationTest(this)" type="button" title="${esc(testTitle).replace(/"/g, '&quot;')}" aria-label="${esc(testTitle).replace(/"/g, '&quot;')}"${testDisabledAttr}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8"></path><path d="M10 3v5.2l-4.7 8.1A3.2 3.2 0 0 0 8.1 21h7.8a3.2 3.2 0 0 0 2.8-4.7L14 8.2V3"></path><path d="M8.2 15h7.6"></path></svg><span class="model-test-cancel" aria-hidden="true">×</span>
+      </button>
       ${canCustomize ? `<button class="model-config-toggle${hasConfig ? ' has-config' : ''}" onclick="toggleModelConfig(this)" type="button" title="${configToggleTitle}">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l2.7 5.46L21 9.27l-4.5 4.38 1.06 6.19L12 16.98 6.44 19.84 7.5 13.65 3 9.27l6.3-.81z"/></svg>
       </button>` : ''}
@@ -42386,6 +42642,7 @@ function addModelEntry() {
 async function removeModelEntry(btn) {
   const entry = btn.closest('.model-entry');
   if (!entry) return;
+  if (cancelModelConfigurationTest(entry, { silent: true })) return;
   const originalModel = normalizeModelName(entry.getAttribute('data-original-model'));
   const remotePersisted = isRemoteReadonlySiteAccess() && !!originalModel;
   if (remotePersisted) {
@@ -42454,6 +42711,7 @@ function resetModelCustomConfig(btn) {
   setInput('.model-multi-output-input', cfg.__model_multi_output, !(spec.configurable && spec.supportsMultiOutput));
   entry.setAttribute('data-custom-cleared', '0');
   updateModelConfigToggleState(entry);
+  refreshModelEntryTestButton(entry);
 }
 
 function clearModelCustomConfig(btn) {
@@ -42475,6 +42733,7 @@ function clearModelCustomConfig(btn) {
   setInput('.model-multi-output-input', '', !(spec.configurable && spec.supportsMultiOutput));
   entry.setAttribute('data-custom-cleared', '1');
   updateModelConfigToggleState(entry);
+  refreshModelEntryTestButton(entry);
 }
 
 function getModelEntryCustomConfigState(entry) {
@@ -42530,7 +42789,7 @@ function attachModelConfigInputListeners(entry) {
       scheduleModelKeyHintPreview(tokenInput);
     });
     tokenInput.addEventListener('blur', () => scheduleHideModelKeyHintPreview(tokenInput));
-    tokenInput.addEventListener('input', () => {
+  tokenInput.addEventListener('input', () => {
       if (String(tokenInput.value || '').trim()) {
         if (modelKeyHintPreviewState.trigger === tokenInput || modelKeyHintPreviewState.hoverTrigger === tokenInput) {
           hideModelKeyHintPreview();
@@ -42539,6 +42798,7 @@ function attachModelConfigInputListeners(entry) {
         scheduleModelKeyHintPreview(tokenInput);
       }
       refreshModelEntryPendingState(entry);
+      refreshModelEntryTestButton(entry);
     });
   }
   const configSelectors = [
@@ -42566,6 +42826,7 @@ function attachModelConfigInputListeners(entry) {
         entry.setAttribute('data-custom-cleared', '0');
       }
       updateModelConfigToggleState(entry);
+      refreshModelEntryTestButton(entry);
       if (modelConfigOverflowPreviewState.hoverInput === input || modelConfigOverflowPreviewState.input === input) {
         syncModelConfigOverflowPreview(input);
       }
@@ -42599,6 +42860,7 @@ function attachModelConfigInputListeners(entry) {
   entry.setAttribute('data-custom-cleared', currentCfg.__custom_cleared ? '1' : '0');
   updateModelConfigToggleState(entry);
   refreshModelEntryPendingState(entry);
+  refreshModelEntryTestButton(entry);
 }
 
 function getCurrentModelEntryRawConfig(entry) {
@@ -42873,6 +43135,7 @@ async function saveSettingsAsync() {
   // Check if agent changed and memo has input — reset memo
   const agentChanged = agentId !== state.settings.agentId;
   const onboardingChanged = nextOnboardingEnabled !== isOnboardingEnabled();
+  if (agentChanged) startMemoAgentSwitchOverlay();
   state.settings.agentId = agentId;
   configurationReminderState.hasConfiguredAgent = true;
   saveSettingsToStorage();
@@ -42917,7 +43180,7 @@ async function saveSettingsAsync() {
   }
   // Update memo placeholder with new agent name
   rsInitNote();
-  refreshCronViews();
+  refreshCronViews({ force: agentChanged });
   // Hide memo reset tip
   const tip = document.getElementById('memoResetTip');
   if (tip) tip.classList.remove('show');
@@ -48832,6 +49095,83 @@ document.addEventListener('visibilitychange', () => {
 // ===== Right Sidebar Calendar =====
 let calYear, calMonth, calSelected = null;
 (function() { const n = new Date(); calYear = n.getFullYear(); calMonth = n.getMonth(); })();
+const MEMO_AGENT_SWITCH_OVERLAY_MS = 500;
+const memoAgentSwitchState = { sequence: 0, timer: 0, previousFocus: null };
+let memoTimelineRequestSeq = 0;
+let memoTimelineAbortController = null;
+let memoMetadataRequestSeq = 0;
+let memoMetadataAbortController = null;
+
+function abortMemoTimelineRequest() {
+  if (memoTimelineAbortController) memoTimelineAbortController.abort();
+  memoTimelineAbortController = null;
+}
+
+function abortMemoMetadataRequest() {
+  if (memoMetadataAbortController) memoMetadataAbortController.abort();
+  memoMetadataAbortController = null;
+}
+
+function invalidateMemoAgentRequests() {
+  memoTimelineRequestSeq += 1;
+  memoMetadataRequestSeq += 1;
+  clearTimeout(_tlTimer);
+  abortMemoTimelineRequest();
+  abortMemoMetadataRequest();
+}
+
+function getMemoAgentSwitchContentElements() {
+  const scope = document.getElementById('rsTopGrid');
+  if (!scope) return [];
+  return ['rsCalendar', 'rsMemoCell']
+    .map(id => document.getElementById(id))
+    .filter(element => element && scope.contains(element));
+}
+
+function setMemoAgentSwitchContentLocked(locked) {
+  getMemoAgentSwitchContentElements().forEach(element => {
+    element.inert = !!locked;
+  });
+}
+
+function startMemoAgentSwitchOverlay() {
+  const overlay = document.getElementById('memoAgentSwitchOverlay');
+  const sequence = ++memoAgentSwitchState.sequence;
+  if (memoAgentSwitchState.timer) {
+    clearTimeout(memoAgentSwitchState.timer);
+    memoAgentSwitchState.timer = 0;
+  }
+  invalidateMemoAgentRequests();
+  if (!overlay) return sequence;
+  const activeElement = document.activeElement;
+  const memoContent = getMemoAgentSwitchContentElements();
+  if (activeElement instanceof HTMLElement && memoContent.some(element => element.contains(activeElement))) {
+    memoAgentSwitchState.previousFocus = activeElement;
+  } else {
+    memoAgentSwitchState.previousFocus = null;
+  }
+  setMemoAgentSwitchContentLocked(true);
+  overlay.classList.remove('show');
+  void overlay.offsetWidth;
+  overlay.classList.add('show');
+  overlay.setAttribute('aria-hidden', 'false');
+  if (memoAgentSwitchState.previousFocus) {
+    try { overlay.focus({ preventScroll: true }); } catch { overlay.focus(); }
+  }
+  memoAgentSwitchState.timer = window.setTimeout(() => {
+    if (memoAgentSwitchState.sequence !== sequence) return;
+    overlay.classList.remove('show');
+    overlay.setAttribute('aria-hidden', 'true');
+    setMemoAgentSwitchContentLocked(false);
+    const previousFocus = memoAgentSwitchState.previousFocus;
+    memoAgentSwitchState.previousFocus = null;
+    if (previousFocus instanceof HTMLElement && previousFocus.isConnected) {
+      try { previousFocus.focus({ preventScroll: true }); } catch { previousFocus.focus(); }
+    }
+    memoAgentSwitchState.timer = 0;
+  }, MEMO_AGENT_SWITCH_OVERLAY_MS);
+  return sequence;
+}
 
 function renderCalendar() {
   const el = document.getElementById('rsCalUpper');
@@ -48867,7 +49207,9 @@ let timelineDetailStatusSnapshot = Object.create(null);
 let memoViewRecoveryState = Object.create(null);
 function renderTimeline() {
   clearTimeout(_tlTimer);
-  _tlTimer = setTimeout(_doRenderTimeline, 200);
+  const requestSeq = ++memoTimelineRequestSeq;
+  abortMemoTimelineRequest();
+  _tlTimer = setTimeout(() => _doRenderTimeline(requestSeq), 200);
 }
 function setTimelineDetailCache(details) {
   const nextStatusSnapshot = Object.create(null);
@@ -48922,8 +49264,9 @@ function scheduleRefreshCronViews(delay = 120) {
     refreshCronViews();
   }, Math.max(0, delay));
 }
-function refreshCronViews() {
-  if (_cronRefreshInFlight) {
+function refreshCronViews(options = {}) {
+  const force = !!options.force;
+  if (_cronRefreshInFlight && !force) {
     scheduleRefreshCronViews(180);
     return;
   }
@@ -49024,9 +49367,10 @@ function shouldClearTimelineCompletionBadgeOnReveal() {
   if (metaView && metaView.classList.contains('show')) return false;
   return true;
 }
-async function _doRenderTimeline() {
+async function _doRenderTimeline(requestSeq) {
   const el = document.getElementById('rsTimeline');
-  if (!el) return;
+  const currentRequestSeq = Number.isFinite(Number(requestSeq)) ? Number(requestSeq) : memoTimelineRequestSeq;
+  if (!el || currentRequestSeq !== memoTimelineRequestSeq) return;
   if (isMemoTourDetailListStep(onboardingState.step)) {
     memoDetailPreviewHide();
     renderMemoTourTimeline();
@@ -49034,6 +49378,13 @@ async function _doRenderTimeline() {
     return;
   }
   const agentId = state.settings.agentId;
+  const date = calDateStr();
+  const canApply = () => (
+    currentRequestSeq === memoTimelineRequestSeq &&
+    agentId === state.settings.agentId &&
+    date === calDateStr()
+  );
+  if (!canApply()) return;
   if (!agentId) {
     setTimelineDetailCache([]);
     memoDetailPreviewHide();
@@ -49041,10 +49392,12 @@ async function _doRenderTimeline() {
     syncTimelineCompletionBadge('', '');
     return;
   }
-  const date = calDateStr();
+  const controller = new AbortController();
+  memoTimelineAbortController = controller;
   try {
-    const resp = await fetch('/api/cron/detail/list?agentId=' + encodeURIComponent(agentId) + '&date=' + date, { method: 'POST' });
+    const resp = await fetch('/api/cron/detail/list?agentId=' + encodeURIComponent(agentId) + '&date=' + date, { method: 'POST', signal: controller.signal });
     const data = await resp.json();
+    if (!canApply()) return;
     if (data.status !== 0 || !data.data || data.data.length === 0) {
       setTimelineDetailCache([]);
       memoDetailPreviewSyncAfterTimelineRefresh(agentId, date, []);
@@ -49053,15 +49406,23 @@ async function _doRenderTimeline() {
       el.innerHTML = getTimelineCompletionBadgeMarkup(agentId, date) + '<ul class="rs-timeline"><li style="color:var(--text-muted)">--无任务明细--</li></ul>';
       return;
     }
-    setTimelineDetailCache(data.data);
-    memoDetailPreviewSyncAfterTimelineRefresh(agentId, date, data.data);
+    // The timeline is chronological: earlier details remain at the top and
+    // newly-created details appear below them. Keep API query ordering local
+    // to its callers such as memo search instead of changing the shared API.
+    const details = Array.from(data.data).sort((left, right) => {
+      const timeDelta = Number(left && left.execTime) - Number(right && right.execTime);
+      if (timeDelta !== 0) return timeDelta;
+      return Number(left && left.id) - Number(right && right.id);
+    });
+    setTimelineDetailCache(details);
+    memoDetailPreviewSyncAfterTimelineRefresh(agentId, date, details);
     const now = Date.now() / 1000;
     const soon = 30 * 60; // 30 minutes
     const startedLabels = { 0: '待执行', 1: '已启动', 2: '无需启动', 3: '已完成' };
     const startedClassMap = { 0: 'pending', 1: 'running', 2: 'skipped', 3: 'done' };
     let nearestPendingId = null;
     let nearestPendingDistance = Infinity;
-    data.data.forEach((d) => {
+    details.forEach((d) => {
       if (d.started !== 0 || !Number.isFinite(d.execTime)) return;
       const distance = Math.abs(d.execTime - now);
       if (distance < nearestPendingDistance || (distance === nearestPendingDistance && d.execTime >= now)) {
@@ -49069,9 +49430,9 @@ async function _doRenderTimeline() {
         nearestPendingId = d.id;
       }
     });
-    syncMemoCompletionTourCandidate(agentId, date, data.data);
-    updateTimelineCompletionBadge(agentId, date, data.data);
-    el.innerHTML = getTimelineCompletionBadgeMarkup(agentId, date) + '<ul class="rs-timeline">' + data.data.map((d, i) => {
+    syncMemoCompletionTourCandidate(agentId, date, details);
+    updateTimelineCompletionBadge(agentId, date, details);
+    el.innerHTML = getTimelineCompletionBadgeMarkup(agentId, date) + '<ul class="rs-timeline">' + details.map((d, i) => {
       const t = new Date(d.execTime * 1000);
       const timeStr = String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0') + ' ' + String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0');
       const isSoon = d.started === 0 && d.execTime > now && (d.execTime - now) <= soon;
@@ -49098,6 +49459,7 @@ async function _doRenderTimeline() {
     const nearestEl = document.getElementById('tlNearestPending');
     if (nearestEl && el.scrollHeight > el.clientHeight) {
       requestAnimationFrame(() => {
+        if (!canApply()) return;
         const nearestEl2 = document.getElementById('tlNearestPending');
         if (!nearestEl2) return;
         const targetTop = nearestEl2.offsetTop - Math.max((el.clientHeight - nearestEl2.offsetHeight) / 2, 0);
@@ -49106,10 +49468,13 @@ async function _doRenderTimeline() {
       });
     }
   } catch {
+    if (!canApply()) return;
     setTimelineDetailCache([]);
     memoDetailPreviewSyncAfterTimelineRefresh(agentId, date, []);
     el.innerHTML = getTimelineCompletionBadgeMarkup(agentId, date) + '<ul class="rs-timeline"><li style="color:var(--text-muted)">--无任务明细--</li></ul>';
     syncTimelineCompletionBadge(agentId, date);
+  } finally {
+    if (memoTimelineAbortController === controller) memoTimelineAbortController = null;
   }
 }
 function tlHover(e, el) {
@@ -49216,17 +49581,19 @@ async function tlIgnoreDo() {
   }
 }
 let tlViewPending = null; // {detailId, metaId, agentId, model, thinking, chatId, execTime}
-function tlViewShow(detailId, metaId, btn) {
+function tlViewShow(detailId, metaId, btn, detailOverride) {
   if (isMemoTourInteractionLocked() && !memoCompletionTourState.scriptMode) return;
   clearTimelineCompletionBadge();
   memoDetailPreviewHide();
-  const li = btn.closest('li');
+  const li = btn && typeof btn.closest === 'function' ? btn.closest('li') : null;
   const meta = li ? li.getAttribute('data-meta') : null;
   const execTime = li ? li.getAttribute('data-exectime') : '';
   const chatId = li ? (li.getAttribute('data-chatid') || '') : '';
-  const detail = getTimelineDetail(detailId);
-  const agentId = state.settings.agentId;
-  tlViewPending = { detailId, metaId, agentId, execTime, chatId: chatId || (metaId + '@' + detailId) };
+  const detail = detailOverride || getTimelineDetail(detailId);
+  const agentId = String(detail && detail.agentId || state.settings.agentId || '');
+  const resolvedExecTime = execTime || String(detail && detail.execTime || '');
+  const resolvedChatId = chatId || String(detail && detail.chatId || '') || (metaId + '@' + detailId);
+  tlViewPending = { detailId, metaId, agentId, execTime: resolvedExecTime, chatId: resolvedChatId };
   if (detail) {
     tlViewPending.userContent = String(detail.content || '').trim();
     tlViewPending.resultContent = String(detail.resultContent || '');
@@ -49234,19 +49601,29 @@ function tlViewShow(detailId, metaId, btn) {
     tlViewPending.started = Number(detail.started || 0);
   }
   const info = document.getElementById('tlViewInfo');
+  let viewMeta = null;
   if (meta) {
     try {
-      const m = JSON.parse(meta);
-      tlViewPending.model = normalizeModelName(m.model) || '';
-      tlViewPending.thinking = !!m.thinking;
-      tlViewPending.verify = !!m.verify && !!m.thinking;
-      tlViewPending.routerDisable = readMetadataBoolean(m.router_disable);
-      const swarm = formatSwarmStatus(m.router_disable);
-      info.innerHTML = '<div class="rs-confirm-row"><span>模型</span><span>' + esc(normalizeModelName(m.model)) + '</span></div>' +
-        '<div class="rs-confirm-row"><span>SWARM</span><span>' + swarm + '</span></div>' +
-        '<div class="rs-confirm-row"><span>思考</span><span>' + (m.thinking ? 'Thinking' : 'Auto') + '</span></div>' +
-        '<div class="rs-confirm-row"><span>状态</span><span>' + esc(m.started) + '</span></div>';
-    } catch { info.textContent = ''; }
+      viewMeta = JSON.parse(meta);
+    } catch {}
+  }
+  const viewSource = viewMeta || detail;
+  if (viewSource) {
+    const started = Number(viewSource.started);
+    const status = typeof viewSource.started === 'string'
+      ? viewSource.started
+      : (MEMO_DETAIL_STATUS_LABELS[started] || '未知');
+    const routerDisable = viewSource.router_disable != null ? viewSource.router_disable : viewSource.routerDisable;
+    tlViewPending.model = normalizeModelName(viewSource.model) || '';
+    tlViewPending.thinking = !!viewSource.thinking;
+    tlViewPending.verify = !!viewSource.verify && !!viewSource.thinking;
+    tlViewPending.routerDisable = readMetadataBoolean(routerDisable);
+    if (info) info.innerHTML = '<div class="rs-confirm-row"><span>模型</span><span>' + esc(normalizeModelName(viewSource.model)) + '</span></div>' +
+      '<div class="rs-confirm-row"><span>SWARM</span><span>' + formatSwarmStatus(routerDisable) + '</span></div>' +
+      '<div class="rs-confirm-row"><span>思考</span><span>' + (viewSource.thinking ? 'Thinking' : 'Auto') + '</span></div>' +
+      '<div class="rs-confirm-row"><span>状态</span><span>' + esc(status) + '</span></div>';
+  } else if (info) {
+    info.textContent = '';
   }
   showExclusiveOverlay(document.getElementById('tlViewConfirm'));
 }
@@ -49641,24 +50018,8 @@ function rsBuildSaveSchedule() {
     rawTime: date + ' ' + hour + ':' + minute
   };
 }
-function rsNormalizeOnceScheduleToNow(now = new Date()) {
-  if (rsRepeatMode !== 'once') return false;
-  const current = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes(), 0, 0);
-  calYear = current.getFullYear();
-  calMonth = current.getMonth();
-  calSelected = { y: current.getFullYear(), m: current.getMonth(), d: current.getDate() };
-  const hour = document.getElementById('rsTimeH');
-  const minute = document.getElementById('rsTimeM');
-  if (hour) hour.value = String(current.getHours()).padStart(2, '0');
-  if (minute) minute.value = String(current.getMinutes()).padStart(2, '0');
-  renderCalendar();
-  renderTimeline();
-  return true;
-}
-function rsResolveSaveSchedule(now = new Date()) {
-  if (rsSelectedScheduleIsFuture(now)) return { schedule: rsBuildSaveSchedule(), normalized: false };
-  if (rsNormalizeOnceScheduleToNow(now)) return { schedule: rsBuildSaveSchedule(), normalized: true };
-  return { schedule: rsBuildSaveSchedule(), normalized: false, invalid: true };
+function rsResolveSaveSchedule() {
+  return { schedule: rsBuildSaveSchedule(), normalized: false };
 }
 async function rsToggleThinking() {
   if (isMemoTourInteractionLocked()) return;
@@ -49728,10 +50089,6 @@ function rsSaveNote(options = {}) {
   }
   const scheduleState = rsResolveSaveSchedule();
   const schedule = scheduleState.schedule;
-  if (scheduleState.invalid) {
-    vfsShowUploadToast('执行时间需要晚于当前时间', true);
-    return false;
-  }
   const cycleLabels = { once: '仅一次', workday: '工作日', daily: '自然日', hourly: '每小时', every15: '每15分钟', every30: '每30分钟' };
   // Populate confirm panel
   document.getElementById('rsConfirmModel').textContent = selectedModel;
@@ -49798,11 +50155,6 @@ async function rsSubmitNote(options = {}) {
   }
   const scheduleState = rsResolveSaveSchedule();
   const schedule = scheduleState.schedule;
-  if (scheduleState.invalid) {
-    const message = '执行时间需要晚于当前时间';
-    if (options.showToast !== false) vfsShowUploadToast(message, true);
-    return { ok: false, reason: 'past-exec-time', message };
-  }
   const cycleMap = { once: 0, workday: 1, daily: 2, hourly: 3, every15: 4, every30: 5 };
   const agentId = state.settings.agentId;
   const chatId = rsReuseChatEnabled() ? (state.activeChat || '') : '';
@@ -50160,7 +50512,8 @@ function memoQueryDateMs(value, end) {
 function memoQueryDisplayTime(record, dimension) {
   if (dimension === 'detail') return memoDetailPreviewFormatTime(record && record.execTime, 'input').replace('T', ' ');
   const raw = String(record && record.rawTime || '').trim();
-  return raw || (Number(record && record.cycle) === -1 ? 'Cron' : '-');
+  if (Number(record && record.cycle) === -1) return String(record && record.cron || '').trim() || '-';
+  return raw || '-';
 }
 function memoQueryMatchesRecord(record, dimension, form, metaStatusMap) {
   const item = record && typeof record === 'object' ? record : {};
@@ -50453,6 +50806,14 @@ const memoPreviewAgentChangeConfirmState = {
   targetId: '',
   agentId: ''
 };
+const memoPreviewRunState = {
+  sourceType: '',
+  sourceId: '',
+  agentId: '',
+  reuseChat: false,
+  submitting: false,
+  requestToken: 0
+};
 function rsSetMetaPreviewFocus(active) {
   document.body.classList.toggle('meta-preview-focus', !!active);
 }
@@ -50497,6 +50858,128 @@ function memoMetaPreviewDelete() {
   if (!meta || memoMetaPreviewState.editing || memoMetaPreviewState.saving || memoMetaPreviewState.deleting) return;
   memoMetaPreviewHide();
   setTimeout(() => rsDeleteMeta(Number(meta.id), meta.content), 0);
+}
+function memoPreviewRunIsActive() {
+  return !!memoPreviewRunState.sourceType;
+}
+function memoPreviewRunIsFor(sourceType, sourceId) {
+  return memoPreviewRunState.sourceType === sourceType && String(memoPreviewRunState.sourceId || '') === String(sourceId || '');
+}
+function memoPreviewRunSetReuseChat(reuseChat) {
+  if (!memoPreviewRunIsActive() || memoPreviewRunState.submitting) return;
+  memoPreviewRunState.reuseChat = !!reuseChat;
+  document.querySelectorAll('input[name="memoPreviewRunReuseChat"]').forEach(input => {
+    input.checked = String(input.value) === String(!!reuseChat);
+  });
+}
+function memoPreviewRunSetSubmitting(submitting) {
+  memoPreviewRunState.submitting = !!submitting;
+  const cancel = document.getElementById('memoPreviewRunCancelBtn');
+  const submit = document.getElementById('memoPreviewRunSubmitBtn');
+  const radios = document.querySelectorAll('input[name="memoPreviewRunReuseChat"]');
+  if (cancel) cancel.disabled = !!submitting;
+  if (submit) submit.disabled = !!submitting;
+  radios.forEach(input => { input.disabled = !!submitting; });
+}
+function memoPreviewRunReset() {
+  memoPreviewRunState.sourceType = '';
+  memoPreviewRunState.sourceId = '';
+  memoPreviewRunState.agentId = '';
+  memoPreviewRunState.reuseChat = false;
+  memoPreviewRunSetSubmitting(false);
+}
+function memoPreviewRunRefreshSourceActions() {
+  if (memoPreviewRunState.sourceType === 'detail' && memoDetailPreviewState.detail) {
+    rsRenderMetaCenterPreview(memoDetailPreviewBuildMeta(memoDetailPreviewState.detail), { detail: true, editing: memoDetailPreviewState.editing });
+  } else if (memoPreviewRunState.sourceType === 'meta' && memoMetaPreviewState.meta) {
+    rsRenderMetaCenterPreview(memoMetaPreviewBuildMeta(memoMetaPreviewState.meta), { metadata: true, editing: memoMetaPreviewState.editing });
+  }
+}
+function memoPreviewRunBegin(sourceType, source) {
+  if (isMemoTourInteractionLocked() || memoPreviewRunIsActive() || !source || memoDetailPreviewState.editing || memoMetaPreviewState.editing || memoDetailPreviewState.saving || memoMetaPreviewState.saving || memoDetailPreviewState.deleting || memoMetaPreviewState.deleting) return;
+  const sourceId = String(source.id || '').trim();
+  const agentId = String(source.agentId || state.settings.agentId || '').trim();
+  if (!sourceId || !agentId || document.getElementById('rsSaveLock')?.classList.contains('show')) return;
+  if (sourceType === 'detail' && ![0, 2, 3].includes(Number(source.started))) return;
+  memoPreviewRunState.sourceType = sourceType;
+  memoPreviewRunState.sourceId = sourceId;
+  memoPreviewRunState.agentId = agentId;
+  memoPreviewRunState.reuseChat = false;
+  memoPreviewRunSetSubmitting(false);
+  memoPreviewRunSetReuseChat(false);
+  if (sourceType === 'detail') memoDetailPreviewClearCloseTimer();
+  else memoMetaPreviewClearCloseTimer();
+  const overlay = document.getElementById('memoPreviewRunConfirm');
+  const card = document.getElementById('memoPreviewRunConfirmCard');
+  setOverlayVisible(overlay, true, card);
+  if (card instanceof HTMLElement) {
+    try { card.focus({ preventScroll: true }); } catch { card.focus(); }
+  }
+}
+function memoDetailPreviewRun() {
+  memoPreviewRunBegin('detail', memoDetailPreviewState.detail);
+}
+function memoMetaPreviewRun() {
+  memoPreviewRunBegin('meta', memoMetaPreviewState.meta);
+}
+function memoPreviewRunCancel() {
+  if (!memoPreviewRunIsActive() || memoPreviewRunState.submitting) return;
+  setOverlayVisible(document.getElementById('memoPreviewRunConfirm'), false, document.getElementById('memoPreviewRunConfirmCard'));
+  memoPreviewRunReset();
+  memoDetailPreviewScheduleClose();
+  memoMetaPreviewScheduleClose();
+}
+async function memoPreviewRunSubmit() {
+  if (!memoPreviewRunIsActive() || memoPreviewRunState.submitting) return;
+  const sourceType = memoPreviewRunState.sourceType;
+  const sourceId = memoPreviewRunState.sourceId;
+  const agentId = memoPreviewRunState.agentId;
+  const source = sourceType === 'detail' ? memoDetailPreviewState.detail : memoMetaPreviewState.meta;
+  if (!source || String(source.id || '') !== sourceId || String(source.agentId || state.settings.agentId || '') !== agentId || (sourceType === 'detail' && ![0, 2, 3].includes(Number(source.started)))) {
+    memoPreviewRunCancel();
+    vfsShowUploadToast('任务状态已变化，请刷新后重试', true);
+    return;
+  }
+  const requestToken = ++memoPreviewRunState.requestToken;
+  const reuseChat = !!memoPreviewRunState.reuseChat;
+  memoPreviewRunSetSubmitting(true);
+  memoPreviewRunRefreshSourceActions();
+  setOverlayVisible(document.getElementById('memoPreviewRunConfirm'), false, document.getElementById('memoPreviewRunConfirmCard'));
+  setMemoSaveLock(true, { title: '创建任务中', description: '正在创建待执行任务，请稍后' });
+  try {
+    const body = { sourceType, reuseChat };
+    body[sourceType === 'detail' ? 'detailId' : 'metaId'] = Number(sourceId);
+    const response = await fetch('/api/cron/detail/run?agentId=' + encodeURIComponent(agentId), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const responseText = await response.text();
+    let data = null;
+    try { data = responseText ? JSON.parse(responseText) : null; } catch {}
+    if (!response.ok || !data || data.status !== 0 || !data.data) {
+      throw new Error((data && data.content) || '创建任务失败');
+    }
+    if (memoPreviewRunState.requestToken !== requestToken) return;
+    memoQueryClearCache({ render: false });
+    scheduleRefreshCronViews(0);
+    vfsShowUploadToast('已创建，等待执行', false);
+  } catch (error) {
+    if (memoPreviewRunState.requestToken === requestToken) {
+      vfsShowUploadToast(String(error && error.message || '创建任务失败'), true);
+    }
+  } finally {
+    if (memoPreviewRunState.requestToken !== requestToken) return;
+    setMemoSaveLock(false);
+    memoPreviewRunReset();
+    if (sourceType === 'detail' && memoDetailPreviewState.detail) {
+      rsRenderMetaCenterPreview(memoDetailPreviewBuildMeta(memoDetailPreviewState.detail), { detail: true, editing: false });
+      rsSetMetaPreviewInteractive(true);
+    } else if (sourceType === 'meta' && memoMetaPreviewState.meta) {
+      rsRenderMetaCenterPreview(memoMetaPreviewBuildMeta(memoMetaPreviewState.meta), { metadata: true, editing: false });
+      rsSetMetaPreviewInteractive(true);
+    }
+  }
 }
 function memoPreviewRequestAgentChangeConfirmation(kind, item, agentId) {
   const isDetail = kind === 'detail';
@@ -50603,7 +51086,7 @@ function memoMetaPreviewBuildMeta(meta) {
   const source = meta && typeof meta === 'object' ? meta : {};
   return {
     cycle: MEMO_DETAIL_CYCLE_LABELS[Number(source.cycle)] || (Number(source.cycle) === -1 ? 'Cron' : '-'),
-    time: String(source.rawTime || '').trim() || (Number(source.cycle) === -1 ? 'Cron 自定义' : '-'),
+    time: Number(source.cycle) === -1 ? (String(source.cron || '').trim() || '-') : (String(source.rawTime || '').trim() || '-'),
     model: normalizeModelName(source.model),
     thinking: source.thinking ? 'Thinking' : 'Auto',
     swarm: formatSwarmStatus(source.router_disable),
@@ -50627,23 +51110,42 @@ function memoMetaPreviewCreateDraft(meta) {
   };
 }
 function memoDetailPreviewActionMarkup(editing, saving) {
-  if (!memoDetailPreviewState.detailId || Number(memoDetailPreviewState.detail && memoDetailPreviewState.detail.started) !== 0) return '';
-  const disabled = (saving || memoDetailPreviewState.deleting) ? ' disabled' : '';
+  if (!memoDetailPreviewState.detailId) return '';
+  const detail = memoDetailPreviewState.detail || {};
+  const started = Number(detail.started);
+  const disabled = (saving || memoDetailPreviewState.deleting || memoPreviewRunIsFor('detail', memoDetailPreviewState.detailId)) ? ' disabled' : '';
+  const viewButton = started === 3
+    ? '<button type="button" class="rs-meta-center-action" onclick="memoDetailPreviewView()" title="查看会话" aria-label="查看会话"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>'
+    : '';
+  const runButton = [0, 2, 3].includes(started)
+    ? '<button type="button" class="rs-meta-center-action" onclick="memoDetailPreviewRun()" title="运行备忘录" aria-label="运行备忘录"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 5 11 7-11 7z"/></svg></button>'
+    : '';
   if (!editing) {
-    return '<button type="button" class="rs-meta-center-action" onclick="memoDetailPreviewBeginEdit()" title="编辑备忘录" aria-label="编辑备忘录"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' +
+    if (started !== 0) return viewButton + runButton;
+    return runButton + '<button type="button" class="rs-meta-center-action" onclick="memoDetailPreviewBeginEdit()" title="编辑备忘录" aria-label="编辑备忘录"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' +
       '<button type="button" class="rs-meta-center-action rs-meta-center-delete-action" onclick="memoDetailPreviewDelete()" title="删除备忘录" aria-label="删除备忘录"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>';
   }
   return '<button type="button" class="rs-meta-center-action" onclick="memoDetailPreviewSave()" title="保存修改" aria-label="保存修改"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg></button>' +
     '<button type="button" class="rs-meta-center-action" onclick="memoDetailPreviewCancelEdit()" title="取消编辑" aria-label="取消编辑"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>';
+}
+function memoDetailPreviewView() {
+  const detail = memoDetailPreviewState.detail;
+  if (!detail || Number(detail.started) !== 3 || memoDetailPreviewState.editing || memoDetailPreviewState.saving || memoDetailPreviewState.deleting) return;
+  const viewDetail = memoDetailPreviewClone(detail);
+  memoDetailPreviewHide();
+  // Open after the action-button click finishes bubbling. Otherwise the
+  // global outside-click handler immediately closes the list's view dialog.
+  setTimeout(() => tlViewShow(viewDetail.id, viewDetail.metaId, null, viewDetail), 0);
 }
 function memoDetailPreviewToggleMarkup(field, active, disabled) {
   return '<button type="button" class="rs-meta-center-field-toggle' + (active ? ' on' : '') + '" role="switch" aria-checked="' + (active ? 'true' : 'false') + '" onclick="memoDetailPreviewToggleField(\'' + field + '\')"' + (disabled ? ' disabled' : '') + '>' + (active ? '开启' : '关闭') + '</button>';
 }
 function memoMetaPreviewActionMarkup(editing, saving) {
   if (!memoMetaPreviewState.metaId) return '';
-  const disabled = (saving || memoMetaPreviewState.deleting) ? ' disabled' : '';
+  const disabled = (saving || memoMetaPreviewState.deleting || memoPreviewRunIsFor('meta', memoMetaPreviewState.metaId)) ? ' disabled' : '';
+  const runButton = '<button type="button" class="rs-meta-center-action" onclick="memoMetaPreviewRun()" title="运行备忘录" aria-label="运行备忘录"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 5 11 7-11 7z"/></svg></button>';
   if (!editing) {
-    return '<button type="button" class="rs-meta-center-action" onclick="memoMetaPreviewBeginEdit()" title="编辑备忘录" aria-label="编辑备忘录"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' +
+    return runButton + '<button type="button" class="rs-meta-center-action" onclick="memoMetaPreviewBeginEdit()" title="编辑备忘录" aria-label="编辑备忘录"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' +
       '<button type="button" class="rs-meta-center-action rs-meta-center-delete-action" onclick="memoMetaPreviewDelete()" title="删除备忘录" aria-label="删除备忘录"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>';
   }
   return '<button type="button" class="rs-meta-center-action" onclick="memoMetaPreviewSave()" title="保存修改" aria-label="保存修改"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg></button>' +
@@ -50757,7 +51259,7 @@ function rsHideMetaCenterPreview() {
 // outside the WebView while they are open, so relying on hover state alone is
 // not sufficient here.
 function memoDetailPreviewHide(options = {}) {
-  if (!options.force && (memoDetailPreviewState.editing || memoDetailPreviewState.saving)) {
+  if (!options.force && (memoDetailPreviewState.editing || memoDetailPreviewState.saving || memoPreviewRunIsActive())) {
     memoDetailPreviewClearCloseTimer();
     return false;
   }
@@ -50782,17 +51284,17 @@ function memoDetailPreviewHide(options = {}) {
 }
 function memoDetailPreviewScheduleClose() {
   memoDetailPreviewClearCloseTimer();
-  if (memoDetailPreviewState.editing || memoDetailPreviewState.saving || memoDetailPreviewState.sourceHovered || memoDetailPreviewState.cardHovered || memoDetailPreviewCardIsHovered() || !memoDetailPreviewState.detailId) return;
+  if (memoPreviewRunIsActive() || memoDetailPreviewState.editing || memoDetailPreviewState.saving || memoDetailPreviewState.sourceHovered || memoDetailPreviewState.cardHovered || memoDetailPreviewCardIsHovered() || !memoDetailPreviewState.detailId) return;
   const detailId = memoDetailPreviewState.detailId;
   const closeGeneration = ++memoDetailPreviewState.closeGeneration;
   memoDetailPreviewState.closeTimer = setTimeout(() => {
     memoDetailPreviewState.closeTimer = 0;
-    if (memoDetailPreviewState.closeGeneration !== closeGeneration || memoDetailPreviewState.detailId !== detailId || memoDetailPreviewState.editing || memoDetailPreviewState.saving || memoDetailPreviewState.sourceHovered || memoDetailPreviewState.cardHovered || memoDetailPreviewCardIsHovered()) return;
+    if (memoDetailPreviewState.closeGeneration !== closeGeneration || memoPreviewRunIsActive() || memoDetailPreviewState.detailId !== detailId || memoDetailPreviewState.editing || memoDetailPreviewState.saving || memoDetailPreviewState.sourceHovered || memoDetailPreviewState.cardHovered || memoDetailPreviewCardIsHovered()) return;
     memoDetailPreviewHide();
   }, MEMO_DETAIL_PREVIEW_CLOSE_DELAY_MS);
 }
 function memoDetailPreviewSourceEnter(detail) {
-  if (!detail || isMemoTourInteractionLocked()) return;
+  if (!detail || isMemoTourInteractionLocked() || memoPreviewRunIsActive()) return;
   const detailId = String(detail.id || '').trim();
   if (!detailId) return;
   if (memoMetaPreviewState.metaId) return;
@@ -50848,7 +51350,7 @@ function memoDetailPreviewCardLeave() {
 }
 function memoDetailPreviewBeginEdit() {
   const detail = memoDetailPreviewState.detail;
-  if (!detail || Number(detail.started) !== 0 || memoDetailPreviewState.saving || memoDetailPreviewState.deleting) return;
+  if (!detail || memoPreviewRunIsActive() || Number(detail.started) !== 0 || memoDetailPreviewState.saving || memoDetailPreviewState.deleting) return;
   memoDetailPreviewClearCloseTimer();
   memoDetailPreviewState.snapshot = memoDetailPreviewClone(detail);
   memoDetailPreviewState.draft = memoDetailPreviewCreateDraft(detail);
@@ -50916,6 +51418,13 @@ function memoDetailPreviewHandleEscape(event) {
     event.stopImmediatePropagation();
     return;
   }
+  const runConfirm = document.getElementById('memoPreviewRunConfirm');
+  if (runConfirm && runConfirm.classList.contains('show')) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    memoPreviewRunCancel();
+    return;
+  }
   if (memoMetaPreviewState.editing && !memoMetaPreviewState.saving) {
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -50932,10 +51441,6 @@ function memoDetailPreviewNormalizeExecTime(value) {
   if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(normalized)) return '';
   const parsed = new Date(normalized.replace(' ', 'T'));
   return Number.isNaN(parsed.getTime()) ? '' : normalized;
-}
-function memoDetailPreviewExecTimeIsFuture(execTime, now = Date.now()) {
-  const parsed = new Date(String(execTime || '').replace(' ', 'T'));
-  return !Number.isNaN(parsed.getTime()) && parsed.getTime() > now;
 }
 async function memoDetailPreviewSave(options = {}) {
   const detail = memoDetailPreviewState.detail;
@@ -50962,10 +51467,6 @@ async function memoDetailPreviewSave(options = {}) {
   }
   if (!execTime) {
     vfsShowUploadToast('请选择有效执行时间', true);
-    return;
-  }
-  if (!memoDetailPreviewExecTimeIsFuture(execTime)) {
-    memoPreviewSetValidationMessage('执行时间需要晚于当前时间', false);
     return;
   }
   if (!isSelectableConfiguredModel(model, state.settings.models || {})) {
@@ -51061,7 +51562,7 @@ function memoMetaPreviewCardIsHovered() {
   return !!(card && card.matches(':hover'));
 }
 function memoMetaPreviewHide(options = {}) {
-  if (!options.force && (memoMetaPreviewState.editing || memoMetaPreviewState.saving)) {
+  if (!options.force && (memoMetaPreviewState.editing || memoMetaPreviewState.saving || memoPreviewRunIsActive())) {
     memoMetaPreviewClearCloseTimer();
     return false;
   }
@@ -51086,17 +51587,17 @@ function memoMetaPreviewHide(options = {}) {
 }
 function memoMetaPreviewScheduleClose() {
   memoMetaPreviewClearCloseTimer();
-  if (memoMetaPreviewState.editing || memoMetaPreviewState.saving || memoMetaPreviewState.sourceHovered || memoMetaPreviewState.cardHovered || memoMetaPreviewCardIsHovered() || !memoMetaPreviewState.metaId) return;
+  if (memoPreviewRunIsActive() || memoMetaPreviewState.editing || memoMetaPreviewState.saving || memoMetaPreviewState.sourceHovered || memoMetaPreviewState.cardHovered || memoMetaPreviewCardIsHovered() || !memoMetaPreviewState.metaId) return;
   const metaId = memoMetaPreviewState.metaId;
   const closeGeneration = ++memoMetaPreviewState.closeGeneration;
   memoMetaPreviewState.closeTimer = setTimeout(() => {
     memoMetaPreviewState.closeTimer = 0;
-    if (memoMetaPreviewState.closeGeneration !== closeGeneration || memoMetaPreviewState.metaId !== metaId || memoMetaPreviewState.editing || memoMetaPreviewState.saving || memoMetaPreviewState.sourceHovered || memoMetaPreviewState.cardHovered || memoMetaPreviewCardIsHovered()) return;
+    if (memoMetaPreviewState.closeGeneration !== closeGeneration || memoPreviewRunIsActive() || memoMetaPreviewState.metaId !== metaId || memoMetaPreviewState.editing || memoMetaPreviewState.saving || memoMetaPreviewState.sourceHovered || memoMetaPreviewState.cardHovered || memoMetaPreviewCardIsHovered()) return;
     memoMetaPreviewHide();
   }, MEMO_DETAIL_PREVIEW_CLOSE_DELAY_MS);
 }
 function memoMetaPreviewSourceEnter(meta) {
-  if (!meta || isMemoTourInteractionLocked()) return;
+  if (!meta || isMemoTourInteractionLocked() || memoPreviewRunIsActive()) return;
   const metaId = String(meta.id || '').trim();
   if (!metaId) return;
   if (memoMetaPreviewState.editing && memoMetaPreviewState.metaId !== metaId) return;
@@ -51132,7 +51633,7 @@ function memoMetaPreviewSourceLeave(metaId) {
 }
 function memoMetaPreviewBeginEdit() {
   const meta = memoMetaPreviewState.meta;
-  if (!meta || memoMetaPreviewState.saving || memoMetaPreviewState.deleting) return;
+  if (!meta || memoPreviewRunIsActive() || memoMetaPreviewState.saving || memoMetaPreviewState.deleting) return;
   memoMetaPreviewClearCloseTimer();
   memoMetaPreviewState.snapshot = memoDetailPreviewClone(meta);
   memoMetaPreviewState.draft = memoMetaPreviewCreateDraft(meta);
@@ -51232,10 +51733,6 @@ async function memoMetaPreviewSave(options = {}) {
   }
   if (cycle !== -1 && !rawTime) {
     vfsShowUploadToast('请选择有效执行时间', true);
-    return;
-  }
-  if (cycle !== -1 && !memoDetailPreviewExecTimeIsFuture(rawTime)) {
-    memoPreviewSetValidationMessage('执行时间需要晚于当前时间', true);
     return;
   }
   if (!isSelectableConfiguredModel(model, state.settings.models || {})) {
@@ -51395,20 +51892,36 @@ function rsToggleMetaView() {
 async function rsLoadMetadata() {
   const agentId = state.settings.agentId;
   const list = document.getElementById('rsMetaList');
+  const requestSeq = ++memoMetadataRequestSeq;
+  abortMemoMetadataRequest();
+  const controller = new AbortController();
+  memoMetadataAbortController = controller;
+  const canApply = () => (
+    requestSeq === memoMetadataRequestSeq &&
+    agentId === state.settings.agentId &&
+    list === document.getElementById('rsMetaList')
+  );
+  if (!list || !canApply()) {
+    if (memoMetadataAbortController === controller) memoMetadataAbortController = null;
+    return;
+  }
   if (memoDetailPreviewState.detailId) memoDetailPreviewHide();
   if (isMemoTourMetaListStep(onboardingState.step)) {
     renderMemoTourMetadataList();
+    if (memoMetadataAbortController === controller) memoMetadataAbortController = null;
     return;
   }
   if (!agentId) {
     memoMetaPreviewSyncAfterMetadataRefresh('', []);
     list.innerHTML = '<div style="padding:8px;font-size:11px;color:var(--text-muted)">请先选择 Agent</div>';
+    if (memoMetadataAbortController === controller) memoMetadataAbortController = null;
     return;
   }
   list.innerHTML = '<div style="padding:8px;font-size:11px;color:var(--text-muted)">加载中...</div>';
   try {
-    const resp = await fetch('/api/cron/detail/metadata?agentId=' + encodeURIComponent(agentId), { method: 'POST' });
+    const resp = await fetch('/api/cron/detail/metadata?agentId=' + encodeURIComponent(agentId), { method: 'POST', signal: controller.signal });
     const data = await resp.json();
+    if (!canApply()) return;
     if (data.status !== 0 || !data.data || data.data.length === 0) {
       memoMetaPreviewSyncAfterMetadataRefresh(agentId, []);
       list.innerHTML = '<div style="padding:8px;font-size:11px;color:var(--text-muted)">暂无备忘录元数据</div>';
@@ -51438,7 +51951,10 @@ async function rsLoadMetadata() {
     }).join('');
     list.scrollTop = 0;
   } catch (e) {
+    if (!canApply()) return;
     list.innerHTML = '<div style="padding:8px;font-size:11px;color:var(--text-muted)">加载失败</div>';
+  } finally {
+    if (memoMetadataAbortController === controller) memoMetadataAbortController = null;
   }
 }
 

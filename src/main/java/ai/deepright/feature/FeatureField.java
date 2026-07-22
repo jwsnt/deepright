@@ -23,8 +23,6 @@ public interface FeatureField {
 
     public static final String KEY_SANDBOX_PATH = "sandbox_path";
 
-    public static final String KEY_FILE_SYSTEM = "file_system";
-
     public static final String KEY_PLUGINS_DIR = "plugins_dir";
 
     public static final String KEY_CRON_TYPE = "cron_type";
@@ -49,8 +47,6 @@ public interface FeatureField {
     // 上游标准报文头，首字母大写
     public static final String KEY_ORIGIN = "Origin";
 
-    public static final String KEY_VERIFY = "verify";
-
     // 后台进程（刷新知识库或Task等）
     public static final String KEY_DAEMON = "daemon";
 
@@ -70,8 +66,6 @@ public interface FeatureField {
     public static final String KEY_USER = "user";
 
     public static final String KEY_SOUL = "soul";
-
-    public static final String KEY_PORT = "port";
 
     public static final String KEY_DIR = "dir";
 

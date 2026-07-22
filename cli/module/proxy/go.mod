@@ -6,6 +6,7 @@ require (
 	agent-scanner v0.0.0
 	connect v0.0.0
 	github.com/glebarez/go-sqlite v1.21.2
+	github.com/robfig/cron/v3 v3.0.1
 	knowledge v0.0.0
 	runtimepaths v0.0.0
 	skill-scanner v0.0.0

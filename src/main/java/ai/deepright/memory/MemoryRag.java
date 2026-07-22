@@ -33,6 +33,8 @@ import java.nio.charset.StandardCharsets;
 @Slf4j
 public class MemoryRag extends RagCondition implements RagService {
 
+    public static final String KEY_READONLY = "#knowledge_readonly";
+
     public static final String RAG_KEY = "rag_memory";
 
     protected ResourceService resourceService;
@@ -57,13 +59,19 @@ public class MemoryRag extends RagCondition implements RagService {
         return new RagAtOnce(ragConfig);
     }
 
+    @Override
+    protected Boolean allowed(RagConfig ragConfig, RagData ragData) throws Exception {
+        // 跳过测试请求
+        return super.allowed(ragConfig, ragData) && !FeatureFlag.isTest(ragData.getQuery());
+    }
+
     protected void updateLongMemory(RagConfig ragConfig, RagData ragData, Object memory) throws Exception {
         // 当上下文超过10K tokens时，模型对尾部指令的注意力权重下降
         RagService.updatePrompt(ragConfig, ragData, ragConfig.getReplace(), memory);
     }
 
     protected void updateReadonly(RagConfig ragConfig, RagData ragData) throws Exception {
-        RagService.updatePrompt(ragConfig, ragData, "#knowledge_readonly", !FeatureFlag.isKnowledgeCommit(ragData.getQuery()) ? this.template4readonly : "");
+        RagService.updatePrompt(ragConfig, ragData, MemoryRag.KEY_READONLY, !FeatureFlag.isKnowledgeCommit(ragData.getQuery()) ? this.template4readonly : "");
     }
 
     protected String buildMemory(RagConfig ragConfig, RagData ragData) throws Exception {

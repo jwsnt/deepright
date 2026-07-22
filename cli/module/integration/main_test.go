@@ -9,6 +9,7 @@ import (
 	"connect/sandboxstate"
 	"connect/sharedutil"
 	"connect/skillstate"
+	"context"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -2677,7 +2678,7 @@ func TestProxyChatCompletionsPrunesRedundantTopLevelAgentFieldsFromRequestMetada
 	server := httptest.NewServer(http.HandlerFunc(handleChatCompletions(cfg, proxyClient)))
 	defer server.Close()
 
-	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"HELLO PRUNE"}],"stream":true,"metadata":{"agentId":"A","chat":"chat-prune","hello":"world","workspace":"/tmp/fake-workspace","skills":[{"name":"fake-skill"}],"media":{"type":"fake"},"soul":"fake soul","user":"fake user","dir":"/tmp/fake-dir"}}`
+	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"HELLO PRUNE"}],"stream":true,"metadata":{"agentId":"A","chat":"chat-prune","hello":"world","test":true,"workspace":"/tmp/fake-workspace","skills":[{"name":"fake-skill"}],"media":{"type":"fake"},"soul":"fake soul","user":"fake user","dir":"/tmp/fake-dir"}}`
 	req, err := http.NewRequest(http.MethodPost, server.URL, strings.NewReader(reqBody))
 	if err != nil {
 		t.Fatalf("new request: %v", err)
@@ -2700,7 +2701,7 @@ func TestProxyChatCompletionsPrunesRedundantTopLevelAgentFieldsFromRequestMetada
 	if meta["hello"] != "world" {
 		t.Fatalf("metadata.hello = %#v, want %q", meta["hello"], "world")
 	}
-	for _, key := range []string{"workspace", "skills", "media", "soul", "user", "dir"} {
+	for _, key := range []string{"workspace", "skills", "media", "soul", "user", "dir", "test"} {
 		if _, exists := meta[key]; exists {
 			t.Fatalf("metadata.%s should be removed, got %#v", key, meta[key])
 		}
@@ -10571,15 +10572,15 @@ func TestUpdateCronDetailOnlyUpdatesPendingDetail(t *testing.T) {
 		t.Fatalf("update logs = %d, want 1", updateLogs)
 	}
 	if _, err := updateCronDetail("beta", cronDetailUpdateRequest{
-		DetailID: int(detailID), ExecTime: time.Now().Add(-time.Minute).Format("2006-01-02 15:04"), Content: "must not persist", Model: "openai", RouterDisable: true,
-	}); err == nil || !strings.Contains(err.Error(), "需要晚于当前时间") {
-		t.Fatalf("past execTime error = %v, want current-time rejection", err)
+		DetailID: int(detailID), ExecTime: "not-a-time", Content: "must not persist", Model: "openai", RouterDisable: true,
+	}); err == nil || !strings.Contains(err.Error(), "invalid execTime") {
+		t.Fatalf("invalid execTime error = %v, want format rejection", err)
 	}
 	if err := db.QueryRow("SELECT content, exec_time FROM task_detail WHERE id = ?", detailID).Scan(&content, &execTime); err != nil {
-		t.Fatalf("query detail after past-time rejection: %v", err)
+		t.Fatalf("query detail after invalid-time rejection: %v", err)
 	}
 	if content != "updated memo" || execTime != futureExecTime.Unix() {
-		t.Fatalf("past-time rejection changed detail: content=%q time=%d", content, execTime)
+		t.Fatalf("invalid-time rejection changed detail: content=%q time=%d", content, execTime)
 	}
 
 	if _, err := db.Exec(`UPDATE task_detail SET started = 1 WHERE id = ?`, detailID); err != nil {
@@ -10699,14 +10700,213 @@ func TestUpdateCronMetaRebuildsOnlyPendingDetails(t *testing.T) {
 		t.Fatalf("deleted detail logs = %d, want 1", count)
 	}
 	if _, err := updateCronMeta("beta", cronMetaUpdateRequest{
-		MetaID: int(metaID), RawTime: time.Now().Add(-time.Minute).Format("2006-01-02 15:04"), Cycle: 2, Content: "invalid time", Model: "openai",
-	}); err == nil || !strings.Contains(err.Error(), "需要晚于当前时间") {
-		t.Fatalf("past rawTime error = %v, want current-time rejection", err)
+		MetaID: int(metaID), RawTime: "not-a-time", Cycle: 2, Content: "invalid time", Model: "openai",
+	}); err == nil || !strings.Contains(err.Error(), "invalid time") {
+		t.Fatalf("invalid rawTime error = %v, want format rejection", err)
 	}
 	if _, err := updateCronMeta("beta", cronMetaUpdateRequest{
 		MetaID: int(metaID), RawTime: updatedTime.Format("2006-01-02 15:04"), Cycle: 0, Content: "must remain recurring", Model: "openai",
 	}); err == nil || !strings.Contains(err.Error(), "metadata cycle") {
 		t.Fatalf("one-time metadata cycle error = %v, want recurring-cycle rejection", err)
+	}
+}
+
+func TestValidateCronCreateScheduleRejectsAmbiguousCycleAndTime(t *testing.T) {
+	future := time.Now().Add(2 * time.Hour).In(time.Local).Truncate(time.Minute).Format("2006-01-02 15:04")
+
+	if _, err := validateCronCreateSchedule(2, future, ""); err != nil {
+		t.Fatalf("valid built-in schedule rejected: %v", err)
+	}
+	if _, err := validateCronCreateSchedule(-1, "", "10 12 * * 1-5"); err != nil {
+		t.Fatalf("valid custom cron rejected: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name    string
+		cycle   int
+		rawTime string
+		cron    string
+	}{
+		{name: "custom cron with display time", cycle: -1, rawTime: "Cron", cron: "10 12 * * 1-5"},
+		{name: "custom cron missing expression", cycle: -1},
+		{name: "invalid custom expression", cycle: -1, cron: "not a cron"},
+		{name: "built-in cycle with custom cron", cycle: 2, rawTime: future, cron: "10 12 * * 1-5"},
+		{name: "built-in cycle with display time", cycle: 2, rawTime: "Cron"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := validateCronCreateSchedule(tc.cycle, tc.rawTime, tc.cron); err == nil {
+				t.Fatal("expected schedule validation error")
+			}
+		})
+	}
+	if _, err := validateCronCreateSchedule(2, time.Now().Add(-time.Hour).Format("2006-01-02 15:04"), ""); err != nil {
+		t.Fatalf("past built-in schedule rejected: %v", err)
+	}
+}
+
+func TestCreateCronDetailRunCreatesPendingCopiesAndAuditsAtomically(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+	oldCronDB := cronDB
+	cronDB = db
+	defer func() { cronDB = oldCronDB }()
+	ensureCronSchema(db)
+
+	metaRes, err := db.Exec(`INSERT INTO task_meta (cycle, raw_time, agent_id, chat_id, task_type, model, thinking, verify, router_disable, cron, content, response_schema)
+		VALUES (2, '2026-07-23 10:00', 'alpha', 'meta-chat', 'cron', 'openai', 1, 1, 0, '0 0 10 * * ?', 'run source', '{"type":"object"}')`)
+	if err != nil {
+		t.Fatalf("insert meta: %v", err)
+	}
+	metaID, err := metaRes.LastInsertId()
+	if err != nil {
+		t.Fatalf("read meta id: %v", err)
+	}
+	baseTime := time.Unix(1_800_000_000, 0)
+	conflictRes, err := db.Exec(`INSERT INTO task_detail (meta_id, exec_time, agent_id, chat_id, task_type, model, thinking, verify, router_disable, content, response_schema, started)
+		VALUES (?, ?, 'alpha', '', 'cron', 'openai', 1, 1, 0, 'run source', '{"type":"object"}', 0)`, metaID, baseTime.Unix())
+	if err != nil {
+		t.Fatalf("insert collision detail: %v", err)
+	}
+	_ = conflictRes
+
+	sourceSequence := int64(0)
+	createSource := func(started int) int64 {
+		sourceSequence++
+		res, insertErr := db.Exec(`INSERT INTO task_detail (meta_id, exec_time, agent_id, chat_id, task_type, model, thinking, verify, router_disable, content, response_schema, result_content, replied_at, started)
+			VALUES (?, ?, 'alpha', 'detail-chat', 'cron', 'openai', 1, 1, 0, 'run source', '{"type":"object"}', 'old result', '2026-07-23T10:00:00Z', ?)`, metaID, baseTime.Unix()-100-int64(started)-sourceSequence*10, started)
+		if insertErr != nil {
+			t.Fatalf("insert source status=%d: %v", started, insertErr)
+		}
+		id, insertErr := res.LastInsertId()
+		if insertErr != nil {
+			t.Fatalf("read source id: %v", insertErr)
+		}
+		return id
+	}
+
+	for _, started := range []int{0, 2, 3} {
+		sourceID := createSource(started)
+		reuseChat := false
+		created, runErr := createCronDetailRun("alpha", cronDetailRunRequest{SourceType: "detail", DetailID: int(sourceID), ReuseChat: &reuseChat}, baseTime)
+		if runErr != nil {
+			t.Fatalf("run detail status=%d: %v", started, runErr)
+		}
+		if created.ID == int(sourceID) || created.MetaID != int(metaID) || created.Started != 0 || created.ChatID != "" || created.Model != "openai" || !created.Thinking || !created.Verify || created.RouterDisable || created.Content != "run source" || created.ResponseSchema != `{"type":"object"}` || created.ResultContent != "" || created.RepliedAt != "" {
+			t.Fatalf("created detail status=%d = %+v", started, created)
+		}
+		if created.ExecTime <= baseTime.Unix() {
+			t.Fatalf("created exec time = %d, want collision retry after %d", created.ExecTime, baseTime.Unix())
+		}
+		var chatID, resultContent, repliedAt string
+		var storedStarted int
+		if err := db.QueryRow(`SELECT chat_id, result_content, replied_at, started FROM task_detail WHERE id = ?`, created.ID).Scan(&chatID, &resultContent, &repliedAt, &storedStarted); err != nil {
+			t.Fatalf("query created detail: %v", err)
+		}
+		if chatID != "" || resultContent != "" || repliedAt != "" || storedStarted != 0 {
+			t.Fatalf("created persisted fields = chat=%q result=%q repliedAt=%q started=%d", chatID, resultContent, repliedAt, storedStarted)
+		}
+		var logs int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM cron_detail_log WHERE detail_id = ? AND action = 'run' AND started = 0`, created.ID).Scan(&logs); err != nil {
+			t.Fatalf("count run audits: %v", err)
+		}
+		if logs != 1 {
+			t.Fatalf("run audit count = %d, want 1", logs)
+		}
+	}
+
+	startedSourceID := createSource(1)
+	reuseChat := true
+	if _, err := createCronDetailRun("alpha", cronDetailRunRequest{SourceType: "detail", DetailID: int(startedSourceID), ReuseChat: &reuseChat}, baseTime); err == nil || !strings.Contains(err.Error(), "不能重跑") {
+		t.Fatalf("started task run error = %v, want started rejection", err)
+	}
+
+	// A pending detail may be reassigned independently of its metadata. The
+	// detail list is scoped by task_detail.agent_id, so replay must use that
+	// same ownership check instead of rejecting the visible detail because the
+	// metadata remains assigned to its original agent.
+	reassignedSourceID := createSource(0)
+	if _, err := db.Exec(`UPDATE task_detail SET agent_id = 'beta' WHERE id = ?`, reassignedSourceID); err != nil {
+		t.Fatalf("reassign source detail: %v", err)
+	}
+	reassigned, err := createCronDetailRun("beta", cronDetailRunRequest{SourceType: "detail", DetailID: int(reassignedSourceID), ReuseChat: &reuseChat}, baseTime)
+	if err != nil {
+		t.Fatalf("run reassigned detail: %v", err)
+	}
+	if reassigned.MetaID != int(metaID) || reassigned.AgentID != "beta" || reassigned.ChatID != "detail-chat" || reassigned.Started != 0 {
+		t.Fatalf("reassigned created detail = %+v", reassigned)
+	}
+
+	// Completed detail history deliberately outlives deleted metadata. It stays
+	// visible in the detail list and must be runnable from there using its own
+	// persisted execution settings.
+	orphanMetaID := int(metaID) + 10_000
+	orphanRes, err := db.Exec(`INSERT INTO task_detail (meta_id, exec_time, agent_id, chat_id, task_type, model, thinking, verify, router_disable, content, response_schema, started)
+		VALUES (?, ?, 'alpha', 'orphan-chat', 'cron', 'openai', 1, 1, 0, 'orphan source', '{"type":"object"}', 3)`, orphanMetaID, baseTime.Unix()-1_000)
+	if err != nil {
+		t.Fatalf("insert orphan source detail: %v", err)
+	}
+	orphanSourceID, err := orphanRes.LastInsertId()
+	if err != nil {
+		t.Fatalf("read orphan source detail id: %v", err)
+	}
+	orphan, err := createCronDetailRun("alpha", cronDetailRunRequest{SourceType: "detail", DetailID: int(orphanSourceID), ReuseChat: &reuseChat}, baseTime)
+	if err != nil {
+		t.Fatalf("run orphan detail: %v", err)
+	}
+	if orphan.MetaID != orphanMetaID || orphan.AgentID != "alpha" || orphan.ChatID != "orphan-chat" || orphan.Cycle != 0 || orphan.RawTime != "" || orphan.Cron != "" || orphan.Started != 0 {
+		t.Fatalf("orphan created detail = %+v", orphan)
+	}
+
+	metaCreated, err := createCronDetailRun("alpha", cronDetailRunRequest{SourceType: "meta", MetaID: int(metaID), ReuseChat: &reuseChat}, baseTime)
+	if err != nil {
+		t.Fatalf("run meta: %v", err)
+	}
+	if metaCreated.ChatID != "meta-chat" || metaCreated.MetaID != int(metaID) || metaCreated.Started != 0 {
+		t.Fatalf("meta-created detail = %+v", metaCreated)
+	}
+
+	root := t.TempDir()
+	agentDir := filepath.Join(root, "alpha")
+	if err := os.MkdirAll(agentDir, 0o755); err != nil {
+		t.Fatalf("mkdir agent: %v", err)
+	}
+	handler := handleCronDetailRun(&Config{AgentDir: agentDir})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/cron/detail/run?agentId=alpha", strings.NewReader(fmt.Sprintf(`{"sourceType":"meta","metaId":%d,"reuseChat":false}`, metaID)))
+	handler(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("run handler status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	var response struct {
+		Status int              `json:"status"`
+		Data   cronDetailResult `json:"data"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
+		t.Fatalf("decode handler response: %v", err)
+	}
+	if response.Status != 0 || response.Data.ID <= 0 || response.Data.ChatID != "" || response.Data.Started != 0 {
+		t.Fatalf("run handler response = %+v", response)
+	}
+
+	if _, err := db.Exec(`CREATE TRIGGER reject_run_audit BEFORE INSERT ON cron_detail_log WHEN NEW.action = 'run' BEGIN SELECT RAISE(ABORT, 'audit blocked'); END`); err != nil {
+		t.Fatalf("create audit trigger: %v", err)
+	}
+	var before int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM task_detail`).Scan(&before); err != nil {
+		t.Fatalf("count details before audit rollback: %v", err)
+	}
+	if _, err := createCronDetailRun("alpha", cronDetailRunRequest{SourceType: "meta", MetaID: int(metaID), ReuseChat: &reuseChat}, baseTime.Add(time.Hour)); err == nil || !strings.Contains(err.Error(), "audit") {
+		t.Fatalf("audit failure = %v, want rollback error", err)
+	}
+	var after int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM task_detail`).Scan(&after); err != nil {
+		t.Fatalf("count details after audit rollback: %v", err)
+	}
+	if after != before {
+		t.Fatalf("audit failure created detail: before=%d after=%d", before, after)
 	}
 }
 
@@ -18764,6 +18964,38 @@ func TestHandleIntegrationBundleAppLaunchFirstLaunchBypassesExistingBrowserReuse
 	}
 }
 
+func TestCleanupIntegrationBrowserReuseStateRemovesOnlyBrowserReuseMarkers(t *testing.T) {
+	disableIntegrationManagedRuntimeForTest(t)
+	runtimeRoot := t.TempDir()
+	t.Setenv(integrationRuntimeDirEnv, runtimeRoot)
+
+	markerDir := filepath.Join(runtimeRoot, "state", "browser-reuse")
+	markerPath := filepath.Join(markerDir, "old-version.seen")
+	if err := os.MkdirAll(markerDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(markerPath, []byte("2026-07-22T00:00:00Z\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	otherStatePath := filepath.Join(runtimeRoot, "state", "unrelated", "keep")
+	if err := os.MkdirAll(filepath.Dir(otherStatePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(otherStatePath, []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := cleanupIntegrationBrowserReuseState(); err != nil {
+		t.Fatalf("cleanupIntegrationBrowserReuseState() error = %v", err)
+	}
+	if _, err := os.Stat(markerDir); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("marker directory stat error = %v, want not exist", err)
+	}
+	if data, err := os.ReadFile(otherStatePath); err != nil || string(data) != "keep" {
+		t.Fatalf("unrelated state = %q, err = %v; want preserved", data, err)
+	}
+}
+
 func TestHandleIntegrationBundleAppLaunchFirstLaunchUsesDirectOpenWhileStartingService(t *testing.T) {
 	oldExecutable := integrationExecutableFn
 	oldHome := integrationUserHomeFn
@@ -18987,5 +19219,137 @@ func TestIntegrationModelProviderCatalogUsesStartupCache(t *testing.T) {
 	handleModelProviderCatalog(&opts.Config).ServeHTTP(methodRec, httptest.NewRequest(http.MethodPost, "/api/model_provider", nil))
 	if methodRec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("POST status = %d, want %d", methodRec.Code, http.StatusMethodNotAllowed)
+	}
+}
+
+func writeModelTestRuntimeConfig(t *testing.T, content string) {
+	t.Helper()
+	root := t.TempDir()
+	useIntegrationExecutableDir(t, root)
+	if err := os.MkdirAll(filepath.Join(root, "config"), 0o755); err != nil {
+		t.Fatalf("mkdir config: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "config", "config.json"), []byte(content), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+}
+
+func newLocalModelTestRequest(body string) *http.Request {
+	req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1/api/model/test", strings.NewReader(body))
+	req.Host = "127.0.0.1"
+	req.RemoteAddr = "127.0.0.1:34567"
+	req.Header.Set("Content-Type", "application/json")
+	return req
+}
+
+func TestHandleModelTestUsesTransientConfigurationAndReturnsSuccess(t *testing.T) {
+	writeModelTestRuntimeConfig(t, `{"test":{"content":"runtime probe","timeout":10}}`)
+	var captured map[string]interface{}
+	var authorization string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authorization = r.Header.Get("Authorization")
+		_ = json.NewDecoder(r.Body).Decode(&captured)
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "data: {\"choices\":[{\"delta\":{\"content\":\"ok\"}}]}\n\ndata: [DONE]\n\n")
+	}))
+	defer upstream.Close()
+
+	handler := handleModelTest(&Config{Host: upstream.URL, Device: "test-device", Port: 17896}, upstream.Client())
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, newLocalModelTestRequest(`{"model":"deepseek","token":"Bearer transient-token","__url":"https://draft.example/v1","__model":"deepseek-draft","__model_fast":"fast-draft"}`))
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", recorder.Code, recorder.Body.String())
+	}
+	if authorization != "Bearer transient-token" {
+		t.Fatalf("authorization = %q", authorization)
+	}
+	if !strings.Contains(recorder.Body.String(), `"status":0`) || !strings.Contains(recorder.Body.String(), "配置成功") {
+		t.Fatalf("unexpected SSE result: %s", recorder.Body.String())
+	}
+	metadata, ok := captured["metadata"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("metadata = %#v", captured["metadata"])
+	}
+	if metadata["test"] != true || metadata["type"] != "test" || metadata["provider"] != "deepseek" {
+		t.Fatalf("test metadata = %#v", metadata)
+	}
+	chatID, _ := metadata["chat"].(string)
+	if !regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`).MatchString(chatID) {
+		t.Fatalf("chat UUID = %q", chatID)
+	}
+	if metadata["__model"] != "deepseek-draft" || metadata["__url"] != "https://draft.example/v1" || metadata["__model_fast"] != "fast-draft" {
+		t.Fatalf("transient model metadata = %#v", metadata)
+	}
+	for _, forbidden := range []string{"agentId", "agent", "workspace", "skills", "knowledge", "router_remote", "plugins", "memory"} {
+		if _, found := metadata[forbidden]; found {
+			t.Fatalf("metadata.%s must not be present: %#v", forbidden, metadata)
+		}
+	}
+	messages, ok := captured["messages"].([]interface{})
+	if !ok || len(messages) != 1 {
+		t.Fatalf("messages = %#v", captured["messages"])
+	}
+	message, _ := messages[0].(map[string]interface{})
+	if message["content"] != "runtime probe" {
+		t.Fatalf("test content = %#v, want runtime config content", message["content"])
+	}
+}
+
+func TestHandleModelTestRejectsMissingTestConfigAndRedactsProviderErrors(t *testing.T) {
+	t.Run("missing config", func(t *testing.T) {
+		writeModelTestRuntimeConfig(t, `{}`)
+		recorder := httptest.NewRecorder()
+		handleModelTest(&Config{Device: "test-device"}, http.DefaultClient).ServeHTTP(recorder, newLocalModelTestRequest(`{"model":"deepseek","token":"secret-token","__model":"deepseek-chat"}`))
+		if recorder.Code != http.StatusBadRequest || !strings.Contains(recorder.Body.String(), "config.json.test") {
+			t.Fatalf("response = %d %s", recorder.Code, recorder.Body.String())
+		}
+	})
+	t.Run("http error", func(t *testing.T) {
+		writeModelTestRuntimeConfig(t, `{"test":{"content":"probe","timeout":10}}`)
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = io.WriteString(w, `{"error":{"message":"Authorization: Bearer secret-token rejected"}}`)
+		}))
+		defer upstream.Close()
+		recorder := httptest.NewRecorder()
+		handleModelTest(&Config{Host: upstream.URL, Device: "test-device"}, upstream.Client()).ServeHTTP(recorder, newLocalModelTestRequest(`{"model":"deepseek","token":"secret-token","__model":"deepseek-chat"}`))
+		if recorder.Code != http.StatusBadGateway || !strings.Contains(recorder.Body.String(), "HTTP 401") {
+			t.Fatalf("response = %d %s", recorder.Code, recorder.Body.String())
+		}
+		if strings.Contains(recorder.Body.String(), "secret-token") {
+			t.Fatalf("provider error leaked token: %s", recorder.Body.String())
+		}
+	})
+}
+
+func TestConsumeModelTestSSERequiresBusinessDataAndDone(t *testing.T) {
+	tests := []struct {
+		name    string
+		stream  string
+		wantErr string
+	}{
+		{name: "success", stream: "data: {\"choices\":[{\"delta\":{\"content\":\"ok\"}}]}\n\ndata: [DONE]\n\n"},
+		{name: "empty", stream: "data: [DONE]\n\n", wantErr: "有效业务数据"},
+		{name: "missing done", stream: "data: {\"choices\":[{\"delta\":{\"content\":\"ok\"}}]}\n\n", wantErr: "缺少 [DONE]"},
+		{name: "stream error", stream: "data: {\"error\":{\"message\":\"token=secret-token rejected\"}}\n\n", wantErr: "[REDACTED]"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := consumeModelTestSSE(context.Background(), strings.NewReader(test.stream), "secret-token")
+			if test.wantErr == "" {
+				if err != nil {
+					t.Fatalf("consume error: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), test.wantErr) {
+				t.Fatalf("error = %v, want %q", err, test.wantErr)
+			}
+			if strings.Contains(err.Error(), "secret-token") {
+				t.Fatalf("stream error leaked token: %v", err)
+			}
+		})
 	}
 }

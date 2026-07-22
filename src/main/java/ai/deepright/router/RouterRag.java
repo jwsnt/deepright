@@ -1,9 +1,9 @@
 package ai.deepright.router;
 
 import ai.deepright.feature.FeatureField;
+import ai.deepright.feature.FeatureFlag;
 import ai.deepright.feature.FeatureUtils;
 import ai.open.right.WorkflowException;
-import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.resouce.ResourceService;
 import ai.open.right.workflow.flow.llm.rag.RagCondition;
 import ai.open.right.workflow.flow.llm.rag.RagConfig;
@@ -67,6 +67,12 @@ public class RouterRag extends RagCondition implements RagService {
         // 当上下文超过10K tokens时，模型对尾部指令的注意力权重下降
         RagService.updatePrompt(ragConfig, ragData, ragConfig.getReplace(), this.buildRouter(ragConfig, ragData));
         return new RagAtOnce(ragConfig);
+    }
+
+    @Override
+    protected Boolean allowed(RagConfig ragConfig, RagData ragData) throws Exception {
+        // 跳过测试请求
+        return super.allowed(ragConfig, ragData) && !FeatureFlag.isTest(ragData.getQuery());
     }
 
     protected List<RouterDevice> fetchRouter(RagConfig ragConfig, RagData ragData) throws Exception {

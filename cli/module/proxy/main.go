@@ -41,6 +41,7 @@ import (
 	"connect/pluginlog"
 	"connect/sharedutil"
 	_ "github.com/glebarez/go-sqlite"
+	"github.com/robfig/cron/v3"
 	tokenconsume "proxy/consume"
 	"proxy/eventlog"
 	"skill-scanner/skillscore"
@@ -8391,6 +8392,40 @@ func cronCycleInterval(cycle int) time.Duration {
 	}
 }
 
+// validateProxyCronCreateSchedule keeps the cycle, rawTime and cron fields
+// mutually exclusive so persisted tasks have one unambiguous schedule.
+func validateProxyCronCreateSchedule(cycle int, rawTime, cronExpr string) (time.Time, error) {
+	rawTime = strings.TrimSpace(rawTime)
+	cronExpr = strings.TrimSpace(cronExpr)
+	if cycle == -1 {
+		if rawTime != "" {
+			return time.Time{}, fmt.Errorf("custom cron must not include rawTime")
+		}
+		if cronExpr == "" {
+			return time.Time{}, fmt.Errorf("custom cron expression is required")
+		}
+		parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+		if _, err := parser.Parse(strings.ReplaceAll(cronExpr, "?", "*")); err != nil {
+			return time.Time{}, fmt.Errorf("invalid custom cron expression: %w", err)
+		}
+		return time.Time{}, nil
+	}
+	if cycle < 0 || cycle > 5 {
+		return time.Time{}, fmt.Errorf("cycle must be one of -1,0,1,2,3,4,5")
+	}
+	if cronExpr != "" {
+		return time.Time{}, fmt.Errorf("built-in cycle must not include cron")
+	}
+	if rawTime == "" {
+		return time.Time{}, fmt.Errorf("rawTime is required for built-in cycle")
+	}
+	execAt, err := time.ParseInLocation("2006-01-02 15:04", rawTime, time.Local)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid time: %w", err)
+	}
+	return execAt, nil
+}
+
 type cronCreateRequest struct {
 	Content        string `json:"content"`
 	Model          string `json:"model"`
@@ -8484,18 +8519,15 @@ func createCronTask(agentID string, req cronCreateRequest) (map[string]interface
 		routerDisableInt = 1
 	}
 
-	if req.Cycle == -1 && req.Cron != "" {
+	execAt, err := validateProxyCronCreateSchedule(req.Cycle, req.RawTime, req.Cron)
+	if err != nil {
+		return nil, err
+	}
+	if req.Cycle == -1 {
 		cronExpr = req.Cron
 		rawTime = ""
 	} else {
-		if req.Cycle < 0 || req.Cycle > 5 {
-			return nil, fmt.Errorf("cycle must be one of 0,1,2,3,4,5")
-		}
-		t, err := time.ParseInLocation("2006-01-02 15:04", req.RawTime, time.Local)
-		if err != nil {
-			return nil, fmt.Errorf("invalid time: %w", err)
-		}
-		cronExpr = cronBuildExpr(req.Cycle, t)
+		cronExpr = cronBuildExpr(req.Cycle, execAt)
 		rawTime = req.RawTime
 	}
 

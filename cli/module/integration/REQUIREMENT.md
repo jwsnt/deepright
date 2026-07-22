@@ -160,6 +160,12 @@
 + `./integration cron delete-meta --id`：删除任务元数据（同时删除关联明细）
 + `./integration cron delete-detail --metaId/--detailId`：删除任务明细
 
+#### 运行任务明细
++ `POST /api/cron/detail/run?agentId=<AgentId>` 可从指定任务明细创建一条新的待执行任务；创建后仍由 Cron 轮询执行，接口不得直接调用模型。
++ 当 `sourceType=detail` 时，运行必须以被点击 `task_detail` 的持久化快照为唯一执行配置来源：`agent_id`、`chat_id`（由 `reuseChat` 决定是否复用）、`task_type`、`model`、`thinking`、`verify`、`router_disable`、`content`、`response_schema`。不得以 `task_meta` 的当前配置覆盖明细快照。
++ 任务元数据仅可补充周期、原始时间和 Cron 表达式等展示信息；完成态历史明细在元数据被删除后仍可能保留并显示，此类明细点击运行时必须可以使用自身快照重新创建待执行明细，不得因元数据不存在返回“task detail or metadata not found”。
++ 仅允许重跑状态为待执行、已跳过或已完成的任务明细；已启动的任务不得重跑。新建明细必须为 `started=0`，并写入运行审计记录。
+
 ### 启动关闭
 + 使用start命令启动，并指定启动参数（或默认值），启动后进入后台进程（并创建pid文件）
     > 新增自 iteration/20260509-2/REQUIREMENT.md
@@ -782,10 +788,46 @@
 + 通知内容"DeepRight通知"
 + 通知图标：应用程序的图标
 
+
+### 从 Git 安装 Skill 运行时配置
+> 新增自 ./iteration/20260718-2/REQUIREMENT.md
++ 在 Site 的「提炼 Skill」范围浮层中新增/完善「从 Git 安装」入口。用户输入 Git 地址并确认后，页面只负责从主应用 `config/config.json` 读取 `skills_git_install` 文案、替换变量并自动发送给当前 Agent；技能识别、Git 克隆、文件复制、覆盖确认及安装结果均由 Agent 根据该文案处理，页面不得解析 Skill 或执行 Git 命令。
++ `skills_git_install` 是必填的字符串模板，必须包含 `$git_path` 变量。页面使用用户输入的原始文本替换模板内每一处 `$git_path`，不得规范化 URL、添加转义、拼接 shell 命令或改写其余模板内容。
++ 用户输入只以 `trim()` 后是否为空作为前端有效性判断；为空时在浮层展示「Git地址不能为空」，不读取配置、不关闭浮层、不发送消息。非空输入无需由页面校验 URL 格式，交由 Agent 处理。
++ 配置文件无法读取、`skills_git_install` 缺失/为空、或模板未包含 `$git_path` 时，在浮层展示明确异常，不关闭浮层且不得发送消息。
++ 替换成功后，使用既有居中对话发送链路自动发送完整文案到当前 Agent 会话，并沿用 `requestSource = "install_skill_git"`。该请求须像普通用户请求一样在会话中创建用户消息气泡。
++ 当 Git 地址为 `http://` 或 `https://` URL 时，模板中的 `$git_path` 不得被 Markdown 反引号包裹；发送后的现有消息 URL 装饰链路应将其展示为可点击的 URL 气泡。页面不另行解析或转换 Git 地址。
++ 新增只读 `GET /api/runtime_config`。该接口必须由 Integration 使用其已解析的应用资源目录读取主应用 `config/config.json`，不得通过 `/api/data?path=config/config.json` 依赖进程当前目录；macOS 读取 `integration.app/Contents/Resources/config/config.json`，WSL 读取 Integration 可执行文件同级的 `config/config.json`（默认 `~/deepright/config/config.json`）。响应只返回前端已有运行态需求的白名单字段及 `skills_git_install`，不暴露 token 或其他配置。
++ 每次点击确认均通过 `GET /api/runtime_config` 重新读取 `skills_git_install`，确保本次发送使用当前文案；模板替换使用纯字符串全量替换，保留输入文本本身。
++ 保持现有会话、Agent、忙碌状态、模型和密钥可用性校验。任何一项校验失败时不发消息；配置模板读取/校验失败同样遵循该原则。
++ 修改主应用 `config/config.json` 的默认模板，使 `$git_path` 以普通正文 URL 位置出现，避免其被渲染为代码文本而失去 URL 气泡。
++ 不新增后端 Git 操作、CLI 命令、Agent 工作目录写入或 Skill 解析逻辑；除只读 `GET /api/runtime_config` 外不新增接口。
+
+### macOS 进程防睡眠支持
+> 新增自 ./iteration/20260719-1/REQUIREMENT.md
++ Integration 在 macOS 上以前台或后台方式启动服务时，必须创建并持有一个独立的 `caffeinate` 子进程，避免系统因空闲关闭显示器或进入睡眠而中断正在执行的任务。
++ 子进程必须使用 `caffeinate -d -i -m -s`，并持续运行到 Integration 结束；不采用固定时长租约、定时续租或周期性重启方案。
++ `caffeinate` 仅在 macOS 上启动。Linux、WSL、Windows 和其他平台不得尝试执行该命令，且原有启动行为保持不变。
++ Integration 的关闭路径（正常退出、`SIGINT`、`SIGTERM`、`integration stop`、重启前的停止及本机 `/api/shutdown`）必须在服务资源释放前终止由当前进程启动的 `caffeinate` 子进程，避免留下残留防睡眠进程；重复关闭必须安全。
++ 若 macOS 中无法找到或启动 `caffeinate`，Integration 记录清晰日志后继续运行，不得使服务启动失败。
++ 不修改用户的屏幕保护、自动锁屏或其他系统偏好；不支持合上笔记本盖子后继续运行。
+
+### 模型配置测试接口
+> 新增自 ./iteration/20260722-2/REQUIREMENT.md
++ 新增仅供本地设置页调用的模型配置测试接口 `POST /api/model/test`。接口使用请求中当前行、尚未保存的服务商、密钥和模型客户化配置发起一次测试；不得写入 token_store、Agent `config.json`、聊天历史、会话恢复记录、记忆、技能、任务或通知。
++ 请求体只允许包含服务商名及该行有效配置：`model`、`token`、`__url`、`__model`、`__model_fast`、`__model_thinking`、`__model_multi_input`、`__model_multi_output`。服务端必须拒绝未知字段、空服务商、空密钥，以及空 `__model`；测试始终使用 `__model`，不得回退到 fast、thinking 或多模态模型。
++ 接口必须从运行时 `config/config.json` 的 `test.content` 和 `test.timeout` 读取测试内容与超时秒数。`test`、`content` 或 `timeout` 缺失，内容为空，timeout 非正整数时，接口返回可展示的配置错误；不得使用前端传入的测试文本或超时兜底值。
++ 服务端为每次测试生成 UUID 会话 ID，并以最小 SSE 请求转发到现有上游 `/v1/chat/completions`。转发请求必须标识 `metadata.test = true`、`metadata.chat = UUID`、`metadata.type = test`，携带当前行 Token 和模型配置；`metadata.test` 必须原样透传至 `--host` 指定的最终处理服务器，供其启用测试隔离逻辑。不得合并 Agent、workspace、skills、memory、knowledge、router、插件、历史、任务或媒体元数据，也不得将该 UUID 加入连接表或日志表。
++ `metadata.test` 是测试专用保留字段：除 `/api/model/test` 构造的测试转发请求外，普通页面聊天、Cron、CLI 与其他 `/v1/chat/completions` 请求均不得携带该字段；普通转发收到客户端伪造的 `metadata.test` 时必须删除，不能进入测试执行分支。
++ 测试请求需保留当前服务商客户化配置，使上游可按与实际使用一致的 URL、`__model` 和 Token 调用服务商。HTTP Authorization 与内部 Token 元数据只在本次内存请求中使用，任何错误、日志与响应均不得回显密钥。
++ 测试接口须在服务端消费上游 SSE，并仅向浏览器返回不含模型正文的测试结果 SSE；用 `context.WithTimeout` 约束连接、首包与整个流的总耗时。客户端断开时立即取消上游请求。测试取消不写入 any 状态，也不影响普通会话。
++ 成功仅在同时满足以下条件时成立：HTTP 状态为 200、收到至少一个有效业务 SSE `data` 事件、未出现 SSE error/错误 JSON、且收到 `[DONE]` 后正常结束。HTTP 非 2xx、首包或总超时、流中断、空流、SSE 内错误或缺少 `[DONE]` 必须以 SSE 错误事件返回，并包含服务商错误的脱敏、截断说明。
++ 所有测试错误内容需移除/遮蔽 Token、Bearer、Authorization、API Key 等敏感值，并限制可展示的错误正文长度；非 JSON 错误响应、网络错误、异常状态码和 SSE 错误事件均需转换为稳定、可展示的 `配置错误：…` 信息。
+
 ### 撰写手册
 + 编写USER_GUIDE.md
 
 ### 其他要求
 + REQUIREMENT.md为需求文档，禁止编写
 + 相关迭代：iteration/日期/REQUIREMENT.md
-> 合并截止：./iteration/20260718-1/REQUIREMENT.md，下次合并从此之后的新迭代开始
+> 合并截止：./iteration/20260722-2/REQUIREMENT.md，下次合并从此之后的新迭代开始
