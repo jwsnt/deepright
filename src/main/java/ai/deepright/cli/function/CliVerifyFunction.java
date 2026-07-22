@@ -72,7 +72,6 @@ public class CliVerifyFunction extends BaseFunction {
         WorkflowException.checkCondition(StringUtils.isEmpty(this.template), "The template must not be empty");
     }
 
-
     @Override
     public Object call(FunctionContext functionContext) throws Exception {
         WorkflowTask workTask = functionContext.getWorkTask().printQuery();

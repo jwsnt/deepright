@@ -209,7 +209,7 @@ public class KnowledgeService implements MemoryService {
 
     protected String buildQuery(WorkflowTask workTask) throws Exception {
         Knowledge knowledge = this.buildKnowledge(workTask);
-        String prefix = this.template4prefix;
+        String prefix = this.template4prefix.replace("#init", this.template4init);
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern(KnowledgeService.DATE_FORMAT);
         ZoneId zoneId = this.buildZoneId(workTask);
         // lastUpdate使用客户端时间，如果不存在则使用请求创建时间-days
