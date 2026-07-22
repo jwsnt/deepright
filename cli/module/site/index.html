@@ -1540,7 +1540,7 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 .memo-query-overlay.show .memo-query-panel{transform:translateY(0) scale(1)}
 .memo-query-head{display:flex;align-items:center;gap:12px;padding:15px 18px 12px;border-bottom:1px solid color-mix(in srgb,var(--border) 84%,transparent);flex-shrink:0}.memo-query-head-copy{min-width:0;flex:1}.memo-query-kicker{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted)}.memo-query-title{margin-top:3px;font-size:17px;font-weight:700;color:var(--text-primary)}
 .memo-query-close{width:30px;height:30px;flex:0 0 30px;border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition)}.memo-query-close:hover,.memo-query-close:focus-visible{border-color:var(--accent);color:var(--text-primary);outline:none}
-.memo-query-tabs{display:flex;gap:7px;padding:10px 18px 0;flex-shrink:0}.memo-query-tab{border:1px solid color-mix(in srgb,var(--border) 82%,transparent);border-radius:999px;background:transparent;color:var(--text-secondary);padding:5px 11px;font-size:12px;cursor:pointer;transition:var(--transition)}.memo-query-tab.active{background:var(--accent);border-color:var(--accent);color:#fff}.memo-query-tab:hover:not(.active),.memo-query-tab:focus-visible:not(.active){background:rgba(var(--accent-rgb),.12);border-color:rgba(var(--accent-rgb),.3);color:var(--accent);outline:none}.memo-query-tab.active:focus-visible{outline:2px solid color-mix(in srgb,var(--accent) 44%,#fff);outline-offset:2px}
+.memo-query-tabs{display:flex;gap:7px;padding:10px 18px 0;flex-shrink:0}.memo-query-tabs.scoped{display:none}.memo-query-tab{border:1px solid color-mix(in srgb,var(--border) 82%,transparent);border-radius:999px;background:transparent;color:var(--text-secondary);padding:5px 11px;font-size:12px;cursor:pointer;transition:var(--transition)}.memo-query-tab.active{background:var(--accent);border-color:var(--accent);color:#fff}.memo-query-tab:hover:not(.active),.memo-query-tab:focus-visible:not(.active){background:rgba(var(--accent-rgb),.12);border-color:rgba(var(--accent-rgb),.3);color:var(--accent);outline:none}.memo-query-tab.active:focus-visible{outline:2px solid color-mix(in srgb,var(--accent) 44%,#fff);outline-offset:2px}
 .memo-query-conditions{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;padding:10px 18px 12px;flex-shrink:0}.memo-query-field{display:flex;flex-direction:column;gap:4px;min-width:0}.memo-query-field.wide{grid-column:1 / span 5}.memo-query-field label{font-size:10px;color:var(--text-muted)}.memo-query-field input,.memo-query-field select{width:100%;height:28px;box-sizing:border-box;border:1px solid color-mix(in srgb,var(--border) 86%,transparent);border-radius:8px;background:color-mix(in srgb,var(--bg-input) 90%,transparent);color:var(--text-primary);font:inherit;font-size:11px;padding:0 8px;outline:none}.memo-query-field input:focus,.memo-query-field select:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(var(--accent-rgb),.1)}
 .memo-query-actions{grid-column:6;grid-row:2;display:flex;align-items:flex-end;justify-content:flex-end;gap:7px}.memo-query-action{height:28px;padding:0 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg-input);color:var(--text-secondary);font-size:11px;font-weight:600;cursor:pointer;transition:var(--transition)}.memo-query-action.primary{background:var(--accent);border-color:var(--accent);color:#fff}.memo-query-action:hover:not(:disabled),.memo-query-action:focus-visible:not(:disabled){border-color:var(--accent);color:var(--accent);outline:none}.memo-query-action.primary:hover:not(:disabled),.memo-query-action.primary:focus-visible:not(:disabled){color:#fff;filter:brightness(1.06)}.memo-query-action:disabled{opacity:.55;cursor:wait}
 .memo-query-results{min-height:0;display:flex;flex-direction:column;border-top:1px solid color-mix(in srgb,var(--border) 88%,transparent);padding:11px 18px 15px;flex:1}.memo-query-results-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-shrink:0;margin-bottom:8px}.memo-query-results-title{font-size:12px;font-weight:700;color:var(--text-primary)}.memo-query-results-meta{font-size:10px;color:var(--text-muted);text-align:right}
@@ -1648,20 +1648,20 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 .cmd-toast.show{opacity:1;visibility:visible;transform:translate(-50%,-50%) scale(1);transition:opacity .25s ease,transform .25s ease}
 .cmd-toast.error{background:linear-gradient(180deg,rgba(255,236,240,.8),rgba(255,220,226,.62));border-color:rgba(255,90,107,.46);color:var(--error);box-shadow:0 18px 42px rgba(149,37,58,.16),0 0 0 1px rgba(255,90,107,.08);backdrop-filter:blur(24px) saturate(175%);-webkit-backdrop-filter:blur(24px) saturate(175%)}
 [data-theme="dark"] .cmd-toast.error{background:linear-gradient(180deg,rgba(74,23,32,.78),rgba(54,16,25,.64));border-color:rgba(255,126,144,.38);box-shadow:0 18px 42px rgba(0,0,0,.34),0 0 0 1px rgba(255,126,144,.1)}
-.right-sidebar .rs-top .rs-cell:nth-child(4){position:relative;border-bottom:none;border-left:none;border-right:none;overflow-y:auto;padding:10px 10px 15px;grid-column:span 2;min-height:0;background:var(--bg-sidebar);box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.18)}
-.right-sidebar.cli-sub-expanded .rs-top .rs-cell:nth-child(4){grid-column:1;min-height:0;height:auto}
-.right-sidebar .rs-top .rs-cell:nth-child(4).task-flash{animation:cliPulse .3s ease-in-out infinite;box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.40),0 0 14px rgba(var(--accent-rgb),.12)}
+.right-sidebar .rs-top #rsCliSubCell{position:relative;border-bottom:none;border-left:none;border-right:none;overflow-y:auto;padding:10px 10px 15px;grid-column:span 2;min-height:0;background:var(--bg-sidebar);box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.18)}
+.right-sidebar.cli-sub-expanded .rs-top #rsCliSubCell{grid-column:1;min-height:0;height:auto}
+.right-sidebar .rs-top #rsCliSubCell.task-flash{animation:cliPulse .3s ease-in-out infinite;box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.40),0 0 14px rgba(var(--accent-rgb),.12)}
 @keyframes cliPulse{0%,100%{filter:brightness(1);opacity:1}50%{filter:brightness(1.14);opacity:.72}}
 .cli-sub-container,.plugin-log-stream{display:flex;flex-direction:column;padding:0;min-height:0;width:100%;box-sizing:border-box}
 .cli-sub-container{gap:2px}
 .plugin-log-stream{gap:8px}
 .cli-sub-container::after{content:'';display:block;flex:0 0 2px}
 .plugin-log-stream::after{content:'';display:block;flex:0 0 5px}
-.right-sidebar .rs-top .rs-cell:nth-child(4).cli-sub-cell-empty{overflow:hidden}
-.right-sidebar .rs-top .rs-cell:nth-child(4).cli-sub-cell-empty .cli-sub-container{display:none}
+.right-sidebar .rs-top #rsCliSubCell.cli-sub-cell-empty{overflow:hidden}
+.right-sidebar .rs-top #rsCliSubCell.cli-sub-cell-empty .cli-sub-container{display:none}
 .cli-sub-empty{display:none;min-height:100%;width:100%;align-items:center;justify-content:center;padding:14px 4px 10px;box-sizing:border-box;pointer-events:none}
-.right-sidebar .rs-top .rs-cell:nth-child(4).cli-sub-cell-empty .cli-sub-empty{display:flex}
-.right-sidebar .rs-top .rs-cell:nth-child(4)[data-cli-tour-demo-active="1"] .cli-sub-empty{display:none}
+.right-sidebar .rs-top #rsCliSubCell.cli-sub-cell-empty .cli-sub-empty{display:flex}
+.right-sidebar .rs-top #rsCliSubCell[data-cli-tour-demo-active="1"] .cli-sub-empty{display:none}
 .cli-sub-empty-scene{width:min(100%,230px);display:flex;flex-direction:column;align-items:center;gap:10px}
 .cli-sub-empty-marquee{position:relative;width:100%;height:116px;border-radius:20px;border:1px solid rgba(var(--accent-rgb),.18);background:linear-gradient(180deg,rgba(255,249,244,.96) 0%,rgba(251,234,222,.92) 42%,rgba(255,192,58,.22) 42%,rgba(189,51,48,.68) 100%);box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.08),0 10px 24px rgba(91,34,29,.08);overflow:hidden;isolation:isolate}
 .cli-sub-empty-marquee::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 22% 18%,rgba(255,255,255,.64),transparent 18%),radial-gradient(circle at 76% 22%,rgba(255,255,255,.28),transparent 17%),linear-gradient(180deg,rgba(255,255,255,.36),rgba(255,255,255,0) 54%);pointer-events:none;opacity:.94}
@@ -1775,7 +1775,6 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 .cli-copy-btn:hover,.cli-copy-btn:focus-visible,.cli-kill-btn:hover,.cli-kill-btn:focus-visible{box-shadow:0 0 0 1px rgba(var(--accent-rgb),.42),0 0 8px rgba(var(--accent-rgb),.14);outline:none}
 .cli-copy-btn svg,.cli-kill-btn svg{display:block;width:9px;height:9px;fill:rgb(var(--accent-soft-rgb))}
 .cli-sub-container .runtime-log-entry .message-meta{display:none}
-.right-sidebar .rs-top .rs-cell:nth-child(5){display:none}
 .right-sidebar .rs-bottom{flex:1;overflow:hidden;padding:8px;display:flex;flex-direction:column;gap:0;min-height:0;background:var(--bg-sidebar);transition:flex .38s cubic-bezier(.22,1,.36,1),padding .28s ease,opacity .28s ease,filter .32s ease,transform .32s ease}
 .right-sidebar.wiki-expanded .rs-bottom{flex:1 1 100%;padding-top:10px}
 .right-sidebar.cli-sub-expanded .rs-bottom{flex:0 0 0;max-height:0;opacity:0;padding-top:0;padding-bottom:0;pointer-events:none;overflow:hidden}
@@ -1911,8 +1910,8 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 [data-theme="dark"] .rs-timeline li:hover .tl-del.tl-view{opacity:1}
 [data-theme="dark"] .rs-timeline li .tl-del.tl-view svg{color:currentColor}
 [data-theme="dark"] .rs-timeline li .tl-del.tl-view:hover,[data-theme="dark"] .rs-timeline li .tl-del.tl-view:focus-visible{background:linear-gradient(180deg,rgba(27,70,100,.98),rgba(13,43,65,.96));border-color:rgba(126,244,255,.5);box-shadow:0 12px 24px rgba(0,0,0,.24),0 0 0 1px rgba(230,253,255,.1) inset,0 0 18px rgba(0,212,255,.18);transform:translateY(-1px);outline:none}
-[data-theme="dark"] .right-sidebar .rs-top .rs-cell:nth-child(4){background:linear-gradient(180deg,rgba(8,24,41,.92),rgba(5,16,28,.96));box-shadow:inset 0 0 0 1px rgba(84,220,255,.16),0 -1px 0 rgba(84,220,255,.12)}
-[data-theme="dark"] .right-sidebar .rs-top .rs-cell:nth-child(4).task-flash{box-shadow:inset 0 0 0 1px rgba(84,220,255,.3),0 0 18px rgba(0,212,255,.12)}
+[data-theme="dark"] .right-sidebar .rs-top #rsCliSubCell{background:linear-gradient(180deg,rgba(8,24,41,.92),rgba(5,16,28,.96));box-shadow:inset 0 0 0 1px rgba(84,220,255,.16),0 -1px 0 rgba(84,220,255,.12)}
+[data-theme="dark"] .right-sidebar .rs-top #rsCliSubCell.task-flash{box-shadow:inset 0 0 0 1px rgba(84,220,255,.3),0 0 18px rgba(0,212,255,.12)}
 [data-theme="dark"] .cli-sub-container .runtime-log-entry,[data-theme="dark"] .plugin-log-stream .runtime-log-entry{background:linear-gradient(180deg,rgba(8,28,48,.94),rgba(6,18,32,.94));border-color:rgba(84,220,255,.24);box-shadow:0 0 0 1px rgba(84,220,255,.06),0 0 16px rgba(0,212,255,.08)}
 [data-theme="dark"] .cli-sub-container .runtime-log-entry-content,[data-theme="dark"] .plugin-log-stream .runtime-log-entry-content{color:#dff8ff}
 [data-theme="dark"] .cli-sub-container .runtime-log-entry-content pre,[data-theme="dark"] .plugin-log-stream .runtime-log-entry-content pre{background:rgba(4,16,30,.98);border-color:rgba(84,220,255,.28);color:#8ef4ff;box-shadow:0 0 12px rgba(0,212,255,.08)}
@@ -3125,7 +3124,7 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 #rsMetaCenterPreview.meta-preview-interactive .rs-meta-center-cycle-picker .rs-repeat-dd:not(.show) *{pointer-events:none !important}
 #rsMetaCenterPreview.meta-preview-interactive .rs-meta-center-cycle-picker .rs-repeat-dd.show,
 #rsMetaCenterPreview.meta-preview-interactive .rs-meta-center-cycle-picker .rs-repeat-dd.show *{pointer-events:auto !important}
-.rs-meta-center-section{display:flex;flex-direction:column;gap:8px;min-height:0;flex:1}
+.rs-meta-center-section{display:flex;flex-direction:column;gap:8px;min-height:0;flex:1}.rs-meta-center-section-title-row{display:flex;align-items:center;gap:5px;min-height:24px}.rs-meta-center-section-actions{display:flex;align-items:center;gap:4px;min-height:24px}
 .rs-meta-center-section-label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)}
 .rs-meta-center-content{font-size:13px;line-height:1.7;color:var(--text-primary);white-space:pre-wrap;word-break:break-word;overflow:auto;min-height:96px;max-height:calc(min(68vh,560px) - 230px);padding:14px 16px;border-radius:20px;border:1px solid color-mix(in srgb,var(--border) 82%,transparent);background:linear-gradient(180deg,color-mix(in srgb,var(--bg-sidebar) 76%,transparent),color-mix(in srgb,var(--bg-input) 78%,transparent))}
 .rs-meta-center-content.editing{padding:0;overflow:hidden}
@@ -4987,12 +4986,12 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
   <section class="memo-query-panel" id="memoQueryPanel" role="dialog" aria-modal="true" aria-labelledby="memoQueryTitle" onclick="event.stopPropagation()">
     <div class="memo-query-head">
       <div class="memo-query-head-copy">
-        <div class="memo-query-kicker">Memo Search</div>
+        <div class="memo-query-kicker" id="memoQueryKicker">Memo Search</div>
         <div class="memo-query-title" id="memoQueryTitle">备忘录查询</div>
       </div>
       <button class="memo-query-close" type="button" onclick="closeMemoQueryOverlay()" aria-label="收起备忘录查询" title="收起备忘录查询"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
     </div>
-    <div class="memo-query-tabs" role="tablist" aria-label="备忘录查询维度">
+    <div class="memo-query-tabs" id="memoQueryTabs" role="tablist" aria-label="备忘录查询维度">
       <button class="memo-query-tab active" id="memoQueryTabMeta" type="button" role="tab" aria-selected="true" onclick="setMemoQueryDimension('meta')">元数据</button>
       <button class="memo-query-tab" id="memoQueryTabDetail" type="button" role="tab" aria-selected="false" onclick="setMemoQueryDimension('detail')">任务明细</button>
     </div>
@@ -5033,7 +5032,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
       <div class="rs-meta-center-row"><span class="rs-meta-center-label">状态</span><span class="rs-meta-center-value" id="rsMetaCenterPreviewStatus">-</span></div>
     </div>
     <div class="rs-meta-center-section">
-      <div class="rs-meta-center-section-label">内容</div>
+      <div class="rs-meta-center-section-title-row"><div class="rs-meta-center-section-label">内容</div><div class="rs-meta-center-section-actions" id="rsMetaCenterPreviewContentActions"></div></div>
       <div class="rs-meta-center-content" id="rsMetaCenterPreviewContent"></div>
     </div>
   </div>
@@ -5051,7 +5050,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
 <div class="memo-preview-delete-confirm-overlay" id="memoPreviewRunConfirm" data-overlay-base data-overlay-domain="center" data-overlay-order="26" aria-hidden="true" onclick="event.stopPropagation()">
   <div class="memo-preview-delete-confirm-card memo-preview-run-confirm-card" id="memoPreviewRunConfirmCard" role="dialog" aria-modal="true" aria-labelledby="memoPreviewRunConfirmTitle" aria-describedby="memoPreviewRunConfirmDesc" tabindex="-1">
     <p class="memo-preview-delete-confirm-title" id="memoPreviewRunConfirmTitle">运行备忘录</p>
-    <p class="memo-preview-delete-confirm-desc" id="memoPreviewRunConfirmDesc">将创建一条新的待执行任务明细。</p>
+    <p class="memo-preview-delete-confirm-desc" id="memoPreviewRunConfirmDesc">将复制并执行一条新的待执行任务明细</p>
     <div class="memo-preview-run-options" role="radiogroup" aria-label="会话复用方式">
       <label class="memo-preview-run-option"><input type="radio" name="memoPreviewRunReuseChat" value="false" checked onchange="memoPreviewRunSetReuseChat(false)">不复用原会话</label>
       <label class="memo-preview-run-option"><input type="radio" name="memoPreviewRunReuseChat" value="true" onchange="memoPreviewRunSetReuseChat(true)">复用原会话</label>
@@ -39152,7 +39151,10 @@ function appendRestoredRecords(chatId, chat, records) {
       if (!text) return;
       let userIndex = activeUserIndex;
       const pending = getPendingRequestState(chat);
-      const reusePendingUser = pending.start >= 0 && isSameRestoreUserContent(pending.user, text);
+      // Only an in-flight request may reuse its already-rendered user message.
+      // A completed memo can legitimately run again with identical content;
+      // that must start a new Q/A round instead of replacing the prior result.
+      const reusePendingUser = chat.pendingRequest && pending.start >= 0 && isSameRestoreUserContent(pending.user, text);
       if (reusePendingUser) {
         userIndex = pending.start;
       } else if (chat.pendingRequest) {
@@ -50332,6 +50334,8 @@ const memoQueryState = {
   minimized: false,
   previewKind: '',
   dimension: 'meta',
+  scopedMeta: null,
+  scopedSnapshot: null,
   forms: { meta: MEMO_QUERY_EMPTY_FORM(), detail: MEMO_QUERY_EMPTY_FORM() },
   records: { meta: [], detail: [] },
   visibleCount: { meta: MEMO_QUERY_PAGE_SIZE, detail: MEMO_QUERY_PAGE_SIZE },
@@ -50347,6 +50351,46 @@ const memoQueryState = {
 function memoQueryClone(value) {
   return value && typeof value === 'object' ? JSON.parse(JSON.stringify(value)) : value;
 }
+function memoQueryScopedMetaId(scope = memoQueryState.scopedMeta) {
+  return String(scope && scope.id || '').trim();
+}
+function memoQueryIsScoped() {
+  return !!memoQueryScopedMetaId();
+}
+function memoQueryCaptureScopedSnapshot() {
+  return {
+    dimension: memoQueryState.dimension,
+    forms: memoQueryClone(memoQueryState.forms),
+    records: memoQueryClone(memoQueryState.records),
+    visibleCount: memoQueryClone(memoQueryState.visibleCount),
+    resultMeta: memoQueryClone(memoQueryState.resultMeta),
+    scrollTop: memoQueryClone(memoQueryState.scrollTop),
+    dirty: !!memoQueryState.dirty,
+    previewKind: memoQueryState.previewKind
+  };
+}
+function memoQueryAbortActiveRequest() {
+  const controller = memoQueryState.abortController;
+  memoQueryState.abortController = null;
+  memoQueryState.loading = false;
+  memoQueryState.requestSeq += 1;
+  if (controller) controller.abort();
+}
+function memoQueryClearScopedMeta(options = {}) {
+  if (!memoQueryIsScoped()) return;
+  const snapshot = memoQueryState.scopedSnapshot;
+  memoQueryState.scopedMeta = null;
+  memoQueryState.scopedSnapshot = null;
+  if (options.restore === false || !snapshot) return;
+  memoQueryState.dimension = snapshot.dimension === 'detail' ? 'detail' : 'meta';
+  memoQueryState.forms = snapshot.forms || { meta: MEMO_QUERY_EMPTY_FORM(), detail: MEMO_QUERY_EMPTY_FORM() };
+  memoQueryState.records = snapshot.records || { meta: [], detail: [] };
+  memoQueryState.visibleCount = snapshot.visibleCount || { meta: MEMO_QUERY_PAGE_SIZE, detail: MEMO_QUERY_PAGE_SIZE };
+  memoQueryState.resultMeta = snapshot.resultMeta || { meta: '', detail: '' };
+  memoQueryState.scrollTop = snapshot.scrollTop || { meta: 0, detail: 0 };
+  memoQueryState.dirty = !!snapshot.dirty;
+  memoQueryState.previewKind = snapshot.previewKind || '';
+}
 function memoQueryNormalizeForm(value) {
   const source = value && typeof value === 'object' ? value : {};
   const cycle = String(source.cycle || '').trim();
@@ -50360,8 +50404,8 @@ function memoQueryNormalizeForm(value) {
     content: String(source.content || '').trim()
   };
 }
-function memoQueryCacheKey(dimension, form) {
-  return JSON.stringify({ v: 3, dimension: String(dimension || 'meta'), form: memoQueryNormalizeForm(form) });
+function memoQueryCacheKey(dimension, form, scope = memoQueryState.scopedMeta) {
+  return JSON.stringify({ v: 4, dimension: String(dimension || 'meta'), metaId: memoQueryScopedMetaId(scope), form: memoQueryNormalizeForm(form) });
 }
 function memoQueryReadPersistentCache() {
   try {
@@ -50453,7 +50497,17 @@ function memoQueryReadFormFromDom() {
 function memoQueryWriteFormToDom() {
   const dimension = memoQueryState.dimension;
   const form = memoQueryState.forms[dimension] || MEMO_QUERY_EMPTY_FORM();
+  const scoped = memoQueryIsScoped();
   const meta = dimension === 'meta';
+  const kicker = document.getElementById('memoQueryKicker');
+  const title = document.getElementById('memoQueryTitle');
+  const tabs = document.getElementById('memoQueryTabs');
+  if (kicker) kicker.textContent = scoped ? 'Memo Details' : 'Memo Search';
+  if (title) title.textContent = scoped ? '备忘录任务明细' : '备忘录查询';
+  if (tabs) {
+    tabs.classList.toggle('scoped', scoped);
+    tabs.setAttribute('aria-hidden', scoped ? 'true' : 'false');
+  }
   const cycleField = document.getElementById('memoQueryCycleField');
   if (cycleField) cycleField.style.display = meta ? '' : 'none';
   const startLabel = document.getElementById('memoQueryStartLabel');
@@ -50515,9 +50569,11 @@ function memoQueryDisplayTime(record, dimension) {
   if (Number(record && record.cycle) === -1) return String(record && record.cron || '').trim() || '-';
   return raw || '-';
 }
-function memoQueryMatchesRecord(record, dimension, form, metaStatusMap) {
+function memoQueryMatchesRecord(record, dimension, form, metaStatusMap, scope) {
   const item = record && typeof record === 'object' ? record : {};
   const normalized = memoQueryNormalizeForm(form);
+  const scopedMetaId = memoQueryScopedMetaId(scope);
+  if (scopedMetaId && (dimension !== 'detail' || String(item.metaId || '') !== scopedMetaId)) return false;
   if (normalized.agent && String(item.agentId || '') !== normalized.agent) return false;
   if (normalized.model && normalizeModelName(item.model) !== normalized.model) return false;
   if (normalized.content && !String(item.content || '').includes(normalized.content)) return false;
@@ -50541,9 +50597,10 @@ function memoQueryMatchesRecord(record, dimension, form, metaStatusMap) {
   }
   return true;
 }
-function memoQueryBuildURL(dimension, form) {
+function memoQueryBuildURL(dimension, form, scope) {
   const params = new URLSearchParams();
   const normalized = memoQueryNormalizeForm(form);
+  const scopedMetaId = memoQueryScopedMetaId(scope);
   if (normalized.agent) params.set('agentId', normalized.agent);
   if (normalized.model) params.set('model', normalized.model);
   if (normalized.content) params.set('content', normalized.content);
@@ -50553,6 +50610,7 @@ function memoQueryBuildURL(dimension, form) {
     if (normalized.cycle) params.set('cycle', normalized.cycle);
   } else {
     params.set('history', '1');
+    if (scopedMetaId) params.set('metaId', scopedMetaId);
   }
   if (normalized.start) params.set('from', normalized.start.replace('T', ' '));
   if (normalized.end) params.set('to', normalized.end.replace('T', ' '));
