@@ -46735,7 +46735,10 @@ function findAgentDirPrefixedMessageMatches(source) {
 function findMessagePathMatches(text) {
   const source = String(text || '');
   if (!source || source.length > 5000) return [];
-  const matches = findAgentDirPrefixedMessageMatches(source);
+  // Match complete FILE tokens before their paths. An absolute path inside a
+  // [FILE:...] token can also start with the current Agent directory; keeping
+  // both matches would render the same file twice and leave the closing `]`.
+  const matches = [];
   MESSAGE_FILE_TOKEN_MATCHER.lastIndex = 0;
   let tokenMatch;
   while ((tokenMatch = MESSAGE_FILE_TOKEN_MATCHER.exec(source)) !== null) {
@@ -46748,6 +46751,9 @@ function findMessagePathMatches(text) {
     if (!filePath) continue;
     matches.push({ start, end, text: tokenText, href: tokenText, filePath, kind: 'file' });
   }
+  findAgentDirPrefixedMessageMatches(source).forEach(match => {
+    if (!hasOverlappingMessageMatch(matches, match.start, match.end)) matches.push(match);
+  });
   MESSAGE_QUOTED_FILE_TOKEN_MATCHER.lastIndex = 0;
   let quotedTokenMatch;
   while ((quotedTokenMatch = MESSAGE_QUOTED_FILE_TOKEN_MATCHER.exec(source)) !== null) {

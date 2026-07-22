@@ -39,12 +39,14 @@ public class RequestProviderUtils {
                         // O：图片
                         // X：图 视频 音频
                         // K：图 视频 音频
+                        StringUtils.equalsIgnoreCase(provider, LLMQueryService.LLM_VOLCENGINE) ||
                         StringUtils.equalsIgnoreCase(provider, LLMQueryService.LLM_ANTHROPIC) ||
                         StringUtils.equalsIgnoreCase(provider, LLMQueryService.LLM_BIGMODEL) ||
                         StringUtils.equalsIgnoreCase(provider, LLMQueryService.LLM_GEMINI) ||
                         StringUtils.equalsIgnoreCase(provider, LLMQueryService.LLM_VERTEX) ||
                         StringUtils.equalsIgnoreCase(provider, LLMQueryService.LLM_OPENAI) ||
                         StringUtils.equalsIgnoreCase(provider, LLMQueryService.LLM_XIAOMI) ||
+                        StringUtils.equalsIgnoreCase(provider, LLMQueryService.LLM_QWEN) ||
                         StringUtils.equalsIgnoreCase(provider, LLMQueryService.LLM_KIMI)
                 );
     }
