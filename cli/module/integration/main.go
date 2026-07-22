@@ -12922,7 +12922,7 @@ p{margin:8px 0 0;font-size:13px;line-height:1.4;color:#465b84;white-space:nowrap
   <div class="badge"><div class="spinner" aria-hidden="true"></div></div>
   <h1>正在启动</h1>
   <p id="launchDesc">等待完成</p>
-  <button id="launchRetry" class="retry" type="button">立即重试</button>
+  <button id="launchRetry" class="retry" type="button">手动重试</button>
 </main>
 <script>
 const target=%s;

@@ -19,6 +19,8 @@ public class ComplexityUtils {
     // 耗时监控
     public static final Integer THRESHOLD = Integer.valueOf(StringUtils.defaultIfEmpty(System.getenv("COMPLEXITY_THRESHOLD"), "1000"));
 
+    public static final String KEY_COMPLEXITY_UPGRADE = "complexity_upgrade";
+
     public static final String KEY_COMPLEXITY = "complexity";
 
     public static ComplexityMode score(String input) throws Exception {
@@ -62,20 +64,17 @@ public class ComplexityUtils {
         return complexity;
     }
 
-    public static ComplexityMode upgrade(WorkflowTask workTask) throws Exception {
-        ComplexityMode lastMode = ComplexityUtils.result(workTask);
-        if (ComplexityMode.FAST_REPLY.equals(lastMode)) {
-            lastMode = ComplexityMode.DEEP_THINKING;
-        } else if (ComplexityMode.DEEP_THINKING.equals(lastMode)) {
-            lastMode = ComplexityMode.TASK_PLANNING;
-        }
-        workTask.putMetadata(ComplexityUtils.KEY_COMPLEXITY, lastMode);
-        return lastMode;
-    }
-
     public static ComplexityMode result(WorkflowTask workTask) throws Exception {
         ComplexityMode lastMode = workTask.getMetadata(ComplexityUtils.KEY_COMPLEXITY, ComplexityMode.class);
         if (lastMode != null) {
+            if (MapUtils.getBoolean(workTask.getMetadata(), ComplexityUtils.KEY_COMPLEXITY_UPGRADE, false)) {
+                if (ComplexityMode.TASK_PLANNING.is(lastMode)) {
+                    return ComplexityMode.DEEP_THINKING;
+                }
+                if (ComplexityMode.FAST_REPLY.is(lastMode)) {
+                    return ComplexityMode.TASK_PLANNING;
+                }
+            }
             return lastMode;
         }
         lastMode = ComplexityUtils.score(ComplexityUtils.buildQuery(workTask));
@@ -113,5 +112,13 @@ public class ComplexityUtils {
 
     public static Boolean isThinking(WorkflowTask workTask) throws Exception {
         return MapUtils.getBoolean(workTask.getMetadata(), FeatureField.KEY_THINKING, false);
+    }
+
+    public static void resetUpgrade(WorkflowTask workTask) throws Exception {
+        workTask.delMetadata(ComplexityUtils.KEY_COMPLEXITY_UPGRADE);
+    }
+
+    public static void markUpgrade(WorkflowTask workTask) throws Exception {
+        workTask.putMetadata(ComplexityUtils.KEY_COMPLEXITY_UPGRADE, true);
     }
 }

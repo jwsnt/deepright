@@ -61,7 +61,8 @@ public class CustomerCozeRouter extends CozeRouter {
     @Override
     protected StringEntity buildEntity(CozeRequest request, LLMConfig llmConfig) throws Exception {
         StringEntity entity = super.buildEntity(request, llmConfig);
-        request.getMessage().putMetadata(RequestModelRag.RAG_KEY, entity.getContentLength());
+        request.getMessage().putMetadata(RequestModelRag.LANG_KEY_REQUEST_CAPACITY, entity.getContentLength());
+        request.getMessage().putMetadata(RequestModelRag.LANG_KEY_REQUEST_MODEL, request.getModel());
         return entity;
     }
 

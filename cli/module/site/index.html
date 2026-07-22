@@ -12347,11 +12347,13 @@ function getInitialLeftSidebarCollapsed() {
   return false;
 }
 
-function applyLeftSidebarState(collapsed) {
+function applyLeftSidebarState(collapsed, options = {}) {
   const sidebar = document.querySelector('.sidebar');
   if (!sidebar) return;
   sidebar.classList.toggle('collapsed', !!collapsed);
-  try { localStorage.setItem(LEFT_SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0'); } catch {}
+  if (options.persist !== false) {
+    try { localStorage.setItem(LEFT_SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0'); } catch {}
+  }
   scheduleLayoutSync();
   syncVfsUploadToastPlacement();
   updateLeftSidebarToggleUI();
@@ -12397,13 +12399,15 @@ function revealLeftSidebarForModelSetup() {
   return true;
 }
 
-function applyRightSidebarState(collapsed) {
+function applyRightSidebarState(collapsed, options = {}) {
   const rightSidebar = document.getElementById('rightSidebar');
   if (!rightSidebar) return;
-  if (collapsed) rsMetaLeave();
-  if (collapsed) setCliSubPanelExpanded(false);
+  if (collapsed && options.resetPanelState !== false) rsMetaLeave();
+  if (collapsed && options.resetPanelState !== false) setCliSubPanelExpanded(false);
   rightSidebar.classList.toggle('collapsed', !!collapsed);
-  try { localStorage.setItem(RIGHT_SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0'); } catch {}
+  if (options.persist !== false) {
+    try { localStorage.setItem(RIGHT_SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0'); } catch {}
+  }
   updateRightSidebarToggleUI();
   updateLeftSidebarToggleUI();
   scheduleLayoutSync();
@@ -23517,7 +23521,10 @@ async function init() {
   window.addEventListener('resize', hideModelConfigOverflowPreview);
   window.addEventListener('resize', syncScreenSaverSceneScale);
   ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'].forEach(evt => {
-    document.addEventListener(evt, syncFullscreenToggleUI);
+    document.addEventListener(evt, () => {
+      syncBrowserFullscreenSidebarState();
+      syncFullscreenToggleUI();
+    });
   });
   document.addEventListener('scroll', hideModelConfigOverflowPreview, true);
   syncVfsUploadToastPlacement();
@@ -34083,6 +34090,46 @@ function exitBrowserFullscreenMode() {
   return Promise.reject(new Error('当前浏览器不支持退出全屏'));
 }
 
+// This snapshot only lives for the current browser-fullscreen session.  It lets
+// us restore each sidebar to the state the user chose before entering fullscreen.
+let browserFullscreenSidebarSnapshot = null;
+let browserFullscreenRequestedByToggle = false;
+
+function captureBrowserFullscreenSidebarSnapshot() {
+  if (browserFullscreenSidebarSnapshot) return;
+  const sidebar = document.querySelector('.sidebar');
+  const rightSidebar = document.getElementById('rightSidebar');
+  browserFullscreenSidebarSnapshot = {
+    leftCollapsed: !!(sidebar && sidebar.classList.contains('collapsed')),
+    rightCollapsed: !!(rightSidebar && rightSidebar.classList.contains('collapsed'))
+  };
+}
+
+function collapseSidebarsForBrowserFullscreen() {
+  if (!browserFullscreenSidebarSnapshot) return;
+  const transientOptions = { persist: false, resetPanelState: false };
+  applyLeftSidebarState(true, transientOptions);
+  applyRightSidebarState(true, transientOptions);
+}
+
+function restoreSidebarsAfterBrowserFullscreen() {
+  const snapshot = browserFullscreenSidebarSnapshot;
+  if (!snapshot) return;
+  browserFullscreenSidebarSnapshot = null;
+  const transientOptions = { persist: false, resetPanelState: false };
+  applyLeftSidebarState(snapshot.leftCollapsed, transientOptions);
+  applyRightSidebarState(snapshot.rightCollapsed, transientOptions);
+}
+
+function syncBrowserFullscreenSidebarState() {
+  if (getFullscreenElement()) {
+    if (browserFullscreenRequestedByToggle) collapseSidebarsForBrowserFullscreen();
+    return;
+  }
+  restoreSidebarsAfterBrowserFullscreen();
+  browserFullscreenRequestedByToggle = false;
+}
+
 function syncFullscreenToggleUI() {
   const group = document.getElementById('inputFullscreenGroup');
   const toggle = document.getElementById('inputFullscreenToggle');
@@ -34115,6 +34162,8 @@ async function toggleBrowserFullscreen(event) {
     if (active) {
       await exitBrowserFullscreenMode();
     } else {
+      captureBrowserFullscreenSidebarSnapshot();
+      browserFullscreenRequestedByToggle = true;
       await requestBrowserFullscreen();
       window.setTimeout(() => {
         startFullscreenTourOnboarding();
@@ -34123,7 +34172,10 @@ async function toggleBrowserFullscreen(event) {
   } catch (err) {
     vfsShowUploadToast((active ? '退出' : '进入') + '全屏失败: ' + (((err && err.message) || '').trim() || '请重试'), true);
   } finally {
-    setTimeout(syncFullscreenToggleUI, 0);
+    setTimeout(() => {
+      syncBrowserFullscreenSidebarState();
+      syncFullscreenToggleUI();
+    }, 0);
   }
 }
 
@@ -42923,45 +42975,86 @@ function getImageExtensionFromMime(type) {
   return 'png';
 }
 
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result || '');
-      const commaIndex = result.indexOf(',');
-      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : '');
-    };
-    reader.onerror = () => reject(reader.error || new Error('读取图片失败'));
-    reader.readAsDataURL(file);
-  });
+const PASTE_MEDIA_FILE_EXTENSIONS = new Set([
+  '3gp', '3g2', 'aac', 'aif', 'aiff', 'amr', 'avi', 'bmp', 'flac', 'gif', 'heic', 'heif',
+  'jpeg', 'jpg', 'm4a', 'm4v', 'mkv', 'mov', 'mp3', 'mp4', 'mpeg', 'mpg', 'oga', 'ogg', 'ogv',
+  'opus', 'png', 'svg', 'tif', 'tiff', 'wav', 'webm', 'webp', 'wma', 'wmv'
+]);
+const PASTE_OFFICE_FILE_EXTENSIONS = new Set(['doc', 'docx', 'xls', 'xlsx']);
+const PASTE_OFFICE_FILE_MIME_TYPES = new Set([
+  'application/msword',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+]);
+
+function getPastedFileExtension(file) {
+  const name = String((file && file.name) || '').trim().toLowerCase();
+  const dot = name.lastIndexOf('.');
+  return dot > 0 && dot < name.length - 1 ? name.slice(dot + 1) : '';
 }
 
-async function saveClipboardImageAsTmp(file, targetEl) {
-  const chatId = state.activeChat;
-  if (!chatId) throw new Error('请先选择会话');
-  const agentId = getChatAgentId(chatId);
-  if (!agentId) throw new Error('请先选择 Agent');
-  const ext = getImageExtensionFromMime(file.type);
-  const relPath = 'tmp/paste_' + Date.now() + '_' + randomToken(6) + '.' + ext;
-  const content = await fileToBase64(file);
-  const resp = await fetch('/api/edit?agentId=' + encodeURIComponent(agentId) + '&path=' + encodeURIComponent(relPath), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content })
-  });
-  let data = null;
-  try { data = await resp.json(); } catch {}
-  if (!resp.ok || !data || data.status !== 0 || !data.savedAs) {
-    throw new Error((data && data.content) || ('图片保存失败: HTTP ' + resp.status));
+function getClipboardFallbackExtension(type) {
+  const mime = String(type || '').trim().toLowerCase().split(';')[0];
+  if (mime.startsWith('image/')) return getImageExtensionFromMime(mime);
+  if (mime === 'application/pdf') return 'pdf';
+  if (mime === 'application/msword') return 'doc';
+  if (mime === 'application/vnd.ms-excel') return 'xls';
+  if (mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return 'docx';
+  if (mime === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') return 'xlsx';
+  if (mime.startsWith('audio/')) return 'audio';
+  if (mime.startsWith('video/')) return 'video';
+  if (mime.startsWith('text/')) return 'txt';
+  return 'bin';
+}
+
+function isPasteSupportedBinaryFile(file) {
+  const type = String((file && file.type) || '').trim().toLowerCase().split(';')[0];
+  const extension = getPastedFileExtension(file);
+  return type.startsWith('image/') || type.startsWith('audio/') || type.startsWith('video/')
+    || type === 'application/pdf' || extension === 'pdf' || PASTE_MEDIA_FILE_EXTENSIONS.has(extension)
+    || PASTE_OFFICE_FILE_MIME_TYPES.has(type) || PASTE_OFFICE_FILE_EXTENSIONS.has(extension);
+}
+
+async function hasPlainTextContent(file) {
+  if (!(file instanceof File)) return false;
+  const sample = new Uint8Array(await file.slice(0, 64 * 1024).arrayBuffer());
+  if (sample.length === 0) return true;
+  const hasUtf16Bom = (sample[0] === 0xff && sample[1] === 0xfe) || (sample[0] === 0xfe && sample[1] === 0xff);
+  if (!hasUtf16Bom && sample.includes(0)) return false;
+  if (hasUtf16Bom) return true;
+  try {
+    new TextDecoder('utf-8', { fatal: true }).decode(sample, { stream: true });
+    return true;
+  } catch {
+    return false;
   }
-  const absPath = data.savedAs;
-  const fileName = absPath.split(/[\\/]/).pop() || relPath.split('/').pop() || 'image';
-  insertBubbleAtCursor('[FILE:' + fileName + ']', absPath, targetEl, {
-    bubbleKind: 'image',
-    valuePrefix: '[FILE:',
-    valueSuffix: ']'
+}
+
+async function isSupportedPastedSystemFile(file) {
+  if (isPasteSupportedBinaryFile(file)) return true;
+  // File.type is often empty for Finder copies.  Inspecting a small prefix
+  // admits text files with uncommon extensions while rejecting binary data.
+  return hasPlainTextContent(file);
+}
+
+function getClipboardFiles(clipboard) {
+  const listedFiles = clipboard && clipboard.files ? Array.from(clipboard.files) : [];
+  if (listedFiles.length > 0) return listedFiles;
+  const items = clipboard && clipboard.items ? Array.from(clipboard.items) : [];
+  return items
+    .filter(item => item && item.kind === 'file')
+    .map(item => item.getAsFile && item.getAsFile())
+    .filter(file => file instanceof File);
+}
+
+function buildClipboardUploadItems(files) {
+  return Array.from(files || []).map((file, index) => {
+    const name = String(file.name || '').trim();
+    const fallbackExtension = getClipboardFallbackExtension(file.type);
+    const relativePath = name || ('paste_' + Date.now() + '_' + randomToken(6) + '_' + index + '.' + fallbackExtension);
+    return { file, relativePath, displayName: getFsBasename(relativePath) };
   });
-  return absPath;
 }
 
 function handleInput(el) {
@@ -44472,24 +44565,25 @@ async function extractSystemDropItemsFromDataTransfer(dataTransfer) {
   return { uploadItems: files, emptyDirs };
 }
 
-async function uploadDroppedSystemItemsToBubbles(dataTransfer, targetEl, domain) {
+async function uploadSystemItemsToBubbles(uploadItems, emptyDirs, targetEl, domain) {
   const agentId = state.settings.agentId || getChatAgentId(state.activeChat);
   if (!agentId) throw new Error('请先选择 Agent');
-  const extracted = await extractSystemDropItemsFromDataTransfer(dataTransfer);
-  if ((!extracted.uploadItems || extracted.uploadItems.length === 0) && (!extracted.emptyDirs || extracted.emptyDirs.length === 0)) {
+  const items = Array.isArray(uploadItems) ? uploadItems : [];
+  const dirs = Array.isArray(emptyDirs) ? emptyDirs : [];
+  if (items.length === 0 && dirs.length === 0) {
     throw new Error('未识别到可上传的文件或目录');
   }
   const abortController = new AbortController();
-  const lockMeta = getLargeUploadLockMeta(extracted.uploadItems, extracted.emptyDirs);
+  const lockMeta = getLargeUploadLockMeta(items, dirs);
   setDomainUploadLock(domain, true, {
     title: lockMeta.title,
-    desc: lockMeta.requiresLock ? lockMeta.desc : summarizeUploadSelection(extracted.uploadItems),
+    desc: lockMeta.requiresLock ? lockMeta.desc : summarizeUploadSelection(items),
     abortController
   });
   try {
-    const result = await uploadItemsToAgentTmp(extracted.uploadItems, {
+    const result = await uploadItemsToAgentTmp(items, {
       agentId,
-      emptyDirs: extracted.emptyDirs,
+      emptyDirs: dirs,
       abortController
     });
     result.uploadedAbsPaths.forEach(absPath => insertFileBubble(targetEl, absPath));
@@ -44502,6 +44596,11 @@ async function uploadDroppedSystemItemsToBubbles(dataTransfer, targetEl, domain)
   } finally {
     setDomainUploadLock(domain, false, { abortController });
   }
+}
+
+async function uploadDroppedSystemItemsToBubbles(dataTransfer, targetEl, domain) {
+  const extracted = await extractSystemDropItemsFromDataTransfer(dataTransfer);
+  return uploadSystemItemsToBubbles(extracted.uploadItems, extracted.emptyDirs, targetEl, domain);
 }
 
 // ===== File Editor =====
@@ -51383,25 +51482,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
 document.addEventListener('DOMContentLoaded', updateCliSubEmptyState);
 
-// ===== Paste Plain Text / Images =====
-document.addEventListener('paste', e => {
+// ===== Paste Plain Text / Supported Files =====
+document.addEventListener('paste', async e => {
   const el = e.target.closest('[contenteditable="true"]');
   if (el) {
     const clipboard = e.clipboardData || window.clipboardData;
-    const items = clipboard && clipboard.items ? Array.from(clipboard.items) : [];
-    const imageItem = items.find(item => item && item.kind === 'file' && String(item.type || '').startsWith('image/'));
-    if (imageItem) {
+    const files = getClipboardFiles(clipboard);
+    if (files.length > 0) {
       e.preventDefault();
-      const file = imageItem.getAsFile();
-      if (!file) return;
+      const accepted = [];
+      const rejected = [];
+      for (const file of files) {
+        if (await isSupportedPastedSystemFile(file)) accepted.push(file);
+        else rejected.push(String(file.name || '未命名文件'));
+      }
+      if (accepted.length === 0) {
+        vfsShowUploadToast('不支持粘贴此二进制文件；仅支持图片、纯文本、PDF、音视频、Word 和 Excel 文件', true);
+        return;
+      }
       const prevSource = atSourceEl;
       atSourceEl = el;
-      saveClipboardImageAsTmp(file, el)
-        .then(() => vfsShowUploadToast('图片已粘贴为路径气泡', false))
-        .catch(err => vfsShowUploadToast(err.message, true))
-        .finally(() => {
-          atSourceEl = prevSource && document.body.contains(prevSource) ? prevSource : null;
-        });
+      try {
+        await uploadSystemItemsToBubbles(buildClipboardUploadItems(accepted), [], el, 'center');
+        if (rejected.length > 0) {
+          vfsShowUploadToast('已跳过不支持的二进制文件：' + rejected.join('、'), true);
+        }
+      } catch (err) {
+        vfsShowUploadToast(err.message, true);
+      } finally {
+        atSourceEl = prevSource && document.body.contains(prevSource) ? prevSource : null;
+      }
       return;
     }
     e.preventDefault();

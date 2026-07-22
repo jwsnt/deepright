@@ -1,7 +1,5 @@
 package ai.deepright.llm.optimize.rag;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
 import ai.deepright.cli.CliPrinter;
 import ai.deepright.complex.ComplexityUtils;
 import ai.deepright.feature.FeatureFlag;
@@ -36,6 +34,8 @@ public class RequestModelRag extends RagCondition implements RagService {
 
     public static final String RAG_KEY = "rag_model";
 
+    protected Double notifyRate;
+
     protected Double focusRate;
 
     @Override
@@ -46,10 +46,11 @@ public class RequestModelRag extends RagCondition implements RagService {
         String model = ragData.getQuery().delMetadata(RequestModelRag.LANG_KEY_REQUEST_MODEL, String.class);
         Long bytes = ragData.getQuery().delMetadata(RequestModelRag.LANG_KEY_REQUEST_CAPACITY, Long.class);
         if (!StringUtils.isEmpty(model) && bytes != null) {
-            if ((bytes / (double) RequestContextUtils.limit(ragData.getQuery(), ragData.getRequest().getModel()) > this.focusRate)) {
+            double currentRate = bytes / (double) RequestContextUtils.limit(ragData.getQuery(), ragData.getRequest().getModel());
+            if (currentRate > this.notifyRate) {
                 this.notify(ragConfig, ragData, XmlResourceLang.get(RequestModelRag.LANG_KEY_REQUEST_CAPACITY).replace("#size", String.valueOf(bytes / 1024)).replace("#model", model));
-                ComplexityUtils.upgrade(ragData.getQuery());
             }
+            this.upgrade(ragData, currentRate);
         }
         return new RagAtOnce(ragConfig);
     }
@@ -66,12 +67,24 @@ public class RequestModelRag extends RagCondition implements RagService {
         }
     }
 
+    protected void upgrade(RagData ragData, double currentRage) throws Exception {
+        if (currentRage > this.focusRate) {
+            // 提示升级
+            ComplexityUtils.markUpgrade(ragData.getQuery());
+        } else {
+            ComplexityUtils.resetUpgrade(ragData.getQuery());
+        }
+    }
+
     @Configuration
     @Setter
     @Getter
     public static class InitConfig extends ConditionInitConfig {
 
-        @Value("${optimize.remind.focus.rate:0.25}")
+        @Value("${optimize.remind.notify.rate:0.25}")
+        protected Double notifyRate;
+
+        @Value("${optimize.remind.focus.rate:0.50}")
         protected Double focusRate;
 
         @Bean(RequestModelRag.RAG_KEY)
