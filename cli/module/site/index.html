@@ -50627,13 +50627,14 @@ async function memoQueryRun() {
   memoQueryReadFormFromDom();
   const dimension = memoQueryState.dimension;
   const form = memoQueryNormalizeForm(memoQueryState.forms[dimension]);
+  const scope = memoQueryClone(memoQueryState.scopedMeta);
   const start = memoQueryDateMs(form.start);
   const end = memoQueryDateMs(form.end, true);
   if (Number.isFinite(start) && Number.isFinite(end) && start > end) {
     vfsShowUploadToast('开始时间不能晚于结束时间', true);
     return;
   }
-  const key = memoQueryCacheKey(dimension, form);
+  const key = memoQueryCacheKey(dimension, form, scope);
   if (memoQueryState.abortController) memoQueryState.abortController.abort();
   const controller = new AbortController();
   memoQueryState.abortController = controller;
@@ -50641,7 +50642,7 @@ async function memoQueryRun() {
   memoQueryState.loading = true;
   memoQueryRenderResults();
   try {
-    const records = await memoQueryFetch(memoQueryBuildURL(dimension, form), controller.signal);
+    const records = await memoQueryFetch(memoQueryBuildURL(dimension, form, scope), controller.signal);
     if (requestSeq !== memoQueryState.requestSeq) return;
     let metaStatusMap = null;
     if (dimension === 'meta') {
@@ -50652,7 +50653,7 @@ async function memoQueryRun() {
         if (metaId && statuses.length) metaStatusMap[metaId] = new Set(statuses);
       });
     }
-    const filtered = records.filter(record => memoQueryMatchesRecord(record, dimension, form, metaStatusMap));
+    const filtered = records.filter(record => memoQueryMatchesRecord(record, dimension, form, metaStatusMap, scope));
     if (dimension === 'meta') {
       filtered.forEach(record => {
         const statuses = metaStatusMap && metaStatusMap[String(record.id)];
@@ -50708,7 +50709,7 @@ function memoQueryRenderResults() {
   }
   const icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4.2 4.2"></path></svg>';
   const headers = dimension === 'meta'
-    ? [['预览', 'memo-query-col-preview'], ['周期', 'memo-query-col-cycle'], ['时间', 'memo-query-col-time'], ['模型', 'memo-query-col-model'], ['思考', 'memo-query-col-thinking'], ['SWARM', 'memo-query-col-swarm'], ['校验', 'memo-query-col-verify'], ['AGENT', 'memo-query-col-agent'], ['状态', 'memo-query-col-status'], ['任务内容', '']]
+    ? [['预览', 'memo-query-col-preview'], ['周期', 'memo-query-col-cycle'], ['时间', 'memo-query-col-time'], ['模型', 'memo-query-col-model'], ['思考', 'memo-query-col-thinking'], ['SWARM', 'memo-query-col-swarm'], ['校验', 'memo-query-col-verify'], ['AGENT', 'memo-query-col-agent'], ['任务内容', '']]
     : [['预览', 'memo-query-col-preview'], ['时间', 'memo-query-col-time'], ['模型', 'memo-query-col-model'], ['思考', 'memo-query-col-thinking'], ['SWARM', 'memo-query-col-swarm'], ['校验', 'memo-query-col-verify'], ['AGENT', 'memo-query-col-agent'], ['状态', 'memo-query-col-status'], ['任务内容', '']];
   const header = '<thead><tr>' + headers.map(([label, className]) => '<th' + (className ? ' class="' + className + '"' : '') + '>' + label + '</th>').join('') + '</tr></thead>';
   const cell = (value, className = '') => {
@@ -50730,7 +50731,10 @@ function memoQueryRenderResults() {
     const statusTitle = esc(status).replace(/"/g, '&quot;');
     const contentTitle = esc(content || '-').replace(/"/g, '&quot;');
     const preview = '<td class="memo-query-col-preview"><button class="memo-query-preview" type="button" onclick="memoQueryOpenPreview(\'' + dimension + '\',' + index + ')" title="预览备忘录" aria-label="预览备忘录">' + icon + '</button></td>';
-    return '<tr>' + preview + values.join('') + '<td class="memo-query-col-status" title="' + statusTitle + '"><span class="memo-query-status">' + esc(status) + '</span></td><td class="memo-query-content" title="' + contentTitle + '">' + esc(contentSummary || '-') + '</td></tr>';
+    const statusCell = dimension === 'detail'
+      ? '<td class="memo-query-col-status" title="' + statusTitle + '"><span class="memo-query-status">' + esc(status) + '</span></td>'
+      : '';
+    return '<tr>' + preview + values.join('') + statusCell + '<td class="memo-query-content" title="' + contentTitle + '">' + esc(contentSummary || '-') + '</td></tr>';
   }).join('');
   list.innerHTML = '<table class="memo-query-table memo-query-table-' + dimension + '">' + header + '<tbody>' + rows + '</tbody></table>' + (all.length > records.length ? '<div class="memo-query-load-more">继续向下滚动以加载更多（已显示 ' + records.length + '/' + all.length + '）</div>' : '');
   requestAnimationFrame(() => { if (list && memoQueryState.dimension === dimension) list.scrollTop = scrollTop; });
