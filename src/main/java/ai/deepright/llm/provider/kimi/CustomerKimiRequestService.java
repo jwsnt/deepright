@@ -58,7 +58,7 @@ public class CustomerKimiRequestService extends KimiRequestService {
                 .build()));
         // 存在ReasoningEffort且不为K3, 强制补充enabled
         if (!StringUtils.isEmpty(request.getReasoningEffort()) && !StringUtils.containsIgnoreCase(request.getModel(), KimiRequestService.MODEL)) {
-            request.putExtra(ProviderRequestService.KEY_THINKING, ImmutableMap.of("type", "enabled"));
+            request.setExtra(ProviderRequestService.KEY_THINKING, ImmutableMap.of("type", "enabled"));
         }
     }
 

@@ -1394,11 +1394,11 @@ Header 中 `Authorization` 为对应模型的密钥。
 
 ## 迭代 20260718-4：新增模型时从 CURL 导入配置
 
-- 新增、未保存的模型在选择 `gemini`、`openai`、`kimi`、`bigmodel`、`xiaomi`、`deepseek`、`anthropic` 或 `minimax` 后，密钥输入框右侧会出现 `CURL` 图标；已保存模型、`seedream`、`deepright` 和不支持的服务商不显示该入口。
+- 新增、未保存的模型在选择 `gemini`、`openai`、`volcengine`、`qwen`、`kimi`、`bigmodel`、`xiaomi`、`deepseek`、`anthropic`、`minimax` 或 `seedream` 后，密钥输入框右侧会出现 `CURL` 图标；已保存模型、`deepright` 和不支持的服务商不显示该入口。
 - 如果同时存在复制入口，复制图标会向左移动，CURL 图标固定在最右侧；没有复制来源时，CURL 图标仍可使用。
 - 点击 CURL 图标会收起设置内容并打开导入卡片。取消只丢弃本次输入的命令，当前设置里的新增模型和所有未保存填写内容都会保留。
 - 解析仅在浏览器内读取 CURL 文本，不会执行命令或请求 URL。成功后会将 URL、API Key 和模型填回当前新增模型；模型名称会同步填写该服务商全部支持的模型能力字段，仍需点击设置的“保存”才会真正写入。
-- Gemini 支持从 `models/{model}`、查询参数 `key` 或 `x-goog-api-key` 请求头读取信息；查询参数中的密钥会独立写入密钥字段，不会留在 URL 中。OpenAI 兼容服务支持 `Authorization: Bearer`、`api-key` 与 `x-api-key`；Anthropic / MiniMax 优先使用 `x-api-key`，并兼容 Bearer 请求头。
+- Gemini 支持从 `models/{model}`、查询参数 `key` 或 `x-goog-api-key` 请求头读取信息；查询参数中的密钥会独立写入密钥字段，不会留在 URL 中。OpenAI 兼容服务（包括火山引擎和通义千问）支持 `Authorization: Bearer`、`api-key` 与 `x-api-key`；Anthropic / MiniMax 优先使用 `x-api-key`，并兼容 Bearer 请求头。Seedream 从图片生成请求的 `Authorization: Bearer` 与 JSON `model` 读取信息，仅填写 URL、密钥和多模态输出模型。
 - 缺少 URL、模型或 API Key，请求体非 JSON，或输入不符合当前服务商协议时，导入卡片会显示错误，原模型配置不会被改动。使用 `$OPENAI_API_KEY` 等 shell 变量时，需先替换为实际值；页面不会读取 shell 环境变量。Vertex CURL 请求不支持导入。
 
 ## 迭代 20260718-5：备忘录 STOP 引导

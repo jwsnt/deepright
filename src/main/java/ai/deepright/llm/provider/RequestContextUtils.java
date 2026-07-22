@@ -6,6 +6,7 @@ import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.llm.provider.ProviderRequestService;
 import com.google.common.collect.ImmutableMap;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.util.Assert;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -35,6 +36,8 @@ public class RequestContextUtils {
     }
 
     public static void thinking(WorkflowTask workTask, String medium, String high) throws Exception {
+        Assert.hasText(medium, "The thinking level 'medium' must not be empty");
+        Assert.hasText(high, "The thinking level 'high' must not be empty");
         ComplexityMode complexity = ComplexityUtils.result(workTask);
         if (!ComplexityMode.FAST_REPLY.is(complexity)) {
             workTask.putMetadata(ProviderRequestService.KEY_INTERNAL + ProviderRequestService.KEY_REASONING_EFFORT, ComplexityMode.TASK_PLANNING.is(complexity) ? medium : high);

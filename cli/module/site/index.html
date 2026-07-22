@@ -6295,12 +6295,15 @@ const DEEPRIGHT_MODEL_PROVIDER_SPEC = Object.freeze({
 const MODEL_CURL_IMPORT_PROTOCOLS = Object.freeze({
   gemini: 'gemini',
   openai: 'openai',
+  volcengine: 'openai',
   kimi: 'openai',
   bigmodel: 'openai',
   xiaomi: 'openai',
   deepseek: 'openai',
+  qwen: 'openai',
   anthropic: 'anthropic',
-  minimax: 'anthropic'
+  minimax: 'anthropic',
+  seedream: 'seedream'
 });
 let modelProviderCatalog = { deepright: DEEPRIGHT_MODEL_PROVIDER_SPEC };
 let modelProviderCatalogLoaded = false;
@@ -35382,6 +35385,11 @@ function extractSseChoiceMessage(payload, fallbackMessage) {
 function mapProviderErrorText(code, fallbackMessage) {
   const resolvedCode = Number.parseInt(String(code == null ? '' : code).trim(), 10);
   if (resolvedCode === 401) return '模型服务商拒绝访问，请核对API KEY。';
+  if (resolvedCode === 403) return '模型访问受限，请核对服务商的地区限制或余额。';
+  if (resolvedCode === 404) return '模型或服务地址不存在，请核对服务商配置。';
+  if (resolvedCode === 429) return '模型服务商限流，请稍后重试。';
+  if (resolvedCode === 503) return '模型服务暂时不可用，请稍后重试。';
+  if (resolvedCode >= 500 && resolvedCode <= 599) return '模型服务异常，请稍后重试。';
   return String(fallbackMessage || '').trim();
 }
 
@@ -41990,7 +41998,9 @@ function parseModelCurlImportConfig(provider, command) {
   const model = requireConcreteCurlValue(getModelFromCurlJsonData(parsed.dataValues), 'JSON 请求体中的 model');
   const apiKey = requireConcreteCurlValue(protocol === 'anthropic'
     ? getCurlHeaderApiKey(parsed.headers, { headerNames: ['x-api-key'] })
-    : getCurlHeaderApiKey(parsed.headers, { headerNames: ['api-key', 'x-api-key'] }), '请求头中的 API Key');
+    : protocol === 'seedream'
+      ? getCurlHeaderApiKey(parsed.headers, { headerNames: [] })
+      : getCurlHeaderApiKey(parsed.headers, { headerNames: ['api-key', 'x-api-key'] }), '请求头中的 API Key');
   return { url: parsed.url.toString(), model, apiKey };
 }
 

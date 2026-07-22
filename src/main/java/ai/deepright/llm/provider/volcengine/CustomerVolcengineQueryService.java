@@ -22,7 +22,7 @@ public class CustomerVolcengineQueryService extends VolcengineQueryService {
 
     @Override
     public OpenAiStream stream(SignalStream signalStream, OpenAiRequest request) throws Exception {
-        ProviderStreamConfig<OpenAiRequest> providerRequestConfig = ProviderStreamConfig.<OpenAiRequest>builder()
+        return new CustomerOpenAiStreamFunCall(ProviderStreamConfig.<OpenAiRequest>builder()
                 .providerStorePolicy(this.providerStorePolicy)
                 .trackFunCallService(this.trackFunCallService)
                 .mediaInlineService(this.mediaInlineService)
@@ -32,8 +32,8 @@ public class CustomerVolcengineQueryService extends VolcengineQueryService {
                 .historyStore(this.historyStore)
                 .namesService(this.namesService)
                 .signalStream(signalStream)
-                .request(request).build().check();
-        return request.getFunCallStream() ? new CustomerOpenAiStreamFunCall(providerRequestConfig) : new CustomerOpenAiStream(providerRequestConfig);
+                .request(request)
+                .build().check());
     }
 
     @ConditionalOnProperty(name = "volcengine.enable", havingValue = "true", matchIfMissing = false)
