@@ -2654,9 +2654,11 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 @media (prefers-reduced-motion:reduce){.model-test-wait{animation:none;opacity:1;filter:none}}
 .model-test-result{max-height:0;overflow:auto;opacity:0;margin:0;padding:0 2px;color:var(--text-secondary);font-size:11px;line-height:1.45;transition:max-height .2s ease,opacity .18s ease,margin .2s ease,padding .2s ease}
 .model-test-result.show{max-height:64px;opacity:1;margin-top:1px;padding:2px 2px 0}
-.model-test-result.success{color:#23815b}
+.model-test-result.success{color:#d85f48}
 .model-test-result.error{color:var(--error)}
 .model-test-result.cancelled{color:var(--text-muted)}
+.model-config-field .model-test-success-result{display:none;min-width:0;margin-left:auto;color:#d85f48;font-size:12px;font-weight:600;line-height:16px;white-space:nowrap}
+.model-config-field .model-test-success-result.show{display:flex}
 .remove-model-btn{width:32px;height:32px;border-radius:50%;border:1px solid var(--border);background:transparent;color:var(--error);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:var(--transition);flex-shrink:0}
 .remove-model-btn:hover{background:var(--error-bg)}
 .remove-model-btn:disabled{opacity:.4;cursor:not-allowed;pointer-events:none;background:transparent}
@@ -2684,6 +2686,8 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .model-config-field input{width:100%;min-width:0;padding:8px 12px;border:1px solid rgba(var(--accent-rgb),.18);border-radius:14px;background:rgba(255,252,248,.9);color:var(--text-primary);font-size:12px;outline:none;transition:var(--transition);box-shadow:inset 0 1px 0 rgba(255,255,255,.78)}
 .model-config-field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(var(--accent-soft-rgb),.14)}
 .model-config-field input[aria-invalid="true"]{border-color:#dc4b4b;box-shadow:0 0 0 3px rgba(220,75,75,.13)}
+.model-config-field .model-url-validation-message{display:none;margin:4px 2px 0;color:#c83f3f!important;font-size:11px!important;line-height:1.35!important;min-height:0!important;white-space:normal!important}
+.model-config-field .model-url-validation-message.show{display:block}
 .model-config-field input[readonly]{opacity:.7;cursor:default}
 .model-config-field input[disabled]{opacity:.55;cursor:not-allowed}
 .model-config-field.disabled span{opacity:.68}
@@ -2770,7 +2774,7 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 [data-theme="dark"] .model-config-toggle.has-config{border-color:rgba(127,165,255,.48);background:rgba(var(--accent-soft-rgb),.18);color:#9fc4ff}
 [data-theme="dark"] .model-test-btn.is-running{border-color:rgba(255,172,117,.68);color:#ffbd8b;background:rgba(255,154,90,.16)}
 [data-theme="dark"] .model-test-wait{border-color:rgba(255,172,117,.66);background:var(--modal-field-bg);color:#ffc39e}
-[data-theme="dark"] .model-test-result.success{color:#83e7b7}
+[data-theme="dark"] .model-test-result.success,[data-theme="dark"] .model-test-success-result{color:#ffb18b}
 [data-theme="dark"] .model-config-overflow-preview{box-shadow:0 20px 44px rgba(0,0,0,.36),inset 0 1px 0 rgba(255,255,255,.08)}
 [data-theme="dark"] .model-key-hint-preview{border-color:rgba(127,165,255,.34);background:linear-gradient(180deg,rgba(15,27,49,.98),rgba(10,20,38,.94));color:#a9c7ff;box-shadow:0 22px 46px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.08)}
 [data-theme="dark"] .media-output-launch-btn{border-color:rgba(84,215,255,.24);background:rgba(39,180,255,.14);color:#8fdcff;box-shadow:none}
@@ -42619,13 +42623,19 @@ function hasValidModelServiceURLPercentEncoding(value) {
   return true;
 }
 
-function syncModelServiceURLInputValidity(input) {
+function syncModelServiceURLInputValidity(input, options) {
   if (!input) return true;
   const valid = isValidModelServiceURL(input.value);
+  const showMessage = !!(options && options.showMessage);
+  const message = input.parentElement && input.parentElement.querySelector('.model-url-validation-message');
   input.setCustomValidity(valid ? '' : MODEL_SERVICE_URL_FORMAT_ERROR);
   input.setAttribute('aria-invalid', valid ? 'false' : 'true');
   if (valid) input.removeAttribute('title');
   else input.title = MODEL_SERVICE_URL_FORMAT_ERROR;
+  if (message) {
+    message.textContent = valid ? '' : MODEL_SERVICE_URL_FORMAT_ERROR;
+    message.classList.toggle('show', !valid && showMessage);
+  }
   return valid;
 }
 
@@ -42673,17 +42683,37 @@ function modelEntryNeedsConfigurationTestFromDOM(entry) {
 
 function setModelConfigurationTestResult(entry, kind, message) {
   const result = entry && entry.querySelector('.model-test-result');
-  if (!result) return;
   const text = limitModelTestMessage(message, kind === 'success' ? '配置成功' : kind === 'cancelled' ? '测试已取消' : '配置错误：测试失败');
+  const successResult = entry && entry.querySelector('.model-test-success-result');
+  if (kind === 'success' && successResult) {
+    successResult.textContent = text;
+    successResult.classList.add('show');
+    if (result) {
+      result.textContent = '';
+      result.className = 'model-test-result';
+    }
+    return;
+  }
+  if (successResult) {
+    successResult.textContent = '';
+    successResult.classList.remove('show');
+  }
+  if (!result) return;
   result.textContent = text;
   result.className = 'model-test-result show ' + (kind || 'error');
 }
 
 function clearModelConfigurationTestResult(entry) {
   const result = entry && entry.querySelector('.model-test-result');
-  if (!result) return;
-  result.textContent = '';
-  result.className = 'model-test-result';
+  const successResult = entry && entry.querySelector('.model-test-success-result');
+  if (result) {
+    result.textContent = '';
+    result.className = 'model-test-result';
+  }
+  if (successResult) {
+    successResult.textContent = '';
+    successResult.classList.remove('show');
+  }
 }
 
 function markModelConfigurationDraftChanged(entry) {
@@ -42948,8 +42978,10 @@ function modelEntryHtml(idx, model, rawConfig, originalModel) {
         <label class="model-config-field">
           <div class="model-config-head">
             <span class="model-config-head-label">模型URL</span>
+            <span class="model-test-success-result" role="status" aria-live="polite"></span>
           </div>
           <input class="model-base-url-input" type="url" value="${esc(cfg.__url || '')}" placeholder="https://api.example.com/v1" autocomplete="off" inputmode="url"${urlAttr} />
+          <span class="model-url-validation-message" role="alert"></span>
         </label>
       </div>
       <div class="model-config-split">
@@ -43232,7 +43264,9 @@ function attachModelConfigInputListeners(entry) {
     input.dataset.configWatchBound = '1';
     if (selector === '.model-base-url-input') syncModelServiceURLInputValidity(input);
     input.addEventListener('input', () => {
-      if (selector === '.model-base-url-input') syncModelServiceURLInputValidity(input);
+      if (selector === '.model-base-url-input') {
+        syncModelServiceURLInputValidity(input, { showMessage: input.dataset.modelUrlValidationTouched === '1' });
+      }
       if (input.dataset.modelAutoFilledBy) delete input.dataset.modelAutoFilledBy;
       copyModelValueToEmptyModelInputs(entry, input);
       const hasAnyValue = !!(
@@ -43252,6 +43286,12 @@ function attachModelConfigInputListeners(entry) {
         syncModelConfigOverflowPreview(input);
       }
     });
+    if (selector === '.model-base-url-input') {
+      input.addEventListener('blur', () => {
+        input.dataset.modelUrlValidationTouched = '1';
+        syncModelServiceURLInputValidity(input, { showMessage: true });
+      });
+    }
   });
   const modelUrlInput = entry.querySelector('.model-base-url-input');
   if (modelUrlInput && modelUrlInput.dataset.modelUrlTourBound !== '1') {

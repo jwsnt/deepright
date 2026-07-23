@@ -1,5 +1,6 @@
 ### 输出格式
 + 以交接文档的规格用词简洁的总结我们在做什么任务、已经完成了什么、产生了哪些交付物#thinking
++ 本次任务需要#schema_app同时制作成`网页文件`呈现在`#origin/mapping/#agentId/`
 + 使用结构化的HTML，数据以表格展示
 ``` 支持结构
 + 文本结构：div section article p span br hr

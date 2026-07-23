@@ -152,10 +152,10 @@ public class SkillsSchemaRag extends RagSkills implements SkillsChecker {
     }
 
     protected String buildUsage(RagConfig ragConfig, RagData ragData, Skills skills, String query) throws Exception {
-        String usage = this.template4usage.replace("#feishu", FeatureFlag.isActivePlugin(ragData.getQuery(), SkillsChecker.PLUGIN_FEISHU_NAME) ? this.template4feishu.replace("#deepright", this.skillDeepRight).replace("#feishu", this.skillFeishu) : "");
+        String usage = this.template4usage.replace("#miniapp", SkillsSelector.contain(ragData.getQuery(), this.skillMiniApp) ? this.template4miniapp.replace("#miniapp", this.skillMiniApp).replace("#html", FeatureFlag.isHtml(ragData.getQuery()) ? this.template4html : "") : "");
+        usage = usage.replace("#feishu", FeatureFlag.isActivePlugin(ragData.getQuery(), SkillsChecker.PLUGIN_FEISHU_NAME) ? this.template4feishu.replace("#deepright", this.skillDeepRight).replace("#feishu", this.skillFeishu) : "");
         usage = usage.replace("#browser", this.allowedSkill(ragConfig, ragData, SkillsChecker.PLUGIN_BROWSER_SKILL) ? this.template4browser.replace("#browser", SkillsChecker.PLUGIN_BROWSER_SKILL) : "");
         usage = usage.replace("#remote", this.allowedSkill(ragConfig, ragData, SkillsChecker.PLUGIN_REMOTE_SKILL) ? this.template4remote.replace("#remote", SkillsChecker.PLUGIN_REMOTE_SKILL) : "");
-        usage = usage.replace("#miniapp", this.template4miniapp.replace("#miniapp", this.skillMiniApp).replace("#html", FeatureFlag.isHtml(ragData.getQuery()) ? this.template4html : ""));
         usage = usage.replace("#email", FeatureFlag.isActivePlugin(ragData.getQuery(), SkillsChecker.PLUGIN_EMAIL_NAME) ? this.template4email.replace("#deepright", this.skillDeepRight) : "");
         usage = usage.replace("#creator", this.isSkillExtract(ragConfig, ragData, skills) ? this.template4creator.replace("#creator", this.skillCreator) : "");
         usage = usage.replace("#image", RequestProviderUtils.isMultiOutputModel(ragData.getQuery()) ? this.template4image : "");
@@ -211,7 +211,7 @@ public class SkillsSchemaRag extends RagSkills implements SkillsChecker {
         @Value("${skills.schema.deepright:__internal_deepright}")
         protected String skillDeepRight;
 
-        @Value("${skills.schema.miniapp:__internal_miniapp}")
+        @Value("${skills.schema.miniapp:__internal_miniapp_creator}")
         protected String skillMiniApp;
 
         @Value("${skills.schema.creator:__internal_creator}")

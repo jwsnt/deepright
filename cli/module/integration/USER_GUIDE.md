@@ -3062,7 +3062,7 @@ Integration 新增受保护的单一“立即运行”创建接口 `POST /api/cr
 Integration 新增本机接口 `POST /api/model/test`，供设置页测试尚未保存的单行模型配置。接口只读取运行时 `config/config.json.test.content` 和 `config/config.json.test.timeout`，并以 UUID、`metadata.test = true` 的最小 SSE 请求调用服务商。
 
 - 测试固定使用 `__model`，不回退到快速、思考或多模态模型。
-- `__url` 可以为空以使用服务商默认地址；非空时必须是无用户名和密码、带主机名的完整 `http://` 或 `https://` URL，非法值会在上游转发前被拒绝。
+- `__url` 可以为空以使用服务商默认地址；非空时必须是无用户名和密码、带主机名的完整 `http://` 或 `https://` URL；反斜杠、空白、中文标点（如 `、`）和无效百分号编码均会在上游转发前被拒绝。
 - 测试配置、Token 与 UUID 均不写入 token_store、Agent 配置、聊天日志、连接表、记忆、技能、任务或通知。
 - 成功必须同时满足 HTTP 200、有效 SSE 业务数据和 `[DONE]`；HTTP/SSE 错误、超时、空流、流中断或缺少 `[DONE]` 都会返回脱敏后的错误。错误 JSON 的 `content`（包括 `choices[].delta.content`）会优先展示，不会回显完整响应；401、403、404、429、503 与其他 5xx 会只使用统一中文原因和处理建议（404 为“请检查模型 URL 和基础模型”），`content` 内如 `(code=401)` 的显式状态码也会识别。接口只返回最终测试结果，页面在对应设置模型行内展示它，不会发送虚拟文件系统 Toast。
 - 只有该测试转发携带 `metadata.test = true`，并会原样传至 `--host` 指定的最终处理服务器；普通 `/v1/chat/completions` 会在转发前移除客户端伪造的同名字段。

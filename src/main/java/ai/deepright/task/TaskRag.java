@@ -3,7 +3,9 @@ package ai.deepright.task;
 import ai.deepright.complex.ComplexityUtils;
 import ai.deepright.feature.FeatureField;
 import ai.deepright.feature.FeatureFlag;
+import ai.deepright.feature.FeatureUtils;
 import ai.deepright.llm.notifier.MultiSourceNotifier;
+import ai.deepright.skills.SkillsSelector;
 import ai.deepright.utils.TemplateChecker;
 import ai.open.right.WorkflowException;
 import ai.open.right.protocol.ProtocolCode;
@@ -54,6 +56,10 @@ public class TaskRag extends RagCondition implements RagService {
 
     protected String template4schemaDef;
 
+    protected String template4schemaApp;
+
+    protected String skillMiniApp;
+
     @PostConstruct
     public void init() throws Exception {
         // 由IOUtils关闭资源
@@ -61,9 +67,13 @@ public class TaskRag extends RagCondition implements RagService {
         this.template4schemaPlugin = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4schemaPlugin).openStream()), StandardCharsets.UTF_8);
         this.template4schemaHtml = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4schemaHtml).openStream()), StandardCharsets.UTF_8);
         this.template4schemaJson = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4schemaJson).openStream()), StandardCharsets.UTF_8);
+        this.template4schemaApp = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4schemaApp).openStream()), StandardCharsets.UTF_8);
         this.template4schemaDef = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4schemaDef).openStream()), StandardCharsets.UTF_8);
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4schemaThinking), "The template thinking schema must not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4schemaPlugin), "The template plugin schema must not be empty", ProtocolCode.C400);
         WorkflowException.checkCondition(StringUtils.isEmpty(this.template4schemaJson), "The template json schema must not be empty", ProtocolCode.C400);
         WorkflowException.checkCondition(StringUtils.isEmpty(this.template4schemaHtml), "The template html schema must not be empty", ProtocolCode.C400);
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4schemaApp), "The template app schema must not be empty", ProtocolCode.C400);
         WorkflowException.checkCondition(StringUtils.isEmpty(this.template4schemaDef), "The template def schema must not be empty", ProtocolCode.C400);
     }
 
@@ -103,7 +113,15 @@ public class TaskRag extends RagCondition implements RagService {
 
     protected String buildTemplate(RagConfig ragConfig, RagData ragData) throws Exception {
         // 追加Thinking
-        return (FeatureFlag.isHtml(ragData.getQuery()) ? this.template4schemaHtml : this.template4schemaDef).replace("#thinking", ComplexityUtils.isThinking(ragData.getQuery()) ? this.template4schemaThinking : "");
+        String query = (FeatureFlag.isHtml(ragData.getQuery()) ? this.template4schemaHtml : this.template4schemaDef);
+        query = query.replace("#schema_app", SkillsSelector.contain(ragData.getQuery(), this.skillMiniApp) ? this.template4schemaApp.replace("#mini_app", this.skillMiniApp) : "");
+        query = query.replace("#thinking", ComplexityUtils.isThinking(ragData.getQuery()) ? this.template4schemaThinking : "");
+        query = query.replace("#agentId", FeatureUtils.buildAgentId(ragData.getQuery()));
+        query = query.replace("#origin", FeatureUtils.buildOrigin(ragData.getQuery()));
+        if (log.isWarnEnabled() && !TemplateChecker.check(query)) {
+            log.warn("The query template contains unexpected characters; please check: {}", query);
+        }
+        return query;
     }
 
     protected String buildPlugin(RagData ragData, String responseSchema) throws Exception {
@@ -145,8 +163,14 @@ public class TaskRag extends RagCondition implements RagService {
         @Value("${task.rag.schema.json:classpath:config/task/schema_json.md}")
         protected String template4schemaJson;
 
+        @Value("${task.rag.schema.app:classpath:config/task/schema_app.md}")
+        protected String template4schemaApp;
+
         @Value("${task.rag.schema.def:classpath:config/task/schema_def.md}")
         protected String template4schemaDef;
+
+        @Value("${task.rag.schema.miniapp:__internal_miniapp_creator}")
+        protected String skillMiniApp;
 
         @Bean(TaskRag.RAG_KEY)
         @ConditionalOnMissingBean(name = TaskRag.RAG_KEY)
