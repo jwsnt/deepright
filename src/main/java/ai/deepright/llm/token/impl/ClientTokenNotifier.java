@@ -45,6 +45,8 @@ public class ClientTokenNotifier implements TokenNotifier, TokenSource {
 
     protected static final String NAME = "token_notifier_client";
 
+    protected static final String TEST = "test";
+
     protected ExecutorService executorService;
 
     protected CliSubFetcher cliSubFetcher;
@@ -90,7 +92,7 @@ public class ClientTokenNotifier implements TokenNotifier, TokenSource {
         @Override
         public void run() {
             try {
-                String agentId = FeatureUtils.buildAgentId(this.providerRequest.getMessage());
+                String agentId = !FeatureFlag.isTest(this.providerRequest.getMessage()) ? FeatureUtils.buildAgentId(this.providerRequest.getMessage()) : ClientTokenNotifier.TEST;
                 String function = this.tokenSource.source(this.providerRequest.getMessage());
                 String app = FeatureUtils.buildApp(this.providerRequest.getMessage());
                 Integer thinking = this.tokenData.getThinking();

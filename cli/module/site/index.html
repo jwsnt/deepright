@@ -2634,7 +2634,8 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .model-config-toggle.active{border-color:var(--accent);color:var(--accent);background:rgba(var(--accent-soft-rgb),.12)}
 .model-config-toggle.has-config{border-color:rgba(var(--accent-soft-rgb),.42);color:var(--accent);background:rgba(var(--accent-soft-rgb),.1);animation:modelConfigGlow 1.15s ease-in-out infinite}
 .model-config-toggle.active.has-config{animation:none}
-.model-test-btn{width:28px;height:28px;border-radius:50%;border:1px solid var(--border);background:transparent;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:var(--transition);flex-shrink:0;padding:0}
+.model-test-btn{width:0;height:28px;border-radius:50%;border:0 solid transparent;background:transparent;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:width .2s ease,border-color .2s ease,background .2s ease,color .2s ease,opacity .18s ease,transform .2s ease;flex-shrink:0;padding:0;overflow:hidden;opacity:0;transform:scale(.78);pointer-events:none}
+.model-test-btn.is-visible{width:28px;border-width:1px;border-color:var(--border);opacity:1;transform:scale(1);pointer-events:auto}
 .model-test-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .model-test-btn:hover:not(:disabled),.model-test-btn:focus-visible:not(:disabled){border-color:var(--accent);color:var(--accent);background:rgba(var(--accent-soft-rgb),.08);outline:none}
 .model-test-btn:disabled{opacity:.38;cursor:not-allowed}
@@ -2645,6 +2646,11 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 @keyframes modelTestSpin{to{transform:rotate(360deg)}}
 @keyframes modelTestCounterSpin{to{transform:rotate(-360deg)}}
 .model-entry.model-test-running{box-shadow:0 0 0 1px rgba(255,150,83,.18),0 10px 24px rgba(255,150,83,.08)}
+.model-test-result{max-height:0;overflow:auto;opacity:0;margin:0;padding:0 2px;color:var(--text-secondary);font-size:11px;line-height:1.45;transition:max-height .2s ease,opacity .18s ease,margin .2s ease,padding .2s ease}
+.model-test-result.show{max-height:64px;opacity:1;margin-top:1px;padding:2px 2px 0}
+.model-test-result.success{color:#23815b}
+.model-test-result.error{color:var(--error)}
+.model-test-result.cancelled{color:var(--text-muted)}
 .remove-model-btn{width:32px;height:32px;border-radius:50%;border:1px solid var(--border);background:transparent;color:var(--error);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:var(--transition);flex-shrink:0}
 .remove-model-btn:hover{background:var(--error-bg)}
 .remove-model-btn:disabled{opacity:.4;cursor:not-allowed;pointer-events:none;background:transparent}
@@ -2756,6 +2762,7 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 [data-theme="dark"] .model-entry-status{border-color:rgba(245,166,35,.32);background:rgba(245,166,35,.14);color:#ffcf83}
 [data-theme="dark"] .model-config-toggle.has-config{border-color:rgba(127,165,255,.48);background:rgba(var(--accent-soft-rgb),.18);color:#9fc4ff}
 [data-theme="dark"] .model-test-btn.is-running{border-color:rgba(255,172,117,.68);color:#ffbd8b;background:rgba(255,154,90,.16)}
+[data-theme="dark"] .model-test-result.success{color:#83e7b7}
 [data-theme="dark"] .model-config-overflow-preview{box-shadow:0 20px 44px rgba(0,0,0,.36),inset 0 1px 0 rgba(255,255,255,.08)}
 [data-theme="dark"] .model-key-hint-preview{border-color:rgba(127,165,255,.34);background:linear-gradient(180deg,rgba(15,27,49,.98),rgba(10,20,38,.94));color:#a9c7ff;box-shadow:0 22px 46px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.08)}
 [data-theme="dark"] .media-output-launch-btn{border-color:rgba(84,215,255,.24);background:rgba(39,180,255,.14);color:#8fdcff;box-shadow:none}
@@ -3097,6 +3104,10 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .rs-meta-center-action:hover:not(:disabled),.rs-meta-center-action:focus-visible{background:color-mix(in srgb,var(--accent) 14%,var(--bg-sidebar) 86%);color:var(--accent);outline:none}
 .rs-meta-center-action:disabled{cursor:wait;opacity:.54}
 .rs-meta-center-action svg{width:13px;height:13px}
+.rs-meta-center-detail-list-action:not(:disabled){background:color-mix(in srgb,var(--accent) 16%,var(--bg-sidebar) 84%);color:color-mix(in srgb,var(--accent) 88%,var(--text-primary) 12%);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 38%,transparent),0 0 8px color-mix(in srgb,var(--accent) 12%,transparent);animation:memoMetaDetailListFlash 3.2s ease-in-out infinite}
+@keyframes memoMetaDetailListFlash{0%,100%{opacity:.78;filter:brightness(1);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 38%,transparent),0 0 8px color-mix(in srgb,var(--accent) 12%,transparent)}50%{opacity:1;filter:brightness(1.14) drop-shadow(0 0 4px rgba(var(--accent-rgb),.28));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 58%,transparent),0 0 14px color-mix(in srgb,var(--accent) 24%,transparent)}}
+[data-energy-saver="on"] .rs-meta-center-detail-list-action,[data-low-power-rendering="on"] .rs-meta-center-detail-list-action{animation:none;opacity:1;filter:none}
+@media (prefers-reduced-motion:reduce){.rs-meta-center-detail-list-action{animation:none;opacity:1;filter:none}}
 .rs-meta-center-delete-action:hover:not(:disabled),.rs-meta-center-delete-action:focus-visible{background:color-mix(in srgb,var(--error) 14%,var(--bg-sidebar) 86%);color:var(--error)}
 .rs-meta-center-config{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px 12px;padding:14px 16px;border-radius:20px;background:color-mix(in srgb,var(--bg-sidebar) 72%,transparent);border:1px solid color-mix(in srgb,var(--border) 84%,transparent)}
 .rs-meta-center-row{display:flex;flex-direction:column;gap:4px;min-width:0}
@@ -6501,6 +6512,7 @@ const LOCAL_STORAGE_SIZE_ENCODER = typeof TextEncoder !== 'undefined' ? new Text
 let runtimeModelTokenCache = Object.create(null);
 const modelTestRequests = new Set();
 let modelTestRequestSequence = 0;
+const MODEL_TEST_CONFIG_KEYS = Object.freeze(['token', '__url', '__model', '__model_fast', '__model_thinking', '__model_multi_input', '__model_multi_output']);
 
 function getStoredOnboardingEnabled() {
   try {
@@ -42190,6 +42202,7 @@ function applyModelCurlImportConfig(entry, imported) {
   entry.setAttribute('data-custom-cleared', '0');
   refreshModelEntryPendingState(entry);
   updateModelConfigToggleState(entry);
+  markModelConfigurationDraftChanged(entry);
   setOnboardingModelConfigEntryTarget(entry);
   setModelConfigEntryOpen(entry, true);
 }
@@ -42280,7 +42293,7 @@ function copyModelConfigFrom(btn) {
   closeModelCopyMenus();
   refreshModelEntryPendingState(entry);
   updateModelConfigToggleState(entry);
-  refreshModelEntryTestButton(entry);
+  markModelConfigurationDraftChanged(entry);
   if (target.spec.configurable) {
     setOnboardingModelConfigEntryTarget(entry);
     setModelConfigEntryOpen(entry, true);
@@ -42308,6 +42321,62 @@ function getModelTestUnavailableReason(model, config) {
   if (!String(current.token || '').trim() || isMaskedRemoteTokenValue(current.token)) return '请先填写模型密钥';
   if (!String(current.__model || '').trim()) return '请先填写基础模型 __model';
   return '';
+}
+
+function buildModelTestConfigSnapshot(model, rawConfig) {
+  const normalizedModel = normalizeModelName(model);
+  const effective = buildEffectiveModelConfig(normalizedModel, rawConfig).effective;
+  const snapshot = {};
+  MODEL_TEST_CONFIG_KEYS.forEach(key => {
+    snapshot[key] = String(effective[key] || '').trim();
+  });
+  return snapshot;
+}
+
+function modelTestSnapshotsEqual(left, right) {
+  return MODEL_TEST_CONFIG_KEYS.every(key => String(left && left[key] || '') === String(right && right[key] || ''));
+}
+
+function modelTestSnapshotHasConfiguration(snapshot) {
+  return MODEL_TEST_CONFIG_KEYS.some(key => String(snapshot && snapshot[key] || '').trim() !== '');
+}
+
+function modelEntryNeedsConfigurationTest(model, rawConfig, originalModel) {
+  const normalizedModel = normalizeModelName(model);
+  if (!normalizedModel) return false;
+  const current = buildModelTestConfigSnapshot(normalizedModel, rawConfig);
+  const savedModel = normalizeModelName(originalModel);
+  if (!savedModel) return modelTestSnapshotHasConfiguration(current);
+  const savedConfig = state.settings.models && state.settings.models[savedModel];
+  if (!savedConfig || normalizedModel !== savedModel) return true;
+  return !modelTestSnapshotsEqual(current, buildModelTestConfigSnapshot(savedModel, savedConfig));
+}
+
+function modelEntryNeedsConfigurationTestFromDOM(entry) {
+  if (!entry) return false;
+  const model = normalizeModelName(entry.querySelector('select') && entry.querySelector('select').value);
+  return modelEntryNeedsConfigurationTest(model, getCurrentModelEntryRawConfig(entry), entry.getAttribute('data-original-model'));
+}
+
+function setModelConfigurationTestResult(entry, kind, message) {
+  const result = entry && entry.querySelector('.model-test-result');
+  if (!result) return;
+  const text = limitModelTestMessage(message, kind === 'success' ? '配置成功' : kind === 'cancelled' ? '测试已取消' : '配置错误：测试失败');
+  result.textContent = text;
+  result.className = 'model-test-result show ' + (kind || 'error');
+}
+
+function clearModelConfigurationTestResult(entry) {
+  const result = entry && entry.querySelector('.model-test-result');
+  if (!result) return;
+  result.textContent = '';
+  result.className = 'model-test-result';
+}
+
+function markModelConfigurationDraftChanged(entry) {
+  if (!entry) return;
+  clearModelConfigurationTestResult(entry);
+  refreshModelEntryTestButton(entry);
 }
 
 function getModelConfigurationTestRequest(entry) {
@@ -42343,11 +42412,16 @@ function refreshModelEntryTestButton(entry) {
   if (!button) return;
   const running = getModelTestStateForEntry(entry);
   if (running) return;
+  const visible = modelEntryNeedsConfigurationTestFromDOM(entry);
   const request = getModelConfigurationTestRequest(entry);
   const reason = request && request.reason ? request.reason : '';
-  button.disabled = !!reason;
+  button.classList.toggle('is-visible', visible);
+  button.disabled = !visible || !!reason;
+  button.tabIndex = visible ? 0 : -1;
+  button.setAttribute('aria-hidden', visible ? 'false' : 'true');
   button.title = reason || '测试配置';
   button.setAttribute('aria-label', reason || '测试配置');
+  if (!visible) clearModelConfigurationTestResult(entry);
 }
 
 function setModelConfigurationTestRunning(state) {
@@ -42387,7 +42461,7 @@ function cancelModelConfigurationTest(entry, options) {
   state.cancelled = true;
   if (state.controller) state.controller.abort();
   finishModelConfigurationTest(state);
-  if (!(options && options.silent)) vfsShowUploadToast('测试已取消', false);
+  if (!(options && options.silent)) setModelConfigurationTestResult(entry, 'cancelled', '测试已取消');
   return true;
 }
 
@@ -42450,7 +42524,7 @@ async function toggleModelConfigurationTest(button) {
   }
   const request = getModelConfigurationTestRequest(entry);
   if (!request || request.reason || !request.payload) {
-    if (request && request.reason) setSettingsErrorMessage(request.reason);
+    if (request && request.reason) setModelConfigurationTestResult(entry, 'error', '配置错误：' + request.reason);
     refreshModelEntryTestButton(entry);
     return;
   }
@@ -42473,10 +42547,10 @@ async function toggleModelConfigurationTest(button) {
       signal: state.controller.signal
     });
     await readModelConfigurationTestResponse(response);
-    if (!state.completed && !state.cancelled) vfsShowUploadToast('配置成功', false);
+    if (!state.completed && !state.cancelled) setModelConfigurationTestResult(entry, 'success', '配置成功');
   } catch (error) {
     if (!state.completed && !state.cancelled && !(error && error.name === 'AbortError')) {
-      vfsShowUploadToast(limitModelTestMessage(error && error.message, '配置错误：网络异常'), true);
+      setModelConfigurationTestResult(entry, 'error', limitModelTestMessage(error && error.message, '配置错误：网络异常'));
     }
   } finally {
     finishModelConfigurationTest(state);
@@ -42524,6 +42598,7 @@ function modelEntryHtml(idx, model, rawConfig, originalModel) {
     : ' title="删除模型"';
   const configToggleTitle = remotePersisted ? '客户化配置（只读）' : '客户化配置';
   const testUnavailableReason = getModelTestUnavailableReason(model, cfg);
+  const testVisible = modelEntryNeedsConfigurationTest(model, rawConfig, normalizedOriginalModel);
   const testDisabledAttr = testUnavailableReason ? ' disabled' : '';
   const testTitle = testUnavailableReason || '测试配置';
   return `<div class="model-entry" data-idx="${idx}"${originalAttr}>
@@ -42545,7 +42620,7 @@ function modelEntryHtml(idx, model, rawConfig, originalModel) {
         ${canImportCurl ? `<button class="model-curl-btn" onclick="openModelCurlImportPanel(this)" type="button" title="从 CURL 导入配置" aria-label="从 CURL 导入配置">CURL</button>` : ''}
       </div>
       <span class="model-entry-status">待完成</span>
-      <button class="model-test-btn" onclick="toggleModelConfigurationTest(this)" type="button" title="${esc(testTitle).replace(/"/g, '&quot;')}" aria-label="${esc(testTitle).replace(/"/g, '&quot;')}"${testDisabledAttr}>
+      <button class="model-test-btn${testVisible ? ' is-visible' : ''}" onclick="toggleModelConfigurationTest(this)" type="button" title="${esc(testTitle).replace(/"/g, '&quot;')}" aria-label="${esc(testTitle).replace(/"/g, '&quot;')}" aria-hidden="${testVisible ? 'false' : 'true'}" tabindex="${testVisible ? '0' : '-1'}"${testDisabledAttr}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8"></path><path d="M10 3v5.2l-4.7 8.1A3.2 3.2 0 0 0 8.1 21h7.8a3.2 3.2 0 0 0 2.8-4.7L14 8.2V3"></path><path d="M8.2 15h7.6"></path></svg><span class="model-test-cancel" aria-hidden="true">×</span>
       </button>
       ${canCustomize ? `<button class="model-config-toggle${hasConfig ? ' has-config' : ''}" onclick="toggleModelConfig(this)" type="button" title="${configToggleTitle}">
@@ -42553,6 +42628,7 @@ function modelEntryHtml(idx, model, rawConfig, originalModel) {
       </button>` : ''}
       <button class="remove-model-btn" onclick="removeModelEntry(this)" type="button"${removeDisabledAttr}>×</button>
     </div>
+    <div class="model-test-result" role="status" aria-live="polite"></div>
     <div class="model-config-panel"${canCustomize ? '' : ' style="display:none"'} data-configurable="${canCustomize ? '1' : '0'}">
       <div class="model-config-row">
         <label class="model-config-field">
@@ -42713,7 +42789,7 @@ function resetModelCustomConfig(btn) {
   setInput('.model-multi-output-input', cfg.__model_multi_output, !(spec.configurable && spec.supportsMultiOutput));
   entry.setAttribute('data-custom-cleared', '0');
   updateModelConfigToggleState(entry);
-  refreshModelEntryTestButton(entry);
+  markModelConfigurationDraftChanged(entry);
 }
 
 function clearModelCustomConfig(btn) {
@@ -42735,7 +42811,7 @@ function clearModelCustomConfig(btn) {
   setInput('.model-multi-output-input', '', !(spec.configurable && spec.supportsMultiOutput));
   entry.setAttribute('data-custom-cleared', '1');
   updateModelConfigToggleState(entry);
-  refreshModelEntryTestButton(entry);
+  markModelConfigurationDraftChanged(entry);
 }
 
 function getModelEntryCustomConfigState(entry) {
@@ -42800,7 +42876,7 @@ function attachModelConfigInputListeners(entry) {
         scheduleModelKeyHintPreview(tokenInput);
       }
       refreshModelEntryPendingState(entry);
-      refreshModelEntryTestButton(entry);
+      markModelConfigurationDraftChanged(entry);
     });
   }
   const configSelectors = [
@@ -42828,7 +42904,7 @@ function attachModelConfigInputListeners(entry) {
         entry.setAttribute('data-custom-cleared', '0');
       }
       updateModelConfigToggleState(entry);
-      refreshModelEntryTestButton(entry);
+      markModelConfigurationDraftChanged(entry);
       if (modelConfigOverflowPreviewState.hoverInput === input || modelConfigOverflowPreviewState.input === input) {
         syncModelConfigOverflowPreview(input);
       }
@@ -43093,6 +43169,7 @@ async function saveSettingsAsync() {
           }
         }
         refreshModelEntryPendingState(entry);
+        refreshModelEntryTestButton(entry);
       });
       refreshModelEntryOptions();
       refreshSwarmModelAvailability();
@@ -43850,6 +43927,9 @@ let wikiKnowledgePath = '';
 let vfsLoadRequestSeq = 0;
 let vfsRefreshRequestSeq = 0;
 let vfsInitialized = false;
+// Agent workspaces are fixed for the lifetime of this page.  Keep the
+// resolved path so returning to an Agent does not need to rescan metadata.
+const vfsWorkspaceByAgent = new Map();
 
 function getVfsRequestedAgentId() {
   const activeChatId = String(state.activeChat || '').trim();
@@ -43896,9 +43976,13 @@ async function vfsLoadWorkspace() {
   vfsLastJson = '';
   vfsSelected.clear();
   if (requestedAgentId) setVfsLoadingState(requestedAgentId);
-  const resolvedAgentId = applyResolvedAgentSelection(requestedAgentId, resolveAgentSelection(requestedAgentId, await fetchAgentList()));
-  if (requestSeq !== vfsLoadRequestSeq) return false;
-  const agentId = resolvedAgentId || requestedAgentId;
+  let agentId = requestedAgentId;
+  let workspace = agentId ? String(vfsWorkspaceByAgent.get(agentId) || '').trim() : '';
+  if (!workspace) {
+    const resolvedAgentId = applyResolvedAgentSelection(requestedAgentId, resolveAgentSelection(requestedAgentId, await fetchAgentList()));
+    if (requestSeq !== vfsLoadRequestSeq) return false;
+    agentId = resolvedAgentId || requestedAgentId;
+  }
   if (!agentId) {
     docTidyLastUpdateState = {};
     docTidyDismissedState = {};
@@ -43911,15 +43995,19 @@ async function vfsLoadWorkspace() {
     return false;
   }
   try {
-    const resp = await fetch('/api/workspace?agentId=' + encodeURIComponent(agentId));
-    if (requestSeq !== vfsLoadRequestSeq) return false;
-    if (!resp.ok) {
-      setVfsLoadFailure('工作区加载失败');
-      return false;
+    if (!workspace) {
+      const resp = await fetch('/api/workspace?agentId=' + encodeURIComponent(agentId));
+      if (requestSeq !== vfsLoadRequestSeq) return false;
+      if (!resp.ok) {
+        setVfsLoadFailure('工作区加载失败');
+        return false;
+      }
+      workspace = (await resp.text()).trim();
+      if (requestSeq !== vfsLoadRequestSeq) return false;
+      if (workspace) vfsWorkspaceByAgent.set(agentId, workspace);
     }
-    vfsWorkspace = (await resp.text()).trim();
-    if (requestSeq !== vfsLoadRequestSeq) return false;
-    vfsCurrentPath = vfsWorkspace;
+    vfsWorkspace = workspace;
+    vfsCurrentPath = workspace;
     docTidyLastUpdateState = {};
     docTidyDismissedState = {};
     document.getElementById('vfs').classList.remove('hidden');
@@ -50754,6 +50842,7 @@ function memoQueryRender() {
   memoQueryRenderResults();
 }
 function setMemoQueryDimension(dimension) {
+  if (memoQueryIsScoped()) return;
   const next = dimension === 'detail' ? 'detail' : 'meta';
   if (next === memoQueryState.dimension) return;
   memoQueryReadFormFromDom();
@@ -50777,6 +50866,28 @@ function memoQueryResetCurrent() {
 function memoQueryOverlayBackdropClick(event) {
   if (event && event.target === event.currentTarget) closeMemoQueryOverlay();
 }
+function memoQueryOpenScopedMetaDetails(meta) {
+  const metaId = String(meta && meta.id || '').trim();
+  if (!metaId) return;
+  memoQueryAbortActiveRequest();
+  if (!memoQueryIsScoped()) memoQueryState.scopedSnapshot = memoQueryCaptureScopedSnapshot();
+  memoQueryState.scopedMeta = { id: metaId, agentId: String(meta && meta.agentId || '').trim() };
+  memoQueryState.dimension = 'detail';
+  memoQueryState.previewKind = '';
+  memoQueryState.forms.detail = MEMO_QUERY_EMPTY_FORM();
+  memoQueryState.records.detail = [];
+  memoQueryState.visibleCount.detail = MEMO_QUERY_PAGE_SIZE;
+  memoQueryState.resultMeta.detail = '';
+  memoQueryState.scrollTop.detail = 0;
+  memoQueryState.dirty = false;
+  const overlay = document.getElementById('memoQueryOverlay');
+  if (!overlay) return;
+  memoQueryState.open = true;
+  memoQueryState.minimized = false;
+  showExclusiveOverlay(overlay, document.getElementById('memoQueryPanel'));
+  memoQueryRender();
+  void memoQueryRun();
+}
 function toggleMemoQueryOverlay(event) {
   if (event) { event.preventDefault(); event.stopPropagation(); }
   if (isMemoTourInteractionLocked()) return;
@@ -50788,8 +50899,9 @@ function toggleMemoQueryOverlay(event) {
   showExclusiveOverlay(overlay, document.getElementById('memoQueryPanel'));
   memoQueryRender();
 }
-function closeMemoQueryOverlay() {
-  if (memoQueryState.abortController) memoQueryState.abortController.abort();
+function closeMemoQueryOverlay(options = {}) {
+  memoQueryAbortActiveRequest();
+  if (!options.preserveScope) memoQueryClearScopedMeta();
   memoQueryState.open = false;
   memoQueryState.minimized = true;
   setOverlayVisible(document.getElementById('memoQueryOverlay'), false, document.getElementById('memoQueryPanel'));
@@ -50799,7 +50911,7 @@ function memoQueryOpenPreview(kind, index) {
   const record = (memoQueryState.records[dimension] || [])[Number(index)];
   if (!record) return;
   memoQueryState.previewKind = dimension;
-  closeMemoQueryOverlay();
+  closeMemoQueryOverlay({ preserveScope: true });
   if (dimension === 'detail') {
     memoMetaPreviewHide({ force: true });
     memoDetailPreviewSourceEnter(record);
@@ -51213,6 +51325,19 @@ function memoMetaPreviewActionMarkup(editing, saving) {
   return '<button type="button" class="rs-meta-center-action" onclick="memoMetaPreviewSave()" title="保存修改" aria-label="保存修改"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg></button>' +
     '<button type="button" class="rs-meta-center-action" onclick="memoMetaPreviewCancelEdit()" title="取消编辑" aria-label="取消编辑"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>';
 }
+function memoMetaPreviewDetailListMarkup() {
+  if (!memoMetaPreviewState.metaId) return '';
+  const disabled = (memoMetaPreviewState.saving || memoMetaPreviewState.deleting || memoPreviewRunIsFor('meta', memoMetaPreviewState.metaId) || document.getElementById('rsSaveLock')?.classList.contains('show')) ? ' disabled' : '';
+  return '<button type="button" class="rs-meta-center-action rs-meta-center-detail-list-action" onclick="memoMetaPreviewOpenDetailList()" title="查看任务明细" aria-label="查看任务明细"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h11"/><path d="M8 12h11"/><path d="M8 18h11"/><path d="M4 6h.01"/><path d="M4 12h.01"/><path d="M4 18h.01"/></svg></button>';
+}
+function memoMetaPreviewOpenDetailList() {
+  const meta = memoMetaPreviewState.meta;
+  if (!meta || !memoMetaPreviewState.metaId || memoMetaPreviewState.editing || memoMetaPreviewState.saving || memoMetaPreviewState.deleting || memoPreviewRunIsActive() || document.getElementById('rsSaveLock')?.classList.contains('show')) return;
+  const source = memoDetailPreviewClone(meta);
+  memoMetaPreviewClearCloseTimer();
+  memoMetaPreviewHide({ force: true });
+  memoQueryOpenScopedMetaDetails(source);
+}
 function memoMetaPreviewToggleMarkup(field, active, disabled) {
   return '<button type="button" class="rs-meta-center-field-toggle' + (active ? ' on' : '') + '" role="switch" aria-checked="' + (active ? 'true' : 'false') + '" onclick="memoMetaPreviewToggleField(\'' + field + '\')"' + (disabled ? ' disabled' : '') + '>' + (active ? '开启' : '关闭') + '</button>';
 }
@@ -51251,9 +51376,11 @@ function rsRenderMetaCenterPreview(meta, options = {}) {
   if (title) title.textContent = options.detail ? '备忘录明细预览' : (metadata ? '备忘录元数据预览' : '备忘录预览');
   memoPreviewSyncValidationMessage(metadata, editing);
   const actions = document.getElementById('rsMetaCenterPreviewActions');
+  const contentActions = document.getElementById('rsMetaCenterPreviewContentActions');
   if (actions) actions.innerHTML = (options.detail
     ? memoDetailPreviewActionMarkup(editing, !!memoDetailPreviewState.saving)
     : (metadata ? memoMetaPreviewActionMarkup(editing, !!memoMetaPreviewState.saving) : '')) + memoQueryPreviewCloseMarkup(editing);
+  if (contentActions) contentActions.innerHTML = metadata && !editing ? memoMetaPreviewDetailListMarkup() : '';
   Object.keys(RS_META_PREVIEW_FIELD_IDS).forEach(key => {
     const node = document.getElementById(RS_META_PREVIEW_FIELD_IDS[key]);
     if (!node) return;

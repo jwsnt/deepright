@@ -3057,7 +3057,7 @@ Integration 新增本机接口 `POST /api/model/test`，供设置页测试尚未
 
 - 测试固定使用 `__model`，不回退到快速、思考或多模态模型。
 - 测试配置、Token 与 UUID 均不写入 token_store、Agent 配置、聊天日志、连接表、记忆、技能、任务或通知。
-- 成功必须同时满足 HTTP 200、有效 SSE 业务数据和 `[DONE]`；HTTP/SSE 错误、超时、空流、流中断或缺少 `[DONE]` 都会返回脱敏后的错误。
+- 成功必须同时满足 HTTP 200、有效 SSE 业务数据和 `[DONE]`；HTTP/SSE 错误、超时、空流、流中断或缺少 `[DONE]` 都会返回脱敏后的错误。接口只返回最终测试结果，页面在对应设置模型行内展示它，不会发送虚拟文件系统 Toast。
 - 只有该测试转发携带 `metadata.test = true`，并会原样传至 `--host` 指定的最终处理服务器；普通 `/v1/chat/completions` 会在转发前移除客户端伪造的同名字段。
 
 完整说明见 [iteration/20260722-2/USER_GUIDE.md](iteration/20260722-2/USER_GUIDE.md)。
