@@ -240,6 +240,7 @@ func TestFeishuParamCommandOutput(t *testing.T) {
 	want := map[string]string{
 		"appId":     "飞书开放平台（https://open.feishu.cn/app）中应用凭证的App ID ",
 		"appSecret": "App Secret",
+		"mcp_url":   "飞书MCP地址",
 	}
 	if len(got[0]) != len(want) {
 		t.Fatalf("param field len = %d, want %d; got=%v", len(got[0]), len(want), got[0])

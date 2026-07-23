@@ -15,7 +15,7 @@
 
 - `command` 固定返回 `["command","help","name","param","scope","schema","openid","search","init","send","start","stop"]`
 - `help` 打印插件使用手册
-- `param` 固定返回带字段说明的示例对象数组，字段 key 固定为 `appId`、`appSecret`
+- `param` 固定返回带字段说明的示例对象数组，字段 key 固定为 `appId`、`appSecret`、`mcp_url`；其中 `mcp_url` 为可选的飞书 MCP 地址
 - `name` 固定返回 `{"key":"feishu","name":"飞书"}`
 - `scope` 固定返回 `["reuse","agent","provider","thinking","swarm"]`
 - `schema` 固定返回飞书插件响应 JSON Schema
@@ -38,6 +38,8 @@
 - 入库即时回执迭代手册：[iteration/20260717-1/USER_GUIDE.md](iteration/20260717-1/USER_GUIDE.md)
 - 消息快照查询迭代需求：[iteration/20260719-1/REQUIREMENT.md](iteration/20260719-1/REQUIREMENT.md)
 - 消息快照查询迭代手册：[iteration/20260719-1/USER_GUIDE.md](iteration/20260719-1/USER_GUIDE.md)
+- 飞书 MCP 地址迭代需求：[iteration/20260723-1/REQUIREMENT.md](iteration/20260723-1/REQUIREMENT.md)
+- 飞书 MCP 地址迭代手册：[iteration/20260723-1/USER_GUIDE.md](iteration/20260723-1/USER_GUIDE.md)
 - 当前用户手册：[USER_GUIDE.md](USER_GUIDE.md)
 
 ## 固定输出命令
@@ -122,7 +124,8 @@
 ```json
 [{
   "appId": "飞书开放平台（https://open.feishu.cn/app）中应用凭证的App ID ",
-  "appSecret": "App Secret"
+  "appSecret": "App Secret",
+  "mcp_url": "飞书MCP地址"
 }]
 ```
 
@@ -197,16 +200,17 @@
 ```json
 {
   "appId": "cli_xxx",
-  "appSecret": "yyy"
+  "appSecret": "yyy",
+  "mcp_url": "https://your-feishu-mcp-server.example.com"
 }
 ```
 
-`param` 返回的是字段说明示例，不是运行时真实值；`meta-create` / `meta-update` 里仍然使用同名字段传入真实配置。
+`param` 返回的是字段说明示例，不是运行时真实值；`meta-create` / `meta-update` 里仍然使用同名字段传入真实配置。`mcp_url` 可省略，默认留空。
 
 通常通过 `integration` 顶层命令写入：
 
 ```bash
-./integration connect meta-create --key feishu --meta '{"appId":"x","appSecret":"y"}' --callback ignored --agent a --model deepseek
+./integration connect meta-create --key feishu --meta '{"appId":"x","appSecret":"y","mcp_url":"https://your-feishu-mcp-server.example.com"}' --callback ignored --agent a --model deepseek
 ```
 
 通过页面右上角即时通讯扇形菜单打开 `feishu` 插件配置时，运行时绑定规则如下：

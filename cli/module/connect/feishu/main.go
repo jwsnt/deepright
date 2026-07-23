@@ -29,6 +29,7 @@ var localMetaParams = []localMetaParamDefinition{
 	{
 		AppID:     "飞书开放平台（https://open.feishu.cn/app）中应用凭证的App ID ",
 		AppSecret: "App Secret",
+		MCPURL:    "飞书MCP地址",
 	},
 }
 var runFeishuCLI = feishusvc.RunCLI
@@ -51,6 +52,7 @@ var runUpstreamQueryCommand = func(name string, args []string) ([]byte, error) {
 type localMetaParamDefinition struct {
 	AppID     string `json:"appId"`
 	AppSecret string `json:"appSecret"`
+	MCPURL    string `json:"mcp_url"`
 }
 
 func main() {
@@ -851,7 +853,7 @@ func printHelp(w io.Writer) {
 	fmt.Fprintln(w, "Fixed output commands:")
 	fmt.Fprintln(w, "  command                         print supported commands")
 	fmt.Fprintln(w, "  name                            print stable plugin key/name: {\"key\":\"feishu\",\"name\":\"飞书\"}")
-	fmt.Fprintln(w, "  param                           print required meta fields with descriptions for appId/appSecret")
+	fmt.Fprintln(w, "  param                           print meta fields with descriptions for appId/appSecret/mcp_url (mcp_url is optional)")
 	fmt.Fprintln(w, "  scope                           print supported container scopes: [\"reuse\",\"agent\",\"provider\",\"thinking\",\"swarm\"]")
 	fmt.Fprintln(w, "  schema                          print response json schema for schema-backed send content")
 	fmt.Fprintln(w, "  openid                          list unique Feishu senders and their last message time in the configured window")

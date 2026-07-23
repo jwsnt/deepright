@@ -8005,13 +8005,22 @@ func modelTestTimeoutSeconds(raw interface{}) (int64, bool) {
 
 func buildModelTestUpstreamRequest(cfg *Config, request modelTestRequest, sessionID, content string) map[string]interface{} {
 	metadata := map[string]interface{}{
-		"test":     true,
-		"type":     "test",
-		"chat":     sessionID,
-		"device":   cfg.effectiveDeviceID(),
-		"port":     integrationMetadataPort(cfg),
-		"provider": request.Model,
-		"__model":  request.ModelBase,
+		"test":   true,
+		"type":   "test",
+		"chat":   sessionID,
+		"device": cfg.effectiveDeviceID(),
+		"port":   integrationMetadataPort(cfg),
+		// Keep the runtime fields required by the upstream /v1/chat/completions
+		// pipeline. They describe this Integration process only; unlike ordinary
+		// chat requests, a model test still does not merge Agent, skills, memory,
+		// knowledge, router, task, or media context.
+		"app":       firstNonEmpty(resolveExecutablePath(os.Args[0]), os.Args[0]),
+		"workspace": modelTestWorkspace(cfg),
+		"terminal":  detectTerminal(),
+		"Origin":    modelTestOrigin(cfg),
+		"sys":       agentcore.DetectSys(),
+		"provider":  request.Model,
+		"__model":   request.ModelBase,
 	}
 	if request.BaseURL != "" {
 		metadata["__url"] = request.BaseURL
@@ -8034,6 +8043,24 @@ func buildModelTestUpstreamRequest(cfg *Config, request modelTestRequest, sessio
 		"stream":   true,
 		"metadata": metadata,
 	}
+}
+
+func modelTestWorkspace(cfg *Config) string {
+	if cfg == nil {
+		return ""
+	}
+	workspace := strings.TrimSpace(cfg.AgentDir)
+	if workspace == "" {
+		return ""
+	}
+	if absolute, err := filepath.Abs(workspace); err == nil {
+		return absolute
+	}
+	return filepath.Clean(workspace)
+}
+
+func modelTestOrigin(cfg *Config) string {
+	return fmt.Sprintf("http://localhost:%d", integrationMetadataPort(cfg))
 }
 
 func newModelTestUUID() (string, error) {

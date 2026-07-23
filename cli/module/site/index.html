@@ -3228,6 +3228,10 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
 .plugin-meta-label{flex:0 0 112px;font-size:13px;font-weight:600;color:var(--text-primary);text-align:left;white-space:nowrap}
 .plugin-meta-input{flex:1 1 auto;min-width:0;padding:11px 12px;border:1px solid var(--border);border-radius:14px;background:var(--bg-input);color:var(--text-primary);font-size:14px;outline:none;transition:var(--transition)}
 .plugin-meta-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(var(--accent-rgb),.12)}
+.plugin-meta-doc-link{width:30px;height:30px;flex:0 0 30px;padding:0;font:inherit;display:inline-flex;align-items:center;justify-content:center;border:1px solid color-mix(in srgb,var(--accent) 38%,var(--border) 62%);border-radius:10px;background:color-mix(in srgb,var(--accent) 8%,var(--bg-input) 92%);color:var(--accent);box-shadow:0 0 0 0 rgba(var(--accent-rgb),.32);animation:pluginMetaDocLinkPulse 1.35s ease-in-out infinite;transition:transform .18s ease,border-color .18s ease,background .18s ease,color .18s ease;cursor:pointer}
+.plugin-meta-doc-link svg{width:15px;height:15px;stroke:currentColor}
+.plugin-meta-doc-link:hover,.plugin-meta-doc-link:focus-visible{animation-play-state:paused;transform:translateY(-1px) scale(1.05);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,var(--bg-input) 84%);outline:none}
+@keyframes pluginMetaDocLinkPulse{0%,100%{box-shadow:0 0 0 0 rgba(var(--accent-rgb),.28);opacity:.76}50%{box-shadow:0 0 0 6px rgba(var(--accent-rgb),0);opacity:1}}
 .plugin-meta-placeholder-preview{position:absolute;top:0;left:0;min-width:160px;max-width:min(360px,calc(100% - 24px));padding:10px 12px;border-radius:16px;border:1px solid var(--modal-field-border);background:linear-gradient(180deg,var(--modal-panel-bg-strong),var(--modal-panel-bg));color:var(--text-primary);font-size:12px;line-height:1.55;word-break:break-word;pointer-events:none;opacity:0;visibility:hidden;transform:translateY(4px);transition:opacity .16s ease,transform .16s ease,visibility 0s linear .16s;box-shadow:0 18px 40px rgba(16,24,40,.2),inset 0 1px 0 rgba(255,255,255,.72);z-index:5}
 .plugin-meta-placeholder-preview.show{opacity:1;visibility:visible;transform:translateY(0);transition:opacity .16s ease,transform .16s ease}
 .plugin-meta-placeholder-measure{position:absolute;left:-9999px;top:-9999px;visibility:hidden;pointer-events:none;white-space:pre}
@@ -3714,6 +3718,7 @@ body.quick-fan-transition-active{cursor:progress}
   .plugin-modal-thinking{margin-left:0}
   .plugin-meta-item{flex-direction:column;align-items:stretch;gap:8px}
   .plugin-meta-label{flex:none}
+  .plugin-meta-doc-link{align-self:flex-end}
   .plugin-meta-list{max-height:250px}
   .chat-storage-stats-overlay{padding:12px}
   .chat-storage-stats-card{width:min(100%,calc(100vw - 16px));max-height:min(88vh,780px);border-radius:24px}
@@ -9094,6 +9099,8 @@ const PLUGIN_MODAL_BROWSER_RESTART_CONFIRM_HINT = [
 ];
 const EMAIL_PLUGIN_INTERVAL_FIELD = 'email_pop3_interval';
 const EMAIL_PLUGIN_INTERVAL_RECOMMENDED_SECONDS = 300;
+const FEISHU_MCP_URL_FIELD = 'mcp_url';
+const FEISHU_MCP_DOCUMENT_URL = 'https://open.feishu.cn/page/mcp/7616252843057548502';
 const CHAT_SKILL_HOLD_MS = 15000;
 const CHAT_SKILL_HIDE_MS = 280;
 const CHAT_SKILL_REPLAY_MS = 1420;
@@ -26160,6 +26167,20 @@ function pluginModalCollectMetaInput() {
   return meta;
 }
 
+function openFeishuMcpDocument(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  try {
+    if (typeof _origOpen === 'function') {
+      _origOpen(FEISHU_MCP_DOCUMENT_URL, '_blank', 'noopener,noreferrer');
+      return false;
+    }
+  } catch {}
+  return false;
+}
+
 function pluginModalResolveEmailIntervalWarning(metaInput) {
   if (!isEmailPlugin(pluginModalState.plugin)) return null;
   const meta = metaInput && typeof metaInput === 'object' && !Array.isArray(metaInput)
@@ -26543,10 +26564,17 @@ function renderPluginModalMeta(plugin) {
     const keyAttr = esc(normalizePluginMetaFieldKey(field)).replace(/"/g, '&quot;');
     const itemId = getPluginMetaItemId(field);
     const itemIdAttr = itemId ? ' id="' + itemId + '"' : '';
-    return '<label class="plugin-meta-item"' + itemIdAttr + ' data-plugin-meta-field="' + fieldAttr + '" data-plugin-meta-key="' + keyAttr + '">' +
-      '<span class="plugin-meta-label">' + esc(field) + '</span>' +
-      '<input class="plugin-meta-input" data-plugin-meta-field="' + fieldAttr + '" placeholder="' + esc(placeholderText).replace(/"/g, '&quot;') + '" autocomplete="off" />' +
-    '</label>';
+    const inputId = itemId ? itemId + '-input' : 'pluginMetaInput-' + keyAttr;
+    const mcpDocLink = isFeishuPlugin(plugin) && normalizePluginMetaFieldKey(field) === FEISHU_MCP_URL_FIELD
+      ? '<button class="plugin-meta-doc-link" type="button" onclick="return openFeishuMcpDocument(event)" title="打开飞书 MCP 文档" aria-label="在新页面打开飞书 MCP 文档">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14 21 3"></path><path d="M15 3h6v6"></path><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"></path></svg>' +
+        '</button>'
+      : '';
+    return '<div class="plugin-meta-item"' + itemIdAttr + ' data-plugin-meta-field="' + fieldAttr + '" data-plugin-meta-key="' + keyAttr + '">' +
+      '<label class="plugin-meta-label" for="' + inputId + '">' + esc(field) + '</label>' +
+      '<input class="plugin-meta-input" id="' + inputId + '" data-plugin-meta-field="' + fieldAttr + '" placeholder="' + esc(placeholderText).replace(/"/g, '&quot;') + '" autocomplete="off" />' +
+      mcpDocLink +
+    '</div>';
   }).join('');
   const defaults = plugin && plugin.meta && typeof plugin.meta === 'object' && !Array.isArray(plugin.meta) ? plugin.meta : {};
   list.querySelectorAll('.plugin-meta-input').forEach(input => {

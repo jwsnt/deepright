@@ -115,8 +115,8 @@ public class TaskRag extends RagCondition implements RagService {
         // 追加Thinking
         String query = (FeatureFlag.isHtml(ragData.getQuery()) ? this.template4schemaHtml : this.template4schemaDef);
         query = query.replace("#schema_app", SkillsSelector.contain(ragData.getQuery(), this.skillMiniApp) ? this.template4schemaApp.replace("#mini_app", this.skillMiniApp) : "");
+        query = query.replace("#agentId", !FeatureFlag.isTest(ragData.getQuery()) ? FeatureUtils.buildAgentId(ragData.getQuery()) : "");
         query = query.replace("#thinking", ComplexityUtils.isThinking(ragData.getQuery()) ? this.template4schemaThinking : "");
-        query = query.replace("#agentId", FeatureUtils.buildAgentId(ragData.getQuery()));
         query = query.replace("#origin", FeatureUtils.buildOrigin(ragData.getQuery()));
         if (log.isWarnEnabled() && !TemplateChecker.check(query)) {
             log.warn("The query template contains unexpected characters; please check: {}", query);

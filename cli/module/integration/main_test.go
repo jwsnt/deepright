@@ -19327,6 +19327,7 @@ func TestDecodeModelTestRequestValidatesBaseURL(t *testing.T) {
 
 func TestHandleModelTestUsesTransientConfigurationAndReturnsSuccess(t *testing.T) {
 	writeModelTestRuntimeConfig(t, `{"test":{"content":"runtime probe","timeout":10}}`)
+	workspace := t.TempDir()
 	var captured map[string]interface{}
 	var authorization string
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -19337,7 +19338,7 @@ func TestHandleModelTestUsesTransientConfigurationAndReturnsSuccess(t *testing.T
 	}))
 	defer upstream.Close()
 
-	handler := handleModelTest(&Config{Host: upstream.URL, Device: "test-device", Port: 17896}, upstream.Client())
+	handler := handleModelTest(&Config{Host: upstream.URL, AgentDir: workspace, Device: "test-device", Port: 17896}, upstream.Client())
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, newLocalModelTestRequest(`{"model":"deepseek","token":"Bearer transient-token","__url":"https://draft.example/v1","__model":"deepseek-draft","__model_fast":"fast-draft"}`))
 
@@ -19364,7 +19365,21 @@ func TestHandleModelTestUsesTransientConfigurationAndReturnsSuccess(t *testing.T
 	if metadata["__model"] != "deepseek-draft" || metadata["__url"] != "https://draft.example/v1" || metadata["__model_fast"] != "fast-draft" {
 		t.Fatalf("transient model metadata = %#v", metadata)
 	}
-	for _, forbidden := range []string{"agentId", "agent", "workspace", "skills", "knowledge", "router_remote", "plugins", "memory"} {
+	if metadata["workspace"] != workspace {
+		t.Fatalf("metadata.workspace = %v, want %q", metadata["workspace"], workspace)
+	}
+	if metadata["Origin"] != "http://localhost:17896" {
+		t.Fatalf("metadata.Origin = %v, want %q", metadata["Origin"], "http://localhost:17896")
+	}
+	for _, key := range []string{"app", "terminal", "device", "chat", "sys"} {
+		if strings.TrimSpace(fmt.Sprint(metadata[key])) == "" {
+			t.Fatalf("metadata.%s must be present: %#v", key, metadata)
+		}
+	}
+	if metadata["device"] != "test-device" {
+		t.Fatalf("metadata.device = %v, want %q", metadata["device"], "test-device")
+	}
+	for _, forbidden := range []string{"agentId", "agent", "skills", "knowledge", "router_remote", "plugins", "memory"} {
 		if _, found := metadata[forbidden]; found {
 			t.Fatalf("metadata.%s must not be present: %#v", forbidden, metadata)
 		}
