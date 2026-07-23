@@ -41,6 +41,8 @@ public class ClientTokenNotifier implements TokenNotifier, TokenSource {
 
     public static final String LANG_KEY_TOKEN_TASK = "token.task";
 
+    public static final String LANG_KEY_TOKEN_TEST = "token.test";
+
     public static final String LANG_KEY_TOKEN_CHAT = "token.chat";
 
     protected static final String NAME = "token_notifier_client";
@@ -73,6 +75,8 @@ public class ClientTokenNotifier implements TokenNotifier, TokenSource {
             return XmlResourceLang.get(ClientTokenNotifier.LANG_KEY_TOKEN_TASK);
         } else if (FeatureFlag.isCron(workTask)) {
             return XmlResourceLang.get(ClientTokenNotifier.LANG_KEY_TOKEN_CRON);
+        } else if (FeatureFlag.isTest(workTask)) {
+            return XmlResourceLang.get(ClientTokenNotifier.LANG_KEY_TOKEN_TEST);
         } else {
             return XmlResourceLang.get(ClientTokenNotifier.LANG_KEY_TOKEN_CHAT);
         }

@@ -5181,21 +5181,13 @@ func handleWorkspace(cfg *Config) http.HandlerFunc {
 			http.Error(w, "agentId is required", http.StatusBadRequest)
 			return
 		}
-		agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
-		metadata, err := getAgentOutput(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL)
+		workspace, err := getWorkspaceByAgentID(cfg, agentID)
 		if err != nil {
-			log.Printf("api/workspace: agent scan error: %v", err)
-			http.Error(w, "Failed to get agent metadata", http.StatusInternalServerError)
+			http.Error(w, "Agent not found: "+agentID, http.StatusNotFound)
 			return
 		}
-		for _, a := range metadata.Agents {
-			if a.AgentID == agentID {
-				w.Header().Set("Content-Type", "text/plain")
-				w.Write([]byte(a.Workspace))
-				return
-			}
-		}
-		http.Error(w, "Agent not found: "+agentID, http.StatusNotFound)
+		w.Header().Set("Content-Type", "text/plain")
+		w.Write([]byte(workspace))
 	}
 }
 
@@ -7779,7 +7771,11 @@ const (
 	modelTestMaxErrorRunes    = 500
 )
 
-var modelTestSensitiveValuePattern = regexp.MustCompile(`(?i)(["']?(?:authorization|api[-_ ]?key|token|secret)["']?\s*[:=]\s*["']?)([^\s,"';&}]+)`)
+var (
+	modelTestSensitiveValuePattern   = regexp.MustCompile(`(?i)(["']?(?:authorization|api[-_ ]?key|token|secret)["']?\s*[:=]\s*["']?)([^\s,"';&}]+)`)
+	modelTestInlineStatusCodePattern = regexp.MustCompile(`(?i)\b(?:http(?:\s+status)?|code|status)\s*(?:=|:|\s)\s*([1-5][0-9]{2})\b`)
+	modelTestURLAllowedCharacters    = regexp.MustCompile(`^[A-Za-z0-9\-._~:/?#[\]@!$&'()*+,;=%]+$`)
+)
 
 // modelTestRequest deliberately contains only transient provider material. It
 // is never written to token_store or any of the chat/agent persistence paths.
@@ -7874,7 +7870,7 @@ func handleModelTest(cfg *Config, proxyClient *http.Client) http.HandlerFunc {
 		if !strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "text/event-stream") {
 			body, _ := io.ReadAll(io.LimitReader(resp.Body, modelTestMaxSSEEventBytes))
 			message := "配置错误：服务商未返回 SSE 响应"
-			if detail := sanitizeModelTestError(string(body), request.Token); detail != "" {
+			if detail := modelTestProviderErrorDetail(string(body), request.Token, resp.StatusCode); detail != "" {
 				message += "：" + detail
 			}
 			writeModelTestJSONError(w, http.StatusBadGateway, message)
@@ -7923,10 +7919,45 @@ func decodeModelTestRequest(body io.ReadCloser) (modelTestRequest, error) {
 	if request.Token == "" || request.Token == maskedTokenValue {
 		return request, fmt.Errorf("配置错误：模型密钥不能为空")
 	}
+	if !isValidModelTestBaseURL(request.BaseURL) {
+		return request, fmt.Errorf("配置错误：模型 URL 格式不正确，请填写 http:// 或 https:// 开头的完整 URL")
+	}
 	if request.ModelBase == "" {
 		return request, fmt.Errorf("配置错误：基础模型 __model 不能为空")
 	}
 	return request, nil
+}
+
+func isValidModelTestBaseURL(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return true
+	}
+	if !modelTestURLAllowedCharacters.MatchString(value) || !hasValidModelTestURLPercentEncoding(value) {
+		return false
+	}
+	parsed, err := url.Parse(value)
+	if err != nil || parsed == nil || parsed.User != nil || parsed.Hostname() == "" {
+		return false
+	}
+	return strings.EqualFold(parsed.Scheme, "http") || strings.EqualFold(parsed.Scheme, "https")
+}
+
+func hasValidModelTestURLPercentEncoding(value string) bool {
+	for index := 0; index < len(value); index++ {
+		if value[index] != '%' {
+			continue
+		}
+		if index+2 >= len(value) || !isModelTestURLHexDigit(value[index+1]) || !isModelTestURLHexDigit(value[index+2]) {
+			return false
+		}
+		index += 2
+	}
+	return true
+}
+
+func isModelTestURLHexDigit(value byte) bool {
+	return (value >= '0' && value <= '9') || (value >= 'a' && value <= 'f') || (value >= 'A' && value <= 'F')
 }
 
 func readModelTestConfig() (modelTestConfig, error) {
@@ -8070,7 +8101,7 @@ func consumeModelTestSSE(ctx context.Context, body io.Reader, token string) erro
 
 func inspectModelTestSSEEvent(event, token string) (bool, bool, error) {
 	if strings.Contains(strings.ToLower(event), "event: error") {
-		return false, false, fmt.Errorf("配置错误：服务商返回错误：%s", modelTestSSEErrorDetail(event, token))
+		return false, false, fmt.Errorf("配置错误：%s", modelTestSSEErrorDetail(event, token))
 	}
 	business := false
 	done := false
@@ -8092,7 +8123,7 @@ func inspectModelTestSSEEvent(event, token string) (bool, bool, error) {
 			return false, done, fmt.Errorf("配置错误：SSE 响应包含无效数据")
 		}
 		if modelTestPayloadIsError(raw) {
-			return false, done, fmt.Errorf("配置错误：服务商返回错误：%s", modelTestPayloadErrorDetail(raw, token))
+			return false, done, fmt.Errorf("配置错误：%s", modelTestPayloadErrorDetail(raw, token))
 		}
 		if choices, ok := raw["choices"].([]interface{}); ok && len(choices) > 0 {
 			business = true
@@ -8102,6 +8133,9 @@ func inspectModelTestSSEEvent(event, token string) (bool, bool, error) {
 }
 
 func modelTestPayloadIsError(raw map[string]interface{}) bool {
+	if modelTestPayloadStatusCode(raw) != 0 {
+		return true
+	}
 	if responseValueIsAbnormal(raw) {
 		return true
 	}
@@ -8127,6 +8161,17 @@ func modelTestSSEErrorDetail(event, token string) string {
 }
 
 func modelTestPayloadErrorDetail(raw map[string]interface{}, token string) string {
+	return formatModelTestProviderFailure(modelTestPayloadStatusCode(raw), modelTestPayloadErrorContent(raw, token))
+}
+
+func modelTestPayloadErrorContent(raw map[string]interface{}, token string) string {
+	// Some compatible providers encode an error as an assistant delta instead
+	// of the conventional top-level error object. Prefer its content so the UI
+	// never has to show the complete provider payload (which may include
+	// transport metadata).
+	if text := modelTestNestedContentText(raw); text != "" {
+		return sanitizeModelTestError(text, token)
+	}
 	for _, key := range []string{"error", "message", "detail", "content"} {
 		if value, ok := raw[key]; ok && value != nil {
 			if text := modelTestErrorValueText(value); text != "" {
@@ -8136,6 +8181,110 @@ func modelTestPayloadErrorDetail(raw map[string]interface{}, token string) strin
 	}
 	encoded, _ := json.Marshal(raw)
 	return sanitizeModelTestError(string(encoded), token)
+}
+
+func modelTestPayloadStatusCode(raw map[string]interface{}) int {
+	if raw == nil {
+		return 0
+	}
+	for _, key := range []string{"code", "status"} {
+		if code, ok := parseResponseStatusCode(raw[key]); ok && (code < 200 || code >= 300) {
+			return code
+		}
+	}
+	for _, key := range []string{"error", "data", "result"} {
+		if nested, ok := raw[key].(map[string]interface{}); ok {
+			if code := modelTestPayloadStatusCode(nested); code != 0 {
+				return code
+			}
+		}
+	}
+	if code := modelTestStatusCodeFromText(modelTestNestedContentText(raw)); code != 0 {
+		return code
+	}
+	return 0
+}
+
+func modelTestStatusCodeFromText(value string) int {
+	match := modelTestInlineStatusCodePattern.FindStringSubmatch(value)
+	if len(match) < 2 {
+		return 0
+	}
+	code, err := strconv.Atoi(match[1])
+	if err != nil || (code >= 200 && code < 300) {
+		return 0
+	}
+	return code
+}
+
+func formatModelTestProviderFailure(status int, detail string) string {
+	detail = strings.TrimSpace(detail)
+	standard := modelTestStandardStatusMessage(status)
+	if standard != "" {
+		return standard
+	}
+	if detail != "" {
+		return detail
+	}
+	if status > 0 {
+		return fmt.Sprintf("服务商返回 HTTP %d", status)
+	}
+	return "测试服务返回了未知错误"
+}
+
+func modelTestStandardStatusMessage(status int) string {
+	switch {
+	case status == http.StatusUnauthorized:
+		return "服务商身份认证失败（401），请检查 API Key/Token 是否正确、有效且未过期"
+	case status == http.StatusForbidden:
+		return "服务商拒绝访问（403），请确认密钥已获该模型或接口的访问权限"
+	case status == http.StatusNotFound:
+		return "服务商资源不存在（404），请检查模型 URL 和基础模型"
+	case status == http.StatusTooManyRequests:
+		return "服务商请求受限（429），请稍后重试并检查账户额度或速率限制"
+	case status == http.StatusServiceUnavailable:
+		return "服务商暂不可用（503），请稍后重试"
+	case status >= 500 && status <= 599:
+		return fmt.Sprintf("服务商服务异常（%d），请稍后重试", status)
+	default:
+		return ""
+	}
+}
+
+func modelTestNestedContentText(value interface{}) string {
+	return modelTestNestedContentTextAtDepth(value, 0)
+}
+
+func modelTestNestedContentTextAtDepth(value interface{}, depth int) string {
+	if depth > 16 || value == nil {
+		return ""
+	}
+	switch typed := value.(type) {
+	case string:
+		return strings.TrimSpace(typed)
+	case []interface{}:
+		for _, item := range typed {
+			if text := modelTestNestedContentTextAtDepth(item, depth+1); text != "" {
+				return text
+			}
+		}
+	case map[string]interface{}:
+		if content, ok := typed["content"]; ok {
+			if text := modelTestNestedContentTextAtDepth(content, depth+1); text != "" {
+				return text
+			}
+		}
+		// Follow the provider response structure deterministically. This covers
+		// choices[].delta.content as well as common wrapper objects.
+		for _, key := range []string{"choices", "choice", "delta", "error", "data", "result"} {
+			if nested, ok := typed[key]; ok {
+				if text := modelTestNestedContentTextAtDepth(nested, depth+1); text != "" {
+					return text
+				}
+			}
+		}
+	}
+	return ""
 }
 
 func modelTestErrorValueText(value interface{}) string {
@@ -8155,11 +8304,19 @@ func modelTestErrorValueText(value interface{}) string {
 }
 
 func modelTestHTTPError(status int, body, token string) string {
-	message := fmt.Sprintf("配置错误：服务商返回 HTTP %d", status)
-	if detail := sanitizeModelTestError(body, token); detail != "" {
-		message += "：" + detail
+	return "配置错误：" + modelTestProviderErrorDetail(body, token, status)
+}
+
+func modelTestProviderErrorDetail(body, token string, fallbackStatus int) string {
+	var raw map[string]interface{}
+	if json.Unmarshal([]byte(body), &raw) == nil && raw != nil {
+		status := modelTestPayloadStatusCode(raw)
+		if status == 0 {
+			status = fallbackStatus
+		}
+		return formatModelTestProviderFailure(status, modelTestPayloadErrorContent(raw, token))
 	}
-	return message
+	return formatModelTestProviderFailure(fallbackStatus, sanitizeModelTestError(body, token))
 }
 
 func modelTestErrorMessage(err error, token string) string {
@@ -11589,16 +11746,49 @@ type roundLogOptions struct {
 const roundLogStorageTimeLayout = "2006-01-02T15:04:05.000"
 
 func getWorkspaceByAgentID(cfg *Config, agentID string) (string, error) {
-	metadata, err := getAgentOutput(cfg.AgentDir, cfg.effectiveDeviceID(), time.Duration(cfg.AgentCacheMs)*time.Millisecond)
+	if cfg == nil {
+		return "", fmt.Errorf("config is required")
+	}
+	return resolveAgentWorkspace(cfg.AgentDir, agentID)
+}
+
+// resolveAgentWorkspace resolves one direct child of the configured Agent root
+// without building Agent metadata. Workspace lookup is used by the file browser
+// and must not walk every Agent's skills directory.
+func resolveAgentWorkspace(agentDir, agentID string) (string, error) {
+	agentID = strings.TrimSpace(agentID)
+	if agentID == "" || agentID == "." || agentID == ".." || filepath.Base(agentID) != agentID || strings.ContainsAny(agentID, `/\\`) {
+		return "", fmt.Errorf("invalid agentId")
+	}
+
+	root, err := resolveIntegrationAgentDir(agentDir)
 	if err != nil {
 		return "", err
 	}
-	for _, agent := range metadata.Agents {
-		if agent.AgentID == agentID {
-			return agent.Workspace, nil
-		}
+	root, err = filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", fmt.Errorf("resolve agent root: %w", err)
 	}
-	return "", fmt.Errorf("agent not found: %s", agentID)
+	rootInfo, err := os.Stat(root)
+	if err != nil {
+		return "", fmt.Errorf("stat agent root: %w", err)
+	}
+	if !rootInfo.IsDir() {
+		return "", fmt.Errorf("agent root is not a directory")
+	}
+
+	workspace, err := filepath.EvalSymlinks(filepath.Join(root, agentID))
+	if err != nil {
+		return "", fmt.Errorf("resolve agent workspace: %w", err)
+	}
+	workspaceInfo, err := os.Stat(workspace)
+	if err != nil {
+		return "", fmt.Errorf("stat agent workspace: %w", err)
+	}
+	if !workspaceInfo.IsDir() || !ensurePathWithinRoot(root, workspace) {
+		return "", fmt.Errorf("agent workspace is invalid")
+	}
+	return workspace, nil
 }
 
 func formatRoundLogTime(value string) string {

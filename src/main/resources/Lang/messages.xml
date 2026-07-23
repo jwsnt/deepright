@@ -35,6 +35,7 @@
     <entry key="token.skill">创建技能</entry>
     <entry key="token.cron">计划任务</entry>
     <entry key="token.task">合作任务</entry>
+    <entry key="token.test">测试配置</entry>
     <entry key="token.chat">对话</entry>
     <entry key="plan.create">[正在制定规划]</entry>
     <entry key="plan.update">[正在更新规划]</entry>

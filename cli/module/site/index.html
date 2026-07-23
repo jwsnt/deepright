@@ -2646,6 +2646,12 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 @keyframes modelTestSpin{to{transform:rotate(360deg)}}
 @keyframes modelTestCounterSpin{to{transform:rotate(-360deg)}}
 .model-entry.model-test-running{box-shadow:0 0 0 1px rgba(255,150,83,.18),0 10px 24px rgba(255,150,83,.08)}
+.model-test-wait{position:absolute;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:0 12px;box-sizing:border-box;border:1px solid rgba(255,150,83,.58);border-radius:14px;background:var(--modal-field-bg);color:#b25735;font-size:12px;font-weight:700;line-height:1.2;text-align:center;white-space:nowrap;cursor:wait;user-select:none;pointer-events:auto;box-shadow:inset 0 0 0 999px rgba(255,150,83,.08);animation:modelTestWaitPulse 1.05s ease-in-out infinite}
+.model-entry.model-test-running .model-test-wait{display:flex}
+/* During a probe this is a replacement state, not a translucent overlay. */
+.model-entry.model-test-running .password-wrap > :not(.model-test-wait){visibility:hidden!important}
+@keyframes modelTestWaitPulse{0%,100%{box-shadow:inset 0 0 0 999px rgba(255,150,83,.05)}50%{box-shadow:inset 0 0 0 999px rgba(255,150,83,.15)}}
+@media (prefers-reduced-motion:reduce){.model-test-wait{animation:none;opacity:1;filter:none}}
 .model-test-result{max-height:0;overflow:auto;opacity:0;margin:0;padding:0 2px;color:var(--text-secondary);font-size:11px;line-height:1.45;transition:max-height .2s ease,opacity .18s ease,margin .2s ease,padding .2s ease}
 .model-test-result.show{max-height:64px;opacity:1;margin-top:1px;padding:2px 2px 0}
 .model-test-result.success{color:#23815b}
@@ -2677,6 +2683,7 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .model-config-field span{font-size:12px;line-height:18px;color:var(--text-muted);min-width:0;display:flex;align-items:center;min-height:18px;white-space:nowrap}
 .model-config-field input{width:100%;min-width:0;padding:8px 12px;border:1px solid rgba(var(--accent-rgb),.18);border-radius:14px;background:rgba(255,252,248,.9);color:var(--text-primary);font-size:12px;outline:none;transition:var(--transition);box-shadow:inset 0 1px 0 rgba(255,255,255,.78)}
 .model-config-field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(var(--accent-soft-rgb),.14)}
+.model-config-field input[aria-invalid="true"]{border-color:#dc4b4b;box-shadow:0 0 0 3px rgba(220,75,75,.13)}
 .model-config-field input[readonly]{opacity:.7;cursor:default}
 .model-config-field input[disabled]{opacity:.55;cursor:not-allowed}
 .model-config-field.disabled span{opacity:.68}
@@ -2762,6 +2769,7 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 [data-theme="dark"] .model-entry-status{border-color:rgba(245,166,35,.32);background:rgba(245,166,35,.14);color:#ffcf83}
 [data-theme="dark"] .model-config-toggle.has-config{border-color:rgba(127,165,255,.48);background:rgba(var(--accent-soft-rgb),.18);color:#9fc4ff}
 [data-theme="dark"] .model-test-btn.is-running{border-color:rgba(255,172,117,.68);color:#ffbd8b;background:rgba(255,154,90,.16)}
+[data-theme="dark"] .model-test-wait{border-color:rgba(255,172,117,.66);background:var(--modal-field-bg);color:#ffc39e}
 [data-theme="dark"] .model-test-result.success{color:#83e7b7}
 [data-theme="dark"] .model-config-overflow-preview{box-shadow:0 20px 44px rgba(0,0,0,.36),inset 0 1px 0 rgba(255,255,255,.08)}
 [data-theme="dark"] .model-key-hint-preview{border-color:rgba(127,165,255,.34);background:linear-gradient(180deg,rgba(15,27,49,.98),rgba(10,20,38,.94));color:#a9c7ff;box-shadow:0 22px 46px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.08)}
@@ -3070,6 +3078,16 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .rs-meta-center-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;opacity:0;visibility:hidden;transition:opacity .22s ease,visibility 0s linear .22s}
 .rs-meta-center-overlay.show{opacity:1;visibility:visible;transition:opacity .22s ease}
 .rs-meta-center-overlay.meta-preview-editing-lock{background:rgba(9,18,33,.16);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+#memoMetaPreviewOnboardingLayer{position:absolute;inset:0;z-index:6;opacity:0;visibility:hidden;pointer-events:none;isolation:isolate;transition:opacity .22s ease,visibility 0s linear .22s}
+#memoMetaPreviewOnboardingLayer.show{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .22s ease}
+#memoMetaPreviewOnboardingLayer .onboarding-blocker{pointer-events:none!important}
+#memoMetaPreviewOnboardingLayer .onboarding-card{pointer-events:auto}
+/* The preview is intentionally a passive overlay. Its generic inactive rule
+   disables every descendant, so explicitly restore the nested guide card. */
+#rsMetaCenterPreview.meta-preview-interactive[data-overlay-front="0"] #memoMetaPreviewOnboardingLayer.show,
+#rsMetaCenterPreview.meta-preview-interactive[data-overlay-front="0"] #memoMetaPreviewOnboardingLayer.show .onboarding-card,
+#rsMetaCenterPreview.meta-preview-interactive[data-overlay-front="0"] #memoMetaPreviewOnboardingLayer.show .onboarding-card *{pointer-events:auto!important}
+#rsMetaCenterPreview.meta-preview-interactive[data-overlay-front="0"] #memoMetaPreviewOnboardingLayer.show .onboarding-blocker{pointer-events:none!important}
 /* Editing owns the entire overlay: clicks outside the card must be consumed
    here and never reach the calendar or timeline underneath. */
 #rsMetaCenterPreview.meta-preview-editing-lock[data-overlay-active="1"]{pointer-events:auto !important}
@@ -5023,6 +5041,24 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
   </section>
 </div>
 <div class="rs-meta-center-overlay" id="rsMetaCenterPreview" data-overlay-base data-overlay-domain="center" data-overlay-order="23" data-overlay-passive="1" aria-hidden="true" onpointerdown="memoPreviewEditLockOverlayPointerDown(event)" onclick="memoPreviewEditLockOverlayClick(event)">
+  <div class="memo-meta-preview-onboarding-layer onboarding-domain-overlay" id="memoMetaPreviewOnboardingLayer" aria-hidden="true">
+    <div class="onboarding-blocker onboarding-blocker-top"></div>
+    <div class="onboarding-blocker onboarding-blocker-left"></div>
+    <div class="onboarding-blocker onboarding-blocker-right"></div>
+    <div class="onboarding-blocker onboarding-blocker-bottom"></div>
+    <div class="onboarding-spotlight"></div>
+    <div class="onboarding-card">
+      <div class="onboarding-card-head">
+        <div class="onboarding-card-kicker">新手引导</div>
+        <button class="onboarding-card-close hidden" type="button" onclick="handleOnboardingDismiss(event)" title="跳过当前引导" aria-label="跳过当前引导"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5.25v13.5L15.2 12 5 5.25Zm10.8 0v13.5H19V5.25h-3.2Z"/></svg></button>
+      </div>
+      <div class="onboarding-card-text"></div>
+      <div class="onboarding-card-actions">
+        <button class="onboarding-card-btn secondary onboarding-card-btn-secondary hidden" type="button" data-onboarding-action="secondary" onclick="handleOnboardingAction(event)"></button>
+        <button class="onboarding-card-btn onboarding-card-btn-primary hidden" type="button" data-onboarding-action="primary" onclick="handleOnboardingAction(event)"></button>
+      </div>
+    </div>
+  </div>
   <div class="rs-meta-center-card" onpointerenter="memoDetailPreviewCardEnter()" onpointerleave="memoDetailPreviewCardLeave()">
     <div class="rs-meta-center-head">
       <div class="rs-meta-center-kicker">Memo Metadata</div>
@@ -6420,6 +6456,7 @@ const DOC_TIDY_TOUR_CLICK_KEY = 'deepright_doc_tidy_tour_clicked';
 const KNOWLEDGE_FILE_TOUR_CLICK_KEY = 'deepright_knowledge_file_tour_clicked';
 const MEMO_TOUR_CLICK_KEY = 'deepright_memo_tour_clicked';
 const MEMO_TASK_TOUR_CLICK_KEY = 'deepright_memo_task_tour_clicked';
+const MEMO_META_PREVIEW_TOUR_CLICK_KEY = 'deepright_memo_meta_preview_tour_clicked_v2';
 const MEMO_COMPLETION_TOUR_CLICK_KEY = 'deepright_memo_completion_tour_clicked';
 const MEMO_RECURRING_TOUR_CLICK_KEY = 'deepright_memo_recurring_tour_clicked';
 const MEMO_STOP_TOUR_CLICK_KEY = 'deepright_memo_stop_tour_clicked';
@@ -6513,6 +6550,7 @@ let runtimeModelTokenCache = Object.create(null);
 const modelTestRequests = new Set();
 let modelTestRequestSequence = 0;
 const MODEL_TEST_CONFIG_KEYS = Object.freeze(['token', '__url', '__model', '__model_fast', '__model_thinking', '__model_multi_input', '__model_multi_output']);
+const DEEPRIGHT_TEST_MODEL = 'deepright';
 
 function getStoredOnboardingEnabled() {
   try {
@@ -7074,6 +7112,9 @@ let browserInstanceInitTourState = {
 };
 let memoTourState = {
   starting: false
+};
+let memoMetaPreviewTourState = {
+  pendingStart: false
 };
 let skillTourState = {
   starting: false,
@@ -9317,6 +9358,20 @@ function markMemoTaskTourClickRecord() {
   } catch {}
 }
 
+function hasMemoMetaPreviewTourClickRecord() {
+  try {
+    return localStorage.getItem(MEMO_META_PREVIEW_TOUR_CLICK_KEY) === '1';
+  } catch {
+    return true;
+  }
+}
+
+function markMemoMetaPreviewTourClickRecord() {
+  try {
+    localStorage.setItem(MEMO_META_PREVIEW_TOUR_CLICK_KEY, '1');
+  } catch {}
+}
+
 function hasMemoCompletionTourClickRecord() {
   try {
     return localStorage.getItem(MEMO_COMPLETION_TOUR_CLICK_KEY) === '1';
@@ -11236,6 +11291,20 @@ function getOnboardingStepConfig(step) {
         cardOffsetY: 16,
         targetClass: 'onboarding-memo-detail-view-target'
       };
+    case 'memo-meta-preview-detail-list':
+      return {
+        domain: 'center',
+        selector: '#memoMetaPreviewDetailListAction',
+        message: '点击列表，查看具体任务明细。',
+        actionLabel: '完成',
+        padding: 8,
+        highlightPadding: 12,
+        cardPlacement: 'below-left',
+        cardWidth: 288,
+        cardMinHeight: 118,
+        cardOffsetX: -168,
+        cardOffsetY: 16
+      };
     case 'memo-task-tour-confirm':
       return {
         domain: 'right',
@@ -12805,6 +12874,7 @@ function clearDeferredOnboardingStarts(options = {}) {
   if (rightSidebarUrlPreviewTourState) rightSidebarUrlPreviewTourState.pendingStart = false;
   if (messageUrlTourState) messageUrlTourState.pendingStart = false;
   if (chatCompletionTourState) chatCompletionTourState.pendingStart = false;
+  if (memoMetaPreviewTourState) memoMetaPreviewTourState.pendingStart = false;
   if (memoRecurringTourState) memoRecurringTourState.pendingStart = false;
   if (memoCompletionTourState) memoCompletionTourState.pendingStart = false;
   if (pluginSuccessTourState) pluginSuccessTourState.pendingStart = false;
@@ -13443,6 +13513,12 @@ function maybeCollapseRightSidebarForOnboardingFloatingStep(step) {
   if (!isOnboardingActive()) return false;
   const normalizedStep = String(step || '').trim();
   if (!normalizedStep) return false;
+  // This guide is mounted inside the metadata preview itself. Collapse the
+  // right sidebar as usual, but preserve that preview as its guide container.
+  if (isMemoMetaPreviewTourOnboardingStep(normalizedStep)) {
+    if (!isRightSidebarCollapsed()) applyRightSidebarState(true, { resetPanelState: false });
+    return true;
+  }
   if (isSettingsOnboardingStep(normalizedStep)) {
     if (!isRightSidebarCollapsed()) applyRightSidebarState(true);
     return true;
@@ -14457,6 +14533,10 @@ function isMemoTourOnboardingStep(step) {
   ].includes(String(step || '').trim());
 }
 
+function isMemoMetaPreviewTourOnboardingStep(step) {
+  return String(step || '').trim() === 'memo-meta-preview-detail-list';
+}
+
 function isMemoTaskTourOnboardingStep(step) {
   return ['memo-task-tour-confirm', 'memo-task-tour-demo'].includes(String(step || '').trim());
 }
@@ -14523,6 +14603,7 @@ function isRemoteAgentTourInteractionLocked() {
 function isMemoTourInteractionLocked() {
   return isOnboardingActive() && (
     isMemoTourOnboardingStep(onboardingState.step) ||
+    isMemoMetaPreviewTourOnboardingStep(onboardingState.step) ||
     isMemoTaskTourOnboardingStep(onboardingState.step) ||
     isMemoStopTourOnboardingStep(onboardingState.step) ||
     isMemoRecurringTourOnboardingStep(onboardingState.step) ||
@@ -19365,6 +19446,114 @@ function syncSettingsOnboardingLayer(config, target, targetRect) {
   }
 }
 
+function setMemoMetaPreviewTourCardInert(active) {
+  const card = document.querySelector('#rsMetaCenterPreview .rs-meta-center-card');
+  if (!card) return;
+  card.inert = !!active;
+  card.toggleAttribute('inert', !!active);
+}
+
+function syncMemoMetaPreviewOnboardingLayer(config, targetRect) {
+  const layer = document.getElementById('memoMetaPreviewOnboardingLayer');
+  const preview = document.getElementById('rsMetaCenterPreview');
+  if (!layer || !preview) return;
+  const active = !!(
+    isOnboardingActive() &&
+    isMemoMetaPreviewTourOnboardingStep(onboardingState.step) &&
+    config &&
+    preview.classList.contains('show') &&
+    memoMetaPreviewState.metaId
+  );
+  layer.classList.toggle('show', active);
+  layer.setAttribute('aria-hidden', active ? 'false' : 'true');
+  layer.setAttribute('data-onboarding-active', active ? '1' : '0');
+  layer.setAttribute('data-onboarding-step', active ? String(onboardingState.step || '') : '');
+  setMemoMetaPreviewTourCardInert(active);
+  if (!active) {
+    layer.classList.remove('has-card', 'has-target');
+    const card = layer.querySelector('.onboarding-card');
+    if (card) resetOnboardingCardLayout(card);
+    syncOnboardingCardContent(layer, null);
+    return;
+  }
+  const layerRect = layer.getBoundingClientRect();
+  const card = layer.querySelector('.onboarding-card');
+  const cardState = syncOnboardingCardContent(layer, config);
+  const resolvedConfig = getResolvedOnboardingCardConfig(config, cardState);
+  if (!targetRect || !layerRect.width || !layerRect.height) {
+    layer.classList.remove('has-target');
+    layer.classList.add('has-card');
+    if (card) {
+      const layout = getOnboardingStandaloneCardLayout(layerRect, resolvedConfig, cardState);
+      applyOnboardingCardLayout(card, layerRect, layout);
+    }
+    return;
+  }
+  const padding = Number(config.padding || 12);
+  const highlightPadding = Number(config.highlightPadding || padding);
+  const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+  const maskLeft = clamp(targetRect.left - layerRect.left - padding, 0, Math.max(0, layerRect.width - 56));
+  const maskTop = clamp(targetRect.top - layerRect.top - padding, 0, Math.max(0, layerRect.height - 40));
+  const maskWidth = clamp(targetRect.width + padding * 2, 56, Math.max(56, layerRect.width - maskLeft));
+  const maskHeight = clamp(targetRect.height + padding * 2, 36, Math.max(36, layerRect.height - maskTop));
+  const highlightLeft = clamp(targetRect.left - layerRect.left - highlightPadding, 0, Math.max(0, layerRect.width - 56));
+  const highlightTop = clamp(targetRect.top - layerRect.top - highlightPadding, 0, Math.max(0, layerRect.height - 40));
+  const highlightWidth = clamp(targetRect.width + highlightPadding * 2, 56, Math.max(56, layerRect.width - highlightLeft));
+  const highlightHeight = clamp(targetRect.height + highlightPadding * 2, 36, Math.max(36, layerRect.height - highlightTop));
+  const topBlocker = layer.querySelector('.onboarding-blocker-top');
+  const leftBlocker = layer.querySelector('.onboarding-blocker-left');
+  const rightBlocker = layer.querySelector('.onboarding-blocker-right');
+  const bottomBlocker = layer.querySelector('.onboarding-blocker-bottom');
+  const spotlight = layer.querySelector('.onboarding-spotlight');
+  if (topBlocker) Object.assign(topBlocker.style, { left: '0px', top: '0px', width: `${layerRect.width}px`, height: `${maskTop}px` });
+  if (leftBlocker) Object.assign(leftBlocker.style, { left: '0px', top: `${maskTop}px`, width: `${maskLeft}px`, height: `${maskHeight}px` });
+  if (rightBlocker) Object.assign(rightBlocker.style, { left: `${maskLeft + maskWidth}px`, top: `${maskTop}px`, width: `${Math.max(0, layerRect.width - maskLeft - maskWidth)}px`, height: `${maskHeight}px` });
+  if (bottomBlocker) Object.assign(bottomBlocker.style, { left: '0px', top: `${maskTop + maskHeight}px`, width: `${layerRect.width}px`, height: `${Math.max(0, layerRect.height - maskTop - maskHeight)}px` });
+  if (spotlight) Object.assign(spotlight.style, { left: `${highlightLeft}px`, top: `${highlightTop}px`, width: `${highlightWidth}px`, height: `${highlightHeight}px` });
+  layer.style.setProperty('--onboarding-left', `${highlightLeft}px`);
+  layer.style.setProperty('--onboarding-top', `${highlightTop}px`);
+  layer.style.setProperty('--onboarding-width', `${highlightWidth}px`);
+  layer.style.setProperty('--onboarding-height', `${highlightHeight}px`);
+  layer.classList.add('has-target');
+  setOnboardingCard(layer, resolvedConfig, true);
+  requestAnimationFrame(() => {
+    if (!isOnboardingActive() || !isMemoMetaPreviewTourOnboardingStep(onboardingState.step)) return;
+    const button = layer.querySelector('.onboarding-card-btn-primary:not(.hidden)');
+    if (button instanceof HTMLElement) button.focus({ preventScroll: true });
+  });
+}
+
+document.addEventListener('keydown', event => {
+  if (!isOnboardingActive() || !isMemoMetaPreviewTourOnboardingStep(onboardingState.step)) return;
+  const layer = document.getElementById('memoMetaPreviewOnboardingLayer');
+  const button = layer && layer.querySelector('.onboarding-card-btn-primary:not(.hidden)');
+  if (!(button instanceof HTMLButtonElement)) return;
+  if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    button.click();
+    return;
+  }
+  if (event.key === 'Tab') {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    button.focus({ preventScroll: true });
+    return;
+  }
+  if (!event.ctrlKey && !event.metaKey && !event.altKey) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+}, true);
+
+document.addEventListener('focusin', event => {
+  if (!isOnboardingActive() || !isMemoMetaPreviewTourOnboardingStep(onboardingState.step)) return;
+  const layer = document.getElementById('memoMetaPreviewOnboardingLayer');
+  const button = layer && layer.querySelector('.onboarding-card-btn-primary:not(.hidden)');
+  if (!(layer instanceof HTMLElement) || !(button instanceof HTMLButtonElement) || layer.contains(event.target)) return;
+  button.focus({ preventScroll: true });
+}, true);
+
 function getSkillExtractOnboardingLayer() {
   const step = String(onboardingState.step || '').trim();
   if (!isSkillTourOnboardingStep(step)) return null;
@@ -19473,6 +19662,12 @@ function syncOnboardingOverlayDomain(overlay, domain, config, target, targetRect
     overlay.classList.remove('has-target');
     return;
   }
+  if (domain === 'center' && isMemoMetaPreviewTourOnboardingStep(onboardingState.step)) {
+    setOverlayVisible(overlay, false);
+    overlay.classList.remove('has-card');
+    overlay.classList.remove('has-target');
+    return;
+  }
   if (!active) {
     setOverlayVisible(overlay, false);
     overlay.classList.remove('has-card');
@@ -19557,6 +19752,7 @@ function syncOnboardingOverlays() {
   });
   syncVfsDragTourDemo(isOnboardingActive() ? config : null, primaryTargetRect);
   syncSettingsOnboardingLayer(isOnboardingActive() ? config : null, target, primaryTargetRect);
+  syncMemoMetaPreviewOnboardingLayer(isOnboardingActive() ? config : null, primaryTargetRect);
   syncSkillExtractOnboardingLayer(isOnboardingActive() ? config : null, primaryTargetRect);
   syncSkillTourGoalInputDemo(primaryTargetRect);
   syncMemoTourAgentHint(primaryTargetRect);
@@ -20133,6 +20329,7 @@ function stopOnboarding(markComplete) {
   onboardingState.step = '';
   setOnboardingTarget(null, null);
   syncSettingsOnboardingLayer(null, null);
+  syncMemoMetaPreviewOnboardingLayer(null, null);
   updateStandaloneButton();
   ['left', 'center', 'right'].forEach(domain => {
     const overlay = getOnboardingOverlay(domain);
@@ -20280,6 +20477,12 @@ function stopOnboarding(markComplete) {
   chatCompletionTourState.phase = 'item';
   restoreEnergySaverAfterOnboarding();
   updateBeeIcons();
+  if (memoMetaPreviewTourState.pendingStart && !hasMemoMetaPreviewTourClickRecord()) {
+    window.setTimeout(() => {
+      if (!memoMetaPreviewTourState.pendingStart || hasMemoMetaPreviewTourClickRecord() || isOnboardingActive()) return;
+      startMemoMetaPreviewTourOnboarding();
+    }, 160);
+  }
   if (chatCompletionTourState.pendingStart && !hasChatCompletionTourClickRecord()) {
     window.setTimeout(() => {
       if (!chatCompletionTourState.pendingStart || hasChatCompletionTourClickRecord() || isOnboardingActive()) return;
@@ -20715,6 +20918,53 @@ async function startMemoTourOnboarding() {
   } finally {
     memoTourState.starting = false;
   }
+}
+
+function memoMetaPreviewTourCanStart() {
+  const overlay = document.getElementById('rsMetaCenterPreview');
+  const action = document.getElementById('memoMetaPreviewDetailListAction');
+  return !!(
+    overlay &&
+    overlay.classList.contains('show') &&
+    memoMetaPreviewState.metaId &&
+    !memoMetaPreviewState.editing &&
+    !memoMetaPreviewState.saving &&
+    !memoMetaPreviewState.deleting &&
+    !memoPreviewRunIsActive() &&
+    !document.getElementById('rsSaveLock')?.classList.contains('show') &&
+    action instanceof HTMLButtonElement &&
+    !action.disabled
+  );
+}
+
+function startMemoMetaPreviewTourOnboarding() {
+  return withOnboardingStartLock(() => {
+    if (hasMemoMetaPreviewTourClickRecord() || !memoMetaPreviewTourCanStart()) {
+      memoMetaPreviewTourState.pendingStart = false;
+      return false;
+    }
+    memoMetaPreviewTourState.pendingStart = false;
+    memoMetaPreviewClearCloseTimer();
+    onboardingState.active = true;
+    setOnboardingStep('memo-meta-preview-detail-list');
+    if (!isOnboardingActive() || !isMemoMetaPreviewTourOnboardingStep(onboardingState.step)) return false;
+    markMemoMetaPreviewTourClickRecord();
+    return true;
+  });
+}
+
+function queueMemoMetaPreviewTourOnboarding() {
+  if (!isOnboardingEnabled() || hasMemoMetaPreviewTourClickRecord()) {
+    memoMetaPreviewTourState.pendingStart = false;
+    return false;
+  }
+  memoMetaPreviewTourState.pendingStart = true;
+  requestAnimationFrame(() => {
+    if (!memoMetaPreviewTourState.pendingStart || hasMemoMetaPreviewTourClickRecord()) return;
+    if (isOnboardingStartLocked()) return;
+    startMemoMetaPreviewTourOnboarding();
+  });
+  return true;
 }
 
 async function startMemoTaskTourOnboarding() {
@@ -21471,6 +21721,9 @@ function handleOnboardingAction(event) {
       return;
     case 'memo-task-tour-demo':
       if (!memoTaskTourState.demoDone) return;
+      stopOnboarding(false);
+      return;
+    case 'memo-meta-preview-detail-list':
       stopOnboarding(false);
       return;
     case 'memo-stop-tour-toggle':
@@ -41890,21 +42143,16 @@ function handleSwarmDescInput() {
 
 function renderModelEntries() {
   const container = document.getElementById('modelEntries');
-  const addBtn = document.querySelector('.add-model-btn');
   const models = normalizeModelMap(state.settings.models || {});
   state.settings.models = models;
   syncModelRuntimeTokenCacheFromSettings();
-  if (addBtn) {
-    const remoteRestricted = isRemoteReadonlySiteAccess();
-    addBtn.disabled = remoteRestricted;
-    addBtn.title = remoteRestricted ? '远程访问下不允许新增模型配置' : '';
-  }
   const keys = getOrderedConfiguredModelNames(models);
   cancelAllModelConfigurationTests({ silent: true });
   hideModelKeyHintPreview();
   hideModelConfigOverflowPreview();
   if (keys.length === 0) {
     container.innerHTML = '';
+    refreshAddModelButton();
     renderSettingsAccessNote();
     refreshSwarmModelAvailability();
     scheduleOnboardingSync();
@@ -42301,6 +42549,26 @@ function copyModelConfigFrom(btn) {
   scheduleOnboardingSync();
 }
 
+function getUnconfiguredModelNames() {
+  const occupiedModels = new Set();
+  document.querySelectorAll('#modelEntries .model-entry').forEach(entry => {
+    const model = normalizeModelName(entry.querySelector('select') && entry.querySelector('select').value);
+    if (model) occupiedModels.add(model);
+  });
+  return getAvailableModelNames().filter(model => !occupiedModels.has(model));
+}
+
+function refreshAddModelButton() {
+  const addBtn = document.querySelector('.add-model-btn');
+  if (!addBtn) return;
+  const hasUnconfiguredModel = getUnconfiguredModelNames().length > 0;
+  const remoteRestricted = isRemoteReadonlySiteAccess();
+  addBtn.hidden = !hasUnconfiguredModel;
+  addBtn.disabled = remoteRestricted || !hasUnconfiguredModel;
+  addBtn.title = remoteRestricted ? '远程访问下不允许新增模型配置' : '';
+  addBtn.setAttribute('aria-hidden', hasUnconfiguredModel ? 'false' : 'true');
+}
+
 function refreshModelEntryOptions() {
   document.querySelectorAll('#modelEntries .model-entry').forEach(entry => {
     const select = entry.querySelector('select');
@@ -42311,16 +42579,60 @@ function refreshModelEntryOptions() {
       select.value = currentModel;
     }
   });
+  refreshAddModelButton();
 }
 
 function getModelTestUnavailableReason(model, config) {
   if (isRemoteReadonlySiteAccess()) return '远程访问下不可测试配置';
   const normalizedModel = normalizeModelName(model);
   if (!normalizedModel) return '请先选择模型服务商';
+  if (normalizedModel === 'seedream') return 'Seedream 不支持对话模型配置测试';
   const current = normalizeModelConfig(config);
   if (!String(current.token || '').trim() || isMaskedRemoteTokenValue(current.token)) return '请先填写模型密钥';
-  if (!String(current.__model || '').trim()) return '请先填写基础模型 __model';
+  if (!isValidModelServiceURL(current.__url)) return MODEL_SERVICE_URL_FORMAT_ERROR;
+  if (!getModelTestBaseModel(normalizedModel, current)) return '请先填写基础模型 __model';
   return '';
+}
+
+const MODEL_SERVICE_URL_FORMAT_ERROR = '模型 URL 格式不正确，请填写 http:// 或 https:// 开头的完整 URL';
+const MODEL_SERVICE_URL_ALLOWED_CHARACTERS = /^[A-Za-z0-9\-._~:/?#[\]@!$&'()*+,;=%]+$/;
+
+function isValidModelServiceURL(value) {
+  const text = String(value || '').trim();
+  if (!text) return true;
+  if (!MODEL_SERVICE_URL_ALLOWED_CHARACTERS.test(text) || !hasValidModelServiceURLPercentEncoding(text)) return false;
+  try {
+    const parsed = new URL(text);
+    return (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+      !!parsed.hostname && !parsed.username && !parsed.password;
+  } catch (_) {
+    return false;
+  }
+}
+
+function hasValidModelServiceURLPercentEncoding(value) {
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index] !== '%') continue;
+    if (!/^[0-9A-Fa-f]{2}$/.test(value.slice(index + 1, index + 3))) return false;
+    index += 2;
+  }
+  return true;
+}
+
+function syncModelServiceURLInputValidity(input) {
+  if (!input) return true;
+  const valid = isValidModelServiceURL(input.value);
+  input.setCustomValidity(valid ? '' : MODEL_SERVICE_URL_FORMAT_ERROR);
+  input.setAttribute('aria-invalid', valid ? 'false' : 'true');
+  if (valid) input.removeAttribute('title');
+  else input.title = MODEL_SERVICE_URL_FORMAT_ERROR;
+  return valid;
+}
+
+function getModelTestBaseModel(model, config) {
+  const normalizedModel = normalizeModelName(model);
+  if (normalizedModel === 'deepright') return DEEPRIGHT_TEST_MODEL;
+  return String(config && config.__model || '').trim();
 }
 
 function buildModelTestConfigSnapshot(model, rawConfig) {
@@ -42343,8 +42655,9 @@ function modelTestSnapshotHasConfiguration(snapshot) {
 
 function modelEntryNeedsConfigurationTest(model, rawConfig, originalModel) {
   const normalizedModel = normalizeModelName(model);
-  if (!normalizedModel) return false;
+  if (!normalizedModel || normalizedModel === 'seedream') return false;
   const current = buildModelTestConfigSnapshot(normalizedModel, rawConfig);
+  if (!current.token || isMaskedRemoteTokenValue(current.token)) return false;
   const savedModel = normalizeModelName(originalModel);
   if (!savedModel) return modelTestSnapshotHasConfiguration(current);
   const savedConfig = state.settings.models && state.settings.models[savedModel];
@@ -42390,7 +42703,7 @@ function getModelConfigurationTestRequest(entry) {
       model,
       token: String(config.token || '').trim(),
       __url: String(config.__url || '').trim(),
-      __model: String(config.__model || '').trim(),
+      __model: getModelTestBaseModel(model, config),
       __model_fast: String(config.__model_fast || '').trim(),
       __model_thinking: String(config.__model_thinking || '').trim(),
       __model_multi_input: String(config.__model_multi_input || '').trim(),
@@ -42597,8 +42910,8 @@ function modelEntryHtml(idx, model, rawConfig, originalModel) {
     ? ' disabled title="远程访问下不允许删除已保存模型配置"'
     : ' title="删除模型"';
   const configToggleTitle = remotePersisted ? '客户化配置（只读）' : '客户化配置';
-  const testUnavailableReason = getModelTestUnavailableReason(model, cfg);
   const testVisible = modelEntryNeedsConfigurationTest(model, rawConfig, normalizedOriginalModel);
+  const testUnavailableReason = testVisible ? getModelTestUnavailableReason(model, cfg) : '';
   const testDisabledAttr = testUnavailableReason ? ' disabled' : '';
   const testTitle = testUnavailableReason || '测试配置';
   return `<div class="model-entry" data-idx="${idx}"${originalAttr}>
@@ -42606,6 +42919,7 @@ function modelEntryHtml(idx, model, rawConfig, originalModel) {
       <select onchange="onModelChange(this)"${selectDisabledAttr}>${'<option value="">选择模型</option>' + opts}</select>
       <div class="${passwordWrapClass}">
         <input class="model-token-input secret-masked" type="text" value="${esc(cfg.token || '')}" maxlength="250" placeholder="填写密钥" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true"${tokenTitleAttr}${tokenInputReadonlyAttr} />
+        <span class="model-test-wait" role="status" aria-live="polite">正在测试配置，请耐心等待。</span>
         ${showDeeprightMediaLauncher ? `<button class="password-media-launch-btn" data-media-launcher-kind="password" onclick="handleMediaConfigLaunch(event,this)" onmouseenter="handleMediaConfigLaunchHover(event,this)" onfocus="handleMediaConfigLaunchHover(event,this)" type="button" title="编辑多模态输出参数"><span class="media-output-launch-dot"></span></button>` : ''}
         ${remoteMaskedToken ? '' : `<button class="eye-btn" onclick="toggleEye(this)" type="button">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -42635,7 +42949,7 @@ function modelEntryHtml(idx, model, rawConfig, originalModel) {
           <div class="model-config-head">
             <span class="model-config-head-label">模型URL</span>
           </div>
-          <input class="model-base-url-input" type="text" value="${esc(cfg.__url || '')}" placeholder="https://api.example.com/v1" autocomplete="off"${urlAttr} />
+          <input class="model-base-url-input" type="url" value="${esc(cfg.__url || '')}" placeholder="https://api.example.com/v1" autocomplete="off" inputmode="url"${urlAttr} />
         </label>
       </div>
       <div class="model-config-split">
@@ -42703,6 +43017,10 @@ function replaceModelEntry(entry, model, rawConfig) {
 function addModelEntry() {
   if (isRemoteReadonlySiteAccess()) {
     setSettingsErrorMessage('远程访问下不允许新增模型配置');
+    return;
+  }
+  if (getUnconfiguredModelNames().length === 0) {
+    refreshAddModelButton();
     return;
   }
   const container = document.getElementById('modelEntries');
@@ -42846,6 +43164,31 @@ function updateModelConfigToggleState(entry) {
   toggle.classList.toggle('has-config', !!state.hasConfig);
 }
 
+const MODEL_CONFIG_MODEL_INPUT_SELECTORS = Object.freeze([
+  '.model-base-model-input',
+  '.model-fast-model-input',
+  '.model-thinking-model-input',
+  '.model-multi-input-input',
+  '.model-multi-output-input'
+]);
+
+function copyModelValueToEmptyModelInputs(entry, sourceInput) {
+  if (!entry || !sourceInput || sourceInput.disabled || sourceInput.readOnly) return;
+  const value = String(sourceInput.value || '');
+  if (!value.trim()) return;
+  const sourceSelector = MODEL_CONFIG_MODEL_INPUT_SELECTORS.find(selector => sourceInput.matches(selector));
+  if (!sourceSelector) return;
+
+  MODEL_CONFIG_MODEL_INPUT_SELECTORS.forEach(selector => {
+    const targetInput = entry.querySelector(selector);
+    if (!targetInput || targetInput === sourceInput || targetInput.disabled || targetInput.readOnly) return;
+    const wasAutoFilledBySource = targetInput.dataset.modelAutoFilledBy === sourceSelector;
+    if (String(targetInput.value || '').trim() && !wasAutoFilledBySource) return;
+    targetInput.value = value;
+    targetInput.dataset.modelAutoFilledBy = sourceSelector;
+  });
+}
+
 function attachModelConfigInputListeners(entry) {
   if (!entry) return;
   const select = entry.querySelector('select');
@@ -42881,17 +43224,17 @@ function attachModelConfigInputListeners(entry) {
   }
   const configSelectors = [
     '.model-base-url-input',
-    '.model-base-model-input',
-    '.model-fast-model-input',
-    '.model-thinking-model-input',
-    '.model-multi-input-input',
-    '.model-multi-output-input'
+    ...MODEL_CONFIG_MODEL_INPUT_SELECTORS
   ];
   configSelectors.forEach(selector => {
     const input = entry.querySelector(selector);
     if (!input || input.dataset.configWatchBound === '1') return;
     input.dataset.configWatchBound = '1';
+    if (selector === '.model-base-url-input') syncModelServiceURLInputValidity(input);
     input.addEventListener('input', () => {
+      if (selector === '.model-base-url-input') syncModelServiceURLInputValidity(input);
+      if (input.dataset.modelAutoFilledBy) delete input.dataset.modelAutoFilledBy;
+      copyModelValueToEmptyModelInputs(entry, input);
       const hasAnyValue = !!(
         String(entry.querySelector('.model-base-url-input') && entry.querySelector('.model-base-url-input').value || '').trim() ||
         String(entry.querySelector('.model-base-model-input') && entry.querySelector('.model-base-model-input').value || '').trim() ||
@@ -43120,6 +43463,10 @@ async function saveSettingsAsync() {
       __custom_cleared: canCustomize && e.getAttribute('data-custom-cleared') === '1'
     };
     if (!m && !cfg.token && !cfg.__url && !cfg.__model && !cfg.__model_fast && !cfg.__model_thinking && !cfg.__model_multi_input && !cfg.__model_multi_output) return;
+    if (cfg.__url && !isValidModelServiceURL(cfg.__url)) {
+      err = MODEL_SERVICE_URL_FORMAT_ERROR;
+      return;
+    }
     if (m && !cfg.token) {
       if (originalModel) {
         err = `模型 ${m} 必须配置密钥`;
@@ -43972,15 +44319,38 @@ function vfsInit() {
 async function vfsLoadWorkspace() {
   const requestSeq = ++vfsLoadRequestSeq;
   const requestedAgentId = getVfsRequestedAgentId();
+  const isCurrentRequest = () => requestSeq === vfsLoadRequestSeq && requestedAgentId === getVfsRequestedAgentId();
   vfsCurrentPath = '';
   vfsLastJson = '';
   vfsSelected.clear();
   if (requestedAgentId) setVfsLoadingState(requestedAgentId);
   let agentId = requestedAgentId;
   let workspace = agentId ? String(vfsWorkspaceByAgent.get(agentId) || '').trim() : '';
-  if (!workspace) {
+  let resolveAgentFromList = !agentId;
+  if (!workspace && agentId) {
+    try {
+      const resp = await fetch('/api/workspace?agentId=' + encodeURIComponent(agentId), { cache: 'no-store' });
+      if (!isCurrentRequest()) return false;
+      if (resp.ok) {
+        workspace = (await resp.text()).trim();
+        if (!isCurrentRequest()) return false;
+        if (workspace) vfsWorkspaceByAgent.set(agentId, workspace);
+      } else if (resp.status === 404) {
+        // A renamed Agent can still be stored under the previous casing. Only
+        // then fall back to listing Agents and retrying the resolved name.
+        resolveAgentFromList = true;
+      } else {
+        setVfsLoadFailure('工作区加载失败');
+        return false;
+      }
+    } catch {
+      setVfsLoadFailure('工作区加载失败');
+      return false;
+    }
+  }
+  if (!workspace && resolveAgentFromList) {
     const resolvedAgentId = applyResolvedAgentSelection(requestedAgentId, resolveAgentSelection(requestedAgentId, await fetchAgentList()));
-    if (requestSeq !== vfsLoadRequestSeq) return false;
+    if (!isCurrentRequest()) return false;
     agentId = resolvedAgentId || requestedAgentId;
   }
   if (!agentId) {
@@ -43996,14 +44366,14 @@ async function vfsLoadWorkspace() {
   }
   try {
     if (!workspace) {
-      const resp = await fetch('/api/workspace?agentId=' + encodeURIComponent(agentId));
-      if (requestSeq !== vfsLoadRequestSeq) return false;
+      const resp = await fetch('/api/workspace?agentId=' + encodeURIComponent(agentId), { cache: 'no-store' });
+      if (!isCurrentRequest()) return false;
       if (!resp.ok) {
         setVfsLoadFailure('工作区加载失败');
         return false;
       }
       workspace = (await resp.text()).trim();
-      if (requestSeq !== vfsLoadRequestSeq) return false;
+      if (!isCurrentRequest()) return false;
       if (workspace) vfsWorkspaceByAgent.set(agentId, workspace);
     }
     vfsWorkspace = workspace;
@@ -44020,7 +44390,7 @@ async function vfsLoadWorkspace() {
     // Knowledge metadata is useful to the right sidebar but must not delay
     // the file list becoming visible.
     await loadWikiKnowledgePath();
-    if (requestSeq !== vfsLoadRequestSeq) return false;
+    if (!isCurrentRequest()) return false;
     const wikiState = ensureWikiPanelState();
     const homeDoc = getWikiHomeDoc(agentId);
     const agentChanged = String(wikiState.currentAgentId || '').trim() !== agentId;
@@ -46197,6 +46567,7 @@ function getVisibleOnboardingActionButton() {
     getOnboardingOverlay('left'),
     getOnboardingOverlay('center'),
     getOnboardingOverlay('right'),
+    document.getElementById('memoMetaPreviewOnboardingLayer'),
     document.getElementById('settingsOnboardingLayer'),
     getSkillExtractOnboardingLayer()
   ];
@@ -46214,6 +46585,7 @@ function getVisibleOnboardingSecondaryButton() {
     getOnboardingOverlay('left'),
     getOnboardingOverlay('center'),
     getOnboardingOverlay('right'),
+    document.getElementById('memoMetaPreviewOnboardingLayer'),
     document.getElementById('settingsOnboardingLayer'),
     getSkillExtractOnboardingLayer()
   ];
@@ -51328,7 +51700,7 @@ function memoMetaPreviewActionMarkup(editing, saving) {
 function memoMetaPreviewDetailListMarkup() {
   if (!memoMetaPreviewState.metaId) return '';
   const disabled = (memoMetaPreviewState.saving || memoMetaPreviewState.deleting || memoPreviewRunIsFor('meta', memoMetaPreviewState.metaId) || document.getElementById('rsSaveLock')?.classList.contains('show')) ? ' disabled' : '';
-  return '<button type="button" class="rs-meta-center-action rs-meta-center-detail-list-action" onclick="memoMetaPreviewOpenDetailList()" title="查看任务明细" aria-label="查看任务明细"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h11"/><path d="M8 12h11"/><path d="M8 18h11"/><path d="M4 6h.01"/><path d="M4 12h.01"/><path d="M4 18h.01"/></svg></button>';
+  return '<button type="button" class="rs-meta-center-action rs-meta-center-detail-list-action" id="memoMetaPreviewDetailListAction" onclick="memoMetaPreviewOpenDetailList()" title="查看任务明细" aria-label="查看任务明细"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h11"/><path d="M8 12h11"/><path d="M8 18h11"/><path d="M4 6h.01"/><path d="M4 12h.01"/><path d="M4 18h.01"/></svg></button>';
 }
 function memoMetaPreviewOpenDetailList() {
   const meta = memoMetaPreviewState.meta;
@@ -51432,9 +51804,13 @@ function rsShowMetaCenterPreview(meta, options = {}) {
   rsRenderMetaCenterPreview(meta, options);
   rsSetMetaPreviewFocus(true);
   showPassiveOverlay(overlay);
+  if (options.metadata && !options.editing) queueMemoMetaPreviewTourOnboarding();
 }
 
 function rsHideMetaCenterPreview() {
+  if (isOnboardingActive() && isMemoMetaPreviewTourOnboardingStep(onboardingState.step)) {
+    stopOnboarding(false);
+  }
   const overlay = document.getElementById('rsMetaCenterPreview');
   rsSetMetaPreviewFocus(false);
   rsSetMetaPreviewInteractive(false);
@@ -51776,7 +52152,7 @@ function memoMetaPreviewHide(options = {}) {
 }
 function memoMetaPreviewScheduleClose() {
   memoMetaPreviewClearCloseTimer();
-  if (memoPreviewRunIsActive() || memoMetaPreviewState.editing || memoMetaPreviewState.saving || memoMetaPreviewState.sourceHovered || memoMetaPreviewState.cardHovered || memoMetaPreviewCardIsHovered() || !memoMetaPreviewState.metaId) return;
+  if (isMemoMetaPreviewTourOnboardingStep(onboardingState.step) || memoPreviewRunIsActive() || memoMetaPreviewState.editing || memoMetaPreviewState.saving || memoMetaPreviewState.sourceHovered || memoMetaPreviewState.cardHovered || memoMetaPreviewCardIsHovered() || !memoMetaPreviewState.metaId) return;
   const metaId = memoMetaPreviewState.metaId;
   const closeGeneration = ++memoMetaPreviewState.closeGeneration;
   memoMetaPreviewState.closeTimer = setTimeout(() => {

@@ -3883,6 +3883,53 @@ func TestResolveFileTargetRelativeRequiresAgentID(t *testing.T) {
 	}
 }
 
+func TestHandleWorkspaceResolvesDirectAgentDirectory(t *testing.T) {
+	agentRoot := t.TempDir()
+	workspace := filepath.Join(agentRoot, "agent-a")
+	if err := os.MkdirAll(filepath.Join(workspace, "skills"), 0o755); err != nil {
+		t.Fatalf("mkdir workspace: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(workspace, "skills", "SKILL.md"), []byte("not valid front matter"), 0o644); err != nil {
+		t.Fatalf("write skill: %v", err)
+	}
+	resolvedWorkspace, err := filepath.EvalSymlinks(workspace)
+	if err != nil {
+		t.Fatalf("resolve workspace: %v", err)
+	}
+
+	cfg := &Config{AgentDir: agentRoot}
+	rec := httptest.NewRecorder()
+	handleWorkspace(cfg)(rec, httptest.NewRequest(http.MethodGet, "/api/workspace?agentId=agent-a", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	if got := strings.TrimSpace(rec.Body.String()); got != resolvedWorkspace {
+		t.Fatalf("workspace = %q, want %q", got, resolvedWorkspace)
+	}
+
+	for _, agentID := range []string{"", ".", "..", "../outside", "nested/agent"} {
+		rec = httptest.NewRecorder()
+		handleWorkspace(cfg)(rec, httptest.NewRequest(http.MethodGet, "/api/workspace?agentId="+url.QueryEscape(agentID), nil))
+		if rec.Code < http.StatusBadRequest || rec.Code >= http.StatusInternalServerError {
+			t.Fatalf("agentId %q status = %d, want client error", agentID, rec.Code)
+		}
+	}
+}
+
+func TestResolveAgentWorkspaceRejectsEscapingSymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("creating symlinks requires additional privileges on Windows")
+	}
+	agentRoot := t.TempDir()
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(agentRoot, "agent-link")); err != nil {
+		t.Fatalf("create escaping symlink: %v", err)
+	}
+	if _, err := resolveAgentWorkspace(agentRoot, "agent-link"); err == nil {
+		t.Fatal("escaping symlink resolved successfully")
+	}
+}
+
 func TestFileLastUpdateDuration(t *testing.T) {
 	filePath := filepath.Join(t.TempDir(), "demo.txt")
 	if err := os.WriteFile(filePath, []byte("demo"), 0o644); err != nil {
@@ -19242,6 +19289,42 @@ func newLocalModelTestRequest(body string) *http.Request {
 	return req
 }
 
+func TestDecodeModelTestRequestValidatesBaseURL(t *testing.T) {
+	const validRequest = `{"model":"deepseek","token":"test-token","__model":"deepseek-chat"`
+	tests := []struct {
+		name    string
+		baseURL string
+		wantErr bool
+	}{
+		{name: "empty uses provider default", baseURL: ""},
+		{name: "https", baseURL: "https://api.example.com/v1"},
+		{name: "http", baseURL: "http://127.0.0.1:8080/v1"},
+		{name: "relative", baseURL: "/v1/chat/completions", wantErr: true},
+		{name: "missing host", baseURL: "https:///v1", wantErr: true},
+		{name: "unsupported scheme", baseURL: "ftp://api.example.com/v1", wantErr: true},
+		{name: "embedded credentials", baseURL: "https://user:password@api.example.com/v1", wantErr: true},
+		{name: "backslash", baseURL: "https://api.example.com/v1\\messages", wantErr: true},
+		{name: "Chinese punctuation", baseURL: "https://api.example.com/v1/messages、", wantErr: true},
+		{name: "invalid percent encoding", baseURL: "https://api.example.com/v1/%ZZ", wantErr: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			body := validRequest + `,"__url":` + strconv.Quote(test.baseURL) + `}`
+			_, err := decodeModelTestRequest(io.NopCloser(strings.NewReader(body)))
+			if test.wantErr {
+				if err == nil || !strings.Contains(err.Error(), "模型 URL 格式不正确") {
+					t.Fatalf("decode error = %v, want URL validation error", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("decode error = %v", err)
+			}
+		})
+	}
+}
+
 func TestHandleModelTestUsesTransientConfigurationAndReturnsSuccess(t *testing.T) {
 	writeModelTestRuntimeConfig(t, `{"test":{"content":"runtime probe","timeout":10}}`)
 	var captured map[string]interface{}
@@ -19310,18 +19393,69 @@ func TestHandleModelTestRejectsMissingTestConfigAndRedactsProviderErrors(t *test
 		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
-			_, _ = io.WriteString(w, `{"error":{"message":"Authorization: Bearer secret-token rejected"}}`)
+			_, _ = io.WriteString(w, `{"content":"Permission denied: Authorization: Bearer secret-token rejected","metadata":{"Content-Length":"492"}}`)
 		}))
 		defer upstream.Close()
 		recorder := httptest.NewRecorder()
 		handleModelTest(&Config{Host: upstream.URL, Device: "test-device"}, upstream.Client()).ServeHTTP(recorder, newLocalModelTestRequest(`{"model":"deepseek","token":"secret-token","__model":"deepseek-chat"}`))
-		if recorder.Code != http.StatusBadGateway || !strings.Contains(recorder.Body.String(), "HTTP 401") {
+		if recorder.Code != http.StatusBadGateway || !strings.Contains(recorder.Body.String(), "服务商身份认证失败（401）") {
 			t.Fatalf("response = %d %s", recorder.Code, recorder.Body.String())
 		}
 		if strings.Contains(recorder.Body.String(), "secret-token") {
 			t.Fatalf("provider error leaked token: %s", recorder.Body.String())
 		}
+		if strings.Contains(recorder.Body.String(), "Permission denied") || strings.Contains(recorder.Body.String(), "Content-Length") {
+			t.Fatalf("standard provider error must not show provider content: %s", recorder.Body.String())
+		}
 	})
+}
+
+func TestModelTestProviderStandardStatusMessages(t *testing.T) {
+	tests := map[int]string{
+		http.StatusUnauthorized:        "服务商身份认证失败（401），请检查 API Key/Token 是否正确、有效且未过期",
+		http.StatusForbidden:           "服务商拒绝访问（403），请确认密钥已获该模型或接口的访问权限",
+		http.StatusNotFound:            "服务商资源不存在（404），请检查模型 URL 和基础模型",
+		http.StatusTooManyRequests:     "服务商请求受限（429），请稍后重试并检查账户额度或速率限制",
+		http.StatusServiceUnavailable:  "服务商暂不可用（503），请稍后重试",
+		http.StatusInternalServerError: "服务商服务异常（500），请稍后重试",
+	}
+	for status, want := range tests {
+		t.Run(strconv.Itoa(status), func(t *testing.T) {
+			got := formatModelTestProviderFailure(status, "provider detail")
+			if got != want {
+				t.Fatalf("status %d message = %q, want %q only", status, got, want)
+			}
+		})
+	}
+}
+
+func TestModelTestPayloadErrorDetailUsesResponseCodeStandardMessage(t *testing.T) {
+	raw := map[string]interface{}{
+		"code": float64(http.StatusTooManyRequests),
+		"choices": []interface{}{map[string]interface{}{
+			"delta": map[string]interface{}{"content": "rate limit reached"},
+		}},
+	}
+	got := modelTestPayloadErrorDetail(raw, "")
+	if got != "服务商请求受限（429），请稍后重试并检查账户额度或速率限制" {
+		t.Fatalf("error detail = %q", got)
+	}
+}
+
+func TestModelTestPayloadErrorDetailUsesContentStatusCodeStandardMessage(t *testing.T) {
+	raw := map[string]interface{}{
+		"biz": "main",
+		"choices": []interface{}{map[string]interface{}{
+			"delta": map[string]interface{}{"content": "Permission denied by the model provider, please verify (code=401)"},
+		}},
+	}
+	if !modelTestPayloadIsError(raw) {
+		t.Fatal("content code=401 must be recognized as a provider error")
+	}
+	got := modelTestPayloadErrorDetail(raw, "")
+	if got != "服务商身份认证失败（401），请检查 API Key/Token 是否正确、有效且未过期" {
+		t.Fatalf("error detail = %q", got)
+	}
 }
 
 func TestConsumeModelTestSSERequiresBusinessDataAndDone(t *testing.T) {
@@ -19334,6 +19468,7 @@ func TestConsumeModelTestSSERequiresBusinessDataAndDone(t *testing.T) {
 		{name: "empty", stream: "data: [DONE]\n\n", wantErr: "有效业务数据"},
 		{name: "missing done", stream: "data: {\"choices\":[{\"delta\":{\"content\":\"ok\"}}]}\n\n", wantErr: "缺少 [DONE]"},
 		{name: "stream error", stream: "data: {\"error\":{\"message\":\"token=secret-token rejected\"}}\n\n", wantErr: "[REDACTED]"},
+		{name: "stream error content", stream: "data: {\"code\":400,\"choices\":[{\"delta\":{\"content\":\"Permission denied: token=secret-token\"},\"metadata\":{\"Content-Length\":\"492\"}}]}\n\n", wantErr: "Permission denied: token=[REDACTED]"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -19349,6 +19484,9 @@ func TestConsumeModelTestSSERequiresBusinessDataAndDone(t *testing.T) {
 			}
 			if strings.Contains(err.Error(), "secret-token") {
 				t.Fatalf("stream error leaked token: %v", err)
+			}
+			if test.name == "stream error content" && strings.Contains(err.Error(), "Content-Length") {
+				t.Fatalf("stream error must show nested content only: %v", err)
 			}
 		})
 	}
