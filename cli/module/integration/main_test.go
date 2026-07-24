@@ -7474,6 +7474,180 @@ func TestLoadIntegrationStartupOptionsReadsConfigDirectoryConfig(t *testing.T) {
 	}
 }
 
+func TestReadIntegrationAtMenuConfig(t *testing.T) {
+	tests := []struct {
+		name      string
+		config    string
+		want      integrationAtMenuConfig
+		wantError string
+	}{
+		{
+			name:   "valid",
+			config: `{"at":{"refresh":60,"cache":120}}`,
+			want: integrationAtMenuConfig{
+				RefreshInterval: time.Minute,
+				CacheTTL:        2 * time.Minute,
+			},
+		},
+		{name: "missing at", config: `{}`, wantError: "config/config.json.at is required"},
+		{name: "at is not object", config: `{"at":60}`, wantError: "config/config.json.at must be an object"},
+		{name: "missing refresh", config: `{"at":{"cache":120}}`, wantError: "config/config.json.at.refresh"},
+		{name: "zero cache", config: `{"at":{"refresh":60,"cache":0}}`, wantError: "config/config.json.at.cache"},
+		{name: "negative refresh", config: `{"at":{"refresh":-1,"cache":120}}`, wantError: "config/config.json.at.refresh"},
+		{name: "fractional refresh", config: `{"at":{"refresh":1.5,"cache":120}}`, wantError: "config/config.json.at.refresh"},
+		{name: "string cache", config: `{"at":{"refresh":60,"cache":"120"}}`, wantError: "config/config.json.at.cache"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			appDir := t.TempDir()
+			useIntegrationExecutableDir(t, appDir)
+			configDir := filepath.Join(appDir, "config")
+			if err := os.MkdirAll(configDir, 0o755); err != nil {
+				t.Fatalf("mkdir config: %v", err)
+			}
+			if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(tt.config), 0o644); err != nil {
+				t.Fatalf("write config: %v", err)
+			}
+
+			got, err := readIntegrationAtMenuConfig()
+			if tt.wantError != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantError) {
+					t.Fatalf("error = %v, want %q", err, tt.wantError)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("readIntegrationAtMenuConfig: %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("config = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRunIntegrationForegroundRejectsMissingAtConfig(t *testing.T) {
+	appDir := t.TempDir()
+	useIntegrationExecutableDir(t, appDir)
+
+	var stderr bytes.Buffer
+	if code := runIntegrationForeground(nil, &stderr); code == 0 {
+		t.Fatal("runIntegrationForeground succeeded without config.json.at")
+	}
+	if !strings.Contains(stderr.String(), "config/config.json.at is required") {
+		t.Fatalf("stderr = %q, want missing at configuration error", stderr.String())
+	}
+}
+
+func TestIntegrationAtMenuCacheRefreshAndExpiry(t *testing.T) {
+	currentTime := time.Date(2026, 7, 24, 8, 0, 0, 0, time.UTC)
+	loads := 0
+	loadErr := error(nil)
+	cache := newIntegrationAtMenuCache(integrationAtMenuConfig{
+		RefreshInterval: time.Minute,
+		CacheTTL:        2 * time.Minute,
+	}, func() (*integrationAtMenuSnapshot, error) {
+		loads++
+		if loadErr != nil {
+			return nil, loadErr
+		}
+		return &integrationAtMenuSnapshot{output: &AgentOutput{Agents: []agentcore.Agent{{AgentID: fmt.Sprintf("agent-%d", loads)}}}}, nil
+	})
+	cache.now = func() time.Time { return currentTime }
+
+	first, err := cache.snapshotForRequest()
+	if err != nil {
+		t.Fatalf("initial snapshot: %v", err)
+	}
+	if loads != 1 || first.output.Agents[0].AgentID != "agent-1" {
+		t.Fatalf("initial cache = %#v, loads = %d", first, loads)
+	}
+	first.output.Agents[0].AgentID = "mutated"
+
+	currentTime = currentTime.Add(time.Minute)
+	cached, err := cache.snapshotForRequest()
+	if err != nil {
+		t.Fatalf("cached snapshot: %v", err)
+	}
+	if loads != 1 || cached.output.Agents[0].AgentID != "agent-1" {
+		t.Fatalf("cached snapshot = %#v, loads = %d", cached, loads)
+	}
+
+	currentTime = currentTime.Add(30 * time.Second)
+	if err := cache.refreshSnapshot(); err != nil {
+		t.Fatalf("scheduled refresh: %v", err)
+	}
+	if loads != 2 {
+		t.Fatalf("loads after scheduled refresh = %d, want 2", loads)
+	}
+
+	loadErr = errors.New("scan failed")
+	previousExpiry := cache.expiresAt
+	currentTime = currentTime.Add(30 * time.Second)
+	if err := cache.refreshSnapshot(); err == nil {
+		t.Fatal("scheduled refresh error = nil, want error")
+	}
+	if !cache.expiresAt.Equal(previousExpiry) {
+		t.Fatalf("expiry after failed refresh = %s, want %s", cache.expiresAt, previousExpiry)
+	}
+
+	currentTime = previousExpiry.Add(time.Second)
+	if _, err := cache.snapshotForRequest(); err == nil || !strings.Contains(err.Error(), "@ cache expired") {
+		t.Fatalf("expired snapshot error = %v, want expired refresh error", err)
+	}
+}
+
+func TestIntegrationAtMenuCacheCombinesConcurrentLoads(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var loadCount int
+	var loadMu sync.Mutex
+	cache := newIntegrationAtMenuCache(integrationAtMenuConfig{
+		RefreshInterval: time.Minute,
+		CacheTTL:        time.Minute,
+	}, func() (*integrationAtMenuSnapshot, error) {
+		loadMu.Lock()
+		loadCount++
+		loadMu.Unlock()
+		close(started)
+		<-release
+		return &integrationAtMenuSnapshot{output: &AgentOutput{Agents: []agentcore.Agent{{AgentID: "alpha"}}}}, nil
+	})
+
+	result := make(chan error, 2)
+	go func() { _, err := cache.snapshotForRequest(); result <- err }()
+	<-started
+	go func() { _, err := cache.snapshotForRequest(); result <- err }()
+	close(release)
+	for index := 0; index < 2; index++ {
+		if err := <-result; err != nil {
+			t.Fatalf("concurrent snapshot: %v", err)
+		}
+	}
+	loadMu.Lock()
+	defer loadMu.Unlock()
+	if loadCount != 1 {
+		t.Fatalf("load count = %d, want 1", loadCount)
+	}
+}
+
+func TestIntegrationAtMenuOutputKeepsDisabledRuntimeSkillHidden(t *testing.T) {
+	snapshot := &integrationAtMenuSnapshot{
+		output: &AgentOutput{Agents: []agentcore.Agent{{
+			AgentID: "a",
+			Skills: []agentcore.Skill{{
+				Name:     "__internal_miniapp_creator",
+				Location: "/tmp/agent/a/skills/__internal_miniapp_creator",
+			}},
+		}}},
+		runtimeSkillNames: []string{"__internal_miniapp_creator"},
+	}
+	output := integrationAtMenuOutputForDisabledPaths(snapshot, []string{"/tmp/agent/a/skills/__internal_miniapp_creator"})
+	if got := agentcore.SkillNames(output.Agents[0].Skills); len(got) != 0 {
+		t.Fatalf("skills = %v, want disabled runtime skill hidden", got)
+	}
+}
+
 func TestReadIntegrationAssociatedPluginsReadsAndNormalizesConfig(t *testing.T) {
 	tempDir := t.TempDir()
 	useIntegrationExecutableDir(t, tempDir)
@@ -7964,6 +8138,7 @@ func TestRunIntegrationForegroundWritesStartupFailureStatusOnListenError(t *test
 	}
 	defer listener.Close()
 	tempDir := t.TempDir()
+	useIntegrationExecutableDir(t, tempDir)
 	startupStatusFile := filepath.Join(tempDir, "startup.json")
 	pidFile := filepath.Join(tempDir, "integration.pid")
 	agentDir := filepath.Join(tempDir, "agent")
@@ -7973,6 +8148,9 @@ func TestRunIntegrationForegroundWritesStartupFailureStatusOnListenError(t *test
 		t.Fatalf("mkdir agent dir: %v", err)
 	}
 	writeDefaultAgentTemplate(t, defaultDir)
+	if err := os.WriteFile(filepath.Join(defaultDir, "config.json"), []byte(`{"at":{"refresh":60,"cache":120}}`), 0o644); err != nil {
+		t.Fatalf("write config/config.json: %v", err)
+	}
 	if err := os.MkdirAll(siteDir, 0o755); err != nil {
 		t.Fatalf("mkdir site dir: %v", err)
 	}
@@ -8106,6 +8284,7 @@ func TestRunIntegrationForegroundInvokesGitIdentityEnsure(t *testing.T) {
 	}
 
 	tempDir := t.TempDir()
+	useIntegrationExecutableDir(t, tempDir)
 	startupStatusFile := filepath.Join(tempDir, "startup.json")
 	pidFile := filepath.Join(tempDir, "integration.pid")
 	agentDir := filepath.Join(tempDir, "agent")
@@ -8115,6 +8294,9 @@ func TestRunIntegrationForegroundInvokesGitIdentityEnsure(t *testing.T) {
 		t.Fatalf("mkdir agent dir: %v", err)
 	}
 	writeDefaultAgentTemplate(t, defaultDir)
+	if err := os.WriteFile(filepath.Join(defaultDir, "config.json"), []byte(`{"at":{"refresh":60,"cache":120}}`), 0o644); err != nil {
+		t.Fatalf("write config/config.json: %v", err)
+	}
 	if err := os.MkdirAll(siteDir, 0o755); err != nil {
 		t.Fatalf("mkdir site dir: %v", err)
 	}
@@ -10446,6 +10628,16 @@ func TestApiAgentDeleteSucceedsWhenDirectoryAlreadyMissing(t *testing.T) {
 	}
 }
 
+func configureIntegrationAtMenuCacheForTest(t *testing.T, cfg *Config) {
+	t.Helper()
+	if err := initializeIntegrationAtMenuCache(cfg, integrationAtMenuConfig{
+		RefreshInterval: time.Hour,
+		CacheTTL:        time.Hour,
+	}); err != nil {
+		t.Fatalf("initialize @ cache: %v", err)
+	}
+}
+
 func TestApiSwarmAgent(t *testing.T) {
 	root := t.TempDir()
 	for _, item := range []struct {
@@ -10471,6 +10663,7 @@ func TestApiSwarmAgent(t *testing.T) {
 		Device:       "test-dev",
 		AgentCacheMs: 120000,
 	}
+	configureIntegrationAtMenuCacheForTest(t, cfg)
 
 	server := httptest.NewServer(http.HandlerFunc(handleSwarmAgents(cfg)))
 	defer server.Close()
@@ -10520,6 +10713,7 @@ func TestApiSwarmAgentExcludesCurrentAgent(t *testing.T) {
 		Device:       "test-dev",
 		AgentCacheMs: 120000,
 	}
+	configureIntegrationAtMenuCacheForTest(t, cfg)
 
 	server := httptest.NewServer(http.HandlerFunc(handleSwarmAgents(cfg)))
 	defer server.Close()
@@ -17836,6 +18030,7 @@ func TestHandleSkillsIncludesInternalSkills(t *testing.T) {
 			Device:       "test-dev",
 			AgentCacheMs: 120000,
 		}
+		configureIntegrationAtMenuCacheForTest(t, cfg)
 
 		server := httptest.NewServer(http.HandlerFunc(handleSkills(cfg)))
 		defer server.Close()
@@ -17878,6 +18073,7 @@ func TestHandleSkillsIncludesInternalSkills(t *testing.T) {
 			Device:       "test-dev",
 			AgentCacheMs: 120000,
 		}
+		configureIntegrationAtMenuCacheForTest(t, cfg)
 
 		server := httptest.NewServer(http.HandlerFunc(handleSkills(cfg)))
 		defer server.Close()
@@ -17912,6 +18108,9 @@ func TestHandleSkillsIncludesInternalSkills(t *testing.T) {
 		}()
 		writeIntegrationPluginPID(t, filepath.Join("..", "plugins", "browser.pid"), cmd.Process.Pid)
 		writeIntegrationPluginPID(t, filepath.Join("..", "plugins", "remote.pid"), cmd.Process.Pid)
+		if err := cfg.AtMenuCache.refreshSnapshot(); err != nil {
+			t.Fatalf("refresh @ cache after plugin start: %v", err)
+		}
 
 		resp, err = http.Get(server.URL + "/api/skills?agentId=a")
 		if err != nil {
@@ -18004,6 +18203,7 @@ func TestHandleSkillsReportsSeedreamOnlyWhenConfigured(t *testing.T) {
 		Device:       "test-dev-seedream",
 		AgentCacheMs: 120000,
 	}
+	configureIntegrationAtMenuCacheForTest(t, cfg)
 	server := httptest.NewServer(http.HandlerFunc(handleSkills(cfg)))
 	defer server.Close()
 
@@ -18035,6 +18235,9 @@ func TestHandleSkillsReportsSeedreamOnlyWhenConfigured(t *testing.T) {
 		seedreamProviderName: {Token: "seedream-token"},
 	}); err != nil {
 		t.Fatalf("write seedream token config: %v", err)
+	}
+	if err := cfg.AtMenuCache.refreshSnapshot(); err != nil {
+		t.Fatalf("refresh @ cache after Seedream token update: %v", err)
 	}
 
 	names = getSkills()
@@ -18096,6 +18299,7 @@ func TestHandleSkillsRespectsChatSkillState(t *testing.T) {
 		Device:       "test-dev",
 		AgentCacheMs: 0,
 	}
+	configureIntegrationAtMenuCacheForTest(t, cfg)
 
 	server := httptest.NewServer(http.HandlerFunc(handleSkills(cfg)))
 	defer server.Close()
@@ -18124,6 +18328,160 @@ func TestHandleSkillsRespectsChatSkillState(t *testing.T) {
 	}
 	if len(names) != 0 {
 		t.Fatalf("skills with disabled alpha = %v, want empty", names)
+	}
+}
+
+func TestHandleSkillStateImmediatelyUpdatesAtMenuCache(t *testing.T) {
+	tmp := t.TempDir()
+	useIntegrationExecutableDir(t, tmp)
+	if err := os.MkdirAll(filepath.Join(tmp, "config"), 0o755); err != nil {
+		t.Fatalf("mkdir app config: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, "config", "config.json"), []byte(`{"skills":["__internal_miniapp_creator"]}`), 0o644); err != nil {
+		t.Fatalf("write app config: %v", err)
+	}
+
+	db, err := sql.Open("sqlite", filepath.Join(tmp, "data"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+	oldCronDB := cronDB
+	cronDB = db
+	defer func() { cronDB = oldCronDB }()
+
+	agentDir := filepath.Join(tmp, "agent")
+	skillDir := filepath.Join(agentDir, "a", "skills", "__internal_miniapp_creator")
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatalf("mkdir skill: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("---\nname: __internal_miniapp_creator\ndescription: demo\n---\n"), 0o644); err != nil {
+		t.Fatalf("write skill: %v", err)
+	}
+
+	cfg := &Config{AgentDir: agentDir, Device: "test-dev", AgentCacheMs: 0}
+	configureIntegrationAtMenuCacheForTest(t, cfg)
+	currentTime := time.Date(2026, 7, 24, 9, 0, 0, 0, time.UTC)
+	cfg.AtMenuCache.now = func() time.Time { return currentTime }
+	skillsServer := httptest.NewServer(handleSkills(cfg))
+	defer skillsServer.Close()
+	stateServer := httptest.NewServer(handleSkillState(cfg))
+	defer stateServer.Close()
+
+	getSkills := func() []string {
+		resp, err := http.Get(skillsServer.URL + "/api/skills?agentId=a&chatId=chat-1")
+		if err != nil {
+			t.Fatalf("GET skills: %v", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			t.Fatalf("GET skills status = %d body=%s", resp.StatusCode, body)
+		}
+		var names []string
+		if err := json.NewDecoder(resp.Body).Decode(&names); err != nil {
+			t.Fatalf("decode skills: %v", err)
+		}
+		return names
+	}
+	if got := getSkills(); !reflect.DeepEqual(got, []string{"__internal_miniapp_creator"}) {
+		t.Fatalf("initial skills = %v, want internal miniapp creator", got)
+	}
+
+	currentTime = currentTime.Add(time.Minute)
+	body := strings.NewReader(fmt.Sprintf(`{"chatId":"chat-1","path":%q,"disabled":true}`, skillDir))
+	resp, err := http.Post(stateServer.URL+"/api/skill_state", "application/json", body)
+	if err != nil {
+		t.Fatalf("POST skill state: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		responseBody, _ := io.ReadAll(resp.Body)
+		t.Fatalf("POST skill state status = %d body=%s", resp.StatusCode, responseBody)
+	}
+	if got := getSkills(); len(got) != 0 {
+		t.Fatalf("skills after disable = %v, want empty", got)
+	}
+	cfg.AtMenuCache.mu.Lock()
+	expiresAt := cfg.AtMenuCache.expiresAt
+	cfg.AtMenuCache.mu.Unlock()
+	if want := currentTime.Add(time.Hour); !expiresAt.Equal(want) {
+		t.Fatalf("cache expiry = %s, want %s after skill state update", expiresAt, want)
+	}
+}
+
+func TestHandleEditImmediatelyUpdatesAtMenuSwarmCache(t *testing.T) {
+	tmp := t.TempDir()
+	agentDir := filepath.Join(tmp, "agent")
+	for agentID, config := range map[string]string{
+		"a": `{"router_disable":false}`,
+		"b": `{"router_disable":true}`,
+	} {
+		workspace := filepath.Join(agentDir, agentID)
+		if err := os.MkdirAll(workspace, 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", agentID, err)
+		}
+		if err := os.WriteFile(filepath.Join(workspace, "config.json"), []byte(config), 0o644); err != nil {
+			t.Fatalf("write %s config: %v", agentID, err)
+		}
+	}
+
+	cfg := &Config{AgentDir: agentDir, Device: "test-dev", AgentCacheMs: 0}
+	configureIntegrationAtMenuCacheForTest(t, cfg)
+	currentTime := time.Date(2026, 7, 24, 10, 0, 0, 0, time.UTC)
+	cfg.AtMenuCache.now = func() time.Time { return currentTime }
+	swarmServer := httptest.NewServer(handleSwarmAgents(cfg))
+	defer swarmServer.Close()
+	editServer := httptest.NewServer(handleEdit(cfg))
+	defer editServer.Close()
+
+	getAgents := func() []string {
+		resp, err := http.Get(swarmServer.URL + "/api/swarm_agent")
+		if err != nil {
+			t.Fatalf("GET swarm agents: %v", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			t.Fatalf("GET swarm agents status = %d body=%s", resp.StatusCode, body)
+		}
+		var agentIDs []string
+		if err := json.NewDecoder(resp.Body).Decode(&agentIDs); err != nil {
+			t.Fatalf("decode swarm agents: %v", err)
+		}
+		return agentIDs
+	}
+	if got := getAgents(); !reflect.DeepEqual(got, []string{"a"}) {
+		t.Fatalf("initial swarm agents = %v, want [a]", got)
+	}
+	if _, err := cfg.AtMenuCache.outputForRequest("chat-1", func() ([]string, error) { return nil, nil }); err != nil {
+		t.Fatalf("create chat cache: %v", err)
+	}
+
+	currentTime = currentTime.Add(time.Minute)
+	resp, err := http.Post(editServer.URL+"/api/edit?agentId=a&path=config.json", "application/json", strings.NewReader(`{"content":"{\n  \"router_disable\": true\n}"}`))
+	if err != nil {
+		t.Fatalf("POST edit: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("POST edit status = %d body=%s", resp.StatusCode, body)
+	}
+	if got := getAgents(); len(got) != 0 {
+		t.Fatalf("swarm agents after disable = %v, want empty", got)
+	}
+
+	cfg.AtMenuCache.mu.Lock()
+	baseDisabled := cfg.AtMenuCache.snapshot.output.Agents[0].RouterDisable
+	chatDisabled := cfg.AtMenuCache.chat["chat-1"].Agents[0].RouterDisable
+	expiresAt := cfg.AtMenuCache.expiresAt
+	cfg.AtMenuCache.mu.Unlock()
+	if !baseDisabled || !chatDisabled {
+		t.Fatalf("router_disable was not applied to every cached snapshot: base=%v chat=%v", baseDisabled, chatDisabled)
+	}
+	if want := currentTime.Add(time.Hour); !expiresAt.Equal(want) {
+		t.Fatalf("cache expiry = %s, want %s after swarm update", expiresAt, want)
 	}
 }
 

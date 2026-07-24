@@ -74,8 +74,8 @@
   --input-bubble-shadow:0 10px 24px rgba(16,24,40,.1),inset 0 1px 0 rgba(255,255,255,.72);
   --input-bubble-file-bg-start:rgba(255,247,240,.98);--input-bubble-file-bg-end:rgba(255,236,223,.94);
   --input-bubble-file-border:rgba(255,186,128,.42);--input-bubble-file-text:#7a4a00;
-  --input-bubble-skill-bg-start:rgba(240,252,248,.98);--input-bubble-skill-bg-end:rgba(222,246,238,.94);
-  --input-bubble-skill-border:rgba(15,118,110,.24);--input-bubble-skill-text:#0f766e;
+  --input-bubble-skill-bg-start:rgba(255,248,238,.98);--input-bubble-skill-bg-end:rgba(255,226,194,.94);
+  --input-bubble-skill-border:rgba(237,139,65,.34);--input-bubble-skill-text:#9a4d12;
   --input-bubble-team-bg-start:rgba(255,245,236,.98);--input-bubble-team-bg-end:rgba(255,229,213,.94);
   --input-bubble-team-border:rgba(234,88,12,.26);--input-bubble-team-text:#c2410c;
   --input-bubble-image-bg-start:rgba(255,240,226,.98);--input-bubble-image-bg-end:rgba(255,218,191,.94);
@@ -126,8 +126,8 @@
   --input-bubble-shadow:0 12px 26px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.08);
   --input-bubble-file-bg-start:rgba(39,87,189,.82);--input-bubble-file-bg-end:rgba(20,56,133,.68);
   --input-bubble-file-border:rgba(123,165,255,.4);--input-bubble-file-text:#b8d4ff;
-  --input-bubble-skill-bg-start:rgba(17,94,89,.72);--input-bubble-skill-bg-end:rgba(11,68,64,.54);
-  --input-bubble-skill-border:rgba(94,234,212,.24);--input-bubble-skill-text:#99f6e4;
+  --input-bubble-skill-bg-start:rgba(132,63,22,.8);--input-bubble-skill-bg-end:rgba(76,34,10,.66);
+  --input-bubble-skill-border:rgba(255,190,132,.34);--input-bubble-skill-text:#ffd1a1;
   --input-bubble-team-bg-start:rgba(39,87,189,.82);--input-bubble-team-bg-end:rgba(20,56,133,.68);
   --input-bubble-team-border:rgba(123,165,255,.4);--input-bubble-team-text:#b8d4ff;
   --input-bubble-image-bg-start:rgba(28,72,160,.88);--input-bubble-image-bg-end:rgba(14,43,110,.76);
@@ -1021,7 +1021,7 @@ animation:queuedInsertExplosion .62s ease-out both}
 .message.user .md-content a.message-path-link,.message.user .md-content .message-inline-token-bubble{text-decoration:none;box-shadow:0 10px 24px rgba(16,24,40,.12),inset 0 1px 0 rgba(255,255,255,.68)}
 .message.user .md-content a.message-http-link{background:linear-gradient(180deg,rgba(255,244,237,.96),rgba(255,232,220,.9));border-color:rgba(255,168,116,.36);color:#a65316}
 .message.user .md-content a.message-file-link,.message.user .md-content .message-inline-token-bubble.token-file{background:linear-gradient(180deg,rgba(255,247,240,.96),rgba(255,236,223,.92));border-color:rgba(255,186,128,.42);color:#9a5e00}
-.message.user .md-content .message-inline-token-bubble.token-skill{background:linear-gradient(180deg,rgba(240,252,248,.96),rgba(222,246,238,.92));border-color:rgba(15,118,110,.24);color:#0f766e}
+.message.user .md-content .message-inline-token-bubble.token-skill{background:linear-gradient(180deg,rgba(255,248,238,.96),rgba(255,226,194,.92));border-color:rgba(237,139,65,.34);color:#9a4d12}
 .message.user .md-content .message-inline-token-bubble.token-team{background:linear-gradient(180deg,rgba(255,245,236,.96),rgba(255,229,213,.92));border-color:rgba(234,88,12,.26);color:#c2410c}
 .message.assistant{background:linear-gradient(160deg,color-mix(in srgb,var(--glass-surface-strong) 88%,transparent),color-mix(in srgb,var(--glass-surface) 72%,transparent));border:1px solid color-mix(in srgb,var(--glass-edge-strong) 58%,transparent);align-self:flex-start;border-bottom-left-radius:10px}
 .message.assistant.message-structured-result{backdrop-filter:none;-webkit-backdrop-filter:none;background:linear-gradient(180deg,rgba(255,251,247,.98),rgba(255,243,235,.94));border-color:rgba(18,18,18,.12);box-shadow:0 22px 48px rgba(18,18,18,.08),inset 0 1px 0 rgba(255,255,255,.84)}
@@ -1051,7 +1051,7 @@ animation:queuedInsertExplosion .62s ease-out both}
 [data-theme="dark"] .message.user .md-content a.message-path-link,[data-theme="dark"] .message.user .md-content .message-inline-token-bubble{box-shadow:0 12px 26px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.08)}
 [data-theme="dark"] .message.user .md-content a.message-http-link{background:linear-gradient(180deg,rgba(24,42,82,.94),rgba(14,28,58,.9));border-color:rgba(128,166,255,.28);color:#aecdff}
 [data-theme="dark"] .message.user .md-content a.message-file-link,[data-theme="dark"] .message.user .md-content .message-inline-token-bubble.token-file{background:linear-gradient(180deg,rgba(39,87,189,.82),rgba(20,56,133,.68));border-color:rgba(123,165,255,.4);color:#b8d4ff}
-[data-theme="dark"] .message.user .md-content .message-inline-token-bubble.token-skill{background:linear-gradient(180deg,rgba(17,94,89,.72),rgba(11,68,64,.54));border-color:rgba(94,234,212,.24);color:#99f6e4}
+[data-theme="dark"] .message.user .md-content .message-inline-token-bubble.token-skill{background:linear-gradient(180deg,rgba(132,63,22,.8),rgba(76,34,10,.66));border-color:rgba(255,190,132,.34);color:#ffd1a1}
 [data-theme="dark"] .message.user .md-content .message-inline-token-bubble.token-team{background:linear-gradient(180deg,rgba(39,87,189,.82),rgba(20,56,133,.68));border-color:rgba(123,165,255,.4);color:#b8d4ff}
 [data-theme="dark"] .message.user .md-content pre,[data-theme="dark"] .message.user .md-content blockquote,[data-theme="dark"] .message.user .md-content details,[data-theme="dark"] .message.user .md-content th{background:rgba(17,22,28,.1);color:#11161c;border-color:rgba(17,22,28,.14)}
 [data-theme="dark"] .message.user .md-content code{background:rgba(17,22,28,.1);color:#11161c}
@@ -4256,14 +4256,14 @@ body.quick-fan-transition-active{cursor:progress}
 .message-wrap .md-content a.message-path-link .message-path-link-label,.message-wrap .md-content .message-inline-token-bubble .message-inline-token-label{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .message-wrap .md-content a.message-http-link{background:linear-gradient(180deg,rgba(var(--accent-rgb),.16),rgba(var(--accent-rgb),.08));border-color:rgba(var(--accent-rgb),.22);color:color-mix(in srgb,var(--accent) 82%,var(--text-primary) 18%)}
 .message-wrap .md-content a.message-file-link,.message-wrap .md-content .message-inline-token-bubble.token-file{background:linear-gradient(180deg,rgba(var(--accent-soft-rgb),.18),rgba(var(--accent-soft-rgb),.08));border-color:rgba(var(--accent-soft-rgb),.26);color:#9a5e00}
-.message-wrap .md-content .message-inline-token-bubble.token-skill{background:linear-gradient(180deg,rgba(15,118,110,.14),rgba(15,118,110,.06));border-color:rgba(15,118,110,.22);color:#0f766e}
+.message-wrap .md-content .message-inline-token-bubble.token-skill{background:linear-gradient(180deg,rgba(237,139,65,.16),rgba(237,139,65,.08));border-color:rgba(237,139,65,.26);color:#9a4d12}
 .message-wrap .md-content .message-inline-token-bubble.token-team{background:linear-gradient(180deg,rgba(234,88,12,.14),rgba(234,88,12,.06));border-color:rgba(234,88,12,.22);color:#c2410c}
 .message-wrap .md-content a.message-path-link.onboarding-message-url-target{box-shadow:0 0 0 1px rgba(var(--accent-rgb),.26),0 16px 30px rgba(var(--accent-rgb),.18)}
 [data-theme="dark"] .message-wrap .md-content a.message-path-link,[data-theme="dark"] .message-wrap .md-content .message-inline-token-bubble{background:linear-gradient(180deg,rgba(16,28,49,.94),rgba(10,20,37,.88));border-color:rgba(169,190,227,.22);color:#d9e8ff;box-shadow:0 14px 32px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.06)}
 [data-theme="dark"] .message-wrap .md-content a.message-path-link:hover,[data-theme="dark"] .message-wrap .md-content a.message-path-link:focus-visible{border-color:rgba(142,180,255,.34);box-shadow:0 18px 36px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.08)}
 [data-theme="dark"] .message-wrap .md-content a.message-http-link{background:linear-gradient(180deg,rgba(62,92,201,.34),rgba(29,58,144,.24));border-color:rgba(128,166,255,.26);color:#aecdff}
 [data-theme="dark"] .message-wrap .md-content a.message-file-link,[data-theme="dark"] .message-wrap .md-content .message-inline-token-bubble.token-file{background:linear-gradient(180deg,rgba(39,87,189,.34),rgba(20,56,133,.22));border-color:rgba(123,165,255,.24);color:#b8d4ff}
-[data-theme="dark"] .message-wrap .md-content .message-inline-token-bubble.token-skill{background:linear-gradient(180deg,rgba(17,94,89,.42),rgba(11,68,64,.26));border-color:rgba(94,234,212,.22);color:#99f6e4}
+[data-theme="dark"] .message-wrap .md-content .message-inline-token-bubble.token-skill{background:linear-gradient(180deg,rgba(170,79,27,.48),rgba(104,44,12,.3));border-color:rgba(255,190,132,.28);color:#ffd1a1}
 [data-theme="dark"] .message-wrap .md-content .message-inline-token-bubble.token-team{background:linear-gradient(180deg,rgba(154,52,18,.4),rgba(124,45,18,.24));border-color:rgba(253,186,116,.22);color:#fdba74}
 [data-theme="dark"] .message-wrap .md-content a.message-path-link.onboarding-message-url-target{box-shadow:0 0 0 1px rgba(142,180,255,.24),0 18px 34px rgba(0,0,0,.34)}
 .file-editor-header-actions{display:flex;align-items:center;gap:8px;min-width:0}
@@ -35047,29 +35047,160 @@ function renderMd(text, options) {
   return getCachedRender(messageRenderCache, cacheKey, () => renderRichText(value, opts), MESSAGE_RENDER_CACHE_LIMIT);
 }
 
+const MATH_RENDER_IGNORED_TAGS = new Set(['SCRIPT', 'NOSCRIPT', 'STYLE', 'TEXTAREA', 'PRE', 'CODE', 'OPTION']);
+const MATH_RENDER_IGNORED_CLASSES = ['render-plain', 'katex', 'katex-display'];
+
+function getKaTeXRenderer() {
+  if (typeof katex === 'undefined' || !katex || typeof katex.render !== 'function') return null;
+  return katex;
+}
+
+function containsMathDelimiter(root) {
+  if (!root || !root.textContent) return false;
+  return /\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|(?<!\\)\$[^$\n]+?\$|\\\([\s\S]+?\\\)/.test(root.textContent);
+}
+
+function isMathRenderIgnoredElement(element) {
+  if (!element || element.nodeType !== 1) return false;
+  if (MATH_RENDER_IGNORED_TAGS.has(element.tagName)) return true;
+  return MATH_RENDER_IGNORED_CLASSES.some(className => element.classList && element.classList.contains(className));
+}
+
+function getStandaloneMathDelimiterMatch(value) {
+  const source = String(value || '').trim();
+  if (!source) return null;
+  const match = /^(?:\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|\$([^$\n]+?)\$|\\\(([\s\S]+?)\\\))$/.exec(source);
+  if (!match) return null;
+  const formula = match[1] || match[2] || match[3] || match[4] || '';
+  if (!formula.trim()) return null;
+  return {
+    formula,
+    displayMode: !!(match[1] || match[2])
+  };
+}
+
+function renderStandaloneInlineCodeMath(root) {
+  const renderer = getKaTeXRenderer();
+  if (!root || !renderer || !root.querySelectorAll || !root.ownerDocument) return false;
+  let rendered = false;
+  root.querySelectorAll('code').forEach(code => {
+    // Preserve fenced code blocks and mixed code snippets. Only a complete
+    // inline-code formula (such as `$$E = mc^2$$`) is mathematical content.
+    if (code.closest('pre')) return;
+    const token = getStandaloneMathDelimiterMatch(code.textContent);
+    if (!token || !code.parentNode) return;
+    const container = root.ownerDocument.createElement('span');
+    container.className = 'math-inline-code';
+    try {
+      renderer.render(token.formula, container, {
+        displayMode: token.displayMode,
+        throwOnError: false,
+        strict: 'ignore'
+      });
+      code.parentNode.replaceChild(container, code);
+      rendered = true;
+    } catch {
+      // Leave the original inline code intact when KaTeX cannot parse it.
+    }
+  });
+  return rendered;
+}
+
+function appendKaTeXTextFragment(fragment, textNode, renderer) {
+  const source = String(textNode && textNode.textContent || '');
+  const tokenPattern = /\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|(?<!\\)\$([^$\n]+?)\$|\\\(([\s\S]+?)\\\)/g;
+  let matched = false;
+  let cursor = 0;
+  let match;
+  while ((match = tokenPattern.exec(source)) !== null) {
+    const formula = match[1] || match[2] || match[3] || match[4] || '';
+    if (!formula.trim()) continue;
+    matched = true;
+    if (match.index > cursor) fragment.appendChild(document.createTextNode(source.slice(cursor, match.index)));
+    const container = document.createElement('span');
+    try {
+      renderer.render(formula, container, {
+        displayMode: !!(match[1] || match[2]),
+        throwOnError: false,
+        strict: 'ignore'
+      });
+      fragment.appendChild(container);
+    } catch {
+      fragment.appendChild(document.createTextNode(match[0]));
+    }
+    cursor = match.index + match[0].length;
+  }
+  if (!matched) return false;
+  if (cursor < source.length) fragment.appendChild(document.createTextNode(source.slice(cursor)));
+  return true;
+}
+
+function renderMathWithKaTeXFallback(root) {
+  const renderer = getKaTeXRenderer();
+  if (!root || !renderer || !root.ownerDocument) return false;
+  const textNodes = [];
+  const collectTextNodes = node => {
+    if (!node) return;
+    if (node.nodeType === 3) {
+      textNodes.push(node);
+      return;
+    }
+    if (node.nodeType !== 1 || isMathRenderIgnoredElement(node)) return;
+    Array.from(node.childNodes).forEach(collectTextNodes);
+  };
+  collectTextNodes(root);
+  let rendered = false;
+  textNodes.forEach(textNode => {
+    if (!textNode.parentNode || !textNode.textContent) return;
+    const fragment = root.ownerDocument.createDocumentFragment();
+    if (!appendKaTeXTextFragment(fragment, textNode, renderer)) return;
+    textNode.parentNode.replaceChild(fragment, textNode);
+    rendered = true;
+  });
+  return rendered;
+}
+
 function renderMathInRoot(root) {
-  if (!root || typeof renderMathInElement !== 'function' || root.dataset.mathEnhanced === '1') return;
+  if (!root || root.dataset.mathEnhanced === '1') return;
+  const hasMath = containsMathDelimiter(root);
+  if (!hasMath) {
+    root.dataset.mathEnhanced = '1';
+    return;
+  }
   root.querySelectorAll('pre, code, script, style, textarea').forEach(el => {
     el.dataset.mathSkip = '1';
   });
+  // Assistants often wrap copyable formulas in Markdown backticks. Those
+  // become <code> nodes and are intentionally ignored by KaTeX auto-render;
+  // render only the standalone formula form, while keeping normal snippets
+  // and fenced blocks untouched.
+  renderStandaloneInlineCodeMath(root);
   try {
-    renderMathInElement(root, {
-      delimiters: [
-        { left: '$$', right: '$$', display: true },
-        { left: '\\[', right: '\\]', display: true },
-        { left: '$', right: '$', display: false },
-        { left: '\\(', right: '\\)', display: false }
-      ],
-      throwOnError: false,
-      strict: 'ignore',
-      ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
-      ignoredClasses: ['render-plain']
-    });
+    if (typeof renderMathInElement === 'function') {
+      renderMathInElement(root, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '\\[', right: '\\]', display: true },
+          { left: '$', right: '$', display: false },
+          { left: '\\(', right: '\\)', display: false }
+        ],
+        throwOnError: false,
+        strict: 'ignore',
+        ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+        ignoredClasses: ['render-plain']
+      });
+    }
   } catch {}
   root.querySelectorAll('[data-math-skip="1"]').forEach(el => {
     el.removeAttribute('data-math-skip');
   });
-  root.dataset.mathEnhanced = '1';
+  // The auto renderer walks text nodes in-place. A malformed/unsupported node
+  // can stop that walk after earlier formulas have already been rendered, most
+  // noticeably in Markdown tables where each cell is a separate text node.
+  // Always finish with the scoped KaTeX pass: it skips existing `.katex` and
+  // code elements, so it only handles delimiters that the first pass left raw.
+  renderMathWithKaTeXFallback(root);
+  if (root.querySelector('.katex, .katex-error') || !containsMathDelimiter(root)) root.dataset.mathEnhanced = '1';
 }
 
 function enhanceMessageMath(root, options) {
@@ -44517,6 +44648,9 @@ let atSkillIdx = 0;
 let atAgentIdx = 0;
 let atSavedRange = null; // saved cursor position when @ triggered
 let atSourceEl = null; // which input triggered the @ menu
+let atMenuAvailabilityRequestSeq = 0;
+const atSkillListRequests = new Map();
+const atSwarmAgentListRequests = new Map();
 
 function randomToken(length) {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -44701,17 +44835,56 @@ function getSwarmAgentMenuRequestUrl(agentId) {
 async function fetchAvailableSwarmAgentList(agentId) {
   const resolvedAgentId = String(agentId || '').trim();
   if (!resolvedAgentId) return [];
-  try {
-    const resp = await fetch(getSwarmAgentMenuRequestUrl(resolvedAgentId), { cache: 'no-store' });
-    if (!resp.ok) return [];
-    const data = await resp.json();
-    if (!Array.isArray(data)) return [];
-    return data
-      .map(item => String(item || '').trim())
-      .filter(Boolean);
-  } catch {
-    return [];
-  }
+  const pending = atSwarmAgentListRequests.get(resolvedAgentId);
+  if (pending) return pending;
+  const request = (async () => {
+    try {
+      const resp = await fetch(getSwarmAgentMenuRequestUrl(resolvedAgentId), { cache: 'no-store' });
+      if (!resp.ok) return [];
+      const data = await resp.json();
+      if (!Array.isArray(data)) return [];
+      return data
+        .map(item => String(item || '').trim())
+        .filter(Boolean);
+    } catch {
+      return [];
+    }
+  })();
+  atSwarmAgentListRequests.set(resolvedAgentId, request);
+  void request.finally(() => {
+    if (atSwarmAgentListRequests.get(resolvedAgentId) === request) atSwarmAgentListRequests.delete(resolvedAgentId);
+  });
+  return request;
+}
+
+function getAtSkillListRequestKey(agentId, chatId) {
+  return String(agentId || '').trim() + '\n' + String(chatId || '').trim();
+}
+
+async function fetchAvailableAtSkills(agentId, chatId) {
+  const resolvedAgentId = String(agentId || '').trim();
+  if (!resolvedAgentId) return [];
+  const requestKey = getAtSkillListRequestKey(resolvedAgentId, chatId);
+  const pending = atSkillListRequests.get(requestKey);
+  if (pending) return pending;
+  const request = (async () => {
+    try {
+      let url = '/api/skills?agentId=' + encodeURIComponent(resolvedAgentId);
+      if (chatId) url += '&chatId=' + encodeURIComponent(chatId);
+      const resp = await fetch(url);
+      if (!resp.ok) return null;
+      const skills = await resp.json();
+      if (!Array.isArray(skills)) return [];
+      return skills.map(item => String(item || '').trim()).filter(Boolean);
+    } catch {
+      return null;
+    }
+  })();
+  atSkillListRequests.set(requestKey, request);
+  void request.finally(() => {
+    if (atSkillListRequests.get(requestKey) === request) atSkillListRequests.delete(requestKey);
+  });
+  return request;
 }
 
 async function shouldShowUnavailableSwarmAgentTip(agentId) {
@@ -44748,38 +44921,35 @@ async function showAtMenu() {
     atSavedRange = sel.getRangeAt(0).cloneRange();
   }
   const menuId = getAtMenuId();
+  const menu = document.getElementById(menuId);
+  if (!menu) return;
   const skillItem = document.querySelector('#' + menuId + ' .at-menu-item[data-type="skill"]');
   const agentItem = document.querySelector('#' + menuId + ' .at-menu-item[data-type="agent"]');
-  if (skillItem) {
-    let hasSkills = false;
-    const chatId = String(state.activeChat || '').trim();
-    const agentId = String(getChatAgentId(chatId) || state.settings.agentId || '').trim();
-    if (agentId) {
-      try {
-        let url = '/api/skills?agentId=' + encodeURIComponent(agentId);
-        if (chatId) url += '&chatId=' + encodeURIComponent(chatId);
-        const resp = await fetch(url);
-        if (resp.ok) {
-          const skills = await resp.json();
-          hasSkills = skills && skills.length > 0;
-        }
-      } catch {}
-    }
-    skillItem.style.display = hasSkills ? '' : 'none';
-  }
+  const chatId = String(state.activeChat || '').trim();
+  const agentId = String(getChatAgentId(chatId) || state.settings.agentId || '').trim();
+  const sourceEl = atSourceEl;
+  const isOnboardingInputGuide = !!(sourceEl && sourceEl.dataset && sourceEl.dataset.onboardingAtGuide === '1');
+  const shouldLoadSwarmAgents = !!agentItem && canShowSwarmAgentMenu();
+
+  // Show the stable entries immediately; availability checks only refine the menu later.
+  if (skillItem) skillItem.style.display = isOnboardingInputGuide || agentId ? '' : 'none';
   state._atAgentList = [];
-  if (agentItem) {
-    let agents = [];
-    if (canShowSwarmAgentMenu()) {
-      const chatId = String(state.activeChat || '').trim();
-      const agentId = String(getChatAgentId(chatId) || state.settings.agentId || '').trim();
-      agents = await fetchAvailableSwarmAgentList(agentId);
-    }
-    state._atAgentList = agents;
-    agentItem.style.display = agents.length > 0 ? '' : 'none';
-  }
-  document.getElementById(menuId).classList.add('show');
+  if (agentItem) agentItem.style.display = 'none';
+  menu.classList.add('show');
   updateAtMenuHighlight();
+
+  const requestSeq = ++atMenuAvailabilityRequestSeq;
+  if (isOnboardingInputGuide) return;
+  const skillRequest = agentId ? fetchAvailableAtSkills(agentId, chatId) : Promise.resolve([]);
+  const agentRequest = shouldLoadSwarmAgents ? fetchAvailableSwarmAgentList(agentId) : Promise.resolve([]);
+  void Promise.all([skillRequest, agentRequest]).then(([skills, agents]) => {
+    if (requestSeq !== atMenuAvailabilityRequestSeq || atSourceEl !== sourceEl || !menu.classList.contains('show')) return;
+    state._skillList = Array.isArray(skills) ? skills : [];
+    state._atAgentList = Array.isArray(agents) ? agents : [];
+    if (skillItem) skillItem.style.display = state._skillList.length > 0 ? '' : 'none';
+    if (agentItem) agentItem.style.display = state._atAgentList.length > 0 ? '' : 'none';
+    updateAtMenuHighlight();
+  });
 }
 function hideAtMenu() { document.getElementById(getAtMenuId()).classList.remove('show'); }
 function hideAtFile() { document.getElementById(getAtFileId()).classList.remove('show'); }
@@ -44809,6 +44979,7 @@ function ensureAtActiveVisible(panelId, itemSelector) {
 
 function updateAtMenuHighlight() {
   const items = Array.from(document.querySelectorAll('#' + getAtMenuId() + ' .at-menu-item')).filter(el => el.style.display !== 'none');
+  atMenuIdx = Math.max(0, Math.min(atMenuIdx, Math.max(0, items.length - 1)));
   items.forEach((el, i) => el.classList.toggle('active', i === atMenuIdx));
   ensureAtActiveVisible(getAtMenuId(), '.at-menu-item');
 }
@@ -45025,21 +45196,21 @@ async function loadSkills() {
   const chatId = String(state.activeChat || '').trim();
   const agentId = String(getChatAgentId(chatId) || state.settings.agentId || '').trim();
   if (!agentId) { alert('请先在设置中选择 Agent'); return; }
-  try {
-    let url = '/api/skills?agentId=' + encodeURIComponent(agentId);
-    if (chatId) url += '&chatId=' + encodeURIComponent(chatId);
-    const resp = await fetch(url);
-    if (!resp.ok) return;
-    const skills = await resp.json();
-    const panel = document.getElementById(getAtSkillId());
-    atSkillIdx = 0;
-    panel.innerHTML = skills.map((s, i) => {
-      const cls = i === atSkillIdx ? ' active' : '';
-      return `<div class="at-skill-item${cls}" onclick="atPickSkill('${esc(s)}')">${esc(s)}</div>`;
-    }).join('');
-    panel.classList.add('show');
-    state._skillList = skills;
-  } catch {}
+  const skills = await fetchAvailableAtSkills(agentId, chatId);
+  if (!Array.isArray(skills) || !skills.length) {
+    state._skillList = [];
+    focusEditableInput(atSourceEl || document.getElementById('msgInput'));
+    return;
+  }
+  const panel = document.getElementById(getAtSkillId());
+  if (!panel) return;
+  atSkillIdx = 0;
+  panel.innerHTML = skills.map((s, i) => {
+    const cls = i === atSkillIdx ? ' active' : '';
+    return `<div class="at-skill-item${cls}" onclick="atPickSkill('${esc(s)}')">${esc(s)}</div>`;
+  }).join('');
+  panel.classList.add('show');
+  state._skillList = skills;
 }
 
 function atPickSkill(name) {

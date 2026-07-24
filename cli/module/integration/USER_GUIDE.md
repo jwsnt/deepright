@@ -65,6 +65,10 @@ cd /path/to/deepright/cli/module/integration
   "queue": 1000,
   "retry_interval": 10000,
   "retry_times": 1,
+  "at": {
+    "refresh": 60,
+    "cache": 120
+  },
   "http": {
     "http_connect_timeout": 15000,
     "http_socket_timeout": 45000,
@@ -84,6 +88,27 @@ cd /path/to/deepright/cli/module/integration
 `config.json` 键名支持和参数名对应的多种常见写法，例如 `agent-dir`、`agent_dir`、`agentDir` 都会识别为 `--agent-dir`；`pid-file`、`log-file`、`port` 等启动参数也同理。`cli-get` 的 HTTP 相关配置只从 `config/config.json.http` 读取，不再读取旧的平铺 `http_timeout` / `http_connect_timeout` / `http_socket_timeout` / `http_debug` 写法，也不从其他运行态文件回退。
 
 `config/config.json` 只作为主应用启动配置使用；同目录下其余模板文件或目录（如 `SOUL.md`、`USER.md`、`skills/`）才会在创建新 Agent 或补齐 `DEF_AGENT` 时复制到 Agent 工作目录。新建出来的 Agent `config.json` 会固定初始化为空对象 `{}`，不会继承主应用配置内容。
+
+### `@` 菜单缓存
+
+`config/config.json.at` 是 Integration 启动必填配置：
+
+```json
+{
+  "at": {
+    "refresh": 60,
+    "cache": 120
+  }
+}
+```
+
+- `refresh` 与 `cache` 都必须是大于 `0` 的整数秒；缺失、为 `0`、负数、非整数或 `at` 不是对象时，Integration 会拒绝启动并明确指出错误配置键。
+- 服务启动后立即预热 `@` 所需的 Agent/Skill 快照，并每隔 `refresh` 秒尝试刷新。
+- 成功刷新会替换快照，并从成功时刻重新计算 `cache` 的有效期；后台刷新失败保留旧快照但不续期。
+- 快照过期后，`/api/skills` 与 `/api/swarm_agent` 的下一次请求会同步加载；此时加载失败会返回接口错误，不会返回已过期数据。
+- 首次读取某个 `chatId` 的 Skill 时会创建该会话的筛选快照。通过 `/api/skill_state` 禁用或恢复技能目录成功后，Integration 会立即更新该会话筛选结果并从操作时刻重新计算 `cache`；不会影响其它会话的可用 Skill，也不需要等待下一次 Agent 扫描。
+- 任意 Agent 保存蜂群开关后，Integration 会立即同步该 Agent 的 `router_disable` 到基础快照和所有已有会话快照，并从操作时刻重新计算 `cache`；`@ Agent` 不会等待定时刷新。
+- 修改 `at` 配置后需要重启 Integration。普通聊天、CLI 心跳和定时任务的 Agent metadata 仍实时读取技能，不使用此缓存。
 
 ### macOS 防止空闲睡眠
 
@@ -512,12 +537,13 @@ curl 'http://127.0.0.1:8080/file/lastUpdate?agentId=A&file=USER.md'
 - `skills` 字段会在每次请求时实时遍历 Agent 的 `skills` 目录及其子孙目录
 - 即使 `integration` 启动时配置了较长的 `--agent-cache`，修改 `SKILL.md` 后，下一次 metadata 输出也会立即反映最新内容
 - `--agent-cache` 仍然保留，但主要作用于设备信息、knowledge、plugins 等其他共享字段，不再缓存 `skills` 本身
+- 上述实时语义不包含 `@` 菜单 API：`/api/skills` 的 Agent/Skill 基础快照由 `config/config.json.at` 控制缓存；每个 `chatId` 的禁用状态会在首次读取时筛选，并在 `/api/skill_state` 成功切换后立即更新其缓存结果与有效期。
 - `skills[].compatibility` 同时兼容 YAML 字符串和字符串列表两种声明；对外输出时始终规范化为字符串，列表项之间使用 `; ` 连接
 
 ## Agent 元数据中的 `config.json` 字段
 
 - `integration` 会在同一份 Agent 元数据里实时输出每个 Agent 的 `description`、`provider`、`thinking`、`router_disable`
-- `GET /api/swarm_agent` 会基于这份 Agent 元数据实时过滤出 `router_disable=false` 的 Agent，供 Site 的 `@ Agent` 菜单直接复用
+- `GET /api/swarm_agent` 会从 `@` 菜单缓存快照过滤出 `router_disable=false` 的 Agent，供 Site 的 `@ Agent` 菜单直接复用
 - `/v1/chat/completions`、`cli/get`、`cli/pub` 以及 integration 内部 cron 执行链路，都会复用同一份输出
 - 这些字段来自对应 Agent 工作目录下的 `config.json`
 - 即使 `integration` 启动时配置了较长的 `--agent-cache`，修改 `config.json` 后，下一次 metadata 输出也会立即反映最新内容
@@ -567,7 +593,7 @@ curl http://127.0.0.1:8080/api/swarm_agent
 说明：
 
 - `/api/swarm_agent` 仅支持 `GET`；其他方法会返回 `405 Method Not Allowed`
-- 接口会实时扫描共享 Agent 元数据，只返回其中 `router_disable=false` 的 Agent ID
+- 接口从 `config/config.json.at` 管理的缓存快照读取 Agent 数据，只返回其中 `router_disable=false` 的 Agent ID
 - 传入查询参数 `agentId=当前AgentId` 时，返回结果会额外过滤掉当前 Agent 自身
 - 返回结果按 Agent 元数据扫描顺序输出
 - 如果当前没有任何 Agent 开启 SWARM，则返回空数组 `[]`

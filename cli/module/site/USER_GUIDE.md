@@ -518,7 +518,11 @@ Seedream 特殊说明：
 - 居中输入框上方新增 `SWARM` 开关，并固定放在当前会话 `HTML` 开关左侧；该开关按 `Agent + Chat` 独立保存，切换会话时会自动切回该会话自己的蜂群状态
 - 这项 `@ Agent` 扩展只在居中会话输入框生效；右侧备忘录输入框仍只保留原有的文件和 Skill 菜单
 - 当当前 `Agent + Chat` 会话的 `SWARM` 处于开启状态时，居中输入框输入 `@` 后的菜单会额外显示 `Agent`
-- `Agent` 菜单会实时请求 `/api/swarm_agent?agentId=当前AgentId`，读取所有 `router_disable=false` 且排除当前 Agent 自身的 Agent ID；如果接口返回空数组或请求失败，这个入口会自动隐藏
+- 输入 `@` 后，文件和技能入口会立即显示；Skill 与 SWARM Agent 的可用性在后台更新，避免主菜单等待接口返回。
+- `Agent` 菜单请求 `/api/swarm_agent?agentId=当前AgentId`，读取 `router_disable=false` 且排除当前 Agent 自身的 Agent ID。接口数据由 Integration 的 `config/config.json.at` 缓存管理；如果接口返回空数组或请求失败，这个入口会自动隐藏，不会使用旧数据。
+- 同一次菜单打开期间，预取与立即点击“技能”或“Agent”会复用同一个请求；页面不额外持久化 Skill 或 Agent 列表。
+- 在文件区禁用或恢复技能目录成功后，无需刷新页面；后续当前会话的 `@ Skill` 菜单会直接使用服务端已筛选并重新计时的缓存结果。
+- 保存任意 Agent 的蜂群开关后，无需刷新页面；后续 `@ Agent` 菜单会直接使用服务端已更新并重新计时的 Agent 列表。
 - 选择某个 Agent 后，会在当前光标位置插入 `[TEAM:AgentId]` 气泡；气泡展示文案和提交时透传文本都保持为同名格式
 - 居中输入框上方新增 `HTML` 开关，并固定放在当前会话 `Thinking/Auto` 开关左侧；该开关按会话独立保存
 - `Thinking` 开关只影响居中会话区的主聊天请求，不会额外改写右侧备忘录、插件或其他接口的请求结构

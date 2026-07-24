@@ -1612,6 +1612,349 @@ func getAgentOutputForChat(root string, deviceID string, ttl time.Duration, chat
 	return &cloned, nil
 }
 
+type integrationAtMenuConfig struct {
+	RefreshInterval time.Duration
+	CacheTTL        time.Duration
+}
+
+type integrationAtMenuRefreshCall struct {
+	done chan struct{}
+	err  error
+}
+
+type integrationAtMenuSnapshot struct {
+	output            *AgentOutput
+	runtimeSkillNames []string
+}
+
+// integrationAtMenuCache holds the expensive Agent/Skill snapshot used only
+// by the @ menu APIs. It deliberately does not replace the live metadata path
+// used for chat, CLI, or scheduled requests.
+type integrationAtMenuCache struct {
+	mu        sync.Mutex
+	config    integrationAtMenuConfig
+	load      func() (*integrationAtMenuSnapshot, error)
+	now       func() time.Time
+	snapshot  *integrationAtMenuSnapshot
+	chat      map[string]*AgentOutput
+	expiresAt time.Time
+	refresh   *integrationAtMenuRefreshCall
+}
+
+func newIntegrationAtMenuCache(config integrationAtMenuConfig, load func() (*integrationAtMenuSnapshot, error)) *integrationAtMenuCache {
+	return &integrationAtMenuCache{
+		config: config,
+		load:   load,
+		now:    time.Now,
+		chat:   make(map[string]*AgentOutput),
+	}
+}
+
+func cloneIntegrationAtMenuOutput(src *AgentOutput) *AgentOutput {
+	if src == nil {
+		return nil
+	}
+	cloned := *src
+	if src.Plugins != nil {
+		cloned.Plugins = append([]string(nil), src.Plugins...)
+	}
+	if src.Knowledge != nil {
+		knowledge := *src.Knowledge
+		cloned.Knowledge = &knowledge
+	}
+	if src.Agents != nil {
+		cloned.Agents = make([]agentcore.Agent, len(src.Agents))
+		for index := range src.Agents {
+			cloned.Agents[index] = src.Agents[index]
+			if src.Agents[index].Skills != nil {
+				cloned.Agents[index].Skills = append([]agentcore.Skill(nil), src.Agents[index].Skills...)
+			}
+		}
+	}
+	return &cloned
+}
+
+func cloneIntegrationAtMenuSnapshot(src *integrationAtMenuSnapshot) *integrationAtMenuSnapshot {
+	if src == nil {
+		return nil
+	}
+	return &integrationAtMenuSnapshot{
+		output:            cloneIntegrationAtMenuOutput(src.output),
+		runtimeSkillNames: append([]string(nil), src.runtimeSkillNames...),
+	}
+}
+
+func integrationAtMenuOutputForDisabledPaths(snapshot *integrationAtMenuSnapshot, disabledPaths []string) *AgentOutput {
+	if snapshot == nil || snapshot.output == nil {
+		return nil
+	}
+	output := cloneIntegrationAtMenuOutput(snapshot.output)
+	for index := range output.Agents {
+		baseSkills := output.Agents[index].Skills
+		filteredSkills := filterSkillsByDisabledPaths(baseSkills, disabledPaths)
+		present := make(map[string]struct{}, len(filteredSkills))
+		allBaseNames := make(map[string]struct{}, len(baseSkills))
+		for _, skill := range filteredSkills {
+			if name := strings.TrimSpace(skill.Name); name != "" {
+				present[name] = struct{}{}
+			}
+		}
+		for _, skill := range baseSkills {
+			if name := strings.TrimSpace(skill.Name); name != "" {
+				allBaseNames[name] = struct{}{}
+			}
+		}
+		runtime := make([]string, 0, len(snapshot.runtimeSkillNames))
+		for _, name := range snapshot.runtimeSkillNames {
+			name = strings.TrimSpace(name)
+			if name == "" {
+				continue
+			}
+			// A configured runtime name must not restore a skill directory that
+			// this chat has just disabled. It remains available when another
+			// non-disabled directory exposes the same name.
+			if _, wasBaseSkill := allBaseNames[name]; wasBaseSkill {
+				if _, remainsAvailable := present[name]; !remainsAvailable {
+					continue
+				}
+			}
+			runtime = append(runtime, name)
+		}
+		names := mergeIntegrationRuntimeSkillNames(agentcore.SkillNames(filteredSkills), runtime)
+		output.Agents[index].Skills = make([]agentcore.Skill, len(names))
+		for skillIndex, name := range names {
+			output.Agents[index].Skills[skillIndex] = agentcore.Skill{Name: name}
+		}
+	}
+	return output
+}
+
+func (cache *integrationAtMenuCache) refreshSnapshot() error {
+	if cache == nil || cache.load == nil {
+		return fmt.Errorf("@ cache is not initialized")
+	}
+	cache.mu.Lock()
+	if pending := cache.refresh; pending != nil {
+		cache.mu.Unlock()
+		<-pending.done
+		return pending.err
+	}
+	pending := &integrationAtMenuRefreshCall{done: make(chan struct{})}
+	cache.refresh = pending
+	cache.mu.Unlock()
+
+	snapshot, err := cache.load()
+	if err == nil && (snapshot == nil || snapshot.output == nil) {
+		err = fmt.Errorf("@ cache loader returned no Agent metadata")
+	}
+
+	cache.mu.Lock()
+	pending.err = err
+	if err == nil {
+		cache.snapshot = cloneIntegrationAtMenuSnapshot(snapshot)
+		cache.chat = make(map[string]*AgentOutput)
+		cache.expiresAt = cache.now().Add(cache.config.CacheTTL)
+	}
+	cache.refresh = nil
+	close(pending.done)
+	cache.mu.Unlock()
+	return err
+}
+
+func (cache *integrationAtMenuCache) snapshotForRequest() (*integrationAtMenuSnapshot, error) {
+	if cache == nil {
+		return nil, fmt.Errorf("@ cache is not initialized")
+	}
+	cache.mu.Lock()
+	if cache.snapshot != nil && cache.now().Before(cache.expiresAt) {
+		snapshot := cloneIntegrationAtMenuSnapshot(cache.snapshot)
+		cache.mu.Unlock()
+		return snapshot, nil
+	}
+	cache.mu.Unlock()
+
+	if err := cache.refreshSnapshot(); err != nil {
+		return nil, fmt.Errorf("@ cache expired and refresh failed: %w", err)
+	}
+
+	cache.mu.Lock()
+	snapshot := cloneIntegrationAtMenuSnapshot(cache.snapshot)
+	cache.mu.Unlock()
+	if snapshot == nil {
+		return nil, fmt.Errorf("@ cache refresh completed without Agent metadata")
+	}
+	return snapshot, nil
+}
+
+func (cache *integrationAtMenuCache) outputForRequest(chatID string, disabledPaths func() ([]string, error)) (*AgentOutput, error) {
+	snapshot, err := cache.snapshotForRequest()
+	if err != nil {
+		return nil, err
+	}
+	chatID = strings.TrimSpace(chatID)
+	if chatID == "" {
+		return integrationAtMenuOutputForDisabledPaths(snapshot, nil), nil
+	}
+
+	cache.mu.Lock()
+	if output := cache.chat[chatID]; output != nil {
+		cloned := cloneIntegrationAtMenuOutput(output)
+		cache.mu.Unlock()
+		return cloned, nil
+	}
+	cache.mu.Unlock()
+
+	paths, err := disabledPaths()
+	if err != nil {
+		return nil, err
+	}
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	if output := cache.chat[chatID]; output != nil {
+		return cloneIntegrationAtMenuOutput(output), nil
+	}
+	if cache.snapshot == nil {
+		return nil, fmt.Errorf("@ cache refresh completed without Agent metadata")
+	}
+	output := integrationAtMenuOutputForDisabledPaths(cache.snapshot, paths)
+	cache.chat[chatID] = cloneIntegrationAtMenuOutput(output)
+	return output, nil
+}
+
+func (cache *integrationAtMenuCache) updateChatSkillState(chatID string, disabledPaths []string) {
+	if cache == nil || strings.TrimSpace(chatID) == "" {
+		return
+	}
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	if cache.snapshot == nil {
+		return
+	}
+	cache.chat[chatID] = integrationAtMenuOutputForDisabledPaths(cache.snapshot, disabledPaths)
+	cache.expiresAt = cache.now().Add(cache.config.CacheTTL)
+}
+
+func (cache *integrationAtMenuCache) updateAgentRouterDisable(agentID string, routerDisable bool) {
+	if cache == nil || strings.TrimSpace(agentID) == "" {
+		return
+	}
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	if cache.snapshot == nil {
+		return
+	}
+	update := func(output *AgentOutput) {
+		if output == nil {
+			return
+		}
+		for index := range output.Agents {
+			if output.Agents[index].AgentID == agentID {
+				output.Agents[index].RouterDisable = routerDisable
+			}
+		}
+	}
+	update(cache.snapshot.output)
+	for _, output := range cache.chat {
+		update(output)
+	}
+	cache.expiresAt = cache.now().Add(cache.config.CacheTTL)
+}
+
+func readIntegrationAtMenuConfig() (integrationAtMenuConfig, error) {
+	raw, _, err := readIntegrationStartupConfigRaw()
+	if err != nil {
+		return integrationAtMenuConfig{}, fmt.Errorf("read config/config.json.at: %w", err)
+	}
+	atRaw, ok := raw["at"]
+	if !ok {
+		return integrationAtMenuConfig{}, fmt.Errorf("config/config.json.at is required")
+	}
+	at, ok := atRaw.(map[string]interface{})
+	if !ok || at == nil {
+		return integrationAtMenuConfig{}, fmt.Errorf("config/config.json.at must be an object")
+	}
+	refreshSeconds, err := integrationAtMenuPositiveSeconds(at["refresh"], "config/config.json.at.refresh")
+	if err != nil {
+		return integrationAtMenuConfig{}, err
+	}
+	cacheSeconds, err := integrationAtMenuPositiveSeconds(at["cache"], "config/config.json.at.cache")
+	if err != nil {
+		return integrationAtMenuConfig{}, err
+	}
+	return integrationAtMenuConfig{
+		RefreshInterval: time.Duration(refreshSeconds) * time.Second,
+		CacheTTL:        time.Duration(cacheSeconds) * time.Second,
+	}, nil
+}
+
+func integrationAtMenuPositiveSeconds(raw interface{}, label string) (int64, error) {
+	value, ok := raw.(json.Number)
+	if !ok {
+		return 0, fmt.Errorf("%s must be a positive integer in seconds", label)
+	}
+	seconds, err := value.Int64()
+	if err != nil || seconds <= 0 || seconds > int64((1<<63-1)/int64(time.Second)) {
+		return 0, fmt.Errorf("%s must be a positive integer in seconds", label)
+	}
+	return seconds, nil
+}
+
+func initializeIntegrationAtMenuCache(cfg *Config, config integrationAtMenuConfig) error {
+	if cfg == nil {
+		return fmt.Errorf("@ cache configuration is required")
+	}
+	if config.RefreshInterval <= 0 || config.CacheTTL <= 0 {
+		return fmt.Errorf("@ cache refresh and TTL must be positive")
+	}
+	cfg.AtMenuCache = newIntegrationAtMenuCache(config, func() (*integrationAtMenuSnapshot, error) {
+		agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
+		output, err := agentcore.GetOutputForApp(cfg.AgentDir, integrationAppDir(), cfg.effectiveDeviceID(), agentTTL)
+		if err != nil {
+			return nil, err
+		}
+		cloned := *output
+		hydrateAgentOutput(&cloned, "")
+		return &integrationAtMenuSnapshot{
+			output:            &cloned,
+			runtimeSkillNames: buildIntegrationRuntimeSkillNames(nil),
+		}, nil
+	})
+	return nil
+}
+
+func atMenuOutputForRequest(cfg *Config, chatID string) (*AgentOutput, error) {
+	if cfg == nil || cfg.AtMenuCache == nil {
+		return nil, fmt.Errorf("@ cache is not configured")
+	}
+	return cfg.AtMenuCache.outputForRequest(chatID, func() ([]string, error) {
+		return disabledSkillPathsForChat(chatID)
+	})
+}
+
+func startIntegrationAtMenuRefresh(ctx context.Context, cfg *Config) {
+	if ctx == nil || cfg == nil || cfg.AtMenuCache == nil {
+		return
+	}
+	cache := cfg.AtMenuCache
+	go func() {
+		if err := cache.refreshSnapshot(); err != nil {
+			log.Printf("@ cache initial refresh failed: %v", err)
+		}
+		ticker := time.NewTicker(cache.config.RefreshInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := cache.refreshSnapshot(); err != nil {
+					log.Printf("@ cache scheduled refresh failed: %v", err)
+				}
+			}
+		}
+	}()
+}
+
 func integrationKnowledgeRoot(agentDir string) (string, error) {
 	resolvedAgentDir, err := resolveIntegrationAgentDir(agentDir)
 	if err != nil {
@@ -3746,11 +4089,10 @@ func handleSwarmAgents(cfg *Config) http.HandlerFunc {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
-		metadata, err := getAgentOutput(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL)
+		metadata, err := atMenuOutputForRequest(cfg, "")
 		if err != nil {
-			log.Printf("api/swarm_agent: agent scan error: %v", err)
-			http.Error(w, "Failed to get agent metadata", http.StatusInternalServerError)
+			log.Printf("api/swarm_agent: @ cache error: %v", err)
+			http.Error(w, "Failed to load @ menu Agent data", http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -4354,25 +4696,16 @@ func handleSkills(cfg *Config) http.HandlerFunc {
 			http.Error(w, "agentId is required", http.StatusBadRequest)
 			return
 		}
-		agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
 		chatID := strings.TrimSpace(r.URL.Query().Get("chatId"))
-		var (
-			metadata *AgentOutput
-			err      error
-		)
-		if chatID != "" {
-			metadata, err = getAgentOutputForChat(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL, chatID)
-		} else {
-			metadata, err = getAgentOutput(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL)
-		}
+		metadata, err := atMenuOutputForRequest(cfg, chatID)
 		if err != nil {
-			log.Printf("api/skills: agent scan error: %v", err)
-			http.Error(w, "Failed to get agent metadata", http.StatusInternalServerError)
+			log.Printf("api/skills: @ cache error: %v", err)
+			http.Error(w, "Failed to load @ menu skill data", http.StatusInternalServerError)
 			return
 		}
 		for _, a := range metadata.Agents {
 			if a.AgentID == agentID {
-				names := buildIntegrationRuntimeSkillNames(agentcore.SkillNames(a.Skills))
+				names := agentcore.SkillNames(a.Skills)
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(names)
 				return
@@ -4433,8 +4766,8 @@ func configuredIntegrationSkillNames() []string {
 }
 
 func buildIntegrationRuntimeSkillNames(base []string) []string {
-	out := make([]string, 0, len(base)+5)
-	seen := make(map[string]struct{}, len(base)+4)
+	runtime := make([]string, 0, 5)
+	seen := make(map[string]struct{}, 4)
 	seedreamEnabled := integrationSeedreamSkillEnabled()
 	appendIfMissing := func(name string, enabled bool) {
 		name = strings.TrimSpace(name)
@@ -4447,13 +4780,10 @@ func buildIntegrationRuntimeSkillNames(base []string) []string {
 		if _, ok := seen[name]; ok {
 			return
 		}
-		out = append(out, name)
+		runtime = append(runtime, name)
 		seen[name] = struct{}{}
 	}
 
-	for _, name := range base {
-		appendIfMissing(name, true)
-	}
 	for _, name := range configuredIntegrationSkillNames() {
 		appendIfMissing(normalizeConfiguredIntegrationSkillName(name), true)
 	}
@@ -4467,6 +4797,25 @@ func buildIntegrationRuntimeSkillNames(base []string) []string {
 	} {
 		status, err := connectsvc.PluginStatusByKey(item.key, nil)
 		appendIfMissing(item.skill, err == nil && status != nil && status.Started)
+	}
+	return mergeIntegrationRuntimeSkillNames(base, runtime)
+}
+
+func mergeIntegrationRuntimeSkillNames(base, runtime []string) []string {
+	out := make([]string, 0, len(base)+len(runtime))
+	seen := make(map[string]struct{}, len(base)+len(runtime))
+	for _, names := range [][]string{base, runtime} {
+		for _, name := range names {
+			name = strings.TrimSpace(name)
+			if name == "" {
+				continue
+			}
+			if _, exists := seen[name]; exists {
+				continue
+			}
+			seen[name] = struct{}{}
+			out = append(out, name)
+		}
 	}
 	agentcore.SortSkillNames(out)
 	return out
@@ -4583,7 +4932,7 @@ func hasDirectSkillMarkdown(dir string) bool {
 	return err == nil && !info.IsDir()
 }
 
-func handleSkillState() http.HandlerFunc {
+func handleSkillState(cfg *Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -4633,6 +4982,9 @@ func handleSkillState() http.HandlerFunc {
 		}
 		if opened && cronDB == nil {
 			_ = skillstate.EnsureSchema(db)
+		}
+		if cfg != nil && cfg.AtMenuCache != nil {
+			cfg.AtMenuCache.updateChatSkillState(req.ChatID, paths)
 		}
 		selfDisabled, inheritedDisabled := skillstate.DisabledStatus(paths, req.Path)
 		w.Header().Set("Content-Type", "application/json")
@@ -5577,8 +5929,30 @@ func handleEdit(cfg *Config) http.HandlerFunc {
 			writeEditResp(w, EditResponse{AgentID: agentID, Path: relPath, Content: "写入失败: " + err.Error(), Status: 1})
 			return
 		}
+		if strings.EqualFold(cleanRelPath, "config.json") {
+			if routerDisable, ok := integrationRouterDisableFromConfigContent(req.Content); ok && cfg != nil && cfg.AtMenuCache != nil {
+				cfg.AtMenuCache.updateAgentRouterDisable(agentID, routerDisable)
+			}
+		}
 		writeEditResp(w, EditResponse{AgentID: agentID, Path: relPath, SavedAs: resolved, Status: 0})
 	}
+}
+
+func integrationRouterDisableFromConfigContent(content string) (bool, bool) {
+	var raw struct {
+		RouterDisable *bool `json:"router_disable"`
+		Swarm         *bool `json:"swarm"`
+	}
+	if err := json.Unmarshal([]byte(content), &raw); err != nil {
+		return false, false
+	}
+	if raw.RouterDisable != nil {
+		return *raw.RouterDisable, true
+	}
+	if raw.Swarm != nil {
+		return !*raw.Swarm, true
+	}
+	return true, true
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -7965,6 +8339,9 @@ func handleSwarm(cfg *Config) http.HandlerFunc {
 			return
 		}
 		flushAgentCache()
+		if cfg.AtMenuCache != nil {
+			cfg.AtMenuCache.updateAgentRouterDisable(agentID, sc.RouterDisable)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{"status": 0, "agentId": agentID})
 	}
@@ -14495,6 +14872,10 @@ type Config struct {
 	// Per-Agent MCP metadata refresh state.
 	mcpStateMu sync.Mutex
 	MCPState   *integrationMCPState
+
+	// Cached @ menu Agent/Skill metadata. Initialized only after config.json.at
+	// is validated during Integration service startup.
+	AtMenuCache *integrationAtMenuCache
 }
 
 type integrationStartupOptions struct {
@@ -17102,6 +17483,10 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	if err := validateIntegrationServicePort(cfg.Port); err != nil {
 		return reportStartupFailure("error: %v", err)
 	}
+	atMenuConfig, err := readIntegrationAtMenuConfig()
+	if err != nil {
+		return reportStartupFailure("error: %v", err)
+	}
 	if err := initializeIntegrationDeviceState(&cfg, explicitDevice); err != nil {
 		return reportStartupFailure("error: initialize device: %v", err)
 	}
@@ -17118,6 +17503,9 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 		return reportStartupFailure("error: %v", err)
 	}
 	cfg.AgentDir = resolvedAgentDir
+	if err := initializeIntegrationAtMenuCache(&cfg, atMenuConfig); err != nil {
+		return reportStartupFailure("error: initialize @ cache: %v", err)
+	}
 
 	resolvedSiteDir, err := resolveServeSiteDir(cfg.Site)
 	if err != nil {
@@ -17216,7 +17604,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/plugins/log", handlePluginsLog(&cfg))
 	mux.HandleFunc("/api/folder", handleFolder(&cfg))
 	mux.HandleFunc("/api/skills", handleSkills(&cfg))
-	mux.HandleFunc("/api/skill_state", handleSkillState())
+	mux.HandleFunc("/api/skill_state", handleSkillState(&cfg))
 	mux.HandleFunc("/skills_warning", handleSkillsWarning(&cfg))
 	mux.HandleFunc("/mcp_warning", handleMCPWarning(&cfg))
 	mux.HandleFunc("/api/files", handleFiles())
@@ -17351,6 +17739,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 
 	startCliGet(ctx, &cfg)
 	startIntegrationDeviceConfigRefresh(ctx, cfg.DeviceState)
+	startIntegrationAtMenuRefresh(ctx, &cfg)
 	initCronDB()
 	startIntegrationLogRetentionCleanup(ctx)
 	startCronCheck(ctx, &cfg)
