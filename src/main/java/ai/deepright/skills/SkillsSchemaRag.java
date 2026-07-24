@@ -42,6 +42,8 @@ public class SkillsSchemaRag extends RagSkills implements SkillsChecker {
 
     protected ResourceService resourceService;
 
+    protected String template4browserHint;
+
     protected String template4browser;
 
     protected String template4creator;
@@ -74,8 +76,9 @@ public class SkillsSchemaRag extends RagSkills implements SkillsChecker {
     public void init() throws Exception {
         super.init();
         // IOUtils/JsonUtils负责关闭资源
-        this.template4miniapp = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4miniapp).openStream()), StandardCharsets.UTF_8);
+        this.template4browserHint = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4browserHint).openStream()), StandardCharsets.UTF_8);
         this.template4browser = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4browser).openStream()), StandardCharsets.UTF_8);
+        this.template4miniapp = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4miniapp).openStream()), StandardCharsets.UTF_8);
         this.template4creator = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4creator).openStream()), StandardCharsets.UTF_8);
         this.template4remote = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4remote).openStream()), StandardCharsets.UTF_8);
         this.template4feishu = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4feishu).openStream()), StandardCharsets.UTF_8);
@@ -143,6 +146,11 @@ public class SkillsSchemaRag extends RagSkills implements SkillsChecker {
     protected void updatePrompt(RagConfig ragConfig, RagData ragData, Skills skills) throws Exception {
         // 当上下文超过10K tokens时，模型对尾部指令的注意力权重下降
         RagService.updatePrompt(ragConfig, ragData, ragConfig.getReplace(), this.buildSkills(ragConfig, ragData, skills));
+        this.updateBrowser(ragConfig, ragData, skills);
+    }
+
+    protected void updateBrowser(RagConfig ragConfig, RagData ragData, Skills skills) throws Exception {
+        RagService.updatePrompt(ragConfig, ragData, "#browser_hint", this.allowedSkill(ragData.getQuery(), SkillsChecker.PLUGIN_BROWSER_SKILL) ? this.template4browserHint.replace("#browser", SkillsChecker.PLUGIN_BROWSER_SKILL) : "");
     }
 
     @Override
@@ -178,11 +186,14 @@ public class SkillsSchemaRag extends RagSkills implements SkillsChecker {
         @Autowired
         protected ResourceService resourceService;
 
-        @Value("${skills.schema.template.creator:classpath:config/skills/creator.md}")
-        protected String template4creator;
+        @Value("${skills.schema.template.browser.hint:classpath:config/skills/browser_hint.md}")
+        protected String template4browserHint;
 
         @Value("${skills.schema.template.browser:classpath:config/skills/browser.md}")
         protected String template4browser;
+
+        @Value("${skills.schema.template.creator:classpath:config/skills/creator.md}")
+        protected String template4creator;
 
         @Value("${skills.schema.template.miniapp:classpath:config/skills/miniapp.md}")
         protected String template4miniapp;

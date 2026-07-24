@@ -4093,6 +4093,8 @@ body.quick-fan-transition-active{cursor:progress}
 .vfs-item.selected{background:rgba(var(--accent-rgb),.15)}
 .vfs-item.warning-path{background:linear-gradient(90deg,rgba(217,48,37,.16),rgba(255,140,0,.08) 48%,transparent);box-shadow:inset 2px 0 0 rgba(217,48,37,.72);animation:vfsWarningPulse .38s steps(2,end) infinite}
 .vfs-item.warning-file .vfs-name{color:var(--error);font-weight:600;text-shadow:0 0 10px rgba(217,48,37,.24)}
+.vfs-item.onboarding-mcp-file-target{background:linear-gradient(90deg,rgba(var(--accent-rgb),.22),rgba(var(--accent-rgb),.08));box-shadow:inset 2px 0 0 rgba(var(--accent-rgb),.86),0 0 0 1px rgba(var(--accent-rgb),.2),0 0 18px rgba(var(--accent-rgb),.16);animation:onboardingMCPFilePulse 1.1s ease-in-out infinite}
+@keyframes onboardingMCPFilePulse{0%,100%{filter:brightness(.98);transform:translateX(0)}50%{filter:brightness(1.08);transform:translateX(1px)}}
 .vfs-item svg{width:14px;height:14px;color:var(--text-muted);flex-shrink:0}
 #vfsList.onboarding-skill-disable-locked,#vfsList.onboarding-skill-disable-locked *{pointer-events:none !important}
 .vfs-item .vfs-skill-toggle{width:18px;height:18px;border:none;background:transparent;border-radius:6px;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;flex-shrink:0;color:#c56a1d;transition:background-color .16s ease,color .16s ease,transform .16s ease,opacity .16s ease,box-shadow .16s ease}
@@ -6493,6 +6495,7 @@ const REMOTE_PLUGIN_RESTART_TOUR_CLICK_KEY = 'deepright_remote_plugin_restart_to
 const INSTALL_APP_TOUR_CLICK_KEY = 'deepright_install_app_tour_clicked';
 const VFS_DRAG_TOUR_CLICK_KEY = 'deepright_vfs_drag_tour_clicked';
 const VFS_EDIT_TOUR_CLICK_KEY = 'deepright_vfs_edit_tour_clicked';
+const MCP_FILE_TOUR_CLICK_KEY = 'deepright_mcp_file_tour_clicked';
 const AT_TOUR_CLICK_KEY = 'deepright_at_tour_clicked';
 const BROWSER_SKILL_TOUR_CLICK_KEY = 'deepright_browser_skill_tour_clicked';
 const CRON_SKILL_TOUR_CLICK_KEY = 'deepright_cron_skill_tour_clicked';
@@ -9701,6 +9704,20 @@ function markVfsEditTourClickRecord() {
   } catch {}
 }
 
+function hasMCPFileTourClickRecord() {
+  try {
+    return localStorage.getItem(MCP_FILE_TOUR_CLICK_KEY) === '1';
+  } catch {
+    return true;
+  }
+}
+
+function markMCPFileTourClickRecord() {
+  try {
+    localStorage.setItem(MCP_FILE_TOUR_CLICK_KEY, '1');
+  } catch {}
+}
+
 function hasAtTourClickRecord() {
   try {
     return localStorage.getItem(AT_TOUR_CLICK_KEY) === '1';
@@ -10183,6 +10200,21 @@ function getOnboardingStepConfig(step) {
         cardWidth: 340,
         cardMinHeight: 118,
         cardOffsetY: 18
+      };
+    case 'mcp-file-tour':
+      return {
+        domain: 'left',
+        selector: '#vfsList .vfs-item[data-vfs-name="mcp.json"][data-vfs-type="file"]',
+        message: '用于配置MCP服务（可选）。',
+        actionLabel: '完成',
+        padding: 8,
+        highlightPadding: 12,
+        cardPlacement: 'above-left',
+        cardWidth: 300,
+        cardMinHeight: 112,
+        cardOffsetX: 0,
+        cardOffsetY: 16,
+        targetClass: 'onboarding-mcp-file-target'
       };
     case 'vfs-drag-tour-intro':
       return {
@@ -14463,6 +14495,10 @@ function isVfsEditTourOnboardingStep(step) {
   return ['vfs-edit-tour-intro', 'vfs-edit-tour-editor', 'vfs-edit-tour-create', 'vfs-edit-tour-create-panel', 'vfs-edit-tour-drag', 'vfs-edit-tour-at'].includes(String(step || '').trim());
 }
 
+function isMCPFileTourOnboardingStep(step) {
+  return String(step || '').trim() === 'mcp-file-tour';
+}
+
 function isAtTourOnboardingStep(step) {
   return ['at-tour-menu', 'at-tour-browse', 'at-tour-enter-dir'].includes(String(step || '').trim());
 }
@@ -17471,7 +17507,7 @@ function syncAtTourStep(step) {
 function isVfsEditTourCandidateFile(fileName, type) {
   if (String(type || 'file').trim() !== 'file') return false;
   const normalizedName = String(fileName || '').trim();
-  if (!normalizedName || normalizedName === 'SOUL.md' || normalizedName === 'USER.md') return false;
+  if (!normalizedName || normalizedName === 'SOUL.md' || normalizedName === 'USER.md' || normalizedName === 'mcp.json') return false;
   const fileType = detectFileType(joinFsPath(vfsCurrentPath || '', normalizedName));
   return fileType === 'text' || fileType === 'html';
 }
@@ -21147,6 +21183,18 @@ function startVfsDragTourOnboarding() {
   return true;
 }
 
+function startMCPFileTourOnboarding() {
+  return withOnboardingStartLock(() => {
+    if (hasMCPFileTourClickRecord()) return false;
+    const target = document.querySelector('#vfsList .vfs-item[data-vfs-name="mcp.json"][data-vfs-type="file"]');
+    if (!target) return false;
+    markMCPFileTourClickRecord();
+    onboardingState.active = true;
+    setOnboardingStep('mcp-file-tour');
+    return true;
+  });
+}
+
 function startModelCustomTourOnboarding(entry) {
   if (!isOnboardingEnabled() || isOnboardingActive() || hasModelCustomTourClickRecord() || !isSettingsOpen()) return false;
   const resolvedEntry = entry && entry.closest ? entry.closest('.model-entry') : null;
@@ -21481,6 +21529,20 @@ async function maybeStartSkillTourFromVfs(event, name, type) {
     return true;
   }
   return false;
+}
+
+function isMCPFileTourCandidateFile(fileName, type) {
+  return String(type || 'file').trim() === 'file' && String(fileName || '').trim() === 'mcp.json';
+}
+
+function maybeStartMCPFileTourFromFile(event, fileName, type) {
+  if (!isMCPFileTourCandidateFile(fileName, type)) return false;
+  if (!startMCPFileTourOnboarding()) return false;
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  return true;
 }
 
 function isDocTidyTourCandidateFile(fileName, type) {
@@ -21926,6 +21988,9 @@ function handleOnboardingAction(event) {
       return;
     case 'vfs-upload':
       stopOnboarding(true);
+      return;
+    case 'mcp-file-tour':
+      stopOnboarding(false);
       return;
     case 'vfs-drag-tour-intro':
       setOnboardingStep('vfs-drag-tour-demo');
@@ -44689,6 +44754,14 @@ async function vfsClick(e, name, type) {
     }
     return;
   }
+  if (isOnboardingActive() && isMCPFileTourOnboardingStep(onboardingState.step)) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    return;
+  }
+  if (maybeStartMCPFileTourFromFile(e, name, type)) return;
   if (await maybeStartKnowledgeFileTourFromFile(e, name, type)) return;
   if (await maybeStartDocTidyTourFromFile(e, name, type)) return;
   if (await maybeStartSkillTourFromVfs(e, name, type)) return;
