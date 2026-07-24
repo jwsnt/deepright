@@ -7239,6 +7239,11 @@ func writeIntegrationDeviceConfig(t *testing.T, root, content string) string {
 	return configPath
 }
 
+func writeIntegrationMCPConfig(t *testing.T, root, content string) string {
+	t.Helper()
+	return writeIntegrationDeviceConfig(t, root, content)
+}
+
 func TestIntegrationDeviceStateUsesFlagConfigThenSystem(t *testing.T) {
 	tempDir := t.TempDir()
 	useIntegrationExecutableDir(t, tempDir)
@@ -11834,6 +11839,8 @@ func TestCronExecuteOnceInjectsCurrentModelConfigForAllTaskTypes(t *testing.T) {
 		t.Fatalf("chdir: %v", err)
 	}
 	defer os.Chdir(oldwd)
+	useIntegrationExecutableDir(t, tmp)
+	writeIntegrationMCPConfig(t, tmp, `{"mcp":{"interval":30,"file":"mcp.json"}}`)
 
 	if cronDB != nil {
 		_ = cronDB.Close()
@@ -11851,6 +11858,9 @@ func TestCronExecuteOnceInjectsCurrentModelConfigForAllTaskTypes(t *testing.T) {
 	}
 	if err := os.WriteFile(filepath.Join(agentDir, "USER.md"), []byte("user"), 0o644); err != nil {
 		t.Fatalf("write user: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(agentDir, "mcp.json"), []byte(`{"servers":{"demo":{}}}`), 0o644); err != nil {
+		t.Fatalf("write MCP config: %v", err)
 	}
 
 	initCronDB()
@@ -11942,6 +11952,9 @@ func TestCronExecuteOnceInjectsCurrentModelConfigForAllTaskTypes(t *testing.T) {
 			seenTaskTypes[taskType] = true
 			if got, ok := metadata["port"].(float64); !ok || got != 18767 {
 				t.Fatalf("%s metadata.port = %#v, want 18767", taskType, metadata["port"])
+			}
+			if got := metadata["mcp"]; got != filepath.Join(agentDir, "mcp.json") {
+				t.Fatalf("%s metadata.mcp = %#v, want %q", taskType, got, filepath.Join(agentDir, "mcp.json"))
 			}
 			for key, expected := range want {
 				if actual := metadata[key]; actual != expected {
@@ -17544,6 +17557,239 @@ func TestHandleSkillsWarning(t *testing.T) {
 	}
 	if len(payload.Data) != 1 || payload.Data[0].Reason != "broken" {
 		t.Fatalf("payload data = %+v, want one broken warning", payload.Data)
+	}
+}
+
+func TestMCPMetadataValidationAndRefresh(t *testing.T) {
+	tmp := t.TempDir()
+	useIntegrationExecutableDir(t, tmp)
+	writeIntegrationMCPConfig(t, tmp, `{"mcp":{"interval":30,"file":"mcp.json"}}`)
+
+	agentA := filepath.Join(tmp, "agents", "A")
+	agentB := filepath.Join(tmp, "agents", "B")
+	if err := os.MkdirAll(agentA, 0o755); err != nil {
+		t.Fatalf("mkdir agent A: %v", err)
+	}
+	if err := os.MkdirAll(agentB, 0o755); err != nil {
+		t.Fatalf("mkdir agent B: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(agentA, "mcp.json"), []byte(`{"servers":{"demo":{}}}`), 0o644); err != nil {
+		t.Fatalf("write valid mcp: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(agentB, "mcp.json"), []byte(`[]`), 0o644); err != nil {
+		t.Fatalf("write empty mcp array: %v", err)
+	}
+	currentDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working directory: %v", err)
+	}
+	relativeAgentA, err := filepath.Rel(currentDir, agentA)
+	if err != nil {
+		t.Fatalf("make relative workspace: %v", err)
+	}
+	if result := integrationMCPFileResult("A", relativeAgentA, "mcp.json"); result.metadataPath != filepath.Join(agentA, "mcp.json") {
+		t.Fatalf("metadata path = %q, want system absolute path %q", result.metadataPath, filepath.Join(agentA, "mcp.json"))
+	}
+
+	cfg := &Config{AgentDir: filepath.Join(tmp, "agents")}
+	metadata := &AgentOutput{Agents: []Agent{{AgentID: "A", Workspace: agentA}, {AgentID: "B", Workspace: agentB}}}
+	meta := map[string]interface{}{"agentId": "A", "mcp": "forged.json"}
+	injectMCPMetadata(cfg, metadata, meta)
+	if got := meta["mcp"]; got != filepath.Join(agentA, "mcp.json") {
+		t.Fatalf("metadata.mcp = %#v, want %q", got, filepath.Join(agentA, "mcp.json"))
+	}
+
+	meta = map[string]interface{}{"agentId": "B", "mcp": "forged.json"}
+	injectMCPMetadata(cfg, metadata, meta)
+	if _, exists := meta["mcp"]; exists {
+		t.Fatalf("empty [] must not forward metadata.mcp: %#v", meta)
+	}
+
+	if err := os.WriteFile(filepath.Join(agentA, "mcp.json"), []byte(`{broken`), 0o644); err != nil {
+		t.Fatalf("write invalid mcp: %v", err)
+	}
+	config, ok := readIntegrationMCPConfig()
+	if !ok {
+		t.Fatal("expected test MCP config")
+	}
+	if refreshed := cfg.mcpState().refresh(config, metadata.Agents, false); refreshed {
+		t.Fatal("MCP state refreshed before its configured interval")
+	}
+	meta = map[string]interface{}{"agentId": "A"}
+	injectMCPMetadata(cfg, metadata, meta)
+	if got := meta["mcp"]; got != filepath.Join(agentA, "mcp.json") {
+		t.Fatalf("cached metadata.mcp = %#v, want %q before refresh", got, filepath.Join(agentA, "mcp.json"))
+	}
+	cfg.mcpState().refresh(config, metadata.Agents, true)
+	meta = map[string]interface{}{"agentId": "A"}
+	injectMCPMetadata(cfg, metadata, meta)
+	if _, exists := meta["mcp"]; exists {
+		t.Fatalf("invalid JSON must not forward metadata.mcp: %#v", meta)
+	}
+	warnings := cfg.mcpState().warnings()
+	if len(warnings) != 1 || warnings[0].AgentID != "A" || warnings[0].Path != "mcp.json" || warnings[0].Reason != integrationMCPParseWarning {
+		t.Fatalf("MCP warnings = %#v", warnings)
+	}
+
+	if err := os.WriteFile(filepath.Join(agentA, "mcp.json"), []byte(`{}`), 0o644); err != nil {
+		t.Fatalf("write empty mcp object: %v", err)
+	}
+	cfg.mcpState().refresh(config, metadata.Agents, true)
+	if warnings := cfg.mcpState().warnings(); len(warnings) != 0 {
+		t.Fatalf("empty {} must clear warnings: %#v", warnings)
+	}
+
+	if err := os.WriteFile(filepath.Join(agentA, "mcp.json"), []byte(`true`), 0o644); err != nil {
+		t.Fatalf("write JSON scalar: %v", err)
+	}
+	cfg.mcpState().refresh(config, metadata.Agents, true)
+	if warnings := cfg.mcpState().warnings(); len(warnings) != 1 || warnings[0].Reason != integrationMCPParseWarning {
+		t.Fatalf("JSON scalar must be a parse warning: %#v", warnings)
+	}
+}
+
+func TestReadIntegrationMCPConfigRequiresPositiveIntervalAndSafeRelativePath(t *testing.T) {
+	tmp := t.TempDir()
+	useIntegrationExecutableDir(t, tmp)
+	for _, content := range []string{
+		`{"mcp":{"interval":0,"file":"mcp.json"}}`,
+		`{"mcp":{"interval":1.5,"file":"mcp.json"}}`,
+		`{"mcp":{"interval":30,"file":"../mcp.json"}}`,
+		`{"mcp":{"interval":30,"file":"/tmp/mcp.json"}}`,
+		`{"mcp":{"interval":30,"file":"dir\\mcp.json"}}`,
+	} {
+		writeIntegrationMCPConfig(t, tmp, content)
+		if _, ok := readIntegrationMCPConfig(); ok {
+			t.Fatalf("invalid MCP config accepted: %s", content)
+		}
+	}
+	writeIntegrationMCPConfig(t, tmp, `{"mcp":{"interval":30,"file":"config/mcp.json"}}`)
+	config, ok := readIntegrationMCPConfig()
+	if !ok || config.file != "config/mcp.json" || config.interval != 30*time.Second {
+		t.Fatalf("MCP config = %#v, ok=%v", config, ok)
+	}
+}
+
+func TestHandleMCPWarningDoesNotUseSkillsWarningStore(t *testing.T) {
+	tmp := t.TempDir()
+	useIntegrationExecutableDir(t, tmp)
+	writeIntegrationMCPConfig(t, tmp, `{"mcp":{"interval":30,"file":"mcp.json"}}`)
+	agentRoot := filepath.Join(tmp, "agents")
+	if err := os.MkdirAll(filepath.Join(agentRoot, "A"), 0o755); err != nil {
+		t.Fatalf("mkdir agent: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(agentRoot, "A", "mcp.json"), []byte(`not-json`), 0o644); err != nil {
+		t.Fatalf("write invalid mcp: %v", err)
+	}
+
+	cfg := &Config{AgentDir: agentRoot}
+	server := httptest.NewServer(http.HandlerFunc(handleMCPWarning(cfg)))
+	defer server.Close()
+	resp, err := http.Get(server.URL + "/mcp_warning?refresh=1")
+	if err != nil {
+		t.Fatalf("GET /mcp_warning failed: %v", err)
+	}
+	defer resp.Body.Close()
+	var payload struct {
+		Status int                     `json:"status"`
+		Data   []integrationMCPWarning `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode MCP warning payload: %v", err)
+	}
+	if payload.Status != 0 || len(payload.Data) != 1 || payload.Data[0].AgentID != "A" || payload.Data[0].Path != "mcp.json" {
+		t.Fatalf("MCP warning payload = %#v", payload)
+	}
+
+	if err := os.WriteFile(filepath.Join(agentRoot, "A", "mcp.json"), []byte(`[]`), 0o644); err != nil {
+		t.Fatalf("write empty mcp array: %v", err)
+	}
+	resp, err = http.Get(server.URL + "/mcp_warning?refresh=1")
+	if err != nil {
+		t.Fatalf("refresh MCP warning failed: %v", err)
+	}
+	defer resp.Body.Close()
+	payload = struct {
+		Status int                     `json:"status"`
+		Data   []integrationMCPWarning `json:"data"`
+	}{}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode cleared MCP warning payload: %v", err)
+	}
+	if payload.Status != 0 || len(payload.Data) != 0 {
+		t.Fatalf("empty [] must clear MCP warning: %#v", payload)
+	}
+}
+
+func TestMCPMetadataIsForwardedByChatAndCLIGet(t *testing.T) {
+	disableIntegrationNotificationsForTest(t)
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+	useIntegrationExecutableDir(t, tmp)
+	writeIntegrationMCPConfig(t, tmp, `{"mcp":{"interval":30,"file":"mcp.json"}}`)
+	flushAgentCache()
+
+	agentRoot := filepath.Join(tmp, "agents")
+	workspace := filepath.Join(agentRoot, "A")
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		t.Fatalf("mkdir workspace: %v", err)
+	}
+	for name, content := range map[string]string{
+		"SOUL.md":  "soul",
+		"USER.md":  "user",
+		"mcp.json": `{"servers":{"demo":{}}}`,
+	} {
+		if err := os.WriteFile(filepath.Join(workspace, name), []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+
+	var chatRequest map[string]interface{}
+	var cliGetRequest map[string]interface{}
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var request map[string]interface{}
+		_ = json.Unmarshal(body, &request)
+		if r.URL.Path == "/cli/get" {
+			cliGetRequest = request
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(ResponsePayload{Code: 200})
+			return
+		}
+		chatRequest = request
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, "data: [DONE]\n\n")
+	}))
+	defer upstream.Close()
+
+	cfg := &Config{Host: upstream.URL, AgentDir: agentRoot, Device: "dev", AgentCacheMs: 0}
+	server := httptest.NewServer(http.HandlerFunc(handleChatCompletions(cfg, &http.Client{Timeout: 5 * time.Second})))
+	defer server.Close()
+	resp, err := http.Post(server.URL, "application/json", strings.NewReader(`{"messages":[{"role":"user","content":"hello"}],"stream":true,"metadata":{"agentId":"A","mcp":"forged.json"}}`))
+	if err != nil {
+		t.Fatalf("post chat: %v", err)
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+	chatMetadata, ok := chatRequest["metadata"].(map[string]interface{})
+	if !ok || chatMetadata["mcp"] != filepath.Join(workspace, "mcp.json") {
+		t.Fatalf("chat metadata.mcp = %#v, want %q", chatMetadata, filepath.Join(workspace, "mcp.json"))
+	}
+
+	metadata := &AgentOutput{Agents: []Agent{{AgentID: "A", Workspace: workspace}}}
+	if _, err := heartbeat(&http.Client{Timeout: 5 * time.Second}, upstream.URL, metadata, cfg); err != nil {
+		t.Fatalf("heartbeat: %v", err)
+	}
+	cliGetMetadata, ok := cliGetRequest["metadata"].(map[string]interface{})
+	if !ok || cliGetMetadata["mcp"] != filepath.Join(workspace, "mcp.json") {
+		t.Fatalf("cli/get metadata.mcp = %#v, want %q", cliGetMetadata, filepath.Join(workspace, "mcp.json"))
 	}
 }
 

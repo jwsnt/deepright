@@ -3,6 +3,7 @@
   "version": "1.0",
   "port": 57896,
   "skills": [
+    "__internal_mcp",
     "__internal_cron",
     "__internal_email",
     "__internal_feishu",
@@ -123,5 +124,9 @@
       "__model_fast": "qwen3.5-flash",
       "__model": "qwen3.5-flash"
     }
+  },
+  "mcp": {
+    "interval": 30,
+    "file": "mcp.json"
   }
 }

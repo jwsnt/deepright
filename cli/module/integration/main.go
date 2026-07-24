@@ -532,6 +532,258 @@ func readAgentRouterRemote(agentDir, deviceID, agentID string, ttl time.Duration
 	return readRouterRemoteFromWorkspace(agent.Workspace)
 }
 
+const integrationMCPParseWarning = "MCP 配置必须是有内容的 JSON 对象或数组"
+
+type integrationMCPConfig struct {
+	interval time.Duration
+	file     string
+}
+
+type integrationMCPWarning struct {
+	AgentID string `json:"agentId"`
+	Path    string `json:"path"`
+	Reason  string `json:"reason"`
+	Time    int64  `json:"time"`
+}
+
+type integrationMCPAgentResult struct {
+	metadataPath string
+	warning      *integrationMCPWarning
+}
+
+type integrationMCPState struct {
+	mu          sync.Mutex
+	config      integrationMCPConfig
+	lastRefresh time.Time
+	results     map[string]integrationMCPAgentResult
+}
+
+func normalizeIntegrationMCPFilePath(raw string) (string, bool) {
+	value := strings.TrimSpace(raw)
+	if value == "" || filepath.IsAbs(value) || strings.Contains(value, "\\") {
+		return "", false
+	}
+	value = path.Clean(value)
+	if value == "." || value == ".." || strings.HasPrefix(value, "../") || path.IsAbs(value) {
+		return "", false
+	}
+	return value, true
+}
+
+func readIntegrationMCPConfig() (integrationMCPConfig, bool) {
+	raw, _, err := readIntegrationStartupConfigRaw()
+	if err != nil || raw == nil {
+		return integrationMCPConfig{}, false
+	}
+	mcp, ok := raw["mcp"].(map[string]interface{})
+	if !ok || mcp == nil {
+		return integrationMCPConfig{}, false
+	}
+	intervalValue, ok := mcp["interval"].(json.Number)
+	if !ok {
+		return integrationMCPConfig{}, false
+	}
+	seconds, err := intervalValue.Int64()
+	if err != nil || seconds <= 0 || seconds > int64((1<<63-1)/int64(time.Second)) {
+		return integrationMCPConfig{}, false
+	}
+	fileValue, ok := mcp["file"].(string)
+	if !ok {
+		return integrationMCPConfig{}, false
+	}
+	file, ok := normalizeIntegrationMCPFilePath(fileValue)
+	if !ok {
+		return integrationMCPConfig{}, false
+	}
+	return integrationMCPConfig{interval: time.Duration(seconds) * time.Second, file: file}, true
+}
+
+func integrationMCPFileResult(agentID, workspace, relativePath string) integrationMCPAgentResult {
+	workspace = strings.TrimSpace(workspace)
+	if workspace == "" || relativePath == "" {
+		return integrationMCPAgentResult{}
+	}
+	absoluteWorkspace, err := filepath.Abs(workspace)
+	if err != nil {
+		return integrationMCPAgentResult{}
+	}
+	filePath := filepath.Join(absoluteWorkspace, filepath.FromSlash(relativePath))
+	data, err := os.ReadFile(filePath)
+	if err != nil || len(bytes.TrimSpace(data)) == 0 {
+		return integrationMCPAgentResult{}
+	}
+	var parsed interface{}
+	if err := json.Unmarshal(data, &parsed); err == nil {
+		switch value := parsed.(type) {
+		case map[string]interface{}:
+			if len(value) > 0 {
+				return integrationMCPAgentResult{metadataPath: filePath}
+			}
+			return integrationMCPAgentResult{}
+		case []interface{}:
+			if len(value) > 0 {
+				return integrationMCPAgentResult{metadataPath: filePath}
+			}
+			return integrationMCPAgentResult{}
+		}
+	}
+	return integrationMCPAgentResult{warning: &integrationMCPWarning{
+		AgentID: strings.TrimSpace(agentID),
+		Path:    relativePath,
+		Reason:  integrationMCPParseWarning,
+		Time:    time.Now().Unix(),
+	}}
+}
+
+func (state *integrationMCPState) refresh(config integrationMCPConfig, agents []Agent, force bool) bool {
+	if state == nil {
+		return false
+	}
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if !force && state.results != nil && state.config == config && time.Since(state.lastRefresh) < config.interval {
+		return false
+	}
+	results := make(map[string]integrationMCPAgentResult, len(agents))
+	for _, agent := range agents {
+		agentID := strings.TrimSpace(agent.AgentID)
+		if agentID == "" {
+			continue
+		}
+		results[agentID] = integrationMCPFileResult(agentID, agent.Workspace, config.file)
+	}
+	state.config = config
+	state.results = results
+	state.lastRefresh = time.Now()
+	return true
+}
+
+func (state *integrationMCPState) clear() bool {
+	if state == nil {
+		return false
+	}
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if state.results == nil && state.config == (integrationMCPConfig{}) {
+		return false
+	}
+	state.config = integrationMCPConfig{}
+	state.results = nil
+	state.lastRefresh = time.Now()
+	return true
+}
+
+func (state *integrationMCPState) pathForAgent(agentID string) string {
+	if state == nil {
+		return ""
+	}
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	return state.results[strings.TrimSpace(agentID)].metadataPath
+}
+
+func (state *integrationMCPState) warnings() []integrationMCPWarning {
+	if state == nil {
+		return nil
+	}
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	warnings := make([]integrationMCPWarning, 0)
+	for _, result := range state.results {
+		if result.warning != nil {
+			warnings = append(warnings, *result.warning)
+		}
+	}
+	return warnings
+}
+
+func (cfg *Config) mcpState() *integrationMCPState {
+	if cfg == nil {
+		return nil
+	}
+	cfg.mcpStateMu.Lock()
+	defer cfg.mcpStateMu.Unlock()
+	if cfg.MCPState == nil {
+		cfg.MCPState = &integrationMCPState{}
+	}
+	return cfg.MCPState
+}
+
+func injectMCPMetadata(cfg *Config, metadata *AgentOutput, metaMap map[string]interface{}) {
+	if metaMap == nil {
+		return
+	}
+	agentID, _ := metaMap["agentId"].(string)
+	injectMCPMetadataForAgent(cfg, metadata, metaMap, agentID)
+}
+
+func injectMCPMetadataForAgent(cfg *Config, metadata *AgentOutput, metaMap map[string]interface{}, agentID string) {
+	if metaMap == nil {
+		return
+	}
+	delete(metaMap, "mcp")
+	if cfg == nil || metadata == nil {
+		return
+	}
+	state := cfg.mcpState()
+	config, ok := readIntegrationMCPConfig()
+	if !ok {
+		state.clear()
+		return
+	}
+	state.refresh(config, metadata.Agents, false)
+	agentID = strings.TrimSpace(agentID)
+	if agentID == "" && len(metadata.Agents) == 1 {
+		agentID = metadata.Agents[0].AgentID
+	}
+	if mcpPath := state.pathForAgent(agentID); mcpPath != "" {
+		metaMap["mcp"] = mcpPath
+	}
+}
+
+func integrationMCPConfiguredAgents(cfg *Config) ([]Agent, error) {
+	if cfg == nil {
+		return nil, nil
+	}
+	agentIDs, err := agentcore.ListAgentIDs(cfg.AgentDir)
+	if err != nil {
+		return nil, err
+	}
+	agents := make([]Agent, 0, len(agentIDs))
+	for _, agentID := range agentIDs {
+		workspace, err := resolveAgentWorkspace(cfg.AgentDir, agentID)
+		if err != nil {
+			continue
+		}
+		agents = append(agents, Agent{AgentID: agentID, Workspace: workspace})
+	}
+	return agents, nil
+}
+
+func refreshIntegrationMCPMetadata(cfg *Config, force bool) (bool, error) {
+	if cfg == nil {
+		return false, nil
+	}
+	state := cfg.mcpState()
+	config, ok := readIntegrationMCPConfig()
+	if !ok {
+		return state.clear(), nil
+	}
+	agents, err := integrationMCPConfiguredAgents(cfg)
+	if err != nil {
+		return false, err
+	}
+	return state.refresh(config, agents, force), nil
+}
+
+func integrationMCPRefreshInterval() time.Duration {
+	config, ok := readIntegrationMCPConfig()
+	if !ok {
+		return time.Minute
+	}
+	return config.interval
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Shared: Skill & Agent metadata
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1736,6 +1988,21 @@ func resolveCurrentPageSessionChatID() string {
 	return strings.TrimSpace(chatID)
 }
 
+func resolveCurrentPageSessionAgentID(chatID string) string {
+	if cronDB == nil {
+		return ""
+	}
+	chatID = strings.TrimSpace(chatID)
+	if chatID == "" {
+		return ""
+	}
+	var agentID string
+	if err := cronDB.QueryRow(`SELECT agent_id FROM chat_log WHERE chat_id = ? AND agent_id != '' ORDER BY created_at DESC, id DESC LIMIT 1`, chatID).Scan(&agentID); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(agentID)
+}
+
 func lookupLastSSEResponseTimestamp(chatID string) (int64, bool) {
 	if cronDB == nil {
 		return 0, false
@@ -2192,8 +2459,9 @@ func integrationMetadataPort(cfg *Config) int {
 
 func heartbeat(client *http.Client, host string, metadata *AgentOutput, cfg *Config) (*TaskContent, error) {
 	metaMap := buildCLIRequestMetadataMap(metadata)
-	metaMap["port"] = integrationMetadataPort(cfg)
 	currentChatID := resolveCurrentPageSessionChatID()
+	injectMCPMetadataForAgent(cfg, metadata, metaMap, resolveCurrentPageSessionAgentID(currentChatID))
+	metaMap["port"] = integrationMetadataPort(cfg)
 	injectLastResponseMetadata(metaMap, currentChatID)
 	injectSandboxPathMetadata(metaMap, currentChatID)
 	injectPluginsDirMetadata(metaMap)
@@ -5539,6 +5807,32 @@ func handleSkillsWarning(cfg *Config) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"status": 0, "data": items})
+	}
+}
+
+// handleMCPWarning serves MCP parse errors independently from SKILL.md
+// warnings. The payload deliberately contains only Agent ID, relative path,
+// and a stable validation message; MCP file contents never leave the process.
+func handleMCPWarning(cfg *Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		refresh := strings.TrimSpace(r.URL.Query().Get("refresh"))
+		force := refresh != "" && refresh != "0" && strings.ToLower(refresh) != "false"
+		if _, err := refreshIntegrationMCPMetadata(cfg, force); err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]any{"status": 1, "content": "读取 MCP 配置失败"})
+			return
+		}
+		warnings := []integrationMCPWarning(nil)
+		if cfg != nil {
+			warnings = cfg.mcpState().warnings()
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"status": 0, "data": warnings})
 	}
 }
 
@@ -13502,6 +13796,7 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 		// Merge request metadata onto the shared Agent metadata and forward the
 		// merged body as-is without any query-based metadata expansion.
 		sharedutil.MergeMetadataFields(metaMap, reqData["metadata"])
+		injectMCPMetadata(cfg, metadata, metaMap)
 		metaMap["port"] = integrationMetadataPort(cfg)
 		// plugins is runtime-owned metadata. A client request can contain a stale
 		// plugin list, but it must not replace the built-in remote capability.
@@ -14196,6 +14491,10 @@ type Config struct {
 	IdleTimeout       int
 	PluginExecTimeout int
 	SkillExtractRound int
+
+	// Per-Agent MCP metadata refresh state.
+	mcpStateMu sync.Mutex
+	MCPState   *integrationMCPState
 }
 
 type integrationStartupOptions struct {
@@ -16919,6 +17218,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/skills", handleSkills(&cfg))
 	mux.HandleFunc("/api/skill_state", handleSkillState())
 	mux.HandleFunc("/skills_warning", handleSkillsWarning(&cfg))
+	mux.HandleFunc("/mcp_warning", handleMCPWarning(&cfg))
 	mux.HandleFunc("/api/files", handleFiles())
 	mux.HandleFunc("/api/data", handleData())
 	mux.HandleFunc("/api/workspace", handleWorkspace(&cfg))
@@ -17054,6 +17354,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	initCronDB()
 	startIntegrationLogRetentionCleanup(ctx)
 	startCronCheck(ctx, &cfg)
+	startIntegrationMCPRefresh(ctx, &cfg)
 	startCronExecutor(ctx, &cfg, proxyClient, connectSvc)
 	startConnectPendingRequestSync(ctx, &cfg, connectSvc)
 	startIntegrationAssociatedPluginsAsync(associatedStartCtx, associatedPlugins, nil, associatedStartDone)
@@ -17980,6 +18281,27 @@ func startCronCheck(ctx context.Context, cfg *Config) {
 		}
 	}()
 	log.Println("[cron] periodic check started (every 1 minute)")
+}
+
+func startIntegrationMCPRefresh(ctx context.Context, cfg *Config) {
+	if ctx == nil || cfg == nil {
+		return
+	}
+	go func() {
+		for {
+			if _, err := refreshIntegrationMCPMetadata(cfg, false); err != nil {
+				log.Printf("[mcp_warning] refresh failed: %v", err)
+			}
+			interval := integrationMCPRefreshInterval()
+			timer := time.NewTimer(interval)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return
+			case <-timer.C:
+			}
+		}
+	}()
 }
 
 // startCronExecutor runs periodic execution of due cron task details.
@@ -19206,6 +19528,7 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 		metaMap["thinking"] = t.Thinking
 		metaMap["verify"] = t.Verify
 		metaMap["router_disable"] = t.RouterDisable
+		injectMCPMetadata(cfg, metadata, metaMap)
 		injectLiveAgentMediaIntoAgentList(metaMap)
 		injectLiveAgentKnowledgeIntoAgentList(metaMap)
 		injectLastResponseMetadata(metaMap, chatID)

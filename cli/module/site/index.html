@@ -3997,11 +3997,12 @@ body.quick-fan-transition-active{cursor:progress}
 [data-theme="dark"] .vfs-upload-toast.center-mode{border:none;border-top:none;box-shadow:0 14px 30px rgba(0,0,0,.26)}
 [data-theme="dark"] .vfs-upload-toast[data-toast-placement="input-anchor"]{border:none;border-top:none;box-shadow:0 14px 30px rgba(0,0,0,.26)}
 [data-theme="dark"] .vfs-upload-toast.center-mode.error{border:none}
-.vfs-warning-popover{position:absolute;min-width:220px;max-width:280px;padding:10px 12px;border-radius:14px;border:1px solid rgba(217,48,37,.24);background:linear-gradient(180deg,color-mix(in srgb,var(--bg-card) 94%,#fff 6%),color-mix(in srgb,var(--bg-sidebar) 88%,transparent));box-shadow:0 16px 36px rgba(16,24,40,.2);font-size:11px;line-height:1.55;color:var(--text-primary);opacity:0;visibility:hidden;pointer-events:none;transform:translateY(6px) scale(.98);transition:opacity .18s ease,transform .18s ease,visibility 0s linear .18s;z-index:3}
+.vfs-warning-popover{position:absolute;min-width:220px;max-width:280px;padding:10px 12px;border-radius:14px;border:1px solid rgba(217,48,37,.24);background:linear-gradient(180deg,rgba(255,253,250,.98),rgba(255,240,229,.96));box-shadow:0 16px 36px rgba(16,24,40,.2),inset 0 1px 0 rgba(255,255,255,.72);font-size:11px;line-height:1.55;color:var(--text-primary);opacity:0;visibility:hidden;pointer-events:none;transform:translateY(6px) scale(.98);transition:opacity .18s ease,transform .18s ease,visibility 0s linear .18s;z-index:3}
 .vfs-warning-popover.show{opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0) scale(1);transition:opacity .18s ease,transform .18s ease}
 .vfs-warning-popover-title{font-size:11px;font-weight:700;color:var(--error);margin-bottom:4px}
 .vfs-warning-popover-path{font-size:10px;color:var(--text-muted);word-break:break-all;margin-bottom:6px}
 .vfs-warning-popover-reason{word-break:break-word;color:var(--text-primary)}
+[data-theme="dark"] .vfs-warning-popover{background:linear-gradient(180deg,rgba(48,35,42,.98),rgba(37,27,34,.96));border-color:rgba(255,122,142,.34);box-shadow:0 16px 36px rgba(0,0,0,.36),inset 0 1px 0 rgba(255,255,255,.08)}
 .vfs-repair-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(14,22,38,.22);backdrop-filter:blur(10px) saturate(135%);-webkit-backdrop-filter:blur(10px) saturate(135%);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .24s ease,visibility 0s linear .24s}
 .vfs-repair-overlay.show{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .24s ease}
 .vfs-repair-popover{width:min(420px,calc(100vw - 32px));max-width:min(420px,calc(100vw - 32px));padding:24px 24px 20px;border-radius:24px;border:1px solid color-mix(in srgb,var(--border) 58%,rgba(255,255,255,.52));background:linear-gradient(180deg,rgba(255,252,249,.84),rgba(249,236,226,.68) 58%,rgba(246,224,209,.58));box-shadow:0 28px 74px rgba(91,34,29,.18),0 0 0 1px rgba(255,255,255,.24) inset,0 0 34px rgba(var(--accent-soft-rgb),.12);backdrop-filter:blur(22px) saturate(155%);-webkit-backdrop-filter:blur(22px) saturate(155%);transform:translateY(10px) scale(.98);transition:transform .24s cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column;gap:14px;pointer-events:auto;outline:none}
@@ -4489,7 +4490,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
       </div>
       <div class="vfs-list" id="vfsList"></div>
       <div class="vfs-warning-popover" id="vfsWarningPopover" data-overlay-base data-overlay-domain="left" data-overlay-order="26" aria-hidden="true" onclick="event.stopPropagation()">
-        <div class="vfs-warning-popover-title">SKILL 解析异常</div>
+        <div class="vfs-warning-popover-title">文件解析异常</div>
         <div class="vfs-warning-popover-path" id="vfsWarningPopoverPath"></div>
         <div class="vfs-warning-popover-reason" id="vfsWarningPopoverReason"></div>
       </div>
@@ -7427,6 +7428,8 @@ let browserInstanceInitState = {
 };
 let skillsWarnings = [];
 let skillsWarningIndex = new Map();
+let mcpWarnings = [];
+let mcpWarningIndex = new Map();
 let vfsWarningPopoverState = { visible: false, path: '' };
 let vfsRepairPopoverState = { visible: false, triggerPath: '', skillPath: '' };
 let installAppState = {
@@ -7444,6 +7447,7 @@ const CLI_GET_QUEUE_STATUS_ACTIVE_INTERVAL_MS = 5000;
 const PAGE_TASK_CHAT_AUTO_RELOAD_INTERVAL_SEC = 30;
 const PAGE_TASK_VFS_INTERVAL_SEC = 30;
 const PAGE_TASK_SKILLS_WARNINGS_INTERVAL_SEC = 30;
+const PAGE_TASK_MCP_WARNINGS_INTERVAL_SEC = 30;
 const PAGE_TASK_QUICK_PLUGINS_INTERVAL_SEC = 30;
 const PAGE_TASK_WIKI_INTERVAL_SEC = 60;
 const PAGE_TASK_CRON_INTERVAL_SEC = 15;
@@ -23744,6 +23748,7 @@ async function init() {
   bindOnboardingEvents();
   bindDeleteConfirmActions();
   startSkillsWarningTimer();
+  startMCPWarningTimer();
   startInstallAppPolling();
   renderQuickFanMenu();
   updateStandaloneButton();
@@ -44335,6 +44340,7 @@ function updateAgentHighlight() {
 // ===== Virtual File System =====
 let vfsCurrentPath = '';
 let vfsWorkspace = '';
+let vfsAgentId = '';
 let vfsTimer = null;
 let vfsSelected = new Set();
 let vfsLastJson = '';
@@ -44422,6 +44428,7 @@ async function vfsLoadWorkspace() {
     agentId = resolvedAgentId || requestedAgentId;
   }
   if (!agentId) {
+    vfsAgentId = '';
     docTidyLastUpdateState = {};
     docTidyDismissedState = {};
     wikiKnowledgePath = '';
@@ -44445,6 +44452,7 @@ async function vfsLoadWorkspace() {
       if (workspace) vfsWorkspaceByAgent.set(agentId, workspace);
     }
     vfsWorkspace = workspace;
+    vfsAgentId = agentId;
     vfsCurrentPath = workspace;
     docTidyLastUpdateState = {};
     docTidyDismissedState = {};
@@ -44518,9 +44526,9 @@ function vfsRender(entries) {
   const relPath = vfsCurrentPath.replace(vfsWorkspace, '.') || '.';
   const pathEl = document.getElementById('vfsPath');
   pathEl.textContent = relPath;
-  pathEl.classList.toggle('warning-active', getSkillsWarningChain(vfsCurrentPath).size > 0);
+  pathEl.classList.toggle('warning-active', getVfsWarningChain(vfsCurrentPath).size > 0);
   const list = document.getElementById('vfsList');
-  const warningChain = getSkillsWarningChain(vfsCurrentPath);
+  const warningChain = getVfsWarningChain(vfsCurrentPath);
   // Sort: dirs first, then files
   entries.sort((a, b) => {
     if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
@@ -44536,7 +44544,7 @@ function vfsRender(entries) {
     const dl = '<button class="vfs-dl" onclick="event.stopPropagation();vfsDownload(event,\'' + esc(e.name) + '\')" title="下载"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>';
     const absPath = vfsCurrentPath + '/' + e.name;
     const sel = vfsSelected.has(absPath) ? ' selected' : '';
-    const warning = getSkillsWarningForPath(absPath);
+    const warning = getVfsWarningForPath(absPath);
     const repairWarning = getSkillRepairTargetForPath(absPath);
     const inChain = warningChain.has(normalizeWarningPath(absPath));
     const docTidyFileName = getDocTidyFileName(e.name, e.type);
@@ -46945,7 +46953,7 @@ function getSkillRepairTargetForPath(path) {
   const candidates = [];
   skillsWarnings.forEach(item => {
     const warningPath = normalizeWarningPath(item && item.path);
-    if (!warningPath) return;
+    if (!warningPath || getFsBasename(warningPath) !== 'SKILL.md') return;
     if (warningPath === target || warningPath.startsWith(target + '/')) {
       candidates.push(item);
     }
@@ -46999,6 +47007,59 @@ function getSkillsWarningChain(path) {
   return chain;
 }
 
+function mcpWarningKey(agentId, path) {
+  const agent = String(agentId || '').trim();
+  const relative = normalizeFsPath(path);
+  return agent && relative && !relative.startsWith('/') ? agent + '\n' + relative : '';
+}
+
+function indexMCPWarnings(items) {
+  mcpWarnings = Array.isArray(items) ? items.slice() : [];
+  mcpWarningIndex = new Map();
+  mcpWarnings.forEach(item => {
+    const key = mcpWarningKey(item && item.agentId, item && item.path);
+    if (!key || mcpWarningIndex.has(key)) return;
+    mcpWarningIndex.set(key, item);
+  });
+}
+
+function getMCPWarningForPath(path) {
+  const relative = relativeFsPath(vfsWorkspace, path);
+  const key = mcpWarningKey(vfsAgentId, relative);
+  return key ? (mcpWarningIndex.get(key) || null) : null;
+}
+
+function getMCPWarningChain(path) {
+  const target = normalizeWarningPath(path);
+  if (!target || !vfsWorkspace || !vfsAgentId || !mcpWarnings.length) return new Set();
+  const chain = new Set();
+  mcpWarnings.forEach(item => {
+    if (String(item && item.agentId || '').trim() !== vfsAgentId) return;
+    const relative = normalizeFsPath(item && item.path);
+    if (!relative || relative.startsWith('/')) return;
+    const warningPath = joinFsPath(vfsWorkspace, relative);
+    if (warningPath !== target && !warningPath.startsWith(target + '/')) return;
+    let cursor = warningPath;
+    while (cursor) {
+      chain.add(cursor);
+      const idx = cursor.lastIndexOf('/');
+      if (idx <= 0) break;
+      cursor = cursor.slice(0, idx);
+    }
+  });
+  return chain;
+}
+
+function getVfsWarningForPath(path) {
+  return getMCPWarningForPath(path) || getSkillsWarningForPath(path);
+}
+
+function getVfsWarningChain(path) {
+  const chain = getSkillsWarningChain(path);
+  getMCPWarningChain(path).forEach(item => chain.add(item));
+  return chain;
+}
+
 function hideVfsWarningPopover() {
   const pop = document.getElementById('vfsWarningPopover');
   if (!pop) return;
@@ -47024,7 +47085,7 @@ function positionVfsFloatingPopover(pop, anchor) {
 }
 
 function showVfsWarningPopover(event, warningPath) {
-  const warning = getSkillsWarningForPath(warningPath);
+  const warning = getVfsWarningForPath(warningPath);
   const pop = document.getElementById('vfsWarningPopover');
   const pathEl = document.getElementById('vfsWarningPopoverPath');
   const reasonEl = document.getElementById('vfsWarningPopoverReason');
@@ -47126,6 +47187,21 @@ async function refreshSkillsWarnings(forceRefresh) {
 
 function startSkillsWarningTimer() {
   refreshSkillsWarnings(false);
+}
+
+async function refreshMCPWarnings(forceRefresh) {
+  const url = forceRefresh ? '/mcp_warning?refresh=1' : '/mcp_warning';
+  try {
+    const resp = await fetch(url, { cache: 'no-store' });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    indexMCPWarnings(data && Array.isArray(data.data) ? data.data : []);
+    if (vfsCurrentPath) vfsRender(JSON.parse(vfsLastJson || '[]'));
+  } catch {}
+}
+
+function startMCPWarningTimer() {
+  refreshMCPWarnings(false);
 }
 
 function isPathWithinWorkspace(path, root) {
@@ -49494,6 +49570,12 @@ function pageTaskSchedulerStep() {
   if (!lowPowerBusy && shouldRunPageTask(getPageTaskIntervalSec('skillsWarnings', PAGE_TASK_SKILLS_WARNINGS_INTERVAL_SEC))) {
     if (visible) {
       runPageTask('skillsWarnings', () => refreshSkillsWarnings(false));
+    }
+  }
+
+  if (!lowPowerBusy && shouldRunPageTask(getPageTaskIntervalSec('mcpWarnings', PAGE_TASK_MCP_WARNINGS_INTERVAL_SEC))) {
+    if (visible) {
+      runPageTask('mcpWarnings', () => refreshMCPWarnings(false));
     }
   }
 

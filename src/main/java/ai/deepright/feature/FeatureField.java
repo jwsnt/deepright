@@ -74,4 +74,6 @@ public interface FeatureField {
     public static final String KEY_APP = "app";
 
     public static final String KEY_GIT = "git";
+
+    public static final String KEY_MCP = "mcp";
 }

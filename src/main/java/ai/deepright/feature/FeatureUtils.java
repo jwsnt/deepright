@@ -55,6 +55,12 @@ public class FeatureUtils {
         }
     }
 
+    // 系统路径
+    public static String buildSysPath(WorkflowTask workTask, String path) throws Exception {
+        Boolean isWindows = FeatureFlag.isWindows(workTask);
+        return FeatureUtils.escapePath(isWindows, isWindows ? FilenameUtils.separatorsToWindows(path) : FilenameUtils.separatorsToUnix(path));
+    }
+
     public static String buildLineSeparator(WorkflowTask workTask) throws Exception {
         return FeatureUtils.buildLineSeparator(FeatureUtils.buildSys(workTask));
     }
@@ -172,9 +178,7 @@ public class FeatureUtils {
         return StringUtils.defaultIfEmpty(MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_SYS), "darwin");
     }
 
-    // 系统路径
-    public static String buildSysPath(WorkflowTask workTask, String path) throws Exception {
-        Boolean isWindows = FeatureFlag.isWindows(workTask);
-        return FeatureUtils.escapePath(isWindows, isWindows ? FilenameUtils.separatorsToWindows(path) : FilenameUtils.separatorsToUnix(path));
+    public static String buildMcp(WorkflowTask workTask) throws Exception {
+        return MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_MCP);
     }
 }

@@ -18,11 +18,13 @@ import ai.open.right.workflow.skill.Skills;
 import ai.open.right.workflow.skill.SkillsFetcher;
 import ai.open.right.workflow.skill.impl.FileSystemFetcher;
 import com.google.common.collect.ImmutableMap;
+import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,7 +33,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.io.BufferedInputStream;
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
@@ -45,13 +49,28 @@ public class MixedSkillFetcher extends FileSystemFetcher {
 
     protected SysStore sysStore;
 
-    protected Integer oversize;
+    protected String template4mcpJson;
 
-    protected String template;
+    protected String template4mcpDef;
+
+    protected String template4load;
+
+    protected Integer oversize;
 
     protected String skills;
 
     protected String cli;
+
+    @PostConstruct
+    public void init() throws Exception {
+        super.init();
+        this.template4mcpJson = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4mcpJson).openStream()), StandardCharsets.UTF_8);
+        this.template4mcpDef = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4mcpDef).openStream()), StandardCharsets.UTF_8);
+        this.template4load = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4load).openStream()), StandardCharsets.UTF_8);
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4mcpJson), "The template mcp json must not be empty");
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4mcpDef), "The template mcp def must not be empty");
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4load), "The template load must not be empty");
+    }
 
     @Override
     // path=SKILL.md
@@ -112,7 +131,7 @@ public class MixedSkillFetcher extends FileSystemFetcher {
                     .app(binary ? List.of("mkdir", "curl", "base64", "gunzip") : List.of("mkdir", "cat"))
                     // 精确匹配
                     .exempted(true).build(), CliPubSub.buildPushCmd(workTask, this.sysStore, binary, this.oversize, content, cliPath), "").valid();
-            String resource = this.template.replace("#path", cliPath);
+            String resource = this.template4load.replace("#path", cliPath);
             resource = resource.replace("#tools_skill", this.skills);
             resource = resource.replace("#tools_cli", this.cli);
             if (log.isWarnEnabled() && !TemplateChecker.check(resource)) {
@@ -164,6 +183,7 @@ public class MixedSkillFetcher extends FileSystemFetcher {
         data = this.updateSys(workTask, name, path, data);
         data = this.updateApp(workTask, name, path, data);
         data = this.updateDir(workTask, name, path, data);
+        data = this.updateMcp(workTask, name, path, data);
         return data;
     }
 
@@ -221,6 +241,11 @@ public class MixedSkillFetcher extends FileSystemFetcher {
         return data.replace("#dir", this.buildDir(workTask));
     }
 
+    protected String updateMcp(WorkflowTask workTask, String name, String path, String data) throws Exception {
+        String mcp = FeatureUtils.buildMcp(workTask);
+        return data.replace("#mcp", !StringUtils.isEmpty(mcp) ? this.template4mcpJson.replace("#mcp", FeatureUtils.escapeShell(workTask, mcp)) : this.template4mcpDef);
+    }
+
     protected String buildDir(WorkflowTask workTask) throws Exception {
         // @see CliRag
         String dir = FeatureUtils.buildPluginsDir(workTask);
@@ -247,11 +272,17 @@ public class MixedSkillFetcher extends FileSystemFetcher {
         @Autowired
         protected SysStore sysStore;
 
+        @Value("${skills.fetcher.template.mcp.json:classpath:config/skills/mcp_json.md}")
+        protected String template4mcpJson;
+
+        @Value("${skills.fetcher.template.mcp.def:classpath:config/skills/mcp_def.md}")
+        protected String template4mcpDef;
+
+        @Value("${skills.fetcher.template.load:classpath:config/skills/load.md}")
+        protected String template4load;
+
         @Value("${cli.push.oversize:1048576}")
         protected Integer oversize;
-
-        @Value("${skills.fetcher.template:classpath:config/skills/load.md}")
-        protected String template;
 
         @Value("${skills.fetcher.skills:skills}")
         protected String skills;
