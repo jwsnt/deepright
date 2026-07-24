@@ -199,18 +199,8 @@ func prepareIntegrationRuntimeLayoutForBundleLaunch(port int, stderr io.Writer) 
 	return false, nil
 }
 
-func integrationBundlePluginUpdateMessage(items []integrationBundledPluginSyncItem) string {
-	names := make([]string, 0, len(items))
-	for _, item := range items {
-		name := strings.TrimSpace(item.Name)
-		if name != "" {
-			names = append(names, name)
-		}
-	}
-	if len(names) == 0 {
-		return "有插件需要更新，请重启应用。"
-	}
-	return fmt.Sprintf("有插件需要更新，请重启应用。\n待更新插件：%s", strings.Join(names, ", "))
+func integrationBundlePluginUpdateMessage(_ []integrationBundledPluginSyncItem) string {
+	return "有插件需要更新，请重启应用。"
 }
 
 func showIntegrationBundlePluginUpdateAlert(layout *integrationBundlePaths, items []integrationBundledPluginSyncItem) error {

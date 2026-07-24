@@ -96,8 +96,8 @@ func TestPrepareIntegrationRuntimeLayoutForBundleLaunchBlocksPendingUpdatesWhenP
 	if string(data) != "old-plugin" {
 		t.Fatalf("runtime plugin was overwritten: %q", string(data))
 	}
-	if got := strings.TrimSpace(stderr.String()); !strings.Contains(got, "有插件需要更新，请重启应用") {
-		t.Fatalf("stderr = %q", got)
+	if got, want := strings.TrimSpace(stderr.String()), "有插件需要更新，请重启应用。"; got != want {
+		t.Fatalf("stderr = %q, want %q", got, want)
 	}
 	if got := os.Getenv(integrationPluginDirEnv); got != pluginDir {
 		t.Fatalf("plugin dir env = %q, want %q", got, pluginDir)

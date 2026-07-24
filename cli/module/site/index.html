@@ -1985,9 +1985,36 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .message-edit-input,.message-edit-input *{text-align:left}
 .message-edit-input.locked{opacity:.78;cursor:progress}
 .message-edit-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px}
+.page-annotation-toolbar{position:fixed;z-index:50;display:none;align-items:center;gap:6px;max-width:min(calc(100vw - 24px),420px);padding:6px;border:1px solid color-mix(in srgb,var(--accent) 22%,var(--border) 78%);border-radius:14px;background:color-mix(in srgb,var(--bg-card) 88%,var(--accent) 12%);box-shadow:0 16px 34px rgba(16,24,40,.18);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.page-annotation-toolbar.show{display:flex}
+.page-annotation-toolbar-btn{border:none;border-radius:10px;padding:6px 10px;background:var(--accent);box-shadow:0 10px 20px rgba(var(--accent-rgb),.22);color:#fff;font-size:12px;line-height:1.2;font-weight:600;cursor:pointer;white-space:nowrap;transition:transform .16s ease,opacity .16s ease,background .16s ease,color .16s ease,box-shadow .16s ease}
+.page-annotation-toolbar-btn:hover{transform:translateY(-1px);opacity:.92}
+.page-annotation-toolbar-btn:active{transform:translateY(0)}
+.page-annotation-toolbar-btn.delete{background:linear-gradient(135deg,#d86943,#bc4c2a)}
+.page-annotation-toolbar-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.page-annotation-toolbar-btn.onboarding-page-annotation-tour-target,.sel-file-bubble-btn.onboarding-page-annotation-tour-target{transform:translateY(-1px) scale(1.04);box-shadow:0 0 0 3px rgba(var(--accent-rgb),.22),0 14px 28px rgba(var(--accent-rgb),.32);animation:pageAnnotationTourTargetPulse 1.1s ease-in-out infinite}
+@keyframes pageAnnotationTourTargetPulse{0%,100%{filter:brightness(1);opacity:1}50%{filter:brightness(1.12);opacity:.9}}
+.page-annotation-list{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px;padding-top:9px;border-top:1px dashed color-mix(in srgb,var(--border) 78%,transparent)}
+.page-annotation-clear-all{position:absolute;top:-11px;left:-22px;width:22px;height:22px;padding:0;border:0;border-radius:999px;background:transparent;color:var(--text-muted);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;opacity:.7;transition:opacity .16s ease,transform .16s ease,color .16s ease,background-color .16s ease,box-shadow .16s ease}
+.page-annotation-clear-all:hover,.page-annotation-clear-all:focus-visible{opacity:1;transform:translateY(-1px);color:#c4512c;background:rgba(220,91,57,.12);box-shadow:0 0 0 1px rgba(220,91,57,.18);outline:none}
+.page-annotation-clear-all svg{width:15px;height:15px;display:block;fill:currentColor}
+.page-annotation-chip{display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:4px 6px 4px 9px;border:1px solid rgba(221,107,61,.28);border-radius:999px;background:rgba(221,107,61,.08);color:var(--text-secondary);font-size:11px;line-height:1.25}
+.page-annotation-chip-text{max-width:min(320px,58vw);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.page-annotation-chip-edit{width:15px;height:15px;padding:0;border:0;border-radius:999px;background:transparent;color:var(--text-muted);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;opacity:.55;transition:opacity .16s ease,transform .16s ease,color .16s ease,background-color .16s ease,box-shadow .16s ease}
+.page-annotation-chip-edit:hover,.page-annotation-chip-edit:focus-visible{opacity:1;transform:translateY(-1px);color:var(--text-primary);background:rgba(var(--accent-rgb),.08);box-shadow:0 0 0 1px rgba(var(--accent-rgb),.14);outline:none}
+.page-annotation-chip-edit svg{width:15px;height:15px;display:block;fill:currentColor}
+.page-annotation-chip-del{width:18px;height:18px;padding:0;border:0;border-radius:999px;background:transparent;color:var(--text-muted);font-size:16px;line-height:1;cursor:pointer}
+.page-annotation-chip-del:hover,.page-annotation-chip-del:focus-visible{background:rgba(220,91,57,.14);color:#c4512c;outline:none}
+.page-annotation-quote{margin:0 0 10px;padding:9px 11px;border-left:3px solid var(--accent);border-radius:10px;background:rgba(var(--accent-rgb),.07);color:var(--text-secondary);font-size:12px;line-height:1.55;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.page-annotation-input{min-height:96px}
+::highlight(deepright-page-annotation-cool){text-decoration-line:underline;text-decoration-style:wavy;text-decoration-color:#FD9762;text-decoration-thickness:1.5px;text-underline-offset:3px}
+::highlight(deepright-page-annotation-warm){text-decoration-line:underline;text-decoration-style:wavy;text-decoration-color:#30C8FF;text-decoration-thickness:1.5px;text-underline-offset:3px}
 [data-theme="dark"] .message-edit-overlay{background:rgba(6,12,24,.3)}
 [data-theme="dark"] .message-edit-input-wrap{background:linear-gradient(180deg,rgba(40,43,54,.94),rgba(28,31,40,.92));border-color:rgba(0,212,255,.16);box-shadow:0 30px 72px rgba(0,0,0,.36),inset 0 1px 0 rgba(255,255,255,.08)}
 [data-theme="dark"] .message-edit-input-wrap:focus-within{box-shadow:0 32px 80px rgba(0,0,0,.42),0 0 0 1px rgba(122,241,255,.14),0 0 20px rgba(0,212,255,.18),inset 0 1px 0 rgba(255,255,255,.08)}
+[data-theme="dark"] .page-annotation-toolbar{background:rgba(12,23,41,.92);border-color:rgba(169,190,227,.22);box-shadow:0 18px 40px rgba(0,0,0,.34)}
+[data-theme="dark"] .page-annotation-chip{border-color:rgba(48,200,255,.34);background:rgba(48,200,255,.09)}
+[data-theme="dark"] .page-annotation-chip-edit:hover,[data-theme="dark"] .page-annotation-chip-edit:focus-visible{color:#8ce5ff;background:rgba(48,200,255,.12);box-shadow:0 0 0 1px rgba(48,200,255,.22)}
 .icon-btn{width:38px;height:38px;border-radius:50%;border:none;background:rgba(255,255,255,.14);color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:var(--transition);flex-shrink:0;box-shadow:inset 0 1px 0 rgba(255,255,255,.26)}
 .icon-btn:hover{background:rgba(255,255,255,.22);color:var(--text-primary)}
 .icon-btn.send{background:linear-gradient(145deg,rgba(255,120,46,.98),rgba(255,69,0,.92));color:#121212;box-shadow:0 18px 40px rgba(var(--accent-rgb),.22),0 8px 18px rgba(18,18,18,.08),inset 0 1px 0 rgba(255,220,198,.28)}
@@ -3595,7 +3622,7 @@ body.quick-fan-transition-active{cursor:progress}
 .chat-storage-stats-chip{display:inline-flex;align-items:center;gap:6px;min-height:28px;padding:0 10px;border-radius:999px;background:rgba(80,112,184,.10);border:1px solid color-mix(in srgb,var(--border) 84%,rgba(80,112,184,.22));font-size:11px;color:var(--text-secondary)}
 .chat-storage-stats-chip strong{font-size:12px;color:var(--text-primary);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700}
 .chat-storage-stats-body{padding:12px 20px 16px;display:flex;flex-direction:column;gap:12px;min-height:0;overflow:auto;scrollbar-gutter:stable}
-.chat-storage-stats-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.chat-storage-stats-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
 .chat-storage-stats-summary-card{padding:11px 13px;border-radius:20px;border:1px solid color-mix(in srgb,var(--border) 84%,rgba(80,112,184,.18));background:linear-gradient(180deg,rgba(255,255,255,.72),rgba(248,250,255,.46));display:flex;flex-direction:column;gap:5px;min-width:0}
 .chat-storage-stats-summary-card.warn{border-color:rgba(224,120,78,.28);background:linear-gradient(180deg,rgba(255,247,242,.92),rgba(255,236,224,.62))}
 .chat-storage-stats-summary-card.info{border-color:rgba(80,112,184,.24)}
@@ -3605,7 +3632,7 @@ body.quick-fan-transition-active{cursor:progress}
 .chat-storage-stats-summary-note{font-size:11px;line-height:1.55;color:var(--text-muted)}
 .chat-storage-stats-summary-meta:empty,.chat-storage-stats-summary-note:empty,.chat-storage-stats-summary-action:empty{display:none}
 .chat-storage-stats-summary-inline{display:flex;align-items:center;gap:8px}
-.chat-storage-stats-summary-action{display:flex;align-items:center;justify-content:flex-start;margin-top:2px}
+.chat-storage-stats-summary-action{display:flex;align-items:center;justify-content:flex-start;margin-top:auto;padding-top:2px}
 .chat-storage-stats-summary-btn{display:inline-flex;align-items:center;justify-content:center;min-height:26px;padding:0 10px;border:1px solid rgba(var(--accent-rgb),.18);border-radius:999px;background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(244,248,255,.78));box-shadow:inset 0 1px 0 rgba(255,255,255,.82);font-size:12px;font-weight:600;color:var(--text-primary);cursor:pointer;transition:var(--transition);white-space:nowrap;flex:0 0 auto}
 .chat-storage-stats-summary-btn:hover,.chat-storage-stats-summary-btn:focus-visible{border-color:rgba(var(--accent-rgb),.32);color:var(--accent);box-shadow:0 8px 18px rgba(var(--accent-rgb),.12),inset 0 1px 0 rgba(255,255,255,.88);outline:none}
 .chat-storage-stats-grid{display:grid;grid-template-columns:minmax(0,1.02fr) minmax(0,.98fr);gap:14px}
@@ -5167,6 +5194,43 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     </div>
   </div>
 </div>
+<div class="page-annotation-toolbar" id="pageAnnotationToolbar" aria-hidden="true">
+  <button class="page-annotation-toolbar-btn" id="pageAnnotationToolbarBtn" type="button" onclick="openPageAnnotationFromSelection(this)">标注</button>
+</div>
+<div class="overlay message-edit-overlay" id="pageAnnotationOverlay" data-overlay-base data-overlay-domain="global" data-overlay-order="33" onclick="handlePageAnnotationOverlayClick(event)" aria-hidden="true">
+  <div class="message-edit-panel" id="pageAnnotationPanel" onclick="event.stopPropagation()">
+    <div class="message-edit-shell">
+      <div class="message-edit-input-wrap" id="pageAnnotationInputWrap">
+        <div class="at-menu" id="pageAnnotationAtMenu">
+          <div class="at-menu-item" data-type="file" onclick="atSelectType('file')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>文件</div>
+          <div class="at-menu-item" data-type="skill" onclick="atSelectType('skill')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>技能</div>
+          <div class="at-menu-item" data-type="agent" onclick="atSelectType('agent')" style="display:none"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M16 11h6"/></svg>Agent</div>
+        </div>
+        <div class="at-file-panel" id="pageAnnotationAtFilePanel">
+          <input class="at-file-input" id="pageAnnotationAtFileInput" placeholder="输入路径..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" oninput="atFileSearch(this.value)" onkeydown="atFileKey(event)"/>
+          <div class="at-file-list" id="pageAnnotationAtFileList"></div>
+        </div>
+        <div class="at-skill-panel" id="pageAnnotationAtSkillPanel"></div>
+        <div class="at-skill-panel" id="pageAnnotationAtAgentPanel"></div>
+        <div class="page-annotation-quote" id="pageAnnotationQuote"></div>
+        <div class="input-editable message-edit-input page-annotation-input" id="pageAnnotationInput" contenteditable="true" data-placeholder="输入我的标注，可粘贴或拖入图片、视频、文件，也可输入 @..." oninput="handleInput(this)" onkeydown="handleKey(event)"></div>
+      </div>
+      <div class="message-edit-actions">
+        <button class="btn btn-secondary" type="button" id="pageAnnotationCancelBtn" onclick="closePageAnnotation()">取消</button>
+        <button class="btn btn-primary" type="button" id="pageAnnotationSaveBtn" onclick="savePageAnnotation()">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="delete-confirm-overlay" id="pageAnnotationClearConfirmOverlay" data-overlay-base data-overlay-domain="global" data-overlay-order="34" aria-hidden="true" onclick="handlePageAnnotationClearConfirmOverlayClick(event)">
+  <div class="delete-confirm delete-confirm-centered" id="pageAnnotationClearConfirm" role="dialog" aria-modal="true" aria-labelledby="pageAnnotationClearConfirmTitle" onclick="event.stopPropagation()">
+    <p class="delete-confirm-title" id="pageAnnotationClearConfirmTitle">是否清除所有标注？</p>
+    <div class="delete-confirm-actions">
+      <button class="btn btn-secondary" id="pageAnnotationClearConfirmCancelBtn" type="button" onclick="cancelPageAnnotationClearConfirm()">取消</button>
+      <button class="btn btn-primary delete-confirm-danger-btn" id="pageAnnotationClearConfirmDeleteBtn" type="button" onclick="confirmPageAnnotationClear()">删除</button>
+    </div>
+  </div>
+</div>
 <div class="overlay assistant-thinking-overlay" id="assistantThinkingOverlay" data-overlay-base data-overlay-domain="global" data-overlay-order="33" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="assistantThinkingTitle" onclick="if(event.target===this)closeAssistantThinkingModal()">
   <section class="assistant-thinking-panel" id="assistantThinkingPanel" onclick="event.stopPropagation()">
     <header class="assistant-thinking-panel__head">
@@ -6452,6 +6516,7 @@ const rightSidebarUrlPreviewAutoOpenTokens = Object.create(null);
 let rightSidebarUrlPreviewRequestSeq = 0;
 const STORE_KEY = 'deepright_settings';
 const CHATS_KEY = 'deepright_chats';
+const PAGE_ANNOTATIONS_KEY = 'deepright_page_annotations_v1';
 const CHAT_LIST_SYNC_INTERVAL_MS = 30000;
 const THEME_KEY = 'theme';
 const ENERGY_SAVER_KEY = 'deepright_energy_saver';
@@ -6509,6 +6574,7 @@ const STANDALONE_MODE_SWITCH_RECORD_KEY = 'deepright_standalone_mode_switch_reco
 const MODEL_SWITCH_TOUR_CLICK_KEY = 'deepright_model_switch_tour_clicked';
 const MESSAGE_URL_TOUR_CLICK_KEY = 'deepright_message_url_tour_clicked';
 const SSE_503_TOUR_CLICK_KEY = 'deepright_sse_503_tour_clicked';
+const PAGE_ANNOTATION_TOUR_CLICK_KEY = 'deepright_page_annotation_tour_clicked';
 const AGENT_TRANSFER_TOUR_AUTO_ADVANCE_MS = 2000;
 const MODEL_SAVE_VERIFY_DEMO_TEXT = 'Hello World';
 const MEMO_TASK_TOUR_DEMO_TEXT = '推荐下我明天的着装风格';
@@ -7302,6 +7368,16 @@ let centerMessageEditState = {
   requestMetadata: null,
   triggerButton: null,
   submitting: false
+};
+let pageAnnotationState = {
+  store: { version: 1, chats: {} },
+  loaded: false,
+  selection: null,
+  visible: false,
+  triggerButton: null,
+  editingAnnotationId: '',
+  clearTarget: null,
+  clearTriggerButton: null
 };
 let agentChangeConfirmState = {
   resolve: null,
@@ -8848,6 +8924,7 @@ function renderChatStorageStatsSummary(stats) {
   const totalBytes = Math.max(0, Number(stats && stats.totalBytes) || 0);
   const chatsStoredValueBytes = Math.max(0, Number(stats && stats.chatsStoredValueBytes) || 0);
   const memoQueryCache = memoQueryStorageStats();
+  const pageAnnotations = pageAnnotationStorageStats();
   const cards = [
     {
       kicker: '总储存',
@@ -8875,6 +8952,13 @@ function renderChatStorageStatsSummary(stats) {
       value: formatUploadBytes(memoQueryCache.bytes),
       meta: `占总存储 ${formatStorageShare(memoQueryCache.bytes, totalBytes)}`,
       action: `<button class="chat-storage-stats-summary-btn" type="button" onclick="clearMemoQueryCacheNow()">立即清空</button>`,
+      tone: 'info'
+    },
+    {
+      kicker: '页面备注',
+      value: formatUploadBytes(pageAnnotations.bytes),
+      meta: `占总存储 ${formatStorageShare(pageAnnotations.bytes, totalBytes)}`,
+      action: `<button class="chat-storage-stats-summary-btn" type="button" onclick="clearAllPageAnnotationsNow()">立即清空</button>`,
       tone: 'info'
     }
   ];
@@ -8971,6 +9055,553 @@ function deleteChatStorageStatsSession(chatId) {
   pendingDeleteId = resolvedChatId;
   confirmDelete();
   if (chatStorageStatsState.visible) refreshChatStorageStatsOverlay();
+}
+
+function normalizePageAnnotationStore(value) {
+  const source = value && typeof value === 'object' ? value : {};
+  const chats = source.chats && typeof source.chats === 'object' && !Array.isArray(source.chats) ? source.chats : {};
+  const normalizedChats = {};
+  Object.keys(chats).forEach(chatId => {
+    const item = chats[chatId] && typeof chats[chatId] === 'object' ? chats[chatId] : null;
+    const targetId = String(item && item.targetId || '').trim();
+    const annotations = Array.isArray(item && item.annotations) ? item.annotations : [];
+    const normalizedAnnotations = annotations.map((annotation, index) => {
+      const sourceAnnotation = annotation && typeof annotation === 'object' ? annotation : {};
+      const quote = String(sourceAnnotation.quote || '');
+      const note = String(sourceAnnotation.note || '');
+      const start = Math.max(0, Number(sourceAnnotation.start) || 0);
+      const end = Math.max(start, Number(sourceAnnotation.end) || start);
+      if (!String(sourceAnnotation.id || '').trim() || !quote.trim() || !note.trim() || end <= start) return null;
+      return {
+        id: String(sourceAnnotation.id),
+        quote,
+        note,
+        noteHtml: String(sourceAnnotation.noteHtml || ''),
+        start,
+        end,
+        createdAt: Number(sourceAnnotation.createdAt) || 0,
+        order: Number(sourceAnnotation.order) || index
+      };
+    }).filter(Boolean);
+    if (targetId && normalizedAnnotations.length) normalizedChats[String(chatId)] = { targetId, annotations: normalizedAnnotations };
+  });
+  return { version: 1, chats: normalizedChats };
+}
+
+function getPageAnnotationStore() {
+  if (pageAnnotationState.loaded) return pageAnnotationState.store;
+  pageAnnotationState.loaded = true;
+  try {
+    pageAnnotationState.store = normalizePageAnnotationStore(JSON.parse(localStorage.getItem(PAGE_ANNOTATIONS_KEY) || 'null'));
+  } catch {
+    pageAnnotationState.store = { version: 1, chats: {} };
+  }
+  return pageAnnotationState.store;
+}
+
+function persistPageAnnotationStore() {
+  const store = normalizePageAnnotationStore(getPageAnnotationStore());
+  pageAnnotationState.store = store;
+  try {
+    if (Object.keys(store.chats).length) localStorage.setItem(PAGE_ANNOTATIONS_KEY, JSON.stringify(store));
+    else localStorage.removeItem(PAGE_ANNOTATIONS_KEY);
+  } catch {}
+  refreshChatStorageStatsIndicator();
+  if (chatStorageStatsState.visible) refreshChatStorageStatsOverlay();
+}
+
+function buildPageAnnotationTargetId(chatId, message, index) {
+  const explicit = String(message && message.pageAnnotationTargetId || '').trim();
+  if (explicit) return explicit;
+  const chatPart = String(chatId || '').trim();
+  const streamPart = String(message && (message.streamSessionToken || message.streamLogicalId || message.receivedAt || message.createdAt) || '').trim();
+  return 'page-annotation-target:' + chatPart + ':' + (streamPart || 'assistant') + ':' + Math.max(0, Number(index) || 0);
+}
+
+function isNormalCompletedAssistantMessage(message) {
+  return !!(message && message.role === 'assistant' && message.pageAnnotationEligible === true && !message.error && !message.cancelMarker && String(message.streamStatus || '').trim() === '完成');
+}
+
+function getCurrentPageAnnotationTarget(chatId) {
+  const resolvedChatId = String(chatId || '').trim();
+  const chat = state.chats && state.chats[resolvedChatId];
+  const messages = chat && Array.isArray(chat.messages) ? chat.messages : [];
+  let hasNewerAssistantError = false;
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (!message || message.role !== 'assistant') continue;
+    if (message.error) {
+      hasNewerAssistantError = true;
+      continue;
+    }
+    if (message.cancelMarker || String(message.streamStatus || '').trim() !== '完成') continue;
+    const target = { chatId: resolvedChatId, message, index, targetId: buildPageAnnotationTargetId(resolvedChatId, message, index) };
+    if (isNormalCompletedAssistantMessage(message) || !hasNewerAssistantError) return target;
+  }
+  return null;
+}
+
+function getPageAnnotationsForTarget(chatId, targetId) {
+  const chatEntry = getPageAnnotationStore().chats[String(chatId || '').trim()];
+  if (!chatEntry || String(chatEntry.targetId || '') !== String(targetId || '')) return [];
+  return Array.isArray(chatEntry.annotations) ? chatEntry.annotations.slice().sort((left, right) => {
+    const position = Number(left.start) - Number(right.start);
+    if (position) return position;
+    return Number(left.order) - Number(right.order);
+  }) : [];
+}
+
+function getPageAnnotationListHtml(chatId, message) {
+  const target = getCurrentPageAnnotationTarget(chatId);
+  if (!target || target.message !== message) return '';
+  const annotations = getPageAnnotationsForTarget(chatId, target.targetId);
+  if (!annotations.length) return '';
+  return `<div class="page-annotation-list" aria-label="页面备注"><button class="page-annotation-clear-all" type="button" onclick="openPageAnnotationClearConfirm()" title="完全清除标注" aria-label="完全清除标注"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.25 2.5h5.5l.58 1.2h3.42a.75.75 0 1 1 0 1.5h-.64l-.7 10.18a2.3 2.3 0 0 1-2.3 2.12H6.89a2.3 2.3 0 0 1-2.3-2.12L3.89 5.2h-.64a.75.75 0 1 1 0-1.5h3.42Zm-1.86 2.7.7 10.08c.02.4.34.72.75.72h6.32c.4 0 .73-.32.75-.72l.7-10.08Zm2.32 2.04c.41 0 .75.34.75.75v5.22a.75.75 0 1 1-1.5 0V8c0-.41.34-.75.75-.75Zm4.58 0c.41 0 .75.34.75.75v5.22a.75.75 0 1 1-1.5 0V8c0-.41.34-.75.75-.75Z"></path></svg></button>${annotations.map(annotation => {
+    const title = ('引用内容：' + annotation.quote + '\n我的备注：' + annotation.note).replace(/"/g, '&quot;');
+    const quoteText = String(annotation.quote || '').replace(/\s+/g, ' ').trim();
+    const quotePreview = Array.from(quoteText).slice(0, 5).join('') + (Array.from(quoteText).length > 5 ? '...' : '');
+    return `<span class="page-annotation-chip" title="${esc(title)}"><span class="page-annotation-chip-text">${esc(quotePreview)}</span><button class="page-annotation-chip-edit" type="button" onclick='openPageAnnotationEdit(${JSON.stringify(String(annotation.id))}); return false;' title="编辑标注" aria-label="编辑标注"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M14.69 2.86a2.1 2.1 0 0 1 2.97 2.97l-8.3 8.3a2.3 2.3 0 0 1-1.03.6l-3.06.78a.75.75 0 0 1-.91-.91l.78-3.06a2.3 2.3 0 0 1 .6-1.03Zm1.91 1.06a.6.6 0 0 0-.85 0l-1.06 1.06 1.91 1.9 1.06-1.05a.6.6 0 0 0 0-.85Zm-2.97 2.12-7.43 7.43a.8.8 0 0 0-.2.35l-.5 1.96 1.96-.5a.8.8 0 0 0 .35-.2l7.43-7.43Z"></path></svg></button><button class="page-annotation-chip-del" type="button" onclick='deletePageAnnotation(${JSON.stringify(String(annotation.id))}); return false;' title="删除标注" aria-label="删除标注">×</button></span>`;
+  }).join('')}</div>`;
+}
+
+function getPageAnnotationMessageAttrs(chatId, message) {
+  const target = getCurrentPageAnnotationTarget(chatId);
+  if (!target || target.message !== message) return '';
+  return ` data-page-annotation-target="${esc(target.targetId).replace(/"/g, '&quot;')}"`;
+}
+
+function resolvePageAnnotationOffset(root, node, offset) {
+  if (!root || !node || !root.contains(node)) return -1;
+  if (node.nodeType === Node.ELEMENT_NODE) {
+    try {
+      const prefix = document.createRange();
+      prefix.selectNodeContents(root);
+      prefix.setEnd(node, Math.min(Math.max(0, Number(offset) || 0), node.childNodes.length));
+      return prefix.toString().length;
+    } catch {
+      return -1;
+    }
+  }
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let total = 0;
+  let current = walker.nextNode();
+  while (current) {
+    if (current === node) return total + Math.min(Math.max(0, Number(offset) || 0), current.textContent.length);
+    total += current.textContent.length;
+    current = walker.nextNode();
+  }
+  return -1;
+}
+
+function resolvePageAnnotationBoundary(root, absoluteOffset) {
+  if (!root) return null;
+  const targetOffset = Math.max(0, Number(absoluteOffset) || 0);
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let total = 0;
+  let current = walker.nextNode();
+  let last = null;
+  while (current) {
+    const length = current.textContent.length;
+    if (targetOffset <= total + length) return { node: current, offset: Math.max(0, targetOffset - total) };
+    total += length;
+    last = current;
+    current = walker.nextNode();
+  }
+  return last ? { node: last, offset: last.textContent.length } : null;
+}
+
+function createPageAnnotationRange(root, annotation) {
+  const start = resolvePageAnnotationBoundary(root, annotation && annotation.start);
+  const end = resolvePageAnnotationBoundary(root, annotation && annotation.end);
+  if (!start || !end) return null;
+  try {
+    const range = document.createRange();
+    range.setStart(start.node, start.offset);
+    range.setEnd(end.node, end.offset);
+    return range.collapsed ? null : range;
+  } catch {
+    return null;
+  }
+}
+
+function clearPageAnnotationHighlights() {
+  if (!(window.CSS && CSS.highlights)) return;
+  CSS.highlights.delete('deepright-page-annotation-cool');
+  CSS.highlights.delete('deepright-page-annotation-warm');
+}
+
+function syncPageAnnotationHighlights() {
+  clearPageAnnotationHighlights();
+  if (!(window.CSS && CSS.highlights && typeof Highlight === 'function')) return;
+  const target = getCurrentPageAnnotationTarget(state.activeChat);
+  if (!target) return;
+  const msgEl = document.querySelector(`.message.assistant[data-page-annotation-target="${CSS.escape(target.targetId)}"]`);
+  const content = msgEl && msgEl.querySelector('.md-content');
+  if (!content) return;
+  const cool = new Highlight();
+  getPageAnnotationsForTarget(target.chatId, target.targetId).forEach(annotation => {
+    const range = createPageAnnotationRange(content, annotation);
+    if (!range) return;
+    cool.add(range);
+  });
+  if (cool.size) CSS.highlights.set('deepright-page-annotation-cool', cool);
+}
+
+function hidePageAnnotationToolbar() {
+  const toolbar = document.getElementById('pageAnnotationToolbar');
+  if (!toolbar) return;
+  toolbar.classList.remove('show');
+  toolbar.setAttribute('aria-hidden', 'true');
+}
+
+function capturePageAnnotationSelection() {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount !== 1 || selection.isCollapsed) return null;
+  const range = selection.getRangeAt(0);
+  const startElement = range.startContainer.nodeType === Node.ELEMENT_NODE ? range.startContainer : range.startContainer.parentElement;
+  const endElement = range.endContainer.nodeType === Node.ELEMENT_NODE ? range.endContainer : range.endContainer.parentElement;
+  const content = startElement && startElement.closest('.message.assistant[data-page-annotation-target] .md-content');
+  if (!content || !endElement || !content.contains(endElement)) return null;
+  const message = content.closest('.message.assistant[data-page-annotation-target]');
+  const targetId = String(message && message.dataset.pageAnnotationTarget || '').trim();
+  const target = getCurrentPageAnnotationTarget(state.activeChat);
+  if (!target || !targetId || target.targetId !== targetId) return null;
+  const start = resolvePageAnnotationOffset(content, range.startContainer, range.startOffset);
+  const end = resolvePageAnnotationOffset(content, range.endContainer, range.endOffset);
+  const quote = range.toString();
+  if (start < 0 || end <= start || !quote.trim()) return null;
+  const existing = getPageAnnotationsForTarget(target.chatId, targetId)
+    .find(annotation => annotation.start === start && annotation.end === end && annotation.quote === quote) || null;
+  return { chatId: target.chatId, targetId, start, end, quote, existing };
+}
+
+function rememberPageAnnotationSelection(selectionState) {
+  if (!selectionState) return null;
+  pageAnnotationState.selection = selectionState;
+  return selectionState;
+}
+
+function showPageAnnotationToolbar(selectionState) {
+  const toolbar = document.getElementById('pageAnnotationToolbar');
+  const button = document.getElementById('pageAnnotationToolbarBtn');
+  const selection = window.getSelection();
+  if (!toolbar || !button || !selection || !selection.rangeCount) return;
+  if (selBubbleEl && selBubbleEl.isConnected) {
+    hidePageAnnotationToolbar();
+    return;
+  }
+  const rect = selection.getRangeAt(0).getBoundingClientRect();
+  if (!rect.width && !rect.height) return;
+  rememberPageAnnotationSelection(selectionState);
+  button.textContent = selectionState.existing ? '删除标注' : '标注';
+  button.classList.toggle('delete', !!selectionState.existing);
+  toolbar.classList.add('show');
+  toolbar.setAttribute('aria-hidden', 'false');
+  const width = toolbar.offsetWidth || 78;
+  const left = Math.max(8, Math.min(window.innerWidth - width - 8, rect.left + rect.width / 2 - width / 2));
+  const top = Math.max(8, rect.top - (toolbar.offsetHeight || 38) - 8);
+  toolbar.style.left = Math.round(left) + 'px';
+  toolbar.style.top = Math.round(top) + 'px';
+}
+
+function handlePageAnnotationPointerUp(event) {
+  const chatContainer = document.getElementById('chatContainer');
+  const eventTarget = event && event.target instanceof Node ? event.target : null;
+  if (!chatContainer || !eventTarget || !chatContainer.contains(eventTarget)) {
+    hidePageAnnotationToolbar();
+    return;
+  }
+  if (event && event.target && event.target.closest && event.target.closest('#pageAnnotationToolbar')) return;
+  window.setTimeout(() => {
+    const selectionState = capturePageAnnotationSelection();
+    if (selectionState) {
+      rememberPageAnnotationSelection(selectionState);
+      showPageAnnotationToolbar(selectionState);
+    }
+    else hidePageAnnotationToolbar();
+  }, 0);
+}
+
+function openPageAnnotationFromSelection(trigger) {
+  if (isPageAnnotationTourOnboardingStep(onboardingState.step)) return false;
+  const selected = pageAnnotationState.selection;
+  if (!selected) return false;
+  rememberPageAnnotationSelection(selected);
+  if (selected.existing) {
+    deletePageAnnotation(selected.existing.id);
+    return false;
+  }
+  if (startPageAnnotationTourOnboarding(trigger)) {
+    return { keepSelectionBubble: !!(trigger && trigger.closest && trigger.closest('.sel-file-bubble')) };
+  }
+  openPageAnnotationEditor(selected);
+  return true;
+}
+
+function openPageAnnotationEditor(selected, annotation) {
+  if (!selected) return;
+  const overlay = document.getElementById('pageAnnotationOverlay');
+  const panel = document.getElementById('pageAnnotationPanel');
+  const input = document.getElementById('pageAnnotationInput');
+  const quote = document.getElementById('pageAnnotationQuote');
+  const saveButton = document.getElementById('pageAnnotationSaveBtn');
+  if (!overlay || !panel || !input || !quote) return;
+  rememberPageAnnotationSelection(selected);
+  pageAnnotationState.visible = true;
+  pageAnnotationState.editingAnnotationId = String(annotation && annotation.id || '');
+  pageAnnotationState.triggerButton = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  quote.textContent = '引用内容：' + selected.quote;
+  quote.title = quote.textContent;
+  input.innerHTML = annotation && annotation.noteHtml ? annotation.noteHtml : '';
+  if (annotation && !input.innerHTML) input.textContent = String(annotation.note || '');
+  if (saveButton) saveButton.textContent = annotation ? '保存修改' : '保存';
+  hidePageAnnotationToolbar();
+  hideAllAt();
+  showExclusiveOverlay(overlay, panel);
+  window.setTimeout(() => focusEditableInput(input), 30);
+}
+
+function openPageAnnotationEdit(annotationId) {
+  const target = getCurrentPageAnnotationTarget(state.activeChat);
+  if (!target) return false;
+  const annotation = getPageAnnotationsForTarget(target.chatId, target.targetId)
+    .find(item => String(item.id || '') === String(annotationId || ''));
+  if (!annotation) return false;
+  openPageAnnotationEditor({
+    chatId: target.chatId,
+    targetId: target.targetId,
+    start: annotation.start,
+    end: annotation.end,
+    quote: annotation.quote,
+    existing: annotation
+  }, annotation);
+  return true;
+}
+
+function closePageAnnotation(force) {
+  const overlay = document.getElementById('pageAnnotationOverlay');
+  const panel = document.getElementById('pageAnnotationPanel');
+  const input = document.getElementById('pageAnnotationInput');
+  const trigger = pageAnnotationState.triggerButton;
+  pageAnnotationState.visible = false;
+  pageAnnotationState.selection = null;
+  pageAnnotationState.triggerButton = null;
+  pageAnnotationState.editingAnnotationId = '';
+  hideAllAt();
+  if (input) input.innerHTML = '';
+  setOverlayVisible(overlay, false, panel);
+  if (!force && trigger && trigger.isConnected && typeof trigger.focus === 'function') {
+    window.setTimeout(() => trigger.focus({ preventScroll: true }), 30);
+  }
+}
+
+function handlePageAnnotationOverlayClick(event) {
+  if (event && event.target === event.currentTarget) closePageAnnotation();
+}
+
+function savePageAnnotation() {
+  const selected = pageAnnotationState.selection;
+  const input = document.getElementById('pageAnnotationInput');
+  if (!selected || !input) return false;
+  const note = extractContent(input, true).trim();
+  if (!note) {
+    vfsShowUploadToast('请输入我的备注', true);
+    focusEditableInput(input);
+    return false;
+  }
+  const target = getCurrentPageAnnotationTarget(selected.chatId);
+  if (!target || target.targetId !== selected.targetId) {
+    closePageAnnotation(true);
+    vfsShowUploadToast('该响应已不再可标注', true);
+    return false;
+  }
+  const store = getPageAnnotationStore();
+  const entry = store.chats[selected.chatId] && String(store.chats[selected.chatId].targetId || '') === selected.targetId
+    ? store.chats[selected.chatId]
+    : { targetId: selected.targetId, annotations: [] };
+  const editingId = String(pageAnnotationState.editingAnnotationId || '');
+  const editingAnnotation = editingId && entry.annotations.find(annotation => String(annotation.id || '') === editingId);
+  if (editingAnnotation) {
+    editingAnnotation.note = note;
+    editingAnnotation.noteHtml = input.innerHTML;
+  } else {
+    entry.annotations.push({
+      id: 'page-note-' + Date.now() + '-' + randomToken(6),
+      quote: selected.quote,
+      note,
+      noteHtml: input.innerHTML,
+      start: selected.start,
+      end: selected.end,
+      createdAt: Date.now(),
+      order: entry.annotations.length
+    });
+  }
+  store.chats[selected.chatId] = entry;
+  persistPageAnnotationStore();
+  closePageAnnotation(true);
+  renderMessages();
+  syncPageAnnotationHighlights();
+  return true;
+}
+
+function deletePageAnnotation(annotationId) {
+  const target = getCurrentPageAnnotationTarget(state.activeChat);
+  if (!target) return false;
+  const store = getPageAnnotationStore();
+  const entry = store.chats[target.chatId];
+  if (!entry || String(entry.targetId || '') !== target.targetId) return false;
+  entry.annotations = (entry.annotations || []).filter(annotation => String(annotation.id || '') !== String(annotationId || ''));
+  if (!entry.annotations.length) delete store.chats[target.chatId];
+  persistPageAnnotationStore();
+  hidePageAnnotationToolbar();
+  pageAnnotationState.selection = null;
+  renderMessages();
+  syncPageAnnotationHighlights();
+  return true;
+}
+
+function openPageAnnotationClearConfirm() {
+  const target = getCurrentPageAnnotationTarget(state.activeChat);
+  if (!target || !getPageAnnotationsForTarget(target.chatId, target.targetId).length) return false;
+  const overlay = document.getElementById('pageAnnotationClearConfirmOverlay');
+  const panel = document.getElementById('pageAnnotationClearConfirm');
+  if (!overlay || !panel) return false;
+  pageAnnotationState.clearTarget = { chatId: target.chatId, targetId: target.targetId };
+  pageAnnotationState.clearTriggerButton = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  showExclusiveOverlay(overlay, panel);
+  window.setTimeout(() => {
+    const button = document.getElementById('pageAnnotationClearConfirmDeleteBtn');
+    if (button && typeof button.focus === 'function') button.focus({ preventScroll: true });
+  }, 30);
+  return true;
+}
+
+function closePageAnnotationClearConfirm(force) {
+  const overlay = document.getElementById('pageAnnotationClearConfirmOverlay');
+  const panel = document.getElementById('pageAnnotationClearConfirm');
+  const trigger = pageAnnotationState.clearTriggerButton;
+  pageAnnotationState.clearTarget = null;
+  pageAnnotationState.clearTriggerButton = null;
+  setOverlayVisible(overlay, false, panel);
+  if (!force && trigger && trigger.isConnected && typeof trigger.focus === 'function') {
+    window.setTimeout(() => trigger.focus({ preventScroll: true }), 30);
+  }
+}
+
+function cancelPageAnnotationClearConfirm() {
+  closePageAnnotationClearConfirm();
+}
+
+function handlePageAnnotationClearConfirmOverlayClick(event) {
+  if (event && event.target === event.currentTarget) cancelPageAnnotationClearConfirm();
+}
+
+function confirmPageAnnotationClear() {
+  const pendingTarget = pageAnnotationState.clearTarget;
+  if (!pendingTarget) return false;
+  const target = getCurrentPageAnnotationTarget(pendingTarget.chatId);
+  const store = getPageAnnotationStore();
+  const entry = store.chats[pendingTarget.chatId];
+  const canClear = target && target.targetId === pendingTarget.targetId
+    && entry && String(entry.targetId || '') === pendingTarget.targetId;
+  closePageAnnotationClearConfirm(true);
+  if (!canClear) return false;
+  delete store.chats[pendingTarget.chatId];
+  persistPageAnnotationStore();
+  hidePageAnnotationToolbar();
+  pageAnnotationState.selection = null;
+  renderMessages();
+  syncPageAnnotationHighlights();
+  return true;
+}
+
+function clearPageAnnotationsForChat(chatId, options) {
+  const resolvedChatId = String(chatId || '').trim();
+  const store = getPageAnnotationStore();
+  if (!resolvedChatId || !store.chats[resolvedChatId]) return false;
+  delete store.chats[resolvedChatId];
+  persistPageAnnotationStore();
+  if (!(options && options.skipRender) && resolvedChatId === String(state.activeChat || '')) renderMessages();
+  return true;
+}
+
+function clearAllPageAnnotations(options) {
+  const opts = options && typeof options === 'object' ? options : {};
+  const hadAnnotations = Object.keys(getPageAnnotationStore().chats || {}).length > 0;
+  pageAnnotationState.store = { version: 1, chats: {} };
+  pageAnnotationState.loaded = true;
+  try { localStorage.removeItem(PAGE_ANNOTATIONS_KEY); } catch {}
+  clearPageAnnotationHighlights();
+  hidePageAnnotationToolbar();
+  if (opts.closeEditor !== false) closePageAnnotation(true);
+  if (opts.render !== false) {
+    renderMessages();
+  } else {
+    document.querySelectorAll('.page-annotation-list').forEach(el => el.remove());
+  }
+  refreshChatStorageStatsOverlay();
+  if (opts.showNotice) vfsShowUploadToast(opts.noticeText || '已清空所有 chat 的页面备注', false);
+  return hadAnnotations;
+}
+
+function clearAllPageAnnotationsNow() {
+  clearAllPageAnnotations({ showNotice: true });
+}
+
+function prunePageAnnotationsForStorageBudget() {
+  return clearAllPageAnnotations({ render: !hasGlobalPendingSseResponse(), showNotice: false });
+}
+
+function completePageAnnotationTargetForChat(chatId, streamLogicalIds) {
+  const resolvedChatId = String(chatId || '').trim();
+  const chat = state.chats && state.chats[resolvedChatId];
+  if (!chat || !Array.isArray(chat.messages)) return;
+  clearPageAnnotationsForChat(resolvedChatId, { skipRender: true });
+  const targetLogicalIds = new Set((Array.isArray(streamLogicalIds) ? streamLogicalIds : [])
+    .map(normalizeStreamLogicalId)
+    .filter(Boolean));
+  chat.messages.forEach(message => {
+    if (message && message.role === 'assistant') message.pageAnnotationEligible = false;
+  });
+  for (let index = chat.messages.length - 1; index >= 0; index -= 1) {
+    const message = chat.messages[index];
+    if (!message || message.role !== 'assistant' || message.error || message.cancelMarker) continue;
+    if (targetLogicalIds.size) {
+      const logicalIds = [normalizeStreamLogicalId(message.streamLogicalId), ...getAssistantExplodedLogicalIds(message)];
+      if (!logicalIds.some(logicalId => targetLogicalIds.has(logicalId))) continue;
+    }
+    message.pageAnnotationEligible = true;
+    message.pageAnnotationTargetId = buildPageAnnotationTargetId(resolvedChatId, message, index);
+    break;
+  }
+  clearPageAnnotationHighlights();
+}
+
+function pageAnnotationStorageStats() {
+  const store = getPageAnnotationStore();
+  const chatEntries = Object.values(store.chats || {});
+  const count = chatEntries.reduce((total, entry) => total + (Array.isArray(entry && entry.annotations) ? entry.annotations.length : 0), 0);
+  return { bytes: estimateJsonStorageBytes(store), count, chats: chatEntries.length };
+}
+
+function composePageAnnotationsForSend(chatId, userText) {
+  const target = getCurrentPageAnnotationTarget(chatId);
+  const text = String(userText || '').trim();
+  if (!target) return text;
+  const annotations = getPageAnnotationsForTarget(target.chatId, target.targetId);
+  if (!annotations.length) return text;
+  const toMarkdownTableCell = value => String(value || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/\|/g, '\\|')
+    .replace(/\r?\n/g, '<br>');
+  const prefix = [
+    '### 标注内容',
+    '',
+    '| 引用内容 | 我的备注 |',
+    '| --- | --- |',
+    ...annotations.map(annotation => `| ${toMarkdownTableCell(annotation.quote)} | ${toMarkdownTableCell(annotation.note)} |`)
+  ].join('\n');
+  return prefix ? (text ? prefix + '\n\n' + text : prefix) : text;
 }
 
 function openChatStorageStatsOverlay(event) {
@@ -9718,6 +10349,20 @@ function markMCPFileTourClickRecord() {
   } catch {}
 }
 
+function hasPageAnnotationTourClickRecord() {
+  try {
+    return localStorage.getItem(PAGE_ANNOTATION_TOUR_CLICK_KEY) === '1';
+  } catch {
+    return true;
+  }
+}
+
+function markPageAnnotationTourClickRecord() {
+  try {
+    localStorage.setItem(PAGE_ANNOTATION_TOUR_CLICK_KEY, '1');
+  } catch {}
+}
+
 function hasAtTourClickRecord() {
   try {
     return localStorage.getItem(AT_TOUR_CLICK_KEY) === '1';
@@ -10215,6 +10860,21 @@ function getOnboardingStepConfig(step) {
         cardOffsetX: 0,
         cardOffsetY: 16,
         targetClass: 'onboarding-mcp-file-target'
+      };
+    case 'page-annotation-tour':
+      return {
+        domain: 'center',
+        viewportOverlay: true,
+        selector: '.onboarding-page-annotation-tour-target',
+        message: '标注内容会自动添加至下次提问。',
+        actionLabel: '完成',
+        padding: 8,
+        highlightPadding: 12,
+        cardPlacement: 'below',
+        cardWidth: 320,
+        cardMinHeight: 112,
+        cardOffsetY: 18,
+        targetClass: 'onboarding-page-annotation-tour-target'
       };
     case 'vfs-drag-tour-intro':
       return {
@@ -13495,6 +14155,8 @@ const ONBOARDING_CENTER_FLOAT_CONTAINER_SELECTORS = [
   '#consumeOverlay',
   '#cmdOverlay',
   '#messageEditOverlay',
+  '#pageAnnotationOverlay',
+  '#pageAnnotationClearConfirmOverlay',
   '#newChatIdOverlay',
   '#deleteConfirmOverlay',
   '#folderConfirmOverlay',
@@ -13621,6 +14283,12 @@ function hideExclusiveOverlayById(id) {
       return true;
     case 'messageEditOverlay':
       closeCenterMessageEdit(true);
+      return true;
+    case 'pageAnnotationOverlay':
+      closePageAnnotation(true);
+      return true;
+    case 'pageAnnotationClearConfirmOverlay':
+      closePageAnnotationClearConfirm(true);
       return true;
     case 'assistantThinkingOverlay':
       closeAssistantThinkingModal({ restoreFocus: false });
@@ -13838,6 +14506,9 @@ function refreshOverlayStates() {
 
 function setOverlayVisible(overlay, visible, panel) {
   if (!overlay) return;
+  const preserveAnnotationTrigger = String(overlay.id || '') === 'onboardingOverlayCenter' &&
+    isPageAnnotationTourOnboardingStep(onboardingState.step);
+  if (visible && String(overlay.id || '') !== 'pageAnnotationOverlay' && !preserveAnnotationTrigger) hidePageAnnotationToolbar();
   if (visible) {
     const target = panel instanceof Element ? panel : overlay;
     maybeCollapseRightSidebarForOnboardingFloatingElement(target);
@@ -14497,6 +15168,10 @@ function isVfsEditTourOnboardingStep(step) {
 
 function isMCPFileTourOnboardingStep(step) {
   return String(step || '').trim() === 'mcp-file-tour';
+}
+
+function isPageAnnotationTourOnboardingStep(step) {
+  return String(step || '').trim() === 'page-annotation-tour';
 }
 
 function isAtTourOnboardingStep(step) {
@@ -20517,6 +21192,10 @@ function stopOnboarding(markComplete) {
       scheduleQueuedCenterRequestDrain(targetChatId, targetAgentId);
     }
   }
+  if (isPageAnnotationTourOnboardingStep(lastStep)) {
+    removeSelBubble();
+    hidePageAnnotationToolbar();
+  }
   clearVfsEditTourSourceElement();
   vfsEditTourState.trigger = '';
   vfsEditTourState.sourceName = '';
@@ -21191,6 +21870,21 @@ function startMCPFileTourOnboarding() {
     markMCPFileTourClickRecord();
     onboardingState.active = true;
     setOnboardingStep('mcp-file-tour');
+    return true;
+  });
+}
+
+function startPageAnnotationTourOnboarding(trigger) {
+  return withOnboardingStartLock(() => {
+    if (hasPageAnnotationTourClickRecord()) return false;
+    const target = trigger instanceof HTMLElement && trigger.isConnected
+      ? trigger
+      : document.getElementById('pageAnnotationToolbarBtn');
+    if (!target || !target.isConnected) return false;
+    target.classList.add('onboarding-page-annotation-tour-target');
+    markPageAnnotationTourClickRecord();
+    onboardingState.active = true;
+    setOnboardingStep('page-annotation-tour');
     return true;
   });
 }
@@ -21990,6 +22684,9 @@ function handleOnboardingAction(event) {
       stopOnboarding(true);
       return;
     case 'mcp-file-tour':
+      stopOnboarding(false);
+      return;
+    case 'page-annotation-tour':
       stopOnboarding(false);
       return;
     case 'vfs-drag-tour-intro':
@@ -23887,7 +24584,7 @@ async function init() {
     if (!e.target.closest('.swarm-model-wrap')) closeSwarmModelDropdown();
     if (!e.target.closest('.top-action-cluster')) closeQuickFanMenu();
     if (!e.target.closest('.plugin-modal-model')) pluginModalCloseModelDropdown();
-    if (!e.target.closest('.at-menu') && !e.target.closest('.at-file-panel') && !e.target.closest('.at-skill-panel') && !e.target.closest('#msgInput') && !e.target.closest('#rsNoteInput') && !e.target.closest('#messageEditInput')) hideAllAt();
+    if (!e.target.closest('.at-menu') && !e.target.closest('.at-file-panel') && !e.target.closest('.at-skill-panel') && !e.target.closest('#msgInput') && !e.target.closest('#rsNoteInput') && !e.target.closest('#messageEditInput') && !e.target.closest('#pageAnnotationInput')) hideAllAt();
     if (!e.target.closest('#vfsSkillIndicator') && !e.target.closest('#skillExtractRangePopover') && !e.target.closest('#skillExtractGitPopover') && !e.target.closest('#skillExtractGoalPopover')) closeAllSkillExtractPopovers();
     if (!e.target.closest('#installAppIndicator') && !e.target.closest('#installAppPopover')) closeInstallAppPopover();
     if (!e.target.closest('.vfs-soul-btn') && !e.target.closest('#soulTidyPopover')) closeSoulTidyPopover();
@@ -27267,6 +27964,15 @@ function maintainLocalStorageBudget(options) {
     totalBytes = estimateLocalStorageUsageWithChatsPayload(basePayload);
   }
   if (totalBytes <= LOCAL_STORAGE_SOFT_LIMIT_BYTES) return false;
+  // Page annotations are temporary per-chat context.  Once automatic
+  // maintenance starts, remove them immediately so stale annotations never
+  // compete with chat history for the local-storage budget.
+  const pageAnnotationsPruned = prunePageAnnotationsForStorageBudget();
+  if (pageAnnotationsPruned) {
+    totalBytes = hasPendingSseResponse
+      ? estimateLocalStorageUsageWithChatsPayload(basePayload)
+      : estimateLocalStorageUsageBytes();
+  }
   // Query pages are disposable cache data.  Evict them before compacting chat
   // history so memo searching never consumes space reserved for conversations.
   const queryCachePruned = memoQueryPruneCacheForBudget();
@@ -27276,6 +27982,7 @@ function maintainLocalStorageBudget(options) {
       : estimateLocalStorageUsageBytes();
     if (totalBytes <= LOCAL_STORAGE_SOFT_LIMIT_BYTES) return true;
   }
+  if (pageAnnotationsPruned && totalBytes <= LOCAL_STORAGE_SOFT_LIMIT_BYTES) return true;
   if (!basePayload) basePayload = buildChatsStoragePayload();
   const baseBytes = estimateLocalStorageUsageWithChatsPayload(basePayload);
   const result = findCompactedChatsPayloadForBudget(basePayload, LOCAL_STORAGE_COMPACT_TARGET_BYTES);
@@ -27621,6 +28328,20 @@ function saveChats() {
     return true;
   } catch (err) {
     if (!isStorageQuotaError(err)) throw err;
+  }
+  // A browser quota rejection is also an automatic local-storage cleanup
+  // trigger.  Remove transient page annotations before falling back to chat
+  // compaction, then retry the uncompressed chat payload once.
+  if (prunePageAnnotationsForStorageBudget()) {
+    try {
+      tryPersistChatsPayload(basePayload);
+      chatStorageFailureNoticeShown = false;
+      refreshChatStorageStatsIndicator();
+      if (chatStorageStatsState.visible) refreshChatStorageStatsOverlay();
+      return true;
+    } catch (err) {
+      if (!isStorageQuotaError(err)) throw err;
+    }
   }
   for (const config of CHAT_STORAGE_COMPACTION_CONFIGS) {
     const compactedPayload = createQuotaCompactedChatsPayload(basePayload, {
@@ -30676,6 +31397,7 @@ function confirmDelete() {
   setOverlayVisible(document.getElementById('deleteConfirmOverlay'), false, document.getElementById('deleteConfirm'));
   pendingDeleteId = null;
   delete state.chats[id];
+  clearPageAnnotationsForChat(id, { skipRender: true });
   // Abort and clean up streaming for deleted chat
   if (chatStreaming[id]) {
     if (chatStreaming[id].abortCtrl) chatStreaming[id].abortCtrl.abort();
@@ -31178,6 +31900,7 @@ function renderMessages(options) {
   syncChatSessionCopyButton();
   document.querySelectorAll('.message-stream-burst').forEach(node => node.remove());
   if (!chat || msgs.length === 0) {
+    clearPageAnnotationHighlights();
     if (!chatAnimPlayed.has(state.activeChat)) {
       chatAnimPlayed.add(state.activeChat);
       container.innerHTML = greetingHtml(false);
@@ -31211,6 +31934,7 @@ function renderMessages(options) {
   enhanceCenterMessageCodeBlocks(container);
   decorateChatMessagePathLinks(container);
   warmRenderedMessageImages(container);
+  syncPageAnnotationHighlights();
   if (keepBottom) scrollToBottom({ force: true });
   else setInstantScrollTop(container, previousScrollTop);
   syncChatFooterInlineHintUI();
@@ -31380,7 +32104,9 @@ function msgHtml(m, options) {
   const assistantBeacon = assistantExplosionBeaconHtml(m);
   const assistantBeaconClass = assistantBeacon ? ' has-explosion-beacon' : '';
   const assistantMaterialClass = getAssistantResultMaterialClass(m);
-  return `<div class="message-wrap assistant"${assistantBindingAttrs}><div class="message assistant${assistantBeaconClass}${assistantMaterialClass}">${assistantBeacon}<div class="${mdClass}"${richPendingAttr}${decoratePathsAttr}>${contentHtml}</div>${assistantMetaHtml(m)}</div>${messageFooterHtml(m)}</div>`;
+  const pageAnnotationAttrs = getPageAnnotationMessageAttrs(state.activeChat, m);
+  const pageAnnotationList = getPageAnnotationListHtml(state.activeChat, m);
+  return `<div class="message-wrap assistant"${assistantBindingAttrs}><div class="message assistant${assistantBeaconClass}${assistantMaterialClass}"${pageAnnotationAttrs}>${assistantBeacon}<div class="${mdClass}"${richPendingAttr}${decoratePathsAttr}>${contentHtml}</div>${assistantMetaHtml(m)}${pageAnnotationList}</div>${messageFooterHtml(m)}</div>`;
 }
 
 function createMessageNode(message, options) {
@@ -35734,7 +36460,9 @@ function handleCenterInputClick() {
 function handleKey(e) {
   const target = e && e.currentTarget instanceof Element ? e.currentTarget : (e && e.target instanceof Element ? e.target : null);
   const isMessageEditInput = !!(target && target.id === 'messageEditInput');
-  if (!isMessageEditInput && document.getElementById('msgInput')?.classList.contains('locked')) {
+  const isPageAnnotationInput = !!(target && target.id === 'pageAnnotationInput');
+  const isOverlayInput = isMessageEditInput || isPageAnnotationInput;
+  if (!isOverlayInput && document.getElementById('msgInput')?.classList.contains('locked')) {
     e.preventDefault();
     return;
   }
@@ -35747,9 +36475,15 @@ function handleKey(e) {
     closeCenterMessageEdit();
     return;
   }
+  if (isPageAnnotationInput && e.key === 'Escape') {
+    e.preventDefault();
+    closePageAnnotation();
+    return;
+  }
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
     if (isMessageEditInput) submitCenterMessageEdit();
+    else if (isPageAnnotationInput) savePageAnnotation();
     else handleSend(e);
   }
 }
@@ -36598,8 +37332,9 @@ async function sendCenterMessage(rawText, options) {
   const extraMetadata = opts.metadata && typeof opts.metadata === 'object' && !Array.isArray(opts.metadata)
     ? { ...opts.metadata }
     : null;
-  const text = String(rawText || '').trim();
-  if (!text) return false;
+  const userText = String(rawText || '').trim();
+  if (!userText) return false;
+  const text = composePageAnnotationsForSend(chatId, userText);
   if (countEditableInputChars(text) > EDITABLE_INPUT_MAX_CHARS) {
     vfsShowUploadToast('输入内容最多 ' + EDITABLE_INPUT_MAX_CHARS + ' 个字符', true);
     return false;
@@ -36800,6 +37535,7 @@ async function sendCenterMessage(rawText, options) {
         receivedAt: '',
         createdAt: '',
         streamStatus: '等待',
+        pageAnnotationEligible: false,
         rawSse: '',
         streamLogicalId: normalizedLogicalId,
         streamSessionToken: streamSessionToken
@@ -37422,7 +38158,7 @@ async function sendCenterMessage(rawText, options) {
       }
     }
     flushStreamingAutoUrlPreviewCandidates();
-    finishStreamingFor(chatId);
+    finishStreamingFor(chatId, { completedNormally: true });
     saveChats();
     return true;
   } catch (err) {
@@ -37531,6 +38267,7 @@ function finishStreamingFor(chatId, options) {
   const chat = state.chats[chatId];
   let completedAssistantTs = '';
   let latestSessionAssistantContent = '';
+  const completedStreamLogicalIds = new Set();
   if (chat && chat.messages.length > 0) {
     let finalized = false;
     for (let i = chat.messages.length - 1; i >= 0; i--) {
@@ -37539,6 +38276,8 @@ function finishStreamingFor(chatId, options) {
       const belongsToCurrentSession = streamSessionToken && String(msg.streamSessionToken || '').trim() === streamSessionToken;
       if (!belongsToCurrentSession && finalized) continue;
       if (!belongsToCurrentSession && streamSessionToken) continue;
+      const streamLogicalId = normalizeStreamLogicalId(msg.streamLogicalId);
+      if (streamLogicalId) completedStreamLogicalIds.add(streamLogicalId);
       if (!msg.cancelMarker && msg.rawSse) {
         const parsed = parseRestoreAssistantRecord(msg.rawSse);
         applyParsedAssistantSnapshot(msg, parsed);
@@ -37581,6 +38320,7 @@ function finishStreamingFor(chatId, options) {
 	    mergeTimingOnlyAssistantMessages(chat.messages);
 	    collapseMultiAssistantRequests(chat.messages);
 	  }
+  if (completedNormally) completePageAnnotationTargetForChat(chatId, Array.from(completedStreamLogicalIds));
   if (latestSessionAssistantContent) {
     autoOpenRightSidebarUrlPreviewFromText(chatId, latestSessionAssistantContent).catch(() => {});
   }
@@ -38463,6 +39203,7 @@ function clearChatConversation(chatId) {
     switchedChatAutoReloadSeq += 1;
     releaseSwitchedChatAutoReloadLock();
   }
+  clearPageAnnotationsForChat(resolvedChatId, { skipRender: true });
   chat.messages = [];
   chat.cliCommandHistory = [];
   chat.lastMsg = '新会话';
@@ -40724,6 +41465,7 @@ async function confirmDeleteAgent() {
     const chatsToDelete = state.chatOrder.filter(cid => chatAgents[cid] === agentId);
     for (const cid of chatsToDelete) {
       delete state.chats[cid];
+      clearPageAnnotationsForChat(cid, { skipRender: true });
       state.chatOrder = state.chatOrder.filter(x => x !== cid);
       delete chatAgents[cid];
       delete chatModels[cid];
@@ -43905,35 +44647,41 @@ function handleInput(el) {
 function getAtMenuId() {
   if (atSourceEl && atSourceEl.id === 'rsNoteInput') return 'rsAtMenu';
   if (atSourceEl && atSourceEl.id === 'messageEditInput') return 'messageEditAtMenu';
+  if (atSourceEl && atSourceEl.id === 'pageAnnotationInput') return 'pageAnnotationAtMenu';
   return 'atMenu';
 }
 function getAtFileId() {
   if (atSourceEl && atSourceEl.id === 'rsNoteInput') return 'rsAtFilePanel';
   if (atSourceEl && atSourceEl.id === 'messageEditInput') return 'messageEditAtFilePanel';
+  if (atSourceEl && atSourceEl.id === 'pageAnnotationInput') return 'pageAnnotationAtFilePanel';
   return 'atFilePanel';
 }
 function getAtSkillId() {
   if (atSourceEl && atSourceEl.id === 'rsNoteInput') return 'rsAtSkillPanel';
   if (atSourceEl && atSourceEl.id === 'messageEditInput') return 'messageEditAtSkillPanel';
+  if (atSourceEl && atSourceEl.id === 'pageAnnotationInput') return 'pageAnnotationAtSkillPanel';
   return 'atSkillPanel';
 }
 function getAtAgentId() {
   if (atSourceEl && atSourceEl.id === 'rsNoteInput') return 'rsAtAgentPanel';
   if (atSourceEl && atSourceEl.id === 'messageEditInput') return 'messageEditAtAgentPanel';
+  if (atSourceEl && atSourceEl.id === 'pageAnnotationInput') return 'pageAnnotationAtAgentPanel';
   return 'atAgentPanel';
 }
 function getAtFileInputId() {
   if (atSourceEl && atSourceEl.id === 'rsNoteInput') return 'rsAtFileInput';
   if (atSourceEl && atSourceEl.id === 'messageEditInput') return 'messageEditAtFileInput';
+  if (atSourceEl && atSourceEl.id === 'pageAnnotationInput') return 'pageAnnotationAtFileInput';
   return 'atFileInput';
 }
 function getAtFileListId() {
   if (atSourceEl && atSourceEl.id === 'rsNoteInput') return 'rsAtFileList';
   if (atSourceEl && atSourceEl.id === 'messageEditInput') return 'messageEditAtFileList';
+  if (atSourceEl && atSourceEl.id === 'pageAnnotationInput') return 'pageAnnotationAtFileList';
   return 'atFileList';
 }
 function canShowSwarmAgentMenu() {
-  if (!atSourceEl || atSourceEl.id !== 'msgInput') return false;
+  if (!atSourceEl || (atSourceEl.id !== 'msgInput' && atSourceEl.id !== 'pageAnnotationInput')) return false;
   const chatId = String(state.activeChat || '').trim();
   if (!chatId) return false;
   const agentId = String(getChatAgentId(chatId) || state.settings.agentId || '').trim();
@@ -44038,10 +44786,10 @@ function hideAtFile() { document.getElementById(getAtFileId()).classList.remove(
 function hideAtSkill() { document.getElementById(getAtSkillId()).classList.remove('show'); }
 function hideAtAgent() { document.getElementById(getAtAgentId()).classList.remove('show'); }
 function hideAllAt() {
-  ['atMenu','rsAtMenu','messageEditAtMenu'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('show'); });
-  ['atFilePanel','rsAtFilePanel','messageEditAtFilePanel'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('show'); });
-  ['atSkillPanel','rsAtSkillPanel','messageEditAtSkillPanel'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('show'); });
-  ['atAgentPanel','rsAtAgentPanel','messageEditAtAgentPanel'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('show'); });
+  ['atMenu','rsAtMenu','messageEditAtMenu','pageAnnotationAtMenu'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('show'); });
+  ['atFilePanel','rsAtFilePanel','messageEditAtFilePanel','pageAnnotationAtFilePanel'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('show'); });
+  ['atSkillPanel','rsAtSkillPanel','messageEditAtSkillPanel','pageAnnotationAtSkillPanel'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('show'); });
+  ['atAgentPanel','rsAtAgentPanel','messageEditAtAgentPanel','pageAnnotationAtAgentPanel'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('show'); });
   atSourceEl = null;
   atSavedRange = null;
 }
@@ -46595,6 +47343,8 @@ function resolveOverlayCancelButton(scope) {
       return findVisibleButton(scope, ['.file-editor-actions .btn-secondary', '.file-editor-close']) || findVisibleButtonByText(scope, ['取消']);
     case 'deleteConfirmOverlay':
       return findVisibleButton(scope, ['#deleteConfirmCancelBtn']) || findVisibleButtonByText(scope, ['取消']);
+    case 'pageAnnotationClearConfirmOverlay':
+      return findVisibleButton(scope, ['#pageAnnotationClearConfirmCancelBtn']) || findVisibleButtonByText(scope, ['取消']);
     case 'newChatIdOverlay':
       return findVisibleButton(scope, ['#newChatIdCancelBtn']) || findVisibleButtonByText(scope, ['取消']);
     case 'folderConfirmOverlay':
@@ -46652,6 +47402,8 @@ function resolveOverlayConfirmButton(scope, target) {
       return resolveSettingsKeyboardConfirmButton(target);
     case 'deleteConfirmOverlay':
       return findVisibleButton(scope, ['#deleteConfirmConfirmBtn']);
+    case 'pageAnnotationClearConfirmOverlay':
+      return findVisibleButton(scope, ['#pageAnnotationClearConfirmDeleteBtn']);
     case 'newChatIdOverlay':
       return findVisibleButton(scope, ['#newChatIdConfirmBtn']) || findVisibleButtonByText(scope, ['新会话']);
     case 'folderConfirmOverlay':
@@ -46798,6 +47550,20 @@ function handleOverlayKeyboardShortcuts(event) {
   const scope = getFrontKeyboardOverlay();
   if (!scope) return false;
   const scopeId = String(scope.id || '').trim();
+  if (scopeId === 'pageAnnotationClearConfirmOverlay') {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      cancelPageAnnotationClearConfirm();
+      return true;
+    }
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      confirmPageAnnotationClear();
+      return true;
+    }
+  }
   if (scopeId === 'logCleanupLock' || scopeId === 'rsSaveLock') {
     event.preventDefault();
     event.stopPropagation();
@@ -48203,6 +48969,18 @@ function positionSelectionActionBubbleElement(bubble, rect) {
 function showSelectionActionBubble(rect, actions, options) {
   const opts = options || {};
   const nextActions = Array.isArray(actions) ? actions.filter(Boolean) : [];
+  const annotationSelection = capturePageAnnotationSelection();
+  if (annotationSelection) {
+    nextActions.unshift({
+      label: annotationSelection.existing ? '删除标注' : '标注',
+      deferDismiss: true,
+      onClick: async trigger => {
+        pageAnnotationState.selection = annotationSelection;
+        return openPageAnnotationFromSelection(trigger);
+      }
+    });
+    hidePageAnnotationToolbar();
+  }
   if (!rect || !nextActions.length) return;
   removeSelBubble();
   const bubble = document.createElement('div');
@@ -48225,10 +49003,12 @@ function showSelectionActionBubble(rect, actions, options) {
     btn.addEventListener('click', async event => {
       event.preventDefault();
       event.stopPropagation();
-      if (!opts.keepOnAction) removeSelBubble();
+      if (!opts.keepOnAction && !action.deferDismiss) removeSelBubble();
       try {
-        if (typeof action.onClick === 'function') await action.onClick();
+        const result = typeof action.onClick === 'function' ? await action.onClick(btn) : null;
+        if (!opts.keepOnAction && action.deferDismiss && !(result && result.keepSelectionBubble)) removeSelBubble();
       } catch (err) {
+        if (!opts.keepOnAction && action.deferDismiss) removeSelBubble();
         vfsShowUploadToast(err && err.message ? err.message : '操作失败', true);
       }
     });
@@ -49767,6 +50547,66 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   });
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('pageAnnotationInput');
+  if (!input) return;
+  let dragCounter = 0;
+  input.addEventListener('dragenter', event => {
+    event.preventDefault();
+    dragCounter += 1;
+    input.classList.add('drag-over');
+  });
+  input.addEventListener('dragover', event => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  });
+  input.addEventListener('dragleave', () => {
+    dragCounter -= 1;
+    if (dragCounter <= 0) {
+      dragCounter = 0;
+      input.classList.remove('drag-over');
+    }
+  });
+  input.addEventListener('drop', async event => {
+    event.preventDefault();
+    dragCounter = 0;
+    input.classList.remove('drag-over');
+    input.focus();
+    const vfsPath = event.dataTransfer.getData('application/x-vfs-path');
+    if (vfsPath) {
+      vfsPath.split('\n').filter(path => path.trim()).forEach(path => insertFileBubble(input, path));
+      return;
+    }
+    const hasSystemFiles = (event.dataTransfer.files && event.dataTransfer.files.length > 0) || (event.dataTransfer.items && event.dataTransfer.items.length > 0);
+    if (hasSystemFiles) {
+      try {
+        await uploadDroppedSystemItemsToBubbles(event.dataTransfer, input, 'center');
+      } catch (err) {
+        vfsShowUploadToast(err.message, true);
+      }
+    }
+  });
+});
+
+document.addEventListener('mouseup', handlePageAnnotationPointerUp);
+document.addEventListener('selectionchange', () => {
+  if (pageAnnotationState.visible) return;
+  const selectionState = capturePageAnnotationSelection();
+  if (selectionState) rememberPageAnnotationSelection(selectionState);
+});
+document.addEventListener('DOMContentLoaded', () => {
+  const button = document.getElementById('pageAnnotationToolbarBtn');
+  if (!button) return;
+  button.addEventListener('pointerdown', event => {
+    event.preventDefault();
+    event.stopPropagation();
+  });
+});
+document.addEventListener('pointerdown', event => {
+  if (event && event.target && event.target.closest && (event.target.closest('#pageAnnotationToolbar') || event.target.closest('#pageAnnotationOverlay'))) return;
+  hidePageAnnotationToolbar();
 });
 
 // ===== Visibility =====
