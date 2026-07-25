@@ -9,6 +9,7 @@ import ai.deepright.lang.XmlResourceLang;
 import ai.deepright.llm.token.TokenNotifier;
 import ai.deepright.llm.token.TokenSource;
 import ai.open.right.WorkflowException;
+import ai.open.right.utils.SplitUtils;
 import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.llm.provider.ProviderRequest;
 import ai.open.right.workflow.flow.llm.token.TokenData;
@@ -30,6 +31,10 @@ import java.util.concurrent.ExecutorService;
 @Setter
 @Slf4j
 public class ClientTokenNotifier implements TokenNotifier, TokenSource {
+
+    public static final String LANG_KEY_TOKEN_MULTI_OUTPUT = "token.multi.output";
+
+    public static final String LANG_KEY_TOKEN_MULTI_INPUT = "token.multi.input";
 
     public static final String LANG_KEY_TOKEN_KNOWLEDGE = "token.knowledge";
 
@@ -65,7 +70,11 @@ public class ClientTokenNotifier implements TokenNotifier, TokenSource {
 
     @Override
     public String source(WorkflowTask workTask) throws Exception {
-        if (FeatureFlag.isKnowledgeCommit(workTask)) {
+        if (StringUtils.equalsIgnoreCase(SplitUtils.join(workTask), "media@image_gen")) {
+            return XmlResourceLang.get(ClientTokenNotifier.LANG_KEY_TOKEN_MULTI_OUTPUT);
+        } else if (StringUtils.equalsIgnoreCase(SplitUtils.join(workTask), "media@ocr_gen")) {
+            return XmlResourceLang.get(ClientTokenNotifier.LANG_KEY_TOKEN_MULTI_INPUT);
+        } else if (FeatureFlag.isKnowledgeCommit(workTask)) {
             return XmlResourceLang.get(ClientTokenNotifier.LANG_KEY_TOKEN_KNOWLEDGE);
         } else if (FeatureFlag.isProfileCommit(workTask)) {
             return XmlResourceLang.get(ClientTokenNotifier.LANG_KEY_TOKEN_PROFILE);

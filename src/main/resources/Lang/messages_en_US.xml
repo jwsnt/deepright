@@ -30,6 +30,8 @@
     <entry key="image.error">[图片操作失败啦] #content</entry>
     <entry key="task.start">[Agent #agent 开始执行]</entry>
     <entry key="task.close">[Agent #agent 完成任务]</entry>
+    <entry key="token.multi.output">多模态生成</entry>
+    <entry key="token.multi.input">多模态识别</entry>
     <entry key="token.knowledge">整理知识库</entry>
     <entry key="token.profile">整理偏好</entry>
     <entry key="token.skill">创建技能</entry>

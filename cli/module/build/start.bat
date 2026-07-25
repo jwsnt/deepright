@@ -31,8 +31,10 @@ echo [i] Starting integration in deepright...
 echo.
 
 :: Run synchronously so browser has time to open.
+:: Use root for compatibility with existing installations whose integration log
+:: was created by the root-owned integration service.
 :: The wrapper script sets TERM and uses setsid (required for browser auto-open).
-wsl -d deepright -- /home/deepright/start-deepright.sh
+wsl -d deepright -u root -- /home/deepright/start-deepright.sh
 if %errorlevel% neq 0 (
     echo [X] Integration failed to start.
     echo ============================================

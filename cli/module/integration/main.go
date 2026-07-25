@@ -1730,35 +1730,51 @@ func integrationAtMenuOutputForDisabledPaths(snapshot *integrationAtMenuSnapshot
 }
 
 func (cache *integrationAtMenuCache) refreshSnapshot() error {
+	return cache.refreshSnapshotWithMode(false)
+}
+
+// refreshSnapshotAfterMutation always performs a scan after the caller's
+// mutation. If a scheduled scan was already running, waiting for that scan is
+// not enough: it may have read the Agent directory before the mutation.
+func (cache *integrationAtMenuCache) refreshSnapshotAfterMutation() error {
+	return cache.refreshSnapshotWithMode(true)
+}
+
+func (cache *integrationAtMenuCache) refreshSnapshotWithMode(force bool) error {
 	if cache == nil || cache.load == nil {
 		return fmt.Errorf("@ cache is not initialized")
 	}
-	cache.mu.Lock()
-	if pending := cache.refresh; pending != nil {
+	for {
+		cache.mu.Lock()
+		if pending := cache.refresh; pending != nil {
+			cache.mu.Unlock()
+			<-pending.done
+			if !force {
+				return pending.err
+			}
+			continue
+		}
+		pending := &integrationAtMenuRefreshCall{done: make(chan struct{})}
+		cache.refresh = pending
 		cache.mu.Unlock()
-		<-pending.done
-		return pending.err
-	}
-	pending := &integrationAtMenuRefreshCall{done: make(chan struct{})}
-	cache.refresh = pending
-	cache.mu.Unlock()
 
-	snapshot, err := cache.load()
-	if err == nil && (snapshot == nil || snapshot.output == nil) {
-		err = fmt.Errorf("@ cache loader returned no Agent metadata")
-	}
+		snapshot, err := cache.load()
+		if err == nil && (snapshot == nil || snapshot.output == nil) {
+			err = fmt.Errorf("@ cache loader returned no Agent metadata")
+		}
 
-	cache.mu.Lock()
-	pending.err = err
-	if err == nil {
-		cache.snapshot = cloneIntegrationAtMenuSnapshot(snapshot)
-		cache.chat = make(map[string]*AgentOutput)
-		cache.expiresAt = cache.now().Add(cache.config.CacheTTL)
+		cache.mu.Lock()
+		pending.err = err
+		if err == nil {
+			cache.snapshot = cloneIntegrationAtMenuSnapshot(snapshot)
+			cache.chat = make(map[string]*AgentOutput)
+			cache.expiresAt = cache.now().Add(cache.config.CacheTTL)
+		}
+		cache.refresh = nil
+		close(pending.done)
+		cache.mu.Unlock()
+		return err
 	}
-	cache.refresh = nil
-	close(pending.done)
-	cache.mu.Unlock()
-	return err
 }
 
 func (cache *integrationAtMenuCache) snapshotForRequest() (*integrationAtMenuSnapshot, error) {
@@ -1831,32 +1847,6 @@ func (cache *integrationAtMenuCache) updateChatSkillState(chatID string, disable
 		return
 	}
 	cache.chat[chatID] = integrationAtMenuOutputForDisabledPaths(cache.snapshot, disabledPaths)
-	cache.expiresAt = cache.now().Add(cache.config.CacheTTL)
-}
-
-func (cache *integrationAtMenuCache) updateAgentRouterDisable(agentID string, routerDisable bool) {
-	if cache == nil || strings.TrimSpace(agentID) == "" {
-		return
-	}
-	cache.mu.Lock()
-	defer cache.mu.Unlock()
-	if cache.snapshot == nil {
-		return
-	}
-	update := func(output *AgentOutput) {
-		if output == nil {
-			return
-		}
-		for index := range output.Agents {
-			if output.Agents[index].AgentID == agentID {
-				output.Agents[index].RouterDisable = routerDisable
-			}
-		}
-	}
-	update(cache.snapshot.output)
-	for _, output := range cache.chat {
-		update(output)
-	}
 	cache.expiresAt = cache.now().Add(cache.config.CacheTTL)
 }
 
@@ -1953,6 +1943,63 @@ func startIntegrationAtMenuRefresh(ctx context.Context, cfg *Config) {
 			}
 		}
 	}()
+}
+
+func refreshIntegrationAtMenuCacheAfterAgentChange(cfg *Config, action string) {
+	if cfg == nil || cfg.AtMenuCache == nil {
+		return
+	}
+	if err := cfg.AtMenuCache.refreshSnapshotAfterMutation(); err != nil {
+		log.Printf("%s: refresh @ cache failed: %v", action, err)
+	}
+}
+
+// integrationAtMenuPathIsAgentConfig reports whether a workspace mutation
+// changes the Agent configuration used by the cached @ Agent menu.
+func integrationAtMenuPathIsAgentConfig(workspace, candidate string) bool {
+	rel, err := filepath.Rel(workspace, candidate)
+	return err == nil && strings.EqualFold(filepath.Clean(rel), "config.json")
+}
+
+// integrationAtMenuPathIsSkillDefinition reports whether a workspace file is
+// one of the skill definitions scanned for the cached @ Skill menu. Agent
+// skills retain compatibility with both SKILL.md and SKILL.
+func integrationAtMenuPathIsSkillDefinition(workspace, candidate string) bool {
+	skillsRoot := filepath.Join(workspace, "skills")
+	rel, err := filepath.Rel(skillsRoot, candidate)
+	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return false
+	}
+	name := filepath.Base(candidate)
+	return strings.EqualFold(name, "SKILL.md") || strings.EqualFold(name, "SKILL")
+}
+
+// integrationAtMenuDeletedPathAffectsSnapshot determines before deletion
+// whether the removed item contributed to the cached @ menu. Ordinary files
+// and directories are intentionally excluded because /api/files is not
+// cached by the @ menu cache.
+func integrationAtMenuDeletedPathAffectsSnapshot(workspace, candidate string, info os.FileInfo) bool {
+	if integrationAtMenuPathIsAgentConfig(workspace, candidate) || integrationAtMenuPathIsSkillDefinition(workspace, candidate) {
+		return true
+	}
+	if info == nil || !info.IsDir() {
+		return false
+	}
+	skillsRoot := filepath.Join(workspace, "skills")
+	rel, err := filepath.Rel(skillsRoot, candidate)
+	if err != nil || (rel != "." && (rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)))) {
+		return false
+	}
+	skills, err := skillscore.ScanAgentSkills(candidate)
+	return err == nil && len(skills) > 0
+}
+
+func refreshIntegrationAtMenuCacheAfterWorkspaceMutation(cfg *Config, action string) {
+	if cfg == nil || cfg.AtMenuCache == nil {
+		return
+	}
+	flushAgentCache()
+	refreshIntegrationAtMenuCacheAfterAgentChange(cfg, action)
 }
 
 func integrationKnowledgeRoot(agentDir string) (string, error) {
@@ -4793,7 +4840,8 @@ func buildIntegrationRuntimeSkillNames(base []string) []string {
 		skill string
 	}{
 		{key: "browser", skill: connectsvc.InternalSkillBrowser},
-		{key: "remote", skill: connectsvc.InternalSkillRemote},
+		{key: "email", skill: connectsvc.InternalSkillEmail},
+		{key: "feishu", skill: connectsvc.InternalSkillFeishu},
 	} {
 		status, err := connectsvc.PluginStatusByKey(item.key, nil)
 		appendIfMissing(item.skill, err == nil && status != nil && status.Started)
@@ -5929,30 +5977,13 @@ func handleEdit(cfg *Config) http.HandlerFunc {
 			writeEditResp(w, EditResponse{AgentID: agentID, Path: relPath, Content: "写入失败: " + err.Error(), Status: 1})
 			return
 		}
-		if strings.EqualFold(cleanRelPath, "config.json") {
-			if routerDisable, ok := integrationRouterDisableFromConfigContent(req.Content); ok && cfg != nil && cfg.AtMenuCache != nil {
-				cfg.AtMenuCache.updateAgentRouterDisable(agentID, routerDisable)
-			}
+		if integrationAtMenuPathIsAgentConfig(workspace, resolved) {
+			refreshIntegrationAtMenuCacheAfterWorkspaceMutation(cfg, "agent config edit")
+		} else if integrationAtMenuPathIsSkillDefinition(workspace, resolved) {
+			refreshIntegrationAtMenuCacheAfterWorkspaceMutation(cfg, "agent skill definition edit")
 		}
 		writeEditResp(w, EditResponse{AgentID: agentID, Path: relPath, SavedAs: resolved, Status: 0})
 	}
-}
-
-func integrationRouterDisableFromConfigContent(content string) (bool, bool) {
-	var raw struct {
-		RouterDisable *bool `json:"router_disable"`
-		Swarm         *bool `json:"swarm"`
-	}
-	if err := json.Unmarshal([]byte(content), &raw); err != nil {
-		return false, false
-	}
-	if raw.RouterDisable != nil {
-		return *raw.RouterDisable, true
-	}
-	if raw.Swarm != nil {
-		return !*raw.Swarm, true
-	}
-	return true, true
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -6010,13 +6041,18 @@ func handleDel(cfg *Config) http.HandlerFunc {
 			writeDelResp(w, DelResponse{AgentID: agentID, Path: relPath, Content: "不存在: " + err.Error(), Status: 1})
 			return
 		}
-		if _, err := os.Stat(resolved); err != nil {
+		info, err := os.Stat(resolved)
+		if err != nil {
 			writeDelResp(w, DelResponse{AgentID: agentID, Path: relPath, Content: "不存在: " + err.Error(), Status: 1})
 			return
 		}
+		atMenuChanged := integrationAtMenuDeletedPathAffectsSnapshot(workspace, resolved, info)
 		if err := os.RemoveAll(resolved); err != nil {
 			writeDelResp(w, DelResponse{AgentID: agentID, Path: relPath, Content: "删除失败: " + err.Error(), Status: 1})
 			return
+		}
+		if atMenuChanged {
+			refreshIntegrationAtMenuCacheAfterWorkspaceMutation(cfg, "agent skill or config delete")
 		}
 		writeDelResp(w, DelResponse{AgentID: agentID, Path: relPath, Status: 0})
 	}
@@ -7040,6 +7076,7 @@ func handleAgentImport(cfg *Config) http.HandlerFunc {
 		}
 
 		flushAgentCache()
+		refreshIntegrationAtMenuCacheAfterAgentChange(cfg, "agent import")
 		writeAgentJSONResponse(w, http.StatusOK, map[string]interface{}{
 			"status":  0,
 			"agentId": result.AgentID,
@@ -7100,6 +7137,7 @@ func handleAgentInit(cfg *Config) http.HandlerFunc {
 			return
 		}
 		flushAgentCache()
+		refreshIntegrationAtMenuCacheAfterAgentChange(cfg, "agent init")
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{"status": 0, "name": name, "path": agentDir})
 	}
@@ -7142,6 +7180,7 @@ func handleAgentCopy(cfg *Config) http.HandlerFunc {
 			return
 		}
 		flushAgentCache()
+		refreshIntegrationAtMenuCacheAfterAgentChange(cfg, "agent copy")
 		payload := map[string]interface{}{
 			"status":        0,
 			"sourceAgentId": result.SourceAgentID,
@@ -7198,6 +7237,8 @@ func handleAgentDelete(cfg *Config) http.HandlerFunc {
 				return
 			}
 		}
+		flushAgentCache()
+		refreshIntegrationAtMenuCacheAfterAgentChange(cfg, "agent delete")
 		if cronDB != nil {
 			if _, _, cleanupErr := deleteAgentCronData(cronDB, name); cleanupErr != nil {
 				w.Header().Set("Content-Type", "application/json")
@@ -7205,7 +7246,6 @@ func handleAgentDelete(cfg *Config) http.HandlerFunc {
 				return
 			}
 		}
-		flushAgentCache()
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{"status": 0, "name": name})
 	}
@@ -8339,9 +8379,7 @@ func handleSwarm(cfg *Config) http.HandlerFunc {
 			return
 		}
 		flushAgentCache()
-		if cfg.AtMenuCache != nil {
-			cfg.AtMenuCache.updateAgentRouterDisable(agentID, sc.RouterDisable)
-		}
+		refreshIntegrationAtMenuCacheAfterAgentChange(cfg, "agent swarm config")
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{"status": 0, "agentId": agentID})
 	}
@@ -17166,12 +17204,12 @@ func handlePluginsStatus(_ *Config) http.HandlerFunc {
 	}
 }
 
-func handlePluginsStart(_ *Config) http.HandlerFunc {
-	return handlePluginAction("start")
+func handlePluginsStart(cfg *Config) http.HandlerFunc {
+	return handlePluginAction(cfg, "start")
 }
 
-func handlePluginsStop(_ *Config) http.HandlerFunc {
-	return handlePluginAction("stop")
+func handlePluginsStop(cfg *Config) http.HandlerFunc {
+	return handlePluginAction(cfg, "stop")
 }
 
 func handlePluginsExec(cfg *Config) http.HandlerFunc {
@@ -17215,7 +17253,7 @@ func resolveIntegrationPluginExecTimeout(cfg *Config) time.Duration {
 	return time.Duration(defaultPluginExecTimeoutMs) * time.Millisecond
 }
 
-func handlePluginAction(action string) http.HandlerFunc {
+func handlePluginAction(cfg *Config, action string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -17245,9 +17283,22 @@ func handlePluginAction(action string) http.HandlerFunc {
 			connectsvc.WritePluginActionError(w, connectsvc.PluginActionStatusCode(err), err)
 			return
 		}
+		refreshIntegrationAtMenuCacheAfterPluginAction(cfg, action, name)
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"status": 0, "data": buildPluginActionResponse(result)})
+	}
+}
+
+// refreshIntegrationAtMenuCacheAfterPluginAction makes plugin-backed skills
+// visible (or hidden) in the @ menu as soon as the plugin lifecycle call
+// succeeds, rather than waiting for the regular snapshot refresh interval.
+func refreshIntegrationAtMenuCacheAfterPluginAction(cfg *Config, action, plugin string) {
+	if cfg == nil || cfg.AtMenuCache == nil {
+		return
+	}
+	if err := cfg.AtMenuCache.refreshSnapshotAfterMutation(); err != nil {
+		log.Printf("plugin %s refresh @ cache failed: plugin=%s err=%v", action, plugin, err)
 	}
 }
 
@@ -17742,6 +17793,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	startIntegrationAtMenuRefresh(ctx, &cfg)
 	initCronDB()
 	startIntegrationLogRetentionCleanup(ctx)
+	startIntegrationTempCleanup(ctx, cfg.AgentDir)
 	startCronCheck(ctx, &cfg)
 	startIntegrationMCPRefresh(ctx, &cfg)
 	startCronExecutor(ctx, &cfg, proxyClient, connectSvc)
@@ -18603,6 +18655,315 @@ func nextAvailableBackupPath(dir, name string) (string, error) {
 			return "", err
 		}
 	}
+}
+
+// integrationTempCleanupConfig is read from config/config.json once for each
+// Integration process. It intentionally has no source-code defaults: operators
+// must set all three values in the runtime configuration file.
+type integrationTempCleanupConfig struct {
+	ClearAfter   time.Duration
+	PackAfter    time.Duration
+	ScanInterval time.Duration
+}
+
+type integrationTempCleanupEvent struct {
+	Action string
+	Agent  string
+	Source string
+	Target string
+	Reason string
+}
+
+type integrationTempCleanupSummary struct {
+	AgentCount int
+	Events     []integrationTempCleanupEvent
+}
+
+func readIntegrationTempCleanupConfig() (integrationTempCleanupConfig, error) {
+	raw, _, err := readIntegrationStartupConfigRaw()
+	if err != nil {
+		return integrationTempCleanupConfig{}, fmt.Errorf("read config/config.json.temp: %w", err)
+	}
+	tempRaw, ok := raw["temp"]
+	if !ok {
+		return integrationTempCleanupConfig{}, fmt.Errorf("config/config.json.temp is required")
+	}
+	temp, ok := tempRaw.(map[string]interface{})
+	if !ok || temp == nil {
+		return integrationTempCleanupConfig{}, fmt.Errorf("config/config.json.temp must be an object")
+	}
+	clearHours, err := integrationTempPositiveHours(temp["clear"], "config/config.json.temp.clear")
+	if err != nil {
+		return integrationTempCleanupConfig{}, err
+	}
+	packHours, err := integrationTempPositiveHours(temp["pack"], "config/config.json.temp.pack")
+	if err != nil {
+		return integrationTempCleanupConfig{}, err
+	}
+	scanHours, err := integrationTempPositiveHours(temp["scan"], "config/config.json.temp.scan")
+	if err != nil {
+		return integrationTempCleanupConfig{}, err
+	}
+	return integrationTempCleanupConfig{
+		ClearAfter:   time.Duration(clearHours) * time.Hour,
+		PackAfter:    time.Duration(packHours) * time.Hour,
+		ScanInterval: time.Duration(scanHours) * time.Hour,
+	}, nil
+}
+
+func integrationTempPositiveHours(raw interface{}, label string) (int64, error) {
+	value, ok := raw.(json.Number)
+	if !ok {
+		return 0, fmt.Errorf("%s must be a positive integer in hours", label)
+	}
+	hours, err := value.Int64()
+	if err != nil || hours <= 0 || hours > int64((1<<63-1)/int64(time.Hour)) {
+		return 0, fmt.Errorf("%s must be a positive integer in hours", label)
+	}
+	return hours, nil
+}
+
+// startIntegrationTempCleanup schedules cleanup in a separate goroutine so
+// filesystem work never delays service startup or HTTP request handling.
+func startIntegrationTempCleanup(ctx context.Context, agentRoot string) {
+	if ctx == nil || strings.TrimSpace(agentRoot) == "" {
+		return
+	}
+	go func() {
+		config, err := readIntegrationTempCleanupConfig()
+		if err != nil {
+			log.Printf("[temp] cleanup disabled: %v", err)
+			return
+		}
+		run := func() {
+			summary, err := cleanupIntegrationAgentTmp(agentRoot, time.Now(), config)
+			if err != nil {
+				log.Printf("[temp] cleanup scan failed: %v", err)
+				return
+			}
+			logIntegrationTempCleanupEvents(summary.Events)
+		}
+		run()
+
+		ticker := time.NewTicker(config.ScanInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				run()
+			}
+		}
+	}()
+}
+
+func logIntegrationTempCleanupEvents(events []integrationTempCleanupEvent) {
+	for _, event := range events {
+		switch event.Action {
+		case "pack":
+			log.Printf("[temp pack] agent=%s archived %s -> %s", event.Agent, event.Source, event.Target)
+		case "pack-skip":
+			log.Printf("[temp pack] agent=%s skipped %s because target exists at %s", event.Agent, event.Source, event.Target)
+		case "clear":
+			log.Printf("[temp clear] agent=%s deleted %s", event.Agent, event.Source)
+		case "error":
+			log.Printf("[temp] agent=%s failed path=%s reason=%s", event.Agent, event.Source, event.Reason)
+		}
+	}
+}
+
+func cleanupIntegrationAgentTmp(agentRoot string, now time.Time, config integrationTempCleanupConfig) (integrationTempCleanupSummary, error) {
+	entries, err := os.ReadDir(agentRoot)
+	if err != nil {
+		return integrationTempCleanupSummary{}, err
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		return strings.ToLower(entries[i].Name()) < strings.ToLower(entries[j].Name())
+	})
+
+	summary := integrationTempCleanupSummary{}
+	for _, entry := range entries {
+		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+		agentID := strings.TrimSpace(entry.Name())
+		if err := integrationagentarchive.ValidateAgentID(agentID); err != nil {
+			continue
+		}
+		summary.AgentCount++
+		workspace := filepath.Join(agentRoot, entry.Name())
+		if err := cleanupIntegrationTempWorkspace(workspace, agentID, now, config, &summary); err != nil {
+			summary.Events = append(summary.Events, integrationTempCleanupEvent{
+				Action: "error",
+				Agent:  agentID,
+				Source: filepath.Join(workspace, "tmp"),
+				Reason: err.Error(),
+			})
+		}
+	}
+	return summary, nil
+}
+
+func cleanupIntegrationTempWorkspace(workspace, agentID string, now time.Time, config integrationTempCleanupConfig, summary *integrationTempCleanupSummary) error {
+	tmpDir := filepath.Join(workspace, "tmp")
+	info, err := os.Lstat(tmpDir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("tmp exists but is not a directory")
+	}
+
+	entries, err := os.ReadDir(tmpDir)
+	if err != nil {
+		return err
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		return strings.ToLower(entries[i].Name()) < strings.ToLower(entries[j].Name())
+	})
+	bakDir := filepath.Join(tmpDir, "bak")
+	for _, entry := range entries {
+		if entry.Name() == "bak" {
+			continue
+		}
+		source := filepath.Join(tmpDir, entry.Name())
+		expired, err := integrationTempEntryExpired(source, now, config.PackAfter)
+		if err != nil {
+			return err
+		}
+		if !expired {
+			continue
+		}
+		if err := os.MkdirAll(bakDir, 0o755); err != nil {
+			return err
+		}
+		if err := mergeIntegrationTempArchiveEntry(source, filepath.Join(bakDir, entry.Name()), agentID, summary); err != nil {
+			return err
+		}
+	}
+
+	bakInfo, err := os.Lstat(bakDir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	if !bakInfo.IsDir() {
+		return fmt.Errorf("tmp/bak exists but is not a directory")
+	}
+	bakEntries, err := os.ReadDir(bakDir)
+	if err != nil {
+		return err
+	}
+	sort.Slice(bakEntries, func(i, j int) bool {
+		return strings.ToLower(bakEntries[i].Name()) < strings.ToLower(bakEntries[j].Name())
+	})
+	for _, entry := range bakEntries {
+		path := filepath.Join(bakDir, entry.Name())
+		expired, err := integrationTempEntryExpired(path, now, config.ClearAfter)
+		if err != nil {
+			return err
+		}
+		if !expired {
+			continue
+		}
+		if err := os.RemoveAll(path); err != nil {
+			return err
+		}
+		summary.Events = append(summary.Events, integrationTempCleanupEvent{
+			Action: "clear",
+			Agent:  agentID,
+			Source: path,
+		})
+	}
+	return nil
+}
+
+// integrationTempEntryExpired checks a top-level temp item. A directory is
+// eligible only when every descendant file is old enough; an empty directory
+// uses its own mtime. WalkDir does not follow symbolic links.
+func integrationTempEntryExpired(path string, now time.Time, age time.Duration) (bool, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return false, err
+	}
+	if !info.IsDir() {
+		return !info.ModTime().After(now.Add(-age)), nil
+	}
+	containsFile := false
+	expired := true
+	err = filepath.WalkDir(path, func(current string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		containsFile = true
+		entryInfo, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if entryInfo.ModTime().After(now.Add(-age)) {
+			expired = false
+		}
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+	if !containsFile {
+		return !info.ModTime().After(now.Add(-age)), nil
+	}
+	return expired, nil
+}
+
+// mergeIntegrationTempArchiveEntry recursively joins a stale temp entry into
+// bak. Existing targets win; skipped sources remain in tmp for a later scan.
+func mergeIntegrationTempArchiveEntry(source, target, agentID string, summary *integrationTempCleanupSummary) error {
+	sourceInfo, err := os.Lstat(source)
+	if err != nil {
+		return err
+	}
+	targetInfo, err := os.Lstat(target)
+	if errors.Is(err, os.ErrNotExist) {
+		if err := os.Rename(source, target); err != nil {
+			return err
+		}
+		summary.Events = append(summary.Events, integrationTempCleanupEvent{Action: "pack", Agent: agentID, Source: source, Target: target})
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !sourceInfo.IsDir() || !targetInfo.IsDir() {
+		summary.Events = append(summary.Events, integrationTempCleanupEvent{Action: "pack-skip", Agent: agentID, Source: source, Target: target})
+		return nil
+	}
+
+	entries, err := os.ReadDir(source)
+	if err != nil {
+		return err
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		return strings.ToLower(entries[i].Name()) < strings.ToLower(entries[j].Name())
+	})
+	for _, entry := range entries {
+		if err := mergeIntegrationTempArchiveEntry(filepath.Join(source, entry.Name()), filepath.Join(target, entry.Name()), agentID, summary); err != nil {
+			return err
+		}
+	}
+	// A skipped collision makes this removal fail, intentionally preserving the
+	// source directory and its skipped entries for a later scan.
+	if err := os.Remove(source); err != nil && !errors.Is(err, os.ErrNotExist) && !errors.Is(err, syscall.ENOTEMPTY) {
+		return err
+	}
+	return nil
 }
 
 func runIntegrationNotifyCLI(args []string) {

@@ -69,6 +69,11 @@ cd /path/to/deepright/cli/module/integration
     "refresh": 60,
     "cache": 120
   },
+  "temp": {
+    "clear": 168,
+    "pack": 168,
+    "scan": 2
+  },
   "http": {
     "http_connect_timeout": 15000,
     "http_socket_timeout": 45000,
@@ -89,6 +94,27 @@ cd /path/to/deepright/cli/module/integration
 
 `config/config.json` 只作为主应用启动配置使用；同目录下其余模板文件或目录（如 `SOUL.md`、`USER.md`、`skills/`）才会在创建新 Agent 或补齐 `DEF_AGENT` 时复制到 Agent 工作目录。新建出来的 Agent `config.json` 会固定初始化为空对象 `{}`，不会继承主应用配置内容。
 
+### Agent `tmp` 自动归档与清理
+
+Integration 在每次启动时读取 `config/config.json.temp`：
+
+```json
+{
+  "temp": {
+    "clear": 168,
+    "pack": 168,
+    "scan": 2
+  }
+}
+```
+
+- 三项均为正整数，单位为小时；`pack` 是归档期限，`clear` 是归档目录清理期限，`scan` 是扫描周期。配置变更后需重启 Integration 生效；不会使用写死的替代值。
+- 服务启动后会在后台立即扫描一次，随后每 `scan` 小时扫描一次；扫描、移动和删除均不阻塞 HTTP 服务、请求或定时任务。
+- 每个 Agent 的 `tmp/` 会按一级文件或目录处理。目录内只要有一个文件在 `pack` 小时内修改过，整个目录就保留；全部文件均过期后，移动到 `tmp/bak/` 并保持目录结构。一级文件按其自身修改时间归档；空目录按目录自身修改时间判断。
+- `tmp/bak/` 不会被再次归档。其一级文件或目录仅在全部文件都超过 `clear` 小时未修改时删除；空目录同样按自身修改时间判断。
+- 已存在的归档目录会递归合并；出现同名文件或文件/目录类型冲突时，保留 `bak` 中的目标并保留源项等待后续扫描，绝不覆盖或改名。
+- Integration 日志会记录 `temp pack` 归档、同名跳过、`temp clear` 删除及每个 Agent 的处理错误。若 `temp` 缺失或非法，则记录配置错误并跳过临时文件整理，不影响服务运行。
+
 ### `@` 菜单缓存
 
 `config/config.json.at` 是 Integration 启动必填配置：
@@ -107,7 +133,10 @@ cd /path/to/deepright/cli/module/integration
 - 成功刷新会替换快照，并从成功时刻重新计算 `cache` 的有效期；后台刷新失败保留旧快照但不续期。
 - 快照过期后，`/api/skills` 与 `/api/swarm_agent` 的下一次请求会同步加载；此时加载失败会返回接口错误，不会返回已过期数据。
 - 首次读取某个 `chatId` 的 Skill 时会创建该会话的筛选快照。通过 `/api/skill_state` 禁用或恢复技能目录成功后，Integration 会立即更新该会话筛选结果并从操作时刻重新计算 `cache`；不会影响其它会话的可用 Skill，也不需要等待下一次 Agent 扫描。
-- 任意 Agent 保存蜂群开关后，Integration 会立即同步该 Agent 的 `router_disable` 到基础快照和所有已有会话快照，并从操作时刻重新计算 `cache`；`@ Agent` 不会等待定时刷新。
+- 任意 Agent 保存蜂群开关后，Integration 会立即完整刷新基础快照和全部已有会话快照，并从操作时刻重新计算 `cache`；`@ Agent` 不会等待定时刷新。
+- 通过 `/api/agent/init` 新建、`/api/agent/delete` 删除或 `/api/agent/import` 导入 Agent 成功后，Integration 会立即完整刷新 `@` 基础快照和全部会话快照并重新计算 `cache`，变更不必等待下一轮 `refresh`。
+- `/api/copy` 复制 Agent 成功后会立即刷新，target Agent 新复制的 Skill 无需等待下一轮 `refresh` 才会出现在 `@ Skill`。
+- `/api/edit` 修改 Agent 的 `config.json` 或 `skills/` 下 `SKILL.md` / `SKILL` 定义文件，以及 `/api/del` 删除这些定义、包含有效 Skill 的目录或 `config.json` 后，都会立即刷新；普通文件和目录列表不使用 `@` 缓存，`/api/agent/create` 仅创建空文件或目录也不会触发刷新。
 - 修改 `at` 配置后需要重启 Integration。普通聊天、CLI 心跳和定时任务的 Agent metadata 仍实时读取技能，不使用此缓存。
 
 ### macOS 防止空闲睡眠

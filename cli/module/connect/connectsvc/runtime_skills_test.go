@@ -12,8 +12,8 @@ func TestBuildRuntimeSkillNames(t *testing.T) {
 		switch key {
 		case "browser":
 			return &PluginStatus{Key: key, Started: true}, nil
-		case "remote":
-			return &PluginStatus{Key: key, Started: false}, nil
+		case "email", "feishu":
+			return &PluginStatus{Key: key, Started: true}, nil
 		default:
 			return nil, errors.New("missing")
 		}
@@ -23,7 +23,7 @@ func TestBuildRuntimeSkillNames(t *testing.T) {
 	}()
 
 	got := BuildRuntimeSkillNames([]string{"alpha", InternalSkillCron, "beta"})
-	want := []string{"alpha", InternalSkillCron, "beta", InternalSkillBrowser}
+	want := []string{"alpha", InternalSkillCron, "beta", InternalSkillBrowser, InternalSkillEmail, InternalSkillFeishu}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("BuildRuntimeSkillNames() = %#v, want %#v", got, want)
 	}

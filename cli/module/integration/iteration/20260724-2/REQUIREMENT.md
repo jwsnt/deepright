@@ -29,7 +29,10 @@
 + `at`、`refresh`、`cache` 缺失、为 `0`、负数、非整数或非对象时，Integration 启动必须失败，并输出包含配置键名的明确错误；不得静默回退默认值。
 + 缓存保存所有 Agent 的可用 Skill 与 SWARM 可见性基础数据。首次读取某个 `chatId` 时须按该会话的禁用 Skill 状态创建筛选快照；`POST /api/skill_state` 成功切换技能目录后，必须使用接口返回的禁用路径立即更新该会话筛选快照，不得等待缓存到期或重新扫描 Agent 目录。
 + 每次技能目录禁用或恢复成功后，均须以操作完成时刻重新计算 `at.cache` 到期时间；该更新只影响对应 `chatId` 的 Skill 筛选结果，不得移除其它会话可用的 Skill。
-+ 任意 Agent 的 `router_disable`（蜂群开关）写入成功后，必须立即更新基础快照及全部已创建的会话筛选快照中的该 Agent 可见性，并从操作完成时刻重新计算 `at.cache`；`/api/swarm_agent` 不得继续返回切换前的 Agent。
++ 任意 Agent 的 `router_disable`（蜂群开关）写入成功后，必须立即完整刷新基础快照及全部已创建的会话筛选快照，并从操作完成时刻重新计算 `at.cache`；`/api/swarm_agent` 不得继续返回切换前的 Agent。
++ 通过 `/api/agent/init` 新建、`/api/agent/delete` 删除，或通过 `/api/agent/import` 导入 Agent 成功后，必须立即完整刷新 `@` 基础快照及全部会话筛选快照，并重新计算 `at.cache`；创建、删除或导入结果不得等待下一轮 `at.refresh` 才反映到 `@` 数据中。
++ `/api/copy` 成功复制 Agent 工作区后，必须立即完整刷新 `@` 基础快照及全部会话筛选快照，并重新计算 `at.cache`，确保 target Agent 新复制的 Skill 立即反映到 `@ Skill` 菜单。
++ `/api/edit` 成功写入 Agent 的 `config.json`、或 `skills/` 下的 `SKILL.md` / `SKILL` Skill 定义文件时，必须立即完整刷新 `@` 缓存；`/api/del` 成功删除该 `config.json`、Skill 定义文件或包含有效 Skill 的目录时也必须立即刷新。普通文件和目录列表不属于 `@` 缓存，不能因此触发刷新；`/api/agent/create` 只创建空文件或目录，也不触发刷新。
 + Integration 启动后应立即尝试预热缓存，随后每隔 `at.refresh` 秒刷新。刷新成功后必须替换缓存内容并重新计算 `at.cache` 到期时间。
 + 主动刷新失败时必须保留旧缓存，且不得续期或清空缓存；缓存仅在最近一次成功加载后的 `at.cache` 到期时失效。
 + 缓存失效后，`/api/skills` 或 `/api/swarm_agent` 的用户请求必须同步主动加载一次；加载成功后更新缓存与到期时间，加载失败则返回接口错误，不得返回已过期缓存。
@@ -45,7 +48,7 @@
 + 作为其他模块可以调用的子模块和可独立运行的CLI命令来编写
 + 在 `main.go` 中以不新增依赖的并发安全缓存状态实现配置校验、预热、周期刷新、请求兜底加载和失效判定；HTTP Handler 仅消费缓存快照，不得在缓存有效期内重复扫描 Agent 目录。
 + `/api/skills` 从缓存快照定位 Agent，并复用对应 `chatId` 的筛选快照；`/api/swarm_agent` 从同一基础快照筛选 `router_disable=false` 并排除当前 Agent。
-+ 覆盖自动化测试：配置缺失、`at` 非对象、`refresh/cache` 为零/负数/非整数、首次预热、定时刷新成功续期、定时刷新失败保留旧缓存且不续期、到期请求成功更新、到期请求失败返回错误、并发请求合并、Skill chat 级过滤、技能禁用/恢复后的缓存即时筛选与续期、蜂群开关写入后的全缓存即时更新与续期，以及 Agent 筛选。
++ 覆盖自动化测试：配置缺失、`at` 非对象、`refresh/cache` 为零/负数/非整数、首次预热、定时刷新成功续期、定时刷新失败保留旧缓存且不续期、到期请求成功更新、到期请求失败返回错误、并发请求合并、Skill chat 级过滤、技能禁用/恢复后的缓存即时筛选与续期、任意 Agent 蜂群开关写入后的完整刷新、创建/删除/导入/复制 Agent 后完整刷新、Skill 定义文件修改或删除与 `config.json` 删除后的完整刷新，以及 Agent 筛选。
 + 最小范围更新
 
 ### 撰写手册

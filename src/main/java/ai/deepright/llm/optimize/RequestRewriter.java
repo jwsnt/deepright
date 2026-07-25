@@ -332,7 +332,7 @@ public class RequestRewriter implements ProviderRequestRewriter {
 
         public SummaryHistories(List<History> histories) throws Exception {
             for (History history : histories) {
-                if (!ComplexityUtils.score(history.getContent() + (!history.isEncrypt() ? history.getReasoning() : "")).is(ComplexityMode.FAST_REPLY)) {
+                if (!ComplexityUtils.score(history.getContent() + (!history.isEncrypt() ? history.getReason() : "")).is(ComplexityMode.FAST_REPLY)) {
                     if (history.isFunction(History.FUN_CHAT)) {
                         this.chat.add(history);
                     }

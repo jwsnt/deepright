@@ -637,18 +637,30 @@ PID_FILE="/home/deepright/deepright/integration.pid"
 WRAPPER_PATH="/home/deepright/start-deepright.sh"
 LAUNCH_COMMAND="sudo -n /usr/bin/env HOME=/home/deepright TERM=xterm-256color /app/integration start"
 
-if ! mkdir -p "$(dirname "$LOG_PATH")"; then
+if ! sudo -n mkdir -p "$(dirname "$LOG_PATH")"; then
   printf '%s\n' "failed to create integration log directory" >&2
   exit 1
 fi
 
 log_launch() {
-  printf '%s [integration launcher] %s\n' "$(date --iso-8601=seconds)" "$*" >> "$LOG_PATH"
+  if ! printf '%s [integration launcher] %s\n' "$(date --iso-8601=seconds)" "$*" \
+    | sudo -n tee -a "$LOG_PATH" >/dev/null; then
+    printf '%s\n' "failed to write integration log" >&2
+    return 1
+  fi
 }
 
-log_launch "start requested wrapper=$WRAPPER_PATH command=$LAUNCH_COMMAND log_path=$LOG_PATH pid_file=$PID_FILE launcher_pid=$$ launcher_uid=$(id -u)"
-setsid sudo -n /usr/bin/env HOME=/home/deepright TERM=xterm-256color /app/integration start >> "$LOG_PATH" 2>&1
-status=$?
+if ! log_launch "start requested wrapper=$WRAPPER_PATH command=$LAUNCH_COMMAND log_path=$LOG_PATH pid_file=$PID_FILE launcher_pid=$$ launcher_uid=$(id -u)"; then
+  exit 1
+fi
+setsid sudo -n /usr/bin/env HOME=/home/deepright TERM=xterm-256color /app/integration start 2>&1 \
+  | sudo -n tee -a "$LOG_PATH" >/dev/null
+pipeline_status=("${PIPESTATUS[@]}")
+status=${pipeline_status[0]}
+if [ "${pipeline_status[1]}" -ne 0 ]; then
+  printf '%s\n' "failed to write integration output to log" >&2
+  status=1
+fi
 pid=""
 integration_uid="unknown"
 integration_user="unknown"

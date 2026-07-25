@@ -1819,7 +1819,8 @@ func buildProxyRuntimeSkillNames(base []string) []string {
 		skill string
 	}{
 		{key: "browser", skill: connectsvc.InternalSkillBrowser},
-		{key: "remote", skill: connectsvc.InternalSkillRemote},
+		{key: "email", skill: connectsvc.InternalSkillEmail},
+		{key: "feishu", skill: connectsvc.InternalSkillFeishu},
 	} {
 		status, err := connectsvc.PluginStatusByKey(item.key, nil)
 		appendIfMissing(item.skill, err == nil && status != nil && status.Started)

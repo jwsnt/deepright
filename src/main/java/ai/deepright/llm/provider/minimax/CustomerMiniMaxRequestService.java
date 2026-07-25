@@ -30,6 +30,8 @@ public class CustomerMiniMaxRequestService extends MiniMaxRequestService {
 
     protected Integer maxTokens;
 
+    protected String multiInput;
+
     protected String thinking;
 
     protected String fast;
@@ -63,6 +65,7 @@ public class CustomerMiniMaxRequestService extends MiniMaxRequestService {
     protected void request(AnthropicRequest request, LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
         super.request(request, llmConfig, llmQuery);
         request.setModel(RequestModelSelect.select(llmQuery, RequestModelSelect.RequestModel.builder()
+                .multiInput(this.multiInput)
                 .thinking(this.thinking)
                 .fast(this.fast)
                 .base(this.base)
@@ -84,6 +87,9 @@ public class CustomerMiniMaxRequestService extends MiniMaxRequestService {
 
         @Value("${minimax.model.max_tokens:128000}")
         protected Integer maxTokens;
+
+        @Value("${minimax.model.multiInput:MiniMax-M3}")
+        protected String multiInput;
 
         @Value("${minimax.model.thinking:MiniMax-M3}")
         protected String thinking;

@@ -4137,6 +4137,99 @@ func TestCleanupIntegrationAgentBackupsMovesAndDeletesFiles(t *testing.T) {
 	}
 }
 
+func TestCleanupIntegrationAgentTmpPacksMergesAndClears(t *testing.T) {
+	now := time.Date(2026, 7, 25, 12, 0, 0, 0, time.UTC)
+	agentRoot := filepath.Join(t.TempDir(), "agents")
+	workspace := filepath.Join(agentRoot, "agent-a")
+	if err := os.MkdirAll(filepath.Join(workspace, "tmp"), 0o755); err != nil {
+		t.Fatalf("mkdir tmp: %v", err)
+	}
+
+	writeAt := func(path, body string, modTime time.Time) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatalf("mkdir parent %s: %v", path, err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatalf("write %s: %v", path, err)
+		}
+		if err := os.Chtimes(path, modTime, modTime); err != nil {
+			t.Fatalf("chtimes %s: %v", path, err)
+		}
+	}
+	tmpDir := filepath.Join(workspace, "tmp")
+	writeAt(filepath.Join(tmpDir, "old-project", "nested", "old.txt"), "archive", now.Add(-48*time.Hour))
+	writeAt(filepath.Join(tmpDir, "active-project", "old.txt"), "old", now.Add(-48*time.Hour))
+	writeAt(filepath.Join(tmpDir, "active-project", "fresh.txt"), "fresh", now.Add(-2*time.Hour))
+	writeAt(filepath.Join(tmpDir, "root-old.txt"), "archive", now.Add(-48*time.Hour))
+	writeAt(filepath.Join(tmpDir, "root-fresh.txt"), "fresh", now.Add(-2*time.Hour))
+	if err := os.MkdirAll(filepath.Join(tmpDir, "empty"), 0o755); err != nil {
+		t.Fatalf("mkdir empty: %v", err)
+	}
+	if err := os.Chtimes(filepath.Join(tmpDir, "empty"), now.Add(-48*time.Hour), now.Add(-48*time.Hour)); err != nil {
+		t.Fatalf("chtimes empty: %v", err)
+	}
+	writeAt(filepath.Join(tmpDir, "collision", "same.txt"), "source", now.Add(-48*time.Hour))
+	writeAt(filepath.Join(tmpDir, "collision", "new.txt"), "new", now.Add(-48*time.Hour))
+	writeAt(filepath.Join(tmpDir, "bak", "collision", "same.txt"), "target", now.Add(-48*time.Hour))
+	writeAt(filepath.Join(tmpDir, "bak", "remove-me", "old.txt"), "delete", now.Add(-96*time.Hour))
+	writeAt(filepath.Join(tmpDir, "bak", "keep-me", "fresh.txt"), "keep", now.Add(-2*time.Hour))
+
+	summary, err := cleanupIntegrationAgentTmp(agentRoot, now, integrationTempCleanupConfig{
+		PackAfter:  24 * time.Hour,
+		ClearAfter: 72 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("cleanupIntegrationAgentTmp: %v", err)
+	}
+	if summary.AgentCount != 1 {
+		t.Fatalf("agent count = %d, want 1", summary.AgentCount)
+	}
+
+	for _, path := range []string{
+		filepath.Join(tmpDir, "bak", "old-project", "nested", "old.txt"),
+		filepath.Join(tmpDir, "bak", "root-old.txt"),
+		filepath.Join(tmpDir, "bak", "empty"),
+		filepath.Join(tmpDir, "bak", "collision", "new.txt"),
+		filepath.Join(tmpDir, "active-project", "old.txt"),
+		filepath.Join(tmpDir, "active-project", "fresh.txt"),
+		filepath.Join(tmpDir, "root-fresh.txt"),
+		filepath.Join(tmpDir, "collision", "same.txt"),
+		filepath.Join(tmpDir, "bak", "collision", "same.txt"),
+		filepath.Join(tmpDir, "bak", "keep-me", "fresh.txt"),
+	} {
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("expected %s to remain, err=%v", path, err)
+		}
+	}
+	for _, path := range []string{
+		filepath.Join(tmpDir, "old-project"),
+		filepath.Join(tmpDir, "root-old.txt"),
+		filepath.Join(tmpDir, "empty"),
+		filepath.Join(tmpDir, "collision", "new.txt"),
+		filepath.Join(tmpDir, "bak", "remove-me"),
+	} {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Fatalf("expected %s to be gone, err=%v", path, err)
+		}
+	}
+
+	var archived, skipped, deleted bool
+	for _, event := range summary.Events {
+		switch event.Action {
+		case "pack":
+			archived = true
+		case "pack-skip":
+			skipped = true
+		case "clear":
+			deleted = true
+		}
+	}
+	if !archived || !skipped || !deleted {
+		t.Fatalf("events missing operation types: %#v", summary.Events)
+	}
+}
+
 func TestHandleAgentCreateAllowsNestedRelativePath(t *testing.T) {
 	flushAgentCache()
 	agentRoot := t.TempDir()
@@ -7084,9 +7177,14 @@ func TestHandleAgentInitCreatesEmptyConfigJSON(t *testing.T) {
 		t.Fatalf("write bundled config: %v", err)
 	}
 
+	cfg := &Config{AgentDir: agentDir, DefaultDir: defaultDir, Device: "test-dev", AgentCacheMs: 0}
+	configureIntegrationAtMenuCacheForTest(t, cfg)
+	currentTime := time.Date(2026, 7, 24, 11, 0, 0, 0, time.UTC)
+	cfg.AtMenuCache.now = func() time.Time { return currentTime }
+
 	req := httptest.NewRequest(http.MethodGet, "/api/agent/init?name=A", nil)
 	rec := httptest.NewRecorder()
-	handleAgentInit(&Config{AgentDir: agentDir, DefaultDir: defaultDir}).ServeHTTP(rec, req)
+	handleAgentInit(cfg).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status code = %d, want %d", rec.Code, http.StatusOK)
@@ -7102,6 +7200,19 @@ func TestHandleAgentInitCreatesEmptyConfigJSON(t *testing.T) {
 	newAgentDir := filepath.Join(agentDir, "A")
 	assertDefaultAgentTemplateCopied(t, newAgentDir)
 	assertAgentConfigIsEmpty(t, newAgentDir)
+	metadata, err := cfg.AtMenuCache.outputForRequest("", func() ([]string, error) { return nil, nil })
+	if err != nil {
+		t.Fatalf("read refreshed @ cache: %v", err)
+	}
+	if len(metadata.Agents) != 1 || metadata.Agents[0].AgentID != "A" {
+		t.Fatalf("refreshed @ cache agents = %#v, want new Agent A", metadata.Agents)
+	}
+	cfg.AtMenuCache.mu.Lock()
+	expiresAt := cfg.AtMenuCache.expiresAt
+	cfg.AtMenuCache.mu.Unlock()
+	if want := currentTime.Add(time.Hour); !expiresAt.Equal(want) {
+		t.Fatalf("@ cache expiry = %s, want %s after Agent creation", expiresAt, want)
+	}
 }
 
 func writeDefaultAgentTemplate(t *testing.T, dir string) {
@@ -7518,6 +7629,57 @@ func TestReadIntegrationAtMenuConfig(t *testing.T) {
 			}
 			if err != nil {
 				t.Fatalf("readIntegrationAtMenuConfig: %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("config = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestReadIntegrationTempCleanupConfig(t *testing.T) {
+	tests := []struct {
+		name      string
+		config    string
+		want      integrationTempCleanupConfig
+		wantError string
+	}{
+		{
+			name:   "valid",
+			config: `{"temp":{"clear":168,"pack":72,"scan":2}}`,
+			want: integrationTempCleanupConfig{
+				ClearAfter:   168 * time.Hour,
+				PackAfter:    72 * time.Hour,
+				ScanInterval: 2 * time.Hour,
+			},
+		},
+		{name: "missing temp", config: `{}`, wantError: "config/config.json.temp is required"},
+		{name: "temp is not object", config: `{"temp":2}`, wantError: "config/config.json.temp must be an object"},
+		{name: "missing pack", config: `{"temp":{"clear":168,"scan":2}}`, wantError: "config/config.json.temp.pack"},
+		{name: "zero clear", config: `{"temp":{"clear":0,"pack":168,"scan":2}}`, wantError: "config/config.json.temp.clear"},
+		{name: "fractional scan", config: `{"temp":{"clear":168,"pack":168,"scan":1.5}}`, wantError: "config/config.json.temp.scan"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			appDir := t.TempDir()
+			useIntegrationExecutableDir(t, appDir)
+			configDir := filepath.Join(appDir, "config")
+			if err := os.MkdirAll(configDir, 0o755); err != nil {
+				t.Fatalf("mkdir config: %v", err)
+			}
+			if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(tt.config), 0o644); err != nil {
+				t.Fatalf("write config: %v", err)
+			}
+
+			got, err := readIntegrationTempCleanupConfig()
+			if tt.wantError != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantError) {
+					t.Fatalf("error = %v, want %q", err, tt.wantError)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("readIntegrationTempCleanupConfig: %v", err)
 			}
 			if got != tt.want {
 				t.Fatalf("config = %#v, want %#v", got, tt.want)
@@ -17260,9 +17422,18 @@ func TestIntegrationHandleSwarmWritesRouterDisableConfig(t *testing.T) {
 		t.Fatalf("mkdir agent workspace: %v", err)
 	}
 
+	cacheCfg := &Config{AgentDir: "agent", Device: "test-dev", AgentCacheMs: 1}
+	configureIntegrationAtMenuCacheForTest(t, cacheCfg)
+	currentTime := time.Date(2026, 7, 24, 13, 0, 0, 0, time.UTC)
+	cacheCfg.AtMenuCache.now = func() time.Time { return currentTime }
+	if _, err := cacheCfg.AtMenuCache.outputForRequest("", func() ([]string, error) { return nil, nil }); err != nil {
+		t.Fatalf("warm @ cache: %v", err)
+	}
+
+	currentTime = currentTime.Add(time.Minute)
 	req := httptest.NewRequest(http.MethodPost, "/api/config?agentId=A", strings.NewReader(`{"description":"demo","thinking":true,"router_disable":false}`))
 	rec := httptest.NewRecorder()
-	handleSwarm(&Config{AgentDir: "agent", AgentCacheMs: 1})(rec, req)
+	handleSwarm(cacheCfg)(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
@@ -17287,6 +17458,16 @@ func TestIntegrationHandleSwarmWritesRouterDisableConfig(t *testing.T) {
 	}
 	if cfg.Description != "demo" || !cfg.Thinking || cfg.RouterDisable {
 		t.Fatalf("config.json = %+v, want description=demo thinking=true router_disable=false", cfg)
+	}
+	metadata, err := cacheCfg.AtMenuCache.outputForRequest("", func() ([]string, error) { return nil, nil })
+	if err != nil || len(metadata.Agents) != 1 || metadata.Agents[0].RouterDisable {
+		t.Fatalf("refreshed @ cache = %#v, err=%v; want Agent A swarm enabled", metadata, err)
+	}
+	cacheCfg.AtMenuCache.mu.Lock()
+	expiresAt := cacheCfg.AtMenuCache.expiresAt
+	cacheCfg.AtMenuCache.mu.Unlock()
+	if want := currentTime.Add(time.Hour); !expiresAt.Equal(want) {
+		t.Fatalf("@ cache expiry = %s, want %s after swarm config write", expiresAt, want)
 	}
 }
 
@@ -18063,6 +18244,8 @@ func TestHandleSkillsIncludesInternalSkills(t *testing.T) {
 
 		restore := withIntegrationPluginSandbox(t, map[string][2]string{
 			"browser": {`{"key":"browser","name":"浏览器"}`, pluginParamJSON("cookie_path")},
+			"email":   {`{"key":"email","name":"邮件"}`, pluginParamJSON("email")},
+			"feishu":  {`{"key":"feishu","name":"飞书"}`, pluginParamJSON("appId")},
 			"remote":  {`{"key":"remote","name":"远程"}`, pluginParamJSON("exec_timeout")},
 		})
 		defer restore()
@@ -18107,6 +18290,8 @@ func TestHandleSkillsIncludesInternalSkills(t *testing.T) {
 			_, _ = cmd.Process.Wait()
 		}()
 		writeIntegrationPluginPID(t, filepath.Join("..", "plugins", "browser.pid"), cmd.Process.Pid)
+		writeIntegrationPluginPID(t, filepath.Join("..", "plugins", "email.pid"), cmd.Process.Pid)
+		writeIntegrationPluginPID(t, filepath.Join("..", "plugins", "feishu.pid"), cmd.Process.Pid)
 		writeIntegrationPluginPID(t, filepath.Join("..", "plugins", "remote.pid"), cmd.Process.Pid)
 		if err := cfg.AtMenuCache.refreshSnapshot(); err != nil {
 			t.Fatalf("refresh @ cache after plugin start: %v", err)
@@ -18127,7 +18312,7 @@ func TestHandleSkillsIncludesInternalSkills(t *testing.T) {
 			t.Fatalf("decode started response: %v", err)
 		}
 
-		wantStarted := []string{"__internal_browser", "__internal_cron", "__internal_demo", "__internal_F", "__internal_remote"}
+		wantStarted := []string{"__internal_browser", "__internal_cron", "__internal_demo", "__internal_email", "__internal_F", "__internal_feishu"}
 		if !reflect.DeepEqual(names, wantStarted) {
 			t.Fatalf("skills = %v, want %v", names, wantStarted)
 		}
@@ -18474,14 +18659,242 @@ func TestHandleEditImmediatelyUpdatesAtMenuSwarmCache(t *testing.T) {
 
 	cfg.AtMenuCache.mu.Lock()
 	baseDisabled := cfg.AtMenuCache.snapshot.output.Agents[0].RouterDisable
-	chatDisabled := cfg.AtMenuCache.chat["chat-1"].Agents[0].RouterDisable
+	chatCacheCount := len(cfg.AtMenuCache.chat)
 	expiresAt := cfg.AtMenuCache.expiresAt
 	cfg.AtMenuCache.mu.Unlock()
-	if !baseDisabled || !chatDisabled {
-		t.Fatalf("router_disable was not applied to every cached snapshot: base=%v chat=%v", baseDisabled, chatDisabled)
+	if !baseDisabled || chatCacheCount != 0 {
+		t.Fatalf("swarm change should fully refresh the cache: base=%v cached chats=%d", baseDisabled, chatCacheCount)
 	}
 	if want := currentTime.Add(time.Hour); !expiresAt.Equal(want) {
 		t.Fatalf("cache expiry = %s, want %s after swarm update", expiresAt, want)
+	}
+	chatOutput, err := cfg.AtMenuCache.outputForRequest("chat-1", func() ([]string, error) { return nil, nil })
+	if err != nil || !chatOutput.Agents[0].RouterDisable {
+		t.Fatalf("rebuilt chat cache = %#v, err=%v; want updated router_disable", chatOutput, err)
+	}
+}
+
+func integrationTestContainsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
+func TestHandleEditImmediatelyRefreshesAtMenuSkillCache(t *testing.T) {
+	root := t.TempDir()
+	workspace := filepath.Join(root, "a")
+	skillPath := filepath.Join(workspace, "skills", "demo", "SKILL.md")
+	if err := os.MkdirAll(filepath.Dir(skillPath), 0o755); err != nil {
+		t.Fatalf("mkdir skill directory: %v", err)
+	}
+	if err := os.WriteFile(skillPath, []byte("---\nname: old-skill\ndescription: old skill\n---\n"), 0o644); err != nil {
+		t.Fatalf("write original skill: %v", err)
+	}
+
+	cfg := &Config{AgentDir: root, Device: "test-dev", AgentCacheMs: 0}
+	configureIntegrationAtMenuCacheForTest(t, cfg)
+	currentTime := time.Date(2026, 7, 24, 14, 0, 0, 0, time.UTC)
+	cfg.AtMenuCache.now = func() time.Time { return currentTime }
+	skillsServer := httptest.NewServer(handleSkills(cfg))
+	defer skillsServer.Close()
+	editServer := httptest.NewServer(handleEdit(cfg))
+	defer editServer.Close()
+
+	getSkills := func() []string {
+		resp, err := http.Get(skillsServer.URL + "/api/skills?agentId=a&chatId=chat-1")
+		if err != nil {
+			t.Fatalf("GET skills: %v", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			t.Fatalf("GET skills status = %d body=%s", resp.StatusCode, body)
+		}
+		var names []string
+		if err := json.NewDecoder(resp.Body).Decode(&names); err != nil {
+			t.Fatalf("decode skills: %v", err)
+		}
+		return names
+	}
+	if got := getSkills(); !integrationTestContainsString(got, "old-skill") {
+		t.Fatalf("initial skills = %v, want old-skill", got)
+	}
+
+	currentTime = currentTime.Add(time.Minute)
+	resp, err := http.Post(editServer.URL+"/api/edit?agentId=a&path=skills/demo/SKILL.md", "application/json", strings.NewReader(`{"content":"---\nname: new-skill\ndescription: new skill\n---\n"}`))
+	if err != nil {
+		t.Fatalf("POST edit skill: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("POST edit skill status = %d body=%s", resp.StatusCode, body)
+	}
+	if got := getSkills(); !integrationTestContainsString(got, "new-skill") || integrationTestContainsString(got, "old-skill") {
+		t.Fatalf("skills after definition edit = %v, want new-skill without old-skill", got)
+	}
+
+	cfg.AtMenuCache.mu.Lock()
+	chatCacheCount := len(cfg.AtMenuCache.chat)
+	expiresAt := cfg.AtMenuCache.expiresAt
+	cfg.AtMenuCache.mu.Unlock()
+	if chatCacheCount != 1 { // getSkills rebuilds the chat cache after the full refresh.
+		t.Fatalf("chat cache count = %d, want rebuilt cache for chat-1", chatCacheCount)
+	}
+	if want := currentTime.Add(time.Hour); !expiresAt.Equal(want) {
+		t.Fatalf("cache expiry = %s, want %s after skill definition edit", expiresAt, want)
+	}
+}
+
+func TestHandleDelImmediatelyRefreshesAtMenuCacheForSkillAndConfig(t *testing.T) {
+	tests := []struct {
+		name       string
+		prepare    func(t *testing.T, workspace string)
+		path       string
+		assertGone func(t *testing.T, cfg *Config)
+	}{
+		{
+			name: "skill definition",
+			prepare: func(t *testing.T, workspace string) {
+				path := filepath.Join(workspace, "skills", "demo", "SKILL.md")
+				if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+					t.Fatalf("mkdir skill: %v", err)
+				}
+				if err := os.WriteFile(path, []byte("---\nname: demo\ndescription: demo skill\n---\n"), 0o644); err != nil {
+					t.Fatalf("write skill: %v", err)
+				}
+			},
+			path: "skills/demo/SKILL.md",
+			assertGone: func(t *testing.T, cfg *Config) {
+				output, err := cfg.AtMenuCache.outputForRequest("", func() ([]string, error) { return nil, nil })
+				if err != nil {
+					t.Fatalf("read @ cache: %v", err)
+				}
+				if len(output.Agents) != 1 || integrationTestContainsString(agentcore.SkillNames(output.Agents[0].Skills), "demo") {
+					t.Fatalf("skills after delete = %#v, want demo removed", output.Agents)
+				}
+			},
+		},
+		{
+			name: "skill directory containing a definition",
+			prepare: func(t *testing.T, workspace string) {
+				path := filepath.Join(workspace, "skills", "demo", "SKILL.md")
+				if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+					t.Fatalf("mkdir skill: %v", err)
+				}
+				if err := os.WriteFile(path, []byte("---\nname: demo\ndescription: demo skill\n---\n"), 0o644); err != nil {
+					t.Fatalf("write skill: %v", err)
+				}
+			},
+			path: "skills/demo",
+			assertGone: func(t *testing.T, cfg *Config) {
+				output, err := cfg.AtMenuCache.outputForRequest("", func() ([]string, error) { return nil, nil })
+				if err != nil {
+					t.Fatalf("read @ cache: %v", err)
+				}
+				if len(output.Agents) != 1 || integrationTestContainsString(agentcore.SkillNames(output.Agents[0].Skills), "demo") {
+					t.Fatalf("skills after directory delete = %#v, want demo removed", output.Agents)
+				}
+			},
+		},
+		{
+			name: "agent config",
+			prepare: func(t *testing.T, workspace string) {
+				if err := os.WriteFile(filepath.Join(workspace, "config.json"), []byte(`{"router_disable":false}`), 0o644); err != nil {
+					t.Fatalf("write config: %v", err)
+				}
+			},
+			path: "config.json",
+			assertGone: func(t *testing.T, cfg *Config) {
+				output, err := cfg.AtMenuCache.outputForRequest("", func() ([]string, error) { return nil, nil })
+				if err != nil {
+					t.Fatalf("read @ cache: %v", err)
+				}
+				if len(swarmAgentIDs(output, "")) != 0 {
+					t.Fatalf("swarm agents after config delete = %v, want none", swarmAgentIDs(output, ""))
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
+			workspace := filepath.Join(root, "a")
+			if err := os.MkdirAll(workspace, 0o755); err != nil {
+				t.Fatalf("mkdir workspace: %v", err)
+			}
+			tt.prepare(t, workspace)
+
+			cfg := &Config{AgentDir: root, Device: "test-dev", AgentCacheMs: 0}
+			configureIntegrationAtMenuCacheForTest(t, cfg)
+			currentTime := time.Date(2026, 7, 24, 15, 0, 0, 0, time.UTC)
+			cfg.AtMenuCache.now = func() time.Time { return currentTime }
+			if _, err := cfg.AtMenuCache.outputForRequest("chat-1", func() ([]string, error) { return nil, nil }); err != nil {
+				t.Fatalf("warm @ cache: %v", err)
+			}
+
+			currentTime = currentTime.Add(time.Minute)
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "/api/del?agentId=a&path="+url.QueryEscape(tt.path), nil)
+			handleDel(cfg)(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("delete status = %d body=%s", rec.Code, rec.Body.String())
+			}
+			tt.assertGone(t, cfg)
+
+			cfg.AtMenuCache.mu.Lock()
+			expiresAt := cfg.AtMenuCache.expiresAt
+			cfg.AtMenuCache.mu.Unlock()
+			if want := currentTime.Add(time.Hour); !expiresAt.Equal(want) {
+				t.Fatalf("cache expiry = %s, want %s after delete", expiresAt, want)
+			}
+		})
+	}
+}
+
+func TestHandleAgentDeleteImmediatelyRefreshesAtMenuCache(t *testing.T) {
+	root := t.TempDir()
+	for _, agentID := range []string{"a", "b"} {
+		workspace := filepath.Join(root, agentID)
+		if err := os.MkdirAll(workspace, 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", agentID, err)
+		}
+		if err := os.WriteFile(filepath.Join(workspace, "config.json"), []byte(`{"router_disable":false}`), 0o644); err != nil {
+			t.Fatalf("write %s config: %v", agentID, err)
+		}
+	}
+
+	cfg := &Config{AgentDir: root, Device: "test-dev", AgentCacheMs: 0}
+	configureIntegrationAtMenuCacheForTest(t, cfg)
+	currentTime := time.Date(2026, 7, 24, 12, 0, 0, 0, time.UTC)
+	cfg.AtMenuCache.now = func() time.Time { return currentTime }
+	if _, err := cfg.AtMenuCache.outputForRequest("", func() ([]string, error) { return nil, nil }); err != nil {
+		t.Fatalf("warm @ cache: %v", err)
+	}
+
+	currentTime = currentTime.Add(time.Minute)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/agent/delete?name=a", nil)
+	handleAgentDelete(cfg)(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("delete status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	output, err := cfg.AtMenuCache.outputForRequest("", func() ([]string, error) { return nil, nil })
+	if err != nil {
+		t.Fatalf("read refreshed @ cache: %v", err)
+	}
+	if len(output.Agents) != 1 || output.Agents[0].AgentID != "b" {
+		t.Fatalf("@ cache agents after delete = %#v, want [b]", output.Agents)
+	}
+	cfg.AtMenuCache.mu.Lock()
+	expiresAt := cfg.AtMenuCache.expiresAt
+	cfg.AtMenuCache.mu.Unlock()
+	if want := currentTime.Add(time.Hour); !expiresAt.Equal(want) {
+		t.Fatalf("@ cache expiry = %s, want %s after Agent deletion", expiresAt, want)
 	}
 }
 
@@ -18685,6 +19098,49 @@ func TestPluginsStopHandlerDoesNotPassConnectBin(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("status = %d, body=%s", resp.StatusCode, string(body))
+	}
+}
+
+func TestPluginActionRefreshesAtMenuSkillSnapshot(t *testing.T) {
+	originalRunConnectPluginAction := runConnectPluginAction
+	defer func() {
+		runConnectPluginAction = originalRunConnectPluginAction
+	}()
+
+	loads := 0
+	cfg := &Config{
+		AtMenuCache: newIntegrationAtMenuCache(integrationAtMenuConfig{
+			RefreshInterval: time.Hour,
+			CacheTTL:        time.Hour,
+		}, func() (*integrationAtMenuSnapshot, error) {
+			loads++
+			return &integrationAtMenuSnapshot{output: &AgentOutput{}}, nil
+		}),
+	}
+	if err := cfg.AtMenuCache.refreshSnapshot(); err != nil {
+		t.Fatalf("warm @ cache: %v", err)
+	}
+	if loads != 1 {
+		t.Fatalf("cache loads = %d, want 1 after warmup", loads)
+	}
+
+	runConnectPluginAction = func(target, action string, flags map[string]string) (*connectsvc.PluginActionResult, error) {
+		return &connectsvc.PluginActionResult{Path: target, Command: []string{action}, Output: []byte(`{"status":"stopped"}`)}, nil
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(handlePluginsStop(cfg)))
+	defer server.Close()
+	resp, err := http.Post(server.URL+"/api/plugins/stop?key=browser", "application/json", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d, body=%s", resp.StatusCode, string(body))
+	}
+	if loads != 2 {
+		t.Fatalf("cache loads = %d, want 2 after successful plugin action", loads)
 	}
 }
 

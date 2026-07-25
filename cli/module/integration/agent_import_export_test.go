@@ -118,7 +118,7 @@ func TestHandleAgentCopyCopiesManagedEntries(t *testing.T) {
 
 	writeTestFile(t, filepath.Join(agentRoot, "SourceAgent", "app", "index.html"), "source app")
 	writeTestFile(t, filepath.Join(agentRoot, "SourceAgent", "data", "cache.json"), "source data")
-	writeTestFile(t, filepath.Join(agentRoot, "SourceAgent", "skills", "skill", "SKILL.md"), "source skill")
+	writeTestFile(t, filepath.Join(agentRoot, "SourceAgent", "skills", "skill", "SKILL.md"), "---\nname: copied-skill\ndescription: copied skill\n---\n")
 	writeTestFile(t, filepath.Join(agentRoot, "SourceAgent", "SOUL.md"), "source soul")
 	writeTestFile(t, filepath.Join(agentRoot, "SourceAgent", "USER.md"), "source user")
 	writeTestFile(t, filepath.Join(agentRoot, "SourceAgent", "Knowledge.md"), "source uppercase knowledge")
@@ -130,9 +130,15 @@ func TestHandleAgentCopyCopiesManagedEntries(t *testing.T) {
 	writeTestFile(t, filepath.Join(agentRoot, "TargetAgent", "config.json"), `{"keep":true}`)
 	writeTestFile(t, filepath.Join(knowledgeRoot, "TargetAgent", "stale.md"), "stale knowledge")
 
+	cfg := &Config{AgentDir: agentRoot, Device: "test-dev", AgentCacheMs: 0}
+	configureIntegrationAtMenuCacheForTest(t, cfg)
+	if _, err := cfg.AtMenuCache.outputForRequest("", func() ([]string, error) { return nil, nil }); err != nil {
+		t.Fatalf("warm @ cache: %v", err)
+	}
+
 	req := httptest.NewRequest(http.MethodGet, "/api/copy?source_agentId=SourceAgent&target_agentId=TargetAgent", nil)
 	rec := httptest.NewRecorder()
-	handleAgentCopy(&Config{AgentDir: agentRoot})(rec, req)
+	handleAgentCopy(cfg)(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
@@ -153,7 +159,7 @@ func TestHandleAgentCopyCopiesManagedEntries(t *testing.T) {
 
 	assertIntegrationTestFileContent(t, filepath.Join(agentRoot, "TargetAgent", "app", "index.html"), "source app")
 	assertIntegrationTestFileContent(t, filepath.Join(agentRoot, "TargetAgent", "data", "cache.json"), "source data")
-	assertIntegrationTestFileContent(t, filepath.Join(agentRoot, "TargetAgent", "skills", "skill", "SKILL.md"), "source skill")
+	assertIntegrationTestFileContent(t, filepath.Join(agentRoot, "TargetAgent", "skills", "skill", "SKILL.md"), "---\nname: copied-skill\ndescription: copied skill\n---\n")
 	assertIntegrationTestFileContent(t, filepath.Join(agentRoot, "TargetAgent", "SOUL.md"), "source soul")
 	assertIntegrationTestFileContent(t, filepath.Join(agentRoot, "TargetAgent", "USER.md"), "source user")
 	assertIntegrationTestFileContent(t, filepath.Join(agentRoot, "TargetAgent", "Knowledge.md"), "source uppercase knowledge")
@@ -161,6 +167,25 @@ func TestHandleAgentCopyCopiesManagedEntries(t *testing.T) {
 	assertIntegrationTestFileContent(t, filepath.Join(knowledgeRoot, "TargetAgent", "index.md"), "source knowledge")
 	assertIntegrationTestMissing(t, filepath.Join(agentRoot, "TargetAgent", "app", "old.txt"))
 	assertIntegrationTestMissing(t, filepath.Join(knowledgeRoot, "TargetAgent", "stale.md"))
+
+	output, err := cfg.AtMenuCache.outputForRequest("", func() ([]string, error) { return nil, nil })
+	if err != nil {
+		t.Fatalf("read refreshed @ cache: %v", err)
+	}
+	foundCopiedSkill := false
+	for _, agent := range output.Agents {
+		if agent.AgentID != "TargetAgent" {
+			continue
+		}
+		for _, skill := range agent.Skills {
+			if skill.Name == "copied-skill" {
+				foundCopiedSkill = true
+			}
+		}
+	}
+	if !foundCopiedSkill {
+		t.Fatalf("@ cache did not include copied-skill for TargetAgent: %#v", output.Agents)
+	}
 }
 
 func TestRunIntegrationAgentCLIExportAndImport(t *testing.T) {

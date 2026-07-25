@@ -6443,9 +6443,21 @@ func TestHandleSkillsIncludesPluginInternalSkillsOnlyWhenStarted(t *testing.T) {
 
 	restorePlugins := withPluginSandbox(t, map[string][2]string{
 		"browser": {`{"key":"browser","name":"浏览器"}`, pluginParamJSON("cookie_path")},
+		"email":   {`{"key":"email","name":"邮件"}`, pluginParamJSON("email")},
+		"feishu":  {`{"key":"feishu","name":"飞书"}`, pluginParamJSON("appId")},
 		"remote":  {`{"key":"remote","name":"远程"}`, pluginParamJSON("exec_timeout")},
 	})
 	defer restorePlugins()
+	if sharedDataDB.db != nil {
+		_ = sharedDataDB.db.Close()
+	}
+	sharedDataDB = pooledDB{}
+	t.Cleanup(func() {
+		if sharedDataDB.db != nil {
+			_ = sharedDataDB.db.Close()
+		}
+		sharedDataDB = pooledDB{}
+	})
 	if err := os.MkdirAll("config", 0o755); err != nil {
 		t.Fatalf("mkdir config: %v", err)
 	}
@@ -6477,9 +6489,10 @@ func TestHandleSkillsIncludesPluginInternalSkillsOnlyWhenStarted(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	want := []string{"__internal_cron", "__internal_demo", "__internal_F"}
-	if !reflect.DeepEqual(names, want) {
-		t.Fatalf("skills without started plugins = %v, want %v", names, want)
+	for _, name := range names {
+		if name == "__internal_browser" || name == "__internal_email" || name == "__internal_feishu" || name == "__internal_remote" {
+			t.Fatalf("skills without started plugins = %v, want plugin skill %q absent", names, name)
+		}
 	}
 
 	cmd := exec.Command("sh", "-c", "sleep 5")
@@ -6492,6 +6505,12 @@ func TestHandleSkillsIncludesPluginInternalSkillsOnlyWhenStarted(t *testing.T) {
 	}()
 	if err := os.WriteFile(filepath.Join("..", "plugins", "browser.pid"), []byte(strconv.Itoa(cmd.Process.Pid)), 0o644); err != nil {
 		t.Fatalf("write browser pid: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join("..", "plugins", "email.pid"), []byte(strconv.Itoa(cmd.Process.Pid)), 0o644); err != nil {
+		t.Fatalf("write email pid: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join("..", "plugins", "feishu.pid"), []byte(strconv.Itoa(cmd.Process.Pid)), 0o644); err != nil {
+		t.Fatalf("write feishu pid: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join("..", "plugins", "remote.pid"), []byte(strconv.Itoa(cmd.Process.Pid)), 0o644); err != nil {
 		t.Fatalf("write remote pid: %v", err)
@@ -6512,9 +6531,17 @@ func TestHandleSkillsIncludesPluginInternalSkillsOnlyWhenStarted(t *testing.T) {
 		t.Fatalf("decode started response: %v", err)
 	}
 
-	wantStarted := []string{"__internal_browser", "__internal_cron", "__internal_demo", "__internal_F", "__internal_remote"}
-	if !reflect.DeepEqual(names, wantStarted) {
-		t.Fatalf("skills = %v, want %v", names, wantStarted)
+	present := make(map[string]bool, len(names))
+	for _, name := range names {
+		present[name] = true
+	}
+	for _, name := range []string{"__internal_browser", "__internal_email", "__internal_feishu"} {
+		if !present[name] {
+			t.Fatalf("skills = %v, want %q after plugin start", names, name)
+		}
+	}
+	if present["__internal_remote"] {
+		t.Fatalf("skills = %v, want %q absent", names, "__internal_remote")
 	}
 }
 

@@ -5,7 +5,8 @@ import "strings"
 const (
 	InternalSkillCron    = "__internal_cron"
 	InternalSkillBrowser = "__internal_browser"
-	InternalSkillRemote  = "__internal_remote"
+	InternalSkillEmail   = "__internal_email"
+	InternalSkillFeishu  = "__internal_feishu"
 )
 
 var internalSkillStatusLookup = PluginStatusByKey
@@ -34,13 +35,14 @@ func BuildRuntimeSkillNames(base []string) []string {
 	started := discoverStartedInternalPlugins()
 	appendIfMissing(InternalSkillCron, true)
 	appendIfMissing(InternalSkillBrowser, hasRuntimePlugin(started, "browser"))
-	appendIfMissing(InternalSkillRemote, hasRuntimePlugin(started, "remote"))
+	appendIfMissing(InternalSkillEmail, hasRuntimePlugin(started, "email"))
+	appendIfMissing(InternalSkillFeishu, hasRuntimePlugin(started, "feishu"))
 	return out
 }
 
 func discoverStartedInternalPlugins() map[string]struct{} {
-	keys := make(map[string]struct{}, 2)
-	for _, key := range []string{"browser", "remote"} {
+	keys := make(map[string]struct{}, 3)
+	for _, key := range []string{"browser", "email", "feishu"} {
 		status, err := internalSkillStatusLookup(key, nil)
 		if err != nil || status == nil || !status.Started {
 			continue
