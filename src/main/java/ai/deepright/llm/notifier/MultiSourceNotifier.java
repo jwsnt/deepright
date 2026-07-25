@@ -34,11 +34,12 @@ public class MultiSourceNotifier extends SourceNotifier {
             // 客户端气泡爆炸逻辑（workflow=main@main + workflow=__开头交替）
             Segment withOutMeta = segment.copyWithId();
             Map<String, Object> metadata = new HashMap<String, Object>();
-            metadata.put(MultiSourceFlag.KEY_START, MapUtils.getString(withOutMeta.getMetadata(), MultiSourceFlag.KEY_START));
-            metadata.put(MultiSourceFlag.KEY_CLOSE, MapUtils.getString(withOutMeta.getMetadata(), MultiSourceFlag.KEY_CLOSE));
+            metadata.put(MultiSourceFlag.TASK_START, MapUtils.getString(withOutMeta.getMetadata(), MultiSourceFlag.TASK_START));
+            metadata.put(MultiSourceFlag.TASK_CLOSE, MapUtils.getString(withOutMeta.getMetadata(), MultiSourceFlag.TASK_CLOSE));
             metadata.put(MultiSourceFlag.PROCESS, MapUtils.getString(withOutMeta.getMetadata(), MultiSourceFlag.PROCESS));
             metadata.put(MultiSourceFlag.TARGET, MapUtils.getString(withOutMeta.getMetadata(), MultiSourceFlag.TARGET));
             metadata.put(MultiSourceFlag.RESET, MapUtils.getString(withOutMeta.getMetadata(), MultiSourceFlag.RESET));
+            metadata.put(MultiSourceFlag.IMAGE, MapUtils.getString(withOutMeta.getMetadata(), MultiSourceFlag.IMAGE));
             metadata.put(MultiSourceFlag.DELAY, MapUtils.getObject(withOutMeta.getMetadata(), MultiSourceFlag.DELAY));
             metadata.put(MultiSourceFlag.WARN, MapUtils.getInteger(withOutMeta.getMetadata(), MultiSourceFlag.WARN));
             metadata.put(MultiSourceFlag.TID, MapUtils.getString(withOutMeta.getMetadata(), MultiSourceFlag.TID));

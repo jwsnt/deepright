@@ -25,6 +25,8 @@ public class CustomerQwenRequestService extends QwenRequestService {
 
     protected String thinkingHigh;
 
+    protected String multiOutput;
+
     protected String multiInput;
 
     protected String thinking;
@@ -48,6 +50,7 @@ public class CustomerQwenRequestService extends QwenRequestService {
     protected void request(OpenAiRequest request, LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
         super.request(request, llmConfig, llmQuery);
         request.setModel(RequestModelSelect.select(llmQuery, RequestModelSelect.RequestModel.builder()
+                .multiOutput(this.multiOutput)
                 .multiInput(this.multiInput)
                 .thinking(this.thinking)
                 .fast(this.fast)
@@ -66,6 +69,9 @@ public class CustomerQwenRequestService extends QwenRequestService {
 
         @Value("${qwen.model.thinkingHigh:high}")
         protected String thinkingHigh;
+
+        @Value("${qwen.model.multiOutput:qwen-image-plus}")
+        protected String multiOutput;
 
         @Value("${qwen.model.multiInput:qwen3.6-plus}")
         protected String multiInput;

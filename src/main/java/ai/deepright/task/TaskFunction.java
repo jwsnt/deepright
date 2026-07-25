@@ -282,7 +282,7 @@ public class TaskFunction extends BaseFunction implements TaskResult {
             try {
                 targetDevice = this.buildTargetDevice(workTask, taskData.check()).printRouter();
                 this.source(workTask, taskData.getWhy());
-                this.notify(workTask, targetDevice, MultiSourceFlag.KEY_START, TaskFunction.LANG_KEY_START);
+                this.notify(workTask, targetDevice, MultiSourceFlag.TASK_START, TaskFunction.LANG_KEY_START);
                 List<TaskTransfer> taskTransfers = this.buildTransfer(workTask, sourceDevice, targetDevice, taskData, true);
                 String query = this.unmaskQuery(workTask, sourceDevice, taskData, targetDevice, taskTransfers);
                 Map<String, Object> metadata = this.buildMetadata(workTask, targetDevice);
@@ -457,7 +457,7 @@ public class TaskFunction extends BaseFunction implements TaskResult {
     }
 
     protected void finishAndClean(WorkflowTask workTask, TaskSync syncTask) throws Exception {
-        this.notify(workTask, syncTask.getTargetDevice(), MultiSourceFlag.KEY_CLOSE, TaskFunction.LANG_KEY_CLOSE);
+        this.notify(workTask, syncTask.getTargetDevice(), MultiSourceFlag.TASK_CLOSE, TaskFunction.LANG_KEY_CLOSE);
         // 结束前清理任务Plan
         String plan = PlanUtils.deletePlan(workTask, syncTask.getTargetDevice().key());
         if (!StringUtils.isEmpty(plan) && log.isInfoEnabled()) {

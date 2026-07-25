@@ -3167,3 +3167,16 @@ Integration 新增本机接口 `POST /api/model/test`，供设置页测试尚未
 - 多窗口会话列表会通过本地存储事件、前台恢复和定时补拉保持最终一致；共享日志会定期清理超过 30 天的数据。
 - 转发请求会携带插件目录、最新响应时间、模型客户化字段及生效端口等运行 metadata；Integration 会定期检测配置变更。
 - WSL 安装对更新与每个软件包安装设置 10 分钟超时，并在 Node.js 安装失败时自动切换备用来源。
+
+---
+
+## 迭代 20260725-2：Agent 工作区媒体预览
+
+Integration 提供同源只读接口 `GET /api/media_preview?agentId=<agentId>&path=<relativePath>`，供 Site 播放当前 Agent 工作目录内的音频和视频文件。
+
+- `path` 必须是 Agent 工作目录内的相对文件路径；绝对路径、`..` 路径逃逸、目录和非媒体文件会被拒绝。
+- 接口仅允许音频和视频预览所支持的扩展名，不会通过预览接口暴露其它 Agent 或任意本机文件。
+- 服务以正确的媒体类型、`inline` 响应和 HTTP Range 支持返回文件，因此播放器可读取时长、拖动进度并前进或后退，无需将整份媒体加载为 Base64 JSON。
+- 支持 `GET` 与 `HEAD`；Range 请求会返回标准的局部内容响应。接口不写入、转换或修改源文件。
+
+完整说明见 [iteration/20260725-2/USER_GUIDE.md](iteration/20260725-2/USER_GUIDE.md)。

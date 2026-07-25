@@ -5566,7 +5566,7 @@ type DataResponse struct {
 
 var binaryExts = map[string]bool{
 	".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".bmp": true, ".ico": true, ".webp": true, ".svg": true, ".tiff": true, ".tif": true,
-	".mp3": true, ".mp4": true, ".avi": true, ".mov": true, ".wmv": true, ".flv": true, ".mkv": true, ".webm": true, ".wav": true, ".flac": true, ".aac": true, ".ogg": true,
+	".mp3": true, ".m4a": true, ".mp4": true, ".m4v": true, ".avi": true, ".mov": true, ".wmv": true, ".flv": true, ".mkv": true, ".webm": true, ".ogv": true, ".mpg": true, ".mpeg": true, ".wav": true, ".flac": true, ".aac": true, ".ogg": true, ".opus": true,
 	".zip": true, ".tar": true, ".gz": true, ".rar": true, ".7z": true, ".bz2": true,
 	".exe": true, ".dll": true, ".so": true, ".dylib": true, ".bin": true,
 	".pdf": true, ".doc": true, ".docx": true, ".xls": true, ".xlsx": true, ".ppt": true, ".pptx": true,
@@ -6148,6 +6148,111 @@ func handleRaw(cfg *Config) http.HandlerFunc {
 		}
 		encoded := base64.StdEncoding.EncodeToString(data)
 		writeRawResp(w, RawResponse{AgentID: agentID, Path: pathParam, Content: encoded, Status: 0})
+	}
+}
+
+// mediaPreviewMIMETypes is the allow-list for streamed, browser-facing media
+// previews. Keep this list in sync with the Site preview type detection.
+var mediaPreviewMIMETypes = map[string]string{
+	".mp4":  "video/mp4",
+	".m4v":  "video/mp4",
+	".webm": "video/webm",
+	".ogv":  "video/ogg",
+	".mov":  "video/quicktime",
+	".mkv":  "video/x-matroska",
+	".avi":  "video/x-msvideo",
+	".mpg":  "video/mpeg",
+	".mpeg": "video/mpeg",
+	".mp3":  "audio/mpeg",
+	".m4a":  "audio/mp4",
+	".aac":  "audio/aac",
+	".wav":  "audio/wav",
+	".flac": "audio/flac",
+	".ogg":  "audio/ogg",
+	".opus": "audio/ogg",
+}
+
+func mediaPreviewMIMEType(filePath string) (string, bool) {
+	mimeType, ok := mediaPreviewMIMETypes[strings.ToLower(filepath.Ext(filePath))]
+	return mimeType, ok
+}
+
+func isValidMediaPreviewAgentID(agentID string) bool {
+	agentID = strings.TrimSpace(agentID)
+	return agentID != "" && agentID != "." && agentID != ".." && filepath.Base(agentID) == agentID && !strings.ContainsAny(agentID, `/\\`)
+}
+
+func resolveMediaPreviewFile(cfg *Config, agentID, rawPath string) (string, os.FileInfo, int, string) {
+	agentID = strings.TrimSpace(agentID)
+	pathParam := normalizeQuotedPathArg(rawPath)
+	if !isValidMediaPreviewAgentID(agentID) || pathParam == "" {
+		return "", nil, http.StatusBadRequest, "agentId and relative path are required"
+	}
+	cleanPath := filepath.Clean(pathParam)
+	if filepath.IsAbs(cleanPath) || strings.HasPrefix(pathParam, "~") || cleanPath == "." || cleanPath == ".." || strings.HasPrefix(cleanPath, ".."+string(filepath.Separator)) {
+		return "", nil, http.StatusBadRequest, "path must be a workspace-relative file path"
+	}
+	workspace, err := getWorkspaceByAgentID(cfg, agentID)
+	if err != nil {
+		return "", nil, http.StatusNotFound, "agent not found"
+	}
+	resolved, err := resolveCaseInsensitiveUnderRoot(workspace, cleanPath)
+	if err != nil || !ensurePathWithinRoot(workspace, resolved) {
+		return "", nil, http.StatusBadRequest, "path must be a workspace-relative file path"
+	}
+	resolved, err = filepath.EvalSymlinks(resolved)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil, http.StatusNotFound, "media file not found"
+		}
+		return "", nil, http.StatusInternalServerError, "failed to resolve media file"
+	}
+	if !ensurePathWithinRoot(workspace, resolved) {
+		return "", nil, http.StatusBadRequest, "path must be a workspace-relative file path"
+	}
+	info, err := os.Stat(resolved)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil, http.StatusNotFound, "media file not found"
+		}
+		return "", nil, http.StatusInternalServerError, "failed to access media file"
+	}
+	if info.IsDir() {
+		return "", nil, http.StatusBadRequest, "path must reference a media file"
+	}
+	if _, ok := mediaPreviewMIMEType(resolved); !ok {
+		return "", nil, http.StatusBadRequest, "file type is not supported for media preview"
+	}
+	return resolved, info, 0, ""
+}
+
+// handleMediaPreview streams one media file from the requesting Agent's
+// workspace. http.ServeContent handles byte ranges, which lets the player seek
+// without loading the entire file into browser memory.
+func handleMediaPreview(cfg *Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			w.Header().Set("Allow", "GET, HEAD")
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		resolved, info, status, message := resolveMediaPreviewFile(cfg, r.URL.Query().Get("agentId"), r.URL.Query().Get("path"))
+		if status != 0 {
+			http.Error(w, message, status)
+			return
+		}
+		file, err := os.Open(resolved)
+		if err != nil {
+			http.Error(w, "failed to open media file", http.StatusInternalServerError)
+			return
+		}
+		defer file.Close()
+		mimeType, _ := mediaPreviewMIMEType(resolved)
+		w.Header().Set("Content-Type", mimeType)
+		w.Header().Set("Content-Disposition", "inline")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Accept-Ranges", "bytes")
+		http.ServeContent(w, r, info.Name(), info.ModTime(), file)
 	}
 }
 
@@ -17665,6 +17770,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/edit", handleEdit(&cfg))
 	mux.HandleFunc("/api/del", handleDel(&cfg))
 	mux.HandleFunc("/api/raw", handleRaw(&cfg))
+	mux.HandleFunc("/api/media_preview", handleMediaPreview(&cfg))
 	mux.HandleFunc("/file/lastUpdate", handleFileLastUpdate(&cfg))
 	mux.HandleFunc("/api/heartbeat", handleHeartbeat())
 	mux.HandleFunc("/api/log_cleanup_status", handleLogCleanupStatus())

@@ -5,9 +5,9 @@ import ai.deepright.cli.CliPubData;
 import ai.deepright.cli.CliSubFetcher;
 import ai.deepright.feature.FeatureFlag;
 import ai.deepright.lang.XmlResourceLang;
+import ai.deepright.llm.notifier.MultiSourceFlag;
 import ai.deepright.router.RouterDevice;
 import ai.open.right.WorkflowException;
-import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.file.impl.SysStore;
 import ai.open.right.workflow.flow.llm.Segment;
@@ -84,12 +84,13 @@ public class MediaFileUploadTransferService extends MediaTransferServiceImpl {
     protected void source(WorkflowTask workTask, String content) throws Exception {
         if (!FeatureFlag.isSilent(workTask)) {
             // ![](http://127.0.0.1:9998/data?name=xxxx)
-            StringBuffer buffer = new StringBuffer(System.lineSeparator());
-            buffer.append(XmlResourceLang.get(MediaFileUploadTransferService.LANG_KEY_IMAGE_ERROR).replace("#content", content)).append(System.lineSeparator());
-            this.notifierService.notify(Segment.build(workTask, Segment.SegmentConfig.builder()
-                    .content(new StringBuffer(buffer.toString()))
+            Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
+                    .content(new StringBuffer(XmlResourceLang.get(MediaFileUploadTransferService.LANG_KEY_IMAGE_ERROR).replace("#content", content)))
+                    .metadata(CliPrinter.process(MultiSourceFlag.IMAGE))
+                    .workflow(workTask.getWorkflow())
                     .notifier(Notifier.SOURCE)
-                    .build()), workTask);
+                    .build();
+            this.notifierService.notify(Segment.build(workTask, segmentConfig), workTask, workTask);
         }
     }
 

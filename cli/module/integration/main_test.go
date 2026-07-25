@@ -3493,6 +3493,145 @@ func TestHandleRawSupportsAbsolutePath(t *testing.T) {
 	}
 }
 
+func TestHandleMediaPreviewStreamsAgentScopedMedia(t *testing.T) {
+	agentRoot := t.TempDir()
+	agentA := filepath.Join(agentRoot, "agent-a")
+	agentB := filepath.Join(agentRoot, "agent-b")
+	if err := os.MkdirAll(filepath.Join(agentA, "media"), 0o755); err != nil {
+		t.Fatalf("mkdir agent-a media: %v", err)
+	}
+	if err := os.MkdirAll(agentB, 0o755); err != nil {
+		t.Fatalf("mkdir agent-b: %v", err)
+	}
+	mediaPath := filepath.Join(agentA, "media", "clip.mp3")
+	if err := os.WriteFile(mediaPath, []byte("0123456789"), 0o644); err != nil {
+		t.Fatalf("write media: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(agentA, "media", "notes.txt"), []byte("not media"), 0o644); err != nil {
+		t.Fatalf("write text file: %v", err)
+	}
+	outsideDir := t.TempDir()
+	outsideMedia := filepath.Join(outsideDir, "outside.mp3")
+	if err := os.WriteFile(outsideMedia, []byte("outside"), 0o644); err != nil {
+		t.Fatalf("write outside media: %v", err)
+	}
+	symlinkPath := filepath.Join(agentA, "media", "outside.mp3")
+	symlinkCreated := os.Symlink(outsideMedia, symlinkPath) == nil
+
+	server := httptest.NewServer(handleMediaPreview(&Config{AgentDir: agentRoot}))
+	defer server.Close()
+
+	mediaURL := server.URL + "?agentId=agent-a&path=" + url.QueryEscape("media/clip.mp3")
+	resp, err := http.Get(mediaURL)
+	if err != nil {
+		t.Fatalf("GET media preview: %v", err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET media preview status = %d, body = %s", resp.StatusCode, body)
+	}
+	if got := resp.Header.Get("Content-Type"); got != "audio/mpeg" {
+		t.Errorf("Content-Type = %q, want audio/mpeg", got)
+	}
+	if got := resp.Header.Get("Content-Disposition"); got != "inline" {
+		t.Errorf("Content-Disposition = %q, want inline", got)
+	}
+	if got := resp.Header.Get("X-Content-Type-Options"); got != "nosniff" {
+		t.Errorf("X-Content-Type-Options = %q, want nosniff", got)
+	}
+	if string(body) != "0123456789" {
+		t.Errorf("GET media body = %q, want full file", body)
+	}
+
+	rangeReq, err := http.NewRequest(http.MethodGet, mediaURL, nil)
+	if err != nil {
+		t.Fatalf("new range request: %v", err)
+	}
+	rangeReq.Header.Set("Range", "bytes=2-5")
+	rangeResp, err := http.DefaultClient.Do(rangeReq)
+	if err != nil {
+		t.Fatalf("GET range media preview: %v", err)
+	}
+	rangeBody, _ := io.ReadAll(rangeResp.Body)
+	rangeResp.Body.Close()
+	if rangeResp.StatusCode != http.StatusPartialContent {
+		t.Fatalf("GET range status = %d, body = %s", rangeResp.StatusCode, rangeBody)
+	}
+	if got := rangeResp.Header.Get("Content-Range"); got != "bytes 2-5/10" {
+		t.Errorf("Content-Range = %q, want bytes 2-5/10", got)
+	}
+	if string(rangeBody) != "2345" {
+		t.Errorf("range body = %q, want 2345", rangeBody)
+	}
+
+	headReq, err := http.NewRequest(http.MethodHead, mediaURL, nil)
+	if err != nil {
+		t.Fatalf("new HEAD request: %v", err)
+	}
+	headResp, err := http.DefaultClient.Do(headReq)
+	if err != nil {
+		t.Fatalf("HEAD media preview: %v", err)
+	}
+	headBody, _ := io.ReadAll(headResp.Body)
+	headResp.Body.Close()
+	if headResp.StatusCode != http.StatusOK || len(headBody) != 0 {
+		t.Errorf("HEAD status/body = %d/%q, want 200 and empty body", headResp.StatusCode, headBody)
+	}
+	if got := headResp.Header.Get("Content-Length"); got != "10" {
+		t.Errorf("HEAD Content-Length = %q, want 10", got)
+	}
+	if got := headResp.Header.Get("Last-Modified"); got == "" {
+		t.Error("HEAD Last-Modified is empty")
+	}
+
+	tests := []struct {
+		name   string
+		method string
+		query  string
+		want   int
+	}{
+		{name: "method", method: http.MethodPost, query: "agentId=agent-a&path=media/clip.mp3", want: http.StatusMethodNotAllowed},
+		{name: "missing path", method: http.MethodGet, query: "agentId=agent-a", want: http.StatusBadRequest},
+		{name: "absolute path", method: http.MethodGet, query: "agentId=agent-a&path=" + url.QueryEscape(mediaPath), want: http.StatusBadRequest},
+		{name: "path escape", method: http.MethodGet, query: "agentId=agent-b&path=" + url.QueryEscape("../agent-a/media/clip.mp3"), want: http.StatusBadRequest},
+		{name: "missing agent", method: http.MethodGet, query: "agentId=missing-agent&path=media/clip.mp3", want: http.StatusNotFound},
+		{name: "missing file", method: http.MethodGet, query: "agentId=agent-a&path=media/missing.mp3", want: http.StatusNotFound},
+		{name: "directory", method: http.MethodGet, query: "agentId=agent-a&path=media", want: http.StatusBadRequest},
+		{name: "not media", method: http.MethodGet, query: "agentId=agent-a&path=media/notes.txt", want: http.StatusBadRequest},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, err := http.NewRequest(tt.method, server.URL+"?"+tt.query, nil)
+			if err != nil {
+				t.Fatalf("new request: %v", err)
+			}
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("request: %v", err)
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != tt.want {
+				body, _ := io.ReadAll(resp.Body)
+				t.Errorf("status = %d, want %d, body = %s", resp.StatusCode, tt.want, body)
+			}
+		})
+	}
+	if symlinkCreated {
+		t.Run("symlink escapes workspace", func(t *testing.T) {
+			resp, err := http.Get(server.URL + "?agentId=agent-a&path=media/outside.mp3")
+			if err != nil {
+				t.Fatalf("request symlink: %v", err)
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusBadRequest {
+				body, _ := io.ReadAll(resp.Body)
+				t.Errorf("status = %d, want %d, body = %s", resp.StatusCode, http.StatusBadRequest, body)
+			}
+		})
+	}
+}
+
 func TestHandleFolderSupportsAbsolutePath(t *testing.T) {
 	testDir := t.TempDir()
 	homeDir := filepath.Join(testDir, "home")

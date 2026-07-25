@@ -62,6 +62,7 @@ public class CustomerVertexRequestService extends VertexRequestService {
     protected void request(GoogleRequest request, LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
         super.request(request, llmConfig, llmQuery);
         request.setModel(RequestModelSelect.select(llmQuery, RequestModelSelect.RequestModel.builder()
+                .multiOutput(this.multiOutput)
                 .multiInput(this.multiInput)
                 .thinking(this.thinking)
                 .fast(this.fast)

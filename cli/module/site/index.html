@@ -4178,6 +4178,22 @@ body.quick-fan-transition-active{cursor:progress}
 [data-theme="dark"] .file-editor-content iframe{background:#0b1220}
 .file-editor-content .fe-image{max-width:100%;max-height:70vh;display:block;margin:0 auto}
 .file-editor-content .fe-video{display:block;width:min(960px,100%);max-width:100%;max-height:70vh;margin:0 auto;border-radius:12px;background:#000}
+.file-editor-content .fe-audio{display:block;width:min(760px,100%);margin:48px auto;background:transparent}
+.file-editor-media-controls{display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid color-mix(in srgb,var(--border) 56%,rgba(255,255,255,.26));background:linear-gradient(180deg,rgba(255,255,255,.58),rgba(255,255,255,.34));flex-shrink:0}
+.file-editor-media-controls[hidden]{display:none!important}
+.fe-media-control-btn{width:34px;height:32px;border:1px solid color-mix(in srgb,var(--accent-rgb),.22);border-radius:9px;padding:0;background:rgba(255,255,255,.76);color:var(--text-primary);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition)}
+.fe-media-control-btn svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none}
+.fe-media-control-btn.play svg{fill:currentColor;stroke:none}
+.fe-media-control-btn:hover:not(:disabled){background:rgba(255,255,255,.96);border-color:rgba(var(--accent-rgb),.42);transform:translateY(-1px)}
+.fe-media-control-btn:disabled{opacity:.45;cursor:not-allowed}
+.fe-media-progress{min-width:72px;flex:1;accent-color:var(--accent);cursor:pointer}
+.fe-media-progress:disabled{cursor:not-allowed}
+.fe-media-time{font-variant-numeric:tabular-nums;font-size:12px;color:var(--text-secondary);white-space:nowrap}
+.fe-media-volume-wrap{display:flex;align-items:center;gap:5px;color:var(--text-muted);font-size:12px;white-space:nowrap}
+.fe-media-volume{width:72px;accent-color:var(--accent);cursor:pointer}
+.fe-media-status{display:none;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--error)}
+.fe-media-status:not(:empty){display:inline}
+@media (max-width:680px){.file-editor-media-controls{flex-wrap:wrap}.fe-media-progress{order:3;flex-basis:100%}.fe-media-status{max-width:100%}.fe-media-volume-wrap{margin-left:auto}}
 .fe-image-editor{display:flex;flex-direction:column;gap:12px;padding:12px}
 .fe-image-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .fe-image-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -4219,6 +4235,9 @@ body.quick-fan-transition-active{cursor:progress}
 [data-theme="dark"] .file-editor-overlay{background:rgba(6,12,24,.3);backdrop-filter:blur(14px) saturate(135%);-webkit-backdrop-filter:blur(14px) saturate(135%)}
 [data-theme="dark"] #fileEditorPath{color:#f3f9fd;text-shadow:0 1px 0 rgba(0,0,0,.28)}
 [data-theme="dark"] .file-editor-actions{background:linear-gradient(180deg,rgba(13,24,43,.8),rgba(11,20,37,.72))}
+[data-theme="dark"] .file-editor-media-controls{background:linear-gradient(180deg,rgba(13,24,43,.8),rgba(11,20,37,.72))}
+[data-theme="dark"] .fe-media-control-btn{background:rgba(255,255,255,.08);border-color:rgba(169,190,227,.22);color:#d5e4ff}
+[data-theme="dark"] .fe-media-control-btn:hover:not(:disabled){background:rgba(255,255,255,.14);border-color:rgba(169,190,227,.4);color:#fff}
 [data-theme="dark"] .file-editor-tab{color:#c8daf8}
 [data-theme="dark"] .file-editor-tab.active{color:#f3f9fd;background:rgba(132,170,255,.14)}
 [data-theme="dark"] .file-editor-tab:hover{color:#f6f9ff}
@@ -6006,6 +6025,16 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
       </div>
     </div>
     <div class="file-editor-content" id="fileEditorContent"></div>
+    <div class="file-editor-media-controls" id="fileEditorMediaControls" hidden aria-label="媒体播放控制">
+      <button class="fe-media-control-btn" type="button" id="feMediaBack15Btn" onclick="feSeekMedia(-15)" aria-label="后退 15 秒" title="后退 15 秒"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6v5h5"/><path d="M3.5 11A8.5 8.5 0 1 0 7 4.2"/><path d="m12 9-3 3 3 3"/></svg></button>
+      <button class="fe-media-control-btn play" type="button" id="feMediaPlayBtn" onclick="fePlayMedia()" aria-label="播放" title="播放"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6L19 12z"/></svg></button>
+      <button class="fe-media-control-btn" type="button" id="feMediaPauseBtn" onclick="fePauseMedia()" aria-label="暂停" title="暂停"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14"/><path d="M15 5v14"/></svg></button>
+      <button class="fe-media-control-btn" type="button" id="feMediaForward15Btn" onclick="feSeekMedia(15)" aria-label="前进 15 秒" title="前进 15 秒"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 6v5h-5"/><path d="M20.5 11A8.5 8.5 0 1 1 17 4.2"/><path d="m12 9 3 3-3 3"/></svg></button>
+      <input class="fe-media-progress" type="range" id="feMediaProgress" min="0" max="0" value="0" step="0.01" aria-label="播放进度" oninput="feSetMediaProgress(this.value)" />
+      <span class="fe-media-time" id="feMediaTime" aria-live="off">00:00 / --:--</span>
+      <label class="fe-media-volume-wrap" for="feMediaVolume">音量<input class="fe-media-volume" type="range" id="feMediaVolume" min="0" max="1" value="1" step="0.01" aria-label="音量" oninput="feSetMediaVolume(this.value)" /></label>
+      <span class="fe-media-status" id="feMediaStatus" role="status" aria-live="polite"></span>
+    </div>
     <div class="file-editor-actions">
       <button class="btn btn-secondary" onclick="feClose()">取消</button>
       <button class="btn btn-primary" onclick="feSave()">保存</button>
@@ -37245,7 +37274,10 @@ async function retryCenterMessage(event) {
     clearInputAfterSend: false,
     toastOnSuccess: '重试成功',
     requestSource,
-    metadata: extraMetadata
+    metadata: extraMetadata,
+    // The bubble already stores the exact payload sent previously, including
+    // any page-annotation table. Reusing it must not compose that table again.
+    includePageAnnotations: false
   });
 }
 
@@ -37474,7 +37506,9 @@ async function sendCenterMessage(rawText, options) {
     : null;
   const userText = String(rawText || '').trim();
   if (!userText) return false;
-  const text = composePageAnnotationsForSend(chatId, userText);
+  const text = opts.includePageAnnotations === false
+    ? userText
+    : composePageAnnotationsForSend(chatId, userText);
   if (countEditableInputChars(text) > EDITABLE_INPUT_MAX_CHARS) {
     vfsShowUploadToast('输入内容最多 ' + EDITABLE_INPUT_MAX_CHARS + ' 个字符', true);
     return false;
@@ -46408,7 +46442,7 @@ let feCurrentPath = '';
 let feCurrentContent = '';
 let feMode = 'view'; // 'view' or 'edit'
 let feAgentRelPath = '';
-let feFileType = 'text'; // 'text', 'html', 'image', 'video', 'pdf', 'unsupported'
+let feFileType = 'text'; // 'text', 'html', 'image', 'audio', 'video', 'pdf', 'unsupported'
 let feImageMime = '';
 let feImageExt = '';
 let feImageState = {
@@ -46465,7 +46499,16 @@ const VIDEO_EXT_MIME_MAP = {
   mpg: 'video/mpeg',
   mpeg: 'video/mpeg'
 };
-const BINARY_EXTS = ['zip','tar','gz','rar','7z','bz2','exe','dll','so','dylib','bin','doc','docx','xls','xlsx','ppt','pptx','ttf','otf','woff','woff2','eot','mp3','mp4','avi','mov','wmv','flv','mkv','webm','wav','flac','aac','ogg'];
+const AUDIO_EXT_MIME_MAP = {
+  mp3: 'audio/mpeg',
+  m4a: 'audio/mp4',
+  aac: 'audio/aac',
+  wav: 'audio/wav',
+  flac: 'audio/flac',
+  ogg: 'audio/ogg',
+  opus: 'audio/ogg'
+};
+const BINARY_EXTS = ['zip','tar','gz','rar','7z','bz2','exe','dll','so','dylib','bin','doc','docx','xls','xlsx','ppt','pptx','ttf','otf','woff','woff2','eot','mp3','m4a','mp4','m4v','avi','mov','wmv','flv','mkv','webm','ogv','mpg','mpeg','wav','flac','aac','ogg','opus'];
 
 function feResolveVideoMime(ext) {
   return VIDEO_EXT_MIME_MAP[String(ext || '').toLowerCase()] || '';
@@ -46505,7 +46548,8 @@ function detectFileType(path) {
   const ext = filename.slice(dotIndex + 1).toLowerCase();
   if (ext === 'html' || ext === 'htm') return 'html';
   if (IMAGE_EXTS.includes(ext)) return 'image';
-  if (feCanPreviewVideoExt(ext)) return 'video';
+  if (VIDEO_EXT_MIME_MAP[ext]) return 'video';
+  if (AUDIO_EXT_MIME_MAP[ext]) return 'audio';
   if (ext === 'pdf') return 'pdf';
   if (TEXT_EXTS.includes(ext)) return 'text';
   if (BINARY_EXTS.includes(ext)) return 'unsupported';
@@ -46650,8 +46694,13 @@ function feOpenCurrentAppInside() {
 async function feOpen(absPath) {
   cmdClosePanel(true);
   closeRightSidebarUrlPreview();
+  feStopMediaPreview();
+  feHideMediaControls();
   feCurrentPath = absPath;
-  feAgentRelPath = absPath.replace(vfsWorkspace + '/', '');
+  const normalizedPath = normalizeFsPath(absPath);
+  const normalizedWorkspace = normalizeFsPath(vfsWorkspace);
+  const workspaceRelativePath = normalizedWorkspace ? relativeFsPath(normalizedWorkspace, normalizedPath) : '';
+  feAgentRelPath = workspaceRelativePath || absPath.replace(vfsWorkspace + '/', '');
   feFileType = detectFileType(absPath);
   feImageMime = '';
   feImageExt = absPath.includes('.') ? absPath.split('.').pop().toLowerCase() : '';
@@ -46738,25 +46787,19 @@ async function feOpen(absPath) {
     return;
   }
 
-  // Video: load via /api/raw base64, preview via local Blob URL, no edit
-  if (feFileType === 'video') {
+  // Audio/video: stream through the Agent-scoped preview endpoint, no edit.
+  if (feFileType === 'audio' || feFileType === 'video') {
     panel.classList.add('auto-size');
     tabs.style.display = 'none';
     actions.style.display = 'none';
-    content.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px">加载中...</div>';
     showExclusiveOverlay(document.getElementById('fileEditorOverlay'));
-    try {
-      const agentId = state.settings.agentId;
-      const resp = await fetch('/api/raw?agentId=' + encodeURIComponent(agentId) + '&path=' + encodeURIComponent(feAgentRelPath));
-      const data = await resp.json();
-      if (data.status !== 0) {
-        content.innerHTML = '<div style="color:var(--error);padding:12px">' + esc(data.content) + '</div>';
-        return;
-      }
-      await renderVideo(data.content, feResolveVideoMime(feImageExt));
-    } catch (err) {
-      content.innerHTML = '<div style="color:var(--error);padding:12px">视频加载失败: ' + esc(err.message) + '</div>';
+    const agentId = feGetPreviewAgentID();
+    if (!agentId || !feAgentRelPath || feAgentRelPath.startsWith('/')) {
+      content.innerHTML = '<div style="color:var(--error);padding:12px">无法确定当前 Agent 工作目录中的媒体文件</div>';
+      return;
     }
+    const sourceURL = '/api/media_preview?agentId=' + encodeURIComponent(agentId) + '&path=' + encodeURIComponent(feAgentRelPath);
+    renderMediaPreview(sourceURL, feFileType);
     return;
   }
 
@@ -47355,6 +47398,8 @@ function feClearImageEdits() {
 
 function feClose() {
   const content = document.getElementById('fileEditorContent');
+  feStopMediaPreview();
+  feHideMediaControls();
   feRevokePreviewBlobUrls(content);
   setOverlayVisible(document.getElementById('fileEditorOverlay'), false);
   const panel = document.querySelector('.file-editor-panel');
@@ -47871,14 +47916,151 @@ async function renderPdf(base64Data) {
   container.innerHTML = '<iframe class="wiki-file-frame" title="PDF 预览" loading="lazy" style="width:min(960px,100%);min-height:70vh;background:#fff" src="' + blobUrl + '"></iframe>';
 }
 
-async function renderVideo(base64Data, mimeType) {
+function feGetPreviewAgentID() {
+  const chatId = String(state && state.activeChat || '').trim();
+  const chatAgentID = chatId && typeof getChatAgentId === 'function'
+    ? String(getChatAgentId(chatId) || '').trim()
+    : '';
+  return chatAgentID || String(vfsAgentId || '').trim() || String(state && state.settings && state.settings.agentId || '').trim();
+}
+
+function feFormatMediaTime(value) {
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds) || seconds < 0) return '--:--';
+  const whole = Math.floor(seconds);
+  const hours = Math.floor(whole / 3600);
+  const minutes = Math.floor((whole % 3600) / 60);
+  const remainder = whole % 60;
+  const twoDigits = number => String(number).padStart(2, '0');
+  return hours > 0 ? hours + ':' + twoDigits(minutes) + ':' + twoDigits(remainder) : twoDigits(minutes) + ':' + twoDigits(remainder);
+}
+
+function feMediaElement() {
+  const element = document.getElementById('feMediaElement');
+  return element instanceof HTMLMediaElement ? element : null;
+}
+
+function feSetMediaStatus(message) {
+  const status = document.getElementById('feMediaStatus');
+  if (status) status.textContent = String(message || '');
+}
+
+function feHasSeekableDuration(media) {
+  return !!(media && Number.isFinite(media.duration) && media.duration >= 0);
+}
+
+function feSyncMediaControls() {
+  const media = feMediaElement();
+  const progress = document.getElementById('feMediaProgress');
+  const time = document.getElementById('feMediaTime');
+  const play = document.getElementById('feMediaPlayBtn');
+  const pause = document.getElementById('feMediaPauseBtn');
+  const back = document.getElementById('feMediaBack15Btn');
+  const forward = document.getElementById('feMediaForward15Btn');
+  const volume = document.getElementById('feMediaVolume');
+  const hasDuration = feHasSeekableDuration(media);
+  const currentTime = media && Number.isFinite(media.currentTime) ? media.currentTime : 0;
+  if (progress) {
+    progress.disabled = !hasDuration;
+    progress.max = hasDuration ? String(media.duration) : '0';
+    progress.value = hasDuration ? String(Math.min(Math.max(currentTime, 0), media.duration)) : '0';
+  }
+  if (time) time.textContent = feFormatMediaTime(currentTime) + ' / ' + feFormatMediaTime(hasDuration ? media.duration : NaN);
+  if (play) play.disabled = !media || !media.paused;
+  if (pause) pause.disabled = !media || media.paused;
+  if (back) back.disabled = !hasDuration;
+  if (forward) forward.disabled = !hasDuration;
+  if (volume && media) volume.value = String(media.volume);
+}
+
+function feShowMediaControls() {
+  const controls = document.getElementById('fileEditorMediaControls');
+  if (!controls) return;
+  controls.hidden = false;
+  feSetMediaStatus('');
+  feSyncMediaControls();
+}
+
+function feHideMediaControls() {
+  const controls = document.getElementById('fileEditorMediaControls');
+  if (controls) controls.hidden = true;
+  feSetMediaStatus('');
+}
+
+function feStopMediaPreview() {
+  const media = feMediaElement();
+  if (!media) return;
+  try { media.pause(); } catch {}
+  media.removeAttribute('src');
+  try { media.load(); } catch {}
+}
+
+function fePlayMedia() {
+  const media = feMediaElement();
+  if (!media) return;
+  feSetMediaStatus('');
+  const playback = media.play();
+  if (playback && typeof playback.catch === 'function') {
+    playback.catch(() => {
+      feSetMediaStatus('媒体无法播放，请检查浏览器是否支持该编码');
+      feSyncMediaControls();
+    });
+  }
+}
+
+function fePauseMedia() {
+  const media = feMediaElement();
+  if (media) media.pause();
+}
+
+function feSeekMedia(offset) {
+  const media = feMediaElement();
+  if (!feHasSeekableDuration(media)) return;
+  media.currentTime = Math.min(media.duration, Math.max(0, media.currentTime + Number(offset || 0)));
+  feSyncMediaControls();
+}
+
+function feSetMediaProgress(value) {
+  const media = feMediaElement();
+  if (!feHasSeekableDuration(media)) return;
+  const requested = Number(value);
+  if (!Number.isFinite(requested)) return;
+  media.currentTime = Math.min(media.duration, Math.max(0, requested));
+  feSyncMediaControls();
+}
+
+function feSetMediaVolume(value) {
+  const media = feMediaElement();
+  const requested = Number(value);
+  if (!media || !Number.isFinite(requested)) return;
+  media.volume = Math.min(1, Math.max(0, requested));
+  feSyncMediaControls();
+}
+
+function renderMediaPreview(sourceURL, mediaType) {
   const container = document.getElementById('fileEditorContent');
   if (!container) return;
-  feRevokePreviewBlobUrls(container);
-  const blob = new Blob([base64ToUint8Array(base64Data)], { type: mimeType || 'video/mp4' });
-  const blobUrl = URL.createObjectURL(blob);
-  container.dataset.videoBlobUrl = blobUrl;
-  container.innerHTML = '<video class="fe-video" controls preload="metadata" playsinline src="' + blobUrl + '"></video>';
+  container.innerHTML = '';
+  const media = document.createElement(mediaType === 'audio' ? 'audio' : 'video');
+  media.id = 'feMediaElement';
+  media.className = mediaType === 'audio' ? 'fe-audio' : 'fe-video';
+  media.preload = 'metadata';
+  media.controls = false;
+  media.playsInline = true;
+  media.src = sourceURL;
+  ['loadedmetadata', 'durationchange', 'timeupdate', 'play', 'pause', 'volumechange', 'ended', 'canplay'].forEach(eventName => {
+    media.addEventListener(eventName, () => {
+      if (eventName === 'canplay' || eventName === 'loadedmetadata') feSetMediaStatus('');
+      feSyncMediaControls();
+    });
+  });
+  media.addEventListener('error', () => {
+    feSetMediaStatus('媒体加载或播放失败，请检查浏览器是否支持该编码');
+    feSyncMediaControls();
+  });
+  container.appendChild(media);
+  feShowMediaControls();
+  media.load();
 }
 
 // ===== Selection File Preview =====

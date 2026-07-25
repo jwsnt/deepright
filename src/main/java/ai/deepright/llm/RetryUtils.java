@@ -1,7 +1,5 @@
 package ai.deepright.llm;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
 import ai.deepright.cli.CliPrinter;
 import ai.deepright.feature.FeatureFlag;
 import ai.deepright.lang.XmlResourceLang;
@@ -44,11 +42,11 @@ public class RetryUtils {
             if (log.isInfoEnabled()) {
                 log.info("The request has been retried {} times", tried);
             }
-            // 静默型异常和401不重试
+            // 所有429及以上的异常均重试, 静默标记只影响是否推送重试消息
             Integer code = WorkflowException.code(exception);
-            if (code >= ProtocolCode.C429 && tried < config.getRetry() && !WorkflowException.silent(exception)) {
+            if (code >= ProtocolCode.C429 && tried < config.getRetry()) {
                 int delay = ProtocolCode.C429.equals(code) ? config.getSleep() : config.getSleep() / 2;
-                RetryUtils.notify(notifierService, request.getMessage(), XmlResourceLang.get(RetryUtils.LANG_KEY_RETRY_MESSAGE).replace("#code", String.valueOf(code)).replace("#delay", String.valueOf(delay / 1000)), code, delay);
+                RetryUtils.notify(notifierService, request.getMessage(), exception, XmlResourceLang.get(RetryUtils.LANG_KEY_RETRY_MESSAGE).replace("#code", String.valueOf(code)).replace("#delay", String.valueOf(delay / 1000)), code, delay);
                 config.getScheduled().schedule(RetryRunnable.builder()
                         .notifierService(notifierService)
                         .exception(exception)
@@ -77,8 +75,8 @@ public class RetryUtils {
     }
 
     // 推送回端
-    public static void notify(NotifierService notifierService, WorkflowTask workTask, String content, Integer code, Integer delay) throws Exception {
-        if (!FeatureFlag.isSilent(workTask)) {
+    public static void notify(NotifierService notifierService, WorkflowTask workTask, Exception exception, String content, Integer code, Integer delay) throws Exception {
+        if (!FeatureFlag.isSilent(workTask) && !WorkflowException.silent(exception)) {
             Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
                     // 推送空格保持连接
                     .metadata(ImmutableMap.of(MultiSourceFlag.WARN, code, MultiSourceFlag.DELAY, delay))
