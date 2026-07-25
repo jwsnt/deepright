@@ -1403,6 +1403,9 @@ body.rs-url-preview-expanded.center-overlay-focus .rs-url-preview-floating-switc
 .rs-url-preview.is-active .rs-url-preview-frame{opacity:1;filter:none;transition-delay:.08s}
 .rs-url-preview.is-closing .rs-url-preview-frame{opacity:.62;filter:blur(6px);transition-delay:0s}
 .rs-url-preview.is-expanded .rs-url-preview-frame{opacity:1;filter:none}
+.rs-url-preview.is-overlay-suspended{opacity:0;visibility:hidden;pointer-events:none;transform:translateY(14px) scale(.982);filter:blur(12px);transition:opacity .2s ease,transform .24s ease,filter .24s ease,visibility 0s linear .24s}
+.rs-url-preview.is-overlay-suspended::before,.rs-url-preview.is-overlay-suspended::after{opacity:0}
+.rs-url-preview.is-overlay-suspended .rs-url-preview-frame-shell,.rs-url-preview.is-overlay-suspended .rs-url-preview-frame{opacity:0;pointer-events:none}
 .rs-url-preview-expand-btn{position:fixed;top:calc(var(--rs-url-preview-toolbar-top,18px) + 22px);left:calc(var(--rs-url-preview-boundary-left,0px) - 9px);z-index:260;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .24s ease,filter .24s ease,visibility 0s linear .24s}
 body.rs-url-preview-toolbar-visible .rs-url-preview-expand-btn{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .24s ease,filter .24s ease,visibility 0s linear 0s,transform .22s ease,box-shadow .22s ease}
 .rs-url-preview-toolbar-closing .rs-url-preview-expand-btn{opacity:0;filter:blur(8px);pointer-events:none}
@@ -1438,6 +1441,8 @@ body.rs-url-preview-expanded .rs-url-preview-expand-btn{opacity:0;visibility:hid
 .rs-url-preview-expanded-backdrop{position:fixed;inset:0;z-index:270;opacity:0;visibility:hidden;pointer-events:none;background:linear-gradient(180deg,rgba(251,241,233,.18),rgba(236,216,205,.3));backdrop-filter:blur(14px) saturate(126%);-webkit-backdrop-filter:blur(14px) saturate(126%);transition:opacity .24s ease,visibility 0s linear .24s}
 .rs-url-preview-expanded-backdrop::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 18% 18%,rgba(255,255,255,.32),transparent 28%),radial-gradient(circle at 82% 14%,rgba(var(--accent-rgb),.16),transparent 30%),radial-gradient(circle at 50% 84%,rgba(var(--accent-soft-rgb),.14),transparent 28%)}
 body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .24s ease,visibility 0s linear 0s}
+.rs-url-preview-expanded-backdrop.is-overlay-suspended{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s ease,visibility 0s linear .2s}
+#rsUrlPreviewFloatingSwitch.is-overlay-suspended,#rsUrlPreviewExpandBtn.is-overlay-suspended{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s ease,filter .2s ease,visibility 0s linear .2s}
 [data-theme="dark"] .rs-url-preview-expanded-backdrop{background:linear-gradient(180deg,rgba(6,12,24,.28),rgba(6,12,24,.4))}
 [data-energy-saver="on"] .rs-url-preview,
 [data-low-power-rendering="on"] .rs-url-preview{transform:none;filter:none;transition-duration:.16s}
@@ -2550,6 +2555,38 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .vfs-create-panel .settings-error{min-height:18px;margin-top:0}
 .vfs-create-actions{display:flex;justify-content:flex-end;gap:12px;padding-top:4px}
 .vfs-create-actions .btn{min-width:96px}
+.canvas-editor-overlay{position:fixed;inset:0;z-index:241;display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;background:rgba(10,18,32,.42);backdrop-filter:blur(10px) saturate(135%);-webkit-backdrop-filter:blur(10px) saturate(135%);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .22s,visibility 0s linear .22s}
+.canvas-editor-overlay.show{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .22s}
+.canvas-editor-panel{position:relative;width:min(1260px,calc(100vw - 36px));height:min(840px,calc(100vh - 36px));display:flex;flex-direction:column;overflow:hidden;border:1px solid color-mix(in srgb,var(--border) 68%,var(--accent) 32%);border-radius:22px;background:var(--bg-main);box-shadow:0 30px 80px rgba(0,0,0,.35)}
+.canvas-editor-header{min-height:58px;display:flex;align-items:center;gap:12px;padding:9px 12px 9px 16px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,color-mix(in srgb,var(--bg-card) 92%,#fff 8%),var(--bg-card));box-sizing:border-box;z-index:5}
+.canvas-editor-title{min-width:110px;max-width:260px;flex:1;border:1px solid transparent;border-radius:9px;padding:7px 9px;background:transparent;color:var(--text-primary);font:600 14px/1.25 inherit;outline:none;text-overflow:ellipsis}
+.canvas-editor-title:hover,.canvas-editor-title:focus{border-color:var(--border);background:var(--bg-input)}
+.canvas-editor-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center}
+.canvas-editor-tool,.canvas-editor-close,.canvas-editor-export-toggle{height:32px;padding:0 10px;border:1px solid var(--border);border-radius:9px;background:var(--bg-card);color:var(--text-secondary);font:600 12px/1 inherit;cursor:pointer;transition:var(--transition)}
+.canvas-editor-tool:hover,.canvas-editor-tool:focus-visible,.canvas-editor-tool.active,.canvas-editor-export-toggle:hover,.canvas-editor-export-toggle:focus-visible{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--bg-card));color:var(--text-primary);outline:none}
+.canvas-editor-tool:disabled{opacity:.42;cursor:not-allowed}
+.canvas-editor-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+.canvas-editor-close{width:32px;padding:0;font-size:20px;line-height:1}
+.canvas-editor-close:hover,.canvas-editor-close:focus-visible{border-color:var(--accent);color:var(--text-primary);outline:none}
+.canvas-editor-export{position:relative}
+.canvas-editor-export-menu{position:absolute;right:0;top:calc(100% + 8px);display:none;grid-template-columns:repeat(2,max-content);gap:6px;padding:8px;border:1px solid var(--border);border-radius:12px;background:var(--bg-card);box-shadow:0 14px 32px rgba(0,0,0,.18);z-index:8;white-space:nowrap}
+.canvas-editor-export.open .canvas-editor-export-menu{display:grid}
+.canvas-editor-export-menu button{border:0;border-radius:8px;padding:8px 10px;background:transparent;color:var(--text-primary);font:500 12px/1 inherit;cursor:pointer;text-align:left}
+.canvas-editor-export-menu button:hover,.canvas-editor-export-menu button:focus-visible{background:color-mix(in srgb,var(--accent) 14%,transparent);outline:none}
+.canvas-editor-stage{position:relative;flex:1;min-height:0;overflow:hidden;touch-action:none;background-color:color-mix(in srgb,var(--bg-main) 96%,#90a4c4 4%);background-image:radial-gradient(color-mix(in srgb,var(--text-muted) 42%,transparent) 1px,transparent 1.2px);background-size:22px 22px;cursor:crosshair}
+.canvas-editor-stage.panning{cursor:grabbing}.canvas-editor-stage.connecting{cursor:crosshair}
+.canvas-editor-world{position:absolute;left:0;top:0;width:1px;height:1px;transform-origin:0 0;will-change:transform}
+.canvas-editor-links{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}.canvas-editor-links path{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linecap:round;opacity:.85}.canvas-editor-links path.preview{stroke-dasharray:6 5;opacity:.58}
+.canvas-node{position:absolute;box-sizing:border-box;min-width:110px;max-width:420px;border:1px solid color-mix(in srgb,var(--border) 72%,var(--accent) 28%);border-radius:13px;background:var(--bg-card);box-shadow:0 10px 22px rgba(29,45,74,.13);color:var(--text-primary);cursor:grab;user-select:none;overflow:hidden}
+.canvas-node.selected{outline:2px solid var(--accent);outline-offset:3px}.canvas-node.dragging{cursor:grabbing}.canvas-node.card{width:260px;min-height:142px;padding:16px;background:linear-gradient(145deg,#fff4ae,#ffe294)}.canvas-node.guide{background:linear-gradient(145deg,#d9f5ff,#bfe6ff)}
+.canvas-node.text{min-width:120px;max-width:360px;padding:8px 10px;border-color:transparent;background:transparent;box-shadow:none;font-size:18px;font-weight:650}.canvas-node.image{width:260px;min-height:120px;background:var(--bg-card)}
+.canvas-node-content{display:block;min-height:1.35em;outline:none;white-space:pre-wrap;overflow-wrap:anywhere;cursor:text;user-select:text}.canvas-node-content:focus{cursor:text}.canvas-node-image{display:block;width:100%;max-height:360px;object-fit:contain;background:rgba(0,0,0,.04)}
+.canvas-selection-box{position:absolute;display:none;border:1px solid var(--accent);background:rgba(var(--accent-rgb),.14);pointer-events:none;z-index:4}.canvas-selection-box.show{display:block}
+.canvas-minimap{position:absolute;right:16px;bottom:16px;width:168px;height:112px;border:1px solid color-mix(in srgb,var(--border) 70%,var(--accent) 30%);border-radius:10px;background:color-mix(in srgb,var(--bg-card) 88%,transparent);box-shadow:0 8px 22px rgba(16,24,40,.15);overflow:hidden;pointer-events:none;z-index:4}.canvas-minimap-nodes{position:absolute;inset:0}.canvas-minimap-node{position:absolute;min-width:3px;min-height:3px;border-radius:2px;background:var(--accent);opacity:.82}.canvas-minimap-viewport{position:absolute;border:1px solid var(--text-primary);background:rgba(var(--accent-rgb),.08)}
+.canvas-editor-status{position:absolute;left:16px;bottom:16px;z-index:4;padding:7px 10px;border-radius:8px;background:color-mix(in srgb,var(--bg-card) 88%,transparent);border:1px solid var(--border);color:var(--text-secondary);font-size:11px;pointer-events:none}
+.canvas-editor-file-input{display:none}.canvas-editor-confirm{position:absolute;inset:0;z-index:12;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(7,13,25,.38);backdrop-filter:blur(3px)}.canvas-editor-confirm.show{display:flex}.canvas-editor-confirm-card{width:min(390px,100%);padding:22px;border:1px solid var(--border);border-radius:17px;background:var(--bg-card);box-shadow:0 20px 50px rgba(0,0,0,.28)}.canvas-editor-confirm-card h3{margin:0;color:var(--text-primary);font-size:17px}.canvas-editor-confirm-card p{margin:9px 0 0;color:var(--text-secondary);font-size:13px;line-height:1.6}.canvas-editor-confirm-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
+[data-theme="dark"] .canvas-editor-panel{border-color:rgba(145,176,238,.28);background:#0d1728}.canvas-editor-header{border-color:rgba(145,176,238,.2);background:linear-gradient(180deg,rgba(20,34,56,.98),rgba(12,22,39,.98))}.canvas-editor-tool,.canvas-editor-close,.canvas-editor-export-toggle{border-color:rgba(145,176,238,.26);background:rgba(255,255,255,.055);color:#cbd9ef}.canvas-editor-stage{background-color:#0a1424;background-image:radial-gradient(rgba(174,199,238,.26) 1px,transparent 1.2px)}.canvas-node{border-color:rgba(145,176,238,.34);box-shadow:0 10px 24px rgba(0,0,0,.27);background:#16243c}.canvas-node.card{background:linear-gradient(145deg,#4d4321,#59491e)}.canvas-node.guide{background:linear-gradient(145deg,#173e5c,#164061)}.canvas-editor-export-menu,.canvas-editor-confirm-card{border-color:rgba(145,176,238,.26);background:#142139}.canvas-editor-status,.canvas-minimap{border-color:rgba(145,176,238,.26);background:rgba(15,26,45,.88)}
+@media (max-width:760px){.canvas-editor-overlay{padding:8px}.canvas-editor-panel{width:100%;height:calc(100vh - 16px);border-radius:15px}.canvas-editor-header{align-items:flex-start;flex-wrap:wrap;padding:9px}.canvas-editor-title{flex-basis:calc(100% - 42px);max-width:none}.canvas-editor-tools{order:3;justify-content:flex-start}.canvas-editor-actions{margin-left:0}.canvas-editor-status{display:none}.canvas-minimap{width:124px;height:82px;right:10px;bottom:10px}}
 .vfs-upload-panel{width:min(420px,calc(100vw - 40px))}
 .vfs-upload-actions{display:flex;flex-direction:column;gap:10px}
 .vfs-upload-actions .btn{width:100%;min-height:44px;padding:10px 18px;border-radius:16px;font-size:14px;font-weight:600}
@@ -4183,6 +4220,7 @@ body.quick-fan-transition-active{cursor:progress}
 .file-editor-content .fe-video-stage{position:relative;width:min(960px,100%);max-width:100%;margin:0 auto;line-height:0}
 .file-editor-content .fe-video-stage .fe-video{width:100%;margin:0}
 .fe-coordinate-picker-marker-layer{position:absolute;inset:0;overflow:hidden;border-radius:12px;pointer-events:none}
+.fe-image-coordinate-picker-marker-layer{inset:auto;z-index:3;border-radius:var(--radius-xs)}
 .fe-coordinate-picker-marker{position:absolute;width:20px;height:20px;border:2px solid #ff4500;border-radius:50%;box-sizing:border-box;background:rgba(255,69,0,.2);box-shadow:0 0 0 3px rgba(255,69,0,.14),0 3px 10px rgba(171,46,0,.34);transform:translate(-50%,-50%)}
 .fe-coordinate-picker-marker::before,.fe-coordinate-picker-marker::after{content:"";position:absolute;left:50%;top:50%;background:#fff8ed;box-shadow:0 1px 2px rgba(100,41,17,.38);transform:translate(-50%,-50%)}
 .fe-coordinate-picker-marker::before{width:9px;height:2px}
@@ -4192,6 +4230,20 @@ body.quick-fan-transition-active{cursor:progress}
 [data-theme="dark"] .fe-coordinate-picker-marker::before,[data-theme="dark"] .fe-coordinate-picker-marker::after{background:#edfdff;box-shadow:0 1px 2px rgba(0,41,65,.7)}
 [data-theme="dark"] .fe-coordinate-picker-marker span{background:#168dcc;color:#eafcff;box-shadow:0 3px 8px rgba(0,101,155,.34)}
 .file-editor-content .fe-audio{display:block;width:min(760px,100%);margin:48px auto;background:transparent}
+.fe-audio-trim-panel{flex-shrink:0;padding:12px;border-top:1px solid color-mix(in srgb,var(--border) 56%,rgba(255,255,255,.26));background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,.38))}
+.fe-audio-trim-panel[hidden]{display:none!important}
+.fe-audio-trim-heading{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:13px;font-weight:700;color:var(--text-primary)}
+.fe-audio-trim-heading span{font-size:11px;font-weight:500;color:var(--text-muted)}
+.fe-audio-trim-range-row{display:grid;grid-template-columns:48px minmax(0,1fr) 56px;align-items:center;gap:9px;margin-top:9px;color:var(--text-secondary);font-size:12px}
+.fe-audio-trim-range-row input{width:100%;margin:0;accent-color:var(--accent);cursor:pointer}
+.fe-audio-trim-range-row output{font:600 12px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;text-align:right;color:var(--text-primary);white-space:nowrap}
+.fe-audio-trim-summary{min-height:18px;margin-top:9px;color:var(--text-muted);font-size:11px;line-height:1.45}
+.fe-audio-trim-summary.error{color:var(--error)}
+.fe-audio-trim-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:9px}
+.fe-audio-trim-actions button{min-width:84px;height:32px;border:1px solid var(--border);border-radius:9px;background:var(--bg-input);color:var(--text-secondary);font-size:12px;font-weight:600;cursor:pointer;transition:var(--transition)}
+.fe-audio-trim-actions button.confirm{border-color:transparent;background:linear-gradient(135deg,var(--accent),rgb(var(--accent-soft-rgb)));color:#fff;box-shadow:0 9px 20px rgba(var(--accent-rgb),.2)}
+.fe-audio-trim-actions button:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.03)}
+.fe-audio-trim-actions button:disabled{opacity:.55;cursor:not-allowed}
 .file-editor-color-picker-btn{width:28px;height:28px;border:0;border-radius:8px;padding:0;background:transparent;color:#48638f;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition)}
 .file-editor-color-picker-btn[hidden]{display:none!important}
 .file-editor-color-picker-btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
@@ -4203,7 +4255,8 @@ body.quick-fan-transition-active{cursor:progress}
 .fe-color-picker-toast.show{opacity:1;transform:translateY(0)}
 .fe-color-picker-toast.error{border-color:rgba(255,210,157,.54);background:linear-gradient(135deg,rgba(173,78,21,.96),rgba(214,122,38,.94));box-shadow:0 10px 26px rgba(147,65,17,.28),inset 0 1px 0 rgba(255,255,255,.2);color:#fff9f3}
 [data-theme="dark"] .fe-color-picker-toast:not(.error){border-color:rgba(122,241,255,.34);background:linear-gradient(180deg,#56e7ff,#1699ff);box-shadow:0 0 0 1px rgba(122,241,255,.34),0 10px 24px rgba(0,212,255,.22),inset 0 1px 0 rgba(255,255,255,.18);color:#11161c}
-.fe-coordinate-picker-progress{position:absolute;right:16px;bottom:64px;z-index:8;padding:9px 12px;border:1px solid rgba(var(--accent-rgb),.24);border-radius:10px;background:linear-gradient(180deg,rgba(255,252,249,.96),rgba(249,236,226,.92));box-shadow:0 10px 24px rgba(91,34,29,.16),inset 0 1px 0 rgba(255,255,255,.78);color:var(--text-primary);font-size:12px;line-height:1.45;pointer-events:none}
+.fe-coordinate-picker-progress{position:absolute;right:16px;bottom:16px;z-index:8;padding:9px 12px;border:1px solid rgba(var(--accent-rgb),.24);border-radius:10px;background:linear-gradient(180deg,rgba(255,252,249,.96),rgba(249,236,226,.92));box-shadow:0 10px 24px rgba(91,34,29,.16),inset 0 1px 0 rgba(255,255,255,.78);color:var(--text-primary);font-size:12px;line-height:1.45;pointer-events:none}
+.fe-coordinate-picker-progress.media{bottom:64px}
 .fe-coordinate-picker-progress[hidden]{display:none!important}
 [data-theme="dark"] .fe-coordinate-picker-progress{border-color:rgba(122,241,255,.28);background:linear-gradient(180deg,rgba(19,44,65,.96),rgba(10,28,47,.94));box-shadow:0 10px 24px rgba(0,212,255,.16),inset 0 1px 0 rgba(255,255,255,.1);color:#d9f7ff}
 .fe-coordinate-picker-dialog{position:absolute;inset:0;z-index:12;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(91,52,31,.14);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
@@ -4239,7 +4292,7 @@ body.quick-fan-transition-active{cursor:progress}
 .fe-media-volume{width:72px;accent-color:var(--accent);cursor:pointer}
 .fe-media-status{display:none;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--error)}
 .fe-media-status:not(:empty){display:inline}
-@media (max-width:680px){.file-editor-media-controls{flex-wrap:wrap}.fe-media-progress{order:3;flex-basis:100%}.fe-media-status{max-width:100%}.fe-media-volume-wrap{margin-left:auto}.fe-color-picker-toast.media,.fe-coordinate-picker-progress{bottom:98px}}
+@media (max-width:680px){.file-editor-media-controls{flex-wrap:wrap}.fe-media-progress{order:3;flex-basis:100%}.fe-media-status{max-width:100%}.fe-media-volume-wrap{margin-left:auto}.fe-color-picker-toast.media,.fe-coordinate-picker-progress.media{bottom:98px}}
 .fe-image-editor{display:flex;flex-direction:column;gap:12px;padding:12px}
 .fe-image-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .fe-image-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -4305,6 +4358,10 @@ body.quick-fan-transition-active{cursor:progress}
 [data-theme="dark"] #fileEditorPath{color:#f3f9fd;text-shadow:0 1px 0 rgba(0,0,0,.28)}
 [data-theme="dark"] .file-editor-actions{background:linear-gradient(180deg,rgba(13,24,43,.8),rgba(11,20,37,.72))}
 [data-theme="dark"] .file-editor-media-controls{background:linear-gradient(180deg,rgba(13,24,43,.8),rgba(11,20,37,.72))}
+[data-theme="dark"] .fe-audio-trim-panel{background:linear-gradient(180deg,rgba(13,24,43,.8),rgba(11,20,37,.72))}
+[data-theme="dark"] .fe-audio-trim-range-row output{color:#e7f8ff}
+[data-theme="dark"] .fe-audio-trim-actions button{border-color:rgba(169,190,227,.22);background:rgba(255,255,255,.08);color:#d5e4ff}
+[data-theme="dark"] .fe-audio-trim-actions button.confirm{border-color:transparent;background:linear-gradient(135deg,#1699ff,#56e7ff);color:#102033}
 [data-theme="dark"] .fe-media-control-btn{background:rgba(255,255,255,.08);border-color:rgba(169,190,227,.22);color:#d5e4ff}
 [data-theme="dark"] .fe-media-control-btn:hover:not(:disabled){background:rgba(255,255,255,.14);border-color:rgba(169,190,227,.4);color:#fff}
 [data-theme="dark"] .file-editor-tab{color:#c8daf8}
@@ -5030,8 +5087,8 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     </div>
     <div class="rs-url-preview" id="rsUrlPreview" aria-hidden="true">
       <div class="rs-url-preview-toolbar">
-        <button type="button" class="rs-url-preview-switch" id="rsUrlPreviewSwitch" title="切换回右侧栏原布局" aria-label="切换回右侧栏原布局" onclick="handleRightSidebarUrlPreviewFloatingSwitch(event)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 5.5v13"></path><path d="M17 7H12.8"></path><path d="M17 12h-5.6"></path><path d="M14.6 17H12"></path><path d="m10.2 9.2-2.7 2.8 2.7 2.8"></path></svg>
+        <button type="button" class="rs-url-preview-switch" id="rsUrlPreviewSwitch" title="关闭网站浏览" aria-label="关闭网站浏览" onclick="handleRightSidebarUrlPreviewFloatingSwitch(event)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m6.5 6.5 11 11"></path><path d="m17.5 6.5-11 11"></path></svg>
         </button>
         <div class="rs-url-preview-meta">
           <div class="rs-url-preview-title" id="rsUrlPreviewTitle">URL 预览</div>
@@ -5105,8 +5162,8 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
 <button type="button" class="rs-url-preview-switch rs-url-preview-expand-btn" id="rsUrlPreviewExpandBtn" title="展开网站浏览" aria-label="展开网站浏览" onclick="expandRightSidebarUrlPreview(event)">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"></path><path d="M16 3h3a2 2 0 0 1 2 2v3"></path><path d="M8 21H5a2 2 0 0 1-2-2v-3"></path><path d="M16 21h3a2 2 0 0 0 2-2v-3"></path></svg>
 </button>
-<button type="button" class="rs-url-preview-switch rs-url-preview-floating-switch" id="rsUrlPreviewFloatingSwitch" title="切换回右侧栏原布局" aria-label="切换回右侧栏原布局" onclick="handleRightSidebarUrlPreviewFloatingSwitch(event)">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 5.5v13"></path><path d="M17 7H12.8"></path><path d="M17 12h-5.6"></path><path d="M14.6 17H12"></path><path d="m10.2 9.2-2.7 2.8 2.7 2.8"></path></svg>
+<button type="button" class="rs-url-preview-switch rs-url-preview-floating-switch" id="rsUrlPreviewFloatingSwitch" title="关闭网站浏览" aria-label="关闭网站浏览" onclick="handleRightSidebarUrlPreviewFloatingSwitch(event)">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m6.5 6.5 11 11"></path><path d="m17.5 6.5-11 11"></path></svg>
 </button>
 
 <!-- Settings Overlay -->
@@ -5947,7 +6004,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
 </div>
 <div class="overlay" id="vfsCreateOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="28" onclick="if(event.target===this)vfsHideCreate()" aria-hidden="true">
   <div class="settings-panel vfs-create-panel" id="vfsCreatePanel" onclick="event.stopPropagation()">
-    <h3 class="vfs-create-title">新建文件或目录</h3>
+    <h3 class="vfs-create-title">新建文件、目录或画布</h3>
     <p class="vfs-create-subtitle">将在当前虚拟文件系统路径下创建。点击空白区域或取消会直接关闭。</p>
     <div class="vfs-create-form">
       <div class="vfs-create-row">
@@ -5955,6 +6012,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
         <select id="vfsCreateType" class="form-select vfs-create-type">
           <option value="0">目录</option>
           <option value="1">文件</option>
+          <option value="2">画布</option>
         </select>
       </div>
       <div id="vfsCreateError" class="settings-error"></div>
@@ -5964,6 +6022,54 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
       </div>
     </div>
   </div>
+</div>
+<div class="canvas-editor-overlay" id="canvasEditorOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="51" onclick="if(event.target===this)canvasRequestClose()" aria-hidden="true">
+  <section class="canvas-editor-panel" id="canvasEditorPanel" role="dialog" aria-modal="true" aria-label="无限画布编辑器" onclick="event.stopPropagation()">
+    <header class="canvas-editor-header">
+      <input class="canvas-editor-title" id="canvasEditorTitle" aria-label="画布标题" autocomplete="off" spellcheck="false" />
+      <div class="canvas-editor-tools" aria-label="画布工具">
+        <button class="canvas-editor-tool" type="button" onclick="canvasAddCard()">便签</button>
+        <button class="canvas-editor-tool" type="button" onclick="canvasAddText()">文本</button>
+        <button class="canvas-editor-tool" type="button" onclick="canvasPickImages()">图片</button>
+        <button class="canvas-editor-tool" id="canvasConnectBtn" type="button" onclick="canvasToggleConnect()" aria-pressed="false">连线</button>
+        <button class="canvas-editor-tool" id="canvasUndoBtn" type="button" onclick="canvasUndo()" title="撤销 (⌘/Ctrl+Z)">撤销</button>
+        <button class="canvas-editor-tool" id="canvasRedoBtn" type="button" onclick="canvasRedo()" title="重做 (⌘/Ctrl+Shift+Z)">重做</button>
+      </div>
+      <div class="canvas-editor-actions">
+        <div class="canvas-editor-export" id="canvasExport">
+          <button class="canvas-editor-export-toggle" type="button" onclick="canvasToggleExport(event)" aria-expanded="false">导出</button>
+          <div class="canvas-editor-export-menu" role="menu" aria-label="导出画布">
+            <button type="button" role="menuitem" onclick="canvasExport('png','all')">PNG · 整个画布</button>
+            <button type="button" role="menuitem" onclick="canvasExport('png','viewport')">PNG · 当前视口</button>
+            <button type="button" role="menuitem" onclick="canvasExport('pdf','all')">PDF · 整个画布</button>
+            <button type="button" role="menuitem" onclick="canvasExport('pdf','viewport')">PDF · 当前视口</button>
+          </div>
+        </div>
+        <button class="btn btn-primary" id="canvasSaveBtn" type="button" onclick="canvasSave()">保存</button>
+        <button class="canvas-editor-close" type="button" onclick="canvasRequestClose()" aria-label="关闭画布" title="关闭">×</button>
+      </div>
+    </header>
+    <div class="canvas-editor-stage" id="canvasEditorStage" tabindex="0" aria-label="无限画布，可拖动、缩放和框选" onpointerdown="canvasStagePointerDown(event)" onpointermove="canvasStagePointerMove(event)" onpointerup="canvasStagePointerUp(event)" onpointercancel="canvasStagePointerUp(event)" onwheel="canvasStageWheel(event)" ondragover="canvasStageDragOver(event)" ondrop="canvasStageDrop(event)">
+      <div class="canvas-editor-world" id="canvasEditorWorld">
+        <svg class="canvas-editor-links" id="canvasEditorLinks" aria-hidden="true"></svg>
+        <div id="canvasEditorNodes"></div>
+      </div>
+      <div class="canvas-selection-box" id="canvasSelectionBox" aria-hidden="true"></div>
+      <div class="canvas-minimap" id="canvasMinimap" aria-label="画布小地图"><div class="canvas-minimap-nodes" id="canvasMinimapNodes"></div><div class="canvas-minimap-viewport" id="canvasMinimapViewport"></div></div>
+      <div class="canvas-editor-status" id="canvasEditorStatus" aria-live="polite">滚轮缩放 · 空白处拖动框选 · 按住空格拖动画布</div>
+    </div>
+    <input class="canvas-editor-file-input" id="canvasImageInput" type="file" accept="image/*" multiple onchange="canvasAddImageFiles(this.files)" />
+    <div class="canvas-editor-confirm" id="canvasEditorConfirm" role="alertdialog" aria-modal="true" aria-labelledby="canvasEditorConfirmTitle" onclick="event.stopPropagation()">
+      <div class="canvas-editor-confirm-card">
+        <h3 id="canvasEditorConfirmTitle">放弃未保存内容？</h3>
+        <p id="canvasEditorConfirmText">关闭后，尚未保存的画布内容将无法恢复。</p>
+        <div class="canvas-editor-confirm-actions">
+          <button class="btn btn-secondary" type="button" onclick="canvasResolveConfirm(false)">继续编辑</button>
+          <button class="btn btn-primary" id="canvasEditorConfirmPrimary" type="button" onclick="canvasResolveConfirm(true)">放弃</button>
+        </div>
+      </div>
+    </div>
+  </section>
 </div>
 <div class="overlay" id="vfsUploadOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="28" onclick="if(event.target===this)vfsHideUpload()" aria-hidden="true">
   <div class="settings-panel vfs-create-panel vfs-upload-panel" id="vfsUploadPanel" onclick="event.stopPropagation()">
@@ -6087,9 +6193,6 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
         <button class="file-editor-color-picker-btn" type="button" id="feColorPickerBtn" onclick="feToggleColorPicker()" aria-label="取色" aria-pressed="false" title="取色" hidden>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.6 4.4 5 5"/><path d="m13.2 5.8 5 5"/><path d="m3.8 20.2 3.4-1 10.2-10.2a2.5 2.5 0 0 0-3.5-3.5L3.7 15.7l.1 4.5Z"/><path d="m6.5 17.5 1.1 1.1"/></svg>
         </button>
-        <button class="file-editor-color-picker-btn" type="button" id="feCoordinatePickerBtn" onclick="feToggleCoordinatePicker()" aria-label="提取坐标" aria-pressed="false" title="提取坐标" hidden>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v16h16"/><path d="M8 16 17 7"/><circle cx="17" cy="7" r="2.5"/></svg>
-        </button>
         <button class="file-editor-color-picker-btn" type="button" id="feImageGridBtn" onclick="feToggleImageGridTool()" aria-label="切图工具" aria-pressed="false" title="切图工具" hidden>
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M12 4v16M4 12h16"/></svg>
         </button>
@@ -6097,12 +6200,36 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
           <div class="file-editor-tab active" id="tabView" onclick="feSetTab('view')">预览</div>
           <div class="file-editor-tab" id="tabEdit" onclick="feSetTab('edit')">编辑</div>
         </div>
+        <button class="file-editor-color-picker-btn" type="button" id="feCoordinatePickerBtn" onclick="feToggleCoordinatePicker()" aria-label="提取坐标" aria-pressed="false" title="提取坐标" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v16h16"/><path d="M8 16 17 7"/><circle cx="17" cy="7" r="2.5"/></svg>
+        </button>
+        <button class="file-editor-color-picker-btn" type="button" id="feAudioTrimBtn" onclick="feEnterAudioTrim()" aria-label="裁剪音频" aria-pressed="false" title="裁剪音频" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.6 4.4 5 5"/><path d="m13.2 5.8 5 5"/><path d="M3.8 20.2 7.2 19.2 17.4 9a2.5 2.5 0 0 0-3.5-3.5L3.7 15.7z"/><path d="m6.5 17.5 1.1 1.1"/></svg>
+        </button>
         <button class="file-editor-close" type="button" onclick="feClose()" aria-label="关闭预览浮层">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
     </div>
     <div class="file-editor-content" id="fileEditorContent"></div>
+    <section class="fe-audio-trim-panel" id="feAudioTrimPanel" aria-label="音频裁剪" hidden>
+      <div class="fe-audio-trim-heading">裁剪音频 <span>拖动手柄，按 0.5 秒定位</span></div>
+      <label class="fe-audio-trim-range-row" for="feAudioTrimStart">
+        <span>开始</span>
+        <input type="range" id="feAudioTrimStart" min="0" max="0" step="0.5" value="0" aria-label="裁剪开始时间" oninput="feSetAudioTrimStart(this.value)" />
+        <output id="feAudioTrimStartValue" for="feAudioTrimStart">00:00</output>
+      </label>
+      <label class="fe-audio-trim-range-row" for="feAudioTrimEnd">
+        <span>结束</span>
+        <input type="range" id="feAudioTrimEnd" min="0" max="0" step="0.5" value="0" aria-label="裁剪结束时间" oninput="feSetAudioTrimEnd(this.value)" />
+        <output id="feAudioTrimEndValue" for="feAudioTrimEnd">00:00</output>
+      </label>
+      <div class="fe-audio-trim-summary" id="feAudioTrimSummary" role="status" aria-live="polite"></div>
+      <div class="fe-audio-trim-actions">
+        <button type="button" id="feAudioTrimCancelBtn" onclick="feCancelAudioTrim()">取消</button>
+        <button class="confirm" type="button" id="feAudioTrimSaveBtn" onclick="feSaveAudioTrim()">保存为新音频</button>
+      </div>
+    </section>
     <div class="fe-color-picker-toast" id="feColorPickerToast" role="status" aria-live="polite"></div>
     <div class="fe-coordinate-picker-progress" id="feCoordinatePickerProgress" role="status" aria-live="polite" hidden></div>
     <div class="fe-coordinate-picker-dialog" id="feCoordinatePickerDialog" role="dialog" aria-modal="true" aria-labelledby="feCoordinatePickerDialogTitle" hidden onclick="event.stopPropagation()">
@@ -6622,7 +6749,7 @@ const rightSidebarUrlPreviewExpandedState = {
 const RIGHT_SIDEBAR_URL_PREVIEW_FADE_MS = 360;
 const RIGHT_SIDEBAR_URL_PREVIEW_MIN_LOADING_MS = 1000;
 const RIGHT_SIDEBAR_URL_PREVIEW_LOAD_TIMEOUT_MS = 12000;
-const RIGHT_SIDEBAR_URL_PREVIEW_CLOSE_ICON_HTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 5.5v13"></path><path d="M17 7H12.8"></path><path d="M17 12h-5.6"></path><path d="M14.6 17H12"></path><path d="m10.2 9.2-2.7 2.8 2.7 2.8"></path></svg>';
+const RIGHT_SIDEBAR_URL_PREVIEW_CLOSE_ICON_HTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m6.5 6.5 11 11"></path><path d="m17.5 6.5-11 11"></path></svg>';
 const RIGHT_SIDEBAR_URL_PREVIEW_RESTORE_ICON_HTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 9V5H5"></path><path d="m5 5 6 6"></path><path d="M15 9h4V5"></path><path d="m19 5-6 6"></path><path d="M9 15v4H5"></path><path d="m5 19 6-6"></path><path d="M15 15h4v4"></path><path d="m19 19-6-6"></path></svg>';
 let rightSidebarUrlPreviewCleanupTimer = 0;
 let rightSidebarUrlPreviewWatchToken = 0;
@@ -13799,6 +13926,7 @@ function handleRightSidebarUrlPreviewFloatingSwitch(event) {
 
 function syncRightSidebarUrlPreviewExpandedEscape(event) {
   if (!isRightSidebarUrlPreviewExpanded() || !event || event.key !== 'Escape') return;
+  if (document.body.classList.contains('rs-url-preview-overlay-suspended')) return;
   if (event.ctrlKey || event.metaKey || event.altKey) return;
   event.preventDefault();
   event.stopPropagation();
@@ -14078,8 +14206,8 @@ function renderRightSidebarUrlPreview() {
   floatingSwitch.innerHTML = expanded
     ? RIGHT_SIDEBAR_URL_PREVIEW_RESTORE_ICON_HTML
     : RIGHT_SIDEBAR_URL_PREVIEW_CLOSE_ICON_HTML;
-  floatingSwitch.title = expanded ? '还原网站浏览尺寸' : '切换回右侧栏原布局';
-  floatingSwitch.setAttribute('aria-label', expanded ? '还原网站浏览尺寸' : '切换回右侧栏原布局');
+  floatingSwitch.title = expanded ? '还原网站浏览尺寸' : '关闭网站浏览';
+  floatingSwitch.setAttribute('aria-label', expanded ? '还原网站浏览尺寸' : '关闭网站浏览');
   if (active) {
     rightSidebar.classList.remove('previewing-url-closing');
     rightSidebar.classList.toggle('previewing-url-expanded', expanded);
@@ -14405,6 +14533,25 @@ function isOverlayExclusiveCandidate(el) {
   return !['limitToast', 'modelSelectToast', 'cmdToast', 'preflightIndicator', 'leftUploadLock', 'centerUploadLock', 'rightUploadLock', 'leftSkillExtractLock', 'centerSkillExtractLock', 'rightSkillExtractLock'].includes(id);
 }
 
+function isCenterModalOverlay(el) {
+  if (!el || !el.hasAttribute('data-overlay-base') || el.hasAttribute('data-overlay-passive')) return false;
+  const domain = String(el.getAttribute('data-overlay-domain') || 'center');
+  if (!['center', 'global'].includes(domain)) return false;
+  const id = String(el.id || '').trim();
+  return !['limitToast', 'modelSelectToast', 'cmdToast', 'preflightIndicator'].includes(id);
+}
+
+function syncRightSidebarUrlPreviewOverlaySuspension(suspended) {
+  const next = !!suspended;
+  document.body.classList.toggle('rs-url-preview-overlay-suspended', next);
+  ['rsUrlPreview', 'rsUrlPreviewExpandedBackdrop', 'rsUrlPreviewExpandBtn', 'rsUrlPreviewFloatingSwitch'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.toggle('is-overlay-suspended', next);
+    if ('inert' in el) el.inert = next;
+  });
+}
+
 function hideExclusiveOverlayById(id) {
   switch (id) {
     case 'settingsOverlay':
@@ -14634,6 +14781,12 @@ function refreshOverlayStates() {
     ['center', 'global'].includes(String(el.getAttribute('data-overlay-domain') || 'center'))
   ));
   document.body.classList.toggle('center-overlay-focus', hasCenterFrontOverlay);
+  const hasCenterModalOverlay = overlayRegistry.some(el => (
+    el.getAttribute('data-overlay-active') === '1' &&
+    el.getAttribute('data-overlay-front') === '1' &&
+    isCenterModalOverlay(el)
+  ));
+  syncRightSidebarUrlPreviewOverlaySuspension(hasCenterModalOverlay);
 }
 
 function setOverlayVisible(overlay, visible, panel) {
@@ -46018,7 +46171,15 @@ async function vfsConfirmCreate() {
   const agentId = state.settings.agentId;
   if (!agentId) { errEl.textContent = '未选择 Agent'; return; }
   const relDir = getVfsCurrentRelativeDir();
-  const relName = relDir ? joinFsPath(relDir, name) : name;
+  const fileName = type === '2' ? canvasEnsureFileName(name) : name;
+  const relName = relDir ? joinFsPath(relDir, fileName) : fileName;
+  if (type === '2') {
+    document.getElementById('vfsCreateName').value = '';
+    errEl.textContent = '';
+    vfsHideCreate();
+    canvasOpenNew({ relPath: relName, fileName });
+    return;
+  }
   try {
     const resp = await fetch('/api/agent/create?agentId=' + encodeURIComponent(agentId) + '&name=' + encodeURIComponent(relName) + '&type=' + type);
     let data;
@@ -46029,6 +46190,11 @@ async function vfsConfirmCreate() {
     vfsHideCreate();
     vfsLastJson = '';
     vfsRefresh();
+    const createdFilePath = joinFsPath(vfsWorkspace, relName);
+    const createdFileType = detectFileType(createdFilePath);
+    if (type === '1' && (createdFileType === 'text' || createdFileType === 'html')) {
+      feOpen(createdFilePath, { initialMode: 'edit' });
+    }
   } catch (err) {
     errEl.textContent = '请求失败: ' + err.message;
   }
@@ -46551,6 +46717,15 @@ let feCoordinatePickerPointerHandler = null;
 let feCoordinatePickerDialogVisible = false;
 let feCoordinatePickerRequiredCount = 1;
 let feCoordinatePickerPoints = [];
+let feCoordinatePickerResizeObserver = null;
+let feCoordinatePickerResizeFrame = 0;
+let feAudioTrimState = {
+  active: false,
+  start: 0,
+  end: 0,
+  sourceURL: '',
+  saving: false
+};
 let feImageGridState = {
   active: false,
   xLines: [],
@@ -46584,6 +46759,10 @@ function feGetCoordinatePickerTarget() {
   if (feFileType === 'video') {
     const video = document.getElementById('feMediaElement');
     return video instanceof HTMLVideoElement ? video : null;
+  }
+  if (feFileType === 'image' && feImageState.loaded) {
+    const canvas = document.getElementById('feImageCanvas');
+    return canvas instanceof HTMLCanvasElement && canvas.width > 0 && canvas.height > 0 ? canvas : null;
   }
   return null;
 }
@@ -46671,6 +46850,7 @@ function feExitCoordinatePicker() {
   feCoordinatePickerActive = false;
   feCoordinatePickerTarget = null;
   feCoordinatePickerPointerHandler = null;
+  feStopObservingCoordinatePickerTarget();
   feUpdateCoordinatePickerButton();
 }
 
@@ -46700,16 +46880,39 @@ function feUpdateCoordinatePickerProgress() {
   const remaining = Math.max(0, feCoordinatePickerRequiredCount - feCoordinatePickerPoints.length);
   const show = feCoordinatePickerActive && remaining > 0;
   progress.hidden = !show;
+  progress.classList.toggle('media', feFileType === 'video');
   progress.textContent = show ? '剩余需要提取 ' + remaining + ' 次' : '';
 }
 
 function feClearCoordinatePickerMarkers() {
   const layer = document.getElementById('feCoordinatePickerMarkerLayer');
-  if (layer) layer.replaceChildren();
+  if (!layer) return;
+  if (layer.classList.contains('fe-image-coordinate-picker-marker-layer')) layer.remove();
+  else layer.replaceChildren();
+}
+
+function feGetCoordinatePickerMarkerLayer(target) {
+  let layer = document.getElementById('feCoordinatePickerMarkerLayer');
+  if (!(target instanceof HTMLCanvasElement)) return layer;
+  const stage = document.getElementById('feImageStage');
+  const canvasRect = target.getBoundingClientRect();
+  const stageRect = stage && stage.getBoundingClientRect ? stage.getBoundingClientRect() : null;
+  if (!stage || !stageRect || !canvasRect.width || !canvasRect.height) return null;
+  if (!layer) {
+    layer = document.createElement('div');
+    layer.id = 'feCoordinatePickerMarkerLayer';
+    layer.className = 'fe-coordinate-picker-marker-layer fe-image-coordinate-picker-marker-layer';
+    stage.appendChild(layer);
+  }
+  layer.style.left = (canvasRect.left - stageRect.left + stage.scrollLeft) + 'px';
+  layer.style.top = (canvasRect.top - stageRect.top + stage.scrollTop) + 'px';
+  layer.style.width = canvasRect.width + 'px';
+  layer.style.height = canvasRect.height + 'px';
+  return layer;
 }
 
 function feRenderCoordinatePickerMarkers() {
-  const layer = document.getElementById('feCoordinatePickerMarkerLayer');
+  const layer = feGetCoordinatePickerMarkerLayer(feCoordinatePickerTarget);
   if (!layer) return;
   layer.replaceChildren();
   if (!feCoordinatePickerActive || feCoordinatePickerRequiredCount <= 1) return;
@@ -46724,6 +46927,29 @@ function feRenderCoordinatePickerMarkers() {
     marker.appendChild(label);
     layer.appendChild(marker);
   });
+}
+
+function feScheduleCoordinatePickerMarkerRender() {
+  if (!feCoordinatePickerActive || feCoordinatePickerResizeFrame) return;
+  feCoordinatePickerResizeFrame = requestAnimationFrame(() => {
+    feCoordinatePickerResizeFrame = 0;
+    feRenderCoordinatePickerMarkers();
+  });
+}
+
+function feObserveCoordinatePickerTarget() {
+  const target = feCoordinatePickerTarget;
+  if (!target || typeof ResizeObserver === 'undefined') return;
+  if (feCoordinatePickerResizeObserver) feCoordinatePickerResizeObserver.disconnect();
+  feCoordinatePickerResizeObserver = new ResizeObserver(feScheduleCoordinatePickerMarkerRender);
+  feCoordinatePickerResizeObserver.observe(target);
+}
+
+function feStopObservingCoordinatePickerTarget() {
+  if (feCoordinatePickerResizeObserver) feCoordinatePickerResizeObserver.disconnect();
+  feCoordinatePickerResizeObserver = null;
+  if (feCoordinatePickerResizeFrame) cancelAnimationFrame(feCoordinatePickerResizeFrame);
+  feCoordinatePickerResizeFrame = 0;
 }
 
 function feShowCoordinatePickerDialog() {
@@ -46855,19 +47081,21 @@ function feToggleColorPicker() {
   else feEnterColorPicker();
 }
 
-function feGetVideoCoordinate(event, target) {
+function feGetCoordinatePickerCoordinate(event, target) {
   const rect = target && target.getBoundingClientRect ? target.getBoundingClientRect() : null;
-  if (!rect || !rect.width || !rect.height || !(target instanceof HTMLVideoElement)) return null;
-  if (!target.videoWidth || !target.videoHeight) return null;
+  if (!rect || !rect.width || !rect.height) return null;
+  const width = target instanceof HTMLVideoElement ? target.videoWidth : target instanceof HTMLCanvasElement ? target.width : 0;
+  const height = target instanceof HTMLVideoElement ? target.videoHeight : target instanceof HTMLCanvasElement ? target.height : 0;
+  if (!width || !height) return null;
   const relativeX = event.clientX - rect.left;
   const relativeY = event.clientY - rect.top;
   if (relativeX < 0 || relativeY < 0 || relativeX >= rect.width || relativeY >= rect.height) return null;
 
-  const x = Math.min(target.videoWidth - 1, Math.max(0, Math.floor(relativeX * target.videoWidth / rect.width)));
-  const topOriginY = Math.min(target.videoHeight - 1, Math.max(0, Math.floor(relativeY * target.videoHeight / rect.height)));
+  const x = Math.min(width - 1, Math.max(0, Math.floor(relativeX * width / rect.width)));
+  const topOriginY = Math.min(height - 1, Math.max(0, Math.floor(relativeY * height / rect.height)));
   return {
-    width: target.videoWidth,
-    height: target.videoHeight,
+    width,
+    height,
     x,
     y: topOriginY
   };
@@ -46888,10 +47116,10 @@ function feFormatVideoCoordinatePayload(coordinate) {
   return prefix + '以左上角为原点的' + coordinates.length + '个坐标位置: [' + points + ']' + suffix;
 }
 
-async function fePickVideoCoordinate(event, target) {
-  const coordinate = feGetVideoCoordinate(event, target);
+async function fePickCoordinate(event, target) {
+  const coordinate = feGetCoordinatePickerCoordinate(event, target);
   if (!coordinate) {
-    feShowColorPickerToast('无法获取视频原始尺寸，请稍后重试', true);
+    feShowColorPickerToast('无法获取画布尺寸，请稍后重试', true);
     return;
   }
   feCoordinatePickerPoints.push(coordinate);
@@ -46935,19 +47163,24 @@ function feEnterCoordinatePicker() {
   if (!target) return;
   feExitColorPicker();
   feExitCoordinatePicker();
+  if (target instanceof HTMLCanvasElement) {
+    feSetImageGridActive(false);
+    feFinalizePendingImageTextEdit(false);
+  }
   feCoordinatePickerActive = true;
   feCoordinatePickerTarget = target;
   feCoordinatePickerPointerHandler = event => {
     if (event.button !== 0) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    fePickVideoCoordinate(event, target);
+    fePickCoordinate(event, target);
   };
   target.addEventListener('pointerdown', feCoordinatePickerPointerHandler, true);
   target.classList.add('fe-color-picker-target');
   feUpdateCoordinatePickerButton();
   feUpdateCoordinatePickerProgress();
   feRenderCoordinatePickerMarkers();
+  feObserveCoordinatePickerTarget();
   feShowColorPickerToast('开始提取坐标', false);
 }
 
@@ -47251,6 +47484,7 @@ function feSetImageGridActive(active) {
     feUpdateImageGridButton();
     return;
   }
+  if (feCoordinatePickerActive) feCancelCoordinatePicker();
   if (!canvas || !stage || !tool) return;
   feFinalizePendingImageTextEdit(true);
   feImageGridState.active = true;
@@ -47553,11 +47787,13 @@ function feOpenCurrentAppInside() {
   openRightSidebarUrlPreview(actionState.href);
 }
 
-async function feOpen(absPath) {
+async function feOpen(absPath, options) {
+  const initialMode = options && options.initialMode === 'edit' ? 'edit' : 'view';
   cmdClosePanel(true);
   closeRightSidebarUrlPreview();
   feStopMediaPreview();
   feHideMediaControls();
+  feResetAudioTrim();
   feResetColorPicker();
   feResetCoordinatePicker();
   feResetImageGridTool();
@@ -47587,7 +47823,7 @@ async function feOpen(absPath) {
   feImageState.pointerId = null;
   feCancelImageTextEdit();
   document.getElementById('fileEditorPath').textContent = feAgentRelPath;
-  feMode = 'view';
+  feMode = initialMode;
   feSyncOpenActions();
 
   const panel = document.querySelector('.file-editor-panel');
@@ -47624,6 +47860,7 @@ async function feOpen(absPath) {
       feImageMime = feResolveImageMime(feImageExt);
       await feRenderImageEditor(data.content);
       feUpdateColorPickerButton();
+      feUpdateCoordinatePickerButton();
       feUpdateImageGridButton();
       refreshOverlayStates();
     } catch {
@@ -47688,7 +47925,8 @@ async function feOpen(absPath) {
       return;
     }
     feCurrentContent = data.content;
-    feRenderView();
+    if (feMode === 'edit') feRenderEdit();
+    else feRenderView();
   } catch (err) {
     document.getElementById('fileEditorContent').innerHTML = '<div style="color:var(--error);padding:12px">加载失败</div>';
   }
@@ -48318,6 +48556,7 @@ function feClearImageEdits() {
 
 function feClose() {
   const content = document.getElementById('fileEditorContent');
+  feResetAudioTrim();
   feResetColorPicker();
   feResetCoordinatePicker();
   feResetImageGridTool();
@@ -48881,6 +49120,21 @@ function feFormatMediaTime(value) {
   return hours > 0 ? hours + ':' + twoDigits(minutes) + ':' + twoDigits(remainder) : twoDigits(minutes) + ':' + twoDigits(remainder);
 }
 
+function feFormatAudioTrimTime(value) {
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds) || seconds < 0) return '--:--';
+  const snapped = Math.round(seconds * 2) / 2;
+  const display = Math.abs(seconds - snapped) < 0.001 ? snapped : Math.round(seconds * 10) / 10;
+  const whole = Math.floor(display);
+  const hours = Math.floor(whole / 3600);
+  const minutes = Math.floor((whole % 3600) / 60);
+  const remainder = whole % 60;
+  const twoDigits = number => String(number).padStart(2, '0');
+  const fractionValue = Math.round((display - whole) * 10);
+  const fraction = fractionValue ? '.' + fractionValue : '';
+  return (hours > 0 ? hours + ':' + twoDigits(minutes) + ':' + twoDigits(remainder) : twoDigits(minutes) + ':' + twoDigits(remainder)) + fraction;
+}
+
 function feMediaElement() {
   const element = document.getElementById('feMediaElement');
   return element instanceof HTMLMediaElement ? element : null;
@@ -48945,6 +49199,10 @@ function fePlayMedia() {
   const media = feMediaElement();
   if (!media) return;
   feSetMediaStatus('');
+  if (feAudioTrimState.active && media instanceof HTMLAudioElement) {
+    const currentTime = Number(media.currentTime) || 0;
+    if (currentTime < feAudioTrimState.start || currentTime >= feAudioTrimState.end) media.currentTime = feAudioTrimState.start;
+  }
   const playback = media.play();
   if (playback && typeof playback.catch === 'function') {
     playback.catch(() => {
@@ -48962,7 +49220,7 @@ function fePauseMedia() {
 function feSeekMedia(offset) {
   const media = feMediaElement();
   if (!feHasSeekableDuration(media)) return;
-  media.currentTime = Math.min(media.duration, Math.max(0, media.currentTime + Number(offset || 0)));
+  media.currentTime = feClampMediaTimeToAudioTrim(media, media.currentTime + Number(offset || 0));
   feSyncMediaControls();
 }
 
@@ -48971,7 +49229,7 @@ function feSetMediaProgress(value) {
   if (!feHasSeekableDuration(media)) return;
   const requested = Number(value);
   if (!Number.isFinite(requested)) return;
-  media.currentTime = Math.min(media.duration, Math.max(0, requested));
+  media.currentTime = feClampMediaTimeToAudioTrim(media, requested);
   feSyncMediaControls();
 }
 
@@ -48981,6 +49239,268 @@ function feSetMediaVolume(value) {
   if (!media || !Number.isFinite(requested)) return;
   media.volume = Math.min(1, Math.max(0, requested));
   feSyncMediaControls();
+}
+
+function feClampMediaTimeToAudioTrim(media, value) {
+  const duration = feHasSeekableDuration(media) ? media.duration : 0;
+  let next = Math.min(duration, Math.max(0, Number(value) || 0));
+  if (feAudioTrimState.active && media instanceof HTMLAudioElement) {
+    next = Math.min(feAudioTrimState.end, Math.max(feAudioTrimState.start, next));
+  }
+  return next;
+}
+
+function feGetAudioTrimDuration() {
+  const media = feMediaElement();
+  return media instanceof HTMLAudioElement && feHasSeekableDuration(media) ? media.duration : 0;
+}
+
+function feSnapAudioTrimTime(value, duration) {
+  const max = Math.max(0, Number(duration) || 0);
+  const snapped = Math.round((Number(value) || 0) * 2) / 2;
+  return Math.min(max, Math.max(0, snapped));
+}
+
+function feGetAudioTrimMinimumDuration(duration) {
+  return Math.min(0.5, Math.max(0, Number(duration) || 0));
+}
+
+function feSetAudioTrimSummary(message, isError) {
+  const summary = document.getElementById('feAudioTrimSummary');
+  if (!summary) return;
+  summary.textContent = String(message || '');
+  summary.classList.toggle('error', !!isError);
+}
+
+function feUpdateAudioTrimButton() {
+  const button = document.getElementById('feAudioTrimBtn');
+  if (!button) return;
+  const available = feFileType === 'audio' && feMediaElement() instanceof HTMLAudioElement;
+  button.hidden = !available;
+  button.disabled = !available || feAudioTrimState.active || feAudioTrimState.saving;
+  button.setAttribute('aria-pressed', feAudioTrimState.active ? 'true' : 'false');
+  button.title = feAudioTrimState.active ? '正在裁剪音频' : '裁剪音频';
+  button.setAttribute('aria-label', button.title);
+}
+
+function feSyncAudioTrimUI() {
+  const panel = document.getElementById('feAudioTrimPanel');
+  const startInput = document.getElementById('feAudioTrimStart');
+  const endInput = document.getElementById('feAudioTrimEnd');
+  const startValue = document.getElementById('feAudioTrimStartValue');
+  const endValue = document.getElementById('feAudioTrimEndValue');
+  const saveButton = document.getElementById('feAudioTrimSaveBtn');
+  const cancelButton = document.getElementById('feAudioTrimCancelBtn');
+  const duration = feGetAudioTrimDuration();
+  const active = feAudioTrimState.active;
+  if (panel) panel.hidden = !active;
+  [startInput, endInput].forEach(input => {
+    if (!input) return;
+    input.min = '0';
+    input.max = String(duration);
+    input.step = '0.5';
+    input.disabled = !active || feAudioTrimState.saving || duration <= 0;
+  });
+  if (startInput) startInput.value = String(feAudioTrimState.start);
+  if (endInput) endInput.value = String(feAudioTrimState.end);
+  if (startValue) startValue.textContent = feFormatAudioTrimTime(feAudioTrimState.start);
+  if (endValue) endValue.textContent = feFormatAudioTrimTime(feAudioTrimState.end);
+  if (saveButton) {
+    saveButton.disabled = !active || feAudioTrimState.saving || feAudioTrimState.end <= feAudioTrimState.start;
+    saveButton.textContent = feAudioTrimState.saving ? '正在保存…' : '保存为新音频';
+  }
+  if (cancelButton) cancelButton.disabled = feAudioTrimState.saving;
+  if (active && !feAudioTrimState.saving) {
+    feSetAudioTrimSummary('已选择 ' + feFormatAudioTrimTime(feAudioTrimState.start) + ' 至 ' + feFormatAudioTrimTime(feAudioTrimState.end) + '，时长 ' + feFormatAudioTrimTime(feAudioTrimState.end - feAudioTrimState.start), false);
+  }
+  feUpdateAudioTrimButton();
+}
+
+function feResetAudioTrim() {
+  feAudioTrimState = { active: false, start: 0, end: 0, sourceURL: '', saving: false };
+  const panel = document.getElementById('feAudioTrimPanel');
+  if (panel) panel.hidden = true;
+  feSetAudioTrimSummary('', false);
+  const button = document.getElementById('feAudioTrimBtn');
+  if (button) {
+    button.hidden = true;
+    button.disabled = true;
+    button.setAttribute('aria-pressed', 'false');
+    button.title = '裁剪音频';
+    button.setAttribute('aria-label', '裁剪音频');
+  }
+}
+
+function feEnterAudioTrim() {
+  const media = feMediaElement();
+  const duration = feGetAudioTrimDuration();
+  if (!(media instanceof HTMLAudioElement) || !duration) {
+    feSetMediaStatus('正在读取音频时长，请稍后再试');
+    return;
+  }
+  try { media.pause(); } catch {}
+  feAudioTrimState.active = true;
+  feAudioTrimState.saving = false;
+  feAudioTrimState.start = 0;
+  feAudioTrimState.end = duration;
+  feSyncAudioTrimUI();
+  feSetMediaProgress(feAudioTrimState.start);
+}
+
+function feSetAudioTrimStart(value) {
+  if (!feAudioTrimState.active || feAudioTrimState.saving) return;
+  const duration = feGetAudioTrimDuration();
+  const minimum = feGetAudioTrimMinimumDuration(duration);
+  let start = feSnapAudioTrimTime(value, duration);
+  let end = feAudioTrimState.end;
+  if (start > end - minimum) start = Math.max(0, end - minimum);
+  feAudioTrimState.start = start;
+  feSyncAudioTrimUI();
+  feSetMediaProgress(start);
+}
+
+function feSetAudioTrimEnd(value) {
+  if (!feAudioTrimState.active || feAudioTrimState.saving) return;
+  const duration = feGetAudioTrimDuration();
+  const minimum = feGetAudioTrimMinimumDuration(duration);
+  let end = feSnapAudioTrimTime(value, duration);
+  const start = feAudioTrimState.start;
+  if (end < start + minimum) end = Math.min(duration, start + minimum);
+  feAudioTrimState.end = end;
+  feSyncAudioTrimUI();
+  const media = feMediaElement();
+  if (media instanceof HTMLAudioElement && media.currentTime > end) feSetMediaProgress(end);
+}
+
+function feCancelAudioTrim(force) {
+  if (feAudioTrimState.saving && !force) return;
+  feAudioTrimState.active = false;
+  feAudioTrimState.start = 0;
+  feAudioTrimState.end = 0;
+  feSetAudioTrimSummary('', false);
+  feSyncAudioTrimUI();
+}
+
+function feEncodeAudioTrimWav(audioBuffer, startSeconds, endSeconds) {
+  const sampleRate = Math.max(1, Math.round(Number(audioBuffer && audioBuffer.sampleRate) || 0));
+  const channelCount = Math.max(1, Math.min(2, Number(audioBuffer && audioBuffer.numberOfChannels) || 1));
+  const startFrame = Math.max(0, Math.min(audioBuffer.length, Math.round(startSeconds * sampleRate)));
+  const endFrame = Math.max(startFrame, Math.min(audioBuffer.length, Math.round(endSeconds * sampleRate)));
+  const frameCount = endFrame - startFrame;
+  if (!frameCount) throw new Error('裁剪区间不能为空');
+  const bytesPerSample = 2;
+  const blockAlign = channelCount * bytesPerSample;
+  const dataSize = frameCount * blockAlign;
+  const output = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(output);
+  const writeASCII = (offset, text) => {
+    for (let index = 0; index < text.length; index++) view.setUint8(offset + index, text.charCodeAt(index));
+  };
+  writeASCII(0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeASCII(8, 'WAVE');
+  writeASCII(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, channelCount, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * blockAlign, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, 16, true);
+  writeASCII(36, 'data');
+  view.setUint32(40, dataSize, true);
+  const channels = Array.from({ length: channelCount }, (_, index) => audioBuffer.getChannelData(index));
+  let offset = 44;
+  for (let frame = startFrame; frame < endFrame; frame++) {
+    for (let channel = 0; channel < channelCount; channel++) {
+      const sample = Math.max(-1, Math.min(1, channels[channel][frame] || 0));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+      offset += bytesPerSample;
+    }
+  }
+  return output;
+}
+
+function feArrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(offset, Math.min(bytes.length, offset + chunkSize)));
+  }
+  return btoa(binary);
+}
+
+function feBuildAudioTrimPath(relPath) {
+  const value = String(relPath || '').trim();
+  const slashIndex = value.lastIndexOf('/');
+  const dir = slashIndex >= 0 ? value.slice(0, slashIndex + 1) : '';
+  const file = slashIndex >= 0 ? value.slice(slashIndex + 1) : value;
+  const dotIndex = file.lastIndexOf('.');
+  const base = dotIndex > 0 ? file.slice(0, dotIndex) : file;
+  return dir + (base || 'audio') + '_trim.wav';
+}
+
+async function feSaveAudioTrim() {
+  if (!feAudioTrimState.active || feAudioTrimState.saving) return;
+  const media = feMediaElement();
+  const agentId = feGetPreviewAgentID();
+  const sourceURL = feAudioTrimState.sourceURL;
+  if (!(media instanceof HTMLAudioElement) || !agentId || !feAgentRelPath || feAgentRelPath.startsWith('/') || !sourceURL) {
+    feSetAudioTrimSummary('无法确定需要保存的音频或 Agent 工作目录', true);
+    return;
+  }
+  const start = feAudioTrimState.start;
+  const end = feAudioTrimState.end;
+  if (!(end > start)) {
+    feSetAudioTrimSummary('请先选择有效的裁剪区间', true);
+    return;
+  }
+  const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextCtor) {
+    feSetAudioTrimSummary('当前浏览器不支持音频裁剪', true);
+    return;
+  }
+  feAudioTrimState.saving = true;
+  feSetAudioTrimSummary('正在生成新音频…', false);
+  feSyncAudioTrimUI();
+  let audioContext = null;
+  try {
+    const response = await fetch(sourceURL, { credentials: 'same-origin' });
+    if (!response.ok) throw new Error('读取源音频失败');
+    const encodedAudio = await response.arrayBuffer();
+    audioContext = new AudioContextCtor();
+    const decodedAudio = await audioContext.decodeAudioData(encodedAudio);
+    const wav = feEncodeAudioTrimWav(decodedAudio, start, end);
+    const responseSave = await fetch('/api/edit?agentId=' + encodeURIComponent(agentId) + '&path=' + encodeURIComponent(feBuildAudioTrimPath(feAgentRelPath)) + '&saveAsNew=true', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: feArrayBufferToBase64(wav) })
+    });
+    const result = await responseSave.json();
+    if (!responseSave.ok || !result || result.status !== 0) throw new Error(result && result.content || '保存新音频失败');
+    feCancelAudioTrim(true);
+    vfsLastJson = '';
+    await vfsRefresh();
+    if (result.savedAs) {
+      try {
+        await copyTextToClipboard(result.savedAs);
+        vfsShowUploadToast('已生成新音频，路径已复制到剪贴板', false);
+      } catch {
+        vfsShowUploadToast('已生成新音频', false);
+      }
+    } else {
+      vfsShowUploadToast('已生成新音频', false);
+    }
+  } catch (error) {
+    feSetAudioTrimSummary('保存失败：' + (error && error.message || '无法生成新音频'), true);
+  } finally {
+    if (audioContext && typeof audioContext.close === 'function') {
+      try { await audioContext.close(); } catch {}
+    }
+    feAudioTrimState.saving = false;
+    feSyncAudioTrimUI();
+  }
 }
 
 function renderMediaPreview(sourceURL, mediaType) {
@@ -48996,7 +49516,12 @@ function renderMediaPreview(sourceURL, mediaType) {
   media.src = sourceURL;
   ['loadedmetadata', 'durationchange', 'timeupdate', 'play', 'pause', 'volumechange', 'ended', 'canplay'].forEach(eventName => {
     media.addEventListener(eventName, () => {
+      if (feAudioTrimState.active && media instanceof HTMLAudioElement && eventName === 'timeupdate' && media.currentTime >= feAudioTrimState.end) {
+        media.currentTime = feAudioTrimState.start;
+        media.pause();
+      }
       if (eventName === 'canplay' || eventName === 'loadedmetadata') feSetMediaStatus('');
+      if (media instanceof HTMLAudioElement && (eventName === 'loadedmetadata' || eventName === 'durationchange')) feSyncAudioTrimUI();
       feSyncMediaControls();
     });
   });
@@ -49016,6 +49541,8 @@ function renderMediaPreview(sourceURL, mediaType) {
   } else {
     container.appendChild(media);
   }
+  feAudioTrimState.sourceURL = mediaType === 'audio' ? sourceURL : '';
+  feUpdateAudioTrimButton();
   feShowMediaControls();
   media.load();
 }

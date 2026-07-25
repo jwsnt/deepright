@@ -5151,6 +5151,44 @@ func ensurePathWithinRoot(root, target string) bool {
 	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))
 }
 
+// ensureWritablePathWithinRoot additionally resolves the closest existing
+// parent directory before a write. A lexical path below workspace can still
+// escape through a symlinked parent, so writes must validate the real parent
+// as well as reject an existing target symlink.
+func ensureWritablePathWithinRoot(root, target string) bool {
+	if !ensurePathWithinRoot(root, target) {
+		return false
+	}
+	resolvedRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return false
+	}
+	parent := filepath.Dir(filepath.Clean(target))
+	for {
+		resolvedParent, err := filepath.EvalSymlinks(parent)
+		if err == nil {
+			if !ensurePathWithinRoot(resolvedRoot, resolvedParent) {
+				return false
+			}
+			break
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			return false
+		}
+		nextParent := filepath.Dir(parent)
+		if nextParent == parent {
+			return false
+		}
+		parent = nextParent
+	}
+	if info, err := os.Lstat(target); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		return false
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+	return true
+}
+
 type knowledgeTreeNode struct {
 	Name     string
 	Children []*knowledgeTreeNode
@@ -5884,7 +5922,7 @@ func writeEditResp(w http.ResponseWriter, resp EditResponse) {
 func appendTimestampToFilename(path string, ts time.Time) string {
 	ext := filepath.Ext(path)
 	base := strings.TrimSuffix(path, ext)
-	stamp := ts.Format("20060102_150405")
+	stamp := ts.Format("20060102_150405_000000000")
 	if ext == "" {
 		return base + "_" + stamp
 	}
@@ -5939,7 +5977,7 @@ func handleEdit(cfg *Config) http.HandlerFunc {
 			writeEditResp(w, EditResponse{AgentID: agentID, Path: relPath, Content: "路径解析失败: " + err.Error(), Status: 1})
 			return
 		}
-		if !ensurePathWithinRoot(workspace, resolved) {
+		if !ensureWritablePathWithinRoot(workspace, resolved) {
 			writeEditResp(w, EditResponse{AgentID: agentID, Path: relPath, Content: "只支持 workspace 下的相对路径", Status: 1})
 			return
 		}

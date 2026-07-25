@@ -3632,6 +3632,92 @@ func TestHandleMediaPreviewStreamsAgentScopedMedia(t *testing.T) {
 	}
 }
 
+func TestHandleEditSavesNewBinaryAudioWithoutChangingSource(t *testing.T) {
+	root := t.TempDir()
+	workspace := filepath.Join(root, "agent-a")
+	sourcePath := filepath.Join(workspace, "media", "message.wav")
+	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
+		t.Fatalf("mkdir media: %v", err)
+	}
+	source := []byte("original-wav-content")
+	if err := os.WriteFile(sourcePath, source, 0o644); err != nil {
+		t.Fatalf("write source audio: %v", err)
+	}
+
+	server := httptest.NewServer(handleEdit(&Config{AgentDir: root, Device: "test-dev", AgentCacheMs: 0}))
+	defer server.Close()
+	generated := []byte("trimmed-wav-content")
+	requestBody, err := json.Marshal(EditRequest{Content: base64.StdEncoding.EncodeToString(generated)})
+	if err != nil {
+		t.Fatalf("marshal edit request: %v", err)
+	}
+	response, err := http.Post(server.URL+"/api/edit?agentId=agent-a&path="+url.QueryEscape("media/message_trim.wav")+"&saveAsNew=true", "application/json", bytes.NewReader(requestBody))
+	if err != nil {
+		t.Fatalf("POST save new audio: %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(response.Body)
+		t.Fatalf("POST status = %d, body=%s", response.StatusCode, body)
+	}
+	var result EditResponse
+	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
+		t.Fatalf("decode edit response: %v", err)
+	}
+	if result.Status != 0 || result.AgentID != "agent-a" || result.Path != "media/message_trim.wav" || result.SavedAs == "" {
+		t.Fatalf("unexpected save response: %+v", result)
+	}
+	if !ensurePathWithinRoot(workspace, result.SavedAs) {
+		t.Fatalf("saved path escaped workspace: %q", result.SavedAs)
+	}
+	if matched, err := regexp.MatchString(`message_trim_\d{8}_\d{6}_\d{9}\.wav$`, filepath.ToSlash(result.SavedAs)); err != nil || !matched {
+		t.Fatalf("saved path = %q, want timestamped .wav path (match=%v err=%v)", result.SavedAs, matched, err)
+	}
+	if saved, err := os.ReadFile(result.SavedAs); err != nil || !bytes.Equal(saved, generated) {
+		t.Fatalf("saved audio = %q, err=%v; want %q", saved, err, generated)
+	}
+	if current, err := os.ReadFile(sourcePath); err != nil || !bytes.Equal(current, source) {
+		t.Fatalf("source audio changed to %q, err=%v; want %q", current, err, source)
+	}
+
+	badResponse, err := http.Post(server.URL+"/api/edit?agentId=agent-a&path="+url.QueryEscape("../message_trim.wav")+"&saveAsNew=true", "application/json", bytes.NewReader(requestBody))
+	if err != nil {
+		t.Fatalf("POST escaped save path: %v", err)
+	}
+	defer badResponse.Body.Close()
+	var badResult EditResponse
+	if err := json.NewDecoder(badResponse.Body).Decode(&badResult); err != nil {
+		t.Fatalf("decode escaped response: %v", err)
+	}
+	if badResult.Status == 0 {
+		t.Fatalf("escaped path unexpectedly succeeded: %+v", badResult)
+	}
+
+	outside := t.TempDir()
+	linkedDir := filepath.Join(workspace, "linked")
+	if err := os.Symlink(outside, linkedDir); err == nil {
+		symlinkResponse, err := http.Post(server.URL+"/api/edit?agentId=agent-a&path="+url.QueryEscape("linked/message_trim.wav")+"&saveAsNew=true", "application/json", bytes.NewReader(requestBody))
+		if err != nil {
+			t.Fatalf("POST symlink escaped save path: %v", err)
+		}
+		defer symlinkResponse.Body.Close()
+		var symlinkResult EditResponse
+		if err := json.NewDecoder(symlinkResponse.Body).Decode(&symlinkResult); err != nil {
+			t.Fatalf("decode symlink response: %v", err)
+		}
+		if symlinkResult.Status == 0 {
+			t.Fatalf("symlink escaped path unexpectedly succeeded: %+v", symlinkResult)
+		}
+		entries, err := os.ReadDir(outside)
+		if err != nil {
+			t.Fatalf("read outside directory: %v", err)
+		}
+		if len(entries) != 0 {
+			t.Fatalf("symlink escaped save created outside files: %v", entries)
+		}
+	}
+}
+
 func TestHandleFolderSupportsAbsolutePath(t *testing.T) {
 	testDir := t.TempDir()
 	homeDir := filepath.Join(testDir, "home")
