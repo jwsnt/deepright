@@ -6545,23 +6545,33 @@ func handleRuntimeHost(cfg *Config) http.HandlerFunc {
 		w.WriteHeader(statusCode)
 		_ = json.NewEncoder(w).Encode(payload)
 	}
+	writeSnapshot := func(w http.ResponseWriter, snapshot runtimehost.Snapshot) {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"status": 0,
+			"data":   map[string]string{"host": snapshot.Host},
+		})
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !isLocalManagementRequest(r) {
 			writeJSON(w, http.StatusForbidden, map[string]any{
 				"status":  1,
-				"content": "only localhost requests can modify runtime host",
+				"content": "only localhost requests can modify service address",
 			})
 			return
 		}
 
 		switch r.Method {
 		case http.MethodGet:
-			writeJSON(w, http.StatusOK, map[string]any{"status": 0, "data": cfg.runtimeHostSnapshot()})
+			writeSnapshot(w, cfg.runtimeHostSnapshot())
 			return
 		case http.MethodDelete:
-			snapshot := cfg.resetRuntimeHost()
-			log.Printf("runtime host reset to startup value: %s", snapshot.StartupHost)
-			writeJSON(w, http.StatusOK, map[string]any{"status": 0, "data": snapshot})
+			snapshot, err := cfg.resetPersistentHost()
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{"status": 1, "content": err.Error()})
+				return
+			}
+			log.Printf("service address restored to default: %s", snapshot.Host)
+			writeSnapshot(w, snapshot)
 			return
 		case http.MethodPost, http.MethodPut:
 			var payload hostRequest
@@ -6584,21 +6594,32 @@ func handleRuntimeHost(cfg *Config) http.HandlerFunc {
 				}
 			}
 			if payload.Reset {
-				snapshot := cfg.resetRuntimeHost()
-				log.Printf("runtime host reset to startup value: %s", snapshot.StartupHost)
-				writeJSON(w, http.StatusOK, map[string]any{"status": 0, "data": snapshot})
+				snapshot, err := cfg.resetPersistentHost()
+				if err != nil {
+					writeJSON(w, http.StatusInternalServerError, map[string]any{"status": 1, "content": err.Error()})
+					return
+				}
+				log.Printf("service address restored to default: %s", snapshot.Host)
+				writeSnapshot(w, snapshot)
 				return
 			}
-			snapshot, err := cfg.setRuntimeHost(payload.Host)
-			if err != nil {
+			if _, err := runtimehost.Validate(payload.Host); err != nil {
 				writeJSON(w, http.StatusBadRequest, map[string]any{
 					"status":  1,
 					"content": err.Error(),
 				})
 				return
 			}
-			log.Printf("runtime host updated: %s", snapshot.Host)
-			writeJSON(w, http.StatusOK, map[string]any{"status": 0, "data": snapshot})
+			snapshot, err := cfg.setPersistentHost(payload.Host)
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{
+					"status":  1,
+					"content": err.Error(),
+				})
+				return
+			}
+			log.Printf("service address updated: %s", snapshot.Host)
+			writeSnapshot(w, snapshot)
 			return
 		default:
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -15110,6 +15131,25 @@ func (cfg *Config) resetRuntimeHost() runtimehost.Snapshot {
 	return cfg.ensureRuntimeHostState().Reset()
 }
 
+func (cfg *Config) setPersistentHost(host string) (runtimehost.Snapshot, error) {
+	if cfg == nil {
+		return runtimehost.Snapshot{}, fmt.Errorf("service address is not initialized")
+	}
+	normalized, err := runtimehost.Validate(host)
+	if err != nil {
+		return runtimehost.Snapshot{}, err
+	}
+	if err := updateIntegrationStartupConfig(map[string]interface{}{"host": normalized}); err != nil {
+		return runtimehost.Snapshot{}, fmt.Errorf("save config/config.json failed: %w", err)
+	}
+	cfg.Host = normalized
+	return cfg.ensureRuntimeHostState().Set(normalized)
+}
+
+func (cfg *Config) resetPersistentHost() (runtimehost.Snapshot, error) {
+	return cfg.setPersistentHost(defaultUpstreamHost)
+}
+
 func (cfg *Config) ensureStandaloneState() *integrationstandalone.State {
 	if cfg == nil {
 		return integrationstandalone.New(false)
@@ -15259,6 +15299,69 @@ func readIntegrationStartupConfigRaw() (map[string]interface{}, string, error) {
 		raw = map[string]interface{}{}
 	}
 	return raw, path, nil
+}
+
+var integrationStartupConfigWriteMu sync.Mutex
+
+func updateIntegrationStartupConfig(values map[string]interface{}) error {
+	if len(values) == 0 {
+		return nil
+	}
+	integrationStartupConfigWriteMu.Lock()
+	defer integrationStartupConfigWriteMu.Unlock()
+
+	raw, configPath, err := readIntegrationStartupConfigRaw()
+	if err != nil {
+		return err
+	}
+	if raw == nil {
+		raw = map[string]interface{}{}
+	}
+	for key, value := range values {
+		key = strings.TrimSpace(key)
+		if key != "" {
+			raw[key] = value
+		}
+	}
+	if strings.TrimSpace(configPath) == "" {
+		return fmt.Errorf("resolve config/config.json path failed")
+	}
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
+		return err
+	}
+	encoded, err := json.MarshalIndent(raw, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	mode := fs.FileMode(0o644)
+	if info, statErr := os.Stat(configPath); statErr == nil {
+		mode = info.Mode().Perm()
+	} else if !errors.Is(statErr, os.ErrNotExist) {
+		return statErr
+	}
+	temporary, err := os.CreateTemp(filepath.Dir(configPath), ".config.json-*")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if err := temporary.Chmod(mode); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if _, err := temporary.Write(append(encoded, '\n')); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if err := temporary.Sync(); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if err := temporary.Close(); err != nil {
+		return err
+	}
+	return os.Rename(temporaryPath, configPath)
 }
 
 func readIntegrationStartupConfig() (map[string]interface{}, string, error) {
@@ -16308,7 +16411,7 @@ func printCLIHelp() {
 	fmt.Println("  cron delete-meta   Delete task metadata and its details")
 	fmt.Println("  cron delete-detail Delete task details")
 	fmt.Println("  knowledge         Knowledge runtime helper commands")
-	fmt.Println("  host              Read or update the in-memory upstream host of a running integration service")
+	fmt.Println("  host              Read or update the persisted service address of a running integration service")
 	fmt.Println("  standalone        Read or update the in-memory localhost-only mode of a running integration service")
 	fmt.Println("  agent             Export, import, or copy managed Agent files")
 	fmt.Println("  sandbox           Read or update sandbox mode for one AgentId + ChatId")
@@ -16535,9 +16638,9 @@ func printHostHelp() {
 	fmt.Println("  integration host reset [--addr URL]")
 	fmt.Println("")
 	fmt.Println("Subcommands:")
-	fmt.Println("  get               Print the current runtime host of the running integration service")
-	fmt.Println("  set               Override the runtime host in memory until the service restarts")
-	fmt.Println("  reset             Clear the runtime override and fall back to the startup host")
+	fmt.Println("  get               Print the current service address")
+	fmt.Println("  set               Update and persist the service address")
+	fmt.Println("  reset             Restore and persist the default service address")
 	fmt.Println("")
 	fmt.Println("Options:")
 	fmt.Println("  --value URL       New upstream host URL, required by set")
@@ -16545,8 +16648,8 @@ func printHostHelp() {
 	fmt.Println("  --port INT        Integration HTTP 端口；仅支持 8080")
 	fmt.Println("")
 	fmt.Println("Notes:")
-	fmt.Println("  该命令通过本机 integration 的 /api/host 接口工作，仅修改当前运行进程内存，不会写入 config.json。")
-	fmt.Println("  integration 重启后，会恢复为 --host / config/config.json / 内置默认值决定的启动 Host。")
+	fmt.Println("  该命令通过本机 integration 的 /api/host 接口工作，并持久化写入 config/config.json.host。")
+	fmt.Println("  reset 会恢复默认服务地址 https://www.deepright.cn。")
 	fmt.Println("")
 	fmt.Println("Examples:")
 	fmt.Println("  integration host get")
@@ -16859,7 +16962,7 @@ func runIntegrationHostCLI(args []string, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	addr := fs.String("addr", "", "integration HTTP base address")
 	port := fs.Int("port", 0, "integration HTTP port")
-	value := fs.String("value", "", "runtime upstream host URL")
+	value := fs.String("value", "", "service address URL")
 	fs.Usage = func() { printHostHelp() }
 	if err := fs.Parse(args[1:]); err != nil {
 		return 1
@@ -16902,12 +17005,7 @@ func runIntegrationHostCLI(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	out, marshalErr := json.MarshalIndent(map[string]any{
-		"host":        snapshot.Host,
-		"startupHost": snapshot.StartupHost,
-		"overridden":  snapshot.Overridden,
-		"runtimeOnly": snapshot.RuntimeOnly,
-	}, "", "  ")
+	out, marshalErr := json.MarshalIndent(map[string]any{"host": snapshot.Host}, "", "  ")
 	if marshalErr != nil {
 		fmt.Fprintln(stderr, marshalErr.Error())
 		return 1

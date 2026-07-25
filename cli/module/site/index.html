@@ -2195,6 +2195,7 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .settings-title h3{margin:0}
 .settings-copy-btn{width:20px;height:20px;border:none;border-radius:999px;background:transparent;color:var(--text-muted);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition);padding:0}
 .settings-copy-btn svg{width:14px;height:14px;animation:settingsCopySpin 6s linear infinite}
+.settings-host-btn svg{animation:none}
 .settings-copy-btn:hover{color:var(--text-primary);background:rgba(var(--accent-rgb),.08)}
 @keyframes settingsCopySpin{0%,92%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
 .settings-form{display:flex;flex-direction:column;flex:1;min-height:0}
@@ -2852,7 +2853,8 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .settings-secret-host-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 .settings-secret-host-head h4{margin:0;font-size:16px;color:var(--text-primary)}
 .settings-secret-host-desc{font-size:12px;line-height:1.5;color:var(--text-secondary)}
-.settings-secret-host-current{padding:10px 12px;border-radius:14px;background:var(--modal-field-bg-muted);border:1px solid var(--modal-field-border);font-size:13px;line-height:1.5;color:var(--text-primary);word-break:break-word}
+.settings-secret-host-current,.settings-secret-host-input{font-family:inherit;font-size:13px;font-weight:400;line-height:1.5}
+.settings-secret-host-current{padding:10px 12px;border-radius:14px;background:var(--modal-field-bg-muted);border:1px solid var(--modal-field-border);color:var(--text-primary);word-break:break-word}
 .settings-secret-host-meta{font-size:12px;line-height:1.5;color:var(--text-muted);word-break:break-word}
 .settings-secret-host-input{width:100%}
 .settings-secret-host-note{font-size:12px;line-height:1.5;color:var(--text-secondary)}
@@ -4167,7 +4169,7 @@ body.quick-fan-transition-active{cursor:progress}
 /* File Editor Overlay */
 .file-editor-overlay{position:fixed;inset:0;padding:16px;box-sizing:border-box;z-index:240;display:flex;align-items:center;justify-content:center;background:rgba(14,22,38,.2);backdrop-filter:blur(10px) saturate(135%);-webkit-backdrop-filter:blur(10px) saturate(135%);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .3s,visibility 0s linear .3s}
 .file-editor-overlay.show{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .3s}
-.file-editor-panel{width:min(700px,calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:90vh;background:color-mix(in srgb,var(--bg-main) 18%,rgba(255,255,255,.82));border:1px solid color-mix(in srgb,var(--glass-edge-strong) 52%,rgba(255,255,255,.24));border-radius:var(--radius-sm);box-shadow:0 18px 42px rgba(0,0,0,.28);display:flex;flex-direction:column;overflow:hidden;backdrop-filter:blur(22px) saturate(145%);-webkit-backdrop-filter:blur(22px) saturate(145%)}
+.file-editor-panel{position:relative;width:min(700px,calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:90vh;background:color-mix(in srgb,var(--bg-main) 18%,rgba(255,255,255,.82));border:1px solid color-mix(in srgb,var(--glass-edge-strong) 52%,rgba(255,255,255,.24));border-radius:var(--radius-sm);box-shadow:0 18px 42px rgba(0,0,0,.28);display:flex;flex-direction:column;overflow:hidden;backdrop-filter:blur(22px) saturate(145%);-webkit-backdrop-filter:blur(22px) saturate(145%)}
 .file-editor-panel.auto-size{width:auto;height:auto;min-width:300px;min-height:200px}
 .file-editor-panel:not(.auto-size){height:700px}
 .file-editor-header{padding:8px 12px;font-size:12px;color:var(--text-muted);border-bottom:1px solid color-mix(in srgb,var(--border) 56%,rgba(255,255,255,.26));display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:linear-gradient(180deg,rgba(255,255,255,.58),rgba(255,255,255,.3))}
@@ -4179,6 +4181,17 @@ body.quick-fan-transition-active{cursor:progress}
 .file-editor-content .fe-image{max-width:100%;max-height:70vh;display:block;margin:0 auto}
 .file-editor-content .fe-video{display:block;width:min(960px,100%);max-width:100%;max-height:70vh;margin:0 auto;border-radius:12px;background:#000}
 .file-editor-content .fe-audio{display:block;width:min(760px,100%);margin:48px auto;background:transparent}
+.file-editor-color-picker-btn{width:28px;height:28px;border:0;border-radius:8px;padding:0;background:transparent;color:#48638f;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition)}
+.file-editor-color-picker-btn[hidden]{display:none!important}
+.file-editor-color-picker-btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.file-editor-color-picker-btn:hover,.file-editor-color-picker-btn[aria-pressed="true"]{background:rgba(var(--accent-rgb),.12);color:var(--accent);transform:translateY(-1px)}
+.file-editor-color-picker-btn:focus-visible{outline:none;box-shadow:0 0 0 2px rgba(var(--accent-rgb),.26)}
+.fe-color-picker-target{cursor:crosshair!important}
+.fe-color-picker-toast{position:absolute;left:16px;bottom:16px;z-index:8;max-width:min(360px,calc(100% - 32px));padding:9px 12px;border:1px solid rgba(var(--accent-soft-rgb),.24);border-radius:10px;background:linear-gradient(180deg,var(--accent-hover),var(--accent));box-shadow:0 0 0 1px rgba(var(--accent-soft-rgb),.24),0 10px 24px rgba(var(--accent-rgb),.18),inset 0 1px 0 rgba(255,255,255,.18);color:#fff;font-size:12px;line-height:1.45;opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity .22s ease,transform .22s ease}
+.fe-color-picker-toast.media{bottom:64px}
+.fe-color-picker-toast.show{opacity:1;transform:translateY(0)}
+.fe-color-picker-toast.error{border-color:rgba(255,210,157,.54);background:linear-gradient(135deg,rgba(173,78,21,.96),rgba(214,122,38,.94));box-shadow:0 10px 26px rgba(147,65,17,.28),inset 0 1px 0 rgba(255,255,255,.2);color:#fff9f3}
+[data-theme="dark"] .fe-color-picker-toast:not(.error){border-color:rgba(122,241,255,.34);background:linear-gradient(180deg,#56e7ff,#1699ff);box-shadow:0 0 0 1px rgba(122,241,255,.34),0 10px 24px rgba(0,212,255,.22),inset 0 1px 0 rgba(255,255,255,.18);color:#11161c}
 .file-editor-media-controls{display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid color-mix(in srgb,var(--border) 56%,rgba(255,255,255,.26));background:linear-gradient(180deg,rgba(255,255,255,.58),rgba(255,255,255,.34));flex-shrink:0}
 .file-editor-media-controls[hidden]{display:none!important}
 .fe-media-control-btn{width:34px;height:32px;border:1px solid color-mix(in srgb,var(--accent-rgb),.22);border-radius:9px;padding:0;background:rgba(255,255,255,.76);color:var(--text-primary);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition)}
@@ -4193,7 +4206,7 @@ body.quick-fan-transition-active{cursor:progress}
 .fe-media-volume{width:72px;accent-color:var(--accent);cursor:pointer}
 .fe-media-status{display:none;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--error)}
 .fe-media-status:not(:empty){display:inline}
-@media (max-width:680px){.file-editor-media-controls{flex-wrap:wrap}.fe-media-progress{order:3;flex-basis:100%}.fe-media-status{max-width:100%}.fe-media-volume-wrap{margin-left:auto}}
+@media (max-width:680px){.file-editor-media-controls{flex-wrap:wrap}.fe-media-progress{order:3;flex-basis:100%}.fe-media-status{max-width:100%}.fe-media-volume-wrap{margin-left:auto}.fe-color-picker-toast.media{bottom:98px}}
 .fe-image-editor{display:flex;flex-direction:column;gap:12px;padding:12px}
 .fe-image-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .fe-image-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -4203,9 +4216,32 @@ body.quick-fan-transition-active{cursor:progress}
 .fe-image-toolbar label{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary)}
 .fe-image-toolbar input[type="range"]{accent-color:var(--accent)}
 .fe-image-color-input{width:32px;height:24px;padding:0;border:1px solid var(--border);border-radius:6px;background:transparent;cursor:pointer}
+.fe-image-color-hex{width:84px;height:25px;padding:3px 7px;border:1px solid var(--border);border-radius:6px;background:var(--bg-input);color:var(--text-primary);font:600 11px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.03em;text-transform:uppercase;outline:none}
+.fe-image-color-hex:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(var(--accent-rgb),.14)}
+.fe-image-color-hex.invalid{border-color:var(--error);box-shadow:0 0 0 2px var(--error-bg)}
+.fe-image-grid-tool{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;padding:10px;border:1px solid color-mix(in srgb,var(--accent-rgb),.22);border-radius:var(--radius-xs);background:color-mix(in srgb,var(--bg-sidebar) 76%,rgba(var(--accent-rgb),.08));box-shadow:inset 0 1px 0 rgba(255,255,255,.28)}
+.fe-image-grid-tool[hidden]{display:none!important}
+.fe-image-grid-field{display:flex;min-width:0;flex-direction:column;gap:4px;color:var(--text-secondary);font-size:11px;line-height:1.2}
+.fe-image-grid-field input{width:100%;min-width:0;height:30px;padding:4px 7px;border:1px solid var(--border);border-radius:7px;background:var(--bg-input);color:var(--text-primary);font:600 12px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;outline:none}
+.fe-image-grid-field input:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(var(--accent-rgb),.14)}
+.fe-image-grid-export{align-self:end;height:30px;padding:0 10px;border:1px solid var(--accent);border-radius:7px;background:var(--accent);color:#fff;font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;transition:var(--transition)}
+.fe-image-grid-export:hover{filter:brightness(1.06);transform:translateY(-1px)}
+.fe-image-grid-summary{grid-column:1 / -1;min-height:16px;color:var(--text-muted);font-size:11px;line-height:1.35}
+.fe-image-grid-summary.error{color:var(--error)}
 .fe-image-tip{font-size:11px;color:var(--text-muted)}
 .fe-image-stage{position:relative;display:flex;align-items:flex-start;justify-content:center;overflow:auto;max-height:70vh}
 .fe-image-canvas{display:block;max-width:100%;height:auto;background-image:linear-gradient(45deg,rgba(0,0,0,.05) 25%,transparent 25%,transparent 75%,rgba(0,0,0,.05) 75%,rgba(0,0,0,.05)),linear-gradient(45deg,rgba(0,0,0,.05) 25%,transparent 25%,transparent 75%,rgba(0,0,0,.05) 75%,rgba(0,0,0,.05));background-position:0 0,8px 8px;background-size:16px 16px;border:1px solid var(--border);border-radius:var(--radius-xs);box-shadow:0 8px 24px rgba(0,0,0,.18);cursor:crosshair}
+.fe-image-stage.fe-image-grid-active .fe-image-canvas{pointer-events:none}
+.fe-image-grid-overlay{position:absolute;z-index:4;pointer-events:auto;overflow:hidden;border-radius:var(--radius-xs);touch-action:none}
+.fe-image-grid-bounds{position:absolute;z-index:1;border:1px solid rgba(var(--accent-rgb),.78);box-shadow:inset 0 0 0 1px rgba(255,255,255,.34);pointer-events:none}
+.fe-image-grid-line{position:absolute;z-index:3;touch-action:none}
+.fe-image-grid-line.vertical{width:2px;transform:translateX(-1px);background:#ffd86a;cursor:ew-resize;box-shadow:0 0 0 1px rgba(31,43,62,.36)}
+.fe-image-grid-line.horizontal{height:2px;transform:translateY(-1px);background:#63d7ff;cursor:ns-resize;box-shadow:0 0 0 1px rgba(31,43,62,.36)}
+.fe-image-grid-line::after{content:attr(data-label);position:absolute;padding:2px 5px;border-radius:999px;background:rgba(14,24,40,.78);color:#fff;font:600 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.fe-image-grid-line.vertical::after{top:6px;left:6px}
+.fe-image-grid-line.horizontal::after{top:6px;right:6px}
+.fe-image-grid-measure{position:absolute;z-index:2;display:grid;place-items:center;min-width:30px;padding:2px 4px;border:1px solid rgba(255,255,255,.38);border-radius:999px;background:rgba(10,18,32,.7);color:#fff;font:600 10px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap;pointer-events:none;transform:translate(-50%,-50%);text-shadow:0 1px 2px rgba(0,0,0,.6)}
+@media (max-width:680px){.fe-image-grid-tool{grid-template-columns:repeat(4,minmax(0,1fr))}.fe-image-grid-export{grid-column:span 2}.fe-image-grid-summary{grid-column:1 / -1}}
 .fe-image-text-editor{position:absolute;display:none;z-index:3;width:min(240px,calc(100% - 16px));padding:10px;border:1px solid color-mix(in srgb,var(--border) 72%,rgba(255,255,255,.28));border-radius:var(--radius-xs);background:rgba(255,255,255,.96);box-shadow:0 10px 28px rgba(0,0,0,.18);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 .fe-image-text-editor textarea{width:100%;min-height:72px;max-height:240px;padding:8px 10px;border:1px solid color-mix(in srgb,var(--border) 80%,rgba(255,255,255,.2));border-radius:var(--radius-xs);background:rgba(255,255,255,.96);color:var(--text-primary);font:inherit;line-height:1.45;resize:none;outline:none}
 .fe-image-text-editor textarea:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(var(--accent-rgb),.12)}
@@ -6015,6 +6051,15 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
           <button class="file-editor-open-btn" type="button" id="fileEditorOpenInsideBtn" onclick="feOpenCurrentAppInside()">应用内打开</button>
           <button class="file-editor-open-btn" type="button" id="fileEditorCopyLinkBtn" onclick="feCopyCurrentAppLink()">复制链接</button>
         </div>
+        <button class="file-editor-color-picker-btn" type="button" id="feColorPickerBtn" onclick="feToggleColorPicker()" aria-label="取色" aria-pressed="false" title="取色" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.6 4.4 5 5"/><path d="m13.2 5.8 5 5"/><path d="m3.8 20.2 3.4-1 10.2-10.2a2.5 2.5 0 0 0-3.5-3.5L3.7 15.7l.1 4.5Z"/><path d="m6.5 17.5 1.1 1.1"/></svg>
+        </button>
+        <button class="file-editor-color-picker-btn" type="button" id="feCoordinatePickerBtn" onclick="feToggleCoordinatePicker()" aria-label="提取坐标" aria-pressed="false" title="提取坐标" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v16h16"/><path d="M8 16 17 7"/><circle cx="17" cy="7" r="2.5"/></svg>
+        </button>
+        <button class="file-editor-color-picker-btn" type="button" id="feImageGridBtn" onclick="feToggleImageGridTool()" aria-label="切图工具" aria-pressed="false" title="切图工具" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M12 4v16M4 12h16"/></svg>
+        </button>
         <div class="file-editor-tabs">
           <div class="file-editor-tab active" id="tabView" onclick="feSetTab('view')">预览</div>
           <div class="file-editor-tab" id="tabEdit" onclick="feSetTab('edit')">编辑</div>
@@ -6025,6 +6070,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
       </div>
     </div>
     <div class="file-editor-content" id="fileEditorContent"></div>
+    <div class="fe-color-picker-toast" id="feColorPickerToast" role="status" aria-live="polite"></div>
     <div class="file-editor-media-controls" id="fileEditorMediaControls" hidden aria-label="媒体播放控制">
       <button class="fe-media-control-btn" type="button" id="feMediaBack15Btn" onclick="feSeekMedia(-15)" aria-label="后退 15 秒" title="后退 15 秒"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6v5h5"/><path d="M3.5 11A8.5 8.5 0 1 0 7 4.2"/><path d="m12 9-3 3 3 3"/></svg></button>
       <button class="fe-media-control-btn play" type="button" id="feMediaPlayBtn" onclick="fePlayMedia()" aria-label="播放" title="播放"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6L19 12z"/></svg></button>
@@ -6098,7 +6144,10 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     <form class="settings-form" autocomplete="off" onsubmit="return false">
       <div class="settings-scroll">
         <div class="settings-title">
-          <h3 id="settingsSecretTrigger" onclick="handleSettingsSecretTap(event)">设置</h3>
+          <h3>设置</h3>
+          <button class="settings-copy-btn settings-host-btn" id="settingsHostBtn" type="button" onclick="openRuntimeHostPanelFromSettings()" title="修改服务地址" aria-label="修改服务地址" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h.01M7 12h.01M7 16h.01M11 8h6M11 12h6M11 16h6"/></svg>
+          </button>
           <button class="settings-copy-btn" id="settingsCopyDeviceBtn" type="button" onclick="copyRuntimeDeviceId()" title="复制 deviceId">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="10" height="10" rx="2"/><path d="M15 9V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/></svg>
           </button>
@@ -6257,25 +6306,23 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
   <div class="settings-secret-host-card" id="runtimeHostCard" onclick="event.stopPropagation()">
     <div class="settings-secret-host-head">
       <div>
-        <h4>运行时 Host</h4>
-        <div class="settings-secret-host-desc">仅本次运行有效，重启后会恢复为原配置</div>
+        <h4>服务地址</h4>
       </div>
       <button class="settings-copy-btn" type="button" onclick="closeRuntimeHostPanel()" title="关闭">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
       </button>
     </div>
     <div>
-      <label class="form-label">当前 Host</label>
+      <label class="form-label">当前服务地址</label>
       <div class="settings-secret-host-current" id="runtimeHostCurrent">加载中...</div>
     </div>
-    <div class="settings-secret-host-meta" id="runtimeHostStartup">启动值：-</div>
     <div>
-      <label class="form-label" for="runtimeHostInput">新的 Host</label>
+      <label class="form-label" for="runtimeHostInput">修改服务地址</label>
       <input class="form-select settings-secret-host-input" id="runtimeHostInput" type="text" placeholder="https://www.deepright.cn" autocomplete="off">
     </div>
     <div class="settings-secret-host-status" id="runtimeHostStatus"></div>
     <div class="settings-secret-host-actions">
-      <button class="btn btn-secondary" type="button" id="runtimeHostResetBtn" onclick="resetRuntimeHostOverride()">恢复启动值</button>
+      <button class="btn btn-secondary" type="button" id="runtimeHostResetBtn" onclick="resetRuntimeHostOverride()">恢复默认值</button>
       <button class="btn btn-secondary" type="button" onclick="closeRuntimeHostPanel()">取消</button>
       <button class="btn btn-primary" type="button" id="runtimeHostSaveBtn" onclick="saveRuntimeHostOverride()">保存</button>
     </div>
@@ -35700,7 +35747,7 @@ async function copyCenterMessage(event) {
   }
   try {
     await copyTextToClipboard(text);
-    vfsShowUploadToast('已复制到粘贴板', false);
+    vfsShowUploadToast('已复制到剪贴板', false);
   } catch (err) {
     vfsShowUploadToast('复制失败: ' + err.message, true);
   }
@@ -35964,7 +36011,7 @@ async function handleMessageCodeBlockAction(event) {
   }
   try {
     await copyTextToClipboard(text);
-    vfsShowUploadToast('已复制到粘贴板', false);
+    vfsShowUploadToast('已复制到剪贴板', false);
   } catch (err) {
     vfsShowUploadToast('复制失败: ' + err.message, true);
   }
@@ -36000,7 +36047,7 @@ async function copyActiveChatId(event) {
   if (triggerState.suppressNormalAction) return;
   try {
     await copyTextToClipboard(chatId);
-    vfsShowUploadToast('ChatID 已复制到粘贴板', false);
+    vfsShowUploadToast('ChatID 已复制到剪贴板', false);
   } catch (err) {
     vfsShowUploadToast('复制失败: ' + err.message, true);
   }
@@ -36133,7 +36180,7 @@ async function cmdCopyFromCliBubble(event) {
     const end = input.value.length;
     if (typeof input.setSelectionRange === 'function') input.setSelectionRange(end, end);
   }
-  if (copied) vfsShowUploadToast('已复制到粘贴板', true);
+  if (copied) vfsShowUploadToast('已复制到剪贴板', true);
   else vfsShowUploadToast('已填入 CMD 输入框, 但浏览器未完成剪贴板复制', true);
 }
 
@@ -38617,19 +38664,15 @@ function syncCenterComposerState(chatId, options) {
 
 // ===== Settings =====
 let settingsErrorAutoCloseTimer = 0;
-const runtimeHostSecretTapThreshold = 10;
-const runtimeHostSecretTapWindowMs = 10000;
-let runtimeHostSecretTapCount = 0;
-let runtimeHostSecretTapStartedAt = 0;
 let runtimeHostRequestPending = false;
-
-function resetRuntimeHostSecretTapState() {
-  runtimeHostSecretTapCount = 0;
-  runtimeHostSecretTapStartedAt = 0;
-}
 
 function runtimeHostIsLocalEnabled() {
   return isLocalHostName(location.hostname);
+}
+
+function updateSettingsHostButton() {
+  const btn = document.getElementById('settingsHostBtn');
+  if (btn) btn.hidden = !runtimeHostIsLocalEnabled();
 }
 
 function getRuntimeHostLayer() {
@@ -38656,14 +38699,10 @@ function setRuntimeHostPending(pending) {
 function applyRuntimeHostInfo(data) {
   const payload = data || {};
   const current = String(payload.host || '').trim();
-  const startup = String(payload.startupHost || '').trim();
-  const overridden = !!payload.overridden;
   const currentEl = document.getElementById('runtimeHostCurrent');
-  const startupEl = document.getElementById('runtimeHostStartup');
   const input = document.getElementById('runtimeHostInput');
   if (currentEl) currentEl.textContent = current || '未设置';
-  if (startupEl) startupEl.textContent = '启动值：' + (startup || '未设置') + (overridden ? ' · 当前已覆盖' : ' · 当前使用启动值');
-  if (input) input.value = current || startup || '';
+  if (input) input.value = current;
 }
 
 async function loadRuntimeHostInfo() {
@@ -38679,7 +38718,7 @@ async function loadRuntimeHostInfo() {
     applyRuntimeHostInfo(data.data || {});
     return true;
   } catch (e) {
-    setRuntimeHostStatus('读取运行时 Host 失败：' + (e && e.message ? e.message : '网络异常'), true);
+    setRuntimeHostStatus('读取服务地址失败：' + (e && e.message ? e.message : '网络异常'), true);
     return false;
   } finally {
     setRuntimeHostPending(false);
@@ -38692,7 +38731,6 @@ function openRuntimeHostPanel() {
   const card = document.getElementById('runtimeHostCard');
   if (!layer) return;
   showExclusiveOverlay(layer, card);
-  resetRuntimeHostSecretTapState();
   loadRuntimeHostInfo().then(ok => {
     if (!ok) return;
     const input = document.getElementById('runtimeHostInput');
@@ -38716,18 +38754,10 @@ function handleRuntimeHostLayerClick(event) {
   if (event && event.target === event.currentTarget) closeRuntimeHostPanel();
 }
 
-function handleSettingsSecretTap(event) {
-  if (event) event.stopPropagation();
+function openRuntimeHostPanelFromSettings() {
   if (!runtimeHostIsLocalEnabled()) return;
-  const now = Date.now();
-  if (!runtimeHostSecretTapStartedAt || now - runtimeHostSecretTapStartedAt > runtimeHostSecretTapWindowMs) {
-    runtimeHostSecretTapStartedAt = now;
-    runtimeHostSecretTapCount = 0;
-  }
-  runtimeHostSecretTapCount += 1;
-  if (runtimeHostSecretTapCount >= runtimeHostSecretTapThreshold) {
-    openRuntimeHostPanel();
-  }
+  closeSettings(true);
+  openRuntimeHostPanel();
 }
 
 async function saveRuntimeHostOverride() {
@@ -38735,7 +38765,7 @@ async function saveRuntimeHostOverride() {
   const input = document.getElementById('runtimeHostInput');
   const host = String(input && input.value || '').trim();
   if (!host) {
-    setRuntimeHostStatus('请输入新的 Host 地址', true);
+    setRuntimeHostStatus('请输入服务地址', true);
     return;
   }
   setRuntimeHostPending(true);
@@ -38753,7 +38783,7 @@ async function saveRuntimeHostOverride() {
     applyRuntimeHostInfo(data.data || {});
     closeRuntimeHostPanel();
   } catch (e) {
-    setRuntimeHostStatus('保存运行时 Host 失败：' + (e && e.message ? e.message : '网络异常'), true);
+    setRuntimeHostStatus('保存服务地址失败：' + (e && e.message ? e.message : '网络异常'), true);
   } finally {
     setRuntimeHostPending(false);
   }
@@ -38770,9 +38800,9 @@ async function resetRuntimeHostOverride() {
       throw new Error(data && data.content ? data.content : '恢复失败');
     }
     applyRuntimeHostInfo(data.data || {});
-    setRuntimeHostStatus('已恢复为启动时 Host', false);
+    setRuntimeHostStatus('已恢复为默认服务地址', false);
   } catch (e) {
-    setRuntimeHostStatus('恢复运行时 Host 失败：' + (e && e.message ? e.message : '网络异常'), true);
+    setRuntimeHostStatus('恢复默认服务地址失败：' + (e && e.message ? e.message : '网络异常'), true);
   } finally {
     setRuntimeHostPending(false);
   }
@@ -38893,7 +38923,7 @@ async function toggleStandaloneMode() {
     if (!snapshot.enabled) {
       try {
         await copyLANAccessUrlToClipboard();
-        vfsShowUploadToast('已在粘贴板复制内网访问地址', false);
+        vfsShowUploadToast('已在剪贴板复制内网访问地址', false);
       } catch (copyErr) {
         vfsShowUploadToast('复制访问地址失败: ' + ((copyErr && copyErr.message) || '未知错误'), true);
       }
@@ -39011,7 +39041,7 @@ async function openSettings() {
   hideModelSelectToast();
   hideInputReloadConfirm();
   closeRuntimeHostPanel();
-  resetRuntimeHostSecretTapState();
+  updateSettingsHostButton();
   hideNewAgentInput();
   hideAgentImportChooser();
   showExclusiveOverlay(document.getElementById('settingsOverlay'), getSettingsPanel());
@@ -39055,6 +39085,7 @@ async function openSettings() {
   renderModelEntries();
   renderSettingsAccessNote();
   renderSettingsOnboardingToggle();
+  updateSettingsHostButton();
   updateSettingsFooterActions();
   promoteOnboardingToModelsIntro();
   // Update bee icon, thinking UI and load config
@@ -39081,7 +39112,6 @@ function closeSettings(force) {
   closeMediaConfigPanel({ force: true, restoreEntry: false, preserveDraft: false });
   closeModelCurlImportPanel({ restoreFocus: false });
   closeRuntimeHostPanel();
-  resetRuntimeHostSecretTapState();
   hideNewAgentInput();
   clearSettingsErrorState();
   hideAgentImportChooser();
@@ -46463,6 +46493,668 @@ let feImageState = {
   isDrawing: false,
   pointerId: null
 };
+let feColorPickerActive = false;
+let feColorPickerTarget = null;
+let feColorPickerPointerHandler = null;
+let feColorPickerToastTimer = null;
+let feColorPickerToastClearTimer = null;
+let feCoordinatePickerActive = false;
+let feCoordinatePickerTarget = null;
+let feCoordinatePickerPointerHandler = null;
+let feImageGridState = {
+  active: false,
+  xLines: [],
+  yLines: [],
+  crop: { top: 0, right: 0, bottom: 0, left: 0 },
+  dragging: null,
+  resizeObserver: null,
+  resizeFrame: 0
+};
+
+function feGetColorPickerTarget() {
+  if (feFileType === 'video') {
+    const video = document.getElementById('feMediaElement');
+    return video instanceof HTMLVideoElement ? video : null;
+  }
+  return null;
+}
+
+function feUpdateColorPickerButton() {
+  const button = document.getElementById('feColorPickerBtn');
+  if (!button) return;
+  const available = !!feGetColorPickerTarget();
+  button.hidden = !available;
+  button.disabled = !available;
+  button.setAttribute('aria-pressed', feColorPickerActive ? 'true' : 'false');
+  button.title = feColorPickerActive ? '退出取色' : '取色';
+  button.setAttribute('aria-label', feColorPickerActive ? '退出取色' : '取色');
+}
+
+function feGetCoordinatePickerTarget() {
+  if (feFileType === 'video') {
+    const video = document.getElementById('feMediaElement');
+    return video instanceof HTMLVideoElement ? video : null;
+  }
+  return null;
+}
+
+function feUpdateCoordinatePickerButton() {
+  const button = document.getElementById('feCoordinatePickerBtn');
+  if (!button) return;
+  const available = !!feGetCoordinatePickerTarget();
+  button.hidden = !available;
+  button.disabled = !available;
+  button.setAttribute('aria-pressed', feCoordinatePickerActive ? 'true' : 'false');
+  button.title = feCoordinatePickerActive ? '退出提取坐标' : '提取坐标';
+  button.setAttribute('aria-label', feCoordinatePickerActive ? '退出提取坐标' : '提取坐标');
+}
+
+function feGetImageGridTarget() {
+  if (feFileType !== 'image' || !feImageState.loaded) return null;
+  const canvas = document.getElementById('feImageCanvas');
+  return canvas instanceof HTMLCanvasElement && canvas.width > 0 && canvas.height > 0 ? canvas : null;
+}
+
+function feUpdateImageGridButton() {
+  const button = document.getElementById('feImageGridBtn');
+  if (!button) return;
+  const available = !!feGetImageGridTarget();
+  button.hidden = !available;
+  button.disabled = !available;
+  button.setAttribute('aria-pressed', feImageGridState.active ? 'true' : 'false');
+  button.title = feImageGridState.active ? '关闭切图工具' : '切图工具';
+  button.setAttribute('aria-label', feImageGridState.active ? '关闭切图工具' : '切图工具');
+}
+
+function feHideColorPickerToast() {
+  const toast = document.getElementById('feColorPickerToast');
+  if (!toast) return;
+  clearTimeout(feColorPickerToastTimer);
+  clearTimeout(feColorPickerToastClearTimer);
+  toast.classList.remove('show');
+  feColorPickerToastClearTimer = setTimeout(() => {
+    if (!toast.classList.contains('show')) toast.textContent = '';
+  }, 240);
+}
+
+function feShowColorPickerToast(message, isError) {
+  const toast = document.getElementById('feColorPickerToast');
+  if (!toast) return;
+  clearTimeout(feColorPickerToastTimer);
+  clearTimeout(feColorPickerToastClearTimer);
+  toast.classList.remove('show');
+  toast.textContent = String(message || '');
+  toast.classList.toggle('error', !!isError);
+  toast.classList.toggle('media', feFileType === 'video');
+  void toast.offsetWidth;
+  toast.classList.add('show');
+  feColorPickerToastTimer = setTimeout(() => feHideColorPickerToast(), 3200);
+}
+
+function feExitColorPicker() {
+  if (feColorPickerTarget && feColorPickerPointerHandler) {
+    feColorPickerTarget.removeEventListener('pointerdown', feColorPickerPointerHandler, true);
+  }
+  if (feColorPickerTarget) feColorPickerTarget.classList.remove('fe-color-picker-target');
+  feColorPickerActive = false;
+  feColorPickerTarget = null;
+  feColorPickerPointerHandler = null;
+  feUpdateColorPickerButton();
+}
+
+function feResetColorPicker() {
+  feExitColorPicker();
+  feHideColorPickerToast();
+  const button = document.getElementById('feColorPickerBtn');
+  if (button) {
+    button.hidden = true;
+    button.disabled = true;
+  }
+}
+
+function feExitCoordinatePicker() {
+  if (feCoordinatePickerTarget && feCoordinatePickerPointerHandler) {
+    feCoordinatePickerTarget.removeEventListener('pointerdown', feCoordinatePickerPointerHandler, true);
+  }
+  if (feCoordinatePickerTarget) feCoordinatePickerTarget.classList.remove('fe-color-picker-target');
+  feCoordinatePickerActive = false;
+  feCoordinatePickerTarget = null;
+  feCoordinatePickerPointerHandler = null;
+  feUpdateCoordinatePickerButton();
+}
+
+function feResetCoordinatePicker() {
+  feExitCoordinatePicker();
+  const button = document.getElementById('feCoordinatePickerBtn');
+  if (button) {
+    button.hidden = true;
+    button.disabled = true;
+  }
+}
+
+function feGetColorPickerPixel(event, target) {
+  const rect = target && target.getBoundingClientRect ? target.getBoundingClientRect() : null;
+  if (!rect || !rect.width || !rect.height) return null;
+  const relativeX = event.clientX - rect.left;
+  const relativeY = event.clientY - rect.top;
+  if (relativeX < 0 || relativeY < 0 || relativeX >= rect.width || relativeY >= rect.height) return null;
+
+  try {
+    if (target instanceof HTMLCanvasElement) {
+      const context = target.getContext('2d', { willReadFrequently: true });
+      if (!context || !target.width || !target.height) return null;
+      const x = Math.min(target.width - 1, Math.max(0, Math.floor(relativeX * target.width / rect.width)));
+      const y = Math.min(target.height - 1, Math.max(0, Math.floor(relativeY * target.height / rect.height)));
+      return context.getImageData(x, y, 1, 1).data;
+    }
+    if (target instanceof HTMLVideoElement) {
+      if (target.readyState < 2 || !target.videoWidth || !target.videoHeight) return null;
+      const x = Math.min(target.videoWidth - 1, Math.max(0, Math.floor(relativeX * target.videoWidth / rect.width)));
+      const y = Math.min(target.videoHeight - 1, Math.max(0, Math.floor(relativeY * target.videoHeight / rect.height)));
+      const canvas = document.createElement('canvas');
+      canvas.width = target.videoWidth;
+      canvas.height = target.videoHeight;
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      if (!context) return null;
+      context.drawImage(target, 0, 0, canvas.width, canvas.height);
+      return context.getImageData(x, y, 1, 1).data;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function feFormatColorPickerHex(pixel) {
+  if (!pixel || pixel.length < 3) return '';
+  return '#' + [pixel[0], pixel[1], pixel[2]]
+    .map(value => Math.max(0, Math.min(255, Number(value) || 0)).toString(16).padStart(2, '0'))
+    .join('').toUpperCase();
+}
+
+function feNormalizeColorPickerHex(color) {
+  const value = String(color || '').trim();
+  if (/^#[0-9a-f]{6}$/i.test(value)) return value.toUpperCase();
+  return '';
+}
+
+async function feCopyPickedColor(color) {
+  const normalizedColor = feNormalizeColorPickerHex(color);
+  if (!normalizedColor) {
+    feShowColorPickerToast('无法读取当前画面颜色，请稍后重试', true);
+    return;
+  }
+  try {
+    await copyTextToClipboard(normalizedColor);
+    feShowColorPickerToast('取色结果已复制到系统剪贴板', false);
+  } catch {
+    feShowColorPickerToast('取色结果复制失败，请检查系统剪贴板权限', true);
+  }
+}
+
+async function fePickColor(event, target) {
+  const color = feFormatColorPickerHex(feGetColorPickerPixel(event, target));
+  feExitColorPicker();
+  await feCopyPickedColor(color);
+}
+
+function feEnterColorPicker() {
+  const target = feGetColorPickerTarget();
+  if (!target) return;
+  feExitCoordinatePicker();
+  feExitColorPicker();
+  feColorPickerActive = true;
+  feColorPickerTarget = target;
+  feColorPickerPointerHandler = event => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    fePickColor(event, target);
+  };
+  target.addEventListener('pointerdown', feColorPickerPointerHandler, true);
+  target.classList.add('fe-color-picker-target');
+  feUpdateColorPickerButton();
+  feShowColorPickerToast('开始取色', false);
+}
+
+function feToggleColorPicker() {
+  if (feColorPickerActive) feExitColorPicker();
+  else feEnterColorPicker();
+}
+
+function feGetVideoCoordinate(event, target) {
+  const rect = target && target.getBoundingClientRect ? target.getBoundingClientRect() : null;
+  if (!rect || !rect.width || !rect.height || !(target instanceof HTMLVideoElement)) return null;
+  if (!target.videoWidth || !target.videoHeight) return null;
+  const relativeX = event.clientX - rect.left;
+  const relativeY = event.clientY - rect.top;
+  if (relativeX < 0 || relativeY < 0 || relativeX >= rect.width || relativeY >= rect.height) return null;
+
+  const x = Math.min(target.videoWidth - 1, Math.max(0, Math.floor(relativeX * target.videoWidth / rect.width)));
+  const topOriginY = Math.min(target.videoHeight - 1, Math.max(0, Math.floor(relativeY * target.videoHeight / rect.height)));
+  return {
+    width: target.videoWidth,
+    height: target.videoHeight,
+    x,
+    y: topOriginY
+  };
+}
+
+function feFormatVideoCoordinatePayload(coordinate) {
+  if (!coordinate) return '';
+  const { width, height, x, y } = coordinate;
+  if (![width, height, x, y].every(Number.isFinite)) return '';
+  return '取值时画布尺寸: 宽度 ' + width + ' px, 高度 ' + height + ' px, 以左上角为原点的坐标位置: (' + x + ', ' + y + '), 使用时需要按实际画布尺寸缩放坐标';
+}
+
+async function fePickVideoCoordinate(event, target) {
+  const payload = feFormatVideoCoordinatePayload(feGetVideoCoordinate(event, target));
+  feExitCoordinatePicker();
+  if (!payload) {
+    feShowColorPickerToast('无法获取视频原始尺寸，请稍后重试', true);
+    return;
+  }
+  try {
+    await copyTextToClipboard(payload);
+    feShowColorPickerToast('坐标位置已复制到系统剪贴板', false);
+  } catch {
+    feShowColorPickerToast('坐标位置复制失败，请检查系统剪贴板权限', true);
+  }
+}
+
+function feEnterCoordinatePicker() {
+  const target = feGetCoordinatePickerTarget();
+  if (!target) return;
+  feExitColorPicker();
+  feExitCoordinatePicker();
+  feCoordinatePickerActive = true;
+  feCoordinatePickerTarget = target;
+  feCoordinatePickerPointerHandler = event => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    fePickVideoCoordinate(event, target);
+  };
+  target.addEventListener('pointerdown', feCoordinatePickerPointerHandler, true);
+  target.classList.add('fe-color-picker-target');
+  feUpdateCoordinatePickerButton();
+  feShowColorPickerToast('开始提取坐标', false);
+}
+
+function feToggleCoordinatePicker() {
+  if (feCoordinatePickerActive) feExitCoordinatePicker();
+  else feEnterCoordinatePicker();
+}
+
+function feGetImageGridInput(id) {
+  return document.getElementById(id);
+}
+
+function feSetImageGridSummary(message, isError) {
+  const summary = document.getElementById('feImageGridSummary');
+  if (!summary) return;
+  summary.textContent = String(message || '');
+  summary.classList.toggle('error', !!isError);
+}
+
+function feParseImageGridInteger(input, minimum) {
+  const raw = String(input && input.value || '').trim();
+  if (!/^\d+$/.test(raw)) return null;
+  const value = Number(raw);
+  return Number.isSafeInteger(value) && value >= minimum ? value : null;
+}
+
+function feReadImageGridConfig() {
+  const canvas = feGetImageGridTarget();
+  if (!canvas) return null;
+  const columns = feParseImageGridInteger(feGetImageGridInput('feImageGridHorizontal'), 1);
+  const rows = feParseImageGridInteger(feGetImageGridInput('feImageGridVertical'), 1);
+  if (columns === null || rows === null) {
+    feSetImageGridSummary('水平和垂直数量必须是大于等于 1 的整数', true);
+    return null;
+  }
+  const rawTop = feParseImageGridInteger(feGetImageGridInput('feImageGridTop'), 0);
+  const rawBottom = feParseImageGridInteger(feGetImageGridInput('feImageGridBottom'), 0);
+  const rawLeft = feParseImageGridInteger(feGetImageGridInput('feImageGridLeft'), 0);
+  const rawRight = feParseImageGridInteger(feGetImageGridInput('feImageGridRight'), 0);
+  if ([rawTop, rawBottom, rawLeft, rawRight].some(value => value === null)) {
+    feSetImageGridSummary('上下左右缩进必须是大于等于 0 的整数', true);
+    return null;
+  }
+  const width = canvas.width;
+  const height = canvas.height;
+  const top = Math.min(rawTop, Math.max(0, height - 1));
+  const bottom = Math.min(rawBottom, Math.max(0, height - top - 1));
+  const left = Math.min(rawLeft, Math.max(0, width - 1));
+  const right = Math.min(rawRight, Math.max(0, width - left - 1));
+  const normalized = { top, right, bottom, left };
+  const inputValues = [
+    ['feImageGridTop', top],
+    ['feImageGridBottom', bottom],
+    ['feImageGridLeft', left],
+    ['feImageGridRight', right]
+  ];
+  inputValues.forEach(([id, value]) => {
+    const input = feGetImageGridInput(id);
+    if (input) input.value = String(value);
+  });
+  return { columns, rows, crop: normalized };
+}
+
+function feGetImageGridBounds() {
+  const canvas = feGetImageGridTarget();
+  if (!canvas) return null;
+  const crop = feImageGridState.crop;
+  const left = Math.max(0, Math.min(canvas.width - 1, Number(crop.left) || 0));
+  const top = Math.max(0, Math.min(canvas.height - 1, Number(crop.top) || 0));
+  const right = Math.max(left + 1, canvas.width - Math.max(0, Number(crop.right) || 0));
+  const bottom = Math.max(top + 1, canvas.height - Math.max(0, Number(crop.bottom) || 0));
+  return {
+    canvas,
+    left,
+    top,
+    right,
+    bottom,
+    width: right - left,
+    height: bottom - top
+  };
+}
+
+function feCreateEvenImageGridPositions(totalSize, count, offset) {
+  if (count <= 1) return [];
+  return Array.from({ length: count - 1 }, (_, index) => offset + totalSize * (index + 1) / count);
+}
+
+function feInitializeImageGridLines() {
+  const config = feReadImageGridConfig();
+  if (!config) return false;
+  const canvas = feGetImageGridTarget();
+  if (!canvas) return false;
+  feImageGridState.crop = config.crop;
+  const bounds = feGetImageGridBounds();
+  if (!bounds) return false;
+  feImageGridState.xLines = feCreateEvenImageGridPositions(bounds.width, config.columns, bounds.left);
+  feImageGridState.yLines = feCreateEvenImageGridPositions(bounds.height, config.rows, bounds.top);
+  feRenderImageGrid();
+  return true;
+}
+
+function feHandleImageGridLayoutInput() {
+  if (feImageGridState.active) feInitializeImageGridLines();
+}
+
+function feHandleImageGridCropInput() {
+  if (feImageGridState.active) feInitializeImageGridLines();
+}
+
+function feGetImageGridOverlay() {
+  return document.getElementById('feImageGridOverlay');
+}
+
+function feGetImageGridDisplayRect(canvas) {
+  const rect = canvas && canvas.getBoundingClientRect ? canvas.getBoundingClientRect() : null;
+  if (!rect) return null;
+  const borderLeft = Number(canvas.clientLeft) || 0;
+  const borderTop = Number(canvas.clientTop) || 0;
+  const width = Number(canvas.clientWidth) || rect.width;
+  const height = Number(canvas.clientHeight) || rect.height;
+  return {
+    left: rect.left + borderLeft,
+    top: rect.top + borderTop,
+    width,
+    height
+  };
+}
+
+function feRemoveImageGridOverlay() {
+  const overlay = feGetImageGridOverlay();
+  if (overlay) overlay.remove();
+}
+
+function feScheduleImageGridRender() {
+  if (!feImageGridState.active || feImageGridState.resizeFrame) return;
+  feImageGridState.resizeFrame = requestAnimationFrame(() => {
+    feImageGridState.resizeFrame = 0;
+    feRenderImageGrid();
+  });
+}
+
+function feObserveImageGridCanvas() {
+  const canvas = feGetImageGridTarget();
+  if (!canvas || typeof ResizeObserver === 'undefined') return;
+  if (feImageGridState.resizeObserver) feImageGridState.resizeObserver.disconnect();
+  feImageGridState.resizeObserver = new ResizeObserver(feScheduleImageGridRender);
+  feImageGridState.resizeObserver.observe(canvas);
+}
+
+function feStopObservingImageGridCanvas() {
+  if (feImageGridState.resizeObserver) feImageGridState.resizeObserver.disconnect();
+  feImageGridState.resizeObserver = null;
+  if (feImageGridState.resizeFrame) cancelAnimationFrame(feImageGridState.resizeFrame);
+  feImageGridState.resizeFrame = 0;
+}
+
+function feCreateImageGridLine(orientation, index, position, bounds, canvasRect) {
+  const line = document.createElement('div');
+  line.className = 'fe-image-grid-line ' + (orientation === 'x' ? 'vertical' : 'horizontal');
+  line.dataset.label = (orientation === 'x' ? 'H' : 'V') + String(index + 1);
+  line.addEventListener('pointerdown', event => feStartImageGridDrag(event, orientation, index));
+  if (orientation === 'x') {
+    line.style.left = ((position / bounds.canvas.width) * canvasRect.width) + 'px';
+    line.style.top = ((bounds.top / bounds.canvas.height) * canvasRect.height) + 'px';
+    line.style.height = ((bounds.height / bounds.canvas.height) * canvasRect.height) + 'px';
+  } else {
+    line.style.left = ((bounds.left / bounds.canvas.width) * canvasRect.width) + 'px';
+    line.style.top = ((position / bounds.canvas.height) * canvasRect.height) + 'px';
+    line.style.width = ((bounds.width / bounds.canvas.width) * canvasRect.width) + 'px';
+  }
+  return line;
+}
+
+function feRenderImageGrid() {
+  if (!feImageGridState.active) {
+    feRemoveImageGridOverlay();
+    return;
+  }
+  const bounds = feGetImageGridBounds();
+  const config = feReadImageGridConfig();
+  if (!bounds || !config) return;
+  if (feImageGridState.xLines.length !== config.columns - 1 || feImageGridState.yLines.length !== config.rows - 1) {
+    feImageGridState.crop = config.crop;
+    feImageGridState.xLines = feCreateEvenImageGridPositions(bounds.width, config.columns, bounds.left);
+    feImageGridState.yLines = feCreateEvenImageGridPositions(bounds.height, config.rows, bounds.top);
+  }
+  const stage = document.getElementById('feImageStage');
+  const canvasRect = feGetImageGridDisplayRect(bounds.canvas);
+  const stageRect = stage && stage.getBoundingClientRect ? stage.getBoundingClientRect() : null;
+  if (!stage || !canvasRect || !canvasRect.width || !canvasRect.height || !stageRect) return;
+  let overlay = feGetImageGridOverlay();
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'feImageGridOverlay';
+    overlay.className = 'fe-image-grid-overlay';
+    overlay.addEventListener('pointerdown', event => event.preventDefault());
+    stage.appendChild(overlay);
+  }
+  overlay.innerHTML = '';
+  overlay.style.left = (canvasRect.left - stageRect.left + stage.scrollLeft) + 'px';
+  overlay.style.top = (canvasRect.top - stageRect.top + stage.scrollTop) + 'px';
+  overlay.style.width = canvasRect.width + 'px';
+  overlay.style.height = canvasRect.height + 'px';
+
+  const displayLeft = bounds.left / bounds.canvas.width * canvasRect.width;
+  const displayTop = bounds.top / bounds.canvas.height * canvasRect.height;
+  const displayWidth = bounds.width / bounds.canvas.width * canvasRect.width;
+  const displayHeight = bounds.height / bounds.canvas.height * canvasRect.height;
+  const cropBounds = document.createElement('div');
+  cropBounds.className = 'fe-image-grid-bounds';
+  cropBounds.style.left = displayLeft + 'px';
+  cropBounds.style.top = displayTop + 'px';
+  cropBounds.style.width = displayWidth + 'px';
+  cropBounds.style.height = displayHeight + 'px';
+  overlay.appendChild(cropBounds);
+
+  feImageGridState.xLines.forEach((position, index) => {
+    overlay.appendChild(feCreateImageGridLine('x', index, position, bounds, canvasRect));
+  });
+  feImageGridState.yLines.forEach((position, index) => {
+    overlay.appendChild(feCreateImageGridLine('y', index, position, bounds, canvasRect));
+  });
+
+  const totalCells = config.columns * config.rows;
+  const xEdges = [bounds.left].concat(feImageGridState.xLines, [bounds.right]);
+  const yEdges = [bounds.top].concat(feImageGridState.yLines, [bounds.bottom]);
+  for (let row = 0; row < config.rows; row += 1) {
+    for (let column = 0; column < config.columns; column += 1) {
+      const left = xEdges[column];
+      const right = xEdges[column + 1];
+      const top = yEdges[row];
+      const bottom = yEdges[row + 1];
+      const measure = document.createElement('span');
+      measure.className = 'fe-image-grid-measure';
+      measure.textContent = Math.round(right - left) + '×' + Math.round(bottom - top) + 'px';
+      measure.style.left = (((left + right) / 2) / bounds.canvas.width * canvasRect.width) + 'px';
+      measure.style.top = (((top + bottom) / 2) / bounds.canvas.height * canvasRect.height) + 'px';
+      overlay.appendChild(measure);
+    }
+  }
+  feSetImageGridSummary(
+    '水平 ' + config.columns + ' × 垂直 ' + config.rows + '，共 ' + totalCells + ' 个矩形；有效区域 ' + Math.round(bounds.width) + '×' + Math.round(bounds.height) + 'px',
+    false
+  );
+}
+
+function feClampImageGridLine(lines, index, value, start, end) {
+  const safeGap = Math.max(0.01, Math.min(1, (end - start) / Math.max(2, lines.length + 1) / 2));
+  const lower = index === 0 ? start + safeGap : lines[index - 1] + safeGap;
+  const upper = index === lines.length - 1 ? end - safeGap : lines[index + 1] - safeGap;
+  return Math.min(upper, Math.max(lower, value));
+}
+
+function feStartImageGridDrag(event, orientation, index) {
+  if (!feImageGridState.active || event.button !== 0) return;
+  event.preventDefault();
+  event.stopPropagation();
+  feStopImageGridDrag();
+  feImageGridState.dragging = { orientation, index, pointerId: event.pointerId };
+  document.addEventListener('pointermove', feMoveImageGridDrag, true);
+  document.addEventListener('pointerup', feStopImageGridDrag, true);
+  document.addEventListener('pointercancel', feStopImageGridDrag, true);
+}
+
+function feMoveImageGridDrag(event) {
+  const drag = feImageGridState.dragging;
+  const bounds = feGetImageGridBounds();
+  if (!drag || !bounds || event.pointerId !== drag.pointerId) return;
+  const rect = feGetImageGridDisplayRect(bounds.canvas);
+  if (!rect || !rect.width || !rect.height) return;
+  event.preventDefault();
+  if (drag.orientation === 'x') {
+    const rawX = (event.clientX - rect.left) * bounds.canvas.width / rect.width;
+    feImageGridState.xLines[drag.index] = feClampImageGridLine(feImageGridState.xLines, drag.index, rawX, bounds.left, bounds.right);
+  } else {
+    const rawY = (event.clientY - rect.top) * bounds.canvas.height / rect.height;
+    feImageGridState.yLines[drag.index] = feClampImageGridLine(feImageGridState.yLines, drag.index, rawY, bounds.top, bounds.bottom);
+  }
+  feRenderImageGrid();
+}
+
+function feStopImageGridDrag(event) {
+  if (event && feImageGridState.dragging && event.pointerId !== feImageGridState.dragging.pointerId) return;
+  document.removeEventListener('pointermove', feMoveImageGridDrag, true);
+  document.removeEventListener('pointerup', feStopImageGridDrag, true);
+  document.removeEventListener('pointercancel', feStopImageGridDrag, true);
+  feImageGridState.dragging = null;
+}
+
+function feSetImageGridActive(active) {
+  const canvas = feGetImageGridTarget();
+  const stage = document.getElementById('feImageStage');
+  const tool = document.getElementById('feImageGridTool');
+  if (!active) {
+    feStopImageGridDrag();
+    feImageGridState.active = false;
+    if (stage) stage.classList.remove('fe-image-grid-active');
+    if (tool) tool.hidden = true;
+    feRemoveImageGridOverlay();
+    feStopObservingImageGridCanvas();
+    feUpdateImageGridButton();
+    return;
+  }
+  if (!canvas || !stage || !tool) return;
+  feFinalizePendingImageTextEdit(true);
+  feImageGridState.active = true;
+  stage.classList.add('fe-image-grid-active');
+  tool.hidden = false;
+  const config = feReadImageGridConfig();
+  const cropChanged = !config || ['top', 'right', 'bottom', 'left'].some(key => feImageGridState.crop[key] !== config.crop[key]);
+  if (!config || cropChanged || feImageGridState.xLines.length !== config.columns - 1 || feImageGridState.yLines.length !== config.rows - 1) {
+    if (!feInitializeImageGridLines()) {
+      feSetImageGridActive(false);
+      return;
+    }
+  } else {
+    feRenderImageGrid();
+  }
+  feObserveImageGridCanvas();
+  feUpdateImageGridButton();
+}
+
+function feToggleImageGridTool() {
+  feSetImageGridActive(!feImageGridState.active);
+}
+
+function feResetImageGridTool() {
+  feSetImageGridActive(false);
+  feImageGridState.xLines = [];
+  feImageGridState.yLines = [];
+  feImageGridState.crop = { top: 0, right: 0, bottom: 0, left: 0 };
+  const button = document.getElementById('feImageGridBtn');
+  if (button) {
+    button.hidden = true;
+    button.disabled = true;
+  }
+}
+
+function feBuildImageGridCoordinatePayload() {
+  const bounds = feGetImageGridBounds();
+  const config = feReadImageGridConfig();
+  if (!bounds || !config || feImageGridState.xLines.length !== config.columns - 1 || feImageGridState.yLines.length !== config.rows - 1) return '';
+  const xEdges = [bounds.left].concat(feImageGridState.xLines, [bounds.right]);
+  const yEdges = [bounds.top].concat(feImageGridState.yLines, [bounds.bottom]);
+  const coordinateGroups = [];
+  const toX = value => Math.max(0, Math.min(bounds.canvas.width, Math.round(value)));
+  const toY = value => Math.max(0, Math.min(bounds.canvas.height, Math.round(value)));
+  for (let row = config.rows - 1; row >= 0; row -= 1) {
+    for (let column = 0; column < config.columns; column += 1) {
+      const left = toX(xEdges[column]);
+      const right = toX(xEdges[column + 1]);
+      const top = toY(bounds.canvas.height - yEdges[row]);
+      const bottom = toY(bounds.canvas.height - yEdges[row + 1]);
+      coordinateGroups.push('[' + [
+        '(' + left + ',' + top + ')',
+        '(' + right + ',' + top + ')',
+        '(' + right + ',' + bottom + ')',
+        '(' + left + ',' + bottom + ')'
+      ].join(',') + ']');
+    }
+  }
+  return '取值时画布尺寸: 宽度 ' + bounds.canvas.width + ' px, 高度 ' + bounds.canvas.height + ' px, 共' + (config.columns * config.rows) + '组矩形坐标集合(左上/右上/右下/左下): ' + coordinateGroups.join(',') + ', 使用时需要按实际画布尺寸缩放坐标';
+}
+
+async function feExportImageGridCoordinates() {
+  const payload = feBuildImageGridCoordinatePayload();
+  if (!payload) {
+    feShowColorPickerToast('无法生成坐标位置，请检查切图工具设置', true);
+    return;
+  }
+  try {
+    await copyTextToClipboard(payload);
+    feShowColorPickerToast('坐标位置已复制到系统剪贴板', false);
+  } catch {
+    feShowColorPickerToast('坐标位置复制失败，请检查系统剪贴板权限', true);
+  }
+}
 
 function feBuildTimestampedPath(relPath, overrideExt) {
   const value = String(relPath || '').trim();
@@ -46666,7 +47358,7 @@ async function feCopyCurrentAppLink() {
   try {
     await copyTextToClipboard(actionState.href);
     feClose();
-    vfsShowUploadToast('已复制到粘贴板', false, { placement: 'vfs' });
+    vfsShowUploadToast('已复制到剪贴板', false, { placement: 'vfs' });
   } catch {
     vfsShowUploadToast('复制链接失败', true);
   }
@@ -46696,6 +47388,9 @@ async function feOpen(absPath) {
   closeRightSidebarUrlPreview();
   feStopMediaPreview();
   feHideMediaControls();
+  feResetColorPicker();
+  feResetCoordinatePicker();
+  feResetImageGridTool();
   feCurrentPath = absPath;
   const normalizedPath = normalizeFsPath(absPath);
   const normalizedWorkspace = normalizeFsPath(vfsWorkspace);
@@ -46758,6 +47453,8 @@ async function feOpen(absPath) {
       }
       feImageMime = feResolveImageMime(feImageExt);
       await feRenderImageEditor(data.content);
+      feUpdateColorPickerButton();
+      feUpdateImageGridButton();
       refreshOverlayStates();
     } catch {
       content.innerHTML = '<div style="color:var(--error);padding:12px">图片加载失败</div>';
@@ -46800,6 +47497,8 @@ async function feOpen(absPath) {
     }
     const sourceURL = '/api/media_preview?agentId=' + encodeURIComponent(agentId) + '&path=' + encodeURIComponent(feAgentRelPath);
     renderMediaPreview(sourceURL, feFileType);
+    feUpdateColorPickerButton();
+    feUpdateCoordinatePickerButton();
     return;
   }
 
@@ -46904,11 +47603,22 @@ function feImageToolbarHtml() {
         '<button type="button" class="fe-image-tool-btn" onclick="feClearImageEdits()">重置</button>' +
       '</div>' +
       '<div class="fe-image-tools">' +
-        '<label>颜色 <input type="color" class="fe-image-color-input" id="feImageColor" value="' + feImageState.strokeColor + '" oninput="feSetImageColor(this.value)"></label>' +
+        '<label>颜色 <input type="color" class="fe-image-color-input" id="feImageColor" value="' + feImageState.strokeColor + '" oninput="feSetImageColor(this.value, true)" aria-label="选择颜色"></label>' +
+        '<input type="text" class="fe-image-color-hex" id="feImageColorHex" value="' + feNormalizeColorPickerHex(feImageState.strokeColor) + '" maxlength="7" spellcheck="false" autocomplete="off" inputmode="text" aria-label="输入十六进制颜色，例如 #RRGGBB" title="输入 #RRGGBB" oninput="fePreviewImageHexColor(this.value)" onchange="feCommitImageHexColor()" onkeydown="feHandleImageHexColorKeydown(event)">' +
         '<label>线粗 <input type="range" id="feImageLineWidth" min="1" max="24" step="1" value="' + feImageState.lineWidth + '" oninput="feSetImageLineWidth(this.value)"><span id="feImageLineWidthValue">' + feImageState.lineWidth + 'px</span></label>' +
         '<label>字号 <input type="range" id="feImageFontSize" min="12" max="96" step="1" value="' + feImageState.fontSize + '" oninput="feSetImageFontSize(this.value)"><span id="feImageFontSizeValue">' + feImageState.fontSize + 'px</span></label>' +
         '<label>橡皮大小 <input type="range" id="feImageBrush" min="8" max="96" step="2" value="' + feImageState.brushSize + '" oninput="feSetImageBrush(this.value)"><span id="feImageBrushValue">' + feImageState.brushSize + 'px</span></label>' +
       '</div>' +
+    '</div>' +
+    '<div class="fe-image-grid-tool" id="feImageGridTool" hidden>' +
+      '<label class="fe-image-grid-field">水平<input id="feImageGridHorizontal" type="number" min="1" step="1" value="1" inputmode="numeric" oninput="feHandleImageGridLayoutInput()"></label>' +
+      '<label class="fe-image-grid-field">垂直<input id="feImageGridVertical" type="number" min="1" step="1" value="1" inputmode="numeric" oninput="feHandleImageGridLayoutInput()"></label>' +
+      '<label class="fe-image-grid-field">上缩进<input id="feImageGridTop" type="number" min="0" step="1" value="0" inputmode="numeric" oninput="feHandleImageGridCropInput()"></label>' +
+      '<label class="fe-image-grid-field">下缩进<input id="feImageGridBottom" type="number" min="0" step="1" value="0" inputmode="numeric" oninput="feHandleImageGridCropInput()"></label>' +
+      '<label class="fe-image-grid-field">左缩进<input id="feImageGridLeft" type="number" min="0" step="1" value="0" inputmode="numeric" oninput="feHandleImageGridCropInput()"></label>' +
+      '<label class="fe-image-grid-field">右缩进<input id="feImageGridRight" type="number" min="0" step="1" value="0" inputmode="numeric" oninput="feHandleImageGridCropInput()"></label>' +
+      '<button class="fe-image-grid-export" type="button" onclick="feExportImageGridCoordinates()">导出</button>' +
+      '<div class="fe-image-grid-summary" id="feImageGridSummary" aria-live="polite"></div>' +
     '</div>' +
     '<div class="fe-image-tip">支持橡皮擦、画笔自由线条、圆/椭圆/矩形/三角形拖拽绘制，以及文字在任意位置落点输入；文字支持换行，点击“确定”或按 Ctrl/Cmd + Enter 生效，Esc 可取消；擦除区域会直接保存为透明像素（Alpha=0），并可最多后退 10 步。</div>' +
     '<div class="fe-image-stage" id="feImageStage">' +
@@ -47011,11 +47721,51 @@ function feSetImageBrush(size) {
   if (label) label.textContent = parsed + 'px';
 }
 
-function feSetImageColor(color) {
-  feImageState.strokeColor = color || '#ff4d4f';
+function feSetImageColor(color, shouldCopy) {
+  feImageState.strokeColor = feNormalizeColorPickerHex(color) || '#FF4D4F';
   const input = document.getElementById('feImageColor');
   if (input && input.value !== feImageState.strokeColor) input.value = feImageState.strokeColor;
+  const hexInput = document.getElementById('feImageColorHex');
+  if (hexInput && document.activeElement !== hexInput) {
+    hexInput.value = feImageState.strokeColor;
+    hexInput.classList.remove('invalid');
+  }
   feSyncImageTextEditorStyle();
+  if (shouldCopy) feCopyPickedColor(feImageState.strokeColor);
+}
+
+function fePreviewImageHexColor(color) {
+  const input = document.getElementById('feImageColorHex');
+  const normalizedColor = feNormalizeColorPickerHex(color);
+  if (!normalizedColor) {
+    if (input) input.classList.toggle('invalid', String(color || '').trim().length > 0);
+    return false;
+  }
+  if (input) input.classList.remove('invalid');
+  feSetImageColor(normalizedColor, false);
+  return true;
+}
+
+function feCommitImageHexColor() {
+  const input = document.getElementById('feImageColorHex');
+  const normalizedColor = feNormalizeColorPickerHex(input && input.value);
+  if (!normalizedColor) {
+    if (input) input.classList.add('invalid');
+    feShowColorPickerToast('请输入 #RRGGBB 格式的颜色值', true);
+    return false;
+  }
+  if (input) {
+    input.value = normalizedColor;
+    input.classList.remove('invalid');
+  }
+  feSetImageColor(normalizedColor, true);
+  return true;
+}
+
+function feHandleImageHexColorKeydown(event) {
+  if (!event || event.key !== 'Enter') return;
+  event.preventDefault();
+  feCommitImageHexColor();
 }
 
 function feSetImageLineWidth(size) {
@@ -47398,6 +48148,9 @@ function feClearImageEdits() {
 
 function feClose() {
   const content = document.getElementById('fileEditorContent');
+  feResetColorPicker();
+  feResetCoordinatePicker();
+  feResetImageGridTool();
   feStopMediaPreview();
   feHideMediaControls();
   feRevokePreviewBlobUrls(content);
@@ -47470,7 +48223,7 @@ async function feSave() {
         if (data.savedAs) {
           try {
             await copyTextToClipboard(data.savedAs);
-            vfsShowUploadToast('路径已保存至黏贴板', false);
+            vfsShowUploadToast('路径已保存至剪贴板', false);
           } catch {
             vfsShowUploadToast('图片已保存，但路径复制失败', true);
           }
@@ -47885,6 +48638,16 @@ function handleOverlayKeyboardShortcuts(event) {
 }
 
 document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && feColorPickerActive) {
+    e.preventDefault();
+    feExitColorPicker();
+    return;
+  }
+  if (e.key === 'Escape' && feCoordinatePickerActive) {
+    e.preventDefault();
+    feExitCoordinatePicker();
+    return;
+  }
   if (e.key === 'Escape') closeQuickFanMenu();
   if (e.key === 'Escape') closeAllSkillExtractPopovers();
   if (e.key === 'Escape') closeInstallAppPopover();
@@ -49545,7 +50308,7 @@ async function copyMessagePathValueToClipboard(value) {
   const text = String(value || '').trim();
   if (!text) throw new Error('没有可复制的内容');
   await copyTextToClipboard(text);
-  vfsShowUploadToast('已复制到粘贴板', false, { placement: 'vfs' });
+  vfsShowUploadToast('已复制到剪贴板', false, { placement: 'vfs' });
 }
 
 function buildMessageFileActionItems(actionState) {

@@ -815,7 +815,7 @@ proxy --agent-dir ./agent
 | `--agent-dir` | 是 | - | Agent 根目录 |
 | `--default-dir` | 否 | 启动目录下的 `./config` | 新建 Agent 和空 `agent-dir` 启动补齐 `DEF_AGENT` 时使用的默认模板目录 |
 | `--port` | 否 | `config/config.json.port`，未配置时为 `8080` | 代理监听端口；显式 `--port` 优先 |
-| `--host` | 否 | `https://www.deepright.cn` | 上游服务地址 |
+| `--host` | 否 | 已保存的 `config/config.json.host`，未配置时为 `https://www.deepright.cn` | 上游服务地址 |
 | `--device` | 否 | 自动探测 | 设备 ID |
 | `--agent-cache` | 否 | `10000` | Agent 元数据缓存 TTL，单位毫秒 |
 | `--site` | 否 | `./site` | 静态站点目录 |
@@ -1007,9 +1007,18 @@ proxy --agent-dir ./agent
 ./proxy --agent-dir ./agents --site ./site --host http://127.0.0.1:9998
 ```
 
+### 服务地址
+
+Proxy 提供本机受限的 `/api/host` 服务地址接口，与 Integration 的接口保持一致。
+
+- `GET /api/host` 返回当前生效地址。
+- `POST` 或 `PUT /api/host` 发送 `{"host":"https://example.com"}` 可立即切换并保存到 Proxy 自身的 `config/config.json.host`。
+- `DELETE /api/host` 或 `POST /api/host?reset=true` 会恢复并保存默认地址 `https://www.deepright.cn`。
+- 仅 `localhost`、`127.0.0.1` 或 `::1` 本机管理请求可修改；写入失败时当前地址保持不变。
+
 ### config/config.json
 
-- 每次以 HTTP 服务模式启动 `proxy` 时，都会在当前启动目录下的 `config/config.json` 写入或更新一份启动配置
+- 每次以 HTTP 服务模式启动 `proxy` 时，都会在其解析到的 `config/config.json` 写入或更新一份启动配置
 - 写入内容为本次启动参数的取值
 - 每次启动都会覆盖更新
 

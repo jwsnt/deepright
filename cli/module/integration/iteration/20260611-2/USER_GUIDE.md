@@ -1,17 +1,17 @@
-# 运行时 Host 覆盖
+# 服务地址管理
 
 ## 简介
 
-本迭代为 `integration` 增加了运行时 Host 覆盖能力：
+`integration` 提供服务地址读取和修改能力：
 
 - HTTP 接口：`/api/host`
 - CLI 命令：`integration host`
 
-该能力只影响当前正在运行的 `integration` 进程内存，不会写入 `config.json`，也不会覆盖 `--host` 的启动参数。服务重启后，会自动恢复为启动时生效的 Host。
+修改会立即生效，并写入应用资源目录中的 `config/config.json.host`。重启后会继续使用已保存的服务地址；恢复默认值会保存 `https://www.deepright.cn`。
 
 ## HTTP 接口
 
-### 读取当前运行时 Host
+### 读取当前服务地址
 
 ```bash
 curl http://127.0.0.1:8080/api/host
@@ -23,15 +23,12 @@ curl http://127.0.0.1:8080/api/host
 {
   "status": 0,
   "data": {
-    "host": "https://deepright.cn",
-    "startupHost": "https://deepright.cn",
-    "overridden": false,
-    "runtimeOnly": true
+    "host": "https://deepright.cn"
   }
 }
 ```
 
-### 设置当前运行时 Host
+### 设置服务地址
 
 ```bash
 curl -X POST http://127.0.0.1:8080/api/host \
@@ -39,7 +36,7 @@ curl -X POST http://127.0.0.1:8080/api/host \
   -d '{"host":"https://staging.deepright.cn"}'
 ```
 
-### 恢复为启动 Host
+### 恢复默认服务地址
 
 ```bash
 curl -X DELETE http://127.0.0.1:8080/api/host
@@ -53,13 +50,13 @@ curl -X DELETE http://127.0.0.1:8080/api/host
 ./integration host get
 ```
 
-### 设置运行时值
+### 设置服务地址
 
 ```bash
 ./integration host set --value https://staging.deepright.cn
 ```
 
-### 恢复启动值
+### 恢复默认值
 
 ```bash
 ./integration host reset
@@ -75,6 +72,6 @@ curl -X DELETE http://127.0.0.1:8080/api/host
 
 ## 说明
 
-- 仅允许本机请求修改运行时 Host。
-- `cli-get` 心跳、`/v1/chat/completions` 转发、Cron 执行等链路都会实时使用当前运行时 Host。
-- `runtime.json` 仍记录启动时 Host，不会因为本次运行时覆盖而被改写。
+- 仅允许本机请求修改服务地址。
+- `cli-get` 心跳、`/v1/chat/completions` 转发、Cron 执行等链路都会立即使用新地址。
+- 配置写入失败时，接口不会切换当前地址，并会返回可展示的错误。

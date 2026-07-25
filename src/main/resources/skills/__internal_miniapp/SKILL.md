@@ -1,5 +1,5 @@
 ---
-name: __internal_miniapp_creator
+name: __internal_miniapp
 description: 在当前Agent的app目录中制作可通过站内iframe预览的静态HTML迷你应用（mini app）。
 ---
 

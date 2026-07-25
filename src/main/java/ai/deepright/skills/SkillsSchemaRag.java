@@ -222,7 +222,7 @@ public class SkillsSchemaRag extends RagSkills implements SkillsChecker {
         @Value("${skills.schema.deepright:__internal_deepright}")
         protected String skillDeepRight;
 
-        @Value("${skills.schema.miniapp:__internal_miniapp_creator}")
+        @Value("${skills.schema.miniapp:__internal_miniapp}")
         protected String skillMiniApp;
 
         @Value("${skills.schema.creator:__internal_creator}")

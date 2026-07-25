@@ -738,6 +738,13 @@ integration token get --help
 > 新增自 ./iteration/20260709-1/REQUIREMENT.md
 + 会话沙盒状态改为仅按非空 `chatId` 命中；转发 metadata 同步当前沙盒模式，日志保留 Agent 与会话信息。
 
+### 服务地址持久化
+> 与 Site ./iteration/20260725-3/REQUIREMENT.md 对齐
++ 新增本机受限 `/api/host`：`GET` 返回当前服务地址，`POST`/`PUT` 修改并持久化服务地址，`DELETE` 或 `reset=true` 恢复 `https://www.deepright.cn`。
++ 地址只接受绝对 `http`/`https` URL，且不能包含查询串或片段；远程来源和远程访问 Host 均不得修改。
++ 保存通过原子替换更新 Proxy 既有配置解析规则定位的 `config/config.json.host`，保留其他字段与 `http` 配置；持久化失败时不改变正在使用的地址。
++ Proxy 普通转发与定时任务转发必须读取同一可并发安全的当前服务地址；重启时默认从已保存的 `config/config.json.host` 读取，显式 `--host` 仍可覆盖并保存。
+
 ### 编写代码
 + 以Golang编写以上代码，要求：
     + 所有API请求必须使用相对路径(如/v1/chat/completions), 禁止硬编码IP或域名, 确保非本地访问时请求自动指向当前Host

@@ -7937,13 +7937,13 @@ func TestIntegrationAtMenuOutputKeepsDisabledRuntimeSkillHidden(t *testing.T) {
 		output: &AgentOutput{Agents: []agentcore.Agent{{
 			AgentID: "a",
 			Skills: []agentcore.Skill{{
-				Name:     "__internal_miniapp_creator",
-				Location: "/tmp/agent/a/skills/__internal_miniapp_creator",
+				Name:     "__internal_miniapp",
+				Location: "/tmp/agent/a/skills/__internal_miniapp",
 			}},
 		}}},
-		runtimeSkillNames: []string{"__internal_miniapp_creator"},
+		runtimeSkillNames: []string{"__internal_miniapp"},
 	}
-	output := integrationAtMenuOutputForDisabledPaths(snapshot, []string{"/tmp/agent/a/skills/__internal_miniapp_creator"})
+	output := integrationAtMenuOutputForDisabledPaths(snapshot, []string{"/tmp/agent/a/skills/__internal_miniapp"})
 	if got := agentcore.SkillNames(output.Agents[0].Skills); len(got) != 0 {
 		t.Fatalf("skills = %v, want disabled runtime skill hidden", got)
 	}
@@ -15325,7 +15325,7 @@ func TestIntegrationCLIHelpIncludesHost(t *testing.T) {
 	if !strings.Contains(stdout, "integration host get [--addr URL]") {
 		t.Fatalf("missing host usage: %s", stdout)
 	}
-	if !strings.Contains(stdout, "host              Read or update the in-memory upstream host of a running integration service") {
+	if !strings.Contains(stdout, "host              Read or update the persisted service address of a running integration service") {
 		t.Fatalf("missing host description: %s", stdout)
 	}
 }
@@ -15375,16 +15375,20 @@ func TestRunIntegrationStandaloneCLIRejectsInvalidPort(t *testing.T) {
 }
 
 func TestHandleRuntimeHost(t *testing.T) {
+	tempDir := t.TempDir()
+	useIntegrationExecutableDir(t, tempDir)
+	writeIntegrationDeviceConfig(t, tempDir, `{
+  "host": "https://www.deepright.cn",
+  "http": {"debug": false},
+  "preserved": "value"
+}`)
 	cfg := &Config{Host: "https://www.deepright.cn"}
 
 	decode := func(t *testing.T, recorder *httptest.ResponseRecorder) struct {
 		Status  int    `json:"status"`
 		Content string `json:"content"`
 		Data    struct {
-			Host        string `json:"host"`
-			StartupHost string `json:"startupHost"`
-			Overridden  bool   `json:"overridden"`
-			RuntimeOnly bool   `json:"runtimeOnly"`
+			Host string `json:"host"`
 		} `json:"data"`
 	} {
 		t.Helper()
@@ -15392,10 +15396,7 @@ func TestHandleRuntimeHost(t *testing.T) {
 			Status  int    `json:"status"`
 			Content string `json:"content"`
 			Data    struct {
-				Host        string `json:"host"`
-				StartupHost string `json:"startupHost"`
-				Overridden  bool   `json:"overridden"`
-				RuntimeOnly bool   `json:"runtimeOnly"`
+				Host string `json:"host"`
 			} `json:"data"`
 		}
 		if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
@@ -15412,7 +15413,7 @@ func TestHandleRuntimeHost(t *testing.T) {
 	getRec := httptest.NewRecorder()
 	handler.ServeHTTP(getRec, getReq)
 	getPayload := decode(t, getRec)
-	if getPayload.Status != 0 || getPayload.Data.Host != "https://www.deepright.cn" || getPayload.Data.StartupHost != "https://www.deepright.cn" || getPayload.Data.Overridden {
+	if getPayload.Status != 0 || getPayload.Data.Host != "https://www.deepright.cn" {
 		t.Fatalf("unexpected initial payload: %#v", getPayload)
 	}
 
@@ -15423,11 +15424,32 @@ func TestHandleRuntimeHost(t *testing.T) {
 	setRec := httptest.NewRecorder()
 	handler.ServeHTTP(setRec, setReq)
 	setPayload := decode(t, setRec)
-	if setPayload.Status != 0 || setPayload.Data.Host != "https://staging.deepright.cn/base" || !setPayload.Data.Overridden {
+	if setPayload.Status != 0 || setPayload.Data.Host != "https://staging.deepright.cn/base" {
 		t.Fatalf("unexpected set payload: %#v", setPayload)
 	}
 	if got := cfg.currentHost(); got != "https://staging.deepright.cn/base" {
 		t.Fatalf("cfg.currentHost() = %q, want %q", got, "https://staging.deepright.cn/base")
+	}
+	configData, err := os.ReadFile(filepath.Join(tempDir, "config", "config.json"))
+	if err != nil {
+		t.Fatalf("read persisted config: %v", err)
+	}
+	var persisted map[string]any
+	if err := json.Unmarshal(configData, &persisted); err != nil {
+		t.Fatalf("decode persisted config: %v", err)
+	}
+	if persisted["host"] != "https://staging.deepright.cn/base" || persisted["preserved"] != "value" {
+		t.Fatalf("unexpected persisted config: %#v", persisted)
+	}
+	if _, ok := persisted["http"].(map[string]any); !ok {
+		t.Fatalf("http config was not preserved: %#v", persisted)
+	}
+	startup, _, err := loadIntegrationStartupOptions()
+	if err != nil {
+		t.Fatalf("read persisted startup config: %v", err)
+	}
+	if startup.Config.Host != "https://staging.deepright.cn/base" {
+		t.Fatalf("restarted host = %q, want persisted value", startup.Config.Host)
 	}
 
 	resetReq := httptest.NewRequest(http.MethodDelete, "/api/host", nil)
@@ -15436,8 +15458,18 @@ func TestHandleRuntimeHost(t *testing.T) {
 	resetRec := httptest.NewRecorder()
 	handler.ServeHTTP(resetRec, resetReq)
 	resetPayload := decode(t, resetRec)
-	if resetPayload.Status != 0 || resetPayload.Data.Host != "https://www.deepright.cn" || resetPayload.Data.Overridden {
+	if resetPayload.Status != 0 || resetPayload.Data.Host != defaultUpstreamHost {
 		t.Fatalf("unexpected reset payload: %#v", resetPayload)
+	}
+	configData, err = os.ReadFile(filepath.Join(tempDir, "config", "config.json"))
+	if err != nil {
+		t.Fatalf("read reset config: %v", err)
+	}
+	if err := json.Unmarshal(configData, &persisted); err != nil {
+		t.Fatalf("decode reset config: %v", err)
+	}
+	if persisted["host"] != defaultUpstreamHost {
+		t.Fatalf("reset host = %v, want %q", persisted["host"], defaultUpstreamHost)
 	}
 }
 
@@ -15452,8 +15484,31 @@ func TestHandleRuntimeHostRejectsRemoteRequest(t *testing.T) {
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
 	}
-	if !strings.Contains(rec.Body.String(), "only localhost requests can modify runtime host") {
+	if !strings.Contains(rec.Body.String(), "only localhost requests can modify service address") {
 		t.Fatalf("unexpected body: %s", rec.Body.String())
+	}
+}
+
+func TestHandleRuntimeHostDoesNotApplyValueWhenConfigSaveFails(t *testing.T) {
+	tempDir := t.TempDir()
+	useIntegrationExecutableDir(t, tempDir)
+	if err := os.WriteFile(filepath.Join(tempDir, "config"), []byte("not a directory"), 0o644); err != nil {
+		t.Fatalf("create blocking config path: %v", err)
+	}
+	cfg := &Config{Host: defaultUpstreamHost}
+	req := httptest.NewRequest(http.MethodPost, "/api/host", strings.NewReader(`{"host":"https://staging.deepright.cn"}`))
+	req.RemoteAddr = "127.0.0.1:34567"
+	req.Host = "127.0.0.1:8080"
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handleRuntimeHost(cfg).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d body=%s", rec.Code, http.StatusInternalServerError, rec.Body.String())
+	}
+	if got := cfg.currentHost(); got != defaultUpstreamHost {
+		t.Fatalf("current host = %q, want unchanged %q", got, defaultUpstreamHost)
 	}
 }
 
@@ -18661,7 +18716,7 @@ func TestHandleSkillStateImmediatelyUpdatesAtMenuCache(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(tmp, "config"), 0o755); err != nil {
 		t.Fatalf("mkdir app config: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(tmp, "config", "config.json"), []byte(`{"skills":["__internal_miniapp_creator"]}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmp, "config", "config.json"), []byte(`{"skills":["__internal_miniapp"]}`), 0o644); err != nil {
 		t.Fatalf("write app config: %v", err)
 	}
 
@@ -18675,11 +18730,11 @@ func TestHandleSkillStateImmediatelyUpdatesAtMenuCache(t *testing.T) {
 	defer func() { cronDB = oldCronDB }()
 
 	agentDir := filepath.Join(tmp, "agent")
-	skillDir := filepath.Join(agentDir, "a", "skills", "__internal_miniapp_creator")
+	skillDir := filepath.Join(agentDir, "a", "skills", "__internal_miniapp")
 	if err := os.MkdirAll(skillDir, 0o755); err != nil {
 		t.Fatalf("mkdir skill: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("---\nname: __internal_miniapp_creator\ndescription: demo\n---\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("---\nname: __internal_miniapp\ndescription: demo\n---\n"), 0o644); err != nil {
 		t.Fatalf("write skill: %v", err)
 	}
 
@@ -18708,8 +18763,8 @@ func TestHandleSkillStateImmediatelyUpdatesAtMenuCache(t *testing.T) {
 		}
 		return names
 	}
-	if got := getSkills(); !reflect.DeepEqual(got, []string{"__internal_miniapp_creator"}) {
-		t.Fatalf("initial skills = %v, want internal miniapp creator", got)
+	if got := getSkills(); !reflect.DeepEqual(got, []string{"__internal_miniapp"}) {
+		t.Fatalf("initial skills = %v, want internal miniapp", got)
 	}
 
 	currentTime = currentTime.Add(time.Minute)

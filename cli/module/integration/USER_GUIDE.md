@@ -154,7 +154,7 @@ Integration 在每次启动时读取 `config/config.json.temp`：
 | `--agent-dir` | 否 | macOS: `~/Library/Application Support/deepright/agent`；WSL: `~/deepright/agent`；其他系统: `./agent` | Agent 根目录路径；目录不存在时自动创建；若目录为空则自动补齐 `DEF_AGENT`，并确保 `DEF_AGENT/skills` 存在 | 共享 |
 | `--default-dir` | 否 | `./config` | 新建 Agent 和空 `agent-dir` 启动补齐 `DEF_AGENT` 时使用的默认模板目录；会复制其中的模板文件，并为 Agent 单独初始化空 `config.json` | 共享 |
 | `--port` | 否 | `8080` | HTTP 服务端口 | proxy + static + cron API |
-| `--host` | 否 | `https://www.deepright.cn` | 上游服务地址 | proxy + cli-get + cron执行 |
+| `--host` | 否 | 已保存的 `config/config.json.host`，未配置时为 `https://www.deepright.cn` | 上游服务地址 | proxy + cli-get + cron执行 |
 | `--device` | 否 | 自动生成 | 设备ID | 共享 |
 | `--agent-cache` | 否 | `120000` | Agent 元数据缓存 TTL（毫秒） | 共享 |
 | `--site` | 否 | `./site` | 静态站点目录；默认取当前应用目录下的 `site` | static |
@@ -3180,3 +3180,14 @@ Integration 提供同源只读接口 `GET /api/media_preview?agentId=<agentId>&p
 - 支持 `GET` 与 `HEAD`；Range 请求会返回标准的局部内容响应。接口不写入、转换或修改源文件。
 
 完整说明见 [iteration/20260725-2/USER_GUIDE.md](iteration/20260725-2/USER_GUIDE.md)。
+
+---
+
+## 服务地址持久化
+
+`/api/host` 及 `integration host` 用于查看和修改当前服务地址。修改只接受绝对 `http` 或 `https` URL，且不能包含查询串或片段。
+
+- `POST` 或 `PUT /api/host` 会立即切换当前地址，并持久化写入应用资源目录中的 `config/config.json.host`。
+- `DELETE /api/host` 或 `POST /api/host?reset=true` 会立即恢复默认地址 `https://www.deepright.cn` 并持久化。
+- 接口仅允许本机管理请求；配置写入失败时不会切换当前地址，并会返回错误。
+- CLI 对应为 `integration host get`、`integration host set --value <URL>` 和 `integration host reset`；三者与 HTTP 接口使用相同的持久化语义。

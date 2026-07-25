@@ -20,6 +20,7 @@ import (
 	"knowledge/knowledgecore"
 	"log"
 
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -1318,6 +1319,7 @@ func pluginPIDFile(key, callback string) string {
 // ProxyServer holds the proxy configuration and state.
 type ProxyServer struct {
 	Host                    string
+	hostMu                  sync.RWMutex
 	AgentDir                string
 	DefaultDir              string
 	DeviceID                string
@@ -1333,6 +1335,40 @@ type ProxyServer struct {
 	ConnectService          *connectsvc.Service
 	WarningScanRoot         string
 	PluginExecTimeout       time.Duration
+}
+
+func (p *ProxyServer) currentHost() string {
+	if p == nil {
+		return defaultUpstreamHost
+	}
+	p.hostMu.RLock()
+	host := strings.TrimSpace(p.Host)
+	p.hostMu.RUnlock()
+	if host == "" {
+		return defaultUpstreamHost
+	}
+	return host
+}
+
+func (p *ProxyServer) setPersistentHost(host string) (string, error) {
+	if p == nil {
+		return "", fmt.Errorf("service address is not initialized")
+	}
+	normalized, err := validateProxyHost(host)
+	if err != nil {
+		return "", err
+	}
+	if err := updateProxyStartupConfig(map[string]interface{}{"host": normalized}); err != nil {
+		return "", fmt.Errorf("save config/config.json failed: %w", err)
+	}
+	p.hostMu.Lock()
+	p.Host = normalized
+	p.hostMu.Unlock()
+	return normalized, nil
+}
+
+func (p *ProxyServer) resetPersistentHost() (string, error) {
+	return p.setPersistentHost(defaultUpstreamHost)
 }
 
 // sharedutil.NewProxyClient creates an HTTP client with only connect timeout, no read/total timeout.
@@ -1369,6 +1405,130 @@ func writeConnectError(w http.ResponseWriter, err error) {
 		"status":  1,
 		"content": err.Error(),
 	})
+}
+
+func normalizeProxyRequestHost(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if strings.Contains(value, ",") {
+		value = strings.TrimSpace(strings.Split(value, ",")[0])
+	}
+	if strings.Contains(value, "://") {
+		if parsed, err := url.Parse(value); err == nil {
+			value = strings.TrimSpace(parsed.Host)
+		}
+	}
+	if host, _, err := net.SplitHostPort(value); err == nil {
+		value = host
+	}
+	value = strings.TrimPrefix(value, "[")
+	value = strings.TrimSuffix(value, "]")
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func proxyRequestAccessHost(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	for _, candidate := range []string{
+		r.Header.Get("X-Forwarded-Host"),
+		r.Header.Get("X-Original-Host"),
+		r.Host,
+		func() string {
+			if r.URL == nil {
+				return ""
+			}
+			return r.URL.Host
+		}(),
+	} {
+		if host := normalizeProxyRequestHost(candidate); host != "" {
+			return host
+		}
+	}
+	return ""
+}
+
+func isProxyLocalManagementRequest(r *http.Request) bool {
+	if !sharedutil.IsLocalExecutionRequest(r) {
+		return false
+	}
+	switch proxyRequestAccessHost(r) {
+	case "", "localhost", "127.0.0.1", "::1":
+		return true
+	default:
+		return false
+	}
+}
+
+func (p *ProxyServer) HandleHost(w http.ResponseWriter, r *http.Request) {
+	type hostRequest struct {
+		Host  string `json:"host"`
+		Reset bool   `json:"reset"`
+	}
+	writeJSON := func(statusCode int, payload map[string]any) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
+		_ = json.NewEncoder(w).Encode(payload)
+	}
+	writeHost := func(host string) {
+		writeJSON(http.StatusOK, map[string]any{"status": 0, "data": map[string]string{"host": host}})
+	}
+	if !isProxyLocalManagementRequest(r) {
+		writeJSON(http.StatusForbidden, map[string]any{"status": 1, "content": "only localhost requests can modify service address"})
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		writeHost(p.currentHost())
+	case http.MethodDelete:
+		host, err := p.resetPersistentHost()
+		if err != nil {
+			writeJSON(http.StatusInternalServerError, map[string]any{"status": 1, "content": err.Error()})
+			return
+		}
+		writeHost(host)
+	case http.MethodPost, http.MethodPut:
+		var payload hostRequest
+		if r.Body != nil {
+			defer r.Body.Close()
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil && !errors.Is(err, io.EOF) {
+				writeJSON(http.StatusBadRequest, map[string]any{"status": 1, "content": "invalid JSON body"})
+				return
+			}
+		}
+		if raw := strings.TrimSpace(r.URL.Query().Get("host")); raw != "" {
+			payload.Host = raw
+		}
+		if raw := strings.TrimSpace(r.URL.Query().Get("reset")); raw != "" {
+			if value, ok := sharedutil.ToBoolValue(raw); ok {
+				payload.Reset = value
+			}
+		}
+		if payload.Reset {
+			host, err := p.resetPersistentHost()
+			if err != nil {
+				writeJSON(http.StatusInternalServerError, map[string]any{"status": 1, "content": err.Error()})
+				return
+			}
+			writeHost(host)
+			return
+		}
+		if _, err := validateProxyHost(payload.Host); err != nil {
+			writeJSON(http.StatusBadRequest, map[string]any{"status": 1, "content": err.Error()})
+			return
+		}
+		host, err := p.setPersistentHost(payload.Host)
+		if err != nil {
+			writeJSON(http.StatusInternalServerError, map[string]any{"status": 1, "content": err.Error()})
+			return
+		}
+		writeHost(host)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 func queryBool(raw string) bool {
@@ -1669,6 +1829,35 @@ func configuredProxyStringValue(key string) string {
 		}
 	}
 	return ""
+}
+
+func validateProxyHost(raw string) (string, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return "", fmt.Errorf("host is required")
+	}
+	parsed, err := url.Parse(value)
+	if err != nil {
+		return "", fmt.Errorf("invalid host: %w", err)
+	}
+	if !parsed.IsAbs() || parsed.Host == "" || strings.TrimSpace(parsed.Hostname()) == "" {
+		return "", fmt.Errorf("host must be absolute http/https URL")
+	}
+	scheme := strings.ToLower(strings.TrimSpace(parsed.Scheme))
+	if scheme != "http" && scheme != "https" {
+		return "", fmt.Errorf("host must use http or https")
+	}
+	if parsed.RawQuery != "" || parsed.Fragment != "" {
+		return "", fmt.Errorf("host must not include query or fragment")
+	}
+	return strings.TrimRight(parsed.String(), "/"), nil
+}
+
+func configuredProxyHost() string {
+	if host, err := validateProxyHost(configuredProxyStringValue("host")); err == nil {
+		return host
+	}
+	return defaultUpstreamHost
 }
 
 func configuredProxySandboxApp() string {
@@ -9235,7 +9424,7 @@ func runDueTask(p *ProxyServer, db *sql.DB, task dueTask, alreadyStarted bool) b
 	if p == nil || db == nil {
 		return false
 	}
-	if strings.TrimSpace(p.Host) == "" || p.Client == nil {
+	if strings.TrimSpace(p.currentHost()) == "" || p.Client == nil {
 		return false
 	}
 
@@ -9358,7 +9547,7 @@ func runDueTask(p *ProxyServer, db *sql.DB, task dueTask, alreadyStarted bool) b
 	detailID := task.ID
 	agentID := task.AgentID
 	go func() {
-		targetURL := strings.TrimRight(p.Host, "/") + "/v1/chat/completions"
+		targetURL := strings.TrimRight(p.currentHost(), "/") + "/v1/chat/completions"
 		req, err := http.NewRequest(http.MethodPost, targetURL, bytes.NewReader(body))
 		if err != nil {
 			if !alreadyStarted {
@@ -9797,7 +9986,7 @@ func (p *ProxyServer) HandleChatCompletions(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	targetURL := strings.TrimRight(p.Host, "/") + "/v1/chat/completions"
+	targetURL := strings.TrimRight(p.currentHost(), "/") + "/v1/chat/completions"
 	proxyReq, err := http.NewRequestWithContext(ctx, http.MethodPost, targetURL, bytes.NewReader(newBody))
 	if err != nil {
 		cancel()
@@ -10043,7 +10232,11 @@ func validateProxyServicePort(port int) error {
 }
 
 func validateServeOptions(opts serveOptions) error {
-	return validateProxyServicePort(opts.port)
+	if err := validateProxyServicePort(opts.port); err != nil {
+		return err
+	}
+	_, err := validateProxyHost(opts.host)
+	return err
 }
 
 func flagProvided(fs *flag.FlagSet, name string) bool {
@@ -10065,28 +10258,70 @@ func configuredProxyServicePort() int {
 	return port
 }
 
-func writeProxyStartupConfig(data map[string]interface{}) {
+var proxyStartupConfigWriteMu sync.Mutex
+
+func updateProxyStartupConfig(data map[string]interface{}) error {
+	if len(data) == 0 {
+		return nil
+	}
+	proxyStartupConfigWriteMu.Lock()
+	defer proxyStartupConfigWriteMu.Unlock()
+
 	raw, path, err := readProxyStartupConfigRaw()
 	if err != nil {
-		log.Printf("config/config.json: read failed: %v", err)
-		return
+		return err
 	}
 	if raw == nil {
 		raw = map[string]interface{}{}
 	}
 	for key, value := range data {
-		raw[key] = value
+		key = strings.TrimSpace(key)
+		if key != "" {
+			raw[key] = value
+		}
+	}
+	if strings.TrimSpace(path) == "" {
+		return fmt.Errorf("cannot resolve config/config.json path")
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		log.Printf("config/config.json: prepare dir failed: %v", err)
-		return
+		return err
 	}
 	out, err := json.MarshalIndent(raw, "", "  ")
 	if err != nil {
-		log.Printf("config/config.json: marshal failed: %v", err)
-		return
+		return err
 	}
-	if err := os.WriteFile(path, append(out, '\n'), 0644); err != nil {
+	mode := fs.FileMode(0o644)
+	if info, statErr := os.Stat(path); statErr == nil {
+		mode = info.Mode().Perm()
+	} else if !errors.Is(statErr, os.ErrNotExist) {
+		return statErr
+	}
+	temporary, err := os.CreateTemp(filepath.Dir(path), ".config.json-*")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if err := temporary.Chmod(mode); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if _, err := temporary.Write(append(out, '\n')); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if err := temporary.Sync(); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if err := temporary.Close(); err != nil {
+		return err
+	}
+	return os.Rename(temporaryPath, path)
+}
+
+func writeProxyStartupConfig(data map[string]interface{}) {
+	if err := updateProxyStartupConfig(data); err != nil {
 		log.Printf("config/config.json: write failed: %v", err)
 	}
 }
@@ -10224,7 +10459,7 @@ func newServeFlagSet(name string, opts *serveOptions) *flag.FlagSet {
 	fs.SetOutput(os.Stderr)
 	opts.port = configuredProxyServicePort()
 	fs.IntVar(&opts.port, "port", opts.port, "proxy listen port")
-	fs.StringVar(&opts.host, "host", defaultUpstreamHost, "upstream server URL")
+	fs.StringVar(&opts.host, "host", configuredProxyHost(), "upstream server URL")
 	fs.StringVar(&opts.agentDir, "agent-dir", "", "agent directory (required)")
 	fs.StringVar(&opts.defaultDir, "default-dir", "", "default agent template directory (default: ./config under startup dir)")
 	fs.StringVar(&opts.device, "device", "", "device ID (auto-generated if empty)")
@@ -10347,6 +10582,7 @@ func runServe(opts serveOptions) {
 	mux.Handle("/api/connect/request", connectHandler)
 	mux.Handle("/api/connect/response", connectHandler)
 	mux.HandleFunc("/v1/chat/completions", proxy.HandleChatCompletions)
+	mux.HandleFunc("/api/host", proxy.HandleHost)
 	mux.HandleFunc("/install_app", proxy.HandleInstallApp)
 	mux.HandleFunc("/api/agentId", proxy.HandleAgentIDs)
 	mux.HandleFunc("/api/swarm_agent", proxy.HandleSwarmAgents)

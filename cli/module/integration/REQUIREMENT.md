@@ -824,6 +824,13 @@
 + 成功仅在同时满足以下条件时成立：HTTP 状态为 200、收到至少一个有效业务 SSE `data` 事件、未出现 SSE error/错误 JSON、且收到 `[DONE]` 后正常结束。HTTP 非 2xx、首包或总超时、流中断、空流、SSE 内错误或缺少 `[DONE]` 必须以 SSE 错误事件返回，并包含服务商错误的脱敏、截断说明。
 + 所有测试错误内容需移除/遮蔽 Token、Bearer、Authorization、API Key 等敏感值，并限制可展示的错误正文长度；非 JSON 错误响应、网络错误、异常状态码和 SSE 错误事件均需转换为稳定、可展示的 `配置错误：…` 信息。
 
+### 服务地址持久化
+> 新增自 Site ./iteration/20260725-3/REQUIREMENT.md
++ Integration 与 Proxy 的 `/api/host` 均仅允许本机管理请求。`GET` 返回当前生效服务地址；`POST`/`PUT` 校验绝对 `http`/`https` URL 后立即生效并持久化到各自解析出的 `config/config.json.host`。
++ `DELETE` 或 `reset=true` 必须立即将当前服务地址及 `config/config.json.host` 恢复为 `https://www.deepright.cn`，不得再恢复旧启动值或只清除内存覆盖。
++ 配置写入必须保留无关字段和既有 `http` 配置，并通过原子文件替换落盘。写入失败时当前服务地址不得改变，接口返回可展示的失败信息。
++ `integration host get`、`set`、`reset` 与接口共用持久化语义；CLI 的说明与 JSON 输出不得再声明仅运行时、启动值或覆盖状态。
+
 ### 撰写手册
 + 编写USER_GUIDE.md
 

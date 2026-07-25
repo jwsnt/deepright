@@ -169,7 +169,7 @@ public class TaskRag extends RagCondition implements RagService {
         @Value("${task.rag.schema.def:classpath:config/task/schema_def.md}")
         protected String template4schemaDef;
 
-        @Value("${task.rag.schema.miniapp:__internal_miniapp_creator}")
+        @Value("${task.rag.schema.miniapp:__internal_miniapp}")
         protected String skillMiniApp;
 
         @Bean(TaskRag.RAG_KEY)

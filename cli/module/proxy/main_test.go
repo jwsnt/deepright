@@ -12512,6 +12512,141 @@ func TestNewServeFlagSetUsesConfiguredPortUnlessOverridden(t *testing.T) {
 	}
 }
 
+func TestProxyHostPersistsAndRestoresDefault(t *testing.T) {
+	tempDir := t.TempDir()
+	configDir := filepath.Join(tempDir, "config")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("mkdir config: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(`{
+  "host": "https://www.deepright.cn",
+  "http": {"debug": false},
+  "preserved": "value"
+}`), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	previousExecutable := proxyOsExecutable
+	proxyOsExecutable = func() (string, error) { return filepath.Join(tempDir, "proxy"), nil }
+	t.Cleanup(func() { proxyOsExecutable = previousExecutable })
+
+	proxy := &ProxyServer{Host: defaultUpstreamHost}
+	decode := func(t *testing.T, recorder *httptest.ResponseRecorder) struct {
+		Status int `json:"status"`
+		Data   struct {
+			Host string `json:"host"`
+		} `json:"data"`
+	} {
+		t.Helper()
+		var payload struct {
+			Status int `json:"status"`
+			Data   struct {
+				Host string `json:"host"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+			t.Fatalf("decode response: %v body=%s", err, recorder.Body.String())
+		}
+		return payload
+	}
+
+	setReq := httptest.NewRequest(http.MethodPost, "/api/host", strings.NewReader(`{"host":"https://staging.deepright.cn/base"}`))
+	setReq.RemoteAddr = "127.0.0.1:34567"
+	setReq.Host = "127.0.0.1:8080"
+	setRec := httptest.NewRecorder()
+	proxy.HandleHost(setRec, setReq)
+	setPayload := decode(t, setRec)
+	if setRec.Code != http.StatusOK || setPayload.Status != 0 || setPayload.Data.Host != "https://staging.deepright.cn/base" {
+		t.Fatalf("unexpected set response: code=%d payload=%#v", setRec.Code, setPayload)
+	}
+	if got := proxy.currentHost(); got != "https://staging.deepright.cn/base" {
+		t.Fatalf("current host = %q", got)
+	}
+	data, err := os.ReadFile(filepath.Join(configDir, "config.json"))
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	var persisted map[string]any
+	if err := json.Unmarshal(data, &persisted); err != nil {
+		t.Fatalf("decode config: %v", err)
+	}
+	if persisted["host"] != "https://staging.deepright.cn/base" || persisted["preserved"] != "value" {
+		t.Fatalf("unexpected config: %#v", persisted)
+	}
+	if _, ok := persisted["http"].(map[string]any); !ok {
+		t.Fatalf("http config was not preserved: %#v", persisted)
+	}
+	var opts serveOptions
+	fs := newServeFlagSet("serve", &opts)
+	fs.SetOutput(io.Discard)
+	if err := fs.Parse(nil); err != nil {
+		t.Fatalf("parse persisted host: %v", err)
+	}
+	if opts.host != "https://staging.deepright.cn/base" {
+		t.Fatalf("restarted host = %q", opts.host)
+	}
+
+	resetReq := httptest.NewRequest(http.MethodDelete, "/api/host", nil)
+	resetReq.RemoteAddr = "127.0.0.1:34567"
+	resetReq.Host = "127.0.0.1:8080"
+	resetRec := httptest.NewRecorder()
+	proxy.HandleHost(resetRec, resetReq)
+	resetPayload := decode(t, resetRec)
+	if resetRec.Code != http.StatusOK || resetPayload.Status != 0 || resetPayload.Data.Host != defaultUpstreamHost {
+		t.Fatalf("unexpected reset response: code=%d payload=%#v", resetRec.Code, resetPayload)
+	}
+	data, err = os.ReadFile(filepath.Join(configDir, "config.json"))
+	if err != nil {
+		t.Fatalf("read reset config: %v", err)
+	}
+	if err := json.Unmarshal(data, &persisted); err != nil {
+		t.Fatalf("decode reset config: %v", err)
+	}
+	if persisted["host"] != defaultUpstreamHost {
+		t.Fatalf("reset host = %v, want %q", persisted["host"], defaultUpstreamHost)
+	}
+}
+
+func TestProxyHostRejectsRemoteRequest(t *testing.T) {
+	proxy := &ProxyServer{Host: defaultUpstreamHost}
+	req := httptest.NewRequest(http.MethodPost, "/api/host", strings.NewReader(`{"host":"https://staging.deepright.cn"}`))
+	req.RemoteAddr = "203.0.113.10:34567"
+	rec := httptest.NewRecorder()
+
+	proxy.HandleHost(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d body=%s", rec.Code, http.StatusForbidden, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "only localhost requests can modify service address") {
+		t.Fatalf("unexpected response: %s", rec.Body.String())
+	}
+}
+
+func TestProxyHostDoesNotApplyValueWhenConfigSaveFails(t *testing.T) {
+	tempDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tempDir, "config"), []byte("not a directory"), 0o644); err != nil {
+		t.Fatalf("create blocking config path: %v", err)
+	}
+	previousExecutable := proxyOsExecutable
+	proxyOsExecutable = func() (string, error) { return filepath.Join(tempDir, "proxy"), nil }
+	t.Cleanup(func() { proxyOsExecutable = previousExecutable })
+
+	proxy := &ProxyServer{Host: defaultUpstreamHost}
+	req := httptest.NewRequest(http.MethodPost, "/api/host", strings.NewReader(`{"host":"https://staging.deepright.cn"}`))
+	req.RemoteAddr = "127.0.0.1:34567"
+	req.Host = "127.0.0.1:8080"
+	rec := httptest.NewRecorder()
+
+	proxy.HandleHost(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d body=%s", rec.Code, http.StatusInternalServerError, rec.Body.String())
+	}
+	if got := proxy.currentHost(); got != defaultUpstreamHost {
+		t.Fatalf("current host = %q, want unchanged %q", got, defaultUpstreamHost)
+	}
+}
+
 func TestExecuteExternalCommandTimeoutOutput(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("shell command is POSIX-specific")

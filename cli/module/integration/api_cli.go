@@ -91,7 +91,7 @@ func printIntegrationAPIHelp() {
 	fmt.Println("  del                   Call GET /api/del")
 	fmt.Println("  raw                   Call GET /api/raw")
 	fmt.Println("  file-last-update      Call GET /file/lastUpdate")
-	fmt.Println("  host                  Reuse existing runtime host CLI for /api/host")
+	fmt.Println("  host                  Reuse the service-address CLI for /api/host")
 	fmt.Println("  standalone            Reuse existing runtime standalone CLI for /api/standalone")
 	fmt.Println("  site-access           Call GET /api/site/access")
 	fmt.Println("  agent                 Agent-related endpoints")
