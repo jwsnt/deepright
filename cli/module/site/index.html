@@ -4180,6 +4180,17 @@ body.quick-fan-transition-active{cursor:progress}
 [data-theme="dark"] .file-editor-content iframe{background:#0b1220}
 .file-editor-content .fe-image{max-width:100%;max-height:70vh;display:block;margin:0 auto}
 .file-editor-content .fe-video{display:block;width:min(960px,100%);max-width:100%;max-height:70vh;margin:0 auto;border-radius:12px;background:#000}
+.file-editor-content .fe-video-stage{position:relative;width:min(960px,100%);max-width:100%;margin:0 auto;line-height:0}
+.file-editor-content .fe-video-stage .fe-video{width:100%;margin:0}
+.fe-coordinate-picker-marker-layer{position:absolute;inset:0;overflow:hidden;border-radius:12px;pointer-events:none}
+.fe-coordinate-picker-marker{position:absolute;width:20px;height:20px;border:2px solid #ff4500;border-radius:50%;box-sizing:border-box;background:rgba(255,69,0,.2);box-shadow:0 0 0 3px rgba(255,69,0,.14),0 3px 10px rgba(171,46,0,.34);transform:translate(-50%,-50%)}
+.fe-coordinate-picker-marker::before,.fe-coordinate-picker-marker::after{content:"";position:absolute;left:50%;top:50%;background:#fff8ed;box-shadow:0 1px 2px rgba(100,41,17,.38);transform:translate(-50%,-50%)}
+.fe-coordinate-picker-marker::before{width:9px;height:2px}
+.fe-coordinate-picker-marker::after{width:2px;height:9px}
+.fe-coordinate-picker-marker span{position:absolute;left:12px;top:-10px;min-width:16px;height:16px;padding:0 4px;border-radius:9px;background:#ff4500;color:#fffaf4;font:700 10px/16px ui-monospace,SFMono-Regular,Menlo,monospace;text-align:center;box-shadow:0 3px 8px rgba(171,46,0,.3)}
+[data-theme="dark"] .fe-coordinate-picker-marker{border-color:#61e9ff;background:rgba(59,206,255,.18);box-shadow:0 0 0 3px rgba(64,213,255,.14),0 3px 12px rgba(0,177,255,.34)}
+[data-theme="dark"] .fe-coordinate-picker-marker::before,[data-theme="dark"] .fe-coordinate-picker-marker::after{background:#edfdff;box-shadow:0 1px 2px rgba(0,41,65,.7)}
+[data-theme="dark"] .fe-coordinate-picker-marker span{background:#168dcc;color:#eafcff;box-shadow:0 3px 8px rgba(0,101,155,.34)}
 .file-editor-content .fe-audio{display:block;width:min(760px,100%);margin:48px auto;background:transparent}
 .file-editor-color-picker-btn{width:28px;height:28px;border:0;border-radius:8px;padding:0;background:transparent;color:#48638f;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition)}
 .file-editor-color-picker-btn[hidden]{display:none!important}
@@ -4192,6 +4203,28 @@ body.quick-fan-transition-active{cursor:progress}
 .fe-color-picker-toast.show{opacity:1;transform:translateY(0)}
 .fe-color-picker-toast.error{border-color:rgba(255,210,157,.54);background:linear-gradient(135deg,rgba(173,78,21,.96),rgba(214,122,38,.94));box-shadow:0 10px 26px rgba(147,65,17,.28),inset 0 1px 0 rgba(255,255,255,.2);color:#fff9f3}
 [data-theme="dark"] .fe-color-picker-toast:not(.error){border-color:rgba(122,241,255,.34);background:linear-gradient(180deg,#56e7ff,#1699ff);box-shadow:0 0 0 1px rgba(122,241,255,.34),0 10px 24px rgba(0,212,255,.22),inset 0 1px 0 rgba(255,255,255,.18);color:#11161c}
+.fe-coordinate-picker-progress{position:absolute;right:16px;bottom:64px;z-index:8;padding:9px 12px;border:1px solid rgba(var(--accent-rgb),.24);border-radius:10px;background:linear-gradient(180deg,rgba(255,252,249,.96),rgba(249,236,226,.92));box-shadow:0 10px 24px rgba(91,34,29,.16),inset 0 1px 0 rgba(255,255,255,.78);color:var(--text-primary);font-size:12px;line-height:1.45;pointer-events:none}
+.fe-coordinate-picker-progress[hidden]{display:none!important}
+[data-theme="dark"] .fe-coordinate-picker-progress{border-color:rgba(122,241,255,.28);background:linear-gradient(180deg,rgba(19,44,65,.96),rgba(10,28,47,.94));box-shadow:0 10px 24px rgba(0,212,255,.16),inset 0 1px 0 rgba(255,255,255,.1);color:#d9f7ff}
+.fe-coordinate-picker-dialog{position:absolute;inset:0;z-index:12;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(91,52,31,.14);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+.fe-coordinate-picker-dialog[hidden]{display:none!important}
+.fe-coordinate-picker-dialog-card{width:min(320px,100%);padding:18px;border:1px solid rgba(var(--accent-rgb),.26);border-radius:16px;background:linear-gradient(180deg,rgba(255,253,250,.98),rgba(250,234,219,.96));box-shadow:0 24px 54px rgba(91,34,29,.24),inset 0 1px 0 rgba(255,255,255,.88);color:var(--text-primary)}
+.fe-coordinate-picker-dialog-title{font-size:15px;font-weight:700;letter-spacing:.01em}
+.fe-coordinate-picker-dialog-desc{margin-top:7px;color:var(--text-secondary);font-size:12px;line-height:1.55}
+.fe-coordinate-picker-dialog-label{display:flex;flex-direction:column;gap:6px;margin-top:14px;color:var(--text-secondary);font-size:12px}
+.fe-coordinate-picker-dialog-input{height:34px;padding:5px 9px;border:1px solid rgba(var(--accent-rgb),.24);border-radius:9px;background:rgba(255,255,255,.76);color:var(--text-primary);font:600 13px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;outline:none}
+.fe-coordinate-picker-dialog-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(var(--accent-rgb),.14)}
+.fe-coordinate-picker-dialog-error{min-height:17px;margin-top:7px;color:var(--error);font-size:11px;line-height:1.5}
+.fe-coordinate-picker-dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
+.fe-coordinate-picker-dialog-actions button{min-width:68px;height:32px;border:1px solid var(--border);border-radius:9px;background:var(--bg-input);color:var(--text-secondary);font-size:12px;cursor:pointer;transition:var(--transition)}
+.fe-coordinate-picker-dialog-actions .confirm{border-color:transparent;background:linear-gradient(135deg,var(--accent),rgb(var(--accent-soft-rgb)));color:#fff;font-weight:700;box-shadow:0 9px 20px rgba(var(--accent-rgb),.2)}
+.fe-coordinate-picker-dialog-actions button:hover{transform:translateY(-1px);filter:brightness(1.03)}
+[data-theme="dark"] .fe-coordinate-picker-dialog{background:rgba(2,17,31,.34)}
+[data-theme="dark"] .fe-coordinate-picker-dialog-card{border-color:rgba(122,241,255,.28);background:linear-gradient(180deg,rgba(17,40,62,.98),rgba(8,25,43,.96));box-shadow:0 24px 54px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.1);color:#e7f8ff}
+[data-theme="dark"] .fe-coordinate-picker-dialog-desc,[data-theme="dark"] .fe-coordinate-picker-dialog-label{color:#b6d9eb}
+[data-theme="dark"] .fe-coordinate-picker-dialog-input{border-color:rgba(122,241,255,.24);background:rgba(255,255,255,.08);color:#ecf9ff}
+[data-theme="dark"] .fe-coordinate-picker-dialog-actions button{border-color:rgba(122,241,255,.2);background:rgba(255,255,255,.08);color:#dcf5ff}
+[data-theme="dark"] .fe-coordinate-picker-dialog-actions .confirm{border-color:transparent;background:linear-gradient(135deg,#1699ff,#56e7ff);color:#102033}
 .file-editor-media-controls{display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid color-mix(in srgb,var(--border) 56%,rgba(255,255,255,.26));background:linear-gradient(180deg,rgba(255,255,255,.58),rgba(255,255,255,.34));flex-shrink:0}
 .file-editor-media-controls[hidden]{display:none!important}
 .fe-media-control-btn{width:34px;height:32px;border:1px solid color-mix(in srgb,var(--accent-rgb),.22);border-radius:9px;padding:0;background:rgba(255,255,255,.76);color:var(--text-primary);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition)}
@@ -4206,7 +4239,7 @@ body.quick-fan-transition-active{cursor:progress}
 .fe-media-volume{width:72px;accent-color:var(--accent);cursor:pointer}
 .fe-media-status{display:none;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--error)}
 .fe-media-status:not(:empty){display:inline}
-@media (max-width:680px){.file-editor-media-controls{flex-wrap:wrap}.fe-media-progress{order:3;flex-basis:100%}.fe-media-status{max-width:100%}.fe-media-volume-wrap{margin-left:auto}.fe-color-picker-toast.media{bottom:98px}}
+@media (max-width:680px){.file-editor-media-controls{flex-wrap:wrap}.fe-media-progress{order:3;flex-basis:100%}.fe-media-status{max-width:100%}.fe-media-volume-wrap{margin-left:auto}.fe-color-picker-toast.media,.fe-coordinate-picker-progress{bottom:98px}}
 .fe-image-editor{display:flex;flex-direction:column;gap:12px;padding:12px}
 .fe-image-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .fe-image-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -6071,6 +6104,20 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     </div>
     <div class="file-editor-content" id="fileEditorContent"></div>
     <div class="fe-color-picker-toast" id="feColorPickerToast" role="status" aria-live="polite"></div>
+    <div class="fe-coordinate-picker-progress" id="feCoordinatePickerProgress" role="status" aria-live="polite" hidden></div>
+    <div class="fe-coordinate-picker-dialog" id="feCoordinatePickerDialog" role="dialog" aria-modal="true" aria-labelledby="feCoordinatePickerDialogTitle" hidden onclick="event.stopPropagation()">
+      <div class="fe-coordinate-picker-dialog-card">
+        <div class="fe-coordinate-picker-dialog-title" id="feCoordinatePickerDialogTitle">提取坐标</div>
+        <label class="fe-coordinate-picker-dialog-label" for="feCoordinatePickerCount">坐标数量
+          <input class="fe-coordinate-picker-dialog-input" id="feCoordinatePickerCount" type="number" min="1" step="1" value="1" inputmode="numeric" aria-describedby="feCoordinatePickerError" oninput="feClearCoordinatePickerError()" />
+        </label>
+        <div class="fe-coordinate-picker-dialog-error" id="feCoordinatePickerError" role="alert"></div>
+        <div class="fe-coordinate-picker-dialog-actions">
+          <button type="button" onclick="feCancelCoordinatePicker()">取消</button>
+          <button class="confirm" type="button" onclick="feConfirmCoordinatePickerCount()">确认</button>
+        </div>
+      </div>
+    </div>
     <div class="file-editor-media-controls" id="fileEditorMediaControls" hidden aria-label="媒体播放控制">
       <button class="fe-media-control-btn" type="button" id="feMediaBack15Btn" onclick="feSeekMedia(-15)" aria-label="后退 15 秒" title="后退 15 秒"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6v5h5"/><path d="M3.5 11A8.5 8.5 0 1 0 7 4.2"/><path d="m12 9-3 3 3 3"/></svg></button>
       <button class="fe-media-control-btn play" type="button" id="feMediaPlayBtn" onclick="fePlayMedia()" aria-label="播放" title="播放"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6L19 12z"/></svg></button>
@@ -46501,6 +46548,9 @@ let feColorPickerToastClearTimer = null;
 let feCoordinatePickerActive = false;
 let feCoordinatePickerTarget = null;
 let feCoordinatePickerPointerHandler = null;
+let feCoordinatePickerDialogVisible = false;
+let feCoordinatePickerRequiredCount = 1;
+let feCoordinatePickerPoints = [];
 let feImageGridState = {
   active: false,
   xLines: [],
@@ -46542,11 +46592,12 @@ function feUpdateCoordinatePickerButton() {
   const button = document.getElementById('feCoordinatePickerBtn');
   if (!button) return;
   const available = !!feGetCoordinatePickerTarget();
+  const engaged = feCoordinatePickerActive || feCoordinatePickerDialogVisible;
   button.hidden = !available;
   button.disabled = !available;
-  button.setAttribute('aria-pressed', feCoordinatePickerActive ? 'true' : 'false');
-  button.title = feCoordinatePickerActive ? '退出提取坐标' : '提取坐标';
-  button.setAttribute('aria-label', feCoordinatePickerActive ? '退出提取坐标' : '提取坐标');
+  button.setAttribute('aria-pressed', engaged ? 'true' : 'false');
+  button.title = engaged ? '取消提取坐标' : '提取坐标';
+  button.setAttribute('aria-label', engaged ? '取消提取坐标' : '提取坐标');
 }
 
 function feGetImageGridTarget() {
@@ -46623,8 +46674,90 @@ function feExitCoordinatePicker() {
   feUpdateCoordinatePickerButton();
 }
 
-function feResetCoordinatePicker() {
+function feSetCoordinatePickerDialogVisible(visible) {
+  const dialog = document.getElementById('feCoordinatePickerDialog');
+  feCoordinatePickerDialogVisible = !!visible;
+  if (dialog) {
+    dialog.hidden = !visible;
+    dialog.setAttribute('aria-hidden', visible ? 'false' : 'true');
+  }
+  feUpdateCoordinatePickerButton();
+}
+
+function feClearCoordinatePickerError() {
+  const error = document.getElementById('feCoordinatePickerError');
+  if (error) error.textContent = '';
+}
+
+function feSetCoordinatePickerError(message) {
+  const error = document.getElementById('feCoordinatePickerError');
+  if (error) error.textContent = String(message || '');
+}
+
+function feUpdateCoordinatePickerProgress() {
+  const progress = document.getElementById('feCoordinatePickerProgress');
+  if (!progress) return;
+  const remaining = Math.max(0, feCoordinatePickerRequiredCount - feCoordinatePickerPoints.length);
+  const show = feCoordinatePickerActive && remaining > 0;
+  progress.hidden = !show;
+  progress.textContent = show ? '剩余需要提取 ' + remaining + ' 次' : '';
+}
+
+function feClearCoordinatePickerMarkers() {
+  const layer = document.getElementById('feCoordinatePickerMarkerLayer');
+  if (layer) layer.replaceChildren();
+}
+
+function feRenderCoordinatePickerMarkers() {
+  const layer = document.getElementById('feCoordinatePickerMarkerLayer');
+  if (!layer) return;
+  layer.replaceChildren();
+  if (!feCoordinatePickerActive || feCoordinatePickerRequiredCount <= 1) return;
+  feCoordinatePickerPoints.forEach((point, index) => {
+    if (!point || !point.width || !point.height) return;
+    const marker = document.createElement('div');
+    marker.className = 'fe-coordinate-picker-marker';
+    marker.style.left = ((point.x + 0.5) * 100 / point.width) + '%';
+    marker.style.top = ((point.y + 0.5) * 100 / point.height) + '%';
+    const label = document.createElement('span');
+    label.textContent = String(index + 1);
+    marker.appendChild(label);
+    layer.appendChild(marker);
+  });
+}
+
+function feShowCoordinatePickerDialog() {
+  if (!feGetCoordinatePickerTarget()) return;
+  feExitColorPicker();
   feExitCoordinatePicker();
+  feCoordinatePickerPoints = [];
+  feCoordinatePickerRequiredCount = 1;
+  feUpdateCoordinatePickerProgress();
+  feClearCoordinatePickerMarkers();
+  feClearCoordinatePickerError();
+  const input = document.getElementById('feCoordinatePickerCount');
+  if (input) input.value = '1';
+  feSetCoordinatePickerDialogVisible(true);
+  setTimeout(() => {
+    if (feCoordinatePickerDialogVisible && input) {
+      input.focus();
+      input.select();
+    }
+  }, 20);
+}
+
+function feCancelCoordinatePicker() {
+  feExitCoordinatePicker();
+  feCoordinatePickerPoints = [];
+  feCoordinatePickerRequiredCount = 1;
+  feUpdateCoordinatePickerProgress();
+  feClearCoordinatePickerMarkers();
+  feSetCoordinatePickerDialogVisible(false);
+  feClearCoordinatePickerError();
+}
+
+function feResetCoordinatePicker() {
+  feCancelCoordinatePicker();
   const button = document.getElementById('feCoordinatePickerBtn');
   if (button) {
     button.hidden = true;
@@ -46701,7 +46834,7 @@ async function fePickColor(event, target) {
 function feEnterColorPicker() {
   const target = feGetColorPickerTarget();
   if (!target) return;
-  feExitCoordinatePicker();
+  feCancelCoordinatePicker();
   feExitColorPicker();
   feColorPickerActive = true;
   feColorPickerTarget = target;
@@ -46741,17 +46874,37 @@ function feGetVideoCoordinate(event, target) {
 }
 
 function feFormatVideoCoordinatePayload(coordinate) {
-  if (!coordinate) return '';
-  const { width, height, x, y } = coordinate;
-  if (![width, height, x, y].every(Number.isFinite)) return '';
-  return '取值时画布尺寸: 宽度 ' + width + ' px, 高度 ' + height + ' px, 以左上角为原点的坐标位置: (' + x + ', ' + y + '), 使用时需要按实际画布尺寸缩放坐标';
+  const coordinates = Array.isArray(coordinate) ? coordinate : [coordinate];
+  if (coordinates.length === 0) return '';
+  const first = coordinates[0];
+  if (!first || ![first.width, first.height].every(Number.isFinite)) return '';
+  if (!coordinates.every(point => point && point.width === first.width && point.height === first.height && [point.x, point.y].every(Number.isFinite))) return '';
+  const prefix = '取值时画布尺寸: 宽度 ' + first.width + ' px, 高度 ' + first.height + ' px, ';
+  const suffix = ', 使用时需要按实际画布尺寸缩放坐标';
+  if (coordinates.length === 1) {
+    return prefix + '以左上角为原点的坐标位置: (' + first.x + ', ' + first.y + ')' + suffix;
+  }
+  const points = coordinates.map(point => '(' + point.x + ', ' + point.y + ')').join(',');
+  return prefix + '以左上角为原点的' + coordinates.length + '个坐标位置: [' + points + ']' + suffix;
 }
 
 async function fePickVideoCoordinate(event, target) {
-  const payload = feFormatVideoCoordinatePayload(feGetVideoCoordinate(event, target));
-  feExitCoordinatePicker();
-  if (!payload) {
+  const coordinate = feGetVideoCoordinate(event, target);
+  if (!coordinate) {
     feShowColorPickerToast('无法获取视频原始尺寸，请稍后重试', true);
+    return;
+  }
+  feCoordinatePickerPoints.push(coordinate);
+  feUpdateCoordinatePickerProgress();
+  feRenderCoordinatePickerMarkers();
+  if (feCoordinatePickerPoints.length < feCoordinatePickerRequiredCount) return;
+  const payload = feFormatVideoCoordinatePayload(feCoordinatePickerPoints);
+  feExitCoordinatePicker();
+  feUpdateCoordinatePickerProgress();
+  feClearCoordinatePickerMarkers();
+  feCoordinatePickerPoints = [];
+  if (!payload) {
+    feShowColorPickerToast('无法生成坐标内容，请稍后重试', true);
     return;
   }
   try {
@@ -46760,6 +46913,21 @@ async function fePickVideoCoordinate(event, target) {
   } catch {
     feShowColorPickerToast('坐标位置复制失败，请检查系统剪贴板权限', true);
   }
+}
+
+function feConfirmCoordinatePickerCount() {
+  const input = document.getElementById('feCoordinatePickerCount');
+  const count = Number(input && input.value);
+  if (!Number.isSafeInteger(count) || count < 1) {
+    feSetCoordinatePickerError('请输入大于等于 1 的整数');
+    if (input) input.focus();
+    return;
+  }
+  feCoordinatePickerRequiredCount = count;
+  feCoordinatePickerPoints = [];
+  feSetCoordinatePickerDialogVisible(false);
+  feClearCoordinatePickerError();
+  feEnterCoordinatePicker();
 }
 
 function feEnterCoordinatePicker() {
@@ -46778,12 +46946,14 @@ function feEnterCoordinatePicker() {
   target.addEventListener('pointerdown', feCoordinatePickerPointerHandler, true);
   target.classList.add('fe-color-picker-target');
   feUpdateCoordinatePickerButton();
+  feUpdateCoordinatePickerProgress();
+  feRenderCoordinatePickerMarkers();
   feShowColorPickerToast('开始提取坐标', false);
 }
 
 function feToggleCoordinatePicker() {
-  if (feCoordinatePickerActive) feExitCoordinatePicker();
-  else feEnterCoordinatePicker();
+  if (feCoordinatePickerActive || feCoordinatePickerDialogVisible) feCancelCoordinatePicker();
+  else feShowCoordinatePickerDialog();
 }
 
 function feGetImageGridInput(id) {
@@ -48638,6 +48808,19 @@ function handleOverlayKeyboardShortcuts(event) {
 }
 
 document.addEventListener('keydown', e => {
+  if (feCoordinatePickerDialogVisible) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      feCancelCoordinatePicker();
+      return;
+    }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      feConfirmCoordinatePickerCount();
+      return;
+    }
+    return;
+  }
   if (e.key === 'Escape' && feColorPickerActive) {
     e.preventDefault();
     feExitColorPicker();
@@ -48645,7 +48828,7 @@ document.addEventListener('keydown', e => {
   }
   if (e.key === 'Escape' && feCoordinatePickerActive) {
     e.preventDefault();
-    feExitCoordinatePicker();
+    feCancelCoordinatePicker();
     return;
   }
   if (e.key === 'Escape') closeQuickFanMenu();
@@ -48821,7 +49004,18 @@ function renderMediaPreview(sourceURL, mediaType) {
     feSetMediaStatus('媒体加载或播放失败，请检查浏览器是否支持该编码');
     feSyncMediaControls();
   });
-  container.appendChild(media);
+  if (mediaType === 'video') {
+    const stage = document.createElement('div');
+    stage.className = 'fe-video-stage';
+    const markerLayer = document.createElement('div');
+    markerLayer.className = 'fe-coordinate-picker-marker-layer';
+    markerLayer.id = 'feCoordinatePickerMarkerLayer';
+    stage.appendChild(media);
+    stage.appendChild(markerLayer);
+    container.appendChild(stage);
+  } else {
+    container.appendChild(media);
+  }
   feShowMediaControls();
   media.load();
 }
