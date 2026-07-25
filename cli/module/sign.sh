@@ -873,8 +873,10 @@ notarize_app() {
   archive_path="$(mktemp_file_path "$(basename "${app_path}" .app).notary" ".zip")"
 
   cleanup_notarize_app() {
-    rm -rf "${temp_root}"
-    rm -f "${archive_path}"
+    # A RETURN trap can outlive this function in some Bash execution modes.
+    # The locals are then out of scope, so tolerate an already-finished cleanup.
+    [[ -z "${temp_root:-}" ]] || rm -rf "${temp_root}"
+    [[ -z "${archive_path:-}" ]] || rm -f "${archive_path}"
   }
   trap cleanup_notarize_app RETURN
 
@@ -1129,7 +1131,9 @@ sign_app_bundle() {
   local sign_temp_dir="${temp_root}/sign"
 
   cleanup_sign_app_bundle() {
-    rm -rf "${temp_root}"
+    # See cleanup_notarize_app: avoid nounset if a deferred RETURN trap runs
+    # after this function's local variables have gone out of scope.
+    [[ -z "${temp_root:-}" ]] || rm -rf "${temp_root}"
   }
   trap cleanup_sign_app_bundle RETURN
 

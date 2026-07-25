@@ -1990,7 +1990,7 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .page-annotation-toolbar-btn{border:none;border-radius:10px;padding:6px 10px;background:var(--accent);box-shadow:0 10px 20px rgba(var(--accent-rgb),.22);color:#fff;font-size:12px;line-height:1.2;font-weight:600;cursor:pointer;white-space:nowrap;transition:transform .16s ease,opacity .16s ease,background .16s ease,color .16s ease,box-shadow .16s ease}
 .page-annotation-toolbar-btn:hover{transform:translateY(-1px);opacity:.92}
 .page-annotation-toolbar-btn:active{transform:translateY(0)}
-.page-annotation-toolbar-btn.delete{background:linear-gradient(135deg,#d86943,#bc4c2a)}
+.page-annotation-toolbar-btn.delete,.sel-file-bubble .sel-file-bubble-btn.danger{background:linear-gradient(135deg,#d86943,#bc4c2a);color:#fff;box-shadow:0 10px 20px rgba(188,76,42,.22)}
 .page-annotation-toolbar-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .page-annotation-toolbar-btn.onboarding-page-annotation-tour-target,.sel-file-bubble-btn.onboarding-page-annotation-tour-target{transform:translateY(-1px) scale(1.04);box-shadow:0 0 0 3px rgba(var(--accent-rgb),.22),0 14px 28px rgba(var(--accent-rgb),.32);animation:pageAnnotationTourTargetPulse 1.1s ease-in-out infinite}
 @keyframes pageAnnotationTourTargetPulse{0%,100%{filter:brightness(1);opacity:1}50%{filter:brightness(1.12);opacity:.9}}
@@ -5196,6 +5196,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
 </div>
 <div class="page-annotation-toolbar" id="pageAnnotationToolbar" aria-hidden="true">
   <button class="page-annotation-toolbar-btn" id="pageAnnotationToolbarBtn" type="button" onclick="openPageAnnotationFromSelection(this)">标注</button>
+  <button class="page-annotation-toolbar-btn delete" id="pageAnnotationToolbarDeleteBtn" type="button" onclick="deletePageAnnotationFromSelection()" hidden>删除</button>
 </div>
 <div class="overlay message-edit-overlay" id="pageAnnotationOverlay" data-overlay-base data-overlay-domain="global" data-overlay-order="33" onclick="handlePageAnnotationOverlayClick(event)" aria-hidden="true">
   <div class="message-edit-panel" id="pageAnnotationPanel" onclick="event.stopPropagation()">
@@ -9284,6 +9285,7 @@ function rememberPageAnnotationSelection(selectionState) {
 function showPageAnnotationToolbar(selectionState) {
   const toolbar = document.getElementById('pageAnnotationToolbar');
   const button = document.getElementById('pageAnnotationToolbarBtn');
+  const deleteButton = document.getElementById('pageAnnotationToolbarDeleteBtn');
   const selection = window.getSelection();
   if (!toolbar || !button || !selection || !selection.rangeCount) return;
   if (selBubbleEl && selBubbleEl.isConnected) {
@@ -9293,8 +9295,9 @@ function showPageAnnotationToolbar(selectionState) {
   const rect = selection.getRangeAt(0).getBoundingClientRect();
   if (!rect.width && !rect.height) return;
   rememberPageAnnotationSelection(selectionState);
-  button.textContent = selectionState.existing ? '删除标注' : '标注';
-  button.classList.toggle('delete', !!selectionState.existing);
+  button.textContent = selectionState.existing ? '修改' : '标注';
+  button.classList.remove('delete');
+  if (deleteButton) deleteButton.hidden = !selectionState.existing;
   toolbar.classList.add('show');
   toolbar.setAttribute('aria-hidden', 'false');
   const width = toolbar.offsetWidth || 78;
@@ -9328,14 +9331,20 @@ function openPageAnnotationFromSelection(trigger) {
   if (!selected) return false;
   rememberPageAnnotationSelection(selected);
   if (selected.existing) {
-    deletePageAnnotation(selected.existing.id);
-    return false;
+    openPageAnnotationEditor(selected, selected.existing);
+    return true;
   }
   if (startPageAnnotationTourOnboarding(trigger)) {
     return { keepSelectionBubble: !!(trigger && trigger.closest && trigger.closest('.sel-file-bubble')) };
   }
   openPageAnnotationEditor(selected);
   return true;
+}
+
+function deletePageAnnotationFromSelection() {
+  const selected = pageAnnotationState.selection;
+  if (!selected || !selected.existing) return false;
+  return deletePageAnnotation(selected.existing.id);
 }
 
 function openPageAnnotationEditor(selected, annotation) {
@@ -49142,14 +49151,35 @@ function showSelectionActionBubble(rect, actions, options) {
   const nextActions = Array.isArray(actions) ? actions.filter(Boolean) : [];
   const annotationSelection = capturePageAnnotationSelection();
   if (annotationSelection) {
-    nextActions.unshift({
-      label: annotationSelection.existing ? '删除标注' : '标注',
-      deferDismiss: true,
-      onClick: async trigger => {
-        pageAnnotationState.selection = annotationSelection;
-        return openPageAnnotationFromSelection(trigger);
-      }
-    });
+    const annotationActions = annotationSelection.existing
+      ? [
+          {
+            label: '修改',
+            deferDismiss: true,
+            onClick: async trigger => {
+              pageAnnotationState.selection = annotationSelection;
+              return openPageAnnotationFromSelection(trigger);
+            }
+          },
+          {
+            label: '删除',
+            className: 'danger',
+            deferDismiss: true,
+            onClick: async () => {
+              pageAnnotationState.selection = annotationSelection;
+              return deletePageAnnotationFromSelection();
+            }
+          }
+        ]
+      : [{
+          label: '标注',
+          deferDismiss: true,
+          onClick: async trigger => {
+            pageAnnotationState.selection = annotationSelection;
+            return openPageAnnotationFromSelection(trigger);
+          }
+        }];
+    nextActions.unshift(...annotationActions);
     hidePageAnnotationToolbar();
   }
   if (!rect || !nextActions.length) return;
@@ -49165,7 +49195,7 @@ function showSelectionActionBubble(rect, actions, options) {
   nextActions.forEach((action, index) => {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'sel-file-bubble-btn ' + (index === 0 ? 'primary' : 'secondary');
+    btn.className = 'sel-file-bubble-btn ' + (index === 0 ? 'primary' : 'secondary') + (action.className ? ' ' + action.className : '');
     btn.textContent = action.label || '';
     btn.addEventListener('mousedown', event => {
       event.preventDefault();
@@ -50768,12 +50798,12 @@ document.addEventListener('selectionchange', () => {
   if (selectionState) rememberPageAnnotationSelection(selectionState);
 });
 document.addEventListener('DOMContentLoaded', () => {
-  const button = document.getElementById('pageAnnotationToolbarBtn');
-  if (!button) return;
-  button.addEventListener('pointerdown', event => {
+  const toolbar = document.getElementById('pageAnnotationToolbar');
+  if (!toolbar) return;
+  toolbar.querySelectorAll('button').forEach(button => button.addEventListener('pointerdown', event => {
     event.preventDefault();
     event.stopPropagation();
-  });
+  }));
 });
 document.addEventListener('pointerdown', event => {
   if (event && event.target && event.target.closest && (event.target.closest('#pageAnnotationToolbar') || event.target.closest('#pageAnnotationOverlay'))) return;
