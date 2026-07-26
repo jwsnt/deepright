@@ -1405,6 +1405,7 @@ curl -X POST 'http://127.0.0.1:8080/api/cron/create?agentId=demo-agent' \
 | GET | `/api/data` | 读取文本文件 |
 | GET | `/api/workspace` | 获取 Agent 工作目录路径 |
 | POST | `/api/edit` | 写入文本或二进制文件 |
+| POST | `/api/agent/audio` | 保存新建流程录制的 WAV 文件 |
 
 补充说明：
 
@@ -3234,10 +3235,66 @@ Site 的视频和图片预览均可提取一个或多个坐标。该交互完全
 
 ## 迭代 20260726-4：音频裁剪另存为新文件
 
-音频裁剪不新增专用转码接口。Site 在浏览器中生成 WAV，再通过既有 `POST /api/edit?agentId=<agentId>&path=<relativePath>&saveAsNew=true` 以 Base64 二进制内容保存。
+音频裁剪不新增专用转码接口。Site 在浏览器中生成 WAV，再通过受限 `POST /api/agent/audio?agentId=<agentId>&path=audios/<filename>.wav` 以 Base64 二进制内容保存。
 
-- `saveAsNew=true` 会在目标文件名末尾附加高精度时间戳，并在响应的 `savedAs` 中返回新文件绝对路径；它不会覆盖同名历史输出。
-- 保存路径始终受 `agentId` 对应工作目录限制。绝对路径、`~`、`..` 逃逸、目录和跨 Agent 路径都会被拒绝。
+- 页面会先显示文件名输入，默认值为带高精度时间戳的裁剪名称，并固定保存到 `agentId` 对应工作目录的 `audios/` 目录；目录不存在时会创建，响应的 `savedAs` 返回新文件绝对路径，供页面复制到系统剪贴板，且不会覆盖同名历史输出。
+- 保存路径只允许 `audios/<filename>.wav`。绝对路径、`~`、`..` 逃逸、其它目录和跨 Agent 路径都会被拒绝。
 - 服务端只负责安全地持久化二进制 WAV，不使用 FFmpeg，也不解码、转码或修改裁剪源音频；源文件保持不变。
 
 完整说明见 [iteration/20260726-4/USER_GUIDE.md](iteration/20260726-4/USER_GUIDE.md)。
+
+---
+
+## 迭代 20260726-5：画布文件保存
+
+无限画布使用普通的 `.canvas` UTF-8 JSON 文件保存在当前 Agent 工作区中，继续复用受限的 `POST /api/edit?agentId=<agentId>&path=<relativePath>` 写入语义。
+
+- 首次保存可直接写入尚不存在的相对 `.canvas` 路径；后续保存覆盖同一路径。页面只会提交无后缀自动补充后的 `.canvas` 路径或已带 `.canvas` 的路径，其他后缀会在请求前拒绝。页面负责在覆盖前向用户确认，服务端仍负责校验 Agent、工作区范围和符号链接边界。
+- 服务端不解析或转换画布节点（含可选背景色）、图片和连线（含 `forward`、`reverse`、`both` 箭头方向与备注），只原样保存 JSON；绝对路径、`~`、`..` 逃逸、目录和工作区外目标仍会被拒绝。
+- 未点击保存的画布仅存在于浏览器，服务端不会创建空文件。PNG/PDF 由浏览器生成后，会通过既有受限 `/api/edit` 写入当前 Agent 工作目录的 `canvas/`；目录不存在时自动创建，使用时间戳另存保留历史文件。服务端返回最终绝对路径，供页面复制到系统剪贴板；不新增画布专用导出接口。
+
+完整说明见 [iteration/20260726-5/USER_GUIDE.md](iteration/20260726-5/USER_GUIDE.md)。
+
+---
+
+## 迭代 20260726-6：视频切分另存为 MP4
+
+Integration 提供 `POST /api/video_trim`，供 Site 在当前 Agent 工作目录内切分视频并另存为新文件。请求 JSON 为：
+
+```json
+{
+  "agentId": "AgentId",
+  "path": "media/source.mov",
+  "start": 1.5,
+  "end": 4.0
+}
+```
+
+- `path` 必须是当前 Agent 工作目录内、允许预览的视频相对路径；绝对路径、`~`、`..`、目录、音频、跨 Agent 路径与符号链接逃逸都会被拒绝。
+- `start`、`end` 必须是非负、以 `0.5` 秒为粒度的有效数值，且结束时间必须大于开始时间。
+- 请求可选传入仅含文件名的 `outputName`，用于指定输出名称；未传入时使用带 `_trim` 和高精度时间戳的默认名。无论名称如何，成功时都会在当前 Agent 工作目录的 `videos/` 下创建新 `.mp4`；目录不存在时自动创建，响应的 `savedAs` 返回新文件绝对路径，供页面复制到系统剪贴板。源视频不会被写入、覆盖、删除或改名。
+- 服务端使用 FFmpeg 重编码为 H.264 视频和 AAC 音频，以保证 0.5 秒精度并统一 MP4 封装；若 FFprobe 能读取源视频目标码率，会将其用于输出。由于精确重编码与统一格式，不能逐字节保留原编码、封装或码率。
+- 服务端仅生成受控命令参数，在工作区内先写临时 MP4、成功后原子改名，并限制转码执行时间。缺少 FFmpeg/FFprobe、转码失败或超时时会返回 JSON 错误，不会留下最终文件。
+- Windows 安装包的 WSL 安装流程会自动安装 `ffmpeg` 软件包，其中包含 `ffmpeg` 与 `ffprobe`；升级或修复安装时也会检测该依赖。
+
+完整说明见 [iteration/20260726-6/USER_GUIDE.md](iteration/20260726-6/USER_GUIDE.md)。
+
+---
+
+## 迭代 20260726-7：新建录音 WAV 保存
+
+Integration 提供 `POST /api/agent/audio?agentId=<agentId>&path=<relativePath>`，用于保存 Site 的“新增 → 音频”录音结果。请求体只包含标准 Base64 WAV 内容：
+
+```json
+{
+  "content": "UklGRiQAAABXQVZF..."
+}
+```
+
+- 路径必须是该 Agent 工作区内、以 `.wav` 结尾的 `audios/<filename>` 相对路径；`audios` 缺失时自动创建。绝对路径、`~`、`.` / `..` 逃逸、其它目录、跨 Agent 路径和符号链接逃逸都会被拒绝。
+- 接口会严格解码 Base64，并校验 RIFF/WAVE、PCM `fmt ` 和非空 `data` 区块；截断、伪造或非 PCM 16-bit WAV 内容不会落盘。
+- 录音只会在最终保存时写入。已存在的同名文件始终返回冲突，不会覆盖、删除或改名已有文件。
+- 写入先发生在同一受限工作区内的临时文件，再原子创建最终文件；失败不会留下最终文件或工作区外临时文件。
+- 服务端不使用 FFmpeg，也不对音频重采样、转码、降噪或修改内容。
+
+完整说明见 [iteration/20260726-7/USER_GUIDE.md](iteration/20260726-7/USER_GUIDE.md)。

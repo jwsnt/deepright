@@ -2,15 +2,15 @@
 
 ## 音频裁剪保存
 
-音频裁剪复用已有的文件另存为能力，不新增媒体转码服务接口：
+音频裁剪复用受限的录音 WAV 保存能力，不新增媒体转码服务接口：
 
 ```text
-POST /api/edit?agentId=<agentId>&path=<relativePath>&saveAsNew=true
+POST /api/agent/audio?agentId=<agentId>&path=audios/<filename>.wav
 ```
 
 页面提交浏览器生成的 WAV Base64 内容。服务端会将其作为二进制文件保存，并在成功响应中返回 `savedAs`。
 
-- `saveAsNew=true` 始终创建新文件：文件名会附加高精度时间戳，避免连续保存时覆盖已有裁剪结果。
-- `path` 必须是该 `agentId` 工作目录中的相对路径。绝对路径、`~`、`..`、目录、跨 Agent 路径及工作目录外的符号链接均会被拒绝。
+- 页面先显示文件名输入，默认值为带高精度时间戳的裁剪名称，保存路径固定是该 `agentId` 工作目录的 `audios/<filename>.wav`；`audios` 不存在时会自动创建，已有同名文件不会被覆盖。成功响应的 `savedAs` 是绝对路径，供页面复制到系统剪贴板。
+- `path` 只允许 `audios/` 下的 WAV 相对路径。绝对路径、`~`、`..`、其它目录、跨 Agent 路径及工作目录外的符号链接均会被拒绝。
 - 服务端不调用 FFmpeg，也不解码、转码或改写源音频。裁剪源文件保持原内容、原名称和原路径不变。
 - 参数或保存失败时接口返回 JSON 错误；页面可据此保留裁剪界面，不会生成不完整文件。

@@ -13,6 +13,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -23,6 +24,7 @@ import (
 	"knowledge/knowledgecore"
 	"log"
 	"maps"
+	"math"
 	"mime/multipart"
 	"net"
 	"net/http"
@@ -5613,6 +5615,11 @@ var binaryExts = map[string]bool{
 
 func isBinaryFile(path string) bool {
 	ext := strings.ToLower(filepath.Ext(path))
+	// Canvas documents are versioned UTF-8 JSON. Keep their /api/edit writes on
+	// the text path even if the binary extension allow-list changes later.
+	if ext == ".canvas" {
+		return false
+	}
 	return binaryExts[ext]
 }
 
@@ -5922,11 +5929,20 @@ func writeEditResp(w http.ResponseWriter, resp EditResponse) {
 func appendTimestampToFilename(path string, ts time.Time) string {
 	ext := filepath.Ext(path)
 	base := strings.TrimSuffix(path, ext)
-	stamp := ts.Format("20060102_150405_000000000")
+	stamp := timestampWithNanoseconds(ts)
 	if ext == "" {
 		return base + "_" + stamp
 	}
 	return base + "_" + stamp + ext
+}
+
+func timestampWithNanoseconds(ts time.Time) string {
+	return ts.Format("20060102_150405") + "_" + fmt.Sprintf("%09d", ts.Nanosecond())
+}
+
+func isSafeSaveAsNewFilename(name string) bool {
+	name = strings.TrimSpace(name)
+	return name != "" && name != "." && name != ".." && len(name) <= 180 && filepath.Base(name) == name && !strings.ContainsAny(name, `/\\`+"\x00")
 }
 
 func handleEdit(cfg *Config) http.HandlerFunc {
@@ -5951,6 +5967,11 @@ func handleEdit(cfg *Config) http.HandlerFunc {
 			return
 		}
 		saveAsNew := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("saveAsNew")), "true")
+		saveAsNewName := strings.TrimSpace(normalizeQuotedPathArg(r.URL.Query().Get("saveAsNewName")))
+		if saveAsNewName != "" && (!saveAsNew || !isSafeSaveAsNewFilename(saveAsNewName)) {
+			writeEditResp(w, EditResponse{AgentID: agentID, Path: relPath, Content: "新文件名无效", Status: 1})
+			return
+		}
 		agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
 		metadata, err := getAgentOutput(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL)
 		if err != nil {
@@ -5969,7 +5990,14 @@ func handleEdit(cfg *Config) http.HandlerFunc {
 			return
 		}
 		targetRelPath := cleanRelPath
-		if saveAsNew {
+		if saveAsNewName != "" {
+			dir := filepath.Dir(cleanRelPath)
+			if dir == "." {
+				targetRelPath = saveAsNewName
+			} else {
+				targetRelPath = filepath.Join(dir, saveAsNewName)
+			}
+		} else if saveAsNew {
 			targetRelPath = appendTimestampToFilename(cleanRelPath, time.Now())
 		}
 		resolved, err := resolveCaseInsensitiveUnderRoot(workspace, targetRelPath)
@@ -5981,8 +6009,17 @@ func handleEdit(cfg *Config) http.HandlerFunc {
 			writeEditResp(w, EditResponse{AgentID: agentID, Path: relPath, Content: "只支持 workspace 下的相对路径", Status: 1})
 			return
 		}
-		if info, statErr := os.Stat(resolved); statErr == nil && info.IsDir() {
-			writeEditResp(w, EditResponse{AgentID: agentID, Path: relPath, Content: "不支持写入目录", Status: 1})
+		if info, statErr := os.Stat(resolved); statErr == nil {
+			if info.IsDir() {
+				writeEditResp(w, EditResponse{AgentID: agentID, Path: relPath, Content: "不支持写入目录", Status: 1})
+				return
+			}
+			if saveAsNew {
+				writeEditResp(w, EditResponse{AgentID: agentID, Path: relPath, Content: "新文件名已存在，请换一个名称", Status: 1})
+				return
+			}
+		} else if !os.IsNotExist(statErr) {
+			writeEditResp(w, EditResponse{AgentID: agentID, Path: relPath, Content: "无法检查目标文件", Status: 1})
 			return
 		}
 		body, err := io.ReadAll(r.Body)
@@ -6291,6 +6328,413 @@ func handleMediaPreview(cfg *Config) http.HandlerFunc {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Accept-Ranges", "bytes")
 		http.ServeContent(w, r, info.Name(), info.ModTime(), file)
+	}
+}
+
+type VideoTrimRequest struct {
+	AgentID    string  `json:"agentId"`
+	Path       string  `json:"path"`
+	Start      float64 `json:"start"`
+	End        float64 `json:"end"`
+	OutputName string  `json:"outputName,omitempty"`
+}
+
+type VideoTrimResponse struct {
+	AgentID string `json:"agentId"`
+	Path    string `json:"path"`
+	SavedAs string `json:"savedAs,omitempty"`
+	Content string `json:"content,omitempty"`
+	Status  int    `json:"status"`
+}
+
+var videoTrimLookPathFn = exec.LookPath
+var videoTrimCommandContextFn = exec.CommandContext
+var videoTrimLastOutputTimestamp int64
+
+func writeVideoTrimResp(w http.ResponseWriter, httpStatus int, resp VideoTrimResponse) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(httpStatus)
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+func isHalfSecondValue(value float64) bool {
+	return math.Abs(value*2-math.Round(value*2)) < 1e-9
+}
+
+func formatVideoTrimSeconds(value float64) string {
+	return strconv.FormatFloat(value, 'f', -1, 64)
+}
+
+func nextVideoTrimOutputTime(now time.Time) time.Time {
+	requested := now.UnixNano()
+	for {
+		previous := atomic.LoadInt64(&videoTrimLastOutputTimestamp)
+		next := requested
+		if next <= previous {
+			next = previous + 1
+		}
+		if atomic.CompareAndSwapInt64(&videoTrimLastOutputTimestamp, previous, next) {
+			return time.Unix(0, next).In(now.Location())
+		}
+	}
+}
+
+func videoTrimOutputRelativePath(sourceRelativePath string, now time.Time) string {
+	name := filepath.Base(sourceRelativePath)
+	base := strings.TrimSuffix(name, filepath.Ext(name))
+	if base == "" {
+		base = "video"
+	}
+	outputName := base + "_trim_" + timestampWithNanoseconds(now) + ".mp4"
+	return filepath.Join("videos", outputName)
+}
+
+func isSafeVideoTrimOutputName(name string) bool {
+	return isSafeSaveAsNewFilename(name) && strings.EqualFold(filepath.Ext(name), ".mp4") && len(strings.TrimSuffix(name, filepath.Ext(name))) > 0
+}
+
+func videoTrimProbeBitrate(ctx context.Context, ffprobePath, sourcePath string) int64 {
+	cmd := videoTrimCommandContextFn(ctx, ffprobePath,
+		"-v", "error",
+		"-select_streams", "v:0",
+		"-show_entries", "stream=bit_rate",
+		"-of", "default=noprint_wrappers=1:nokey=1",
+		sourcePath,
+	)
+	output, err := cmd.Output()
+	if err != nil {
+		return 0
+	}
+	bitrate, err := strconv.ParseInt(strings.TrimSpace(string(output)), 10, 64)
+	if err != nil || bitrate <= 0 {
+		return 0
+	}
+	return bitrate
+}
+
+func videoTrimCommandError(err error, output []byte) string {
+	message := strings.TrimSpace(string(output))
+	if len(message) > 800 {
+		message = message[:800] + "…"
+	}
+	if message == "" {
+		return err.Error()
+	}
+	return message
+}
+
+// handleVideoTrim creates a new MP4 from a video in the requesting Agent's
+// workspace. It never edits the source and deliberately fixes the codecs to
+// H.264/AAC so the selected half-second interval can be re-encoded accurately.
+func handleVideoTrim(cfg *Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", http.MethodPost)
+			writeVideoTrimResp(w, http.StatusMethodNotAllowed, VideoTrimResponse{Content: "method not allowed", Status: 1})
+			return
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+		defer r.Body.Close()
+		var request VideoTrimRequest
+		decoder := json.NewDecoder(r.Body)
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&request); err != nil {
+			writeVideoTrimResp(w, http.StatusBadRequest, VideoTrimResponse{Content: "请求体格式错误", Status: 1})
+			return
+		}
+		if err := decoder.Decode(&struct{}{}); err != io.EOF {
+			writeVideoTrimResp(w, http.StatusBadRequest, VideoTrimResponse{AgentID: request.AgentID, Path: request.Path, Content: "请求体只能包含一个 JSON 对象", Status: 1})
+			return
+		}
+		request.AgentID = strings.TrimSpace(request.AgentID)
+		request.Path = normalizeQuotedPathArg(request.Path)
+		request.OutputName = strings.TrimSpace(normalizeQuotedPathArg(request.OutputName))
+		if !isValidMediaPreviewAgentID(request.AgentID) || request.Path == "" {
+			writeVideoTrimResp(w, http.StatusBadRequest, VideoTrimResponse{AgentID: request.AgentID, Path: request.Path, Content: "agentId 和相对路径不能为空", Status: 1})
+			return
+		}
+		if !isHalfSecondValue(request.Start) || !isHalfSecondValue(request.End) || math.IsNaN(request.Start) || math.IsNaN(request.End) || math.IsInf(request.Start, 0) || math.IsInf(request.End, 0) || request.Start < 0 || request.End <= request.Start {
+			writeVideoTrimResp(w, http.StatusBadRequest, VideoTrimResponse{AgentID: request.AgentID, Path: request.Path, Content: "开始和结束时间必须是有效的 0.5 秒刻度，且结束时间大于开始时间", Status: 1})
+			return
+		}
+		if request.OutputName != "" && !isSafeVideoTrimOutputName(request.OutputName) {
+			writeVideoTrimResp(w, http.StatusBadRequest, VideoTrimResponse{AgentID: request.AgentID, Path: request.Path, Content: "新视频文件名必须是有效的 .mp4 文件名", Status: 1})
+			return
+		}
+
+		sourcePath, _, sourceStatus, sourceMessage := resolveMediaPreviewFile(cfg, request.AgentID, request.Path)
+		if sourceStatus != 0 {
+			writeVideoTrimResp(w, sourceStatus, VideoTrimResponse{AgentID: request.AgentID, Path: request.Path, Content: sourceMessage, Status: 1})
+			return
+		}
+		mimeType, _ := mediaPreviewMIMEType(sourcePath)
+		if !strings.HasPrefix(mimeType, "video/") {
+			writeVideoTrimResp(w, http.StatusBadRequest, VideoTrimResponse{AgentID: request.AgentID, Path: request.Path, Content: "仅支持切分视频文件", Status: 1})
+			return
+		}
+		workspace, err := getWorkspaceByAgentID(cfg, request.AgentID)
+		if err != nil {
+			writeVideoTrimResp(w, http.StatusNotFound, VideoTrimResponse{AgentID: request.AgentID, Path: request.Path, Content: "agent not found", Status: 1})
+			return
+		}
+		sourceRelativePath, err := filepath.Rel(workspace, sourcePath)
+		if err != nil || sourceRelativePath == "." || strings.HasPrefix(sourceRelativePath, ".."+string(filepath.Separator)) {
+			writeVideoTrimResp(w, http.StatusBadRequest, VideoTrimResponse{AgentID: request.AgentID, Path: request.Path, Content: "path must be a workspace-relative video path", Status: 1})
+			return
+		}
+		outputRelativePath := videoTrimOutputRelativePath(sourceRelativePath, nextVideoTrimOutputTime(time.Now()))
+		if request.OutputName != "" {
+			outputRelativePath = filepath.Join("videos", request.OutputName)
+		}
+		outputPath, err := resolveCaseInsensitiveUnderRoot(workspace, outputRelativePath)
+		if err != nil || !ensureWritablePathWithinRoot(workspace, outputPath) {
+			writeVideoTrimResp(w, http.StatusBadRequest, VideoTrimResponse{AgentID: request.AgentID, Path: request.Path, Content: "无法在工作目录中创建新视频", Status: 1})
+			return
+		}
+		if _, err := os.Lstat(outputPath); err == nil {
+			writeVideoTrimResp(w, http.StatusConflict, VideoTrimResponse{AgentID: request.AgentID, Path: request.Path, Content: "目标视频已存在，请重试", Status: 1})
+			return
+		} else if !os.IsNotExist(err) {
+			writeVideoTrimResp(w, http.StatusInternalServerError, VideoTrimResponse{AgentID: request.AgentID, Path: request.Path, Content: "无法检查目标视频", Status: 1})
+			return
+		}
+		if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
+			writeVideoTrimResp(w, http.StatusInternalServerError, VideoTrimResponse{AgentID: request.AgentID, Path: request.Path, Content: "无法创建目标目录", Status: 1})
+			return
+		}
+
+		ffmpegPath, ffmpegErr := videoTrimLookPathFn("ffmpeg")
+		ffprobePath, ffprobeErr := videoTrimLookPathFn("ffprobe")
+		if ffmpegErr != nil || ffprobeErr != nil {
+			writeVideoTrimResp(w, http.StatusServiceUnavailable, VideoTrimResponse{AgentID: request.AgentID, Path: request.Path, Content: "FFmpeg 或 FFprobe 未安装，无法生成新视频", Status: 1})
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
+		defer cancel()
+		bitrate := videoTrimProbeBitrate(ctx, ffprobePath, sourcePath)
+		temporaryPath := strings.TrimSuffix(outputPath, ".mp4") + "." + strconv.FormatInt(time.Now().UnixNano(), 10) + ".tmp.mp4"
+		if !ensureWritablePathWithinRoot(workspace, temporaryPath) {
+			writeVideoTrimResp(w, http.StatusBadRequest, VideoTrimResponse{AgentID: request.AgentID, Path: request.Path, Content: "无法在工作目录中创建临时视频", Status: 1})
+			return
+		}
+		defer os.Remove(temporaryPath)
+		args := []string{
+			"-hide_banner", "-loglevel", "error", "-nostdin",
+			"-ss", formatVideoTrimSeconds(request.Start),
+			"-i", sourcePath,
+			"-t", formatVideoTrimSeconds(request.End - request.Start),
+			"-map", "0:v:0?", "-map", "0:a?",
+			"-c:v", "libx264", "-c:a", "aac",
+		}
+		if bitrate > 0 {
+			args = append(args, "-b:v", strconv.FormatInt(bitrate, 10))
+		}
+		args = append(args, "-movflags", "+faststart", "-f", "mp4", "-n", temporaryPath)
+		output, err := videoTrimCommandContextFn(ctx, ffmpegPath, args...).CombinedOutput()
+		if err != nil {
+			message := "视频转码失败：" + videoTrimCommandError(err, output)
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				message = "视频转码超时"
+			}
+			writeVideoTrimResp(w, http.StatusInternalServerError, VideoTrimResponse{AgentID: request.AgentID, Path: request.Path, Content: message, Status: 1})
+			return
+		}
+		info, err := os.Stat(temporaryPath)
+		if err != nil || info.Size() == 0 {
+			writeVideoTrimResp(w, http.StatusInternalServerError, VideoTrimResponse{AgentID: request.AgentID, Path: request.Path, Content: "视频转码未生成有效输出", Status: 1})
+			return
+		}
+		if err := os.Rename(temporaryPath, outputPath); err != nil {
+			writeVideoTrimResp(w, http.StatusInternalServerError, VideoTrimResponse{AgentID: request.AgentID, Path: request.Path, Content: "保存新视频失败", Status: 1})
+			return
+		}
+		writeVideoTrimResp(w, http.StatusOK, VideoTrimResponse{AgentID: request.AgentID, Path: request.Path, SavedAs: outputPath, Status: 0})
+	}
+}
+
+// AudioSaveRequest carries a browser-recorded WAV as standard Base64. Audio
+// recording deliberately has its own narrow endpoint instead of broadening
+// the generic editor write contract.
+type AudioSaveRequest struct {
+	Content string `json:"content"`
+}
+
+type AudioSaveResponse struct {
+	AgentID string `json:"agentId"`
+	Path    string `json:"path"`
+	SavedAs string `json:"savedAs,omitempty"`
+	Content string `json:"content,omitempty"`
+	Status  int    `json:"status"`
+}
+
+func writeAudioSaveResp(w http.ResponseWriter, httpStatus int, resp AudioSaveResponse) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(httpStatus)
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// isValidPCMContainerWAV validates the RIFF envelope rather than trusting a
+// .wav filename. The browser can choose the sample rate and channel count,
+// while this endpoint deliberately accepts only 16-bit PCM output.
+func isValidPCMContainerWAV(data []byte) bool {
+	if len(data) < 44 || string(data[0:4]) != "RIFF" || string(data[8:12]) != "WAVE" {
+		return false
+	}
+	riffEnd := uint64(binary.LittleEndian.Uint32(data[4:8])) + 8
+	if riffEnd > uint64(len(data)) || riffEnd < 12 {
+		return false
+	}
+	var hasFormat, hasData bool
+	for offset := uint64(12); offset < riffEnd; {
+		if riffEnd-offset < 8 || offset+8 > uint64(len(data)) {
+			return false
+		}
+		chunkID := string(data[offset : offset+4])
+		chunkSize := uint64(binary.LittleEndian.Uint32(data[offset+4 : offset+8]))
+		chunkDataStart := offset + 8
+		chunkEnd := chunkDataStart + chunkSize
+		if chunkEnd < chunkDataStart || chunkEnd > riffEnd || chunkEnd > uint64(len(data)) {
+			return false
+		}
+		switch chunkID {
+		case "fmt ":
+			if chunkSize < 16 {
+				return false
+			}
+			format := binary.LittleEndian.Uint16(data[chunkDataStart : chunkDataStart+2])
+			channels := binary.LittleEndian.Uint16(data[chunkDataStart+2 : chunkDataStart+4])
+			sampleRate := binary.LittleEndian.Uint32(data[chunkDataStart+4 : chunkDataStart+8])
+			bitsPerSample := binary.LittleEndian.Uint16(data[chunkDataStart+14 : chunkDataStart+16])
+			if format != 1 || channels == 0 || sampleRate == 0 || bitsPerSample != 16 {
+				return false
+			}
+			hasFormat = true
+		case "data":
+			if chunkSize == 0 {
+				return false
+			}
+			hasData = true
+		}
+		offset = chunkEnd
+		if chunkSize%2 != 0 {
+			offset++ // RIFF chunks are word-aligned.
+			if offset > riffEnd {
+				return false
+			}
+		}
+	}
+	return hasFormat && hasData
+}
+
+func isAgentAudioRelativePath(relPath string) bool {
+	pathValue := filepath.ToSlash(filepath.Clean(relPath))
+	return path.Dir(pathValue) == "audios" && path.Base(pathValue) != "."
+}
+
+func handleAgentAudioSave(cfg *Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", http.MethodPost)
+			writeAudioSaveResp(w, http.StatusMethodNotAllowed, AudioSaveResponse{Content: "method not allowed", Status: 1})
+			return
+		}
+		agentID := strings.TrimSpace(r.URL.Query().Get("agentId"))
+		relPath := normalizeQuotedPathArg(r.URL.Query().Get("path"))
+		if agentID == "" || relPath == "" {
+			writeAudioSaveResp(w, http.StatusBadRequest, AudioSaveResponse{AgentID: agentID, Path: relPath, Content: "agentId 和相对路径不能为空", Status: 1})
+			return
+		}
+		if filepath.IsAbs(relPath) || strings.HasPrefix(relPath, "~") {
+			writeAudioSaveResp(w, http.StatusBadRequest, AudioSaveResponse{AgentID: agentID, Path: relPath, Content: "只支持 workspace 下的相对路径", Status: 1})
+			return
+		}
+		cleanRelPath := filepath.Clean(relPath)
+		if cleanRelPath == "." || cleanRelPath == "" || cleanRelPath == ".." || strings.HasPrefix(cleanRelPath, ".."+string(filepath.Separator)) {
+			writeAudioSaveResp(w, http.StatusBadRequest, AudioSaveResponse{AgentID: agentID, Path: relPath, Content: "只支持 workspace 下的相对路径", Status: 1})
+			return
+		}
+		if !strings.EqualFold(filepath.Ext(cleanRelPath), ".wav") {
+			writeAudioSaveResp(w, http.StatusBadRequest, AudioSaveResponse{AgentID: agentID, Path: relPath, Content: "录音仅支持 .wav 后缀", Status: 1})
+			return
+		}
+		if !isAgentAudioRelativePath(cleanRelPath) {
+			writeAudioSaveResp(w, http.StatusBadRequest, AudioSaveResponse{AgentID: agentID, Path: relPath, Content: "录音仅可保存到 audios 目录", Status: 1})
+			return
+		}
+
+		r.Body = http.MaxBytesReader(w, r.Body, 256<<20)
+		defer r.Body.Close()
+		var request AudioSaveRequest
+		decoder := json.NewDecoder(r.Body)
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&request); err != nil {
+			writeAudioSaveResp(w, http.StatusBadRequest, AudioSaveResponse{AgentID: agentID, Path: relPath, Content: "请求体格式错误", Status: 1})
+			return
+		}
+		if err := decoder.Decode(&struct{}{}); err != io.EOF {
+			writeAudioSaveResp(w, http.StatusBadRequest, AudioSaveResponse{AgentID: agentID, Path: relPath, Content: "请求体只能包含一个 JSON 对象", Status: 1})
+			return
+		}
+		wavData, err := base64.StdEncoding.DecodeString(request.Content)
+		if err != nil {
+			writeAudioSaveResp(w, http.StatusBadRequest, AudioSaveResponse{AgentID: agentID, Path: relPath, Content: "WAV 内容不是合法的 base64", Status: 1})
+			return
+		}
+		if !isValidPCMContainerWAV(wavData) {
+			writeAudioSaveResp(w, http.StatusBadRequest, AudioSaveResponse{AgentID: agentID, Path: relPath, Content: "录音内容不是有效的 WAV 文件", Status: 1})
+			return
+		}
+
+		workspace, err := getWorkspaceByAgentID(cfg, agentID)
+		if err != nil {
+			writeAudioSaveResp(w, http.StatusNotFound, AudioSaveResponse{AgentID: agentID, Path: relPath, Content: "agent not found", Status: 1})
+			return
+		}
+		targetPath, err := resolveCaseInsensitiveUnderRoot(workspace, cleanRelPath)
+		if err != nil || !ensureWritablePathWithinRoot(workspace, targetPath) {
+			writeAudioSaveResp(w, http.StatusBadRequest, AudioSaveResponse{AgentID: agentID, Path: relPath, Content: "无法在工作目录中保存录音", Status: 1})
+			return
+		}
+		if _, err := os.Lstat(targetPath); err == nil {
+			writeAudioSaveResp(w, http.StatusConflict, AudioSaveResponse{AgentID: agentID, Path: relPath, Content: "同名文件已存在，请更换名称", Status: 1})
+			return
+		} else if !errors.Is(err, os.ErrNotExist) {
+			writeAudioSaveResp(w, http.StatusInternalServerError, AudioSaveResponse{AgentID: agentID, Path: relPath, Content: "无法检查录音目标", Status: 1})
+			return
+		}
+		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil || !ensureWritablePathWithinRoot(workspace, targetPath) {
+			writeAudioSaveResp(w, http.StatusInternalServerError, AudioSaveResponse{AgentID: agentID, Path: relPath, Content: "无法创建录音目录", Status: 1})
+			return
+		}
+		temporary, err := os.CreateTemp(filepath.Dir(targetPath), "."+filepath.Base(targetPath)+".tmp-*")
+		if err != nil {
+			writeAudioSaveResp(w, http.StatusInternalServerError, AudioSaveResponse{AgentID: agentID, Path: relPath, Content: "无法创建录音临时文件", Status: 1})
+			return
+		}
+		temporaryPath := temporary.Name()
+		defer os.Remove(temporaryPath)
+		if _, err := temporary.Write(wavData); err != nil || temporary.Sync() != nil || temporary.Close() != nil {
+			_ = temporary.Close()
+			writeAudioSaveResp(w, http.StatusInternalServerError, AudioSaveResponse{AgentID: agentID, Path: relPath, Content: "保存录音失败", Status: 1})
+			return
+		}
+		// Linking is an atomic create: unlike Rename it can never replace a
+		// file that appeared between the conflict check and this write.
+		if err := os.Link(temporaryPath, targetPath); err != nil {
+			status := http.StatusInternalServerError
+			message := "保存录音失败"
+			if errors.Is(err, fs.ErrExist) {
+				status = http.StatusConflict
+				message = "同名文件已存在，请更换名称"
+			}
+			writeAudioSaveResp(w, status, AudioSaveResponse{AgentID: agentID, Path: relPath, Content: message, Status: 1})
+			return
+		}
+		if err := os.Remove(temporaryPath); err != nil {
+			log.Printf("remove recorded-audio temporary file %s: %v", temporaryPath, err)
+		}
+		flushAgentCache()
+		writeAudioSaveResp(w, http.StatusOK, AudioSaveResponse{AgentID: agentID, Path: filepath.ToSlash(cleanRelPath), SavedAs: targetPath, Status: 0})
 	}
 }
 
@@ -17907,6 +18351,8 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/del", handleDel(&cfg))
 	mux.HandleFunc("/api/raw", handleRaw(&cfg))
 	mux.HandleFunc("/api/media_preview", handleMediaPreview(&cfg))
+	mux.HandleFunc("/api/video_trim", handleVideoTrim(&cfg))
+	mux.HandleFunc("/api/agent/audio", handleAgentAudioSave(&cfg))
 	mux.HandleFunc("/file/lastUpdate", handleFileLastUpdate(&cfg))
 	mux.HandleFunc("/api/heartbeat", handleHeartbeat())
 	mux.HandleFunc("/api/log_cleanup_status", handleLogCleanupStatus())

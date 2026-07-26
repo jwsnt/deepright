@@ -521,7 +521,7 @@ L_Step "Step 5/7: Verify mirrored networking"
 L_OK ".wslconfig already configured with networkingMode=mirrored"
 
 # ---- Step 6: Tools ----
-L_Step "Step 6/7: Install tools (git, npm, python3, bubblewrap, xdg-open)"
+L_Step "Step 6/7: Install tools (git, npm, python3, ffmpeg, bubblewrap, xdg-open)"
 
 $aptPackages = @(
     @{ Package = "git"; Command = "git" },
@@ -529,6 +529,7 @@ $aptPackages = @(
     @{ Package = "python3-pip"; Command = "pip3" },
     @{ Package = "curl"; Command = "curl" },
     @{ Package = "build-essential"; Command = "make" },
+    @{ Package = "ffmpeg"; Command = "ffmpeg" },
     @{ Package = "bubblewrap"; Command = "bwrap" },
     @{ Package = "xdg-utils"; Command = "xdg-open" }
 )
@@ -567,11 +568,13 @@ $gitV  = (& wsl.exe -d $DISTRO_NAME -- bash -c "git --version 2>&1" | Out-String
 $nodeV = (& wsl.exe -d $DISTRO_NAME -- bash -c "node --version 2>&1" | Out-String).Trim()
 $npmV  = (& wsl.exe -d $DISTRO_NAME -- bash -c "npm --version 2>&1" | Out-String).Trim()
 $pyV   = (& wsl.exe -d $DISTRO_NAME -- bash -c "python3 --version 2>&1" | Out-String).Trim()
+$ffmpegV = (& wsl.exe -d $DISTRO_NAME -- bash -c "ffmpeg -version 2>&1 | head -n 1" | Out-String).Trim()
 $bwrapV = (& wsl.exe -d $DISTRO_NAME -- bash -c "bwrap --version 2>&1" | Out-String).Trim()
 L_OK "git:      $gitV"
 L_OK "node:     $nodeV"
 L_OK "npm:      $npmV"
 L_OK "python3:  $pyV"
+L_OK "ffmpeg:   $ffmpegV"
 L_OK "bwrap:    $bwrapV"
 }
 

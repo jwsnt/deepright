@@ -12,6 +12,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -3715,6 +3716,403 @@ func TestHandleEditSavesNewBinaryAudioWithoutChangingSource(t *testing.T) {
 		if len(entries) != 0 {
 			t.Fatalf("symlink escaped save created outside files: %v", entries)
 		}
+	}
+}
+
+func integrationTestWAV(data []byte) []byte {
+	wav := make([]byte, 44+len(data))
+	copy(wav[0:4], "RIFF")
+	binary.LittleEndian.PutUint32(wav[4:8], uint32(len(wav)-8))
+	copy(wav[8:12], "WAVE")
+	copy(wav[12:16], "fmt ")
+	binary.LittleEndian.PutUint32(wav[16:20], 16)
+	binary.LittleEndian.PutUint16(wav[20:22], 1)
+	binary.LittleEndian.PutUint16(wav[22:24], 1)
+	binary.LittleEndian.PutUint32(wav[24:28], 48000)
+	binary.LittleEndian.PutUint32(wav[28:32], 96000)
+	binary.LittleEndian.PutUint16(wav[32:34], 2)
+	binary.LittleEndian.PutUint16(wav[34:36], 16)
+	copy(wav[36:40], "data")
+	binary.LittleEndian.PutUint32(wav[40:44], uint32(len(data)))
+	copy(wav[44:], data)
+	return wav
+}
+
+func TestHandleAgentAudioSaveAcceptsOnlyNewValidWorkspaceWAV(t *testing.T) {
+	root := t.TempDir()
+	workspace := filepath.Join(root, "agent-a")
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		t.Fatalf("mkdir workspace: %v", err)
+	}
+	server := httptest.NewServer(handleAgentAudioSave(&Config{AgentDir: root}))
+	defer server.Close()
+	wav := integrationTestWAV([]byte{0x01, 0x00, 0xFF, 0x7F})
+	post := func(agentID, path, content string) (*http.Response, AudioSaveResponse) {
+		t.Helper()
+		body, err := json.Marshal(AudioSaveRequest{Content: content})
+		if err != nil {
+			t.Fatalf("marshal request: %v", err)
+		}
+		resp, err := http.Post(server.URL+"?agentId="+url.QueryEscape(agentID)+"&path="+url.QueryEscape(path), "application/json", bytes.NewReader(body))
+		if err != nil {
+			t.Fatalf("post audio: %v", err)
+		}
+		var result AudioSaveResponse
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			resp.Body.Close()
+			t.Fatalf("decode response: %v", err)
+		}
+		return resp, result
+	}
+
+	response, saved := post("agent-a", "audios/take.WAV", base64.StdEncoding.EncodeToString(wav))
+	response.Body.Close()
+	if response.StatusCode != http.StatusOK || saved.Status != 0 {
+		t.Fatalf("save result = status %d %+v", response.StatusCode, saved)
+	}
+	if saved.Path != "audios/take.WAV" || filepath.Base(saved.SavedAs) != "take.WAV" {
+		t.Fatalf("unexpected saved path: %+v", saved)
+	}
+	if actual, err := os.ReadFile(filepath.Join(workspace, "audios", "take.WAV")); err != nil || !bytes.Equal(actual, wav) {
+		t.Fatalf("saved WAV = %v, err=%v", actual, err)
+	}
+
+	response, duplicate := post("agent-a", "audios/take.WAV", base64.StdEncoding.EncodeToString(wav))
+	response.Body.Close()
+	if response.StatusCode != http.StatusConflict || duplicate.Status != 1 {
+		t.Fatalf("duplicate result = status %d %+v", response.StatusCode, duplicate)
+	}
+	if actual, err := os.ReadFile(filepath.Join(workspace, "audios", "take.WAV")); err != nil || !bytes.Equal(actual, wav) {
+		t.Fatalf("duplicate changed original WAV = %v, err=%v", actual, err)
+	}
+
+	for _, request := range []struct {
+		name    string
+		path    string
+		content string
+	}{
+		{name: "no extension", path: "audios/no-extension", content: base64.StdEncoding.EncodeToString(wav)},
+		{name: "wrong extension", path: "audios/not-wav.mp3", content: base64.StdEncoding.EncodeToString(wav)},
+		{name: "outside audios", path: "recordings/escape.wav", content: base64.StdEncoding.EncodeToString(wav)},
+		{name: "invalid base64", path: "audios/bad.wav", content: "%%%"},
+		{name: "invalid wav", path: "audios/not-wav.wav", content: base64.StdEncoding.EncodeToString([]byte("not a wav"))},
+		{name: "escaped path", path: "../escaped.wav", content: base64.StdEncoding.EncodeToString(wav)},
+	} {
+		t.Run(request.name, func(t *testing.T) {
+			response, rejected := post("agent-a", request.path, request.content)
+			response.Body.Close()
+			if response.StatusCode < http.StatusBadRequest || rejected.Status != 1 {
+				t.Fatalf("rejected result = status %d %+v", response.StatusCode, rejected)
+			}
+		})
+	}
+	if _, err := os.Stat(filepath.Join(root, "escaped.wav")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("escaped WAV should not exist: %v", err)
+	}
+
+	outside := t.TempDir()
+	linkedWorkspace := filepath.Join(root, "agent-b")
+	if err := os.MkdirAll(linkedWorkspace, 0o755); err != nil {
+		t.Fatalf("mkdir linked workspace: %v", err)
+	}
+	if err := os.Symlink(outside, filepath.Join(linkedWorkspace, "audios")); err == nil {
+		response, rejected := post("agent-b", "audios/escape.wav", base64.StdEncoding.EncodeToString(wav))
+		response.Body.Close()
+		if response.StatusCode < http.StatusBadRequest || rejected.Status != 1 {
+			t.Fatalf("symlink result = status %d %+v", response.StatusCode, rejected)
+		}
+		if entries, err := os.ReadDir(outside); err != nil || len(entries) != 0 {
+			t.Fatalf("symlink escape wrote outside files=%v err=%v", entries, err)
+		}
+	}
+	entries, err := os.ReadDir(filepath.Join(workspace, "audios"))
+	if err != nil {
+		t.Fatalf("read audios: %v", err)
+	}
+	for _, entry := range entries {
+		if strings.Contains(entry.Name(), ".tmp-") {
+			t.Fatalf("temporary audio file remains: %s", entry.Name())
+		}
+	}
+}
+
+func TestHandleVideoTrimCreatesNewMP4WithoutChangingSource(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test command shim uses POSIX sh")
+	}
+	root := t.TempDir()
+	workspace := filepath.Join(root, "agent-a")
+	sourcePath := filepath.Join(workspace, "media", "clip.mov")
+	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
+		t.Fatalf("mkdir media: %v", err)
+	}
+	source := []byte("original-video-content")
+	if err := os.WriteFile(sourcePath, source, 0o644); err != nil {
+		t.Fatalf("write source video: %v", err)
+	}
+
+	previousLookPath := videoTrimLookPathFn
+	previousCommand := videoTrimCommandContextFn
+	t.Cleanup(func() {
+		videoTrimLookPathFn = previousLookPath
+		videoTrimCommandContextFn = previousCommand
+	})
+	var ffmpegArgs []string
+	videoTrimLookPathFn = func(name string) (string, error) {
+		if name != "ffmpeg" && name != "ffprobe" {
+			return "", fmt.Errorf("unexpected executable %q", name)
+		}
+		return name, nil
+	}
+	videoTrimCommandContextFn = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		if name == "ffprobe" {
+			return exec.CommandContext(ctx, "sh", "-c", "printf 2400000")
+		}
+		if name == "ffmpeg" {
+			ffmpegArgs = append([]string(nil), args...)
+			return exec.CommandContext(ctx, "sh", "-c", "cp \"$1\" \"$2\"", "video-trim-test", sourcePath, args[len(args)-1])
+		}
+		return exec.CommandContext(ctx, "sh", "-c", "exit 1")
+	}
+
+	server := httptest.NewServer(handleVideoTrim(&Config{AgentDir: root}))
+	defer server.Close()
+	requestBody, err := json.Marshal(VideoTrimRequest{AgentID: "agent-a", Path: "media/clip.mov", Start: 1.5, End: 4})
+	if err != nil {
+		t.Fatalf("marshal trim request: %v", err)
+	}
+	response, err := http.Post(server.URL, "application/json", bytes.NewReader(requestBody))
+	if err != nil {
+		t.Fatalf("POST video trim: %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(response.Body)
+		t.Fatalf("POST status = %d, body=%s", response.StatusCode, body)
+	}
+	var result VideoTrimResponse
+	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
+		t.Fatalf("decode trim response: %v", err)
+	}
+	if result.Status != 0 || result.AgentID != "agent-a" || result.Path != "media/clip.mov" || result.SavedAs == "" {
+		t.Fatalf("unexpected trim response: %+v", result)
+	}
+	realWorkspace, err := filepath.EvalSymlinks(workspace)
+	if err != nil {
+		t.Fatalf("resolve workspace: %v", err)
+	}
+	if !ensurePathWithinRoot(realWorkspace, result.SavedAs) {
+		t.Fatalf("trim result escaped workspace: %q", result.SavedAs)
+	}
+	if matched, err := regexp.MatchString(`/videos/clip_trim_\d{8}_\d{6}_\d{9}\.mp4$`, filepath.ToSlash(result.SavedAs)); err != nil || !matched {
+		t.Fatalf("trim path = %q, want workspace videos timestamped .mp4 path (match=%v err=%v)", result.SavedAs, matched, err)
+	}
+	if saved, err := os.ReadFile(result.SavedAs); err != nil || !bytes.Equal(saved, source) {
+		t.Fatalf("saved video = %q, err=%v; want copied output", saved, err)
+	}
+	if current, err := os.ReadFile(sourcePath); err != nil || !bytes.Equal(current, source) {
+		t.Fatalf("source video changed to %q, err=%v; want %q", current, err, source)
+	}
+	findArg := func(key string) string {
+		for index := 0; index+1 < len(ffmpegArgs); index++ {
+			if ffmpegArgs[index] == key {
+				return ffmpegArgs[index+1]
+			}
+		}
+		return ""
+	}
+	if got := findArg("-ss"); got != "1.5" {
+		t.Errorf("ffmpeg -ss = %q, want 1.5; args=%q", got, ffmpegArgs)
+	}
+	if got := findArg("-t"); got != "2.5" {
+		t.Errorf("ffmpeg -t = %q, want 2.5; args=%q", got, ffmpegArgs)
+	}
+	if got := findArg("-b:v"); got != "2400000" {
+		t.Errorf("ffmpeg -b:v = %q, want source bitrate; args=%q", got, ffmpegArgs)
+	}
+	if got := findArg("-c:v"); got != "libx264" {
+		t.Errorf("ffmpeg -c:v = %q, want libx264", got)
+	}
+	if got := findArg("-c:a"); got != "aac" {
+		t.Errorf("ffmpeg -c:a = %q, want aac", got)
+	}
+
+	customBody, err := json.Marshal(VideoTrimRequest{AgentID: "agent-a", Path: "media/clip.mov", Start: 0, End: 1, OutputName: "选段.mp4"})
+	if err != nil {
+		t.Fatalf("marshal custom trim request: %v", err)
+	}
+	customResponse, err := http.Post(server.URL, "application/json", bytes.NewReader(customBody))
+	if err != nil {
+		t.Fatalf("POST custom video trim: %v", err)
+	}
+	defer customResponse.Body.Close()
+	if customResponse.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(customResponse.Body)
+		t.Fatalf("custom trim status = %d, body=%s", customResponse.StatusCode, body)
+	}
+	var customResult VideoTrimResponse
+	if err := json.NewDecoder(customResponse.Body).Decode(&customResult); err != nil {
+		t.Fatalf("decode custom trim response: %v", err)
+	}
+	if got, want := filepath.Base(customResult.SavedAs), "选段.mp4"; got != want {
+		t.Errorf("custom trim file = %q, want %q", got, want)
+	}
+	if got, want := filepath.Base(filepath.Dir(customResult.SavedAs)), "videos"; got != want {
+		t.Errorf("custom trim directory = %q, want %q", got, want)
+	}
+
+	invalidBody, _ := json.Marshal(VideoTrimRequest{AgentID: "agent-a", Path: "media/clip.mov", Start: 1.25, End: 4})
+	invalidResponse, err := http.Post(server.URL, "application/json", bytes.NewReader(invalidBody))
+	if err != nil {
+		t.Fatalf("POST invalid video trim: %v", err)
+	}
+	defer invalidResponse.Body.Close()
+	if invalidResponse.StatusCode != http.StatusBadRequest {
+		body, _ := io.ReadAll(invalidResponse.Body)
+		t.Errorf("invalid interval status = %d, want 400, body=%s", invalidResponse.StatusCode, body)
+	}
+
+	videoTrimLookPathFn = func(string) (string, error) { return "", errors.New("not installed") }
+	missingResponse, err := http.Post(server.URL, "application/json", bytes.NewReader(requestBody))
+	if err != nil {
+		t.Fatalf("POST video trim without ffmpeg: %v", err)
+	}
+	defer missingResponse.Body.Close()
+	if missingResponse.StatusCode != http.StatusServiceUnavailable {
+		body, _ := io.ReadAll(missingResponse.Body)
+		t.Errorf("missing ffmpeg status = %d, want 503, body=%s", missingResponse.StatusCode, body)
+	}
+	videoTrimLookPathFn = func(name string) (string, error) { return name, nil }
+
+	outside := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outside, "outside.mp4"), []byte("outside"), 0o644); err != nil {
+		t.Fatalf("write outside video: %v", err)
+	}
+	if err := os.Symlink(filepath.Join(outside, "outside.mp4"), filepath.Join(workspace, "media", "linked.mp4")); err == nil {
+		linkedBody, _ := json.Marshal(VideoTrimRequest{AgentID: "agent-a", Path: "media/linked.mp4", Start: 0, End: 1})
+		linkedResponse, err := http.Post(server.URL, "application/json", bytes.NewReader(linkedBody))
+		if err != nil {
+			t.Fatalf("POST linked video trim: %v", err)
+		}
+		defer linkedResponse.Body.Close()
+		if linkedResponse.StatusCode != http.StatusBadRequest {
+			body, _ := io.ReadAll(linkedResponse.Body)
+			t.Errorf("symlink trim status = %d, want 400, body=%s", linkedResponse.StatusCode, body)
+		}
+	}
+}
+
+func TestHandleEditPersistsCanvasJSONWithinWorkspace(t *testing.T) {
+	flushAgentCache()
+	root := t.TempDir()
+	workspace := filepath.Join(root, "agent-a")
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		t.Fatalf("mkdir workspace: %v", err)
+	}
+	server := httptest.NewServer(handleEdit(&Config{AgentDir: root, Device: "test-dev", AgentCacheMs: 0}))
+	defer server.Close()
+
+	firstCanvas := `{"version":1,"title":"规划","viewport":{"x":0,"y":0,"scale":1},"nodes":[{"id":"note-1","type":"card","x":0,"y":0,"content":"开始"}],"edges":[]}`
+	writeCanvas := func(path, content string, expectSuccess bool) EditResponse {
+		t.Helper()
+		body, err := json.Marshal(EditRequest{Content: content})
+		if err != nil {
+			t.Fatalf("marshal canvas: %v", err)
+		}
+		response, err := http.Post(server.URL+"/api/edit?agentId=agent-a&path="+url.QueryEscape(path), "application/json", bytes.NewReader(body))
+		if err != nil {
+			t.Fatalf("POST canvas: %v", err)
+		}
+		defer response.Body.Close()
+		var result EditResponse
+		if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
+			t.Fatalf("decode canvas response: %v", err)
+		}
+		if expectSuccess && (response.StatusCode != http.StatusOK || result.Status != 0) {
+			t.Fatalf("save canvas status=%d result=%+v", response.StatusCode, result)
+		}
+		return result
+	}
+
+	result := writeCanvas("boards/plan.canvas", firstCanvas, true)
+	if result.Path != "boards/plan.canvas" || result.SavedAs == "" {
+		t.Fatalf("unexpected canvas response: %+v", result)
+	}
+	savedPath := filepath.Join(workspace, "boards", "plan.canvas")
+	if isBinaryFile(savedPath) {
+		t.Fatalf("canvas file must use the UTF-8 text path")
+	}
+	if !ensurePathWithinRoot(workspace, result.SavedAs) {
+		t.Fatalf("saved canvas escaped workspace: %q", result.SavedAs)
+	}
+	if got, err := os.ReadFile(savedPath); err != nil || string(got) != firstCanvas {
+		t.Fatalf("saved canvas = %q, err=%v; want %q", got, err, firstCanvas)
+	}
+
+	secondCanvas := `{"version":1,"title":"规划（已更新）","viewport":{"x":12,"y":8,"scale":1.2},"nodes":[],"edges":[]}`
+	writeCanvas("boards/plan.canvas", secondCanvas, true)
+	if got, err := os.ReadFile(savedPath); err != nil || string(got) != secondCanvas {
+		t.Fatalf("overwritten canvas = %q, err=%v; want %q", got, err, secondCanvas)
+	}
+
+	escaped := writeCanvas("../escape.canvas", firstCanvas, false)
+	if escaped.Status == 0 {
+		t.Fatalf("workspace escape unexpectedly succeeded: %+v", escaped)
+	}
+	if _, err := os.Stat(filepath.Join(root, "escape.canvas")); !os.IsNotExist(err) {
+		t.Fatalf("workspace escape created file, stat err=%v", err)
+	}
+}
+
+func TestHandleEditSavesCanvasExportsWithinWorkspace(t *testing.T) {
+	flushAgentCache()
+	root := t.TempDir()
+	workspace := filepath.Join(root, "agent-a")
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		t.Fatalf("mkdir workspace: %v", err)
+	}
+	server := httptest.NewServer(handleEdit(&Config{AgentDir: root, Device: "test-dev", AgentCacheMs: 0}))
+	defer server.Close()
+
+	exports := []struct {
+		path string
+		data []byte
+	}{
+		{path: "canvas/diagram.png", data: []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a, 0x01}},
+		{path: "canvas/diagram.pdf", data: []byte("%PDF-1.4\ncanvas export\n")},
+	}
+	for _, tt := range exports {
+		t.Run(filepath.Ext(tt.path), func(t *testing.T) {
+			body, err := json.Marshal(EditRequest{Content: base64.StdEncoding.EncodeToString(tt.data)})
+			if err != nil {
+				t.Fatalf("marshal export: %v", err)
+			}
+			response, err := http.Post(server.URL+"/api/edit?agentId=agent-a&path="+url.QueryEscape(tt.path)+"&saveAsNew=true", "application/json", bytes.NewReader(body))
+			if err != nil {
+				t.Fatalf("POST export: %v", err)
+			}
+			defer response.Body.Close()
+			var result EditResponse
+			if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
+				t.Fatalf("decode export response: %v", err)
+			}
+			if response.StatusCode != http.StatusOK || result.Status != 0 || result.Path != tt.path || result.SavedAs == "" {
+				t.Fatalf("unexpected export response: status=%d result=%+v", response.StatusCode, result)
+			}
+			if !ensurePathWithinRoot(workspace, result.SavedAs) || filepath.Base(filepath.Dir(result.SavedAs)) != "canvas" {
+				t.Fatalf("export path is outside canvas workspace directory: %q", result.SavedAs)
+			}
+			pattern := `^diagram_\d{8}_\d{6}_\d{9}` + regexp.QuoteMeta(filepath.Ext(tt.path)) + `$`
+			if matched, err := regexp.MatchString(pattern, filepath.Base(result.SavedAs)); err != nil || !matched {
+				t.Fatalf("export filename = %q, want timestamped canvas export (match=%v err=%v)", filepath.Base(result.SavedAs), matched, err)
+			}
+			if got, err := os.ReadFile(result.SavedAs); err != nil || !bytes.Equal(got, tt.data) {
+				t.Fatalf("saved export = %q, err=%v; want %q", got, err, tt.data)
+			}
+		})
+	}
+	if info, err := os.Stat(filepath.Join(workspace, "canvas")); err != nil || !info.IsDir() {
+		t.Fatalf("canvas directory was not created: info=%v err=%v", info, err)
 	}
 }
 
