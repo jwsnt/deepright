@@ -94,6 +94,14 @@ cd /path/to/deepright/cli/module/integration
 
 `config/config.json` 只作为主应用启动配置使用；同目录下其余模板文件或目录（如 `SOUL.md`、`USER.md`、`skills/`）才会在创建新 Agent 或补齐 `DEF_AGENT` 时复制到 Agent 工作目录。新建出来的 Agent `config.json` 会固定初始化为空对象 `{}`，不会继承主应用配置内容。
 
+### 发布文档端口
+
+`config/app/API.md`、`config/app/CANVAS.md` 与 `config/app/DESIGN.md` 的源码使用 `http://localhost:#port` 作为本地地址占位符。执行 `cli/module/build.sh` 时，构建会读取主应用 `config/config.json` 顶层的数字 `port`，并只在每个发布副本中替换为 `http://localhost:<port>`；源码文档不会被修改。
+
+因此，修改 `config/config.json.port` 后应重新构建，新的发布包文档才会显示新端口。配置缺少 `port` 或其值不是数字时构建会失败，不会回退到 `8080`。运行时的 `./integration --port 18080` 仍可改变实际监听端口，但不会改写已打包文档；此时应以启动参数为准。
+
+macOS 发布包把已替换的文档放入 `DeepRight.app/Contents/Resources/config/app/`；Linux / Windows WSL2 安装载荷保留在 release 根目录的 `config/app/`，随后被安装器复制到 WSL。两种发布形式使用相同的端口替换规则。
+
 ### Agent `tmp` 自动归档与清理
 
 Integration 在每次启动时读取 `config/config.json.temp`：
@@ -3298,3 +3306,15 @@ Integration 提供 `POST /api/agent/audio?agentId=<agentId>&path=<relativePath>`
 - 服务端不使用 FFmpeg，也不对音频重采样、转码、降噪或修改内容。
 
 完整说明见 [iteration/20260726-7/USER_GUIDE.md](iteration/20260726-7/USER_GUIDE.md)。
+
+---
+
+## 迭代 20260726-9：图片统一另存为 PNG
+
+图片编辑继续复用受限的 `POST /api/edit`，不新增图片专用 HTTP 接口。页面以 `agentId`、`path=images/<filename>.png` 和 `saveAsNew=true` 提交 PNG Base64。
+
+- 服务端仅在当前 Agent 工作区的 `images/` 下写入；目录不存在时自动创建。`saveAsNew=true` 统一由服务端在文件扩展名前追加高精度时间戳，生成的新 PNG 不会覆盖原图或历史文件。
+- 返回的 `savedAs` 是最终文件的系统绝对路径，页面据此复制到系统剪贴板。
+- PNG 内容按二进制 Base64 解码后写入，不进行文本转换或图像转码。绝对路径、`~`、`..`、目录、跨 Agent 路径和工作区外符号链接仍会被拒绝。
+
+完整说明见 [iteration/20260726-9/USER_GUIDE.md](iteration/20260726-9/USER_GUIDE.md)。

@@ -262,6 +262,38 @@ copy_release_asset() {
   find "$dst_path" \( -name '.DS_Store' -o -name '._*' \) -exec rm -rf {} +
 }
 
+config_document_port() {
+  config_path="$CONFIG_DIR/config.json"
+  if [ ! -f "$config_path" ]; then
+    echo "missing config file for document port replacement: $config_path" >&2
+    exit 1
+  fi
+
+  port=$(sed -n -E 's/^[[:space:]]*"port"[[:space:]]*:[[:space:]]*"?([0-9]+)"?[[:space:]]*,?[[:space:]]*$/\1/p' "$config_path" | sed -n '1p')
+  case "$port" in
+    ''|*[!0-9]*)
+      echo "config port must be a numeric JSON property: $config_path" >&2
+      exit 1
+      ;;
+  esac
+  printf '%s' "$port"
+}
+
+replace_release_document_port() {
+  release_config_dir="$1"
+  port=$(config_document_port)
+
+  for document_name in API.md CANVAS.md DESIGN.md; do
+    document_path="$release_config_dir/app/$document_name"
+    if [ ! -f "$document_path" ]; then
+      echo "missing packaged document for port replacement: $document_path" >&2
+      exit 1
+    fi
+    sed "s|http://localhost:#port|http://localhost:$port|g" "$document_path" > "$document_path.tmp"
+    mv "$document_path.tmp" "$document_path"
+  done
+}
+
 build_mac_app_icon() {
   src_png="$1"
   out_icns="$2"
@@ -863,6 +895,7 @@ build_target_release() {
 
   echo "-> copying config assets ($target_dir_name/$target_name)"
   copy_release_asset "$CONFIG_DIR" "$target_release_dir/config"
+  replace_release_document_port "$target_release_dir/config"
 }
 
 build_cli_sandbox_mac_release() {

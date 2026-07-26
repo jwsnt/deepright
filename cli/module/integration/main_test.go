@@ -3719,6 +3719,59 @@ func TestHandleEditSavesNewBinaryAudioWithoutChangingSource(t *testing.T) {
 	}
 }
 
+func TestHandleEditSavesTimestampedPNGInImagesDirectory(t *testing.T) {
+	flushAgentCache()
+	root := t.TempDir()
+	workspace := filepath.Join(root, "agent-a")
+	sourcePath := filepath.Join(workspace, "source", "poster.jpg")
+	source := []byte("original-image-content")
+	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
+		t.Fatalf("mkdir source: %v", err)
+	}
+	if err := os.WriteFile(sourcePath, source, 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	server := httptest.NewServer(handleEdit(&Config{AgentDir: root, Device: "test-dev", AgentCacheMs: 0}))
+	defer server.Close()
+	png := []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a, 0x01, 0x02}
+	requestBody, err := json.Marshal(EditRequest{Content: base64.StdEncoding.EncodeToString(png)})
+	if err != nil {
+		t.Fatalf("marshal image edit request: %v", err)
+	}
+	response, err := http.Post(server.URL+"/api/edit?agentId=agent-a&path="+url.QueryEscape("images/poster.png")+"&saveAsNew=true", "application/json", bytes.NewReader(requestBody))
+	if err != nil {
+		t.Fatalf("POST image save: %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(response.Body)
+		t.Fatalf("POST status = %d, body=%s", response.StatusCode, body)
+	}
+	var result EditResponse
+	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
+		t.Fatalf("decode image save response: %v", err)
+	}
+	if result.Status != 0 || result.Path != "images/poster.png" || result.SavedAs == "" {
+		t.Fatalf("unexpected image save response: %+v", result)
+	}
+	if !ensurePathWithinRoot(workspace, result.SavedAs) || filepath.Base(filepath.Dir(result.SavedAs)) != "images" {
+		t.Fatalf("saved image is outside the images directory: %q", result.SavedAs)
+	}
+	if matched, err := regexp.MatchString(`^poster_\d{8}_\d{6}_\d{9}\.png$`, filepath.Base(result.SavedAs)); err != nil || !matched {
+		t.Fatalf("saved image filename = %q, want timestamped PNG (match=%v err=%v)", filepath.Base(result.SavedAs), matched, err)
+	}
+	if saved, err := os.ReadFile(result.SavedAs); err != nil || !bytes.Equal(saved, png) {
+		t.Fatalf("saved image = %q, err=%v; want %q", saved, err, png)
+	}
+	if current, err := os.ReadFile(sourcePath); err != nil || !bytes.Equal(current, source) {
+		t.Fatalf("source image changed to %q, err=%v; want %q", current, err, source)
+	}
+	if info, err := os.Stat(filepath.Join(workspace, "images")); err != nil || !info.IsDir() {
+		t.Fatalf("images directory was not created: info=%v err=%v", info, err)
+	}
+}
+
 func integrationTestWAV(data []byte) []byte {
 	wav := make([]byte, 44+len(data))
 	copy(wav[0:4], "RIFF")

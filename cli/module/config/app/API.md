@@ -1,6 +1,6 @@
 # Integration API
 
-`integration` 默认对外提供 HTTP 服务，默认地址为 `http://127.0.0.1:8080`。启动时可由 `config/config.json` 或 `--port` 覆盖端口；以下 URL 示例均使用默认端口。
+`integration` 默认对外提供 HTTP 服务，默认地址为 `http://localhost:#port`。`#port` 是源码文档占位符，构建发布包时会替换为 `config/config.json` 的 `port` 属性；启动时仍可由 `--port` 覆盖端口。以下 URL 示例使用发布包配置的端口。
 
 主要接口统一提供 CLI 收口：
 
@@ -172,7 +172,7 @@ integration service cancel --chat chat-001
 HTTP：
 
 ```bash
-curl -X POST 'http://127.0.0.1:8080/v1/chat/completions' \
+curl -X POST 'http://localhost:#port/v1/chat/completions' \
   -H 'Content-Type: application/json' \
   -d '{
     "model":"OpenAI",
@@ -190,7 +190,7 @@ integration api chat-completions --body-file ./chat-completions.json
 
 ### 2. `GET /api/heartbeat`
 
-用途：检查 cli-get 心跳。`curl 'http://127.0.0.1:8080/api/heartbeat'` ｜ `integration api heartbeat`
+用途：检查 cli-get 心跳。`curl 'http://localhost:#port/api/heartbeat'` ｜ `integration api heartbeat`
 
 ### 3. `POST /api/cancel`
 
@@ -199,7 +199,7 @@ integration api chat-completions --body-file ./chat-completions.json
 HTTP：
 
 ```bash
-curl -X POST 'http://127.0.0.1:8080/api/cancel?chat=chat-001'
+curl -X POST 'http://localhost:#port/api/cancel?chat=chat-001'
 ```
 
 CLI：
@@ -215,7 +215,7 @@ integration api cancel --chat chat-001
 HTTP：
 
 ```bash
-curl -X POST 'http://127.0.0.1:8080/api/restore?agentId=demo-agent&chat=chat-001&timeline=2026-07-06T10:00:00&lastId=100'
+curl -X POST 'http://localhost:#port/api/restore?agentId=demo-agent&chat=chat-001&timeline=2026-07-06T10:00:00&lastId=100'
 ```
 
 CLI：
@@ -231,7 +231,7 @@ integration api restore \
 历史分页模式：
 
 ```bash
-curl -X POST 'http://127.0.0.1:8080/api/restore?agentId=demo-agent&chat=chat-001&history=1&limit=120'
+curl -X POST 'http://localhost:#port/api/restore?agentId=demo-agent&chat=chat-001&history=1&limit=120'
 
 integration api restore \
   --agentId demo-agent \
@@ -243,7 +243,7 @@ integration api restore \
 继续翻上一页时，可继续携带上一页响应中的 `history.beforeTimeline` 和 `history.beforeId`：
 
 ```bash
-curl -X POST 'http://127.0.0.1:8080/api/restore?agentId=demo-agent&chat=chat-001&history=1&beforeTimeline=2026-07-06T10:00:00&beforeId=321&limit=120'
+curl -X POST 'http://localhost:#port/api/restore?agentId=demo-agent&chat=chat-001&history=1&beforeTimeline=2026-07-06T10:00:00&beforeId=321&limit=120'
 
 integration api restore \
   --agentId demo-agent \
@@ -268,7 +268,7 @@ integration api restore \
 HTTP：
 
 ```bash
-curl 'http://127.0.0.1:8080/api/chat_session_log?agentId=demo-agent&chatId=chat-001&limit=50'
+curl 'http://localhost:#port/api/chat_session_log?agentId=demo-agent&chatId=chat-001&limit=50'
 ```
 
 CLI：
@@ -284,7 +284,7 @@ integration api chat-session-log --agentId demo-agent --chatId chat-001 --limit 
 HTTP：
 
 ```bash
-curl -X POST 'http://127.0.0.1:8080/api/cmd' \
+curl -X POST 'http://localhost:#port/api/cmd' \
   -H 'Content-Type: application/json' \
   -d '{"agentId":"demo-agent","chatId":"chat-001","cmd":"pwd","timeout":30000}'
 ```
@@ -302,7 +302,7 @@ integration api cmd --agentId demo-agent --chatId chat-001 --cmd 'pwd' --timeout
 HTTP：
 
 ```bash
-curl -X POST 'http://127.0.0.1:8080/api/kill' \
+curl -X POST 'http://localhost:#port/api/kill' \
   -H 'Content-Type: application/json' \
   -d '{"agentId":"demo-agent","chatId":"chat-001","cmd":"sleep 10"}'
 ```
@@ -317,21 +317,21 @@ integration api kill --agentId demo-agent --chatId chat-001 --cmd 'sleep 10'
 
 这些接口都属于“轻参数直接调用”；方法与 CLI 名见路由总览，这里只保留最短示例。
 
-- `/api/agentId`：Agent 列表。`curl 'http://127.0.0.1:8080/api/agentId'` ｜ `integration api agent-id`
-- `/api/swarm_agent`：swarm Agent 列表。`curl 'http://127.0.0.1:8080/api/swarm_agent'` ｜ `integration api swarm-agent`
-- `/api/deviceId`：deviceId。`curl 'http://127.0.0.1:8080/api/deviceId'` ｜ `integration api device-id`
-- `/api/folder`：打开 Agent workspace 或绝对路径。`curl 'http://127.0.0.1:8080/api/folder?agentId=demo-agent'` / `curl 'http://127.0.0.1:8080/api/folder?path=/Users/me/Desktop'` ｜ `integration api folder --agentId demo-agent` / `integration api folder --path /Users/me/Desktop`
-- `/api/skills`：技能列表；常用参数 `agentId`、`chatId`。`curl 'http://127.0.0.1:8080/api/skills?agentId=demo-agent&chatId=chat-001'` ｜ `integration api skills --agentId demo-agent --chatId chat-001`
+- `/api/agentId`：Agent 列表。`curl 'http://localhost:#port/api/agentId'` ｜ `integration api agent-id`
+- `/api/swarm_agent`：swarm Agent 列表。`curl 'http://localhost:#port/api/swarm_agent'` ｜ `integration api swarm-agent`
+- `/api/deviceId`：deviceId。`curl 'http://localhost:#port/api/deviceId'` ｜ `integration api device-id`
+- `/api/folder`：打开 Agent workspace 或绝对路径。`curl 'http://localhost:#port/api/folder?agentId=demo-agent'` / `curl 'http://localhost:#port/api/folder?path=/Users/me/Desktop'` ｜ `integration api folder --agentId demo-agent` / `integration api folder --path /Users/me/Desktop`
+- `/api/skills`：技能列表；常用参数 `agentId`、`chatId`。`curl 'http://localhost:#port/api/skills?agentId=demo-agent&chatId=chat-001'` ｜ `integration api skills --agentId demo-agent --chatId chat-001`
 - `/api/skill_state`：切换技能目录禁用状态；HTTP body 形如 `{"chatId":"chat-001","path":"/abs/skills/demo","disabled":true}` ｜ `integration api skill-state --chatId chat-001 --path /abs/skills/demo --disabled true`
-- `/api/files`：文件列表。`curl 'http://127.0.0.1:8080/api/files?path=/abs/workspace'` ｜ `integration api files --path /abs/workspace`
-- `/api/data`：读取文本文件。`curl 'http://127.0.0.1:8080/api/data?path=/abs/workspace/USER.md'` ｜ `integration api data --path /abs/workspace/USER.md`
-- `/api/workspace`：workspace 路径。`curl 'http://127.0.0.1:8080/api/workspace?agentId=demo-agent'` ｜ `integration api workspace --agentId demo-agent`
-- `/api/url_preview_probe`：探测 URL 可达性 / iframe 预览可用性。普通用法：`curl --get 'http://127.0.0.1:8080/api/url_preview_probe' --data-urlencode 'url=https://example.com'` ｜ `integration api url-preview-probe --url https://example.com`
+- `/api/files`：文件列表。`curl 'http://localhost:#port/api/files?path=/abs/workspace'` ｜ `integration api files --path /abs/workspace`
+- `/api/data`：读取文本文件。`curl 'http://localhost:#port/api/data?path=/abs/workspace/USER.md'` ｜ `integration api data --path /abs/workspace/USER.md`
+- `/api/workspace`：workspace 路径。`curl 'http://localhost:#port/api/workspace?agentId=demo-agent'` ｜ `integration api workspace --agentId demo-agent`
+- `/api/url_preview_probe`：探测 URL 可达性 / iframe 预览可用性。普通用法：`curl --get 'http://localhost:#port/api/url_preview_probe' --data-urlencode 'url=https://example.com'` ｜ `integration api url-preview-probe --url https://example.com`
 
 本地页面用法：若目标 URL 的 host 是 `localhost` / `127.0.0.1`，请把 `agentId`、`chatId`、`themeLabel` 放进 `url` 本身；integration 只探测最终 URL，目标本地页面再消费这些参数。例如：
 
 ```bash
-curl --get 'http://127.0.0.1:8080/api/url_preview_probe' \
+curl --get 'http://localhost:#port/api/url_preview_probe' \
   --data-urlencode 'url=http://localhost:3000/demo?agentId=demo-agent&chatId=chat-001&themeLabel=冷色模式'
 ```
 
@@ -342,7 +342,7 @@ curl --get 'http://127.0.0.1:8080/api/url_preview_probe' \
 HTTP：
 
 ```bash
-curl -X POST 'http://127.0.0.1:8080/api/edit?agentId=demo-agent&path=USER.md' \
+curl -X POST 'http://localhost:#port/api/edit?agentId=demo-agent&path=USER.md' \
   -H 'Content-Type: application/json' \
   -d '{"content":"# hello"}'
 ```
@@ -364,7 +364,7 @@ integration api edit --agentId demo-agent --path app/logo.png --base64 "$(<logo.
 HTTP：
 
 ```bash
-curl 'http://127.0.0.1:8080/api/del?agentId=demo-agent&path=tmp/a.txt'
+curl 'http://localhost:#port/api/del?agentId=demo-agent&path=tmp/a.txt'
 ```
 
 CLI：
@@ -378,7 +378,7 @@ integration api del --agentId demo-agent --path tmp/a.txt
 HTTP：
 
 ```bash
-curl 'http://127.0.0.1:8080/api/raw?agentId=demo-agent&path=app/logo.png'
+curl 'http://localhost:#port/api/raw?agentId=demo-agent&path=app/logo.png'
 ```
 
 CLI：
@@ -392,7 +392,7 @@ integration api raw --agentId demo-agent --path app/logo.png
 HTTP：
 
 ```bash
-curl 'http://127.0.0.1:8080/file/lastUpdate?agentId=demo-agent&file=USER.md'
+curl 'http://localhost:#port/file/lastUpdate?agentId=demo-agent&file=USER.md'
 ```
 
 CLI：
@@ -406,28 +406,28 @@ integration api file-last-update --agentId demo-agent --file USER.md
 初始化：
 
 ```bash
-curl 'http://127.0.0.1:8080/api/agent/init?name=demo-agent'
+curl 'http://localhost:#port/api/agent/init?name=demo-agent'
 integration api agent init --name demo-agent
 ```
 
 删除：
 
 ```bash
-curl 'http://127.0.0.1:8080/api/agent/delete?name=demo-agent'
+curl 'http://localhost:#port/api/agent/delete?name=demo-agent'
 integration api agent delete --name demo-agent
 ```
 
 创建文件或目录：
 
 ```bash
-curl 'http://127.0.0.1:8080/api/agent/create?agentId=demo-agent&name=docs/readme.md&type=1'
+curl 'http://localhost:#port/api/agent/create?agentId=demo-agent&name=docs/readme.md&type=1'
 integration api agent create --agentId demo-agent --name docs/readme.md --type 1
 ```
 
 导出：
 
 ```bash
-curl -OJ 'http://127.0.0.1:8080/api/agent/export?agent_id=demo-agent'
+curl -OJ 'http://localhost:#port/api/agent/export?agent_id=demo-agent'
 integration api agent export --agent demo-agent --output ./demo-agent.zip
 ```
 
@@ -440,7 +440,7 @@ integration api agent import --input ./demo-agent.zip
 复制：
 
 ```bash
-curl 'http://127.0.0.1:8080/api/copy?source_agentId=src&target_agentId=dst'
+curl 'http://localhost:#port/api/copy?source_agentId=src&target_agentId=dst'
 integration api agent copy --source src --target dst
 ```
 
@@ -449,7 +449,7 @@ integration api agent copy --source src --target dst
 HTTP：
 
 ```bash
-curl -X POST 'http://127.0.0.1:8080/api/upload?agentId=demo-agent' \
+curl -X POST 'http://localhost:#port/api/upload?agentId=demo-agent' \
   -F 'files=@./local.txt'
 ```
 
@@ -464,7 +464,7 @@ integration api upload --agentId demo-agent --file ./local.txt
 HTTP：
 
 ```bash
-curl -o ./download.bin 'http://127.0.0.1:8080/api/download?path=/abs/workspace/USER.md'
+curl -o ./download.bin 'http://localhost:#port/api/download?path=/abs/workspace/USER.md'
 ```
 
 CLI：
@@ -478,7 +478,7 @@ integration api download --path /abs/workspace/USER.md --output ./USER.md
 HTTP：
 
 ```bash
-curl -X POST 'http://127.0.0.1:8080/api/config?agentId=demo-agent' \
+curl -X POST 'http://localhost:#port/api/config?agentId=demo-agent' \
   -H 'Content-Type: application/json' \
   -d @./agent-config.json
 ```
@@ -492,7 +492,7 @@ integration api config --agentId demo-agent --body-file ./agent-config.json
 删除共享模型配置：
 
 ```bash
-curl -X POST 'http://127.0.0.1:8080/api/config' \
+curl -X POST 'http://localhost:#port/api/config' \
   -H 'Content-Type: application/json' \
   -d '{"action":"delete_model","model":"OpenAI"}'
 
@@ -509,14 +509,14 @@ integration api config --body '{"action":"delete_model","model":"OpenAI"}'
 读取：
 
 ```bash
-curl 'http://127.0.0.1:8080/api/token'
+curl 'http://localhost:#port/api/token'
 integration api token get
 ```
 
 写入：
 
 ```bash
-curl -X POST 'http://127.0.0.1:8080/api/token' \
+curl -X POST 'http://localhost:#port/api/token' \
   -H 'Content-Type: application/json' \
   -d @./token.json
 integration api token set --body-file ./token.json
@@ -527,7 +527,7 @@ integration api token set --body-file ./token.json
 HTTP：
 
 ```bash
-curl 'http://127.0.0.1:8080/api/consume?agentId=demo-agent&starTime=20260706-090000&closeTime=20260706-180000&limit=200'
+curl 'http://localhost:#port/api/consume?agentId=demo-agent&starTime=20260706-090000&closeTime=20260706-180000&limit=200'
 ```
 
 CLI：
@@ -600,7 +600,7 @@ integration api standalone reset
 HTTP：
 
 ```bash
-curl 'http://127.0.0.1:8080/api/site/access'
+curl 'http://localhost:#port/api/site/access'
 ```
 
 CLI：
@@ -614,7 +614,7 @@ integration api site-access
 插件列表：
 
 ```bash
-curl 'http://127.0.0.1:8080/api/plugins/meta'
+curl 'http://localhost:#port/api/plugins/meta'
 integration api plugins meta
 ```
 
@@ -646,7 +646,7 @@ integration api plugins exec --key browser --command 'instance init' --agentId d
 日志：
 
 ```bash
-curl 'http://127.0.0.1:8080/api/plugins/log?key=browser&last=50'
+curl 'http://localhost:#port/api/plugins/log?key=browser&last=50'
 integration api plugins log --key browser --last 50
 ```
 
@@ -721,23 +721,23 @@ integration api cron detail-delete --detailId detail_1
 更新明细状态：
 
 ```bash
-curl -X POST 'http://127.0.0.1:8080/api/cron/detail/status?agentId=demo-agent&detailId=detail_1&status=3'
+curl -X POST 'http://localhost:#port/api/cron/detail/status?agentId=demo-agent&detailId=detail_1&status=3'
 integration api cron detail-status --agentId demo-agent --detailId detail_1 --status 3
 ```
 
 ### 辅助查询与页面路由快速示例
 
-- `/skills_warning`：`curl 'http://127.0.0.1:8080/skills_warning'` ｜ `integration api skills-warning`
-- `/install_app`：`curl 'http://127.0.0.1:8080/install_app'` ｜ `integration api install-app`
-- `/log_round`：`curl 'http://127.0.0.1:8080/log_round?chatId=chat-001&round=3'` ｜ `integration api log-round --chatId chat-001 --round 3`
-- `/log_skill`：`curl 'http://127.0.0.1:8080/log_skill?chatId=chat-001&round=3'` ｜ `integration api log-skill --chatId chat-001 --round 3`
-- `/log_skill_status`：`curl 'http://127.0.0.1:8080/log_skill_status?agentId=demo-agent&chatId=chat-001&round=3'` ｜ `integration api log-skill-status --agentId demo-agent --chatId chat-001 --round 3`
-- `/api/log_cleanup_status`：`curl 'http://127.0.0.1:8080/api/log_cleanup_status'` ｜ `integration api log-cleanup-status`
-- `knowledge`：目录树 `curl 'http://127.0.0.1:8080/knowledge'` ｜ `integration api knowledge`
-- `knowledge` 子路径：`curl 'http://127.0.0.1:8080/knowledge/demo-agent'` ｜ `integration api knowledge --path demo-agent`
-- `knowledge_lastUpdate`：`curl 'http://127.0.0.1:8080/knowledge_lastUpdate?agentId=demo-agent'` ｜ `integration api knowledge-last-update --agentId demo-agent`
-- `knowledge_path`：`curl 'http://127.0.0.1:8080/knowledge_path?agentId=demo-agent'` ｜ `integration api knowledge-path --agentId demo-agent`
-- `/launch`：浏览器启动跳转页，常用于本机拉起后等待 `/site/` 准备完成；示例：直接访问 `http://127.0.0.1:8080/launch`
+- `/skills_warning`：`curl 'http://localhost:#port/skills_warning'` ｜ `integration api skills-warning`
+- `/install_app`：`curl 'http://localhost:#port/install_app'` ｜ `integration api install-app`
+- `/log_round`：`curl 'http://localhost:#port/log_round?chatId=chat-001&round=3'` ｜ `integration api log-round --chatId chat-001 --round 3`
+- `/log_skill`：`curl 'http://localhost:#port/log_skill?chatId=chat-001&round=3'` ｜ `integration api log-skill --chatId chat-001 --round 3`
+- `/log_skill_status`：`curl 'http://localhost:#port/log_skill_status?agentId=demo-agent&chatId=chat-001&round=3'` ｜ `integration api log-skill-status --agentId demo-agent --chatId chat-001 --round 3`
+- `/api/log_cleanup_status`：`curl 'http://localhost:#port/api/log_cleanup_status'` ｜ `integration api log-cleanup-status`
+- `knowledge`：目录树 `curl 'http://localhost:#port/knowledge'` ｜ `integration api knowledge`
+- `knowledge` 子路径：`curl 'http://localhost:#port/knowledge/demo-agent'` ｜ `integration api knowledge --path demo-agent`
+- `knowledge_lastUpdate`：`curl 'http://localhost:#port/knowledge_lastUpdate?agentId=demo-agent'` ｜ `integration api knowledge-last-update --agentId demo-agent`
+- `knowledge_path`：`curl 'http://localhost:#port/knowledge_path?agentId=demo-agent'` ｜ `integration api knowledge-path --agentId demo-agent`
+- `/launch`：浏览器启动跳转页，常用于本机拉起后等待 `/site/` 准备完成；示例：直接访问 `http://localhost:#port/launch`
 
 ### `/api/shutdown`
 
@@ -746,8 +746,8 @@ integration api cron detail-status --agentId demo-agent --detailId detail_1 --st
 HTTP：
 
 ```bash
-curl -X POST 'http://127.0.0.1:8080/api/shutdown'
-curl 'http://127.0.0.1:8080/api/shutdown'
+curl -X POST 'http://localhost:#port/api/shutdown'
+curl 'http://localhost:#port/api/shutdown'
 ```
 
 限制：
