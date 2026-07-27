@@ -14452,15 +14452,7 @@ func normalizeResponseType(responseType string) string {
 }
 
 func buildSSEStreamInterruptedContent(err error) string {
-	const userMessage = "网络异常，请稍后重试"
-	if err == nil {
-		return userMessage
-	}
-	detail := strings.TrimSpace(err.Error())
-	if detail == "" {
-		return userMessage
-	}
-	return fmt.Sprintf("%s（%s）", userMessage, detail)
+	return "连接已中断，请重试"
 }
 
 func queueSSEStreamInterruptedLog(ch chan chatMsg, err error) bool {
@@ -15114,6 +15106,12 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 		if err != nil {
 			releaseActiveConn(key, active)
 			cancel()
+			// A user cancellation can race the initial upstream connection.
+			// The cancel handler has already stored the X marker, so avoid
+			// appending a misleading "Failed to forward" error to the chat.
+			if errors.Is(ctx.Err(), context.Canceled) || errors.Is(err, context.Canceled) {
+				return
+			}
 			if chatID != "" {
 				appendChatLogDB(chatAgentID, chatID, chatType, "A", "abnormal", "Failed to forward: "+err.Error())
 			}

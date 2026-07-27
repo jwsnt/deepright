@@ -764,7 +764,7 @@ func TestProxyChatCompletionsLogsAbnormalWhenUpstreamStreamBreaksMidResponse(t *
 	var abnormalCount int
 	for time.Now().Before(deadline) {
 		if err := cronDB.QueryRow(`SELECT COUNT(*) FROM chat_log WHERE agent_id = ? AND chat_id = ? AND role = 'A' AND response_type = 'abnormal' AND content LIKE ?`,
-			"a", "chat-midstream", "网络异常，请稍后重试（%").Scan(&abnormalCount); err != nil {
+			"a", "chat-midstream", "连接已中断，请重试").Scan(&abnormalCount); err != nil {
 			t.Fatalf("count abnormal chat_log: %v", err)
 		}
 		if abnormalCount > 0 {
@@ -851,7 +851,7 @@ func TestProxyChatCompletionsLogsAbnormalWhenUpstreamEndsWithoutDoneMarker(t *te
 	var abnormalCount int
 	for time.Now().Before(deadline) {
 		if err := cronDB.QueryRow(`SELECT COUNT(*) FROM chat_log WHERE agent_id = ? AND chat_id = ? AND role = 'A' AND response_type = 'abnormal' AND content = ?`,
-			"a", "chat-eof", "网络异常，请稍后重试（EOF）").Scan(&abnormalCount); err != nil {
+			"a", "chat-eof", "连接已中断，请重试").Scan(&abnormalCount); err != nil {
 			t.Fatalf("count abnormal chat_log: %v", err)
 		}
 		if abnormalCount > 0 {

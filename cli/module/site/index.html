@@ -1235,13 +1235,16 @@ animation:queuedInsertExplosion .62s ease-out both}
 [data-theme="dark"] .message-task-badge{color:rgba(24,12,8,.84)}
 .message.error{background:linear-gradient(145deg,rgba(255,120,134,.18),rgba(255,255,255,.12));border:1px solid rgba(255,90,107,.38);color:var(--error)}
 .message-actions{position:static;display:flex;align-items:center;justify-content:flex-end;gap:6px;z-index:40;pointer-events:auto;max-width:100%;flex:0 0 auto}
-.message-copy-btn,.message-retry-btn,.message-edit-btn,.message-scroll-top-btn,.message-thinking-btn{width:15px;height:15px;padding:0;border:none;border-radius:999px;background:transparent;color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.55;transition:opacity .16s ease,transform .16s ease,color .16s ease,background-color .16s ease,box-shadow .16s ease;pointer-events:auto;appearance:none;-webkit-appearance:none;box-shadow:none}
+.message-copy-btn,.message-retry-btn,.message-edit-btn,.message-scroll-top-btn,.message-thinking-btn{width:15px;height:15px;padding:0;border:none;border-radius:999px;background:transparent;color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.55;transition:opacity .16s ease,transform .16s ease,color .16s ease,background-color .16s ease,box-shadow .16s ease,filter .16s ease;pointer-events:auto;appearance:none;-webkit-appearance:none;box-shadow:none}
 .message-scroll-top-btn{display:none}
 .message-scroll-top-btn.show{display:flex}
 .message-copy-btn:hover,.message-copy-btn:focus-visible,.message-retry-btn:hover,.message-retry-btn:focus-visible,.message-edit-btn:hover,.message-edit-btn:focus-visible,.message-scroll-top-btn:hover,.message-scroll-top-btn:focus-visible,.message-thinking-btn:hover,.message-thinking-btn:focus-visible{opacity:1;transform:translateY(-1px);color:var(--text-primary);background:rgba(var(--accent-rgb),.08);box-shadow:0 0 0 1px rgba(var(--accent-rgb),.14);outline:none}
 .message-copy-btn svg,.message-retry-btn svg,.message-edit-btn svg,.message-scroll-top-btn svg,.message-thinking-btn svg{width:15px;height:15px;display:block;fill:currentColor}
 .message-scroll-top-btn svg{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .message-thinking-btn svg{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.message-thinking-btn.is-lit{opacity:1;color:rgb(var(--accent-soft-rgb));background:radial-gradient(circle at 35% 28%,var(--glass-highlight),rgba(var(--accent-soft-rgb),.42) 36%,rgba(var(--accent-rgb),.2) 72%);box-shadow:0 0 0 1px rgba(var(--accent-rgb),.3),0 0 9px rgba(var(--accent-rgb),.32),0 0 18px rgba(var(--accent-soft-rgb),.16);filter:drop-shadow(0 0 3px rgba(var(--accent-soft-rgb),.36))}
+.message-thinking-btn.wiki-thinking-collected{animation:messageThinkingBulbCollected .9s cubic-bezier(.18,.84,.24,1) both}
+@keyframes messageThinkingBulbCollected{0%,52%{transform:scale(.78);filter:brightness(.92) drop-shadow(0 0 0 rgba(var(--accent-soft-rgb),0));box-shadow:0 0 0 1px rgba(var(--accent-rgb),.22),0 0 0 rgba(var(--accent-rgb),0)}70%{transform:scale(1.58);filter:brightness(1.52) drop-shadow(0 0 10px rgba(var(--accent-soft-rgb),.9));box-shadow:0 0 0 7px rgba(var(--accent-rgb),.16),0 0 28px rgba(var(--accent-soft-rgb),.78),0 0 46px rgba(var(--accent-rgb),.4)}84%{transform:scale(1.18);filter:brightness(1.26) drop-shadow(0 0 6px rgba(var(--accent-soft-rgb),.58));box-shadow:0 0 0 3px rgba(var(--accent-rgb),.18),0 0 16px rgba(var(--accent-soft-rgb),.5),0 0 28px rgba(var(--accent-rgb),.24)}100%{transform:scale(1);filter:brightness(1) drop-shadow(0 0 3px rgba(var(--accent-soft-rgb),.36));box-shadow:0 0 0 1px rgba(var(--accent-rgb),.3),0 0 9px rgba(var(--accent-rgb),.32),0 0 18px rgba(var(--accent-soft-rgb),.16)}}
 .message-retry-btn:disabled,.message-edit-btn:disabled,.message-scroll-top-btn:disabled{opacity:.22;cursor:not-allowed;pointer-events:none;transform:none}
 [data-theme="dark"] .message-copy-btn:hover,[data-theme="dark"] .message-copy-btn:focus-visible,[data-theme="dark"] .message-retry-btn:hover,[data-theme="dark"] .message-retry-btn:focus-visible,[data-theme="dark"] .message-edit-btn:hover,[data-theme="dark"] .message-edit-btn:focus-visible,[data-theme="dark"] .message-scroll-top-btn:hover,[data-theme="dark"] .message-scroll-top-btn:focus-visible,[data-theme="dark"] .message-thinking-btn:hover,[data-theme="dark"] .message-thinking-btn:focus-visible{background:rgba(var(--accent-rgb),.14);box-shadow:0 0 0 1px rgba(var(--accent-soft-rgb),.18)}
 .chat-scroll-bottom-btn{position:fixed;left:0;top:0;width:22px;height:22px;padding:0;border:none;border-radius:8px;background:linear-gradient(180deg,rgba(255,255,255,.94),rgba(255,236,224,.9));color:#8a544c;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 10px 24px rgba(91,34,29,.12),inset 0 1px 0 rgba(255,255,255,.94);transition:opacity .18s ease,transform .18s ease,filter .18s ease,color .18s ease,background-color .18s ease,box-shadow .18s ease;opacity:0;visibility:hidden;pointer-events:none;transform:translateY(8px) scale(.92);z-index:6}
@@ -1484,6 +1487,7 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 .right-sidebar.cli-sub-expanded .memo-agent-switch-overlay{display:none}
 .right-sidebar .rs-top.memo-tour-controls-locked{pointer-events:none}
 .right-sidebar.wiki-expanded .rs-top{max-height:0;opacity:0;border-bottom-color:transparent;pointer-events:none}
+.right-sidebar.wiki-thinking-expanded .rs-top{max-height:0;opacity:0;border-bottom-color:transparent;pointer-events:none}
 .right-sidebar.cli-sub-expanded .rs-top{flex:1 1 100%;grid-template-columns:minmax(0,1fr);grid-template-rows:30px minmax(0,1fr);max-height:none;border-bottom-color:transparent}
 .right-sidebar.cli-sub-expanded .rs-top > .rs-row-divider{grid-column:1}
 .right-sidebar.cli-sub-expanded .rs-top .rs-cell:nth-child(1),.right-sidebar.cli-sub-expanded .rs-top .rs-cell:nth-child(2){display:none}
@@ -1620,7 +1624,7 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 #rsAtSkillPanel{bottom:auto;top:100%;max-width:100%;overflow:hidden}
 #rsAtAgentPanel{bottom:auto;top:100%;max-width:100%;overflow:hidden}
 .rs-row-divider{grid-column:span 2;height:30px;background:var(--bg-sidebar);display:flex;align-items:center;justify-content:space-between;padding:0 10px;font-size:11px;color:var(--text-muted);gap:10px}
-.rs-row-title{display:flex;align-items:center;gap:6px;min-width:0}
+.rs-row-title{display:flex;align-items:center;gap:6px;min-width:0;flex:1 1 auto;width:100%}
 .rs-row-title span{white-space:nowrap}
 .rs-cmd-toggle{width:18px;height:18px;border:1px solid var(--accent);border-radius:5px;background:var(--bg-card);color:rgb(var(--accent-soft-rgb));display:inline-flex;align-items:center;justify-content:center;padding:0;box-shadow:0 0 4px rgba(var(--accent-rgb),.50),0 0 10px rgba(var(--accent-rgb),.30),inset 0 0 6px rgba(var(--accent-rgb),.12);cursor:pointer;transition:var(--transition)}
 .rs-cmd-toggle:hover{transform:translateY(-1px);box-shadow:0 0 6px rgba(var(--accent-rgb),.58),0 0 14px rgba(var(--accent-rgb),.38),inset 0 0 8px rgba(var(--accent-rgb),.18)}
@@ -1785,6 +1789,7 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 .cli-sub-container .runtime-log-entry .message-meta{display:none}
 .right-sidebar .rs-bottom{flex:1;overflow:hidden;padding:8px;display:flex;flex-direction:column;gap:0;min-height:0;background:var(--bg-sidebar);transition:flex .38s cubic-bezier(.22,1,.36,1),padding .28s ease,opacity .28s ease,filter .32s ease,transform .32s ease}
 .right-sidebar.wiki-expanded .rs-bottom{flex:1 1 100%;padding-top:10px}
+.right-sidebar.wiki-thinking-expanded .rs-bottom{flex:1 1 100%;padding-top:10px}
 .right-sidebar.cli-sub-expanded .rs-bottom{flex:0 0 0;max-height:0;opacity:0;padding-top:0;padding-bottom:0;pointer-events:none;overflow:hidden}
 .rs-bottom-header{flex-shrink:0}
 .rs-wiki-refresh,.rs-wiki-tidy-btn,.rs-cli-expand-btn{width:18px;height:18px;border:1px solid var(--accent);border-radius:5px;background:var(--bg-card);color:rgb(var(--accent-soft-rgb));display:inline-flex;align-items:center;justify-content:center;padding:0;box-shadow:0 0 4px rgba(var(--accent-rgb),.50),0 0 10px rgba(var(--accent-rgb),.30),inset 0 0 6px rgba(var(--accent-rgb),.12);cursor:pointer;transition:var(--transition)}
@@ -1810,6 +1815,7 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 @keyframes wikiRefreshSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .rs-wiki-panel{flex:1;min-height:0;display:flex;flex-direction:column;padding:10px;border:1px solid rgba(var(--accent-rgb),.18);border-top:none;background:var(--bg-sidebar);box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.08);transition:padding .28s ease,box-shadow .28s ease}
 .right-sidebar.wiki-expanded .rs-wiki-panel{padding:12px;box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.16),0 0 24px rgba(var(--accent-rgb),.08)}
+.right-sidebar.wiki-thinking-expanded .rs-wiki-panel{padding:12px;box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.16),0 0 24px rgba(var(--accent-rgb),.08)}
 .rs-wiki-header-meta{margin-left:auto;display:flex;align-items:center;gap:8px;min-width:0}
 .rs-wiki-status{font-size:10px;line-height:1.4;color:var(--text-muted);display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:0;flex-wrap:nowrap;padding-bottom:8px;border-bottom:1px solid rgba(var(--accent-rgb),.12);flex-shrink:0}
 .rs-wiki-breadcrumb{display:flex;align-items:center;gap:0;flex-wrap:wrap;min-width:0}
@@ -1843,7 +1849,10 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 .right-sidebar.wiki-thinking .rs-bottom-header{display:none}
 .right-sidebar.wiki-thinking .rs-wiki-status{padding-bottom:7px}
 .right-sidebar.wiki-thinking .rs-wiki-content{padding-top:9px;scroll-behavior:smooth}
-.rs-wiki-thinking-status{display:flex;align-items:center;gap:6px;min-width:0;font-size:10px;line-height:1.4;color:var(--text-muted)}
+.rs-wiki-thinking-status{display:flex;align-items:center;gap:6px;min-width:0;width:100%;font-size:10px;line-height:1.4;color:var(--text-muted)}
+.rs-wiki-thinking-label{min-width:0;white-space:nowrap}
+.rs-wiki-thinking-expand{margin-left:auto;flex:0 0 auto}
+.right-sidebar.wiki-thinking-expanded .rs-wiki-thinking-expand svg{transform:rotate(180deg)}
 .rs-wiki-thinking-status::before{content:'';width:6px;height:6px;flex:0 0 6px;border-radius:999px;background:rgb(var(--accent-rgb));box-shadow:0 0 0 3px rgba(var(--accent-rgb),.12),0 0 10px rgba(var(--accent-rgb),.46);animation:rsWikiThinkingPulse 1.1s ease-in-out infinite}
 .rs-wiki-thinking-wait{display:flex;align-items:center;justify-content:center;gap:3px;min-height:42px;padding:8px 0;color:rgb(var(--accent-rgb));font-size:18px;line-height:1;letter-spacing:1px}
 .rs-wiki-thinking-wait span{display:inline-block;animation:rsWikiThinkingWait 1s ease-in-out infinite}
@@ -1854,6 +1863,13 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 .rs-wiki-thinking-list .assistant-explosion-beacon__item-body{font-size:10px;line-height:1.52}
 @keyframes rsWikiThinkingPulse{0%,100%{transform:scale(.82);opacity:.55}50%{transform:scale(1.16);opacity:1}}
 @keyframes rsWikiThinkingWait{0%,100%{transform:translateY(0);opacity:.2}50%{transform:translateY(-3px);opacity:1}}
+.wiki-thinking-collect-ghost{position:fixed;z-index:9999;pointer-events:none;display:flex;flex-direction:column;overflow:hidden;transform:translate3d(0,0,0);transform-origin:center center;backface-visibility:hidden;-webkit-backface-visibility:hidden;contain:layout paint style;isolation:isolate;opacity:1;will-change:transform,opacity;box-shadow:0 0 0 1px rgba(var(--accent-rgb),.34),0 0 22px rgba(var(--accent-soft-rgb),.24),0 12px 30px rgba(var(--accent-rgb),.16)}
+.wiki-thinking-collect-ghost.is-collecting{animation:wikiThinkingCollectGhost .9s linear forwards}
+.wiki-thinking-collect-ghost .rs-wiki-status{padding-bottom:7px}.wiki-thinking-collect-ghost .rs-wiki-content{padding-top:9px;scroll-behavior:auto}.wiki-thinking-collect-ghost .rs-wiki-thinking-list{flex:1;min-height:0;overflow:hidden}
+.wiki-thinking-collect-ghost::after{content:'';position:absolute;inset:-18%;z-index:5;border-radius:inherit;background:radial-gradient(circle at center,rgba(var(--accent-soft-rgb),.46),rgba(var(--accent-rgb),.16) 40%,rgba(var(--accent-rgb),0) 72%);opacity:.22;pointer-events:none;will-change:transform,opacity}
+.wiki-thinking-collect-ghost.is-collecting::after{animation:wikiThinkingCollectHalo .9s ease-in forwards}
+@keyframes wikiThinkingCollectGhost{0%{opacity:.98;transform:translate3d(0,0,0) scale(1)}100%{opacity:0;transform:translate3d(var(--wiki-thinking-collect-x,0px),var(--wiki-thinking-collect-y,0px),0) scale(var(--wiki-thinking-collect-scale,.08))}}
+@keyframes wikiThinkingCollectHalo{0%,18%{opacity:.18;transform:scale(.9)}54%{opacity:.72;transform:scale(1.08)}100%{opacity:0;transform:scale(.42)}}
 .rs-meta-view{display:none;flex-direction:column;width:100%;flex:1;opacity:0;transition:opacity .3s;min-height:0;overflow:hidden}
 .rs-meta-view.show{display:flex;opacity:1}
 .rs-meta-list{flex:1;overflow-y:auto;padding:4px;min-height:0}
@@ -5144,17 +5160,17 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
       <div class="rs-row-divider rs-bottom-header" id="rsWikiHeader">
         <div class="rs-row-title">
           <span id="rsWikiTitle">知识库WIKI</span>
+          <span class="rs-wiki-last-refresh" id="rsWikiLastRefresh">最近刷新 --</span>
           <div class="rs-wiki-header-meta">
-            <span class="rs-wiki-last-refresh" id="rsWikiLastRefresh">最近刷新 --</span>
-            <button type="button" class="rs-wiki-refresh" id="rsWikiRefreshBtn" title="刷新知识库WIKI" aria-label="刷新知识库WIKI" onclick="rsRefreshWikiPanel()">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.13-3.36L23 10M1 14l5.36 4.36A9 9 0 0020.49 15"/></svg>
+            <button type="button" class="rs-wiki-auto-toggle off" id="rsWikiAutoToggle" role="switch" aria-checked="false" title="自动整理知识库WIKI：关闭" aria-label="自动整理知识库WIKI：关闭" onclick="toggleWikiAutoTidy(event)">
+              <span class="rs-wiki-auto-label">自动</span>
+              <span class="rs-wiki-auto-track" aria-hidden="true"><span class="rs-wiki-auto-thumb"></span></span>
             </button>
             <button type="button" class="rs-wiki-tidy-btn" id="rsWikiTidyBtn" title="整理知识库WIKI" aria-label="整理知识库WIKI" onclick="toggleWikiTidyPopover(event)">
               <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 21h6v-1H9v1Zm3-20a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-3.26A7 7 0 0 0 12 1Zm2.59 11.29-.59.42V16h-4v-3.29l-.59-.42a5 5 0 1 1 5.18 0Z"/></svg>
             </button>
-            <button type="button" class="rs-wiki-auto-toggle off" id="rsWikiAutoToggle" role="switch" aria-checked="false" title="自动整理知识库WIKI：关闭" aria-label="自动整理知识库WIKI：关闭" onclick="toggleWikiAutoTidy(event)">
-              <span class="rs-wiki-auto-label">自动</span>
-              <span class="rs-wiki-auto-track" aria-hidden="true"><span class="rs-wiki-auto-thumb"></span></span>
+            <button type="button" class="rs-wiki-refresh" id="rsWikiRefreshBtn" title="刷新知识库WIKI" aria-label="刷新知识库WIKI" onclick="rsRefreshWikiPanel()">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.13-3.36L23 10M1 14l5.36 4.36A9 9 0 0020.49 15"/></svg>
             </button>
           </div>
         </div>
@@ -7812,6 +7828,10 @@ let workingIndicatorState = {
 };
 let preflightTimers = {};
 let restorePolling = {};
+// A cancellation can be initiated locally just before the browser reloads.
+// Keep the server-confirmation phase separate from the SSE reader so it can
+// survive a reload and the next page can finish the cancel request.
+let chatCancellationRecovery = {};
 let liveCliEventPolling = {};
 let restoreReloadQueue = {};
 let chatConversationMutationTokens = {};
@@ -7944,6 +7964,7 @@ let modelKeyHintPreviewState = {
 let messageRenderCache = new Map();
 let wikiRenderCache = new Map();
 let wikiSidebarPresentation = { mode: 'wiki', signature: '' };
+let wikiThinkingExpandedState = { byChat: Object.create(null) };
 let limitToastTimer = null;
 let modelSelectToastTimer = null;
 let modelSelectToastGuideTimer = null;
@@ -13856,6 +13877,10 @@ function setCliSubPanelExpanded(nextExpanded) {
     const wikiState = ensureWikiPanelState();
     if (wikiState.expanded) {
       wikiState.expanded = false;
+      renderWikiPanel();
+    }
+    if (isWikiThinkingPanelExpanded()) {
+      wikiThinkingExpandedState.byChat[String(state.activeChat || '').trim()] = false;
       renderWikiPanel();
     }
   }
@@ -25122,6 +25147,9 @@ async function init() {
   renderQuickFanMenu();
   updateStandaloneButton();
   finalizeBootShell();
+  // Resume cancellation confirmations before secondary boot work. This closes
+  // the reload window between locally stopping a stream and reaching /api/cancel.
+  resumePendingChatCancellationConfirmations();
   releaseBootLoadingOverlay();
   startChatListSync();
   startLocalStorageMaintenance();
@@ -25759,6 +25787,59 @@ function getActiveChatThinkingSnapshots() {
   return { chatId, snapshots };
 }
 
+function isWikiThinkingPanelExpanded() {
+  const activeChatId = String(state.activeChat || '').trim();
+  return !!(activeChatId && wikiThinkingExpandedState.byChat[activeChatId] === true);
+}
+
+function syncWikiThinkingExpandedState(showingThinking, chatId) {
+  const rightSidebar = document.getElementById('rightSidebar');
+  const activeChatId = String(state.activeChat || '').trim();
+  const belongsToActiveChat = !!(
+    showingThinking &&
+    activeChatId &&
+    String(chatId || '').trim() === activeChatId
+  );
+  const shouldCollapse = isWikiThinkingPanelExpanded() && (
+    !belongsToActiveChat ||
+    isRightSidebarCollapsed() ||
+    isCliSubPanelExpanded()
+  );
+  if (shouldCollapse) {
+    wikiThinkingExpandedState.byChat[activeChatId] = false;
+  }
+  const expanded = !!(belongsToActiveChat && isWikiThinkingPanelExpanded());
+  if (rightSidebar) rightSidebar.classList.toggle('wiki-thinking-expanded', expanded);
+  return expanded;
+}
+
+function setWikiThinkingPanelExpanded(nextExpanded) {
+  const next = !!nextExpanded;
+  const activeChatId = String(state.activeChat || '').trim();
+  if (next && (!activeChatId || isRightSidebarCollapsed() || !isChatSseResponsePending(activeChatId))) return false;
+  const changed = isWikiThinkingPanelExpanded() !== next;
+  if (!changed) return true;
+  if (next && isCliSubPanelExpanded()) setCliSubPanelExpanded(false);
+  if (next) wikiThinkingExpandedState.byChat[activeChatId] = true;
+  else wikiThinkingExpandedState.byChat[activeChatId] = false;
+  renderWikiPanel();
+  scheduleLayoutSync();
+  return true;
+}
+
+function toggleWikiThinkingExpanded(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  return setWikiThinkingPanelExpanded(!isWikiThinkingPanelExpanded());
+}
+
+function wikiThinkingExpandButtonHtml(expanded) {
+  const label = expanded ? '收起思考展示' : '展开思考展示';
+  return '<button type="button" class="rs-wiki-refresh rs-wiki-thinking-expand" title="' + label + '" aria-label="' + label + '" aria-pressed="' + (expanded ? 'true' : 'false') + '" onclick="toggleWikiThinkingExpanded(event)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.13-3.36L23 10M1 14l5.36 4.36A9 9 0 0020.49 15"/></svg></button>';
+}
+
 function restoreWikiContentAfterThinking(contentEl, wikiState) {
   if (!contentEl || !wikiState || !wikiState.lastRenderedHtml) return false;
   contentEl.innerHTML = wikiState.lastRenderedHtml;
@@ -25785,10 +25866,21 @@ function renderWikiPanel() {
   const wikiState = ensureWikiPanelState();
   const thinkingState = getActiveChatThinkingSnapshots();
   const showingThinking = !!thinkingState;
+  const thinkingChatId = String(thinkingState && thinkingState.chatId || '').trim();
+  const enteringThinking = showingThinking && wikiSidebarPresentation.mode !== 'thinking';
+  if (
+    enteringThinking &&
+    wikiState.expanded &&
+    thinkingChatId &&
+    !Object.prototype.hasOwnProperty.call(wikiThinkingExpandedState.byChat, thinkingChatId)
+  ) {
+    wikiThinkingExpandedState.byChat[thinkingChatId] = true;
+  }
+  const thinkingExpanded = syncWikiThinkingExpandedState(showingThinking, thinkingState && thinkingState.chatId);
   const agentRefreshAt = getWikiLastRefreshAt();
   wikiState.lastRefreshAt = agentRefreshAt;
   wikiState.staleDismissedAt = getWikiStaleDismissedAt();
-  rightSidebar.classList.toggle('wiki-expanded', !!wikiState.expanded);
+  rightSidebar.classList.toggle('wiki-expanded', !!wikiState.expanded && !showingThinking);
   rightSidebar.classList.toggle('wiki-thinking', showingThinking);
   if (showingThinking) {
     const snapshots = thinkingState.snapshots;
@@ -25796,7 +25888,7 @@ function renderWikiPanel() {
     titleEl.textContent = '知识库WIKI';
     lastRefreshEl.textContent = '当前响应中';
     statusEl.classList.add('is-thinking');
-    breadcrumbEl.innerHTML = '<div class="rs-wiki-thinking-status">正在思考</div>';
+    breadcrumbEl.innerHTML = '<div class="rs-wiki-thinking-status"><span class="rs-wiki-thinking-label">正在思考</span>' + wikiThinkingExpandButtonHtml(thinkingExpanded) + '</div>';
     if (wikiSidebarPresentation.mode !== 'thinking' || wikiSidebarPresentation.signature !== signature || contentEl.dataset.presentation !== 'thinking') {
       contentEl.innerHTML = snapshots.length
         ? '<div class="rs-wiki-thinking-list">' + assistantExplosionBeaconListHtml(snapshots) + '</div>'
@@ -29642,11 +29734,16 @@ function getLastNonErrorAssistantMessage(chat) {
 
 function isAssistantCancelledMessage(msg) {
   const content = normalizeMessageText(msg ? msg.content : '');
-  return !!(msg && msg.role === 'assistant' && !msg.error && (msg.cancelMarker || content === '已取消' || content === '未发送'));
+  return !!(msg && msg.role === 'assistant' && !msg.error && (
+    msg.cancelMarker ||
+    content === '已取消' ||
+    content === '未发送' ||
+    content === '已取消（请求尚未开始）'
+  ));
 }
 
 function getCancellationMessageText(cancelState) {
-  return cancelState === 'not_sent' ? '未发送' : '已取消';
+  return cancelState === 'not_sent' ? '已取消（请求尚未开始）' : '已取消';
 }
 
 function getMessageAgentId(message) {
@@ -29859,6 +29956,32 @@ function setChatPendingRequest(chatId, pending, requestTs) {
   saveChats();
 }
 
+function isChatCancellationConfirmationPending(chatId, chat) {
+  const resolvedChatId = String(chatId || '').trim();
+  const targetChat = chat || state.chats[resolvedChatId];
+  return !!(targetChat && targetChat.cancelConfirmationPending);
+}
+
+function markChatCancellationConfirmationPending(chatId, requestedAt) {
+  const resolvedChatId = String(chatId || '').trim();
+  const chat = state.chats[resolvedChatId];
+  if (!chat) return false;
+  const nextRequestedAt = toChatTimestamp(requestedAt || new Date()) || toChatTimestamp(new Date());
+  const previousRequestedAt = String(chat.cancelConfirmationPendingAt || '').trim();
+  chat.cancelConfirmationPending = true;
+  chat.cancelConfirmationPendingAt = previousRequestedAt || nextRequestedAt;
+  return !previousRequestedAt;
+}
+
+function clearChatCancellationConfirmationPending(chatId) {
+  const resolvedChatId = String(chatId || '').trim();
+  const chat = state.chats[resolvedChatId];
+  if (!chat || !isChatCancellationConfirmationPending(resolvedChatId, chat)) return false;
+  delete chat.cancelConfirmationPending;
+  delete chat.cancelConfirmationPendingAt;
+  return true;
+}
+
 function isChatRestorePolling(chatId) {
   const poll = restorePolling[chatId];
   return !!(poll && poll.active);
@@ -29866,7 +29989,7 @@ function isChatRestorePolling(chatId) {
 
 function isChatBusy(chatId) {
   const cs = chatStreaming[chatId];
-  return !!(cs && cs.streaming) || isChatRestorePolling(chatId);
+  return !!(cs && cs.streaming) || isChatRestorePolling(chatId) || isChatCancellationConfirmationPending(chatId);
 }
 
 function hasGlobalPendingSseResponse() {
@@ -29880,7 +30003,7 @@ function hasGlobalPendingSseResponse() {
     const pollState = restorePolling[key];
     if (pollState && pollState.active) return true;
   }
-  return false;
+  return Object.keys(state.chats || {}).some(chatId => isChatCancellationConfirmationPending(chatId));
 }
 
 function syncGlobalStreamingVisualState() {
@@ -29892,7 +30015,7 @@ function syncGlobalStreamingVisualState() {
 function isChatCancelling(chatId) {
   const cs = chatStreaming[chatId];
   const poll = restorePolling[chatId];
-  return !!((cs && cs.cancelling) || (poll && poll.cancelling));
+  return !!((cs && cs.cancelling) || (poll && poll.cancelling) || isChatCancellationConfirmationPending(chatId));
 }
 
 function getChatExecutionPhase(chatId) {
@@ -29900,6 +30023,7 @@ function getChatExecutionPhase(chatId) {
   if (cs && cs.streaming) return cs.phase === 'stream' ? 'stream' : 'preflight';
   const poll = restorePolling[chatId];
   if (poll && poll.active) return 'stream';
+  if (isChatCancellationConfirmationPending(chatId)) return 'cancel';
   const preflight = preflightTimers[chatId];
   if (preflight && preflight.mode === 'send' && preflight.deadline > Date.now()) return 'preflight';
   return '';
@@ -31760,7 +31884,7 @@ function syncActiveChatAsyncControls() {
   }
   const busy = isChatBusy(activeChatId);
   showWorking(isChatSseResponsePending(activeChatId));
-  showPreflight(!!preflightTimers[activeChatId]);
+  showPreflight(!!preflightTimers[activeChatId] || isChatCancellationConfirmationPending(activeChatId));
   syncQueuedCenterInputUI(activeChatId);
   syncCenterComposerState(activeChatId, { flashSend: !busy });
   syncVisibleMessageRetryButtons(activeChatId);
@@ -31802,6 +31926,9 @@ function stopChatRestorePolling(chatId) {
 function shouldResumeChatPolling(chatId) {
   const chat = state.chats[chatId];
   if (!chat || !chat.pendingRequest || !chat.lastRequestAt) return false;
+  // A locally-cancelled request has its own recovery path. Do not replay its
+  // response while we are still trying to deliver the cancellation upstream.
+  if (isChatCancellationConfirmationPending(chatId, chat)) return false;
   if (isRestoreSkippedAfterAbnormal(chatId, chat)) return false;
   const cs = chatStreaming[chatId];
   if (cs && cs.streaming) return false;
@@ -32226,6 +32353,7 @@ function switchChat(id) {
     const useColdHistoryRestore = !!(state.chats[id] && shouldUseColdHistoryRestore(id));
     const hasLiveChatStream = !!(chatStreaming[id] && chatStreaming[id].streaming);
     const shouldResumeRestorePolling = shouldResumeChatPolling(id);
+    const hasPendingCancellationConfirmation = isChatCancellationConfirmationPending(id);
     const useSessionRestoreLock = !!(
       state.chats[id] &&
       shouldLockChatRestoreOnSwitch(id) &&
@@ -32286,12 +32414,13 @@ function switchChat(id) {
     refreshChatSandboxStatus(id, { agentId: getChatAgentId(id), toastOnError: false }).catch(() => {});
     rsInitNote();
     refreshCronViews({ force: agentChanged });
-    if (shouldResumeRestorePolling) ensureChatRestorePolling(id);
+    if (hasPendingCancellationConfirmation) ensurePendingChatCancellationConfirmation(id);
+    else if (shouldResumeRestorePolling) ensureChatRestorePolling(id);
     else stopChatRestorePolling(id);
     updateChatAsyncUI(id);
     if (vfsCurrentPath) vfsRefresh();
     clearRestoreNoDataTip(id);
-    if (!hasLiveChatStream && !shouldResumeRestorePolling) {
+    if (!hasLiveChatStream && !shouldResumeRestorePolling && !hasPendingCancellationConfirmation) {
       scheduleSwitchedChatAutoReload(id, {
         delayMs: 120,
         holdUiLockDesc: useSessionRestoreLock ? '正在恢复会话内容' : ''
@@ -33388,6 +33517,77 @@ function playStreamingTypeSwapBurst(msgEl) {
   }, timing.cleanupMs);
 }
 
+function captureWikiThinkingCollectionAnimation(chatId, options = {}) {
+  if (!options.completedNormally || String(state.activeChat || '').trim() !== String(chatId || '').trim()) return null;
+  const thinkingState = getActiveChatThinkingSnapshots();
+  if (!thinkingState || !thinkingState.snapshots.length) return null;
+  const panel = document.getElementById('rsWikiPanel');
+  const list = panel && panel.querySelector('.rs-wiki-thinking-list');
+  if (!panel) return null;
+  const rect = panel.getBoundingClientRect();
+  if (!(rect.width > 0) || !(rect.height > 0)) return null;
+  const ghost = panel.cloneNode(true);
+  ghost.removeAttribute('id');
+  ghost.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
+  ghost.classList.add('wiki-thinking-collect-ghost');
+  if (!list || !list.children.length) {
+    const ghostContent = ghost.querySelector('.rs-wiki-content');
+    if (ghostContent) {
+      ghostContent.innerHTML = '<div class="rs-wiki-thinking-list">' + assistantExplosionBeaconListHtml(thinkingState.snapshots) + '</div>';
+    }
+  }
+  ghost.style.left = Math.round(rect.left) + 'px';
+  ghost.style.top = Math.round(rect.top) + 'px';
+  ghost.style.width = Math.max(1, Math.round(rect.width)) + 'px';
+  ghost.style.height = Math.max(1, Math.round(rect.height)) + 'px';
+  const content = panel.querySelector('.rs-wiki-content');
+  return {
+    chatId: String(chatId || '').trim(),
+    ghost,
+    rect,
+    scrollTop: content ? content.scrollTop : 0
+  };
+}
+
+const WIKI_THINKING_COLLECTION_ANIMATION_MS = 900;
+
+function playWikiThinkingCollectionAnimation(capture) {
+  if (!capture || String(capture.chatId || '').trim() !== String(state.activeChat || '').trim()) return false;
+  const target = document.querySelector('#chatContainer .message-thinking-btn.is-lit') || document.querySelector('#chatContainer .message-thinking-btn');
+  if (!target || !target.isConnected) return false;
+  const targetRect = target.getBoundingClientRect();
+  const sourceRect = capture.rect;
+  if (!(targetRect.width > 0) || !(targetRect.height > 0) || !sourceRect) return false;
+  const sourceCenterX = sourceRect.left + (sourceRect.width / 2);
+  const sourceCenterY = sourceRect.top + (sourceRect.height / 2);
+  const targetCenterX = targetRect.left + (targetRect.width / 2);
+  const targetCenterY = targetRect.top + (targetRect.height / 2);
+  const moveX = targetCenterX - sourceCenterX;
+  const moveY = targetCenterY - sourceCenterY;
+  const scale = Math.max(.035, Math.min(.12, Math.min(targetRect.width, targetRect.height) / Math.max(sourceRect.width, sourceRect.height)));
+  const ghost = capture.ghost;
+  if (!ghost) return false;
+  ghost.style.setProperty('--wiki-thinking-collect-x', moveX.toFixed(1) + 'px');
+  ghost.style.setProperty('--wiki-thinking-collect-y', moveY.toFixed(1) + 'px');
+  ghost.style.setProperty('--wiki-thinking-collect-scale', scale.toFixed(3));
+  document.body.appendChild(ghost);
+  const ghostContent = ghost.querySelector('.rs-wiki-content');
+  if (ghostContent) ghostContent.scrollTop = capture.scrollTop || 0;
+  target.classList.remove('wiki-thinking-collected');
+  void target.offsetWidth;
+  target.classList.add('wiki-thinking-collected');
+  requestAnimationFrame(() => {
+    if (!ghost.isConnected) return;
+    void ghost.offsetWidth;
+    ghost.classList.add('is-collecting');
+  });
+  window.setTimeout(() => {
+    target.classList.remove('wiki-thinking-collected');
+    if (ghost.parentNode) ghost.remove();
+  }, WIKI_THINKING_COLLECTION_ANIMATION_MS + 320);
+  return true;
+}
+
 function releaseStreamingTypeSwapHold(streamKey) {
   const stateItem = streamRenderQueue[streamKey];
   if (!stateItem) return;
@@ -33582,7 +33782,7 @@ function messageActionsHtml(m) {
     actions.push(messageCopyButtonHtml(m));
   } else {
     actions.push(messageCopyButtonHtml(m));
-    if (shouldShowAssistantThinkingButton(m)) actions.push(messageThinkingButtonHtml());
+    if (shouldShowAssistantThinkingButton(m)) actions.push(messageThinkingButtonHtml(m));
   }
   return `<div class="message-actions">${actions.join('')}</div>`;
 }
@@ -33606,8 +33806,9 @@ function messageCopyButtonHtml(m) {
   return `<button type="button" class="message-copy-btn" data-copy-text="${text}" onclick="copyCenterMessage(event)" title="复制" aria-label="复制"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M6.55 1.2a.7.7 0 0 0-.7.7v.35h-1.2a1.1 1.1 0 0 0-1.1 1.1v3.9c0 .61.49 1.1 1.1 1.1h3.2a1.1 1.1 0 0 0 1.1-1.1v-3.9a1.1 1.1 0 0 0-1.1-1.1h-1.2V1.9a.7.7 0 0 0-.7-.7h-.7Zm0 .7h.7v.7h-.7v-.7Zm-1.9 1.4h3.2a.4.4 0 0 1 .4.4v3.9a.4.4 0 0 1-.4.4h-3.2a.4.4 0 0 1-.4-.4v-3.9a.4.4 0 0 1 .4-.4ZM2.3 4.05a.35.35 0 0 1 .35.35v3.5c0 .08.07.15.15.15h3.5a.35.35 0 1 1 0 .7H2.8c-.47 0-.85-.38-.85-.85V4.4a.35.35 0 0 1 .35-.35Zm5.45-2.65.19.66.66.19-.66.19-.19.66-.19-.66-.66-.19.66-.19.19-.66Z"></path></svg></button>`;
 }
 
-function messageThinkingButtonHtml() {
-  return `<button type="button" class="message-thinking-btn" onclick="openLatestAssistantThinkingModal(event)" title="查看思考过程" aria-label="查看思考过程"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6"></path><path d="M10 21h4"></path><path d="M12 3a6 6 0 0 0-3.87 10.58c.77.67 1.37 1.5 1.68 2.42h4.38c.31-.92.91-1.75 1.68-2.42A6 6 0 0 0 12 3Z"></path></svg></button>`;
+function messageThinkingButtonHtml(message) {
+  const lit = message && message.hadThinkingSnapshots === true ? ' is-lit' : '';
+  return `<button type="button" class="message-thinking-btn${lit}" onclick="openLatestAssistantThinkingModal(event)" title="查看思考过程" aria-label="查看思考过程"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6"></path><path d="M10 21h4"></path><path d="M12 3a6 6 0 0 0-3.87 10.58c.77.67 1.37 1.5 1.68 2.42h4.38c.31-.92.91-1.75 1.68-2.42A6 6 0 0 0 12 3Z"></path></svg></button>`;
 }
 
 function unwrapStructuredResultSource(text) {
@@ -37651,10 +37852,10 @@ function extractRestoreAbnormalErrorText(raw) {
   const text = String(raw || '').trim();
   if (!text) return '服务端返回错误';
   if (!isLikelyStructuredPayloadText(text)) {
+    if (/\bcontext canceled\b/i.test(text)) return '已取消';
     const interrupted = /^SSE\s+stream\s+interrupted(?:\s*:\s*(.+))?$/i.exec(text);
     if (interrupted) {
-      const detail = String(interrupted[1] || '').trim();
-      return detail ? `网络异常，请稍后重试（${detail}）` : '网络异常，请稍后重试';
+      return '连接已中断，请重试';
     }
     return text;
   }
@@ -39164,7 +39365,7 @@ async function sendCenterMessage(rawText, options) {
     } else if (isUnloadDisconnect) {
       removeEmptyStreamingEntries();
     } else {
-      renderAssistantErrorState('网络异常，请重试', fallbackEntry);
+      renderAssistantErrorState('连接已中断，请重试', fallbackEntry);
     }
     if (!isCancelling && !isUnloadDisconnect) finishStreamingFor(chatId);
     saveChats();
@@ -39179,7 +39380,12 @@ async function stopStreaming() {
   const chatId = state.activeChat;
   const cs = chatStreaming[chatId];
   const poll = restorePolling[chatId];
-  if ((!cs || !cs.streaming) && (!poll || !poll.active)) return;
+  const awaitingCancelConfirmation = isChatCancellationConfirmationPending(chatId);
+  if ((!cs || !cs.streaming) && (!poll || !poll.active) && !awaitingCancelConfirmation) return;
+  if (awaitingCancelConfirmation) {
+    ensurePendingChatCancellationConfirmation(chatId);
+    return;
+  }
   if ((cs && cs.cancelling) || (poll && poll.cancelling)) return;
   // `requestDispatched` flips immediately before fetch. Treat pre-existing
   // stream states without this field as dispatched so a hot reload cannot
@@ -39190,6 +39396,10 @@ async function stopStreaming() {
   const preflight = preflightTimers[chatId];
   const nowTs = toChatTimestamp(new Date());
   markChatRequestCancelled(chatId, nowTs, requestDispatched ? 'cancelled' : 'not_sent', cs && cs.requestMessage);
+  // Persist this before aborting the reader. A reload at this point used to
+  // lose the delayed /api/cancel call and leave the server-side task running.
+  if (requestDispatched) markChatCancellationConfirmationPending(chatId, nowTs);
+  saveChats();
   // Cancellation is terminal for the visible SSE lifecycle even while the
   // best-effort server-side cancel request is still being acknowledged.
   updateChatAsyncUI(chatId);
@@ -39220,30 +39430,94 @@ async function stopStreaming() {
   const indicator = document.getElementById('workingIndicator');
   indicator.classList.add('burst');
   setTimeout(() => { indicator.classList.remove('burst'); }, 500);
-  await new Promise(resolve => setTimeout(resolve, 3000));
-  if (chatId) await requestChatCancel(chatId);
+  // Send immediately; the preflight indicator remains responsible for the
+  // visual transition, but it must not delay delivery of the cancel signal.
+  const cancelConfirmed = chatId ? await requestChatCancel(chatId, { awaitConnection: true }) : true;
+  if (cancelConfirmed) clearChatCancellationConfirmationPending(chatId);
   stopChatRestorePolling(chatId);
   delete preflightTimers[chatId];
   showPreflight(false);
   finishStreamingFor(chatId);
-  vfsShowUploadToast('取消成功', false);
+  if (cancelConfirmed) {
+    vfsShowUploadToast('取消成功', false);
+  } else {
+    ensurePendingChatCancellationConfirmation(chatId);
+    vfsShowUploadToast('取消请求正在重试', true);
+  }
 }
 
-async function requestChatCancel(chatId) {
-  for (let i = 0; i < 8; i++) {
+async function requestChatCancel(chatId, options) {
+  const opts = options || {};
+  const attempts = Math.max(1, Number(opts.attempts) || 8);
+  const retryDelayMs = Math.max(0, Number(opts.retryDelayMs) || 150);
+  const awaitConnection = !!opts.awaitConnection;
+  let acceptedWithoutConnection = false;
+  for (let i = 0; i < attempts; i++) {
     try {
       const resp = await fetchExecApi('/api/cancel?chat=' + encodeURIComponent(chatId), { method: 'POST' });
       let data = {};
       try { data = await resp.json(); } catch {}
-      if (resp.ok && data && data.status === 0) return true;
+      if (resp.ok && data && data.status === 0) {
+        const hasCancellationState = Object.prototype.hasOwnProperty.call(data, 'cancelled');
+        if (!awaitConnection || !hasCancellationState || data.cancelled === true) return true;
+        // The stream request may have crossed the network just after this
+        // cancel request. Keep a short retry window instead of declaring the
+        // task stopped before the proxy has registered its connection.
+        acceptedWithoutConnection = true;
+      }
     } catch {}
-    if (i < 7) await new Promise(resolve => setTimeout(resolve, 150));
+    if (i < attempts - 1) await new Promise(resolve => setTimeout(resolve, retryDelayMs));
   }
-  return false;
+  // The proxy accepted every cancellation attempt but never observed an
+  // active connection, so the original request did not reach it.
+  return acceptedWithoutConnection;
+}
+
+function ensurePendingChatCancellationConfirmation(chatId) {
+  const resolvedChatId = String(chatId || '').trim();
+  if (!resolvedChatId || !isChatCancellationConfirmationPending(resolvedChatId)) return Promise.resolve(false);
+  const activeRecovery = chatCancellationRecovery[resolvedChatId];
+  if (activeRecovery && activeRecovery.promise) return activeRecovery.promise;
+  const recovery = { promise: null };
+  chatCancellationRecovery[resolvedChatId] = recovery;
+  syncGlobalStreamingVisualState();
+  updateChatAsyncUI(resolvedChatId);
+  recovery.promise = (async () => {
+    let confirmed = false;
+    try {
+      confirmed = await requestChatCancel(resolvedChatId, { awaitConnection: true });
+      if (!confirmed) return false;
+      clearChatCancellationConfirmationPending(resolvedChatId);
+      saveChats();
+      if (state.activeChat === resolvedChatId) renderMessages({ forceScroll: true });
+      renderChatList();
+      return true;
+    } finally {
+      if (chatCancellationRecovery[resolvedChatId] === recovery) delete chatCancellationRecovery[resolvedChatId];
+      syncGlobalStreamingVisualState();
+      updateChatAsyncUI(resolvedChatId);
+      // Keep the persisted marker when the endpoint is temporarily
+      // unavailable. It will be retried here and again after a reload.
+      if (!confirmed && !pageUnloading && isChatCancellationConfirmationPending(resolvedChatId)) {
+        setTimeout(() => ensurePendingChatCancellationConfirmation(resolvedChatId), 1200);
+      }
+    }
+  })();
+  return recovery.promise;
+}
+
+function resumePendingChatCancellationConfirmations() {
+  Object.keys(state.chats || {}).forEach(chatId => {
+    if (isChatCancellationConfirmationPending(chatId)) {
+      void ensurePendingChatCancellationConfirmation(chatId);
+    }
+  });
 }
 
 function finishStreamingFor(chatId, options) {
   const completedNormally = !!(options && options.completedNormally === true);
+  const wikiThinkingCollection = captureWikiThinkingCollectionAnimation(chatId, { completedNormally });
+  delete wikiThinkingExpandedState.byChat[String(chatId || '').trim()];
   void performLiveCliEventPoll(chatId).catch(() => {});
   stopLiveCliEventPolling(chatId);
   const streamState = chatStreaming[chatId];
@@ -39349,6 +39623,11 @@ function finishStreamingFor(chatId, options) {
   renderChatList();
   resetSkillExtractDraftState();
   updateChatAsyncUI(chatId);
+  if (wikiThinkingCollection) {
+    requestAnimationFrame(() => {
+      playWikiThinkingCollectionAnimation(wikiThinkingCollection);
+    });
+  }
   const skillIndicatorAgentId = getChatAgentId(chatId);
   if (requestSource === 'skill_extract') {
     resetChatSkillIndicator(chatId, { agentId: skillIndicatorAgentId });
@@ -39385,8 +39664,9 @@ function showPreflight(show, mode) {
   if (!el) return;
   const active = state.activeChat;
   const preflight = active ? preflightTimers[active] : null;
-  const visible = !!show && !!preflight && preflight.deadline > Date.now();
-  const type = mode || (preflight && preflight.mode) || 'send';
+  const awaitingCancelConfirmation = !!(active && isChatCancellationConfirmationPending(active));
+  const visible = !!show && (awaitingCancelConfirmation || (!!preflight && preflight.deadline > Date.now()));
+  const type = mode || (preflight && preflight.mode) || (awaitingCancelConfirmation ? 'cancel' : 'send');
   el.classList.toggle('cancel', type === 'cancel');
   el.classList.toggle('show', visible);
   refreshOverlayStates();
@@ -40917,7 +41197,7 @@ function reviveCancelledAssistantForReplay(msg) {
   const cancelledContent = normalizeMessageText(msg.content);
   delete msg.cancelMarker;
   delete msg.cancelState;
-  if (cancelledContent === '已取消' || cancelledContent === '未发送') msg.content = '';
+  if (cancelledContent === '已取消' || cancelledContent === '未发送' || cancelledContent === '已取消（请求尚未开始）') msg.content = '';
   msg.streamStatus = '等待';
   return msg;
 }
@@ -55118,6 +55398,16 @@ document.addEventListener('mousedown', e => {
 
 // ===== Navigation Prevention =====
 // Block page unload (back, close, refresh)
+function sendPendingChatCancellationBeacons() {
+  if (!navigator || typeof navigator.sendBeacon !== 'function') return;
+  Object.keys(state.chats || {}).forEach(chatId => {
+    if (!isChatCancellationConfirmationPending(chatId)) return;
+    const base = getExecApiBase();
+    const url = (base || '') + '/api/cancel?chat=' + encodeURIComponent(chatId);
+    try { navigator.sendBeacon(url, new Blob([], { type: 'application/json' })); } catch {}
+  });
+}
+
 function handleBeforeUnload(e) {
   pageUnloading = true;
   if (allowIntentionalWindowClose) return;
@@ -55126,7 +55416,10 @@ function handleBeforeUnload(e) {
   return '';
 }
 window.addEventListener('beforeunload', handleBeforeUnload);
-window.addEventListener('pagehide', () => { pageUnloading = true; });
+window.addEventListener('pagehide', () => {
+  pageUnloading = true;
+  sendPendingChatCancellationBeacons();
+});
 // Block browser back/forward — use hash-based approach to prevent any page reload
 (function() {
   function lockHash() { if (location.hash !== '#app') location.hash = '#app'; }

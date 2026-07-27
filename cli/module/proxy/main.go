@@ -8951,15 +8951,7 @@ func detectResponseType(content string) string {
 }
 
 func buildSSEStreamInterruptedContent(err error) string {
-	const userMessage = "网络异常，请稍后重试"
-	if err == nil {
-		return userMessage
-	}
-	detail := strings.TrimSpace(err.Error())
-	if detail == "" {
-		return userMessage
-	}
-	return fmt.Sprintf("%s（%s）", userMessage, detail)
+	return "连接已中断，请重试"
 }
 
 func queueSSEStreamInterruptedLog(ch chan chatMsg, err error) bool {
@@ -10102,6 +10094,12 @@ func (p *ProxyServer) HandleChatCompletions(w http.ResponseWriter, r *http.Reque
 			connMu.Unlock()
 		}
 		cancel()
+		// /api/cancel may arrive while the upstream HTTP request is still
+		// connecting. Its X marker is the user-facing result; do not add an
+		// unrelated forwarding failure to the conversation history.
+		if errors.Is(ctx.Err(), context.Canceled) || errors.Is(err, context.Canceled) {
+			return
+		}
 		if chatID != "" {
 			appendChatLog(chatAgentID, chatID, chatType, "A", "abnormal", "Failed to forward request: "+err.Error())
 		}
