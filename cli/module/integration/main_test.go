@@ -4906,6 +4906,74 @@ func TestCleanupIntegrationAgentTmpPacksMergesAndClears(t *testing.T) {
 	}
 }
 
+func TestCleanupIntegrationAgentTmpAlsoCleansMediaAndCanvasDirectories(t *testing.T) {
+	now := time.Date(2026, 7, 25, 12, 0, 0, 0, time.UTC)
+	agentRoot := filepath.Join(t.TempDir(), "agents")
+	workspace := filepath.Join(agentRoot, "agent-a")
+
+	writeAt := func(path string, modTime time.Time) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatalf("mkdir parent %s: %v", path, err)
+		}
+		if err := os.WriteFile(path, []byte("content"), 0o644); err != nil {
+			t.Fatalf("write %s: %v", path, err)
+		}
+		if err := os.Chtimes(path, modTime, modTime); err != nil {
+			t.Fatalf("chtimes %s: %v", path, err)
+		}
+	}
+
+	for _, directory := range []string{"images", "videos", "audios", "canvas"} {
+		root := filepath.Join(workspace, directory)
+		writeAt(filepath.Join(root, "old", "asset"), now.Add(-48*time.Hour))
+		writeAt(filepath.Join(root, "fresh", "asset"), now.Add(-2*time.Hour))
+		writeAt(filepath.Join(root, "bak", "remove", "asset"), now.Add(-96*time.Hour))
+	}
+
+	summary, err := cleanupIntegrationAgentTmp(agentRoot, now, integrationTempCleanupConfig{
+		PackAfter:  24 * time.Hour,
+		ClearAfter: 72 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("cleanupIntegrationAgentTmp: %v", err)
+	}
+	if summary.AgentCount != 1 {
+		t.Fatalf("agent count = %d, want 1", summary.AgentCount)
+	}
+
+	seenDirectories := make(map[string]bool)
+	for _, directory := range []string{"images", "videos", "audios", "canvas"} {
+		root := filepath.Join(workspace, directory)
+		for _, path := range []string{
+			filepath.Join(root, "bak", "old", "asset"),
+			filepath.Join(root, "fresh", "asset"),
+		} {
+			if _, err := os.Stat(path); err != nil {
+				t.Fatalf("expected %s to remain, err=%v", path, err)
+			}
+		}
+		for _, path := range []string{
+			filepath.Join(root, "old"),
+			filepath.Join(root, "bak", "remove"),
+		} {
+			if _, err := os.Stat(path); !os.IsNotExist(err) {
+				t.Fatalf("expected %s to be gone, err=%v", path, err)
+			}
+		}
+	}
+	for _, event := range summary.Events {
+		if event.Action == "pack" || event.Action == "clear" {
+			seenDirectories[event.Directory] = true
+		}
+	}
+	for _, directory := range []string{"images", "videos", "audios", "canvas"} {
+		if !seenDirectories[directory] {
+			t.Fatalf("expected cleanup event for %s, events=%#v", directory, summary.Events)
+		}
+	}
+}
+
 func TestHandleAgentCreateAllowsNestedRelativePath(t *testing.T) {
 	flushAgentCache()
 	agentRoot := t.TempDir()

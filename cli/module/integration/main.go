@@ -6351,6 +6351,142 @@ var videoTrimLookPathFn = exec.LookPath
 var videoTrimCommandContextFn = exec.CommandContext
 var videoTrimLastOutputTimestamp int64
 
+// FFmpegCheckResponse is intentionally narrow: the Site only needs to know
+// whether it may enter video editing and, when unavailable, which configured
+// request to send to the current chat. It never receives arbitrary runtime
+// configuration.
+type FFmpegCheckResponse struct {
+	Available bool   `json:"available"`
+	Install   string `json:"install,omitempty"`
+	Content   string `json:"content,omitempty"`
+	Status    int    `json:"status"`
+}
+
+type ffmpegCheckConfig struct {
+	CacheFor time.Duration
+	Install  string
+}
+
+var ffmpegCheckLookPathFn = exec.LookPath
+var ffmpegCheckNowFn = time.Now
+var ffmpegCheckCache struct {
+	sync.Mutex
+	availableAt time.Time
+}
+
+func writeFFmpegCheckResp(w http.ResponseWriter, httpStatus int, resp FFmpegCheckResponse) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(httpStatus)
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+func ffmpegCheckPositiveHours(value interface{}) (int64, bool) {
+	var hours int64
+	maxHours := int64(math.MaxInt64 / int64(time.Hour))
+	switch number := value.(type) {
+	case float64:
+		if math.IsNaN(number) || math.IsInf(number, 0) || number != math.Trunc(number) || number < 1 || number > float64(maxHours) {
+			return 0, false
+		}
+		hours = int64(number)
+	case float32:
+		float := float64(number)
+		if math.IsNaN(float) || math.IsInf(float, 0) || float != math.Trunc(float) || float < 1 || float > float64(maxHours) {
+			return 0, false
+		}
+		hours = int64(number)
+	case int:
+		hours = int64(number)
+	case int64:
+		hours = number
+	case int32:
+		hours = int64(number)
+	case json.Number:
+		parsed, err := strconv.ParseInt(string(number), 10, 64)
+		if err != nil {
+			return 0, false
+		}
+		hours = parsed
+	default:
+		return 0, false
+	}
+	return hours, hours > 0 && hours <= maxHours
+}
+
+func parseFFmpegCheckConfig(raw map[string]interface{}) (ffmpegCheckConfig, error) {
+	if raw == nil {
+		return ffmpegCheckConfig{}, errors.New("config/config.json.ffmpeg 配置缺失")
+	}
+	value, ok := raw["ffmpeg"]
+	if !ok {
+		return ffmpegCheckConfig{}, errors.New("config/config.json.ffmpeg 配置缺失")
+	}
+	section, ok := value.(map[string]interface{})
+	if !ok || section == nil {
+		return ffmpegCheckConfig{}, errors.New("config/config.json.ffmpeg 必须是对象")
+	}
+	hours, ok := ffmpegCheckPositiveHours(section["check"])
+	if !ok {
+		return ffmpegCheckConfig{}, errors.New("config/config.json.ffmpeg.check 必须是正整数（小时）")
+	}
+	install, ok := section["install"].(string)
+	install = strings.TrimSpace(install)
+	if !ok || install == "" {
+		return ffmpegCheckConfig{}, errors.New("config/config.json.ffmpeg.install 必须是非空字符串")
+	}
+	return ffmpegCheckConfig{CacheFor: time.Duration(hours) * time.Hour, Install: install}, nil
+}
+
+func ffmpegDependenciesAvailable(cacheFor time.Duration) bool {
+	now := ffmpegCheckNowFn()
+	ffmpegCheckCache.Lock()
+	availableAt := ffmpegCheckCache.availableAt
+	ffmpegCheckCache.Unlock()
+	if !availableAt.IsZero() && now.Before(availableAt.Add(cacheFor)) {
+		return true
+	}
+
+	if _, err := ffmpegCheckLookPathFn("ffmpeg"); err != nil {
+		return false
+	}
+	if _, err := ffmpegCheckLookPathFn("ffprobe"); err != nil {
+		return false
+	}
+
+	ffmpegCheckCache.Lock()
+	ffmpegCheckCache.availableAt = now
+	ffmpegCheckCache.Unlock()
+	return true
+}
+
+// handleFFmpegCheck checks only executable availability. It must not execute
+// an installer or create media, and unsuccessful lookups deliberately do not
+// update the in-memory success cache.
+func handleFFmpegCheck() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.Header().Set("Allow", http.MethodGet)
+			writeFFmpegCheckResp(w, http.StatusMethodNotAllowed, FFmpegCheckResponse{Content: "仅支持 GET 请求", Status: 1})
+			return
+		}
+		raw, _, err := readIntegrationStartupConfigRaw()
+		if err != nil {
+			writeFFmpegCheckResp(w, http.StatusInternalServerError, FFmpegCheckResponse{Content: "读取 config/config.json 失败: " + err.Error(), Status: 1})
+			return
+		}
+		config, err := parseFFmpegCheckConfig(raw)
+		if err != nil {
+			writeFFmpegCheckResp(w, http.StatusBadRequest, FFmpegCheckResponse{Content: err.Error(), Status: 1})
+			return
+		}
+		if !ffmpegDependenciesAvailable(config.CacheFor) {
+			writeFFmpegCheckResp(w, http.StatusOK, FFmpegCheckResponse{Available: false, Install: config.Install, Content: "未检测到 FFmpeg 或 FFprobe", Status: 0})
+			return
+		}
+		writeFFmpegCheckResp(w, http.StatusOK, FFmpegCheckResponse{Available: true, Status: 0})
+	}
+}
+
 func writeVideoTrimResp(w http.ResponseWriter, httpStatus int, resp VideoTrimResponse) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(httpStatus)
@@ -18351,6 +18487,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/del", handleDel(&cfg))
 	mux.HandleFunc("/api/raw", handleRaw(&cfg))
 	mux.HandleFunc("/api/media_preview", handleMediaPreview(&cfg))
+	mux.HandleFunc("/api/ffmpeg/check", handleFFmpegCheck())
 	mux.HandleFunc("/api/video_trim", handleVideoTrim(&cfg))
 	mux.HandleFunc("/api/agent/audio", handleAgentAudioSave(&cfg))
 	mux.HandleFunc("/file/lastUpdate", handleFileLastUpdate(&cfg))
@@ -19355,17 +19492,23 @@ type integrationTempCleanupConfig struct {
 }
 
 type integrationTempCleanupEvent struct {
-	Action string
-	Agent  string
-	Source string
-	Target string
-	Reason string
+	Action    string
+	Agent     string
+	Directory string
+	Source    string
+	Target    string
+	Reason    string
 }
 
 type integrationTempCleanupSummary struct {
 	AgentCount int
 	Events     []integrationTempCleanupEvent
 }
+
+// integrationTempCleanupDirectories are agent-owned output directories that
+// share the configured temp retention policy. Each directory archives into
+// its own bak/ child, so files from different media types never mingle.
+var integrationTempCleanupDirectories = []string{"tmp", "images", "videos", "audios", "canvas"}
 
 func readIntegrationTempCleanupConfig() (integrationTempCleanupConfig, error) {
 	raw, _, err := readIntegrationStartupConfigRaw()
@@ -19450,13 +19593,13 @@ func logIntegrationTempCleanupEvents(events []integrationTempCleanupEvent) {
 	for _, event := range events {
 		switch event.Action {
 		case "pack":
-			log.Printf("[temp pack] agent=%s archived %s -> %s", event.Agent, event.Source, event.Target)
+			log.Printf("[%s pack] agent=%s archived %s -> %s", event.Directory, event.Agent, event.Source, event.Target)
 		case "pack-skip":
-			log.Printf("[temp pack] agent=%s skipped %s because target exists at %s", event.Agent, event.Source, event.Target)
+			log.Printf("[%s pack] agent=%s skipped %s because target exists at %s", event.Directory, event.Agent, event.Source, event.Target)
 		case "clear":
-			log.Printf("[temp clear] agent=%s deleted %s", event.Agent, event.Source)
+			log.Printf("[%s clear] agent=%s deleted %s", event.Directory, event.Agent, event.Source)
 		case "error":
-			log.Printf("[temp] agent=%s failed path=%s reason=%s", event.Agent, event.Source, event.Reason)
+			log.Printf("[%s] agent=%s failed path=%s reason=%s", event.Directory, event.Agent, event.Source, event.Reason)
 		}
 	}
 }
@@ -19481,21 +19624,24 @@ func cleanupIntegrationAgentTmp(agentRoot string, now time.Time, config integrat
 		}
 		summary.AgentCount++
 		workspace := filepath.Join(agentRoot, entry.Name())
-		if err := cleanupIntegrationTempWorkspace(workspace, agentID, now, config, &summary); err != nil {
-			summary.Events = append(summary.Events, integrationTempCleanupEvent{
-				Action: "error",
-				Agent:  agentID,
-				Source: filepath.Join(workspace, "tmp"),
-				Reason: err.Error(),
-			})
+		for _, directory := range integrationTempCleanupDirectories {
+			if err := cleanupIntegrationTempDirectory(workspace, directory, agentID, now, config, &summary); err != nil {
+				summary.Events = append(summary.Events, integrationTempCleanupEvent{
+					Action:    "error",
+					Agent:     agentID,
+					Directory: directory,
+					Source:    filepath.Join(workspace, directory),
+					Reason:    err.Error(),
+				})
+			}
 		}
 	}
 	return summary, nil
 }
 
-func cleanupIntegrationTempWorkspace(workspace, agentID string, now time.Time, config integrationTempCleanupConfig, summary *integrationTempCleanupSummary) error {
-	tmpDir := filepath.Join(workspace, "tmp")
-	info, err := os.Lstat(tmpDir)
+func cleanupIntegrationTempDirectory(workspace, directory, agentID string, now time.Time, config integrationTempCleanupConfig, summary *integrationTempCleanupSummary) error {
+	rootDir := filepath.Join(workspace, directory)
+	info, err := os.Lstat(rootDir)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
@@ -19503,22 +19649,22 @@ func cleanupIntegrationTempWorkspace(workspace, agentID string, now time.Time, c
 		return err
 	}
 	if !info.IsDir() {
-		return fmt.Errorf("tmp exists but is not a directory")
+		return fmt.Errorf("%s exists but is not a directory", directory)
 	}
 
-	entries, err := os.ReadDir(tmpDir)
+	entries, err := os.ReadDir(rootDir)
 	if err != nil {
 		return err
 	}
 	sort.Slice(entries, func(i, j int) bool {
 		return strings.ToLower(entries[i].Name()) < strings.ToLower(entries[j].Name())
 	})
-	bakDir := filepath.Join(tmpDir, "bak")
+	bakDir := filepath.Join(rootDir, "bak")
 	for _, entry := range entries {
 		if entry.Name() == "bak" {
 			continue
 		}
-		source := filepath.Join(tmpDir, entry.Name())
+		source := filepath.Join(rootDir, entry.Name())
 		expired, err := integrationTempEntryExpired(source, now, config.PackAfter)
 		if err != nil {
 			return err
@@ -19529,7 +19675,7 @@ func cleanupIntegrationTempWorkspace(workspace, agentID string, now time.Time, c
 		if err := os.MkdirAll(bakDir, 0o755); err != nil {
 			return err
 		}
-		if err := mergeIntegrationTempArchiveEntry(source, filepath.Join(bakDir, entry.Name()), agentID, summary); err != nil {
+		if err := mergeIntegrationTempArchiveEntry(source, filepath.Join(bakDir, entry.Name()), agentID, directory, summary); err != nil {
 			return err
 		}
 	}
@@ -19542,7 +19688,7 @@ func cleanupIntegrationTempWorkspace(workspace, agentID string, now time.Time, c
 		return err
 	}
 	if !bakInfo.IsDir() {
-		return fmt.Errorf("tmp/bak exists but is not a directory")
+		return fmt.Errorf("%s/bak exists but is not a directory", directory)
 	}
 	bakEntries, err := os.ReadDir(bakDir)
 	if err != nil {
@@ -19564,9 +19710,10 @@ func cleanupIntegrationTempWorkspace(workspace, agentID string, now time.Time, c
 			return err
 		}
 		summary.Events = append(summary.Events, integrationTempCleanupEvent{
-			Action: "clear",
-			Agent:  agentID,
-			Source: path,
+			Action:    "clear",
+			Agent:     agentID,
+			Directory: directory,
+			Source:    path,
 		})
 	}
 	return nil
@@ -19613,7 +19760,7 @@ func integrationTempEntryExpired(path string, now time.Time, age time.Duration) 
 
 // mergeIntegrationTempArchiveEntry recursively joins a stale temp entry into
 // bak. Existing targets win; skipped sources remain in tmp for a later scan.
-func mergeIntegrationTempArchiveEntry(source, target, agentID string, summary *integrationTempCleanupSummary) error {
+func mergeIntegrationTempArchiveEntry(source, target, agentID, directory string, summary *integrationTempCleanupSummary) error {
 	sourceInfo, err := os.Lstat(source)
 	if err != nil {
 		return err
@@ -19623,14 +19770,14 @@ func mergeIntegrationTempArchiveEntry(source, target, agentID string, summary *i
 		if err := os.Rename(source, target); err != nil {
 			return err
 		}
-		summary.Events = append(summary.Events, integrationTempCleanupEvent{Action: "pack", Agent: agentID, Source: source, Target: target})
+		summary.Events = append(summary.Events, integrationTempCleanupEvent{Action: "pack", Agent: agentID, Directory: directory, Source: source, Target: target})
 		return nil
 	}
 	if err != nil {
 		return err
 	}
 	if !sourceInfo.IsDir() || !targetInfo.IsDir() {
-		summary.Events = append(summary.Events, integrationTempCleanupEvent{Action: "pack-skip", Agent: agentID, Source: source, Target: target})
+		summary.Events = append(summary.Events, integrationTempCleanupEvent{Action: "pack-skip", Agent: agentID, Directory: directory, Source: source, Target: target})
 		return nil
 	}
 
@@ -19642,7 +19789,7 @@ func mergeIntegrationTempArchiveEntry(source, target, agentID string, summary *i
 		return strings.ToLower(entries[i].Name()) < strings.ToLower(entries[j].Name())
 	})
 	for _, entry := range entries {
-		if err := mergeIntegrationTempArchiveEntry(filepath.Join(source, entry.Name()), filepath.Join(target, entry.Name()), agentID, summary); err != nil {
+		if err := mergeIntegrationTempArchiveEntry(filepath.Join(source, entry.Name()), filepath.Join(target, entry.Name()), agentID, directory, summary); err != nil {
 			return err
 		}
 	}

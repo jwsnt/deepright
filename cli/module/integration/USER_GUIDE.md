@@ -102,7 +102,7 @@ cd /path/to/deepright/cli/module/integration
 
 macOS 发布包把已替换的文档放入 `DeepRight.app/Contents/Resources/config/app/`；Linux / Windows WSL2 安装载荷保留在 release 根目录的 `config/app/`，随后被安装器复制到 WSL。两种发布形式使用相同的端口替换规则。
 
-### Agent `tmp` 自动归档与清理
+### Agent 临时与媒体目录自动归档与清理
 
 Integration 在每次启动时读取 `config/config.json.temp`：
 
@@ -118,10 +118,10 @@ Integration 在每次启动时读取 `config/config.json.temp`：
 
 - 三项均为正整数，单位为小时；`pack` 是归档期限，`clear` 是归档目录清理期限，`scan` 是扫描周期。配置变更后需重启 Integration 生效；不会使用写死的替代值。
 - 服务启动后会在后台立即扫描一次，随后每 `scan` 小时扫描一次；扫描、移动和删除均不阻塞 HTTP 服务、请求或定时任务。
-- 每个 Agent 的 `tmp/` 会按一级文件或目录处理。目录内只要有一个文件在 `pack` 小时内修改过，整个目录就保留；全部文件均过期后，移动到 `tmp/bak/` 并保持目录结构。一级文件按其自身修改时间归档；空目录按目录自身修改时间判断。
-- `tmp/bak/` 不会被再次归档。其一级文件或目录仅在全部文件都超过 `clear` 小时未修改时删除；空目录同样按自身修改时间判断。
+- 每个 Agent 的 `tmp/`、`images/`、`videos/`、`audios/` 和 `canvas/` 都会按一级文件或目录处理。目录内只要有一个文件在 `pack` 小时内修改过，整个目录就保留；全部文件均过期后，移动到所在目录的 `bak/` 并保持目录结构。一级文件按其自身修改时间归档；空目录按目录自身修改时间判断。
+- 各目录自己的 `bak/` 不会被再次归档。其一级文件或目录仅在全部文件都超过 `clear` 小时未修改时删除；空目录同样按自身修改时间判断。
 - 已存在的归档目录会递归合并；出现同名文件或文件/目录类型冲突时，保留 `bak` 中的目标并保留源项等待后续扫描，绝不覆盖或改名。
-- Integration 日志会记录 `temp pack` 归档、同名跳过、`temp clear` 删除及每个 Agent 的处理错误。若 `temp` 缺失或非法，则记录配置错误并跳过临时文件整理，不影响服务运行。
+- Integration 日志会记录各目录的 `<目录> pack` 归档、同名跳过、`<目录> clear` 删除及每个 Agent 的处理错误。若 `temp` 缺失或非法，则记录配置错误并跳过临时文件整理，不影响服务运行。
 
 ### `@` 菜单缓存
 
@@ -3264,6 +3264,23 @@ Site 的视频和图片预览均可提取一个或多个坐标。该交互完全
 完整说明见 [iteration/20260726-5/USER_GUIDE.md](iteration/20260726-5/USER_GUIDE.md)。
 
 ---
+
+## 迭代 20260726-10：视频编辑依赖检查
+
+视频预览进入编辑模式前，Site 会调用同源 `GET /api/ffmpeg/check`。接口只检查本机命令搜索路径中是否同时存在 `ffmpeg` 和 `ffprobe`，不执行安装命令、不创建文件，也不修改视频或 Agent 工作区。
+
+主应用资源目录的 `config/config.json` 必须包含：
+
+```json
+{
+  "ffmpeg": {
+    "check": 120,
+    "install": "请安装 ffmpeg 和 ffprobe"
+  }
+}
+```
+
+`check` 是正整数，单位为小时；`install` 必须是非空字符串。配置缺失或无效时接口返回可直接展示的错误，不会使用默认值。仅当两个可执行文件都存在时，Integration 才将成功检查的时间保存在进程内存中，并在 `check` 时长内复用结果；重启 Integration 后缓存失效。依赖未安装、只找到其中一个或查找异常都不会被缓存。依赖缺失时，接口会把已校验的 `install` 文本返回给 Site，由用户确认后发送到当前 Chat。
 
 ## 迭代 20260726-6：视频切分另存为 MP4
 

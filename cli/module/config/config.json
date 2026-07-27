@@ -10,6 +10,10 @@
     "refresh": 60,
     "cache": 120
   },
+  "ffmpeg": {
+    "check": 24,
+    "install": "请安装 ffmpeg 和 ffprobe"
+  },
   "test": {
     "content": "Hello World",
     "timeout": 60
