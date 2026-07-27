@@ -50,6 +50,14 @@ WSL 内部还会生成并使用以下路径：
 
 如果 PowerShell 内置 HTTPS 下载出现 TLS 或连接错误，安装器会自动改用 curl.exe，再自动尝试 Windows BITS。清华镜像的全部 HTTPS 下载器都失败时，安装器会自动回退到 Ubuntu 官方 WSL Rootfs；不使用 HTTP 下载，也不需要手工下载或导入。
 
+如果显示 HCS_E_SERVICE_NOT_AVAILABLE 或 Wsl/Service/RegisterDistro/CreateVm，说明 WSL2 虚拟机服务尚未生效。安装器会询问是否立即重启；选择 y 可直接重启，选择 n 则请完整重启 Windows 后以管理员身份再次运行 install.bat。重启后仍报错时，请在管理员 PowerShell 中依次执行：
+
+dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
+dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
+bcdedit /set hypervisorlaunchtype auto
+
+再重启 Windows 后重试；若仍失败，请确认 BIOS/UEFI 已启用 CPU 虚拟化（Intel VT-x 或 AMD-V），并保留 install.log 用于排查。
+
 如果 deepright 已经存在且可用，安装器只刷新应用文件，不会重复询问或更换现有系统。安装器不会导出、注销、修改或删除用户自己安装的 Ubuntu 或其他 WSL 发行版。
 
 

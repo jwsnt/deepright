@@ -6,7 +6,6 @@ import ai.open.right.workflow.flow.llm.provider.kimi.KimiQueryService;
 import ai.open.right.workflow.flow.llm.provider.openai.OpenAiRequest;
 import ai.open.right.workflow.flow.llm.provider.openai.OpenAiStream;
 import ai.open.right.workflow.flow.llm.signal.SignalStream;
-import ai.deepright.llm.provider.openai.CustomerOpenAiStreamFunCall;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +20,7 @@ public class CustomerKimiQueryService extends KimiQueryService {
 
     @Override
     public OpenAiStream stream(SignalStream signalStream, OpenAiRequest request) throws Exception {
-        return new CustomerOpenAiStreamFunCall(ProviderStreamConfig.<OpenAiRequest>builder()
+        return new CustomerKimiStream(ProviderStreamConfig.<OpenAiRequest>builder()
                 .providerStorePolicy(this.providerStorePolicy)
                 .trackFunCallService(this.trackFunCallService)
                 .mediaInlineService(this.mediaInlineService)

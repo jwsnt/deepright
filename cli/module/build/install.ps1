@@ -222,6 +222,50 @@ function Test-WslInstalled {
     try { $null = & wsl.exe --status 2>&1; return ($LASTEXITCODE -eq 0) } catch { return $false }
 }
 
+function Get-PendingWindowsRestartReasons {
+    # `wsl --status` can already return success immediately after WSL features
+    # are enabled, even though the hypervisor and HCS service cannot be used
+    # until Windows has restarted. Check the standard pending-restart markers
+    # before attempting an import, which would otherwise fail with
+    # HCS_E_SERVICE_NOT_AVAILABLE.
+    $reasons = @()
+    $restartMarkers = @(
+        @{ Path = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending"; Name = "Component Based Servicing" },
+        @{ Path = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired"; Name = "Windows Update" }
+    )
+
+    foreach ($marker in $restartMarkers) {
+        if (Test-Path $marker.Path) {
+            $reasons += $marker.Name
+        }
+    }
+
+    $sessionManager = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager"
+    $pendingRename = Get-ItemProperty -Path $sessionManager -Name "PendingFileRenameOperations" -ErrorAction SilentlyContinue
+    if ($null -ne $pendingRename) {
+        $reasons += "Pending file operations"
+    }
+
+    $updateVolatile = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Updates" -Name "UpdateExeVolatile" -ErrorAction SilentlyContinue
+    if ($null -ne $updateVolatile -and [int]$updateVolatile.UpdateExeVolatile -ne 0) {
+        $reasons += "Windows update installation"
+    }
+
+    return $reasons | Select-Object -Unique
+}
+
+function Exit-ForWslRestart([string]$Reason) {
+    L_Err "$Reason"
+    L_Warn "WSL2 cannot create a Linux virtual machine until Windows is restarted."
+    L_Info "Restart Windows completely, then run install.bat again as Administrator."
+    $restartNow = (Read-Host "Restart Windows now? (y/n)").Trim()
+    if ($restartNow -eq "y" -or $restartNow -eq "Y") {
+        L_Info "Restarting Windows now..."
+        Restart-Computer -Force
+    }
+    exit 3010
+}
+
 function Test-DistroExists([string]$N) {
     try {
         $out = & wsl.exe --list --quiet 2>&1 | Out-String
@@ -499,16 +543,19 @@ if ($build -lt 19041) {
 L_OK "Windows version OK (Build $build)"
 
 # ---- Step 3: WSL2 ----
+$wslWasInstalledThisRun = $false
 L_Step "Step 3/7: Check WSL2"
 if (Test-WslInstalled) {
     L_OK "WSL already installed"
 } else {
     L_Info "Installing WSL (may take several minutes)..."
     Invoke-WslWithLiveOutput -Description "WSL install" -Arguments @("--install", "--no-distribution")
+    $wslWasInstalledThisRun = $true
     if (-not (Test-WslInstalled)) {
         L_Info "Trying DISM fallback..."
         $d1 = & dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart 2>&1 | Out-String
         $d2 = & dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart 2>&1 | Out-String
+        $wslWasInstalledThisRun = $true
         Add-Content -Path $LOG_FILE -Value "DISM1: $d1`nDISM2: $d2" -Encoding UTF8
         if (-not (Test-WslInstalled)) {
             L_Warn "WSL features enabled. REBOOT REQUIRED, then re-run install.bat"
@@ -518,6 +565,13 @@ if (Test-WslInstalled) {
         }
     }
     L_OK "WSL2 installation complete"
+}
+
+if ($wslWasInstalledThisRun) {
+    $restartReasons = @(Get-PendingWindowsRestartReasons)
+    if ($restartReasons.Count -gt 0) {
+        Exit-ForWslRestart "WSL features were enabled and Windows has a pending restart: $($restartReasons -join ', ')."
+    }
 }
 $null = & wsl.exe --set-default-version 2 2>&1
 
@@ -663,6 +717,9 @@ if ($distroExists) {
     Add-Content -Path $LOG_FILE -Value "verify: $verifyOut" -Encoding UTF8
 
     if ($verifyOut -notmatch "imported_ok") {
+        if ($imp -match "HCS_E_SERVICE_NOT_AVAILABLE" -or $verifyOut -match "HCS_E_SERVICE_NOT_AVAILABLE") {
+            Exit-ForWslRestart "The WSL virtual-machine service (HCS) is unavailable."
+        }
         L_Err "Import failed. WSL output:"
         L_Info $imp
         L_Info "Verify output: $verifyOut"

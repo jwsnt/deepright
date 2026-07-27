@@ -132,6 +132,23 @@ sudo -n /usr/bin/env HOME=/home/deepright /app/integration start
 
 这是 WSL2 组件首次启用后的正常行为。重启 Windows 后再次运行 `install.bat` 即可。
 
+### 出现 `HCS_E_SERVICE_NOT_AVAILABLE` 或 `Wsl/Service/RegisterDistro/CreateVm`
+
+这表示 WSL2 所需的虚拟机服务还没有生效，通常发生在首次启用 WSL 后、尚未重启 Windows 时。按下面操作：
+
+1. 安装器会询问是否立即重启；选择 `y` 可直接重启，选择 `n` 则请完整重启 Windows（不要只关闭安装窗口）。
+2. 以管理员身份再次运行 `install.bat`。
+
+若重启后仍出现同一错误，请以管理员身份打开 PowerShell，依次执行下面命令后再重启一次：
+
+```powershell
+dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
+dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
+bcdedit /set hypervisorlaunchtype auto
+```
+
+仍无法导入时，确认电脑 BIOS/UEFI 已开启 CPU 虚拟化（Intel VT-x 或 AMD-V），并将安装目录中的 `install.log` 提供给支持人员。
+
 ### 双击 `start.bat` 提示未安装
 
 说明当前 `deepright` 发行版中还没有生成 `~/.integration`。请先执行 `install.bat` 完成安装。

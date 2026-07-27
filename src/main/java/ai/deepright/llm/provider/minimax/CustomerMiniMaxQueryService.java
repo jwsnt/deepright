@@ -6,7 +6,6 @@ import ai.open.right.workflow.flow.llm.provider.anthropic.AnthropicRequest;
 import ai.open.right.workflow.flow.llm.provider.anthropic.AnthropicStream;
 import ai.open.right.workflow.flow.llm.provider.minimax.MiniMaxQueryService;
 import ai.open.right.workflow.flow.llm.signal.SignalStream;
-import ai.deepright.llm.provider.anthropic.CustomerAnthropicStream;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +20,7 @@ public class CustomerMiniMaxQueryService extends MiniMaxQueryService {
 
     @Override
     public AnthropicStream stream(SignalStream signalStream, AnthropicRequest request) throws Exception {
-        return new CustomerAnthropicStream(ProviderStreamConfig.<AnthropicRequest>builder()
+        return new CustomerMiniMaxStream(ProviderStreamConfig.<AnthropicRequest>builder()
                 .providerStorePolicy(this.providerStorePolicy)
                 .trackFunCallService(this.trackFunCallService)
                 .mediaInlineService(this.mediaInlineService)
