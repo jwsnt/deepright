@@ -7089,6 +7089,400 @@ func handleAgentAudioSave(cfg *Config) http.HandlerFunc {
 	}
 }
 
+// AudioMixRequest is deliberately a small, declarative audio project. It is
+// not a transport for an FFmpeg command line: every value is independently
+// validated before the server constructs its fixed filter graph.
+type AudioMixRequest struct {
+	AgentID    string          `json:"agentId"`
+	OutputName string          `json:"outputName"`
+	SampleRate int             `json:"sampleRate"`
+	BitDepth   int             `json:"bitDepth"`
+	Tracks     []AudioMixTrack `json:"tracks"`
+}
+
+type AudioMixTrack struct {
+	Path        string           `json:"path"`
+	TrimStart   float64          `json:"trimStart"`
+	TrimEnd     float64          `json:"trimEnd"`
+	Start       float64          `json:"start"`
+	Speed       float64          `json:"speed"`
+	Loop        bool             `json:"loop"`
+	Duration    float64          `json:"duration"`
+	Volume      float64          `json:"volume"`
+	LeftVolume  float64          `json:"leftVolume"`
+	RightVolume float64          `json:"rightVolume"`
+	Muted       bool             `json:"muted"`
+	FadeIn      float64          `json:"fadeIn"`
+	FadeOut     float64          `json:"fadeOut"`
+	Effects     []AudioMixEffect `json:"effects"`
+}
+
+type AudioMixEffect struct {
+	Type   string  `json:"type"`
+	Amount float64 `json:"amount"`
+}
+
+type AudioMixResponse struct {
+	AgentID string `json:"agentId"`
+	Path    string `json:"path,omitempty"`
+	SavedAs string `json:"savedAs,omitempty"`
+	Content string `json:"content,omitempty"`
+	Status  int    `json:"status"`
+}
+
+const (
+	audioMixMaxTracks          = 64
+	audioMixMaxEffects         = 16
+	audioMixMaxTimelineSeconds = 2 * 60 * 60
+	audioMixMaxLoopCopies      = 128
+)
+
+func writeAudioMixResp(w http.ResponseWriter, httpStatus int, resp AudioMixResponse) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(httpStatus)
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+func isSafeAudioMixOutputName(name string) bool {
+	return isSafeSaveAsNewFilename(name) && strings.EqualFold(filepath.Ext(name), ".wav") && len(strings.TrimSuffix(name, filepath.Ext(name))) > 0
+}
+
+func audioMixFiniteNonNegative(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0) && value >= 0
+}
+
+func audioMixFormatFloat(value float64) string {
+	return strconv.FormatFloat(value, 'f', -1, 64)
+}
+
+func audioMixTempoFilters(speed float64) []string {
+	filters := make([]string, 0, 3)
+	for speed > 2 {
+		filters = append(filters, "atempo=2")
+		speed /= 2
+	}
+	for speed < 0.5 {
+		filters = append(filters, "atempo=0.5")
+		speed /= 0.5
+	}
+	return append(filters, "atempo="+audioMixFormatFloat(speed))
+}
+
+func audioMixEffectFilter(effect AudioMixEffect) (string, error) {
+	typ := strings.ToLower(strings.TrimSpace(effect.Type))
+	if math.IsNaN(effect.Amount) || math.IsInf(effect.Amount, 0) {
+		return "", errors.New("效果器参数必须是有限数字")
+	}
+	switch typ {
+	case "equalizer":
+		if effect.Amount < -24 || effect.Amount > 24 {
+			return "", errors.New("均衡器范围必须在 -24 到 24 dB")
+		}
+		return "equalizer=f=1000:t=q:w=1:g=" + audioMixFormatFloat(effect.Amount), nil
+	case "compressor":
+		if effect.Amount < 0 || effect.Amount > 1 {
+			return "", errors.New("压缩器强度必须在 0 到 1")
+		}
+		ratio := 1 + effect.Amount*19
+		return "acompressor=threshold=0.125:ratio=" + audioMixFormatFloat(ratio) + ":attack=20:release=250", nil
+	case "reverb":
+		if effect.Amount < 0 || effect.Amount > 1 {
+			return "", errors.New("混响强度必须在 0 到 1")
+		}
+		return "aecho=0.8:0.9:1000:" + audioMixFormatFloat(effect.Amount*0.5), nil
+	case "delay":
+		if effect.Amount < 0 || effect.Amount > 1 {
+			return "", errors.New("延迟强度必须在 0 到 1")
+		}
+		return "aecho=0.8:0.88:400:" + audioMixFormatFloat(effect.Amount*0.55), nil
+	default:
+		return "", errors.New("不支持的效果器")
+	}
+}
+
+func audioMixTrackDuration(track AudioMixTrack) (float64, int, error) {
+	if !audioMixFiniteNonNegative(track.TrimStart) || !audioMixFiniteNonNegative(track.TrimEnd) || !audioMixFiniteNonNegative(track.Start) || !audioMixFiniteNonNegative(track.FadeIn) || !audioMixFiniteNonNegative(track.FadeOut) {
+		return 0, 0, errors.New("片段时间必须是非负有限数字")
+	}
+	if track.TrimEnd <= track.TrimStart {
+		return 0, 0, errors.New("裁剪结束时间必须大于开始时间")
+	}
+	if math.IsNaN(track.Speed) || math.IsInf(track.Speed, 0) || track.Speed < 0.25 || track.Speed > 4 {
+		return 0, 0, errors.New("播放速率必须在 0.25× 到 4×")
+	}
+	for _, value := range []float64{track.Volume, track.LeftVolume, track.RightVolume} {
+		if !audioMixFiniteNonNegative(value) || value > 4 {
+			return 0, 0, errors.New("音量必须在 0 到 4")
+		}
+	}
+	baseDuration := (track.TrimEnd - track.TrimStart) / track.Speed
+	duration := baseDuration
+	copies := 1
+	if track.Loop {
+		if !audioMixFiniteNonNegative(track.Duration) || track.Duration <= 0 || track.Duration > audioMixMaxTimelineSeconds {
+			return 0, 0, errors.New("循环片段总时长必须在有效范围内")
+		}
+		duration = track.Duration
+		copies = int(math.Ceil(duration / baseDuration))
+		if copies < 1 || copies > audioMixMaxLoopCopies {
+			return 0, 0, errors.New("循环次数超出允许范围")
+		}
+	}
+	if duration <= 0 || duration > audioMixMaxTimelineSeconds || track.Start+duration > audioMixMaxTimelineSeconds {
+		return 0, 0, errors.New("片段时间轴范围超出允许范围")
+	}
+	if track.FadeIn+track.FadeOut > duration+1e-9 {
+		return 0, 0, errors.New("淡入淡出时长不能超过片段时长")
+	}
+	if len(track.Effects) > audioMixMaxEffects {
+		return 0, 0, errors.New("单个片段的效果器数量过多")
+	}
+	for _, effect := range track.Effects {
+		if _, err := audioMixEffectFilter(effect); err != nil {
+			return 0, 0, err
+		}
+	}
+	return duration, copies, nil
+}
+
+func audioMixResolveSource(workspace, relativePath string) (string, error) {
+	relativePath = normalizeQuotedPathArg(relativePath)
+	if relativePath == "" || filepath.IsAbs(relativePath) || strings.HasPrefix(relativePath, "~") {
+		return "", errors.New("源文件路径必须是当前工作区相对路径")
+	}
+	cleanPath := filepath.Clean(relativePath)
+	if cleanPath == "." || cleanPath == ".." || strings.HasPrefix(cleanPath, ".."+string(filepath.Separator)) {
+		return "", errors.New("源文件路径必须是当前工作区相对路径")
+	}
+	resolved, err := resolveCaseInsensitiveUnderRoot(workspace, cleanPath)
+	if err != nil || !ensurePathWithinRoot(workspace, resolved) {
+		return "", errors.New("源文件路径无效")
+	}
+	info, err := os.Lstat(resolved)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return "", errors.New("源文件不存在")
+		}
+		return "", errors.New("无法读取源文件")
+	}
+	if info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return "", errors.New("源文件必须是普通文件")
+	}
+	return resolved, nil
+}
+
+func audioMixProbeSource(ctx context.Context, ffprobePath, sourcePath string) (float64, error) {
+	output, err := videoTrimCommandContextFn(ctx, ffprobePath,
+		"-v", "error", "-select_streams", "a:0",
+		"-show_entries", "stream=codec_type:format=duration",
+		"-of", "default=noprint_wrappers=1:nokey=1", sourcePath,
+	).Output()
+	if err != nil {
+		return 0, errors.New("无法解析源文件中的音频流")
+	}
+	lines := strings.Fields(string(output))
+	if len(lines) < 2 || lines[0] != "audio" {
+		return 0, errors.New("源文件不含可解析音频流")
+	}
+	duration, err := strconv.ParseFloat(lines[len(lines)-1], 64)
+	if err != nil || !audioMixFiniteNonNegative(duration) || duration <= 0 {
+		return 0, errors.New("无法读取源文件时长")
+	}
+	return duration, nil
+}
+
+func audioMixTrackFilter(index int, track AudioMixTrack, duration float64, copies int) (string, error) {
+	label := "m" + strconv.Itoa(index)
+	filters := []string{
+		"[" + strconv.Itoa(index) + ":a]atrim=start=" + audioMixFormatFloat(track.TrimStart) + ":end=" + audioMixFormatFloat(track.TrimEnd),
+		"asetpts=PTS-STARTPTS",
+	}
+	filters = append(filters, audioMixTempoFilters(track.Speed)...)
+	if track.Loop && copies > 1 {
+		outputs := make([]string, 0, copies)
+		for copyIndex := 0; copyIndex < copies; copyIndex++ {
+			outputs = append(outputs, "["+label+"_copy"+strconv.Itoa(copyIndex)+"]")
+		}
+		filters = append(filters, "asplit="+strconv.Itoa(copies)+strings.Join(outputs, ""))
+		filters = append(filters, strings.Join(outputs, "")+"concat=n="+strconv.Itoa(copies)+":v=0:a=1")
+	}
+	filters = append(filters, "atrim=duration="+audioMixFormatFloat(duration), "aformat=channel_layouts=stereo")
+	volume := track.Volume
+	if track.Muted {
+		volume = 0
+	}
+	filters = append(filters,
+		"volume="+audioMixFormatFloat(volume),
+		"pan=stereo|c0="+audioMixFormatFloat(track.LeftVolume)+"*c0|c1="+audioMixFormatFloat(track.RightVolume)+"*c1",
+	)
+	if track.FadeIn > 0 {
+		filters = append(filters, "afade=t=in:st=0:d="+audioMixFormatFloat(track.FadeIn))
+	}
+	if track.FadeOut > 0 {
+		filters = append(filters, "afade=t=out:st="+audioMixFormatFloat(math.Max(0, duration-track.FadeOut))+":d="+audioMixFormatFloat(track.FadeOut))
+	}
+	for _, effect := range track.Effects {
+		filter, err := audioMixEffectFilter(effect)
+		if err != nil {
+			return "", err
+		}
+		filters = append(filters, filter)
+	}
+	filters = append(filters, "adelay="+strconv.FormatInt(int64(math.Round(track.Start*1000)), 10)+":all=1")
+	return strings.Join(filters, ",") + "[" + label + "]", nil
+}
+
+func handleAudioMix(cfg *Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", http.MethodPost)
+			writeAudioMixResp(w, http.StatusMethodNotAllowed, AudioMixResponse{Content: "method not allowed", Status: 1})
+			return
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+		defer r.Body.Close()
+		var request AudioMixRequest
+		decoder := json.NewDecoder(r.Body)
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&request); err != nil {
+			writeAudioMixResp(w, http.StatusBadRequest, AudioMixResponse{Content: "请求体格式错误", Status: 1})
+			return
+		}
+		if err := decoder.Decode(&struct{}{}); err != io.EOF {
+			writeAudioMixResp(w, http.StatusBadRequest, AudioMixResponse{AgentID: request.AgentID, Content: "请求体只能包含一个 JSON 对象", Status: 1})
+			return
+		}
+		request.AgentID = strings.TrimSpace(request.AgentID)
+		request.OutputName = strings.TrimSpace(normalizeQuotedPathArg(request.OutputName))
+		if !isValidMediaPreviewAgentID(request.AgentID) || !isSafeAudioMixOutputName(request.OutputName) {
+			writeAudioMixResp(w, http.StatusBadRequest, AudioMixResponse{AgentID: request.AgentID, Content: "agentId 和输出文件名必须有效，且输出必须为 .wav", Status: 1})
+			return
+		}
+		if request.SampleRate != 44100 && request.SampleRate != 48000 {
+			writeAudioMixResp(w, http.StatusBadRequest, AudioMixResponse{AgentID: request.AgentID, Content: "采样率只支持 44100 或 48000", Status: 1})
+			return
+		}
+		if request.BitDepth != 16 && request.BitDepth != 24 {
+			writeAudioMixResp(w, http.StatusBadRequest, AudioMixResponse{AgentID: request.AgentID, Content: "位深只支持 16 或 24", Status: 1})
+			return
+		}
+		if len(request.Tracks) == 0 || len(request.Tracks) > audioMixMaxTracks {
+			writeAudioMixResp(w, http.StatusBadRequest, AudioMixResponse{AgentID: request.AgentID, Content: "音轨数量必须在 1 到 64 之间", Status: 1})
+			return
+		}
+		workspace, err := getWorkspaceByAgentID(cfg, request.AgentID)
+		if err != nil {
+			writeAudioMixResp(w, http.StatusNotFound, AudioMixResponse{AgentID: request.AgentID, Content: "agent not found", Status: 1})
+			return
+		}
+		outputRelativePath := filepath.Join("audios", request.OutputName)
+		outputPath, err := resolveCaseInsensitiveUnderRoot(workspace, outputRelativePath)
+		if err != nil || !ensureWritablePathWithinRoot(workspace, outputPath) {
+			writeAudioMixResp(w, http.StatusBadRequest, AudioMixResponse{AgentID: request.AgentID, Content: "无法在工作目录中创建 WAV", Status: 1})
+			return
+		}
+		if _, err := os.Lstat(outputPath); err == nil {
+			writeAudioMixResp(w, http.StatusConflict, AudioMixResponse{AgentID: request.AgentID, Path: filepath.ToSlash(outputRelativePath), Content: "同名 WAV 已存在，请更换名称", Status: 1})
+			return
+		} else if !errors.Is(err, os.ErrNotExist) {
+			writeAudioMixResp(w, http.StatusInternalServerError, AudioMixResponse{AgentID: request.AgentID, Content: "无法检查 WAV 输出路径", Status: 1})
+			return
+		}
+		if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil || !ensureWritablePathWithinRoot(workspace, outputPath) {
+			writeAudioMixResp(w, http.StatusInternalServerError, AudioMixResponse{AgentID: request.AgentID, Content: "无法创建 audios 目录", Status: 1})
+			return
+		}
+		ffmpegPath, ffmpegErr := videoTrimLookPathFn("ffmpeg")
+		ffprobePath, ffprobeErr := videoTrimLookPathFn("ffprobe")
+		if ffmpegErr != nil || ffprobeErr != nil {
+			writeAudioMixResp(w, http.StatusServiceUnavailable, AudioMixResponse{AgentID: request.AgentID, Content: "FFmpeg 或 FFprobe 未安装，无法生成 WAV", Status: 1})
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Minute)
+		defer cancel()
+		inputArgs := []string{"-hide_banner", "-loglevel", "error", "-nostdin"}
+		filterParts := make([]string, 0, len(request.Tracks)+1)
+		labels := make([]string, 0, len(request.Tracks))
+		for index, track := range request.Tracks {
+			sourcePath, err := audioMixResolveSource(workspace, track.Path)
+			if err != nil {
+				writeAudioMixResp(w, http.StatusBadRequest, AudioMixResponse{AgentID: request.AgentID, Content: "第 " + strconv.Itoa(index+1) + " 段音轨无效：" + err.Error(), Status: 1})
+				return
+			}
+			sourceDuration, err := audioMixProbeSource(ctx, ffprobePath, sourcePath)
+			if err != nil || track.TrimEnd > sourceDuration+0.001 {
+				message := "源文件不含可解析音频流"
+				if err != nil {
+					message = err.Error()
+				} else {
+					message = "裁剪范围超出源文件时长"
+				}
+				writeAudioMixResp(w, http.StatusBadRequest, AudioMixResponse{AgentID: request.AgentID, Content: "第 " + strconv.Itoa(index+1) + " 段音轨无效：" + message, Status: 1})
+				return
+			}
+			if track.TrimEnd == 0 {
+				track.TrimEnd = sourceDuration
+			}
+			duration, copies, err := audioMixTrackDuration(track)
+			if err != nil {
+				writeAudioMixResp(w, http.StatusBadRequest, AudioMixResponse{AgentID: request.AgentID, Content: "第 " + strconv.Itoa(index+1) + " 段音轨无效：" + err.Error(), Status: 1})
+				return
+			}
+			inputArgs = append(inputArgs, "-i", sourcePath)
+			filter, err := audioMixTrackFilter(index, track, duration, copies)
+			if err != nil {
+				writeAudioMixResp(w, http.StatusBadRequest, AudioMixResponse{AgentID: request.AgentID, Content: "第 " + strconv.Itoa(index+1) + " 段音轨无效：" + err.Error(), Status: 1})
+				return
+			}
+			filterParts = append(filterParts, filter)
+			labels = append(labels, "[m"+strconv.Itoa(index)+"]")
+		}
+		filterParts = append(filterParts, strings.Join(labels, "")+"amix=inputs="+strconv.Itoa(len(labels))+":duration=longest:dropout_transition=0,alimiter=limit=0.99,aformat=channel_layouts=stereo[mixout]")
+		temporaryPath := strings.TrimSuffix(outputPath, ".wav") + "." + strconv.FormatInt(time.Now().UnixNano(), 10) + ".tmp.wav"
+		if !ensureWritablePathWithinRoot(workspace, temporaryPath) {
+			writeAudioMixResp(w, http.StatusBadRequest, AudioMixResponse{AgentID: request.AgentID, Content: "无法创建临时 WAV", Status: 1})
+			return
+		}
+		defer os.Remove(temporaryPath)
+		args := append(inputArgs, "-filter_complex", strings.Join(filterParts, ";"), "-map", "[mixout]", "-ar", strconv.Itoa(request.SampleRate), "-ac", "2")
+		if request.BitDepth == 24 {
+			args = append(args, "-c:a", "pcm_s24le")
+		} else {
+			args = append(args, "-c:a", "pcm_s16le")
+		}
+		args = append(args, "-f", "wav", "-n", temporaryPath)
+		output, err := videoTrimCommandContextFn(ctx, ffmpegPath, args...).CombinedOutput()
+		if err != nil {
+			message := "音频混音失败：" + videoTrimCommandError(err, output)
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				message = "音频混音超时"
+			}
+			writeAudioMixResp(w, http.StatusInternalServerError, AudioMixResponse{AgentID: request.AgentID, Content: message, Status: 1})
+			return
+		}
+		info, err := os.Stat(temporaryPath)
+		if err != nil || info.Size() == 0 {
+			writeAudioMixResp(w, http.StatusInternalServerError, AudioMixResponse{AgentID: request.AgentID, Content: "WAV 混音未生成有效输出", Status: 1})
+			return
+		}
+		if err := os.Link(temporaryPath, outputPath); err != nil {
+			status, message := http.StatusInternalServerError, "保存 WAV 失败"
+			if errors.Is(err, fs.ErrExist) {
+				status, message = http.StatusConflict, "同名 WAV 已存在，请更换名称"
+			}
+			writeAudioMixResp(w, status, AudioMixResponse{AgentID: request.AgentID, Path: filepath.ToSlash(outputRelativePath), Content: message, Status: 1})
+			return
+		}
+		if err := os.Remove(temporaryPath); err != nil {
+			_ = os.Remove(outputPath)
+			writeAudioMixResp(w, http.StatusInternalServerError, AudioMixResponse{AgentID: request.AgentID, Content: "清理临时 WAV 失败", Status: 1})
+			return
+		}
+		flushAgentCache()
+		writeAudioMixResp(w, http.StatusOK, AudioMixResponse{AgentID: request.AgentID, Path: filepath.ToSlash(outputRelativePath), SavedAs: outputPath, Content: "混音已保存", Status: 0})
+	}
+}
+
 func syncIntegrationSkillsWarnings(cfg *Config) error {
 	agentDir, err := resolveIntegrationAgentDir(cfg.AgentDir)
 	if err != nil {
@@ -7363,6 +7757,7 @@ func handleLogCleanupStatus() http.HandlerFunc {
 			"finishedAt":             snapshot.FinishedAt,
 			"deletedAgentMessageLog": snapshot.DeletedAgentMessageLog,
 			"deletedChatLog":         snapshot.DeletedChatLog,
+			"deletedCmdLog":          snapshot.DeletedCmdLog,
 			"error":                  snapshot.Error,
 		})
 	}
@@ -18713,6 +19108,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/video_trim", handleVideoTrim(&cfg))
 	mux.HandleFunc("/api/video_record_convert", handleVideoRecordConvert(&cfg))
 	mux.HandleFunc("/api/agent/audio", handleAgentAudioSave(&cfg))
+	mux.HandleFunc("/api/audio_mix", handleAudioMix(&cfg))
 	mux.HandleFunc("/file/lastUpdate", handleFileLastUpdate(&cfg))
 	mux.HandleFunc("/api/heartbeat", handleHeartbeat())
 	mux.HandleFunc("/api/log_cleanup_status", handleLogCleanupStatus())

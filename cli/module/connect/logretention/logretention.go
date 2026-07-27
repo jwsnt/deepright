@@ -22,6 +22,7 @@ type Result struct {
 	Cutoff                 string
 	DeletedAgentMessageLog int64
 	DeletedChatLog         int64
+	DeletedCmdLog          int64
 }
 
 type Status struct {
@@ -34,6 +35,7 @@ type Status struct {
 	FinishedAt             string
 	DeletedAgentMessageLog int64
 	DeletedChatLog         int64
+	DeletedCmdLog          int64
 	Error                  string
 }
 
@@ -134,6 +136,7 @@ func (m *Manager) startAsyncRunner(
 		m.status.FinishedAt = finishedAt
 		m.status.DeletedAgentMessageLog = result.DeletedAgentMessageLog
 		m.status.DeletedChatLog = result.DeletedChatLog
+		m.status.DeletedCmdLog = result.DeletedCmdLog
 		if err != nil {
 			m.status.Error = strings.TrimSpace(err.Error())
 		}
@@ -147,11 +150,12 @@ func (m *Manager) startAsyncRunner(
 			return
 		}
 		logf(
-			"[log-retention] cleanup finished cutoff=%s retention_days=%d agent_message_log=%d chat_log=%d",
+			"[log-retention] cleanup finished cutoff=%s retention_days=%d agent_message_log=%d chat_log=%d cmd_log=%d",
 			result.Cutoff,
 			result.RetentionDays,
 			result.DeletedAgentMessageLog,
 			result.DeletedChatLog,
+			result.DeletedCmdLog,
 		)
 	}()
 	return true
@@ -210,7 +214,7 @@ func CleanupExpiredLogs(ctx context.Context, db *sql.DB, now time.Time, retentio
 	if exists, err := tableExists(ctx, db, "agent_message_log"); err != nil {
 		return result, err
 	} else if exists {
-		deleted, err := deleteBeforeCutoffBatched(ctx, db, "agent_message_log", result.Cutoff)
+		deleted, err := deleteBeforeCutoffBatched(ctx, db, "agent_message_log", "created_at", result.Cutoff)
 		if err != nil {
 			return result, err
 		}
@@ -220,11 +224,21 @@ func CleanupExpiredLogs(ctx context.Context, db *sql.DB, now time.Time, retentio
 	if exists, err := tableExists(ctx, db, "chat_log"); err != nil {
 		return result, err
 	} else if exists {
-		deleted, err := deleteBeforeCutoffBatched(ctx, db, "chat_log", result.Cutoff)
+		deleted, err := deleteBeforeCutoffBatched(ctx, db, "chat_log", "created_at", result.Cutoff)
 		if err != nil {
 			return result, err
 		}
 		result.DeletedChatLog = deleted
+	}
+
+	if exists, err := tableExists(ctx, db, "cmd_log"); err != nil {
+		return result, err
+	} else if exists {
+		deleted, err := deleteBeforeCutoffBatched(ctx, db, "cmd_log", "received_at", result.Cutoff)
+		if err != nil {
+			return result, err
+		}
+		result.DeletedCmdLog = deleted
 	}
 	return result, nil
 }
@@ -241,8 +255,8 @@ func tableExists(ctx context.Context, db *sql.DB, name string) (bool, error) {
 	return count > 0, nil
 }
 
-func deleteBeforeCutoff(ctx context.Context, tx *sql.Tx, tableName, cutoff string) (int64, error) {
-	stmt := fmt.Sprintf(`DELETE FROM %s WHERE created_at != '' AND created_at < ?`, tableName)
+func deleteBeforeCutoff(ctx context.Context, tx *sql.Tx, tableName, timeColumn, cutoff string) (int64, error) {
+	stmt := fmt.Sprintf(`DELETE FROM %s WHERE %s != '' AND %s < ?`, tableName, timeColumn, timeColumn)
 	res, err := tx.ExecContext(ctx, stmt, cutoff)
 	if err != nil {
 		return 0, err
@@ -254,7 +268,7 @@ func deleteBeforeCutoff(ctx context.Context, tx *sql.Tx, tableName, cutoff strin
 	return rows, nil
 }
 
-func deleteBeforeCutoffBatched(ctx context.Context, db *sql.DB, tableName, cutoff string) (int64, error) {
+func deleteBeforeCutoffBatched(ctx context.Context, db *sql.DB, tableName, timeColumn, cutoff string) (int64, error) {
 	batchSize := cleanupDeleteBatchSize
 	if batchSize <= 0 {
 		batchSize = 500
@@ -267,7 +281,7 @@ func deleteBeforeCutoffBatched(ctx context.Context, db *sql.DB, tableName, cutof
 			return total, err
 		}
 
-		deleted, err := deleteBeforeCutoffBatch(ctx, tx, tableName, cutoff, batchSize)
+		deleted, err := deleteBeforeCutoffBatch(ctx, tx, tableName, timeColumn, cutoff, batchSize)
 		if err != nil {
 			_ = tx.Rollback()
 			return total, err
@@ -283,8 +297,8 @@ func deleteBeforeCutoffBatched(ctx context.Context, db *sql.DB, tableName, cutof
 	}
 }
 
-func deleteBeforeCutoffBatch(ctx context.Context, tx *sql.Tx, tableName, cutoff string, limit int) (int64, error) {
-	stmt := fmt.Sprintf(`DELETE FROM %s WHERE rowid IN (SELECT rowid FROM %s WHERE created_at != '' AND created_at < ? LIMIT ?)`, tableName, tableName)
+func deleteBeforeCutoffBatch(ctx context.Context, tx *sql.Tx, tableName, timeColumn, cutoff string, limit int) (int64, error) {
+	stmt := fmt.Sprintf(`DELETE FROM %s WHERE rowid IN (SELECT rowid FROM %s WHERE %s != '' AND %s < ? LIMIT ?)`, tableName, tableName, timeColumn, timeColumn)
 	res, err := tx.ExecContext(ctx, stmt, cutoff, limit)
 	if err != nil {
 		return 0, err

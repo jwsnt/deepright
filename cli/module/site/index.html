@@ -2602,6 +2602,7 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .vfs-reference-trigger{position:absolute;z-index:2;top:-13px;left:8px;width:38px;height:38px;padding:0;border:1px solid rgba(255,130,73,.44);border-radius:13px;background:linear-gradient(145deg,#fffaf5,#ffe1ca);color:#bd5425;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 10px 20px rgba(133,63,30,.16),inset 0 1px 0 rgba(255,255,255,.86);transition:transform .18s ease,filter .18s ease,box-shadow .18s ease}.vfs-reference-trigger svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}.vfs-reference-trigger:hover,.vfs-reference-trigger:focus-visible{outline:none;transform:translateY(-1px) scale(1.04);filter:brightness(1.035);box-shadow:0 13px 24px rgba(133,63,30,.22),0 0 0 3px rgba(255,143,80,.16),inset 0 1px 0 rgba(255,255,255,.9)}
 .vfs-audio-preview-shell{display:none;width:100%;min-height:84px;padding:14px;border:1px solid var(--vfs-audio-main-border);border-radius:20px;background:var(--vfs-audio-status-bg-1);align-items:center;justify-content:center}.vfs-audio-preview-shell.show{display:flex}.vfs-audio-preview{display:block;width:100%;height:54px;min-height:0;padding:0;border:0;border-radius:14px;accent-color:var(--vfs-audio-main);color-scheme:light}.vfs-audio-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.vfs-audio-action{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:10px 12px;border:1px solid var(--vfs-audio-main-border);border-radius:16px;background:linear-gradient(135deg,var(--vfs-audio-main),var(--vfs-audio-main-strong));color:#fff;font:700 14px/1 inherit;cursor:pointer;box-shadow:0 13px 25px var(--vfs-audio-shadow);transition:transform .18s ease,filter .18s ease,opacity .18s ease,box-shadow .18s ease}.vfs-audio-action svg{width:17px;height:17px;fill:currentColor}.vfs-audio-action:hover:not(:disabled),.vfs-audio-action:focus-visible:not(:disabled){outline:none;transform:translateY(-1px);filter:brightness(1.05)}.vfs-audio-action:disabled{cursor:not-allowed;opacity:.4;box-shadow:none}.vfs-audio-stop,.vfs-audio-reset{background:linear-gradient(135deg,color-mix(in srgb,var(--vfs-audio-main) 78%,#fff 22%),var(--vfs-audio-main));color:#fff}.vfs-audio-error{min-height:0;color:var(--error);font-size:12px;line-height:1.6}.vfs-audio-error:empty{display:none}.vfs-audio-actions{display:flex;justify-content:flex-end;gap:10px;padding-top:2px}.vfs-audio-actions .btn{min-width:118px}.vfs-audio-actions .btn-secondary{border-color:var(--vfs-audio-main-border);background:var(--vfs-audio-main-soft);color:var(--vfs-audio-text)}.vfs-audio-actions .btn-primary{border-color:transparent;background:linear-gradient(135deg,var(--vfs-audio-main),var(--vfs-audio-main-strong));box-shadow:0 13px 26px var(--vfs-audio-shadow)}
 .vfs-audio-discard-confirm{display:none;position:absolute;inset:0;z-index:3;align-items:center;justify-content:center;padding:22px;background:color-mix(in srgb,var(--vfs-audio-deep) 52%,transparent);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}.vfs-audio-discard-confirm.show{display:flex}.vfs-audio-discard-card{width:min(360px,100%);padding:21px;border:1px solid var(--vfs-audio-main-border);border-radius:19px;background:linear-gradient(160deg,var(--vfs-audio-panel-bg-1),var(--vfs-audio-panel-bg-2));box-shadow:0 22px 52px var(--vfs-audio-shadow);color:var(--vfs-audio-text)}.vfs-audio-discard-card h4{margin:0;font-size:17px}.vfs-audio-discard-card p{margin:8px 0 0;font-size:13px;line-height:1.6;color:var(--vfs-audio-muted)}.vfs-audio-discard-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}.vfs-audio-discard-actions .btn{min-width:96px}.vfs-audio-discard-actions .btn-secondary{border-color:var(--vfs-audio-main-border);background:var(--vfs-audio-main-soft);color:var(--vfs-audio-text)}.vfs-audio-discard-actions .btn-primary{background:linear-gradient(135deg,var(--vfs-audio-main),var(--vfs-audio-main-strong));border-color:transparent;box-shadow:0 12px 25px var(--vfs-audio-shadow)}
+.vfs-mix-panel{width:min(1160px,calc(100vw - 32px));height:min(780px,calc(100vh - 32px));display:flex;flex-direction:column;overflow:hidden;padding:0;border:1px solid color-mix(in srgb,var(--accent) 35%,var(--border));border-radius:22px;background:var(--bg-main);box-shadow:0 30px 80px rgba(0,0,0,.34)}.vfs-mix-head{display:flex;align-items:center;gap:12px;padding:15px 18px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,var(--bg-card),var(--bg-main))}.vfs-mix-head h3{margin:0;font-size:18px;color:var(--text-primary)}.vfs-mix-name{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-muted);font-size:12px}.vfs-mix-close{width:32px;height:32px;border:1px solid var(--border);border-radius:9px;background:var(--bg-card);color:var(--text-secondary);cursor:pointer}.vfs-mix-body{display:grid;grid-template-columns:minmax(0,1fr) 285px;min-height:0;flex:1}.vfs-mix-workspace{min-width:0;display:flex;flex-direction:column;border-right:1px solid var(--border)}.vfs-mix-drop{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:14px 14px 0;padding:12px 14px;border:1px dashed color-mix(in srgb,var(--accent) 55%,var(--border));border-radius:12px;background:color-mix(in srgb,var(--accent) 6%,var(--bg-card));color:var(--text-secondary);font-size:12px;line-height:1.5;transition:background .16s,border-color .16s}.vfs-mix-drop-copy{min-width:0}.vfs-mix-add-file{flex:0 0 auto;height:30px;padding:0 10px;border:1px solid color-mix(in srgb,var(--accent) 48%,var(--border));border-radius:8px;background:color-mix(in srgb,var(--accent) 12%,var(--bg-card));color:var(--text-primary);font-size:12px;font-weight:650;cursor:pointer}.vfs-mix-add-file:hover,.vfs-mix-add-file:focus-visible{outline:none;border-color:var(--accent);background:color-mix(in srgb,var(--accent) 22%,var(--bg-card))}.vfs-mix-add-file:disabled{opacity:.5;cursor:not-allowed}.vfs-mix-drop.dragover{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,var(--bg-card));color:var(--text-primary)}.vfs-mix-timeline-scroll{flex:1;min-height:220px;overflow:auto;margin:14px}.vfs-mix-ruler{position:relative;height:28px;min-width:720px;border-bottom:1px solid var(--border);background:repeating-linear-gradient(90deg,transparent 0,transparent 49px,color-mix(in srgb,var(--border) 75%,transparent) 50px)}.vfs-mix-ruler span{position:absolute;top:6px;color:var(--text-muted);font:11px/1 ui-monospace,SFMono-Regular,Menlo,monospace}.vfs-mix-tracks{position:relative;min-width:720px;min-height:260px;padding-bottom:12px}.vfs-mix-empty{padding:52px 18px;color:var(--text-muted);font-size:13px;text-align:center}.vfs-mix-track{position:relative;height:50px;margin-top:7px;border:1px solid var(--border);border-radius:10px;background:var(--bg-card)}.vfs-mix-clip{position:absolute;top:5px;height:38px;min-width:34px;padding:0 10px;box-sizing:border-box;display:flex;align-items:center;overflow:hidden;border:1px solid color-mix(in srgb,var(--accent) 66%,var(--border));border-radius:8px;background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 64%,#fff),var(--accent));color:#fff;box-shadow:0 5px 13px rgba(var(--accent-rgb),.2);font-size:12px;font-weight:650;cursor:grab;user-select:none}.vfs-mix-clip:active{cursor:grabbing}.vfs-mix-clip.selected{outline:3px solid color-mix(in srgb,var(--accent) 30%,transparent)}.vfs-mix-clip.muted{opacity:.48;filter:grayscale(.65)}.vfs-mix-inspector{min-width:0;overflow:auto;padding:15px;background:color-mix(in srgb,var(--bg-card) 74%,var(--bg-main))}.vfs-mix-inspector h4{margin:0 0 12px;color:var(--text-primary);font-size:14px}.vfs-mix-inspector-empty{color:var(--text-muted);font-size:12px;line-height:1.6}.vfs-mix-field{display:grid;grid-template-columns:1fr 94px;gap:8px;align-items:center;margin:8px 0;color:var(--text-secondary);font-size:12px}.vfs-mix-field input,.vfs-mix-field select{min-width:0;height:30px;padding:4px 7px;border:1px solid var(--border);border-radius:7px;background:var(--bg-input);color:var(--text-primary);font:12px/1 inherit}.vfs-mix-field.checkbox{grid-template-columns:1fr auto}.vfs-mix-field.checkbox input{width:16px;height:16px;padding:0;accent-color:var(--accent)}.vfs-mix-effects{margin-top:15px;padding-top:12px;border-top:1px solid var(--border)}.vfs-mix-effect{display:grid;grid-template-columns:1fr 75px 27px;gap:5px;margin:6px 0}.vfs-mix-effect select,.vfs-mix-effect input{height:28px;min-width:0;padding:3px 5px;border:1px solid var(--border);border-radius:7px;background:var(--bg-input);color:var(--text-primary);font-size:11px}.vfs-mix-effect button,.vfs-mix-add-effect,.vfs-mix-delete-track{height:28px;border:1px solid var(--border);border-radius:7px;background:var(--bg-card);color:var(--text-secondary);cursor:pointer;font-size:11px}.vfs-mix-delete-track{width:100%;margin-top:14px;color:var(--error)}.vfs-mix-foot{display:flex;align-items:center;gap:10px;padding:12px 18px;border-top:1px solid var(--border);background:var(--bg-card)}.vfs-mix-export{display:flex;align-items:center;gap:8px;margin-right:auto;color:var(--text-secondary);font-size:12px}.vfs-mix-export select{height:31px;border:1px solid var(--border);border-radius:8px;background:var(--bg-input);color:var(--text-primary)}.vfs-mix-status{min-width:0;max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-muted);font-size:12px}.vfs-mix-status.error{color:var(--error)}.vfs-mix-foot .btn:disabled{opacity:.55;cursor:not-allowed}@media (max-width:760px){.vfs-mix-panel{height:min(840px,calc(100vh - 18px));width:calc(100vw - 18px)}.vfs-mix-body{grid-template-columns:1fr;overflow:auto}.vfs-mix-workspace{min-height:350px;border-right:0;border-bottom:1px solid var(--border)}.vfs-mix-inspector{min-height:310px}.vfs-mix-foot{flex-wrap:wrap}.vfs-mix-status{order:3;flex-basis:100%}.vfs-mix-drop{align-items:flex-start;flex-direction:column}.vfs-mix-add-file{align-self:flex-start}}
 .vfs-reference-preview{position:fixed;top:50%;right:16px;width:min(400px,calc(100vw - 32px));height:min(560px,68vh);display:flex;opacity:0;visibility:hidden;pointer-events:none;transform:translate3d(24px,-50%,0) scale(.98);transition:opacity .24s ease,transform .3s cubic-bezier(.22,1,.36,1),visibility 0s linear .3s}.vfs-reference-preview.show{opacity:1;visibility:visible;transform:translate3d(0,-50%,0) scale(1);transition:opacity .24s ease,transform .3s cubic-bezier(.22,1,.36,1),visibility 0s linear 0s}.vfs-reference-book{position:relative;isolation:isolate;display:flex;flex-direction:column;width:100%;min-height:0;overflow:hidden;padding:15px 15px 15px 24px;border:1px solid rgba(255,133,76,.42);border-radius:12px 24px 24px 12px;background:linear-gradient(137deg,rgba(255,252,247,.98),rgba(255,238,222,.96));box-shadow:0 28px 66px rgba(105,48,24,.24),inset 0 1px 0 rgba(255,255,255,.9);color:#5f3524}.vfs-reference-book::before{content:'';position:absolute;z-index:-1;top:0;bottom:0;left:0;width:15px;background:linear-gradient(180deg,#d96731,#f49a62 46%,#b84d24);box-shadow:inset -1px 0 0 rgba(255,255,255,.44),7px 0 12px rgba(122,50,21,.16)}.vfs-reference-book::after{content:'';position:absolute;z-index:-1;right:-32%;bottom:-38%;width:78%;height:72%;border-radius:50%;background:radial-gradient(circle,rgba(255,167,102,.28),transparent 68%);filter:blur(10px);pointer-events:none}.vfs-reference-book>*{position:relative;z-index:1}.vfs-reference-book-head{display:flex;align-items:flex-start;gap:10px;min-height:37px;padding:0 2px 11px 4px;border-bottom:1px solid rgba(169,82,42,.18)}.vfs-reference-book-mark{display:grid;place-items:center;flex:0 0 auto;width:30px;height:30px;margin-top:1px;border-radius:10px;background:linear-gradient(145deg,#ffb175,#e76d34);color:#fff;box-shadow:0 8px 16px rgba(170,75,30,.2),inset 0 1px 0 rgba(255,255,255,.48)}.vfs-reference-book-mark svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}.vfs-reference-book-meta{flex:1;min-width:0}.vfs-reference-book-title{display:block;overflow:hidden;color:#6a3420;font-size:13px;font-weight:750;line-height:1.35;text-overflow:ellipsis;white-space:nowrap}.vfs-reference-book-subtitle{display:block;margin-top:2px;color:#9d6247;font-size:10px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.vfs-reference-book-actions{display:flex;align-items:center;gap:5px;flex:0 0 auto}.vfs-reference-book-action{height:29px;padding:0 9px;border:1px solid rgba(209,105,55,.32);border-radius:9px;background:rgba(255,252,247,.7);color:#9d4a24;font-size:11px;font-weight:700;cursor:pointer;transition:transform .18s ease,background .18s ease,box-shadow .18s ease}.vfs-reference-book-action:hover,.vfs-reference-book-action:focus-visible{outline:none;transform:translateY(-1px);background:#fffaf5;box-shadow:0 7px 14px rgba(142,62,25,.14)}.vfs-reference-book-action.close{width:29px;padding:0;display:inline-grid;place-items:center}.vfs-reference-book-action.close svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}.vfs-reference-book-pages{flex:1;min-height:0;margin:13px 0 0 5px;overflow:auto;border:1px solid rgba(176,99,59,.2);border-radius:5px 15px 15px 5px;background:linear-gradient(90deg,rgba(255,255,255,.78),rgba(255,250,243,.96));box-shadow:inset 7px 0 11px rgba(126,61,31,.06),inset 0 1px 0 rgba(255,255,255,.94);scrollbar-gutter:stable}.vfs-reference-book-content{min-height:100%;padding:18px 18px 28px;color:#513326;font-size:13px;line-height:1.72;overflow-wrap:anywhere}.vfs-reference-book-content .md-content{color:inherit}.vfs-reference-book-content .md-content>*:first-child{margin-top:0}.vfs-reference-book-content .md-content>*:last-child{margin-bottom:0}.vfs-reference-book-content pre{margin:0;white-space:pre-wrap;font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:inherit}.vfs-reference-book-content iframe{display:block;width:100%;height:100%;min-height:360px;border:0;border-radius:6px;background:#fff}.vfs-reference-book-loading,.vfs-reference-book-error{display:flex;align-items:center;justify-content:center;min-height:100%;padding:24px;text-align:center;color:#9d6247;font-size:12px;line-height:1.6}.vfs-reference-book-error{color:var(--error)}
 @keyframes vfsAudioRecordingPulse{0%,100%{transform:scale(.88);opacity:.7}50%{transform:scale(1.18);opacity:1}}
 [data-theme="dark"] .vfs-audio-panel{--vfs-audio-main:#43d7ff;--vfs-audio-main-strong:#5d9dff;--vfs-audio-main-soft:rgba(67,215,255,.15);--vfs-audio-main-border:rgba(83,218,255,.38);--vfs-audio-deep:#07182a;--vfs-audio-panel-bg-1:#101d31;--vfs-audio-panel-bg-2:#142842;--vfs-audio-status-bg-1:#132b43;--vfs-audio-status-bg-2:#19243b;--vfs-audio-text:#dcf8ff;--vfs-audio-muted:#9fc8da;--vfs-audio-shadow:rgba(23,174,228,.22);border-color:var(--vfs-audio-main-border);box-shadow:0 32px 82px rgba(0,0,0,.48),0 0 34px var(--vfs-audio-main-soft)}[data-theme="dark"] .vfs-audio-shell::after{background:radial-gradient(circle,rgba(93,157,255,.17),transparent 70%)}[data-theme="dark"] .vfs-audio-preview{color-scheme:dark;background:var(--vfs-audio-status-bg-1)}[data-theme="dark"] .vfs-reference-trigger{border-color:rgba(89,220,255,.42);background:linear-gradient(145deg,#173e61,#122c4a);color:#b7f5ff;box-shadow:0 10px 22px rgba(0,0,0,.28),inset 0 1px 0 rgba(235,254,255,.12)}[data-theme="dark"] .vfs-reference-trigger:hover,[data-theme="dark"] .vfs-reference-trigger:focus-visible{box-shadow:0 13px 25px rgba(0,0,0,.34),0 0 0 3px rgba(67,215,255,.16),inset 0 1px 0 rgba(235,254,255,.14)}[data-theme="dark"] .vfs-reference-book{border-color:rgba(84,220,255,.3);background:linear-gradient(137deg,rgba(15,34,57,.98),rgba(10,24,43,.98));box-shadow:0 30px 74px rgba(0,0,0,.46),inset 0 1px 0 rgba(220,252,255,.1);color:#cbeaf5}[data-theme="dark"] .vfs-reference-book::before{background:linear-gradient(180deg,#167dac,#27b4d7 46%,#11518e);box-shadow:inset -1px 0 0 rgba(225,253,255,.18),7px 0 12px rgba(0,0,0,.26)}[data-theme="dark"] .vfs-reference-book::after{background:radial-gradient(circle,rgba(0,212,255,.18),transparent 68%)}[data-theme="dark"] .vfs-reference-book-head{border-color:rgba(105,215,255,.16)}[data-theme="dark"] .vfs-reference-book-mark{background:linear-gradient(145deg,#48dbff,#2176dc);box-shadow:0 8px 16px rgba(0,0,0,.26),inset 0 1px 0 rgba(240,254,255,.2)}[data-theme="dark"] .vfs-reference-book-title{color:#e0faff}[data-theme="dark"] .vfs-reference-book-subtitle{color:#91c9dc}[data-theme="dark"] .vfs-reference-book-action{border-color:rgba(82,210,255,.28);background:rgba(23,66,98,.68);color:#b9efff}[data-theme="dark"] .vfs-reference-book-action:hover,[data-theme="dark"] .vfs-reference-book-action:focus-visible{background:rgba(34,86,122,.92);box-shadow:0 7px 14px rgba(0,0,0,.26)}[data-theme="dark"] .vfs-reference-book-pages{border-color:rgba(92,207,255,.2);background:linear-gradient(90deg,rgba(13,35,59,.94),rgba(16,42,68,.92));box-shadow:inset 7px 0 11px rgba(0,0,0,.16),inset 0 1px 0 rgba(230,254,255,.05)}[data-theme="dark"] .vfs-reference-book-content{color:#d6edf5}[data-theme="dark"] .vfs-reference-book-loading{color:#91c9dc}
@@ -4371,7 +4372,7 @@ body.quick-fan-transition-active{cursor:progress}
 .fe-media-trim-filename-dialog[hidden]{display:none!important}
 .fe-media-trim-filename-card{width:min(410px,100%);padding:18px;border:1px solid color-mix(in srgb,var(--border) 64%,var(--accent) 36%);border-radius:16px;background:color-mix(in srgb,var(--bg-card) 88%,rgba(255,255,255,.92));box-shadow:0 20px 46px rgba(81,43,28,.22)}
 .fe-media-trim-filename-card h3{margin:0;color:var(--text-primary);font-size:16px}.fe-media-trim-filename-card p{margin:7px 0 12px;color:var(--text-muted);font-size:12px;line-height:1.5}.fe-media-trim-filename-input{display:block;width:100%;height:38px;padding:0 10px;border:1px solid color-mix(in srgb,var(--border) 70%,var(--accent) 30%);border-radius:9px;outline:none;background:var(--bg-input);color:var(--text-primary);font:600 13px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace}.fe-media-trim-filename-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(var(--accent-rgb),.12)}.fe-media-trim-filename-error{min-height:18px;margin-top:7px;color:var(--error);font-size:11px;line-height:1.45}.fe-media-trim-filename-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}.fe-media-trim-filename-actions button{min-width:78px;height:32px;border:1px solid var(--border);border-radius:9px;background:var(--bg-input);color:var(--text-secondary);font-size:12px;font-weight:650;cursor:pointer}.fe-media-trim-filename-actions .confirm{border-color:transparent;background:linear-gradient(135deg,var(--accent-hover),var(--accent));color:#fff}
-.fe-ffmpeg-install-dialog{position:absolute;inset:0;z-index:13;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(18,18,18,.22);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.fe-ffmpeg-install-dialog{position:fixed;inset:0;z-index:260;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(18,18,18,.22);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
 .fe-ffmpeg-install-dialog[hidden]{display:none!important}
 .fe-ffmpeg-install-card{width:min(390px,100%);padding:20px;border:1px solid color-mix(in srgb,var(--border) 60%,var(--accent) 40%);border-radius:16px;background:color-mix(in srgb,var(--bg-card) 88%,rgba(255,255,255,.92));box-shadow:0 24px 54px rgba(81,43,28,.24)}
 .fe-ffmpeg-install-card h3{margin:0;color:var(--text-primary);font-size:16px}.fe-ffmpeg-install-card p{margin:8px 0 0;color:var(--text-secondary);font-size:13px;line-height:1.55}.fe-ffmpeg-install-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.fe-ffmpeg-install-actions button{min-width:78px;height:32px;border:1px solid var(--border);border-radius:9px;background:var(--bg-input);color:var(--text-secondary);font-size:12px;font-weight:650;cursor:pointer}.fe-ffmpeg-install-actions .confirm{border-color:transparent;background:linear-gradient(135deg,var(--accent-hover),var(--accent));color:#fff}
@@ -6128,6 +6129,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
           <option value="3">音频</option>
           <option value="4">图片</option>
           <option value="5">录屏</option>
+	          <option value="6">混音</option>
         </select>
       </div>
       <div id="vfsCreateError" class="settings-error"></div>
@@ -6137,6 +6139,19 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
       </div>
     </div>
   </div>
+</div>
+<div class="overlay" id="vfsMixOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="29" onclick="if(event.target===this)vfsMixClose()" aria-hidden="true">
+  <section class="settings-panel vfs-mix-panel" id="vfsMixPanel" role="dialog" aria-modal="true" aria-labelledby="vfsMixTitle" onclick="event.stopPropagation()">
+    <header class="vfs-mix-head"><h3 id="vfsMixTitle">混音</h3><span class="vfs-mix-name" id="vfsMixFilename"></span><button class="vfs-mix-close" type="button" onclick="vfsMixClose()" aria-label="关闭混音">×</button></header>
+    <div class="vfs-mix-body">
+      <div class="vfs-mix-workspace" ondragenter="vfsMixDragOver(event)" ondragover="vfsMixDragOver(event)" ondragleave="vfsMixDragLeave(event)" ondrop="vfsMixDrop(event)">
+        <div class="vfs-mix-drop" id="vfsMixDrop" ondragenter="vfsMixDragOver(event)" ondragover="vfsMixDragOver(event)" ondragleave="vfsMixDragLeave(event)" ondrop="vfsMixDrop(event)"><span class="vfs-mix-drop-copy">拖入任意本地文件、从虚拟文件系统拖入，或选择文件。格式由服务端解析，不能解析的文件会在保存时说明原因。</span><button class="vfs-mix-add-file" id="vfsMixAddFileBtn" type="button" onclick="vfsMixChooseFiles()">添加音频文件</button></div>
+        <div class="vfs-mix-timeline-scroll" id="vfsMixTimelineScroll"><div class="vfs-mix-ruler" id="vfsMixRuler"></div><div class="vfs-mix-tracks" id="vfsMixTracks"></div></div>
+      </div>
+      <aside class="vfs-mix-inspector" id="vfsMixInspector"></aside>
+    </div>
+    <footer class="vfs-mix-foot"><div class="vfs-mix-export"><label>采样率 <select id="vfsMixSampleRate" onchange="vfsMixSetExport('sampleRate',this.value)"><option value="44100">44.1 kHz</option><option value="48000">48 kHz</option></select></label><label>位深 <select id="vfsMixBitDepth" onchange="vfsMixSetExport('bitDepth',this.value)"><option value="16">16-bit</option><option value="24">24-bit</option></select></label></div><span class="vfs-mix-status" id="vfsMixStatus" role="status" aria-live="polite"></span><button class="btn btn-secondary" type="button" onclick="vfsMixClose()">关闭</button><button class="btn btn-primary" id="vfsMixSaveBtn" type="button" onclick="vfsMixSave()">保存 WAV</button></footer>
+  </section>
 </div>
 <div class="overlay" id="vfsAudioOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="29" onclick="if(event.target===this)vfsAudioRequestCancel()" aria-hidden="true">
   <section class="settings-panel vfs-audio-panel" id="vfsAudioPanel" role="dialog" aria-modal="true" aria-labelledby="vfsAudioTitle" onclick="event.stopPropagation()">
@@ -6508,13 +6523,13 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
         <div class="fe-media-trim-filename-actions"><button type="button" onclick="feCancelMediaTrimFilename()">取消</button><button class="confirm" type="button" onclick="feConfirmMediaTrimFilename()">确认保存</button></div>
       </div>
     </div>
-    <div class="fe-ffmpeg-install-dialog" id="feFFmpegInstallDialog" role="dialog" aria-modal="true" aria-labelledby="feFFmpegInstallTitle" aria-describedby="feFFmpegInstallDesc" hidden onclick="feHandleFFmpegInstallDialogClick(event)">
-      <div class="fe-ffmpeg-install-card" tabindex="-1" onclick="event.stopPropagation()">
-        <h3 id="feFFmpegInstallTitle">需要安装 FFmpeg</h3>
-        <p id="feFFmpegInstallDesc">是否发送安装请求？</p>
-        <div class="fe-ffmpeg-install-actions"><button type="button" onclick="feCancelFFmpegInstall()">取消</button><button class="confirm" type="button" id="feFFmpegInstallConfirmBtn" onclick="feConfirmFFmpegInstall()">安装</button></div>
-      </div>
-    </div>
+  </div>
+</div>
+<div class="fe-ffmpeg-install-dialog" id="feFFmpegInstallDialog" role="dialog" aria-modal="true" aria-labelledby="feFFmpegInstallTitle" aria-describedby="feFFmpegInstallDesc" hidden onclick="feHandleFFmpegInstallDialogClick(event)">
+  <div class="fe-ffmpeg-install-card" tabindex="-1" onclick="event.stopPropagation()">
+    <h3 id="feFFmpegInstallTitle">需要安装 FFmpeg</h3>
+    <p id="feFFmpegInstallDesc">是否发送安装请求？</p>
+    <div class="fe-ffmpeg-install-actions"><button type="button" onclick="feCancelFFmpegInstall()">取消</button><button class="confirm" type="button" id="feFFmpegInstallConfirmBtn" onclick="feConfirmFFmpegInstall()">安装</button></div>
   </div>
 </div>
 <div class="overlay shutdown-overlay" id="shutdownConfirmOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="59" aria-hidden="true">
@@ -6927,6 +6942,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
 
 <input type="file" id="vfsUploadInput" multiple style="display:none" onchange="vfsUploadFiles(this.files)" />
 <input type="file" id="vfsUploadDirInput" webkitdirectory multiple style="display:none" onchange="vfsUploadFiles(this.files)" />
+<input type="file" id="vfsMixFileInput" multiple style="display:none" onchange="vfsMixHandleChosenFiles(this.files)" />
 <input type="file" id="vfsReferenceFileInput" accept=".txt,.text,.md,.markdown,.mdx,.json,.html,.htm,.xml,.yaml,.yml,.toml,.ini,.cfg,.conf,.log,.csv,.sh,.bash,.zsh,.go,.js,.ts,.py,.java,.c,.cpp,.h,.hpp,.css,.scss,.less,.sql,.rb,.rs,.swift,.kt,.lua,.pl,.r,.m,.mm,.pdf,text/plain,text/markdown,application/json,text/html,application/pdf" style="display:none" onchange="vfsReferenceHandleSelection(this.files)" />
 <input type="file" id="agentImportZipInput" accept=".zip,application/zip" style="display:none" onchange="handleAgentImportZipSelection(this.files)" />
 <input type="file" id="agentImportDirInput" webkitdirectory multiple style="display:none" onchange="handleAgentImportDirectorySelection(this.files)" />
@@ -7144,7 +7160,7 @@ const MESSAGE_IMAGE_CACHE = 'deepright-message-images-v1';
 const MESSAGE_IMAGE_DB = 'deepright-message-images-db';
 const MESSAGE_IMAGE_STORE = 'images';
 const REMOTE_MASKED_TOKEN_VALUE = '**********';
-const MAX_STORE = 2000, MAX_SHOW = 500, LAZY_PAGE = 20, MAX_CLI_SUB_SHOW = 30, MAX_CLI_COMMAND_HISTORY = 30, COLD_HISTORY_RECORD_PAGE = 120;
+const MAX_STORE = 2000, MAX_SHOW = 500, LAZY_PAGE = 20, MAX_CLI_SUB_SHOW = 100, MAX_CLI_COMMAND_HISTORY = 100, MAX_CLI_COMMAND_HISTORY_BYTES = 5 * 1024 * 1024, COLD_HISTORY_RECORD_PAGE = 120;
 const LOCAL_STORAGE_SOFT_LIMIT_BYTES = Math.round(2.5 * 1024 * 1024);
 const LOCAL_STORAGE_COMPACT_TARGET_BYTES = Math.round(2 * 1024 * 1024);
 const LOCAL_STORAGE_MAINTENANCE_INTERVAL_MS = 30000;
@@ -29750,10 +29766,11 @@ function normalizeCliCommandHistoryEntry(entry) {
 }
 
 function normalizeCliCommandHistoryList(entries) {
-  return (Array.isArray(entries) ? entries : [])
+  const normalized = (Array.isArray(entries) ? entries : [])
     .map(normalizeCliCommandHistoryEntry)
     .filter(Boolean)
     .slice(-MAX_CLI_COMMAND_HISTORY);
+  return retainCliSubPanelEntries(normalized);
 }
 
 function ensureChatCliCommandHistory(chat) {
@@ -35745,6 +35762,53 @@ function compareCliSubEntries(a, b) {
   return String(a && a.id || '').localeCompare(String(b && b.id || ''));
 }
 
+function estimateCliSubEntryBytes(entry) {
+  try {
+    if (entry && entry.type === 'manual-cmd') {
+      return estimateLocalStorageTextBytes(JSON.stringify({
+        command: String(entry.command || ''),
+        output: String(entry.output || '')
+      }));
+    }
+    return estimateLocalStorageTextBytes(String(entry && entry.content || ''));
+  } catch {
+    return 0;
+  }
+}
+
+function compactCliSubEntryToBytes(entry, maxBytes) {
+  const limit = Math.max(0, Number(maxBytes) || 0);
+  if (!entry || !limit || estimateCliSubEntryBytes(entry) <= limit) return entry;
+  if (entry.type === 'manual-cmd') {
+    const compacted = { ...entry };
+    ['output', 'command'].forEach(field => {
+      if (estimateCliSubEntryBytes(compacted) <= limit) return;
+      const text = String(compacted[field] || '');
+      const withoutField = { ...compacted, [field]: '' };
+      const available = Math.max(0, limit - estimateCliSubEntryBytes(withoutField));
+      compacted[field] = available > 0 ? truncateStoredTextToBytes(text, available) : '';
+    });
+    return compacted;
+  }
+  return { ...entry, content: truncateStoredTextToBytes(entry.content, limit) };
+}
+
+function retainCliSubPanelEntries(entries) {
+  const source = Array.isArray(entries) ? entries : [];
+  const retained = [];
+  let totalBytes = 0;
+  for (let index = source.length - 1; index >= 0 && retained.length < MAX_CLI_SUB_SHOW; index--) {
+    const available = MAX_CLI_COMMAND_HISTORY_BYTES - totalBytes;
+    if (available <= 0) break;
+    const entry = compactCliSubEntryToBytes(source[index], available);
+    const entryBytes = estimateCliSubEntryBytes(entry);
+    if (entryBytes > available) break;
+    retained.push(entry);
+    totalBytes += entryBytes;
+  }
+  return retained.reverse();
+}
+
 function setCliSubBubbleContent(el, content) {
   const md = ensureCliSubBubble(el);
   if (!md) return;
@@ -35803,8 +35867,7 @@ function buildCliSubPanelEntries(chat) {
     });
   });
   entries.sort(compareCliSubEntries);
-  if (entries.length > MAX_CLI_SUB_SHOW) return entries.slice(-MAX_CLI_SUB_SHOW);
-  return entries;
+  return retainCliSubPanelEntries(entries);
 }
 
 function renderCliSubPanelEntry(group, entry) {
@@ -37234,7 +37297,7 @@ function upsertManualCmdCliHistory(chatId, entry, flash) {
   const idx = history.findIndex(item => item && item.id === normalized.id);
   if (idx >= 0) history[idx] = normalized;
   else history.push(normalized);
-  if (history.length > MAX_CLI_COMMAND_HISTORY) chat.cliCommandHistory = history.slice(-MAX_CLI_COMMAND_HISTORY);
+  chat.cliCommandHistory = normalizeCliCommandHistoryList(history);
   saveChats();
   if (state.activeChat === chatId) {
     restoreCliSubPanel(chatId);
@@ -41486,7 +41549,7 @@ function upsertRestoreCliHistoryEntry(chat, entry) {
     || prevNormalized.updatedAt !== next.updatedAt;
   if (idx >= 0) history[idx] = next;
   else history.push(next);
-  if (history.length > MAX_CLI_COMMAND_HISTORY) chat.cliCommandHistory = history.slice(-MAX_CLI_COMMAND_HISTORY);
+  chat.cliCommandHistory = normalizeCliCommandHistoryList(history);
   return { entry: next, changed };
 }
 
@@ -47296,6 +47359,13 @@ function validateScreenCreateName(name) {
   if (dotIndex > 0) return '录屏只支持 .mp4 后缀';
   return '';
 }
+function validateMixCreateName(name) {
+  const trimmed = String(name || '').trim();
+  if (/\.wav$/i.test(trimmed)) return '';
+  const dotIndex = trimmed.lastIndexOf('.');
+  if (dotIndex > 0) return '混音只支持 .wav 后缀';
+  return '';
+}
 async function vfsScreenCheckOutputName(agentId, fileName) {
   const normalizedAgentId = String(agentId || '').trim();
   const normalizedName = String(fileName || '').trim();
@@ -47313,6 +47383,25 @@ async function vfsScreenCheckOutputName(agentId, fileName) {
   if (!response.ok) throw new Error('无法检查 videos 目录');
   const entries = await response.json();
   if (!Array.isArray(entries)) throw new Error('无法检查 videos 目录');
+  return entries.some(entry => entry && entry.type === 'file' && String(entry.name || '').toLowerCase() === normalizedName.toLowerCase());
+}
+async function vfsMixCheckOutputName(agentId, fileName) {
+  const normalizedAgentId = String(agentId || '').trim();
+  const normalizedName = String(fileName || '').trim();
+  let workspace = normalizeFsPath(vfsWorkspaceByAgent.get(normalizedAgentId) || '');
+  if (!workspace && normalizedAgentId === String(vfsAgentId || '').trim()) workspace = normalizeFsPath(vfsWorkspace);
+  if (!workspace) {
+    const response = await fetch('/api/workspace?agentId=' + encodeURIComponent(normalizedAgentId), { cache: 'no-store' });
+    if (!response.ok) throw new Error('无法读取当前 Agent 工作区');
+    workspace = normalizeFsPath((await response.text()).trim());
+    if (workspace) vfsWorkspaceByAgent.set(normalizedAgentId, workspace);
+  }
+  if (!workspace || !normalizedName) throw new Error('无法检查 WAV 文件名');
+  const response = await fetch('/api/files?path=' + encodeURIComponent(joinFsPath(workspace, 'audios', normalizedName)), { cache: 'no-store' });
+  if (response.status === 404) return false;
+  if (!response.ok) throw new Error('无法检查 audios 目录');
+  const entries = await response.json();
+  if (!Array.isArray(entries)) throw new Error('无法检查 audios 目录');
   return entries.some(entry => entry && entry.type === 'file' && String(entry.name || '').toLowerCase() === normalizedName.toLowerCase());
 }
 async function vfsConfirmCreate() {
@@ -47337,14 +47426,52 @@ async function vfsConfirmCreate() {
     const screenNameError = validateScreenCreateName(name);
     if (screenNameError) { errEl.textContent = screenNameError; return; }
   }
+  if (type === '6') {
+    const mixNameError = validateMixCreateName(name);
+    if (mixNameError) { errEl.textContent = mixNameError; return; }
+  }
   const agentId = state.settings.agentId;
   if (!agentId) { errEl.textContent = '未选择 Agent'; return; }
+  if (type === '6') {
+    const fileName = vfsMixEnsureFileName(name);
+    const createButton = document.querySelector('#vfsCreatePanel .vfs-create-actions .btn-primary');
+    if (createButton) createButton.disabled = true;
+    errEl.textContent = '正在检查 WAV 文件名…';
+    try {
+      if (await vfsMixCheckOutputName(agentId, fileName)) {
+        errEl.textContent = '同名 WAV 已存在：audios/' + fileName;
+        if (createButton) createButton.disabled = false;
+        return;
+      }
+    } catch (error) {
+      errEl.textContent = '创建前检查失败：' + ((error && error.message) || '请重试');
+      if (createButton) createButton.disabled = false;
+      return;
+    }
+    if (createButton) createButton.disabled = false;
+    document.getElementById('vfsCreateName').value = '';
+    errEl.textContent = '';
+    vfsHideCreate();
+    vfsMixOpen({ agentId, fileName });
+    return;
+  }
   if (type === '5') {
     const fileName = vfsScreenEnsureFileName(name);
     const createButton = document.querySelector('#vfsCreatePanel .vfs-create-actions .btn-primary');
     if (createButton) createButton.disabled = true;
-    errEl.textContent = '正在检查 MP4 文件名…';
+    errEl.textContent = '正在检查 FFmpeg…';
     let nameConflictAtCreate = false;
+    try {
+      if (!await vfsScreenCheckFFmpeg()) {
+        if (createButton) createButton.disabled = false;
+        return;
+      }
+    } catch (error) {
+      errEl.textContent = '录屏环境检查失败：' + ((error && error.message) || '请重试');
+      if (createButton) createButton.disabled = false;
+      return;
+    }
+    errEl.textContent = '正在检查 MP4 文件名…';
     try {
       nameConflictAtCreate = await vfsScreenCheckOutputName(agentId, fileName);
     } catch (error) {
@@ -47412,9 +47539,243 @@ async function vfsConfirmCreate() {
 // ===== VFS audio recording =====
 const VFS_AUDIO_FILE_EXTENSION = '.wav';
 const VFS_AUDIO_DIRECTORY = 'audios';
+const VFS_MIX_FILE_EXTENSION = '.wav';
 const VFS_IMAGE_FILE_EXTENSION = '.png';
 const VFS_IMAGE_DIRECTORY = 'images';
 let vfsAudioState = null;
+let vfsMixState = null;
+
+function vfsMixEnsureFileName(name) {
+  const value = String(name || '').trim();
+  return /\.wav$/i.test(value) ? value : value + VFS_MIX_FILE_EXTENSION;
+}
+function vfsMixTrackById(id) {
+  return vfsMixState && vfsMixState.tracks.find(track => track.id === id);
+}
+function vfsMixClipDuration(track) {
+  if (!track) return 0;
+  const sourceDuration = Math.max(0, Number(track.trimEnd) - Number(track.trimStart));
+  const speed = Math.max(.25, Math.min(4, Number(track.speed) || 1));
+  if (track.loop) return Math.max(.1, Number(track.duration) || 0);
+  return sourceDuration > 0 ? sourceDuration / speed : Math.max(.1, Number(track.duration) || 10);
+}
+function vfsMixTimelineEnd() {
+  if (!vfsMixState || !vfsMixState.tracks.length) return 15;
+  return Math.max(15, ...vfsMixState.tracks.map(track => Math.max(0, Number(track.start) || 0) + vfsMixClipDuration(track)));
+}
+function vfsMixSafeNumber(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+function vfsMixSetStatus(message, error) {
+  if (!vfsMixState) return;
+  vfsMixState.status = String(message || '');
+  vfsMixState.error = !!error;
+  const element = document.getElementById('vfsMixStatus');
+  if (element) {
+    element.textContent = vfsMixState.status;
+    element.classList.toggle('error', vfsMixState.error);
+  }
+}
+function vfsMixRender() {
+  const state = vfsMixState;
+  if (!state) return;
+  const timeline = document.getElementById('vfsMixTracks');
+  const ruler = document.getElementById('vfsMixRuler');
+  const inspector = document.getElementById('vfsMixInspector');
+  const saveButton = document.getElementById('vfsMixSaveBtn');
+  const filename = document.getElementById('vfsMixFilename');
+  if (filename) filename.textContent = 'audios/' + state.fileName;
+  if (saveButton) saveButton.disabled = state.saving || state.importing || !state.tracks.length;
+  const addFileButton = document.getElementById('vfsMixAddFileBtn');
+  if (addFileButton) addFileButton.disabled = state.saving || state.importing;
+  const pixelsPerSecond = state.pixelsPerSecond;
+  const width = Math.max(720, Math.ceil(vfsMixTimelineEnd() * pixelsPerSecond + 80));
+  if (ruler) {
+    ruler.style.width = width + 'px';
+    const seconds = Math.ceil(vfsMixTimelineEnd());
+    const labels = [];
+    for (let second = 0; second <= seconds; second += 5) labels.push('<span style="left:' + (second * pixelsPerSecond) + 'px">' + second + 's</span>');
+    ruler.innerHTML = labels.join('');
+  }
+  if (timeline) {
+    timeline.style.width = width + 'px';
+    timeline.innerHTML = state.tracks.length ? state.tracks.map(track => {
+      const left = Math.max(0, Number(track.start) || 0) * pixelsPerSecond;
+      const clipWidth = Math.max(34, vfsMixClipDuration(track) * pixelsPerSecond);
+      const selected = state.selectedId === track.id ? ' selected' : '';
+      const muted = track.muted ? ' muted' : '';
+      return '<div class="vfs-mix-track"><div class="vfs-mix-clip' + selected + muted + '" style="left:' + left + 'px;width:' + clipWidth + 'px" title="拖动片段改变时间轴位置" onpointerdown="vfsMixBeginMove(event,\'' + track.id + '\')" onclick="vfsMixSelect(\'' + track.id + '\')">' + esc(track.name) + '</div></div>';
+    }).join('') : '<div class="vfs-mix-empty">将左侧虚拟文件系统中的文件拖到这里，开始添加音轨。</div>';
+  }
+  const track = vfsMixTrackById(state.selectedId);
+  if (!inspector) return;
+  if (!track) {
+    inspector.innerHTML = '<h4>音轨参数</h4><p class="vfs-mix-inspector-empty">选择时间轴中的片段后，可裁剪源音频并调整音量、左右声道、静音、循环、播放速率、淡入淡出和效果器。</p>';
+    return;
+  }
+  const effectRows = track.effects.map((effect, index) => '<div class="vfs-mix-effect"><select onchange="vfsMixUpdateEffect(\'' + track.id + '\',' + index + ',\'type\',this.value)"><option value="equalizer"' + (effect.type === 'equalizer' ? ' selected' : '') + '>均衡器</option><option value="compressor"' + (effect.type === 'compressor' ? ' selected' : '') + '>压缩器</option><option value="reverb"' + (effect.type === 'reverb' ? ' selected' : '') + '>混响</option><option value="delay"' + (effect.type === 'delay' ? ' selected' : '') + '>延迟</option></select><input type="number" step="0.1" value="' + esc(effect.amount) + '" title="均衡器为 dB（-24 到 24），其它效果器为 0 到 1" onchange="vfsMixUpdateEffect(\'' + track.id + '\',' + index + ',\'amount\',this.value)"><button type="button" onclick="vfsMixRemoveEffect(\'' + track.id + '\',' + index + ')" aria-label="删除效果器">×</button></div>').join('');
+  inspector.innerHTML = '<h4 title="' + esc(track.path) + '">' + esc(track.name) + '</h4>'
+    + vfsMixField(track.id, '裁剪起点（秒）', 'trimStart', track.trimStart, 'number', '0.01')
+    + vfsMixField(track.id, '裁剪终点（秒）', 'trimEnd', track.trimEnd, 'number', '0.01', '0 表示整段源文件')
+    + vfsMixField(track.id, '时间轴位置（秒）', 'start', track.start, 'number', '0.01')
+    + vfsMixField(track.id, '播放速率', 'speed', track.speed, 'number', '0.01')
+    + vfsMixField(track.id, '总时长（循环）', 'duration', track.duration, 'number', '0.01')
+    + vfsMixField(track.id, '整体音量', 'volume', track.volume, 'number', '0.01')
+    + vfsMixField(track.id, '左声道音量', 'leftVolume', track.leftVolume, 'number', '0.01')
+    + vfsMixField(track.id, '右声道音量', 'rightVolume', track.rightVolume, 'number', '0.01')
+    + vfsMixField(track.id, '淡入（秒）', 'fadeIn', track.fadeIn, 'number', '0.01')
+    + vfsMixField(track.id, '淡出（秒）', 'fadeOut', track.fadeOut, 'number', '0.01')
+    + '<label class="vfs-mix-field checkbox">循环（按总时长填充）<input type="checkbox" ' + (track.loop ? 'checked ' : '') + 'onchange="vfsMixUpdateTrack(\'' + track.id + '\',\'loop\',this.checked,true)"></label>'
+    + '<label class="vfs-mix-field checkbox">静音（覆盖左右声道）<input type="checkbox" ' + (track.muted ? 'checked ' : '') + 'onchange="vfsMixUpdateTrack(\'' + track.id + '\',\'muted\',this.checked,true)"></label>'
+    + '<div class="vfs-mix-effects"><h4>效果器</h4>' + effectRows + '<button type="button" class="vfs-mix-add-effect" onclick="vfsMixAddEffect(\'' + track.id + '\')">添加效果器</button></div>'
+    + '<button type="button" class="vfs-mix-delete-track" onclick="vfsMixRemoveTrack(\'' + track.id + '\')">删除当前片段</button>';
+  vfsMixSetStatus(state.status, state.error);
+}
+function vfsMixField(id, label, key, value, type, step, note) {
+  return '<label class="vfs-mix-field" title="' + esc(note || '') + '"><span>' + label + '</span><input type="' + type + '" step="' + step + '" value="' + esc(value) + '" onchange="vfsMixUpdateTrack(\'' + id + '\',\'' + key + '\',this.value)"></label>';
+}
+function vfsMixOpen(options) {
+  vfsMixState = { agentId: String(options.agentId || ''), fileName: vfsMixEnsureFileName(options.fileName), tracks: [], selectedId: '', sampleRate: 44100, bitDepth: 16, pixelsPerSecond: 50, saving: false, importing: false, status: '', error: false };
+  document.getElementById('vfsMixSampleRate').value = '44100';
+  document.getElementById('vfsMixBitDepth').value = '16';
+  showExclusiveOverlay(document.getElementById('vfsMixOverlay'), document.getElementById('vfsMixPanel'));
+  vfsMixRender();
+}
+function vfsMixClose() {
+  if (!vfsMixState || vfsMixState.saving) return;
+  vfsMixState = null;
+  setOverlayVisible(document.getElementById('vfsMixOverlay'), false, document.getElementById('vfsMixPanel'));
+}
+function vfsMixSelect(id) {
+  if (!vfsMixState) return;
+  vfsMixState.selectedId = id;
+  vfsMixRender();
+}
+function vfsMixDragOver(event) { event.preventDefault(); event.stopPropagation(); document.getElementById('vfsMixDrop')?.classList.add('dragover'); }
+function vfsMixDragLeave(event) { event.preventDefault(); document.getElementById('vfsMixDrop')?.classList.remove('dragover'); }
+function vfsMixChooseFiles() {
+  if (!vfsMixState || vfsMixState.saving || vfsMixState.importing) return;
+  document.getElementById('vfsMixFileInput')?.click();
+}
+async function vfsMixHandleChosenFiles(files) {
+  const input = document.getElementById('vfsMixFileInput');
+  try {
+    await vfsMixImportSystemItems(normalizeUploadFileItems(files));
+  } finally {
+    if (input) input.value = '';
+  }
+}
+async function vfsMixDrop(event) {
+  event.preventDefault(); event.stopPropagation();
+  document.getElementById('vfsMixDrop')?.classList.remove('dragover');
+  if (!vfsMixState || vfsMixState.saving || vfsMixState.importing) return;
+  const transfer = event.dataTransfer;
+  const raw = transfer && (transfer.getData('application/x-vfs-path') || transfer.getData('text/plain'));
+  const workspace = normalizeFsPath(vfsWorkspace);
+  const paths = String(raw || '').split(/\r?\n/).map(normalizeFsPath).filter(Boolean);
+  const relativePaths = paths.filter(path => workspace && path.startsWith(workspace + '/')).map(path => path.slice(workspace.length + 1));
+  if (relativePaths.length) {
+    relativePaths.forEach(path => vfsMixAddSource(path));
+    vfsMixSetStatus('已加入 ' + relativePaths.length + ' 段音轨，保存时由服务端解析格式。', false);
+    vfsMixRender();
+    return;
+  }
+  try {
+    const extracted = await extractSystemDropItemsFromDataTransfer(transfer);
+    await vfsMixImportSystemItems(extracted.uploadItems);
+  } catch (error) {
+    vfsMixSetStatus('添加文件失败：' + ((error && error.message) || '未识别到文件'), true);
+  }
+}
+async function vfsMixImportSystemItems(items) {
+  const state = vfsMixState;
+  const uploadItems = Array.isArray(items) ? items.filter(item => item && item.file instanceof File && item.relativePath) : [];
+  if (!state || state.saving || state.importing) return;
+  if (!uploadItems.length) { vfsMixSetStatus('未识别到可添加的文件。', true); return; }
+  state.importing = true;
+  vfsMixSetStatus('正在添加 ' + uploadItems.length + ' 个文件…', false);
+  vfsMixRender();
+  try {
+    const result = await uploadItemsToAgentTmp(uploadItems, { agentId: state.agentId });
+    if (vfsMixState !== state) return;
+    const paths = result.uploadedRelPaths.map(path => joinFsPath('tmp', path));
+    if (!paths.length) throw new Error('上传完成，但没有可用文件');
+    paths.forEach(path => vfsMixAddSource(path));
+    vfsMixSetStatus('', false);
+    vfsLastJson = '';
+    void vfsRefresh();
+  } catch (error) {
+    if (vfsMixState === state) vfsMixSetStatus('添加文件失败：' + ((error && error.message) || '请重试'), true);
+  } finally {
+    if (vfsMixState === state) {
+      state.importing = false;
+      vfsMixRender();
+    }
+  }
+}
+function vfsMixAddSource(path) {
+  const state = vfsMixState;
+  if (!state) return;
+  const start = state.tracks.length ? Math.max(...state.tracks.map(item => Math.max(0, Number(item.start) || 0) + vfsMixClipDuration(item))) : 0;
+  const id = 'mix-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+  const track = { id, path: String(path || ''), name: String(path || '').split('/').pop() || '音轨', trimStart: 0, trimEnd: 0, start, speed: 1, loop: false, duration: 10, volume: 1, leftVolume: 1, rightVolume: 1, muted: false, fadeIn: 0, fadeOut: 0, effects: [] };
+  state.tracks.push(track);
+  state.selectedId = id;
+  const preview = new Audio('/api/media_preview?agentId=' + encodeURIComponent(state.agentId) + '&path=' + encodeURIComponent(track.path));
+  preview.preload = 'metadata';
+  preview.onloadedmetadata = () => {
+    if (!vfsMixState || !vfsMixTrackById(id) || !Number.isFinite(preview.duration) || preview.duration <= 0) return;
+    const current = vfsMixTrackById(id);
+    current.trimEnd = preview.duration;
+    current.duration = preview.duration;
+    vfsMixRender();
+  };
+  preview.onerror = () => {};
+}
+function vfsMixUpdateTrack(id, key, value, booleanValue) {
+  const track = vfsMixTrackById(id);
+  if (!track || !vfsMixState || vfsMixState.saving) return;
+  track[key] = booleanValue ? !!value : vfsMixSafeNumber(value, track[key]);
+  if (key === 'speed') track.speed = Math.max(.25, Math.min(4, track.speed));
+  if (['volume', 'leftVolume', 'rightVolume'].includes(key)) track[key] = Math.max(0, Math.min(4, track[key]));
+  if (['trimStart', 'trimEnd', 'start', 'duration', 'fadeIn', 'fadeOut'].includes(key)) track[key] = Math.max(0, track[key]);
+  vfsMixRender();
+}
+function vfsMixAddEffect(id) { const track = vfsMixTrackById(id); if (!track) return; track.effects.push({ type: 'equalizer', amount: 0 }); vfsMixRender(); }
+function vfsMixUpdateEffect(id, index, key, value) { const track = vfsMixTrackById(id); if (!track || !track.effects[index]) return; track.effects[index][key] = key === 'amount' ? vfsMixSafeNumber(value, 0) : String(value || ''); vfsMixRender(); }
+function vfsMixRemoveEffect(id, index) { const track = vfsMixTrackById(id); if (!track) return; track.effects.splice(index, 1); vfsMixRender(); }
+function vfsMixRemoveTrack(id) { if (!vfsMixState) return; vfsMixState.tracks = vfsMixState.tracks.filter(track => track.id !== id); vfsMixState.selectedId = vfsMixState.tracks[0] ? vfsMixState.tracks[0].id : ''; vfsMixRender(); }
+function vfsMixSetExport(key, value) { if (!vfsMixState) return; vfsMixState[key] = Number(value); }
+function vfsMixBeginMove(event, id) {
+  if (!vfsMixState || vfsMixState.saving || event.button !== 0) return;
+  event.preventDefault(); event.stopPropagation();
+  const track = vfsMixTrackById(id); if (!track) return;
+  vfsMixState.selectedId = id;
+  const originX = event.clientX; const originStart = Number(track.start) || 0;
+  const move = next => { const current = vfsMixTrackById(id); if (!current) return; current.start = Math.max(0, originStart + (next.clientX - originX) / vfsMixState.pixelsPerSecond); vfsMixRender(); };
+  const end = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', end); window.removeEventListener('pointercancel', end); };
+  window.addEventListener('pointermove', move); window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end);
+  vfsMixRender();
+}
+async function vfsMixSave() {
+  const state = vfsMixState;
+  if (!state || state.saving) return;
+  if (!state.tracks.length) { vfsMixSetStatus('请至少加入一段音轨。', true); return; }
+  state.saving = true; vfsMixSetStatus('正在由服务端解析并合成 WAV…', false); vfsMixRender();
+  const tracks = state.tracks.map(({ id, name, ...track }) => track);
+  try {
+    const response = await fetch('/api/audio_mix', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agentId: state.agentId, outputName: state.fileName, sampleRate: state.sampleRate, bitDepth: state.bitDepth, tracks }) });
+    let result = null; try { result = await response.json(); } catch {}
+    if (!response.ok || !result || result.status !== 0) throw new Error(result && result.content || '混音保存失败');
+    vfsLastJson = ''; await vfsRefresh();
+    if (result.savedAs) { try { await copyTextToClipboard(result.savedAs); vfsShowUploadToast('混音已保存，绝对路径已复制到系统剪贴板', false); } catch { vfsShowUploadToast('混音已保存到 audios/' + state.fileName, false); } } else vfsShowUploadToast('混音已保存到 audios/' + state.fileName, false);
+    state.saving = false;
+    vfsMixClose();
+  } catch (error) {
+    state.saving = false; vfsMixSetStatus('保存失败：' + ((error && error.message) || '请检查音轨参数'), true); vfsMixRender();
+  }
+}
 
 function vfsAudioEnsureFileName(name) {
   const value = String(name || '').trim();
@@ -47895,24 +48256,21 @@ async function vfsScreenWaitForVideo(video) {
     video.addEventListener('error', () => reject(new Error('无法读取共享的视频流')), { once: true });
   });
 }
+async function vfsScreenCheckFFmpeg() {
+  const response = await fetch('/api/ffmpeg/check?_=' + Date.now(), { cache: 'no-store' });
+  const result = await response.json().catch(() => null);
+  if (!response.ok || !result || result.status !== 0) throw new Error(result && result.content || '无法检查 FFmpeg 配置');
+  if (result.available) return true;
+  const installRequest = String(result.install || '').trim();
+  if (!installRequest) throw new Error(result.content || 'FFmpeg 安装请求配置为空');
+  feShowFFmpegInstallDialog(installRequest, 'screen-recording');
+  return false;
+}
 async function vfsScreenOpen(options) {
   vfsScreenDispose(true);
-  const state = { agentId: String(options.agentId || ''), fileName: vfsScreenEnsureFileName(options.fileName), nameConflictAtCreate: !!options.nameConflictAtCreate, phase: 'checking', selection: { x: .1, y: .1, width: .8, height: .8 }, rangeSelection: false, status: '正在检查视频保存环境…', error: '', displayStream: null, framePipeline: null, mediaRecorder: null, resultURL: '', blob: null, timer: null, startedAt: 0, captureSession: 0, stopping: false, drag: null };
+  const state = { agentId: String(options.agentId || ''), fileName: vfsScreenEnsureFileName(options.fileName), nameConflictAtCreate: !!options.nameConflictAtCreate, phase: 'idle', selection: { x: .1, y: .1, width: .8, height: .8 }, rangeSelection: false, status: options.nameConflictAtCreate ? '检测到同名 MP4，保存时将自动加时间戳' : '先选择一个录制来源', error: '', displayStream: null, framePipeline: null, mediaRecorder: null, resultURL: '', blob: null, timer: null, startedAt: 0, captureSession: 0, stopping: false, drag: null };
   vfsScreenState = state;
   showExclusiveOverlay(document.getElementById('vfsScreenOverlay'), document.getElementById('vfsScreenPanel'));
-  vfsScreenRender();
-  try {
-    const response = await fetch('/api/ffmpeg/check?_=' + Date.now(), { cache: 'no-store' });
-    const result = await response.json().catch(() => null);
-    if (vfsScreenState !== state) return;
-    if (!response.ok || !result || result.status !== 0) throw new Error(result && result.content || '无法检查 FFmpeg 配置');
-    if (!result.available) throw new Error((result.content || '未检测到 FFmpeg 或 FFprobe') + (result.install ? '。' + result.install : ''));
-    state.phase = 'idle';
-    state.status = state.nameConflictAtCreate ? '检测到同名 MP4，保存时将自动加时间戳' : '先选择一个录制来源';
-  } catch (error) {
-    state.phase = 'blocked';
-    state.error = '无法开始录屏：' + ((error && error.message) || '视频保存环境不可用');
-  }
   vfsScreenRender();
 }
 async function vfsScreenChooseTab() {
@@ -50285,6 +50643,7 @@ let feVideoTrimState = {
 let feVideoTrimCheckPending = false;
 let feVideoTrimCheckRequest = 0;
 let feFFmpegInstallRequest = '';
+let feFFmpegInstallOrigin = '';
 let feMediaTrimFilenameRequest = null;
 let feVideoFrameSavePending = false;
 let feImageGridState = {
@@ -53436,6 +53795,7 @@ function feResetVideoTrim() {
   const installDialog = document.getElementById('feFFmpegInstallDialog');
   if (installDialog) installDialog.hidden = true;
   feFFmpegInstallRequest = '';
+  feFFmpegInstallOrigin = '';
   feVideoTrimState = { active: false, start: 0, end: 0, saving: false };
   const overlay = document.getElementById('fileEditorOverlay');
   if (overlay) overlay.classList.remove('video-trim-active');
@@ -53468,7 +53828,7 @@ function feFFmpegInstallDialogOpen() {
   return !!(dialog && !dialog.hidden);
 }
 
-function feShowFFmpegInstallDialog(installRequest) {
+function feShowFFmpegInstallDialog(installRequest, origin = 'video-trim') {
   const request = String(installRequest || '').trim();
   if (!request) {
     feSetMediaStatus('FFmpeg 安装请求配置为空');
@@ -53481,14 +53841,21 @@ function feShowFFmpegInstallDialog(installRequest) {
     return;
   }
   feFFmpegInstallRequest = request;
+  feFFmpegInstallOrigin = origin;
   dialog.hidden = false;
   window.setTimeout(() => confirm.focus({ preventScroll: true }), 0);
 }
 
 function feCancelFFmpegInstall() {
   const dialog = document.getElementById('feFFmpegInstallDialog');
+  const origin = feFFmpegInstallOrigin;
   if (dialog) dialog.hidden = true;
   feFFmpegInstallRequest = '';
+  feFFmpegInstallOrigin = '';
+  if (origin === 'screen-recording') {
+    document.querySelector('#vfsCreatePanel .vfs-create-actions .btn-primary')?.focus({ preventScroll: true });
+    return;
+  }
   const button = document.getElementById('feVideoTrimBtn');
   if (button && !button.disabled) button.focus({ preventScroll: true });
 }
@@ -53500,12 +53867,15 @@ function feHandleFFmpegInstallDialogClick(event) {
 async function feConfirmFFmpegInstall() {
   const request = String(feFFmpegInstallRequest || '').trim();
   if (!request) return;
+  const origin = feFFmpegInstallOrigin;
   const dialog = document.getElementById('feFFmpegInstallDialog');
   const confirm = document.getElementById('feFFmpegInstallConfirmBtn');
   if (confirm) confirm.disabled = true;
   if (dialog) dialog.hidden = true;
   feFFmpegInstallRequest = '';
-  feClose();
+  feFFmpegInstallOrigin = '';
+  if (origin === 'screen-recording') vfsHideCreate();
+  else feClose();
   const sent = await sendCenterMessage(request, {
     clearInputAfterSend: false,
     toastOnSuccess: '',

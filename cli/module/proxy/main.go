@@ -4470,6 +4470,7 @@ func handleProxyLogCleanupStatus(w http.ResponseWriter, r *http.Request) {
 		"finishedAt":             snapshot.FinishedAt,
 		"deletedAgentMessageLog": snapshot.DeletedAgentMessageLog,
 		"deletedChatLog":         snapshot.DeletedChatLog,
+		"deletedCmdLog":          snapshot.DeletedCmdLog,
 		"error":                  snapshot.Error,
 	})
 }
