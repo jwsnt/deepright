@@ -7,7 +7,6 @@ import ai.open.right.workflow.flow.llm.provider.ProviderFunCallResponse;
 import ai.open.right.workflow.flow.llm.provider.ProviderStreamConfig;
 import ai.open.right.workflow.flow.llm.provider.openai.OpenAiRequest;
 import ai.open.right.workflow.flow.llm.provider.xiaomi.XiaomiStream;
-import org.apache.commons.collections.MapUtils;
 
 import java.util.Map;
 
@@ -26,6 +25,8 @@ public class CustomerXiaomiStream extends XiaomiStream {
     // 子类覆盖
     protected void addReason(Map<String, Object> message, Boolean finished) throws Exception {
         super.addReason(message, finished);
-        RequestThinkingUtils.notifyMessage(this.notifierService, this.request.getMessage(), MapUtils.getString(message, "reasoning_content"));
+        if (finished) {
+            RequestThinkingUtils.notifyMessage(this.notifierService, this.request.getMessage(), this.reasoning);
+        }
     }
 }
