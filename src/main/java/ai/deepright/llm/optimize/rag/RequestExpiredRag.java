@@ -1,5 +1,6 @@
 package ai.deepright.llm.optimize.rag;
 
+import ai.deepright.cli.CliPrinter;
 import ai.deepright.feature.FeatureFlag;
 import ai.deepright.feature.FeatureUtils;
 import ai.deepright.lang.XmlResourceLang;
@@ -7,7 +8,6 @@ import ai.deepright.llm.notifier.MultiSourceFlag;
 import ai.deepright.llm.provider.RequestContextBuilder;
 import ai.deepright.utils.TemplateChecker;
 import ai.open.right.WorkflowException;
-import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.resouce.ResourceService;
 import ai.open.right.workflow.flow.llm.Segment;
 import ai.open.right.workflow.flow.llm.rag.RagCondition;
@@ -18,7 +18,6 @@ import ai.open.right.workflow.flow.llm.rag.future.RagAtOnce;
 import ai.open.right.workflow.flow.llm.rag.future.RagFuture;
 import ai.open.right.workflow.flow.llm.store.history.History;
 import ai.open.right.workflow.notify.Notifier;
-import com.google.common.collect.ImmutableMap;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.Setter;
@@ -126,8 +125,8 @@ public class RequestExpiredRag extends RagCondition implements RagService {
 
     protected void notifyFooter(RagConfig ragConfig, RagData ragData) throws Exception {
         this.notifierService.notify(Segment.build(ragData.getQuery(), Segment.SegmentConfig.builder()
-                .metadata(ImmutableMap.of(MultiSourceFlag.WARN, ProtocolCode.C404, MultiSourceFlag.DELAY, this.delay))
                 .content(new StringBuffer(XmlResourceLang.get(RequestExpiredRag.LANG_KEY_REQUEST_EXPIRED_FOOTER)))
+                .metadata(CliPrinter.process(MultiSourceFlag.WARN))
                 .workflow(ragData.getQuery().getWorkflow())
                 .notifier(Notifier.SOURCE)
                 .build()), ragData.getQuery(), ragData.getQuery());

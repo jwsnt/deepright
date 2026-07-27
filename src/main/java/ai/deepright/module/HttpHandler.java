@@ -15,6 +15,7 @@ import io.netty.handler.codec.http.*;
 import io.netty.handler.stream.ChunkedStream;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.util.AttributeKey;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
 import lombok.Getter;
@@ -42,9 +43,13 @@ public class HttpHandler extends NettyHttpHandler {
 
     protected static final ByteBuf SSE_HEARTBEAT_BUF = Unpooled.copiedBuffer(": keepalive\n\n", CharsetUtil.US_ASCII);
 
+    protected static final AttributeKey<Integer> ACTIVE = AttributeKey.valueOf("active");
+
     protected HttpProtocol httpProtocol;
 
     protected SysStore sysStore;
+
+    protected Integer idleTimes;
 
     protected String health;
 
@@ -69,14 +74,19 @@ public class HttpHandler extends NettyHttpHandler {
         if (evt instanceof IdleStateEvent) {
             IdleStateEvent event = IdleStateEvent.class.cast(evt);
             if (NettyWriter.isSse(ctx) && IdleState.WRITER_IDLE.equals(event.state())) {
-                // SSE 注释心跳
-                log.info("SSE heartbeat sent, remote={}", ctx.channel().remoteAddress());
-                ctx.writeAndFlush(new DefaultHttpContent(HttpHandler.SSE_HEARTBEAT_BUF.retainedDuplicate())).addListener(NettyAlarm.INSTANCE);
-            } else {
-                if (log.isInfoEnabled()) {
-                    log.info("Channel will be closed by idle={}", ctx.channel().remoteAddress());
+                Integer idleTimes = ctx.channel().attr(HttpHandler.ACTIVE).get();
+                int accumulatedIdles = idleTimes == null ? 1 : idleTimes + 1;
+                if (accumulatedIdles <= this.idleTimes) {
+                    // SSE 注释心跳
+                    ctx.channel().attr(HttpHandler.ACTIVE).set(accumulatedIdles);
+                    log.info("SSE heartbeat sent, idleTimes={}, remote={}", accumulatedIdles, ctx.channel().remoteAddress());
+                    ctx.writeAndFlush(new DefaultHttpContent(HttpHandler.SSE_HEARTBEAT_BUF.retainedDuplicate())).addListener(NettyAlarm.INSTANCE);
+                } else {
+                    if (log.isInfoEnabled()) {
+                        log.info("Channel will be closed after {} idle events, remote={}", accumulatedIdles, ctx.channel().remoteAddress());
+                    }
+                    ctx.close().addListener(NettyAlarm.INSTANCE);
                 }
-                ctx.close().addListener(NettyAlarm.INSTANCE);
             }
         }
         ctx.fireUserEventTriggered(evt);
@@ -221,6 +231,10 @@ public class HttpHandler extends NettyHttpHandler {
 
         @Autowired
         protected SysStore sysStore;
+
+        // 单通道IDLE的最大次数
+        @Value("${chat.http.idleTime:1500}")
+        protected Integer idleTimes;
 
         @Value("${chat.http.health:/health}")
         protected String health;

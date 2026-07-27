@@ -43,6 +43,7 @@ public class MultiSourceNotifier extends SourceNotifier {
             metadata.put(MultiSourceFlag.DELAY, MapUtils.getObject(withOutMeta.getMetadata(), MultiSourceFlag.DELAY));
             metadata.put(MultiSourceFlag.WARN, MapUtils.getInteger(withOutMeta.getMetadata(), MultiSourceFlag.WARN));
             metadata.put(MultiSourceFlag.TID, MapUtils.getString(withOutMeta.getMetadata(), MultiSourceFlag.TID));
+            // 特殊豁免字段AgentID
             metadata.put(FeatureField.KEY_AGENTID, MapUtils.getString(segment.getMetadata(), FeatureField.KEY_AGENTID));
             metadata.values().removeIf(Objects::isNull);
             withOutMeta.putMetadata(metadata);

@@ -4453,6 +4453,7 @@ body.quick-fan-transition-active{cursor:progress}
 .sel-file-bubble-list{display:flex;flex-direction:column;gap:8px;overflow:auto;padding-right:2px}
 .sel-file-bubble-item{display:flex;flex-direction:column;gap:6px;padding:8px 10px;border-radius:12px;background:color-mix(in srgb,var(--bg-sidebar) 82%,var(--accent) 18%);border:1px solid color-mix(in srgb,var(--accent) 16%,var(--border) 84%)}
 .sel-file-bubble-path{font-size:11px;line-height:1.45;color:var(--text-primary);word-break:break-all}
+.sel-file-bubble-path-diff{color:var(--accent);font-weight:700;text-decoration-line:underline;text-decoration-thickness:2px;text-underline-offset:3px}
 .sel-file-bubble-actions{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
 .sel-file-bubble.onboarding-message-url-bubble{z-index:calc(var(--overlay-z-center) + 220);box-shadow:0 20px 42px rgba(16,24,40,.22),0 0 0 1px rgba(var(--accent-rgb),.18)}
 .sel-file-bubble.onboarding-message-url-bubble.tour-locked{pointer-events:none}
@@ -54318,6 +54319,48 @@ function showSelectionActionBubble(rect, actions, options) {
   selBubbleEl = bubble;
 }
 
+function getSelectionFilePathDifferenceRanges(actionStates) {
+  const paths = (Array.isArray(actionStates) ? actionStates : [])
+    .map(state => String(state && state.filePath || '').trim())
+    .filter(Boolean);
+  if (paths.length < 2) return new Map();
+  const shortestLength = Math.min(...paths.map(path => path.length));
+  let commonPrefixLength = 0;
+  while (commonPrefixLength < shortestLength && paths.every(path => path[commonPrefixLength] === paths[0][commonPrefixLength])) {
+    commonPrefixLength += 1;
+  }
+  // Only preserve a common directory prefix. A partial directory name does
+  // not help distinguish files and would make the underline hard to read.
+  const commonPrefix = paths[0].slice(0, commonPrefixLength);
+  commonPrefixLength = commonPrefix.lastIndexOf('/') + 1;
+
+  let commonSuffixLength = 0;
+  while (paths.every(path => path.length - commonSuffixLength - 1 >= commonPrefixLength)) {
+    const index = commonSuffixLength + 1;
+    if (!paths.every(path => path[path.length - index] === paths[0][paths[0].length - index])) break;
+    commonSuffixLength = index;
+  }
+  return new Map(paths.map(path => [path, {
+    start: commonPrefixLength,
+    end: Math.max(commonPrefixLength, path.length - commonSuffixLength)
+  }]));
+}
+
+function appendSelectionFilePathWithDifference(container, path, range) {
+  const value = String(path || '').trim();
+  const start = Math.max(0, Math.min(value.length, Number(range && range.start) || 0));
+  const end = Math.max(start, Math.min(value.length, Number(range && range.end) || start));
+  if (!range || start === end) {
+    container.textContent = value;
+    return;
+  }
+  container.append(document.createTextNode(value.slice(0, start)));
+  const difference = document.createElement('span');
+  difference.className = 'sel-file-bubble-path-diff';
+  difference.textContent = value.slice(start, end);
+  container.append(difference, document.createTextNode(value.slice(end)));
+}
+
 function showSelectionActionListBubble(rect, actionStates, options) {
   const opts = options || {};
   const nextStates = Array.isArray(actionStates) ? actionStates.filter(Boolean) : [];
@@ -54333,6 +54376,7 @@ function showSelectionActionListBubble(rect, actionStates, options) {
   }
   const list = document.createElement('div');
   list.className = 'sel-file-bubble-list';
+  const pathDifferenceRanges = getSelectionFilePathDifferenceRanges(nextStates);
   nextStates.forEach(state => {
     const actions = buildMessageFileActionItems(state);
     if (!actions.length) return;
@@ -54340,8 +54384,9 @@ function showSelectionActionListBubble(rect, actionStates, options) {
     item.className = 'sel-file-bubble-item';
     const pathText = document.createElement('div');
     pathText.className = 'sel-file-bubble-path';
-    pathText.textContent = String(state.filePath || '').trim();
-    pathText.title = String(state.filePath || '').trim();
+    const filePath = String(state.filePath || '').trim();
+    appendSelectionFilePathWithDifference(pathText, filePath, pathDifferenceRanges.get(filePath));
+    pathText.title = filePath;
     const actionRow = document.createElement('div');
     actionRow.className = 'sel-file-bubble-actions';
     actions.forEach((action, index) => {
