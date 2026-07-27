@@ -1840,6 +1840,20 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 .rs-wiki-content .wiki-file-image,.rs-wiki-content .wiki-file-video{display:block;max-width:100%;height:auto;border-radius:var(--radius-xs);border:1px solid rgba(var(--accent-rgb),.16);background:var(--bg-card)}
 .rs-wiki-content .wiki-file-download{display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:inherit}
 .rs-wiki-empty{flex:1;min-height:0;display:flex;align-items:flex-start;justify-content:flex-start;text-align:left;font-size:10px;line-height:1.6;color:var(--text-muted);padding:2px 0 0}
+.right-sidebar.wiki-thinking .rs-bottom-header{display:none}
+.right-sidebar.wiki-thinking .rs-wiki-status{padding-bottom:7px}
+.right-sidebar.wiki-thinking .rs-wiki-content{padding-top:9px;scroll-behavior:smooth}
+.rs-wiki-thinking-status{display:flex;align-items:center;gap:6px;min-width:0;font-size:10px;line-height:1.4;color:var(--text-muted)}
+.rs-wiki-thinking-status::before{content:'';width:6px;height:6px;flex:0 0 6px;border-radius:999px;background:rgb(var(--accent-rgb));box-shadow:0 0 0 3px rgba(var(--accent-rgb),.12),0 0 10px rgba(var(--accent-rgb),.46);animation:rsWikiThinkingPulse 1.1s ease-in-out infinite}
+.rs-wiki-thinking-wait{display:flex;align-items:center;justify-content:center;gap:3px;min-height:42px;padding:8px 0;color:rgb(var(--accent-rgb));font-size:18px;line-height:1;letter-spacing:1px}
+.rs-wiki-thinking-wait span{display:inline-block;animation:rsWikiThinkingWait 1s ease-in-out infinite}
+.rs-wiki-thinking-wait span:nth-child(2){animation-delay:.16s}.rs-wiki-thinking-wait span:nth-child(3){animation-delay:.32s}
+.rs-wiki-thinking-list{display:flex;flex-direction:column;gap:8px;padding:1px 0 6px}
+.rs-wiki-thinking-list .assistant-explosion-beacon__item{padding:10px 11px 9px;border-radius:11px;box-shadow:0 6px 16px rgba(var(--accent-rgb),.09),inset 0 1px 0 var(--glass-highlight)}
+.rs-wiki-thinking-list .assistant-explosion-beacon__item-head{gap:8px;margin-bottom:5px}
+.rs-wiki-thinking-list .assistant-explosion-beacon__item-body{font-size:10px;line-height:1.52}
+@keyframes rsWikiThinkingPulse{0%,100%{transform:scale(.82);opacity:.55}50%{transform:scale(1.16);opacity:1}}
+@keyframes rsWikiThinkingWait{0%,100%{transform:translateY(0);opacity:.2}50%{transform:translateY(-3px);opacity:1}}
 .rs-meta-view{display:none;flex-direction:column;width:100%;flex:1;opacity:0;transition:opacity .3s;min-height:0;overflow:hidden}
 .rs-meta-view.show{display:flex;opacity:1}
 .rs-meta-list{flex:1;overflow-y:auto;padding:4px;min-height:0}
@@ -5129,7 +5143,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     <div class="rs-bottom" id="rsWikiSection">
       <div class="rs-row-divider rs-bottom-header" id="rsWikiHeader">
         <div class="rs-row-title">
-          <span>知识库WIKI</span>
+          <span id="rsWikiTitle">知识库WIKI</span>
           <div class="rs-wiki-header-meta">
             <span class="rs-wiki-last-refresh" id="rsWikiLastRefresh">最近刷新 --</span>
             <button type="button" class="rs-wiki-refresh" id="rsWikiRefreshBtn" title="刷新知识库WIKI" aria-label="刷新知识库WIKI" onclick="rsRefreshWikiPanel()">
@@ -5146,7 +5160,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
         </div>
       </div>
       <div class="rs-wiki-panel" id="rsWikiPanel">
-        <div class="rs-wiki-status">
+        <div class="rs-wiki-status" id="rsWikiStatus">
           <div class="rs-wiki-breadcrumb" id="rsWikiBreadcrumb"></div>
         </div>
         <div class="rs-wiki-content" id="rsWikiContent"></div>
@@ -7929,6 +7943,7 @@ let modelKeyHintPreviewState = {
 };
 let messageRenderCache = new Map();
 let wikiRenderCache = new Map();
+let wikiSidebarPresentation = { mode: 'wiki', signature: '' };
 let limitToastTimer = null;
 let modelSelectToastTimer = null;
 let modelSelectToastGuideTimer = null;
@@ -25686,19 +25701,124 @@ function renderWikiBreadcrumb(path) {
   breadcrumbEl.innerHTML = crumbs.join('');
 }
 
+// The right sidebar follows the selected chat, not the global stream pool.
+// A background chat may be streaming while the visible chat is already done.
+function isChatSseResponsePending(chatId) {
+  const streamState = chatStreaming[chatId];
+  const pollState = restorePolling[chatId];
+  // On a chat switch after refresh, the restore poll is created a moment
+  // later. Preserve the target chat's pending SSE presentation in between.
+  const locallyPendingRestore = !streamState && shouldResumeChatPolling(chatId);
+  return !!(
+    (streamState && streamState.streaming && !streamState.cancelling && (streamState.phase === 'stream' || streamState.requestDispatched === true)) ||
+    (pollState && pollState.active && !pollState.cancelling) ||
+    locallyPendingRestore
+  );
+}
+
+function getActiveChatThinkingSnapshots() {
+  const chatId = String(state.activeChat || '').trim();
+  const chat = chatId ? state.chats[chatId] : null;
+  if (!chatId || !chat || !isChatSseResponsePending(chatId)) return null;
+  const streamState = chatStreaming[chatId];
+  const sessionToken = String(streamState && streamState.sessionToken || '').trim();
+  const pending = getPendingRequestState(chat);
+  const messages = sessionToken
+    ? (Array.isArray(chat.messages) ? chat.messages.filter(message => (
+      message &&
+      message.role === 'assistant' &&
+      !message.error &&
+      String(message.streamSessionToken || '').trim() === sessionToken
+    )) : [])
+    : getAssistantsForRequest(chat, pending.start).filter(message => (
+      message && !message.error && !isAssistantCancelledMessage(message)
+    ));
+  const seen = new Map();
+  let order = 0;
+  messages.forEach(message => {
+    getAssistantExplosionSnapshots(message).forEach(snapshot => {
+      const groupKey = String(snapshot && snapshot.groupKey || '').trim();
+      const id = String(snapshot && snapshot.id || '').trim();
+      const content = String(snapshot && snapshot.content || '');
+      const key = groupKey ? ('group:' + groupKey) : (id ? ('id:' + id) : ('content:' + normalizeMessageText(content)));
+      const existing = seen.get(key);
+      if (existing) {
+        existing.content = mergeAssistantExplosionSnapshotContent(existing.content, content);
+        if (snapshot.capturedAt && (!existing.capturedAt || snapshot.capturedAt > existing.capturedAt)) existing.capturedAt = snapshot.capturedAt;
+        return;
+      }
+      seen.set(key, { ...snapshot, _sidebarOrder: order++ });
+    });
+  });
+  const snapshots = Array.from(seen.values()).sort((left, right) => {
+    const leftTime = String(left.capturedAt || '');
+    const rightTime = String(right.capturedAt || '');
+    if (leftTime && rightTime && leftTime !== rightTime) return leftTime < rightTime ? -1 : 1;
+    return (left._sidebarOrder || 0) - (right._sidebarOrder || 0);
+  });
+  return { chatId, snapshots };
+}
+
+function restoreWikiContentAfterThinking(contentEl, wikiState) {
+  if (!contentEl || !wikiState || !wikiState.lastRenderedHtml) return false;
+  contentEl.innerHTML = wikiState.lastRenderedHtml;
+  contentEl.dataset.presentation = 'wiki';
+  contentEl.querySelectorAll('.md-content').forEach(renderMathInRoot);
+  return true;
+}
+
+function syncWikiPanelSsePresentation(chatId) {
+  if (String(chatId || '').trim() !== String(state.activeChat || '').trim()) return;
+  renderWikiPanel();
+}
+
 function renderWikiPanel() {
   const rightSidebar = document.querySelector('.right-sidebar');
+  const titleEl = document.getElementById('rsWikiTitle');
+  const statusEl = document.getElementById('rsWikiStatus');
   const lastRefreshEl = document.getElementById('rsWikiLastRefresh');
   const breadcrumbEl = document.getElementById('rsWikiBreadcrumb');
   const contentEl = document.getElementById('rsWikiContent');
   const refreshBtn = document.getElementById('rsWikiRefreshBtn');
   const tidyBtn = document.getElementById('rsWikiTidyBtn');
-  if (!rightSidebar || !lastRefreshEl || !breadcrumbEl || !contentEl || !refreshBtn || !tidyBtn) return;
+  if (!rightSidebar || !titleEl || !statusEl || !lastRefreshEl || !breadcrumbEl || !contentEl || !refreshBtn || !tidyBtn) return;
   const wikiState = ensureWikiPanelState();
+  const thinkingState = getActiveChatThinkingSnapshots();
+  const showingThinking = !!thinkingState;
   const agentRefreshAt = getWikiLastRefreshAt();
   wikiState.lastRefreshAt = agentRefreshAt;
   wikiState.staleDismissedAt = getWikiStaleDismissedAt();
   rightSidebar.classList.toggle('wiki-expanded', !!wikiState.expanded);
+  rightSidebar.classList.toggle('wiki-thinking', showingThinking);
+  if (showingThinking) {
+    const snapshots = thinkingState.snapshots;
+    const signature = snapshots.map(item => [item.id, item.groupKey, item.capturedAt, item.content].join('\u0001')).join('\u0002');
+    titleEl.textContent = '知识库WIKI';
+    lastRefreshEl.textContent = '当前响应中';
+    statusEl.classList.add('is-thinking');
+    breadcrumbEl.innerHTML = '<div class="rs-wiki-thinking-status">正在思考</div>';
+    if (wikiSidebarPresentation.mode !== 'thinking' || wikiSidebarPresentation.signature !== signature || contentEl.dataset.presentation !== 'thinking') {
+      contentEl.innerHTML = snapshots.length
+        ? '<div class="rs-wiki-thinking-list">' + assistantExplosionBeaconListHtml(snapshots) + '</div>'
+        : '<div class="rs-wiki-thinking-wait" role="status" aria-label="正在思考"><span>.</span><span>.</span><span>.</span></div>';
+      contentEl.dataset.presentation = 'thinking';
+      contentEl.querySelectorAll('.assistant-explosion-beacon__item-body').forEach(renderMathInRoot);
+      wikiSidebarPresentation.signature = signature;
+    }
+    wikiSidebarPresentation.mode = 'thinking';
+    requestAnimationFrame(() => {
+      if (!rightSidebar.classList.contains('wiki-thinking') || String(state.activeChat || '').trim() !== thinkingState.chatId) return;
+      contentEl.scrollTop = contentEl.scrollHeight;
+    });
+    return;
+  }
+  titleEl.textContent = '知识库WIKI';
+  statusEl.classList.remove('is-thinking');
+  const restoredWikiContent = wikiSidebarPresentation.mode !== 'thinking' || restoreWikiContentAfterThinking(contentEl, wikiState);
+  wikiSidebarPresentation.mode = 'wiki';
+  wikiSidebarPresentation.signature = '';
+  contentEl.dataset.presentation = 'wiki';
+  if (!restoredWikiContent) contentEl.innerHTML = renderWikiEmptyState();
   renderWikiBreadcrumb(wikiState.currentDoc);
   lastRefreshEl.textContent = formatWikiRefreshTime(agentRefreshAt);
   refreshBtn.title = wikiState.expanded ? '收起知识库全屏' : '刷新并展开知识库WIKI';
@@ -25793,8 +25913,9 @@ async function loadWikiDoc(docPath, options = {}) {
   wikiState.currentDoc = nextDoc;
   wikiState.loading = true;
   renderWikiPanel();
-  if (contentEl && !options.noLoading) {
+  if (contentEl && !options.noLoading && !getActiveChatThinkingSnapshots()) {
     contentEl.innerHTML = '<div class="md-content"><p>正在加载 <code>' + esc(nextDoc === '.' ? '/knowledge' : requestUrl) + '</code> ...</p></div>';
+    contentEl.dataset.presentation = 'wiki';
     showedLoadingState = true;
   }
   try {
@@ -25816,8 +25937,9 @@ async function loadWikiDoc(docPath, options = {}) {
       wikiState.lastRenderedDoc !== nextDoc ||
       wikiState.lastRenderedType !== fileType ||
       wikiState.lastRenderedHtml !== nextHtml;
-    if (contentEl && needsRender) {
+    if (contentEl && needsRender && !getActiveChatThinkingSnapshots()) {
       contentEl.innerHTML = nextHtml;
+      contentEl.dataset.presentation = 'wiki';
       if (fileType === 'html') hydrateWikiHtmlPreview(contentEl, text, nextDoc, previewRequestKey);
       if (scrollSnapshot) restoreWikiScrollSnapshot(contentEl, scrollSnapshot);
     }
@@ -25830,7 +25952,10 @@ async function loadWikiDoc(docPath, options = {}) {
     if (ensureWikiPanelState().requestSeq !== requestSeq) return;
     wikiState.loading = false;
     wikiState.currentType = 'empty';
-    if (contentEl && !options.noLoading) contentEl.innerHTML = renderWikiEmptyState();
+    if (contentEl && !options.noLoading && !getActiveChatThinkingSnapshots()) {
+      contentEl.innerHTML = renderWikiEmptyState();
+      contentEl.dataset.presentation = 'wiki';
+    }
     renderWikiPanel();
     if (!options.silent) console.warn('wiki load failed:', err);
   }
@@ -31634,7 +31759,7 @@ function syncActiveChatAsyncControls() {
     return false;
   }
   const busy = isChatBusy(activeChatId);
-  showWorking(busy);
+  showWorking(isChatSseResponsePending(activeChatId));
   showPreflight(!!preflightTimers[activeChatId]);
   syncQueuedCenterInputUI(activeChatId);
   syncCenterComposerState(activeChatId, { flashSend: !busy });
@@ -32092,6 +32217,7 @@ function switchChat(id) {
   state.activeChat = id;
   syncRightSidebarUrlPreviewForActiveChat();
   syncChatSessionCopyButton();
+  renderWikiPanel();
   syncActiveChatAsyncControls();
   renderVfsSkillIndicator();
   updateSandboxUI();
@@ -38363,6 +38489,7 @@ async function sendCenterMessage(rawText, options) {
     };
     initializeStreamingStorageBudget(chatStreaming[chatId]);
     syncGlobalStreamingVisualState();
+    syncWikiPanelSsePresentation(chatId);
     syncCliGetQueueStatusPolling();
     // Once the chat enters the async lifecycle, busy/streaming should own the UI.
     // Keeping dispatching=true for the whole SSE session incorrectly locks input
@@ -38766,6 +38893,7 @@ async function sendCenterMessage(rawText, options) {
     if (chatStreaming[chatId]) {
       chatStreaming[chatId].requestDispatched = true;
       chatStreaming[chatId].phase = 'stream';
+      syncWikiPanelSsePresentation(chatId);
     }
     const responsePromise = fetch(chatCompletionsUrl, {
       method: 'POST',
@@ -38853,6 +38981,7 @@ async function sendCenterMessage(rawText, options) {
                 delete assistantMsg._pendingExplosionContent;
                 delete assistantMsg._pendingExplosionGroupKey;
               }
+              syncWikiPanelSsePresentation(chatId);
             }
           }
           const shouldAppendToExplodedSnapshot = !!(
@@ -38879,6 +39008,7 @@ async function sendCenterMessage(rawText, options) {
             if (explodedSnapshotChanged && streamEntry && streamEntry.msgEl) {
               syncAssistantExplosionBeacon(streamEntry.msgEl, assistantMsg);
             }
+            if (explodedSnapshotChanged) syncWikiPanelSsePresentation(chatId);
             continue;
           }
           if (!isCliSub && !isClosePacket && assistantMsg && hasDeltaContent && !inlineHintPacket.active && !taskBadgePacket.active && packetLogicalId) {
@@ -38976,6 +39106,7 @@ async function sendCenterMessage(rawText, options) {
                     packetExplosionGroupKey
                   );
                 }
+                if (liveExplosionSnapshotChanged) syncWikiPanelSsePresentation(chatId);
               }
               if (isCliSub) {
                 // cli/sub payloads belong to the CLI task panel only and must not
@@ -39059,6 +39190,9 @@ async function stopStreaming() {
   const preflight = preflightTimers[chatId];
   const nowTs = toChatTimestamp(new Date());
   markChatRequestCancelled(chatId, nowTs, requestDispatched ? 'cancelled' : 'not_sent', cs && cs.requestMessage);
+  // Cancellation is terminal for the visible SSE lifecycle even while the
+  // best-effort server-side cancel request is still being acknowledged.
+  updateChatAsyncUI(chatId);
   if (state.activeChat === chatId) {
     renderMessages({ forceScroll: true });
     clearChatTaskBadges(chatId);
