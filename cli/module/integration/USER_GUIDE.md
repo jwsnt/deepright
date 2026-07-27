@@ -1414,6 +1414,7 @@ curl -X POST 'http://127.0.0.1:8080/api/cron/create?agentId=demo-agent' \
 | GET | `/api/workspace` | 获取 Agent 工作目录路径 |
 | POST | `/api/edit` | 写入文本或二进制文件 |
 | POST | `/api/agent/audio` | 保存新建流程录制的 WAV 文件 |
+| POST | `/api/video_record_convert` | 将受限临时 WebM 转为最终 MP4 |
 
 补充说明：
 
@@ -3359,3 +3360,25 @@ Windows 安装包首次创建受管的 `deepright` WSL 发行版时，会要求�
 `GET/HEAD /api/media_preview` 的安全边界不变：请求必须携带目标 Agent 和该工作区内的相对媒体路径，绝对路径、跨 Agent 路径、路径逃逸和逃出工作区的符号链接都会被拒绝。
 
 完整说明见 [iteration/20260727-2/USER_GUIDE.md](iteration/20260727-2/USER_GUIDE.md)。
+
+---
+
+## 迭代 20260727-3：Chrome 录屏 WebM 转 MP4
+
+`POST /api/video_record_convert` 只服务于 Site 的“新增 → 录屏”保存链路。为兼容 H.264 编码，奇数宽高的录制会在右侧或底部补一个像素，不裁掉原始画面；若最终 MP4 同名或发生并发冲突，服务会在扩展名前自动追加时间戳：
+
+```json
+{
+  "agentId": "AgentId",
+  "path": "tmp/.screen-recording-<随机值>.webm",
+  "outputName": "recording.mp4"
+}
+```
+
+- 输入必须是当前 Agent 工作区 `tmp/` 内、符合专用临时命名规则的 `.webm` 文件；接口拒绝普通视频、绝对路径、路径逃逸、符号链接、目录、跨 Agent 路径和未知字段，因此不能作为任意文件转码接口使用。
+- 输出名称必须是单个安全的 `.mp4` 文件名。输出固定新建在当前 Agent 工作区 `videos/`，同名文件返回冲突且绝不覆盖；成功响应的 `savedAs` 是最终绝对路径。
+- 服务端完整读取该录制的可读取视频时间线，不按 0.5 秒粒度截断。FFmpeg 固定输出 H.264 视频、AAC 音频和 MP4 封装；没有音频时仍可生成视频。FFprobe 可读取时会用于确定视频目标码率。
+- 转码先生成同目录临时 MP4，成功后原子创建最终文件。无论成功、失败、超时、依赖缺失还是输出冲突，临时输入 WebM 和临时 MP4 都会清理；失败不会留下最终 MP4。
+- 运行环境仍需要 `ffmpeg` 与 `ffprobe`，均从受控运行环境查找；接口不执行安装命令。
+
+完整说明见 [iteration/20260727-3/USER_GUIDE.md](iteration/20260727-3/USER_GUIDE.md)。

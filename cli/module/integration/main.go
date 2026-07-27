@@ -6347,6 +6347,26 @@ type VideoTrimResponse struct {
 	Status  int    `json:"status"`
 }
 
+// VideoRecordConvertRequest refers only to a browser-recorded WebM that Site
+// staged under the requesting Agent's temporary workspace directory.
+type VideoRecordConvertRequest struct {
+	AgentID    string `json:"agentId"`
+	Path       string `json:"path"`
+	OutputName string `json:"outputName"`
+}
+
+type VideoRecordConvertResponse struct {
+	AgentID string `json:"agentId"`
+	Path    string `json:"path"`
+	SavedAs string `json:"savedAs,omitempty"`
+	Content string `json:"content,omitempty"`
+	Status  int    `json:"status"`
+}
+
+const screenRecordingTemporaryDirectory = "tmp"
+
+var screenRecordingTemporaryName = regexp.MustCompile(`^\.screen-recording-[a-z0-9-]{12,96}\.webm$`)
+
 var videoTrimLookPathFn = exec.LookPath
 var videoTrimCommandContextFn = exec.CommandContext
 var videoTrimLastOutputTimestamp int64
@@ -6491,6 +6511,201 @@ func writeVideoTrimResp(w http.ResponseWriter, httpStatus int, resp VideoTrimRes
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(httpStatus)
 	_ = json.NewEncoder(w).Encode(resp)
+}
+
+func writeVideoRecordConvertResp(w http.ResponseWriter, httpStatus int, resp VideoRecordConvertResponse) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(httpStatus)
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+func isScreenRecordingTemporaryRelativePath(relPath string) bool {
+	cleanPath := filepath.ToSlash(filepath.Clean(relPath))
+	return path.Dir(cleanPath) == screenRecordingTemporaryDirectory && screenRecordingTemporaryName.MatchString(path.Base(cleanPath))
+}
+
+// videoRecordAvailableOutputPath returns a currently unused final MP4 path.
+// A save still creates it atomically with os.Link below, so this preflight is
+// only a friendly collision avoidance step rather than a race-prone guarantee.
+func videoRecordAvailableOutputPath(workspace, outputName string, now time.Time) (string, error) {
+	for attempt := 0; attempt < 64; attempt++ {
+		candidateName := outputName
+		if attempt > 0 {
+			candidateName = appendTimestampToFilename(outputName, now.Add(time.Duration(attempt)*time.Nanosecond))
+		}
+		outputPath, err := resolveCaseInsensitiveUnderRoot(workspace, filepath.Join("videos", candidateName))
+		if err != nil || !ensureWritablePathWithinRoot(workspace, outputPath) {
+			return "", errors.New("无法在工作目录中创建 MP4")
+		}
+		if _, err := os.Lstat(outputPath); errors.Is(err, os.ErrNotExist) {
+			return outputPath, nil
+		} else if err != nil {
+			return "", fmt.Errorf("无法检查 MP4 输出路径: %w", err)
+		}
+	}
+	return "", errors.New("无法生成不重复的 MP4 文件名")
+}
+
+// handleVideoRecordConvert turns one browser-staged WebM into the final MP4.
+// Its narrow input namespace deliberately prevents this endpoint from becoming
+// a generic workspace transcoder.
+func handleVideoRecordConvert(cfg *Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", http.MethodPost)
+			writeVideoRecordConvertResp(w, http.StatusMethodNotAllowed, VideoRecordConvertResponse{Content: "method not allowed", Status: 1})
+			return
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+		defer r.Body.Close()
+		var request VideoRecordConvertRequest
+		decoder := json.NewDecoder(r.Body)
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&request); err != nil {
+			writeVideoRecordConvertResp(w, http.StatusBadRequest, VideoRecordConvertResponse{Content: "请求体格式错误", Status: 1})
+			return
+		}
+		if err := decoder.Decode(&struct{}{}); err != io.EOF {
+			writeVideoRecordConvertResp(w, http.StatusBadRequest, VideoRecordConvertResponse{AgentID: request.AgentID, Path: request.Path, Content: "请求体只能包含一个 JSON 对象", Status: 1})
+			return
+		}
+		request.AgentID = strings.TrimSpace(request.AgentID)
+		request.Path = normalizeQuotedPathArg(request.Path)
+		request.OutputName = strings.TrimSpace(normalizeQuotedPathArg(request.OutputName))
+		if !isValidMediaPreviewAgentID(request.AgentID) || request.Path == "" {
+			writeVideoRecordConvertResp(w, http.StatusBadRequest, VideoRecordConvertResponse{AgentID: request.AgentID, Path: request.Path, Content: "agentId 和临时录制路径不能为空", Status: 1})
+			return
+		}
+		if !isScreenRecordingTemporaryRelativePath(request.Path) {
+			writeVideoRecordConvertResp(w, http.StatusBadRequest, VideoRecordConvertResponse{AgentID: request.AgentID, Path: request.Path, Content: "仅支持本次录屏产生的临时 WebM 文件", Status: 1})
+			return
+		}
+		if !isSafeVideoTrimOutputName(request.OutputName) {
+			writeVideoRecordConvertResp(w, http.StatusBadRequest, VideoRecordConvertResponse{AgentID: request.AgentID, Path: request.Path, Content: "输出文件名必须是有效的 .mp4 文件名", Status: 1})
+			return
+		}
+
+		workspace, err := getWorkspaceByAgentID(cfg, request.AgentID)
+		if err != nil {
+			writeVideoRecordConvertResp(w, http.StatusNotFound, VideoRecordConvertResponse{AgentID: request.AgentID, Path: request.Path, Content: "agent not found", Status: 1})
+			return
+		}
+		cleanSourcePath := filepath.Clean(request.Path)
+		sourcePath, err := resolveCaseInsensitiveUnderRoot(workspace, cleanSourcePath)
+		if err != nil || !ensurePathWithinRoot(workspace, sourcePath) {
+			writeVideoRecordConvertResp(w, http.StatusBadRequest, VideoRecordConvertResponse{AgentID: request.AgentID, Path: request.Path, Content: "临时录制路径无效", Status: 1})
+			return
+		}
+		sourceInfo, err := os.Lstat(sourcePath)
+		if err != nil {
+			status := http.StatusInternalServerError
+			message := "无法读取临时录制文件"
+			if errors.Is(err, os.ErrNotExist) {
+				status = http.StatusNotFound
+				message = "临时录制文件不存在"
+			}
+			writeVideoRecordConvertResp(w, status, VideoRecordConvertResponse{AgentID: request.AgentID, Path: request.Path, Content: message, Status: 1})
+			return
+		}
+		if sourceInfo.IsDir() || sourceInfo.Mode()&os.ModeSymlink != 0 {
+			writeVideoRecordConvertResp(w, http.StatusBadRequest, VideoRecordConvertResponse{AgentID: request.AgentID, Path: request.Path, Content: "临时录制文件无效", Status: 1})
+			return
+		}
+		// Every path after this point has passed the narrow temporary namespace
+		// validation, so clean it up on both successful and failed conversions.
+		defer func() {
+			if err := os.Remove(sourcePath); err != nil && !errors.Is(err, os.ErrNotExist) {
+				log.Printf("remove screen-recording temporary source %s: %v", sourcePath, err)
+			}
+		}()
+
+		outputPath, err := videoRecordAvailableOutputPath(workspace, request.OutputName, time.Now())
+		if err != nil {
+			writeVideoRecordConvertResp(w, http.StatusInternalServerError, VideoRecordConvertResponse{AgentID: request.AgentID, Path: request.Path, Content: err.Error(), Status: 1})
+			return
+		}
+		if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil || !ensureWritablePathWithinRoot(workspace, outputPath) {
+			writeVideoRecordConvertResp(w, http.StatusInternalServerError, VideoRecordConvertResponse{AgentID: request.AgentID, Path: request.Path, Content: "无法创建 videos 目录", Status: 1})
+			return
+		}
+
+		ffmpegPath, ffmpegErr := videoTrimLookPathFn("ffmpeg")
+		ffprobePath, ffprobeErr := videoTrimLookPathFn("ffprobe")
+		if ffmpegErr != nil || ffprobeErr != nil {
+			writeVideoRecordConvertResp(w, http.StatusServiceUnavailable, VideoRecordConvertResponse{AgentID: request.AgentID, Path: request.Path, Content: "FFmpeg 或 FFprobe 未安装，无法生成 MP4", Status: 1})
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Minute)
+		defer cancel()
+		bitrate := videoTrimProbeBitrate(ctx, ffprobePath, sourcePath)
+		temporaryPath := strings.TrimSuffix(outputPath, ".mp4") + "." + strconv.FormatInt(time.Now().UnixNano(), 10) + ".tmp.mp4"
+		if !ensureWritablePathWithinRoot(workspace, temporaryPath) {
+			writeVideoRecordConvertResp(w, http.StatusBadRequest, VideoRecordConvertResponse{AgentID: request.AgentID, Path: request.Path, Content: "无法创建临时 MP4", Status: 1})
+			return
+		}
+		defer os.Remove(temporaryPath)
+		args := []string{
+			"-hide_banner", "-loglevel", "error", "-nostdin",
+			"-i", sourcePath,
+			"-map", "0:v:0", "-map", "0:a?",
+			// H.264 with 4:2:0 chroma requires even dimensions. Browser display
+			// capture may legitimately produce odd widths or heights (for example
+			// 943x1235). Pad only the extra edge pixel instead of cropping source
+			// content so full-frame recording always remains complete.
+			"-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0",
+			"-pix_fmt", "yuv420p",
+			"-c:v", "libx264", "-c:a", "aac",
+		}
+		if bitrate > 0 {
+			args = append(args, "-b:v", strconv.FormatInt(bitrate, 10))
+		}
+		args = append(args, "-movflags", "+faststart", "-f", "mp4", "-n", temporaryPath)
+		commandOutput, err := videoTrimCommandContextFn(ctx, ffmpegPath, args...).CombinedOutput()
+		if err != nil {
+			message := "视频转码失败：" + videoTrimCommandError(err, commandOutput)
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				message = "视频转码超时"
+			}
+			writeVideoRecordConvertResp(w, http.StatusInternalServerError, VideoRecordConvertResponse{AgentID: request.AgentID, Path: request.Path, Content: message, Status: 1})
+			return
+		}
+		info, err := os.Stat(temporaryPath)
+		if err != nil || info.Size() == 0 {
+			writeVideoRecordConvertResp(w, http.StatusInternalServerError, VideoRecordConvertResponse{AgentID: request.AgentID, Path: request.Path, Content: "MP4 转码未生成有效输出", Status: 1})
+			return
+		}
+		if err := os.Remove(sourcePath); err != nil {
+			writeVideoRecordConvertResp(w, http.StatusInternalServerError, VideoRecordConvertResponse{AgentID: request.AgentID, Path: request.Path, Content: "清理临时 WebM 失败", Status: 1})
+			return
+		}
+		var linkErr error
+		for attempt := 0; attempt < 64; attempt++ {
+			linkErr = os.Link(temporaryPath, outputPath)
+			if linkErr == nil {
+				break
+			}
+			if !errors.Is(linkErr, fs.ErrExist) {
+				writeVideoRecordConvertResp(w, http.StatusInternalServerError, VideoRecordConvertResponse{AgentID: request.AgentID, Path: request.Path, Content: "保存 MP4 失败", Status: 1})
+				return
+			}
+			outputPath, err = videoRecordAvailableOutputPath(workspace, request.OutputName, time.Now().Add(time.Duration(attempt+1)*time.Nanosecond))
+			if err != nil {
+				writeVideoRecordConvertResp(w, http.StatusInternalServerError, VideoRecordConvertResponse{AgentID: request.AgentID, Path: request.Path, Content: err.Error(), Status: 1})
+				return
+			}
+		}
+		if linkErr != nil {
+			writeVideoRecordConvertResp(w, http.StatusInternalServerError, VideoRecordConvertResponse{AgentID: request.AgentID, Path: request.Path, Content: "无法生成不重复的 MP4 文件名", Status: 1})
+			return
+		}
+		if err := os.Remove(temporaryPath); err != nil {
+			_ = os.Remove(outputPath)
+			writeVideoRecordConvertResp(w, http.StatusInternalServerError, VideoRecordConvertResponse{AgentID: request.AgentID, Path: request.Path, Content: "清理临时 MP4 失败", Status: 1})
+			return
+		}
+		flushAgentCache()
+		writeVideoRecordConvertResp(w, http.StatusOK, VideoRecordConvertResponse{AgentID: request.AgentID, Path: request.Path, SavedAs: outputPath, Status: 0})
+	}
 }
 
 func isHalfSecondValue(value float64) bool {
@@ -18496,6 +18711,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/media_preview", handleMediaPreview(&cfg))
 	mux.HandleFunc("/api/ffmpeg/check", handleFFmpegCheck())
 	mux.HandleFunc("/api/video_trim", handleVideoTrim(&cfg))
+	mux.HandleFunc("/api/video_record_convert", handleVideoRecordConvert(&cfg))
 	mux.HandleFunc("/api/agent/audio", handleAgentAudioSave(&cfg))
 	mux.HandleFunc("/file/lastUpdate", handleFileLastUpdate(&cfg))
 	mux.HandleFunc("/api/heartbeat", handleHeartbeat())

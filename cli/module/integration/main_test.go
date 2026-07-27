@@ -4120,6 +4120,169 @@ func TestHandleVideoTrimCreatesNewMP4WithoutChangingSource(t *testing.T) {
 	}
 }
 
+func TestHandleVideoRecordConvertCreatesMP4AndCleansTemporaryWebM(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test command shim uses POSIX sh")
+	}
+	root := t.TempDir()
+	workspace := filepath.Join(root, "agent-a")
+	sourcePath := filepath.Join(workspace, "tmp", ".screen-recording-123456789abc.webm")
+	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
+		t.Fatalf("mkdir temporary recording directory: %v", err)
+	}
+	source := []byte("browser-recorded-webm")
+	if err := os.WriteFile(sourcePath, source, 0o644); err != nil {
+		t.Fatalf("write temporary recording: %v", err)
+	}
+
+	previousLookPath := videoTrimLookPathFn
+	previousCommand := videoTrimCommandContextFn
+	t.Cleanup(func() {
+		videoTrimLookPathFn = previousLookPath
+		videoTrimCommandContextFn = previousCommand
+	})
+	var ffmpegArgs []string
+	videoTrimLookPathFn = func(name string) (string, error) {
+		if name != "ffmpeg" && name != "ffprobe" {
+			return "", fmt.Errorf("unexpected executable %q", name)
+		}
+		return name, nil
+	}
+	videoTrimCommandContextFn = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		if name == "ffprobe" {
+			return exec.CommandContext(ctx, "sh", "-c", "printf 1800000")
+		}
+		if name == "ffmpeg" {
+			ffmpegArgs = append([]string(nil), args...)
+			return exec.CommandContext(ctx, "sh", "-c", "cp \"$1\" \"$2\"", "record-convert-test", sourcePath, args[len(args)-1])
+		}
+		return exec.CommandContext(ctx, "sh", "-c", "exit 1")
+	}
+
+	server := httptest.NewServer(handleVideoRecordConvert(&Config{AgentDir: root}))
+	defer server.Close()
+	body, err := json.Marshal(VideoRecordConvertRequest{AgentID: "agent-a", Path: "tmp/.screen-recording-123456789abc.webm", OutputName: "recording.mp4"})
+	if err != nil {
+		t.Fatalf("marshal convert request: %v", err)
+	}
+	response, err := http.Post(server.URL, "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("POST record convert: %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		responseBody, _ := io.ReadAll(response.Body)
+		t.Fatalf("POST status = %d, body=%s", response.StatusCode, responseBody)
+	}
+	var result VideoRecordConvertResponse
+	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
+		t.Fatalf("decode convert response: %v", err)
+	}
+	if result.Status != 0 || filepath.Base(result.SavedAs) != "recording.mp4" || filepath.Base(filepath.Dir(result.SavedAs)) != "videos" {
+		t.Fatalf("unexpected convert response: %+v", result)
+	}
+	if saved, err := os.ReadFile(result.SavedAs); err != nil || !bytes.Equal(saved, source) {
+		t.Fatalf("saved MP4 = %q, err=%v; want copied output", saved, err)
+	}
+	if _, err := os.Stat(sourcePath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("temporary WebM still exists or stat failed: %v", err)
+	}
+	if findArg := func(key string) string {
+		for index := 0; index+1 < len(ffmpegArgs); index++ {
+			if ffmpegArgs[index] == key {
+				return ffmpegArgs[index+1]
+			}
+		}
+		return ""
+	}; findArg("-c:v") != "libx264" || findArg("-c:a") != "aac" || findArg("-b:v") != "1800000" || findArg("-vf") != "pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0" || findArg("-pix_fmt") != "yuv420p" {
+		t.Errorf("unexpected FFmpeg arguments: %q", ffmpegArgs)
+	}
+	for _, arg := range ffmpegArgs {
+		if arg == "-ss" || arg == "-t" {
+			t.Errorf("record conversion must not trim frames, args=%q", ffmpegArgs)
+			break
+		}
+	}
+}
+
+func TestHandleVideoRecordConvertAppendsTimestampForExistingOutput(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test command shim uses POSIX sh")
+	}
+	root := t.TempDir()
+	workspace := filepath.Join(root, "agent-a")
+	sourcePath := filepath.Join(workspace, "tmp", ".screen-recording-123456789abc.webm")
+	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
+		t.Fatalf("mkdir temporary recording directory: %v", err)
+	}
+	source := []byte("browser-recorded-webm")
+	if err := os.WriteFile(sourcePath, source, 0o644); err != nil {
+		t.Fatalf("write temporary recording: %v", err)
+	}
+	existingOutput := filepath.Join(workspace, "videos", "recording.mp4")
+	if err := os.MkdirAll(filepath.Dir(existingOutput), 0o755); err != nil {
+		t.Fatalf("mkdir videos directory: %v", err)
+	}
+	if err := os.WriteFile(existingOutput, []byte("existing-mp4"), 0o644); err != nil {
+		t.Fatalf("write existing MP4: %v", err)
+	}
+
+	previousLookPath := videoTrimLookPathFn
+	previousCommand := videoTrimCommandContextFn
+	t.Cleanup(func() {
+		videoTrimLookPathFn = previousLookPath
+		videoTrimCommandContextFn = previousCommand
+	})
+	videoTrimLookPathFn = func(name string) (string, error) {
+		if name != "ffmpeg" && name != "ffprobe" {
+			return "", fmt.Errorf("unexpected executable %q", name)
+		}
+		return name, nil
+	}
+	videoTrimCommandContextFn = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		if name == "ffprobe" {
+			return exec.CommandContext(ctx, "sh", "-c", "printf 1800000")
+		}
+		if name == "ffmpeg" {
+			return exec.CommandContext(ctx, "sh", "-c", "cp \"$1\" \"$2\"", "record-conflict-test", sourcePath, args[len(args)-1])
+		}
+		return exec.CommandContext(ctx, "sh", "-c", "exit 1")
+	}
+
+	server := httptest.NewServer(handleVideoRecordConvert(&Config{AgentDir: root}))
+	defer server.Close()
+	body, err := json.Marshal(VideoRecordConvertRequest{AgentID: "agent-a", Path: "tmp/.screen-recording-123456789abc.webm", OutputName: "recording.mp4"})
+	if err != nil {
+		t.Fatalf("marshal convert request: %v", err)
+	}
+	response, err := http.Post(server.URL, "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("POST record convert: %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		responseBody, _ := io.ReadAll(response.Body)
+		t.Fatalf("POST status = %d, body=%s", response.StatusCode, responseBody)
+	}
+	var result VideoRecordConvertResponse
+	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
+		t.Fatalf("decode convert response: %v", err)
+	}
+	savedName := filepath.Base(result.SavedAs)
+	if result.Status != 0 || savedName == "recording.mp4" || !strings.HasPrefix(savedName, "recording_") || filepath.Ext(savedName) != ".mp4" {
+		t.Fatalf("conflict should append timestamp, got %+v", result)
+	}
+	if saved, err := os.ReadFile(result.SavedAs); err != nil || !bytes.Equal(saved, source) {
+		t.Fatalf("timestamped MP4 = %q, err=%v; want copied output", saved, err)
+	}
+	if original, err := os.ReadFile(existingOutput); err != nil || string(original) != "existing-mp4" {
+		t.Fatalf("existing MP4 changed to %q, err=%v", original, err)
+	}
+	if _, err := os.Stat(sourcePath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("temporary WebM still exists or stat failed: %v", err)
+	}
+}
+
 func TestHandleEditPersistsCanvasJSONWithinWorkspace(t *testing.T) {
 	flushAgentCache()
 	root := t.TempDir()

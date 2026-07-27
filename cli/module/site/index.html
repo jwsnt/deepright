@@ -2590,6 +2590,11 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .vfs-create-panel .settings-error{min-height:18px;margin-top:0}
 .vfs-create-actions{display:flex;justify-content:flex-end;gap:12px;padding-top:4px}
 .vfs-create-actions .btn{min-width:96px}
+.vfs-screen-panel{width:min(880px,calc(100vw - 40px));max-height:calc(100vh - 40px);padding:0;overflow:auto;border:1px solid rgba(96,137,226,.44);background:linear-gradient(145deg,#f9fbff,#edf3ff);box-shadow:0 30px 76px rgba(30,58,118,.28);color:#29456f}
+.vfs-screen-shell{display:flex;flex-direction:column;gap:16px;padding:24px}.vfs-screen-guide{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.vfs-screen-guide-step{min-height:76px;padding:12px;border:1px solid rgba(119,153,222,.34);border-radius:16px;background:rgba(255,255,255,.72);font-size:12px;line-height:1.55;color:#617ba5}.vfs-screen-guide-step b{display:block;margin-bottom:3px;color:#365c92;font-size:13px}.vfs-screen-guide-step span{display:inline-grid;place-items:center;width:19px;height:19px;margin-right:6px;border-radius:7px;background:linear-gradient(135deg,#638bfa,#85a9ff);color:#fff;font-size:11px}.vfs-screen-stage-wrap{display:none;padding:12px;border:1px solid rgba(114,151,221,.42);border-radius:20px;background:linear-gradient(145deg,#dce9ff,#eef4ff);box-shadow:inset 0 1px 0 rgba(255,255,255,.74)}.vfs-screen-stage-wrap.show{display:block}.vfs-screen-stage{position:relative;width:100%;overflow:hidden;border-radius:13px;background:#0d1930;line-height:0}.vfs-screen-source,.vfs-screen-result{display:block;width:100%;max-height:48vh;background:#0d1930}.vfs-screen-source{pointer-events:none}.vfs-screen-selection-layer{position:absolute;inset:0;overflow:hidden;touch-action:none;cursor:crosshair;opacity:0;pointer-events:none;transition:opacity .16s ease}.vfs-screen-selection-layer.show{opacity:1;pointer-events:auto}.vfs-screen-dim{position:absolute;background:rgba(5,14,35,.55);pointer-events:none}.vfs-screen-selection{position:absolute;box-sizing:border-box;border:2px solid #6f9bff;border-radius:8px;box-shadow:0 0 0 1px rgba(255,255,255,.72),0 0 0 9999px transparent;cursor:move}.vfs-screen-selection-label{position:absolute;top:7px;left:7px;padding:3px 7px;border-radius:7px;background:#638bfa;color:#fff;font:700 11px/1.25 ui-monospace,SFMono-Regular,Menlo,monospace;pointer-events:none}.vfs-screen-handle{position:absolute;width:11px;height:11px;border:2px solid #fff;border-radius:50%;background:#638bfa;box-shadow:0 1px 5px rgba(17,42,99,.34)}.vfs-screen-handle.nw{left:-7px;top:-7px}.vfs-screen-handle.ne{right:-7px;top:-7px}.vfs-screen-handle.sw{left:-7px;bottom:-7px}.vfs-screen-handle.se{right:-7px;bottom:-7px}.vfs-screen-meta{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 2px;color:#647ba2;font-size:12px}.vfs-screen-meta strong{color:#315584}.vfs-screen-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.vfs-screen-action{min-height:44px;border:1px solid rgba(103,143,221,.48);border-radius:14px;background:rgba(255,255,255,.82);color:#375d93;font:700 13px/1 inherit;cursor:pointer;transition:transform .18s ease,filter .18s ease,opacity .18s ease}.vfs-screen-action.primary{border-color:transparent;background:linear-gradient(135deg,#638bfa,#84a8ff);color:#fff;box-shadow:0 12px 25px rgba(79,120,217,.23)}.vfs-screen-action.stop{background:linear-gradient(135deg,#ed735d,#f39378);border-color:transparent;color:#fff}.vfs-screen-action:hover:not(:disabled),.vfs-screen-action:focus-visible:not(:disabled){outline:none;transform:translateY(-1px);filter:brightness(1.04)}.vfs-screen-action:disabled{cursor:not-allowed;opacity:.44}.vfs-screen-status-row{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:28px}.vfs-screen-status{min-width:0;color:#60789f;font-size:12px;line-height:1.5}.vfs-screen-status.error{color:var(--error)}.vfs-screen-range-toggle{display:inline-flex;align-items:center;gap:8px;flex:0 0 auto;color:#496991;font-size:12px;font-weight:700;line-height:1;cursor:pointer;user-select:none}.vfs-screen-range-toggle input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}.vfs-screen-range-toggle-track{position:relative;width:34px;height:20px;border-radius:999px;background:rgba(102,132,184,.34);box-shadow:inset 0 1px 2px rgba(25,48,91,.2);transition:background .18s ease,box-shadow .18s ease}.vfs-screen-range-toggle-track::after{content:'';position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(28,52,99,.25);transition:transform .18s ease}.vfs-screen-range-toggle input:checked+.vfs-screen-range-toggle-track{background:#638bfa;box-shadow:0 0 0 3px rgba(99,139,250,.16)}.vfs-screen-range-toggle input:checked+.vfs-screen-range-toggle-track::after{transform:translateX(14px)}.vfs-screen-range-toggle input:focus-visible+.vfs-screen-range-toggle-track{outline:2px solid #638bfa;outline-offset:3px}.vfs-screen-range-toggle input:disabled+.vfs-screen-range-toggle-track{opacity:.45}.vfs-screen-range-toggle:has(input:disabled){cursor:not-allowed;opacity:.68}.vfs-screen-result-wrap{display:none;padding:12px;border:1px solid rgba(114,151,221,.36);border-radius:18px;background:rgba(255,255,255,.64)}.vfs-screen-result-wrap.show{display:block}.vfs-screen-result{max-height:220px;border-radius:12px}.vfs-screen-actions{display:flex;justify-content:flex-end;gap:10px}.vfs-screen-actions .btn{min-width:112px}
+[data-theme="dark"] .vfs-screen-panel{border-color:rgba(120,158,239,.32);background:linear-gradient(145deg,#101d35,#152642);color:#dce8ff}.vfs-screen-guide-step{background:rgba(255,255,255,.06)}[data-theme="dark"] .vfs-screen-guide-step{border-color:rgba(137,169,230,.22);color:#aebfdd}[data-theme="dark"] .vfs-screen-guide-step b,[data-theme="dark"] .vfs-screen-meta strong{color:#e0eaff}[data-theme="dark"] .vfs-screen-stage-wrap{border-color:rgba(134,169,235,.25);background:#0a1529}[data-theme="dark"] .vfs-screen-action{border-color:rgba(134,169,235,.3);background:rgba(255,255,255,.08);color:#dce8ff}[data-theme="dark"] .vfs-screen-meta,[data-theme="dark"] .vfs-screen-status{color:#aec1e1}[data-theme="dark"] .vfs-screen-result-wrap{border-color:rgba(134,169,235,.22);background:rgba(255,255,255,.04)}
+.vfs-screen-source{max-height:none}.vfs-screen-result{display:block;width:100%;background:#0d1930}
+@media (max-width:640px){.vfs-screen-panel{width:calc(100vw - 24px);max-height:calc(100vh - 24px)}.vfs-screen-shell{gap:12px;padding:16px}.vfs-screen-guide,.vfs-screen-controls{grid-template-columns:1fr}.vfs-screen-guide-step{min-height:0}.vfs-screen-meta{align-items:flex-start;flex-direction:column;gap:4px}.vfs-screen-actions .btn{min-width:0;flex:1}}
 .vfs-audio-panel{--vfs-audio-main:#ff7a4d;--vfs-audio-main-strong:#ff9a61;--vfs-audio-main-soft:rgba(255,122,77,.14);--vfs-audio-main-border:rgba(255,132,85,.44);--vfs-audio-deep:#814022;--vfs-audio-panel-bg-1:#fffaf5;--vfs-audio-panel-bg-2:#fff0e3;--vfs-audio-status-bg-1:#fff5ec;--vfs-audio-status-bg-2:#ffe8d7;--vfs-audio-text:#6b3826;--vfs-audio-muted:#93614b;--vfs-audio-shadow:rgba(133,63,30,.22);width:min(520px,calc(100vw - 40px));padding:0;overflow:hidden;border:1px solid var(--vfs-audio-main-border);background:linear-gradient(145deg,var(--vfs-audio-panel-bg-1),var(--vfs-audio-panel-bg-2));box-shadow:0 30px 72px var(--vfs-audio-shadow),0 0 0 1px rgba(255,255,255,.42) inset;color:var(--vfs-audio-text)}
 .vfs-audio-shell{position:relative;display:flex;flex-direction:column;gap:18px;padding:25px 25px 22px;overflow:hidden}.vfs-audio-shell::before,.vfs-audio-shell::after{content:'';position:absolute;z-index:0;pointer-events:none;border-radius:999px;filter:blur(5px)}.vfs-audio-shell::before{width:210px;height:210px;top:-122px;right:-64px;background:radial-gradient(circle,var(--vfs-audio-main-soft),transparent 70%)}.vfs-audio-shell::after{width:178px;height:178px;bottom:-112px;left:-76px;background:radial-gradient(circle,rgba(255,154,97,.2),transparent 70%)}.vfs-audio-shell>*{position:relative;z-index:1}
 .vfs-audio-header{display:flex;align-items:flex-start;gap:14px}.vfs-audio-badge{display:grid;place-items:center;flex:0 0 auto;width:48px;height:48px;border-radius:17px;color:#fff;background:linear-gradient(135deg,var(--vfs-audio-main),var(--vfs-audio-main-strong));box-shadow:0 14px 28px var(--vfs-audio-shadow),inset 0 1px 0 rgba(255,255,255,.42)}.vfs-audio-badge svg{width:24px;height:24px;fill:currentColor}.vfs-audio-heading{min-width:0;flex:1}.vfs-audio-title{margin:0;color:var(--vfs-audio-text);font-size:20px;line-height:1.2;letter-spacing:.01em}.vfs-audio-filename{display:block;max-width:100%;margin-top:6px;color:var(--vfs-audio-muted);font-size:12px;line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -6122,6 +6127,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
           <option value="2">画布</option>
           <option value="3">音频</option>
           <option value="4">图片</option>
+          <option value="5">录屏</option>
         </select>
       </div>
       <div id="vfsCreateError" class="settings-error"></div>
@@ -6160,6 +6166,35 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
       <div class="vfs-audio-discard-confirm" id="vfsAudioDiscardConfirm" role="alertdialog" aria-modal="true" aria-labelledby="vfsAudioDiscardTitle">
         <div class="vfs-audio-discard-card"><h4 id="vfsAudioDiscardTitle">放弃正在录制的音频？</h4><p>放弃后本次录音不会保存，且无法恢复。</p><div class="vfs-audio-discard-actions"><button class="btn btn-secondary" type="button" onclick="vfsAudioResolveDiscard(false)">继续录制</button><button class="btn btn-primary" type="button" onclick="vfsAudioResolveDiscard(true)">放弃录音</button></div></div>
       </div>
+    </div>
+  </section>
+</div>
+<div class="overlay" id="vfsScreenOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="29" onclick="if(event.target===this)vfsScreenRequestClose()" aria-hidden="true">
+  <section class="settings-panel vfs-screen-panel" id="vfsScreenPanel" role="dialog" aria-modal="true" aria-label="录制 Chrome 画面" onclick="event.stopPropagation()">
+    <div class="vfs-screen-shell">
+      <div class="vfs-screen-guide" aria-label="录制步骤">
+        <div class="vfs-screen-guide-step"><b><span>1</span>先打开目标网站</b>在Chrome标签页中打开目标网站。</div>
+        <div class="vfs-screen-guide-step"><b><span>2</span>选择录制目标</b>选择标签页、窗口或整个屏幕。</div>
+        <div class="vfs-screen-guide-step"><b><span>3</span>开始录制</b></div>
+      </div>
+      <div class="vfs-screen-stage-wrap" id="vfsScreenStageWrap">
+        <div class="vfs-screen-stage" id="vfsScreenStage">
+          <video class="vfs-screen-source" id="vfsScreenSource" autoplay muted playsinline></video>
+          <div class="vfs-screen-selection-layer" id="vfsScreenSelectionLayer" onpointerdown="vfsScreenPointerDown(event)" onpointermove="vfsScreenPointerMove(event)" onpointerup="vfsScreenPointerEnd(event)" onpointercancel="vfsScreenPointerEnd(event)">
+            <div class="vfs-screen-dim" id="vfsScreenDimTop"></div><div class="vfs-screen-dim" id="vfsScreenDimRight"></div><div class="vfs-screen-dim" id="vfsScreenDimBottom"></div><div class="vfs-screen-dim" id="vfsScreenDimLeft"></div>
+            <div class="vfs-screen-selection" id="vfsScreenSelection"><span class="vfs-screen-selection-label" id="vfsScreenSelectionLabel">—</span><i class="vfs-screen-handle nw" data-vfs-screen-handle="nw"></i><i class="vfs-screen-handle ne" data-vfs-screen-handle="ne"></i><i class="vfs-screen-handle sw" data-vfs-screen-handle="sw"></i><i class="vfs-screen-handle se" data-vfs-screen-handle="se"></i></div>
+          </div>
+        </div>
+        <div class="vfs-screen-meta"><span>源画面：<strong id="vfsScreenSourceSize">—</strong></span><span>输出区域：<strong id="vfsScreenOutputSize">—</strong></span><span>音频：<strong id="vfsScreenAudioState">—</strong></span></div>
+      </div>
+      <div class="vfs-screen-result-wrap" id="vfsScreenResultWrap"><video class="vfs-screen-result" id="vfsScreenResult" controls playsinline></video></div>
+      <div class="vfs-screen-controls">
+        <button class="vfs-screen-action" id="vfsScreenChooseBtn" type="button" onclick="vfsScreenChooseTab()">选择录制来源</button>
+        <button class="vfs-screen-action primary" id="vfsScreenStartBtn" type="button" onclick="vfsScreenStart()" disabled>开始录制</button>
+        <button class="vfs-screen-action stop" id="vfsScreenStopBtn" type="button" onclick="vfsScreenStop()" disabled>停止录制</button>
+      </div>
+      <div class="vfs-screen-status-row"><div class="vfs-screen-status" id="vfsScreenStatus" role="status" aria-live="polite">正在检查视频保存环境…</div><label class="vfs-screen-range-toggle" for="vfsScreenRangeToggle"><input id="vfsScreenRangeToggle" type="checkbox" onchange="vfsScreenToggleRange(this.checked)" disabled><span class="vfs-screen-range-toggle-track" aria-hidden="true"></span><span>选择录制范围</span></label></div>
+      <div class="vfs-screen-actions"><button class="btn btn-secondary" id="vfsScreenCancelBtn" type="button" onclick="vfsScreenRequestClose()">取消</button><button class="btn btn-primary" id="vfsScreenSaveBtn" type="button" onclick="vfsScreenSave()" disabled>保存 MP4</button></div>
     </div>
   </section>
 </div>
@@ -14722,6 +14757,7 @@ const ONBOARDING_CENTER_FLOAT_CONTAINER_SELECTORS = [
   '#agentDelOverlay',
   '#vfsCreateOverlay',
   '#vfsAudioOverlay',
+  '#vfsScreenOverlay',
   '#vfsUploadOverlay',
   '#agentImportOverlay',
   '#shutdownConfirmOverlay',
@@ -14940,6 +14976,9 @@ function hideExclusiveOverlayById(id) {
       return true;
     case 'vfsAudioOverlay':
       vfsAudioDiscard(false);
+      return true;
+    case 'vfsScreenOverlay':
+      vfsScreenRequestClose();
       return true;
     case 'vfsReferencePreviewOverlay':
       vfsReferenceClose();
@@ -47250,11 +47289,37 @@ function validateImageCreateName(name) {
   if (dotIndex > 0) return '图片只支持 .png 后缀';
   return '';
 }
+function validateScreenCreateName(name) {
+  const trimmed = String(name || '').trim();
+  if (!trimmed || /\.mp4$/i.test(trimmed)) return '';
+  const dotIndex = trimmed.lastIndexOf('.');
+  if (dotIndex > 0) return '录屏只支持 .mp4 后缀';
+  return '';
+}
+async function vfsScreenCheckOutputName(agentId, fileName) {
+  const normalizedAgentId = String(agentId || '').trim();
+  const normalizedName = String(fileName || '').trim();
+  let workspace = normalizeFsPath(vfsWorkspaceByAgent.get(normalizedAgentId) || '');
+  if (!workspace && normalizedAgentId === String(vfsAgentId || '').trim()) workspace = normalizeFsPath(vfsWorkspace);
+  if (!workspace) {
+    const response = await fetch('/api/workspace?agentId=' + encodeURIComponent(normalizedAgentId), { cache: 'no-store' });
+    if (!response.ok) throw new Error('无法读取当前 Agent 工作区');
+    workspace = normalizeFsPath((await response.text()).trim());
+    if (workspace) vfsWorkspaceByAgent.set(normalizedAgentId, workspace);
+  }
+  if (!workspace || !normalizedName) throw new Error('无法检查 MP4 文件名');
+  const response = await fetch('/api/files?path=' + encodeURIComponent(joinFsPath(workspace, 'videos', normalizedName)), { cache: 'no-store' });
+  if (response.status === 404) return false;
+  if (!response.ok) throw new Error('无法检查 videos 目录');
+  const entries = await response.json();
+  if (!Array.isArray(entries)) throw new Error('无法检查 videos 目录');
+  return entries.some(entry => entry && entry.type === 'file' && String(entry.name || '').toLowerCase() === normalizedName.toLowerCase());
+}
 async function vfsConfirmCreate() {
   const name = document.getElementById('vfsCreateName').value.trim();
   const type = document.getElementById('vfsCreateType').value;
   const errEl = document.getElementById('vfsCreateError');
-  const validationError = validateVfsCreateName(name);
+  const validationError = type === '5' && !name ? '' : validateVfsCreateName(name);
   if (validationError) { errEl.textContent = validationError; return; }
   if (type === '2') {
     const canvasNameError = validateCanvasCreateName(name);
@@ -47268,8 +47333,36 @@ async function vfsConfirmCreate() {
     const imageNameError = validateImageCreateName(name);
     if (imageNameError) { errEl.textContent = imageNameError; return; }
   }
+  if (type === '5') {
+    const screenNameError = validateScreenCreateName(name);
+    if (screenNameError) { errEl.textContent = screenNameError; return; }
+  }
   const agentId = state.settings.agentId;
   if (!agentId) { errEl.textContent = '未选择 Agent'; return; }
+  if (type === '5') {
+    const fileName = vfsScreenEnsureFileName(name);
+    const createButton = document.querySelector('#vfsCreatePanel .vfs-create-actions .btn-primary');
+    if (createButton) createButton.disabled = true;
+    errEl.textContent = '正在检查 MP4 文件名…';
+    let nameConflictAtCreate = false;
+    try {
+      nameConflictAtCreate = await vfsScreenCheckOutputName(agentId, fileName);
+    } catch (error) {
+      errEl.textContent = '创建前检查失败：' + ((error && error.message) || '请重试');
+      if (createButton) createButton.disabled = false;
+      return;
+    }
+    if (createButton) createButton.disabled = false;
+    if (nameConflictAtCreate) {
+      errEl.textContent = '同名 MP4 已存在：videos/' + fileName;
+      return;
+    }
+    document.getElementById('vfsCreateName').value = '';
+    errEl.textContent = '';
+    vfsHideCreate();
+    await vfsScreenOpen({ agentId, fileName, nameConflictAtCreate });
+    return;
+  }
   const relDir = getVfsCurrentRelativeDir();
   const fileName = type === '2' ? canvasEnsureFileName(name) : (type === '3' ? vfsAudioEnsureFileName(name) : (type === '4' ? vfsImageEnsureFileName(name) : name));
   const relName = type === '3'
@@ -47579,6 +47672,414 @@ async function vfsAudioSave() {
     state.saving = false; state.error = '保存失败：' + ((err && err.message) || '请重试');
     vfsAudioRender();
   }
+}
+
+// ===== VFS Chrome tab recording =====
+const VFS_SCREEN_MIN_SELECTION = .05;
+let vfsScreenState = null;
+
+function vfsScreenEnsureFileName(name) {
+  const value = String(name || '').trim();
+  const defaultName = 'tab-recording-' + new Date().toISOString().replace(/[:.]/g, '-');
+  const resolved = value || defaultName;
+  return /\.mp4$/i.test(resolved) ? resolved : resolved + '.mp4';
+}
+function vfsScreenFormatDuration(milliseconds) {
+  const seconds = Math.max(0, Math.floor((Number(milliseconds) || 0) / 1000));
+  return String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0');
+}
+function vfsScreenHasFramePipelineSupport() {
+  return !!(window.MediaStreamTrackProcessor && window.MediaStreamTrackGenerator && window.VideoFrame);
+}
+function vfsScreenSupportedMimeType() {
+  return ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find(type => MediaRecorder.isTypeSupported(type));
+}
+function vfsScreenVideoBitrate(crop) {
+  return Math.min(24_000_000, Math.max(6_000_000, Math.round(crop.width * crop.height * 60 * .1)));
+}
+function vfsScreenClamp(value, min, max) { return Math.min(Math.max(value, min), max); }
+function vfsScreenMP4OutputSize(crop) {
+  // Do not snap or reject the user's selection. H.264 needs even dimensions,
+  // so the final MP4 pads an odd right/bottom edge by one pixel after capture.
+  return { width: crop.width + (crop.width % 2), height: crop.height + (crop.height % 2) };
+}
+function vfsScreenSourceCrop(state) {
+  const video = document.getElementById('vfsScreenSource');
+  if (!state.rangeSelection) return { x: 0, y: 0, width: video.videoWidth, height: video.videoHeight };
+  return {
+    x: Math.round(state.selection.x * video.videoWidth),
+    y: Math.round(state.selection.y * video.videoHeight),
+    width: Math.max(1, Math.round(state.selection.width * video.videoWidth)),
+    height: Math.max(1, Math.round(state.selection.height * video.videoHeight))
+  };
+}
+function vfsScreenFrameCrop(crop, frame) {
+  const video = document.getElementById('vfsScreenSource');
+  const scaleX = frame.codedWidth / video.videoWidth;
+  const scaleY = frame.codedHeight / video.videoHeight;
+  const left = vfsScreenClamp(Math.round(crop.x * scaleX), 0, Math.max(0, frame.codedWidth - 1));
+  const top = vfsScreenClamp(Math.round(crop.y * scaleY), 0, Math.max(0, frame.codedHeight - 1));
+  const right = vfsScreenClamp(Math.round((crop.x + crop.width) * scaleX), left + 1, frame.codedWidth);
+  const bottom = vfsScreenClamp(Math.round((crop.y + crop.height) * scaleY), top + 1, frame.codedHeight);
+  return { x: left, y: top, width: right - left, height: bottom - top };
+}
+function vfsScreenRenderSelection() {
+  const state = vfsScreenState;
+  const video = document.getElementById('vfsScreenSource');
+  if (!state || !video || !video.videoWidth) return;
+  const selectionLayer = document.getElementById('vfsScreenSelectionLayer');
+  selectionLayer.classList.toggle('show', !!state.rangeSelection);
+  const selection = state.selection;
+  const left = selection.x * 100;
+  const top = selection.y * 100;
+  const width = selection.width * 100;
+  const height = selection.height * 100;
+  const right = left + width;
+  const bottom = top + height;
+  const selectionEl = document.getElementById('vfsScreenSelection');
+  Object.assign(selectionEl.style, { left: left + '%', top: top + '%', width: width + '%', height: height + '%' });
+  Object.assign(document.getElementById('vfsScreenDimTop').style, { left: '0', top: '0', width: '100%', height: top + '%' });
+  Object.assign(document.getElementById('vfsScreenDimRight').style, { left: right + '%', top: top + '%', width: (100 - right) + '%', height: height + '%' });
+  Object.assign(document.getElementById('vfsScreenDimBottom').style, { left: '0', top: bottom + '%', width: '100%', height: (100 - bottom) + '%' });
+  Object.assign(document.getElementById('vfsScreenDimLeft').style, { left: '0', top: top + '%', width: left + '%', height: height + '%' });
+  const crop = vfsScreenSourceCrop(state);
+  const mp4Output = vfsScreenMP4OutputSize(crop);
+  const selectionSize = crop.width + ' × ' + crop.height;
+  const mp4Size = mp4Output.width + ' × ' + mp4Output.height;
+  document.getElementById('vfsScreenSourceSize').textContent = video.videoWidth + ' × ' + video.videoHeight;
+  document.getElementById('vfsScreenOutputSize').textContent = mp4Size + (mp4Size === selectionSize ? '' : '（自动补齐）');
+  document.getElementById('vfsScreenSelectionLabel').textContent = mp4Size === selectionSize ? selectionSize : selectionSize + ' → ' + mp4Size;
+}
+function vfsScreenToggleRange(enabled) {
+  const state = vfsScreenState;
+  if (!state || !state.displayStream || state.phase === 'recording' || state.phase === 'finalizing') return;
+  state.rangeSelection = !!enabled;
+  state.drag = null;
+  state.status = state.rangeSelection ? '拖动蓝色选区后开始录制' : '将录制完整画面';
+  vfsScreenRender();
+}
+function vfsScreenRender() {
+  const state = vfsScreenState;
+  if (!state) return;
+  const busy = ['checking', 'choosing', 'finalizing', 'uploading', 'converting', 'saving'].includes(state.phase);
+  const recording = state.phase === 'recording';
+  const ready = state.phase === 'ready';
+  const captured = !!state.displayStream;
+  document.getElementById('vfsScreenStageWrap').classList.toggle('show', captured);
+  document.getElementById('vfsScreenResultWrap').classList.toggle('show', ready && !!state.resultURL);
+  document.getElementById('vfsScreenChooseBtn').disabled = busy || recording;
+  document.getElementById('vfsScreenChooseBtn').textContent = captured ? '重新选择录制来源' : '选择录制来源';
+  document.getElementById('vfsScreenStartBtn').disabled = !captured || busy || recording;
+  document.getElementById('vfsScreenStopBtn').disabled = !recording;
+  document.getElementById('vfsScreenSaveBtn').disabled = !ready || busy;
+  document.getElementById('vfsScreenCancelBtn').disabled = ['uploading', 'converting', 'saving'].includes(state.phase);
+  const rangeToggle = document.getElementById('vfsScreenRangeToggle');
+  rangeToggle.checked = !!state.rangeSelection;
+  rangeToggle.disabled = !captured || busy || recording;
+  const status = document.getElementById('vfsScreenStatus');
+  status.textContent = state.error || state.status || '先选择一个录制来源';
+  status.classList.toggle('error', !!state.error);
+  if (captured) vfsScreenRenderSelection();
+}
+function vfsScreenPointFromEvent(event) {
+  const rect = document.getElementById('vfsScreenSelectionLayer').getBoundingClientRect();
+  return { x: vfsScreenClamp((event.clientX - rect.left) / rect.width, 0, 1), y: vfsScreenClamp((event.clientY - rect.top) / rect.height, 0, 1) };
+}
+function vfsScreenSelectFromPoints(state, first, second) {
+  const left = vfsScreenClamp(Math.min(first.x, second.x), 0, 1 - VFS_SCREEN_MIN_SELECTION);
+  const top = vfsScreenClamp(Math.min(first.y, second.y), 0, 1 - VFS_SCREEN_MIN_SELECTION);
+  state.selection = { x: left, y: top, width: vfsScreenClamp(Math.abs(second.x - first.x), VFS_SCREEN_MIN_SELECTION, 1 - left), height: vfsScreenClamp(Math.abs(second.y - first.y), VFS_SCREEN_MIN_SELECTION, 1 - top) };
+}
+function vfsScreenPointerDown(event) {
+  const state = vfsScreenState;
+  if (!state || !state.displayStream || !state.rangeSelection || state.phase === 'recording' || state.phase === 'finalizing') return;
+  const point = vfsScreenPointFromEvent(event);
+  const handle = event.target.closest('[data-vfs-screen-handle]')?.dataset.vfsScreenHandle;
+  const moving = !!event.target.closest('#vfsScreenSelection');
+  state.drag = { kind: handle ? 'resize' : (moving ? 'move' : 'select'), handle, start: point, original: { ...state.selection } };
+  event.currentTarget.setPointerCapture(event.pointerId);
+  if (state.drag.kind === 'select') vfsScreenSelectFromPoints(state, point, point);
+  vfsScreenRenderSelection();
+  event.preventDefault();
+}
+function vfsScreenPointerMove(event) {
+  const state = vfsScreenState;
+  if (!state || !state.drag) return;
+  const point = vfsScreenPointFromEvent(event);
+  const drag = state.drag;
+  if (drag.kind === 'select') {
+    vfsScreenSelectFromPoints(state, drag.start, point);
+  } else if (drag.kind === 'move') {
+    state.selection = { ...drag.original, x: vfsScreenClamp(drag.original.x + point.x - drag.start.x, 0, 1 - drag.original.width), y: vfsScreenClamp(drag.original.y + point.y - drag.start.y, 0, 1 - drag.original.height) };
+  } else {
+    let left = drag.original.x, top = drag.original.y, right = drag.original.x + drag.original.width, bottom = drag.original.y + drag.original.height;
+    if (drag.handle.includes('w')) left = vfsScreenClamp(point.x, 0, right - VFS_SCREEN_MIN_SELECTION);
+    if (drag.handle.includes('e')) right = vfsScreenClamp(point.x, left + VFS_SCREEN_MIN_SELECTION, 1);
+    if (drag.handle.includes('n')) top = vfsScreenClamp(point.y, 0, bottom - VFS_SCREEN_MIN_SELECTION);
+    if (drag.handle.includes('s')) bottom = vfsScreenClamp(point.y, top + VFS_SCREEN_MIN_SELECTION, 1);
+    state.selection = { x: left, y: top, width: right - left, height: bottom - top };
+  }
+  vfsScreenRenderSelection();
+}
+function vfsScreenPointerEnd() { if (vfsScreenState) vfsScreenState.drag = null; }
+function vfsScreenClearResult(state) {
+  if (state.resultURL) URL.revokeObjectURL(state.resultURL);
+  state.resultURL = '';
+  state.blob = null;
+  const video = document.getElementById('vfsScreenResult');
+  if (video) { video.pause(); video.removeAttribute('src'); video.load(); }
+}
+function vfsScreenReleaseCapture(state) {
+  if (!state) return;
+  const stream = state.displayStream;
+  const pipeline = state.framePipeline;
+  state.displayStream = null;
+  state.framePipeline = null;
+  state.mediaRecorder = null;
+  state.captureSession++;
+  state.stopping = false;
+  if (state.timer) clearInterval(state.timer);
+  state.timer = null;
+  const source = document.getElementById('vfsScreenSource');
+  if (source) { source.pause(); source.srcObject = null; }
+  void vfsScreenStopFramePipeline(pipeline);
+  stream?.getTracks().forEach(track => track.stop());
+}
+function vfsScreenStartFramePipeline(state, sourceTrack, crop) {
+  const inputTrack = sourceTrack.clone();
+  const processor = new MediaStreamTrackProcessor({ track: inputTrack, maxBufferSize: 30 });
+  const outputTrack = new MediaStreamTrackGenerator({ kind: 'video' });
+  const reader = processor.readable.getReader();
+  const writer = outputTrack.writable.getWriter();
+  const pipeline = { active: true, closing: false, inputTrack, outputTrack, reader, writer, writerClosed: false, pump: null };
+  pipeline.pump = (async () => {
+    try {
+      while (pipeline.active) {
+        const { value: frame, done } = await reader.read();
+        if (done || !frame) break;
+        try {
+          const frameOptions = { visibleRect: vfsScreenFrameCrop(crop, frame), timestamp: frame.timestamp };
+          if (frame.duration != null) frameOptions.duration = frame.duration;
+          const cropped = new VideoFrame(frame, frameOptions);
+          try { await writer.write(cropped); } finally { cropped.close(); }
+        } finally { frame.close(); }
+      }
+    } catch (error) {
+      if (pipeline.active && !pipeline.closing && vfsScreenState === state) {
+        state.error = '逐帧处理意外中断，已结束当前录制。请重试。';
+        window.setTimeout(() => { if (vfsScreenState === state) void vfsScreenStop(); }, 0);
+      }
+    } finally {
+      pipeline.writerClosed = true;
+      await writer.close().catch(() => {});
+    }
+  })();
+  return pipeline;
+}
+async function vfsScreenStopFramePipeline(pipeline) {
+  if (!pipeline) return;
+  if (pipeline.stopPromise) return pipeline.stopPromise;
+  pipeline.closing = true;
+  pipeline.inputTrack.stop();
+  pipeline.stopPromise = (async () => {
+    await pipeline.pump.catch(() => {});
+    if (!pipeline.writerClosed) await pipeline.writer.close().catch(() => {});
+    pipeline.active = false;
+  })();
+  return pipeline.stopPromise;
+}
+async function vfsScreenWaitForVideo(video) {
+  if (video.readyState >= HTMLMediaElement.HAVE_METADATA) return;
+  await new Promise((resolve, reject) => {
+    video.addEventListener('loadedmetadata', resolve, { once: true });
+    video.addEventListener('error', () => reject(new Error('无法读取共享的视频流')), { once: true });
+  });
+}
+async function vfsScreenOpen(options) {
+  vfsScreenDispose(true);
+  const state = { agentId: String(options.agentId || ''), fileName: vfsScreenEnsureFileName(options.fileName), nameConflictAtCreate: !!options.nameConflictAtCreate, phase: 'checking', selection: { x: .1, y: .1, width: .8, height: .8 }, rangeSelection: false, status: '正在检查视频保存环境…', error: '', displayStream: null, framePipeline: null, mediaRecorder: null, resultURL: '', blob: null, timer: null, startedAt: 0, captureSession: 0, stopping: false, drag: null };
+  vfsScreenState = state;
+  showExclusiveOverlay(document.getElementById('vfsScreenOverlay'), document.getElementById('vfsScreenPanel'));
+  vfsScreenRender();
+  try {
+    const response = await fetch('/api/ffmpeg/check?_=' + Date.now(), { cache: 'no-store' });
+    const result = await response.json().catch(() => null);
+    if (vfsScreenState !== state) return;
+    if (!response.ok || !result || result.status !== 0) throw new Error(result && result.content || '无法检查 FFmpeg 配置');
+    if (!result.available) throw new Error((result.content || '未检测到 FFmpeg 或 FFprobe') + (result.install ? '。' + result.install : ''));
+    state.phase = 'idle';
+    state.status = state.nameConflictAtCreate ? '检测到同名 MP4，保存时将自动加时间戳' : '先选择一个录制来源';
+  } catch (error) {
+    state.phase = 'blocked';
+    state.error = '无法开始录屏：' + ((error && error.message) || '视频保存环境不可用');
+  }
+  vfsScreenRender();
+}
+async function vfsScreenChooseTab() {
+  const state = vfsScreenState;
+  if (!state || ['checking', 'choosing', 'recording', 'finalizing', 'uploading', 'converting'].includes(state.phase)) return;
+  if (!navigator.mediaDevices?.getDisplayMedia || !window.MediaRecorder || !vfsScreenHasFramePipelineSupport()) {
+    state.error = '当前浏览器不支持逐帧画面录制，请使用最新版 Chrome。';
+    vfsScreenRender();
+    return;
+  }
+  vfsScreenReleaseCapture(state);
+  vfsScreenClearResult(state);
+  state.phase = 'choosing'; state.error = ''; state.status = '请在 Chrome 共享窗口中选择录制来源…';
+  vfsScreenRender();
+  const session = ++state.captureSession;
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 60 } }, audio: true, preferCurrentTab: false, selfBrowserSurface: 'exclude', surfaceSwitching: 'include', systemAudio: 'include' });
+    if (vfsScreenState !== state || session !== state.captureSession) { stream.getTracks().forEach(track => track.stop()); return; }
+    const track = stream.getVideoTracks()[0];
+    if (!track) throw new Error('浏览器没有提供可录制的视频轨道');
+    state.displayStream = stream;
+    const source = document.getElementById('vfsScreenSource');
+    source.srcObject = stream;
+    await vfsScreenWaitForVideo(source);
+    await source.play();
+    if (vfsScreenState !== state || session !== state.captureSession) return;
+    document.getElementById('vfsScreenStage').style.aspectRatio = source.videoWidth + ' / ' + source.videoHeight;
+    state.selection = { x: .1, y: .1, width: .8, height: .8 };
+    state.rangeSelection = false;
+    state.phase = 'captured';
+    state.status = state.nameConflictAtCreate ? '检测到同名 MP4，保存时将自动加时间戳' : '默认录制完整画面';
+    document.getElementById('vfsScreenAudioState').textContent = stream.getAudioTracks().length ? '已包含共享音频' : '未共享音频';
+    track.addEventListener('ended', () => {
+      if (vfsScreenState !== state || state.captureSession !== session || state.displayStream !== stream) return;
+      if (state.mediaRecorder?.state === 'recording') void vfsScreenStop();
+      else { vfsScreenReleaseCapture(state); state.phase = 'idle'; state.status = '画面共享已结束，可以重新选择'; vfsScreenRender(); }
+    }, { once: true });
+  } catch (error) {
+    if (vfsScreenState !== state || session !== state.captureSession) return;
+    state.phase = 'idle';
+    state.error = error && error.name === 'NotAllowedError' ? '未获得共享权限。请重新选择并在 Chrome 中选择录制来源。' : '无法选择录制来源：' + ((error && error.message) || '请重试');
+  }
+  vfsScreenRender();
+}
+function vfsScreenStart() {
+  const state = vfsScreenState;
+  const source = document.getElementById('vfsScreenSource');
+  if (!state || !state.displayStream || !source.videoWidth || state.phase !== 'captured') return;
+  const sourceTrack = state.displayStream.getVideoTracks()[0];
+  if (!sourceTrack || !vfsScreenHasFramePipelineSupport()) { state.error = '当前 Chrome 不支持逐帧裁切录制，请更新后重试。'; vfsScreenRender(); return; }
+  const crop = vfsScreenSourceCrop(state);
+  let pipeline;
+  let recorder;
+  try {
+    pipeline = vfsScreenStartFramePipeline(state, sourceTrack, crop);
+    state.framePipeline = pipeline;
+    const outputStream = new MediaStream([pipeline.outputTrack, ...state.displayStream.getAudioTracks()]);
+    const options = { videoBitsPerSecond: vfsScreenVideoBitrate(crop), audioBitsPerSecond: 128000 };
+    const mimeType = vfsScreenSupportedMimeType();
+    if (mimeType) options.mimeType = mimeType;
+    recorder = new MediaRecorder(outputStream, options);
+  } catch (error) {
+    state.framePipeline = null;
+    void vfsScreenStopFramePipeline(pipeline);
+    state.error = '无法启动逐帧录制：' + ((error && error.message) || '请更新 Chrome 后重试');
+    vfsScreenRender();
+    return;
+  }
+  const chunks = [];
+  state.mediaRecorder = recorder;
+  recorder.addEventListener('dataavailable', event => { if (event.data.size) chunks.push(event.data); });
+  recorder.addEventListener('stop', () => {
+    if (vfsScreenState !== state) return;
+    state.mediaRecorder = null;
+    state.stopping = false;
+    if (state.timer) clearInterval(state.timer);
+    state.timer = null;
+    vfsScreenReleaseCapture(state);
+    const blob = new Blob(chunks, { type: recorder.mimeType || 'video/webm' });
+    if (!blob.size) { state.phase = 'idle'; state.error = '未生成有效录制内容，请重新录制。'; vfsScreenRender(); return; }
+    vfsScreenClearResult(state);
+    state.blob = blob;
+    state.resultURL = URL.createObjectURL(blob);
+    const result = document.getElementById('vfsScreenResult');
+    result.src = state.resultURL; result.load();
+    state.phase = 'ready'; state.status = '录制完成，可以保存为 MP4'; state.error = '';
+    vfsScreenRender();
+  }, { once: true });
+  recorder.start(1000);
+  state.phase = 'recording'; state.error = ''; state.startedAt = Date.now();
+  state.timer = setInterval(() => { if (vfsScreenState === state && state.phase === 'recording') { state.status = '录制中 ' + vfsScreenFormatDuration(Date.now() - state.startedAt); vfsScreenRender(); } }, 250);
+  state.status = '录制中 00:00';
+  vfsScreenRender();
+}
+async function vfsScreenStop() {
+  const state = vfsScreenState;
+  const recorder = state?.mediaRecorder;
+  if (!state || !recorder || recorder.state !== 'recording' || state.stopping) return;
+  state.stopping = true; state.phase = 'finalizing'; state.status = '正在完成逐帧封装…';
+  const pipeline = state.framePipeline;
+  state.framePipeline = null;
+  vfsScreenRender();
+  await vfsScreenStopFramePipeline(pipeline);
+  if (vfsScreenState === state && recorder.state === 'recording') recorder.stop();
+}
+function vfsScreenBlobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error || new Error('读取录制文件失败'));
+    reader.onload = () => { const value = String(reader.result || ''); const comma = value.lastIndexOf(','); resolve(comma >= 0 ? value.slice(comma + 1) : ''); };
+    reader.readAsDataURL(blob);
+  });
+}
+function vfsScreenTemporaryPath() {
+  const random = window.crypto?.randomUUID ? window.crypto.randomUUID().toLowerCase() : (Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 14));
+  return 'tmp/.screen-recording-' + random + '.webm';
+}
+async function vfsScreenCleanupTemporary(state, temporaryPath) {
+  if (!state || !temporaryPath) return;
+  try { await fetch('/api/del?agentId=' + encodeURIComponent(state.agentId) + '&path=' + encodeURIComponent(temporaryPath), { cache: 'no-store' }); } catch {}
+}
+async function vfsScreenSave() {
+  const state = vfsScreenState;
+  if (!state || state.phase !== 'ready' || !state.blob) return;
+  const temporaryPath = vfsScreenTemporaryPath();
+  let completed = false;
+  state.phase = 'uploading'; state.error = ''; state.status = '正在上传临时录制文件…'; vfsScreenRender();
+  try {
+    const content = await vfsScreenBlobToBase64(state.blob);
+    let response = await fetch('/api/edit?agentId=' + encodeURIComponent(state.agentId) + '&path=' + encodeURIComponent(temporaryPath), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) });
+    let data = await response.json().catch(() => null);
+    if (!response.ok || !data || data.status !== 0) throw new Error(data && data.content || '临时录制文件上传失败');
+    state.phase = 'converting'; state.status = '正在转换为 MP4，请勿关闭…'; vfsScreenRender();
+    response = await fetch('/api/video_record_convert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agentId: state.agentId, path: temporaryPath, outputName: state.fileName }) });
+    data = await response.json().catch(() => null);
+    if (!response.ok || !data || data.status !== 0) throw new Error(data && data.content || 'MP4 转换失败');
+    completed = true;
+    await vfsRefreshAfterWorkspaceMutation(state.agentId, [data.savedAs || joinFsPath('videos', state.fileName)]);
+    const savedAs = String(data.savedAs || '').trim();
+    const savedName = String(getFsBasename(savedAs) || state.fileName).trim();
+    const renamedForConflict = savedName !== state.fileName;
+    vfsScreenDispose(false);
+    if (savedAs) {
+      try { await copyTextToClipboard(savedAs); vfsShowUploadToast(renamedForConflict ? '同名文件已存在，已保存为 ' + savedName + '，路径已复制到剪贴板' : 'MP4 已保存到 videos，绝对路径已复制到剪贴板', false); }
+      catch { vfsShowUploadToast(renamedForConflict ? '同名文件已存在，已保存为 ' + savedName : 'MP4 已保存到 videos', false); }
+    } else vfsShowUploadToast(renamedForConflict ? '同名文件已存在，已保存为 ' + savedName : 'MP4 已保存到 videos', false);
+  } catch (error) {
+    if (vfsScreenState !== state) return;
+    state.phase = 'ready'; state.error = '保存失败：' + ((error && error.message) || '请重试');
+    vfsScreenRender();
+  } finally {
+    if (!completed) void vfsScreenCleanupTemporary(state, temporaryPath);
+  }
+}
+function vfsScreenRequestClose() {
+  const state = vfsScreenState;
+  if (!state || ['uploading', 'converting', 'saving'].includes(state.phase)) return;
+  if (state.phase === 'recording' && !window.confirm('放弃当前录制？本次内容不会保存。')) return;
+  vfsScreenDispose(false);
+}
+function vfsScreenDispose(silent) {
+  const state = vfsScreenState;
+  if (!state) return;
+  vfsScreenState = null;
+  vfsScreenReleaseCapture(state);
+  vfsScreenClearResult(state);
+  if (!silent) setOverlayVisible(document.getElementById('vfsScreenOverlay'), false, document.getElementById('vfsScreenPanel'));
 }
 
 // ===== Reference document preview beside audio recording =====
