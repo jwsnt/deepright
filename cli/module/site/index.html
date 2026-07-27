@@ -1473,7 +1473,7 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 [data-energy-saver="on"] .rs-url-preview.is-loading .rs-url-preview-frame,
 [data-low-power-rendering="on"] .rs-url-preview.is-loading .rs-url-preview-frame{opacity:.54;filter:none}
 .rs-url-preview-empty{position:absolute;inset:0;width:100%;height:100%;min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px;font-size:12px;line-height:1.7;color:var(--text-muted);text-align:center}
-.right-sidebar .rs-top{position:relative;flex:0 0 auto;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:220px auto 250px;border-bottom:1px solid var(--border);overflow:hidden;min-height:0;max-height:1000px;opacity:1;transition:max-height .38s cubic-bezier(.22,1,.36,1),opacity .28s ease,border-color .28s ease,padding .28s ease,margin .28s ease,filter .32s ease,transform .32s ease}
+.right-sidebar .rs-top{position:relative;flex:0 0 auto;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:220px auto 250px;border-bottom:1px solid var(--border);overflow:hidden;min-height:0;max-height:1000px;opacity:1;transition:max-height .38s cubic-bezier(.22,1,.36,1),opacity .28s ease,border-color .28s ease,padding .28s ease,margin .28s ease,filter .32s ease,transform .32s ease}
 .memo-agent-switch-overlay{position:absolute;inset:0 0 auto;z-index:240;height:220px;display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;opacity:0;visibility:hidden;pointer-events:none;background:color-mix(in srgb,var(--bg-sidebar) 42%,transparent);backdrop-filter:blur(8px) saturate(118%);-webkit-backdrop-filter:blur(8px) saturate(118%);transition:opacity .16s ease,visibility 0s linear .16s}
 .memo-agent-switch-overlay.show{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .16s ease}
 .memo-agent-switch-overlay-card{display:flex;align-items:center;gap:9px;padding:10px 14px;border:1px solid color-mix(in srgb,var(--accent) 48%,var(--border));border-radius:14px;background:color-mix(in srgb,var(--modal-panel-bg-strong) 88%,transparent);box-shadow:0 12px 28px rgba(16,24,40,.18),inset 0 1px 0 rgba(255,255,255,.55);color:var(--text-primary);font-size:12px;font-weight:700;letter-spacing:.02em}
@@ -1487,7 +1487,7 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 .right-sidebar.cli-sub-expanded .rs-top{flex:1 1 100%;grid-template-columns:minmax(0,1fr);grid-template-rows:30px minmax(0,1fr);max-height:none;border-bottom-color:transparent}
 .right-sidebar.cli-sub-expanded .rs-top > .rs-row-divider{grid-column:1}
 .right-sidebar.cli-sub-expanded .rs-top .rs-cell:nth-child(1),.right-sidebar.cli-sub-expanded .rs-top .rs-cell:nth-child(2){display:none}
-.right-sidebar .rs-top .rs-cell{border:1px solid var(--border);padding:8px;overflow:auto;display:flex;flex-direction:column;min-height:0}
+.right-sidebar .rs-top .rs-cell{border:1px solid var(--border);padding:8px;overflow:auto;display:flex;flex-direction:column;min-width:0;min-height:0}
 .right-sidebar .rs-top .rs-cell:nth-child(1){border-top:none;border-left:none;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .rs-cell-upper{flex:none;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;transition:max-height .3s ease,opacity .3s ease;max-height:500px;opacity:1}
 #rsCalUpper{padding-left:6px}
@@ -1537,7 +1537,8 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 .tl-popup .tl-popup-row span:first-child{color:var(--text-muted)}
 .right-sidebar .rs-top .rs-cell:nth-child(2){border-top:none;border-right:none;display:flex;flex-direction:column;overflow:visible;min-height:0;max-height:100%}
 #rsMemoCell{position:relative}
-.rs-note-upper{flex:1;display:flex;flex-direction:column;overflow:visible;padding:4px;min-height:0}
+.rs-note-upper{flex:1;display:flex;flex-direction:column;overflow:visible;padding:4px;min-width:0;min-height:0}
+#rsNoteUpper>div{min-width:0}
 .rs-memo-query-trigger{position:absolute;top:0;left:-2px;width:28px;height:28px;padding:0;border:none;border-radius:6px;background:transparent;color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:4;box-shadow:none;transition:var(--transition);flex-shrink:0}
 .rs-memo-query-trigger:hover,.rs-memo-query-trigger:focus-visible{background:var(--bg-card);color:var(--text-primary);outline:none}
 .rs-memo-query-trigger svg{width:18px;height:18px}
@@ -1570,7 +1571,7 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 [data-theme="dark"] .rs-memo-stop-toggle.on{border-color:rgba(255,121,121,.78);background:rgba(176,47,53,.25);color:#ffb1b1;box-shadow:0 0 0 1px rgba(255,121,121,.2),0 0 12px rgba(255,81,81,.34)}
 [data-theme="dark"] .rs-memo-stop-bar.on .rs-memo-stop-label{color:#ffb1b1}
 @keyframes rsMemoStopPulse{0%,100%{opacity:1;filter:brightness(1)}50%{opacity:.42;filter:brightness(1.32)}}
-.rs-note-input{width:100%;flex:1;border:1px solid var(--border);border-radius:var(--radius-xs);background:var(--bg-input) !important;color:var(--text-primary);font-size:20px;padding:6px 8px;overflow-y:auto !important;outline:none;font-family:inherit;line-height:1.4;max-height:150px !important;min-height:0}
+.rs-note-input{width:100%;box-sizing:border-box;flex:1;min-width:0;border:1px solid var(--border);border-radius:var(--radius-xs);background:var(--bg-input) !important;color:var(--text-primary);font-size:20px;padding:6px 8px;overflow-y:auto !important;outline:none;font-family:inherit;line-height:1.4;max-height:150px !important;min-height:0}
 .rs-note-input:empty{text-align:center !important}
 .rs-note-input:not(:empty){text-align:left !important}
 .rs-note-input:focus{border-color:var(--accent)}
@@ -1965,11 +1966,12 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none;-webkit-user-select:none}
 .input-wrapper textarea{flex:1;border:none;outline:none;background:transparent;color:var(--text-primary);font-size:15px;resize:none;max-height:120px;line-height:1.5;font-family:inherit;text-align:center}
 .input-wrapper textarea::placeholder{color:var(--text-muted);text-align:center}
-.input-editable{flex:1;border:none;outline:none;background:transparent;color:var(--text-primary);font-size:15px;min-height:24px;max-height:120px;overflow-y:auto;line-height:1.5;font-family:inherit;text-align:center;word-break:break-word}
+.input-wrapper>div[style*="flex:1"]{min-width:0}
+.input-editable{flex:1;min-width:0;max-width:100%;border:none;outline:none;background:transparent;color:var(--text-primary);font-size:15px;min-height:24px;max-height:120px;overflow-x:hidden;overflow-y:auto;line-height:1.5;font-family:inherit;text-align:center;word-break:break-word}
 .input-editable *{text-align:center}
 .input-editable:empty::before{content:attr(data-placeholder);color:var(--text-muted)}
 .input-editable.locked{opacity:.72;cursor:not-allowed}
-.input-editable .at-bubble{display:inline-flex;align-items:center;gap:3px;max-width:100%;min-width:0;overflow:hidden;background:linear-gradient(180deg,var(--input-bubble-bg-start),var(--input-bubble-bg-end));border:1px solid var(--input-bubble-border);box-shadow:var(--input-bubble-shadow);color:var(--input-bubble-text);font-size:12px;padding:1px 7px;border-radius:10px;vertical-align:middle;margin:0 2px;user-select:all;line-height:1.6;position:relative;transition:background .24s ease,border-color .24s ease,color .24s ease,box-shadow .24s ease,filter .16s ease}
+.input-editable .at-bubble{display:inline-flex;align-items:center;gap:3px;box-sizing:border-box;max-width:calc(100% - 4px);min-width:0;overflow:hidden;background:linear-gradient(180deg,var(--input-bubble-bg-start),var(--input-bubble-bg-end));border:1px solid var(--input-bubble-border);box-shadow:var(--input-bubble-shadow);color:var(--input-bubble-text);font-size:12px;padding:1px 7px;border-radius:10px;vertical-align:middle;margin:0 2px;user-select:all;line-height:1.6;position:relative;transition:background .24s ease,border-color .24s ease,color .24s ease,box-shadow .24s ease,filter .16s ease}
 .input-editable .at-bubble[data-prefix="[FILE:"]{--input-bubble-bg-start:var(--input-bubble-file-bg-start);--input-bubble-bg-end:var(--input-bubble-file-bg-end);--input-bubble-border:var(--input-bubble-file-border);--input-bubble-text:var(--input-bubble-file-text);cursor:pointer}
 .input-editable .at-bubble[data-prefix="[FILE:"]:hover{filter:brightness(1.04)}
 .input-editable .at-bubble[data-prefix="[SKILL:"]{--input-bubble-bg-start:var(--input-bubble-skill-bg-start);--input-bubble-bg-end:var(--input-bubble-skill-bg-end);--input-bubble-border:var(--input-bubble-skill-border);--input-bubble-text:var(--input-bubble-skill-text)}
@@ -1981,7 +1983,7 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .input-editable .at-bubble .bubble-del:hover{opacity:1}
 .input-editable .at-bubble .bubble-del svg{width:10px;height:10px;color:currentColor}
 .rs-note-input .at-bubble{max-width:calc(100% - 4px)}
-.rs-note-input .at-bubble .bubble-label{max-width:100%}
+.rs-note-input .at-bubble .bubble-label{max-width:240px}
 .message-edit-overlay{background:rgba(14,22,38,.22);backdrop-filter:blur(12px) saturate(135%);-webkit-backdrop-filter:blur(12px) saturate(135%)}
 .message-edit-overlay.show .message-edit-panel{transform:translateY(0) scale(1)}
 .message-edit-panel{width:min(100%,820px);display:flex;flex-direction:column;gap:14px;padding:0;transform:translateY(10px) scale(.98);transition:transform .24s cubic-bezier(.22,1,.36,1)}
@@ -19313,7 +19315,11 @@ async function startMessageUrlTourOnboarding() {
         clearMessageUrlTourTargetData();
         return false;
       }
-      const actionState = await resolveMessageFileActionState(anchor.getAttribute('data-file-path') || anchor.getAttribute('href') || anchor.textContent);
+      const actionState = await resolveMessageFileActionState(
+        anchor.getAttribute('data-file-path') || anchor.getAttribute('href') || anchor.textContent,
+        null,
+        getMessagePathOwnerAgentId(anchor)
+      );
       const actions = buildMessageFileActionItems(actionState);
       const rect = getSelectionActionRect(anchor);
       if (!actionState || !actionState.fileExists || !actions.length || !rect || (!rect.width && !rect.height)) {
@@ -31577,7 +31583,7 @@ function scheduleQueuedCenterRequestDrain(chatId, agentId) {
   syncQueuedCenterInputUI(chatId, resolvedAgentId);
 }
 
-function queueCenterMessageAfterBusy(chatId, rawText, agentId) {
+function queueCenterMessageAfterBusy(chatId, rawText, agentId, fileOwners) {
   const text = String(rawText || '').trim();
   const resolvedAgentId = String(agentId != null ? agentId : getChatAgentId(chatId)).trim();
   if (!chatId || !text) return false;
@@ -31591,11 +31597,14 @@ function queueCenterMessageAfterBusy(chatId, rawText, agentId) {
   }
   const draftHtml = input ? input.innerHTML : text;
   const itemId = uuid();
+  const sendOptions = captureQueuedCenterSendOptions(chatId);
+  const normalizedFileOwners = normalizeMessageFileOwners(fileOwners);
+  if (Object.keys(normalizedFileOwners).length) sendOptions.fileOwners = normalizedFileOwners;
   queue.items.push({
     id: itemId,
     text,
     draftHtml,
-    options: captureQueuedCenterSendOptions(chatId),
+    options: sendOptions,
     queuedAt: Date.now()
   });
   if (state.activeChat === chatId) animateQueuedCenterMessageCollapse(text);
@@ -32661,6 +32670,12 @@ function findRenderedAssistantWrapByBinding(container, message) {
   return container.querySelector(selector);
 }
 
+function messageFileOwnersAttribute(message) {
+  const owners = normalizeMessageFileOwners(message && message.fileOwners);
+  if (!Object.keys(owners).length) return '';
+  return ' data-file-owners="' + esc(JSON.stringify(owners)) + '"';
+}
+
 function msgHtml(m, options) {
   const opts = options || {};
   const shouldDecoratePaths = shouldDecoratePathsForMessage(m);
@@ -32680,7 +32695,7 @@ function msgHtml(m, options) {
   const richPendingAttr = opts.deferRich ? ' data-rich-pending="1"' : '';
   const decoratePathsAttr = ' data-decorate-paths="' + (shouldDecoratePaths ? '1' : '0') + '"';
   if (m.role === 'user') {
-    return `<div class="message-wrap user${insertedMaterializedWrapClass}"><div class="message user${insertedMaterializedClass}"><div class="${mdClass}"${richPendingAttr}${decoratePathsAttr}>${contentHtml}</div>${userMetaHtml(m)}</div>${messageFooterHtml(m)}</div>`;
+    return `<div class="message-wrap user${insertedMaterializedWrapClass}"${messageFileOwnersAttribute(m)}><div class="message user${insertedMaterializedClass}"><div class="${mdClass}"${richPendingAttr}${decoratePathsAttr}>${contentHtml}</div>${userMetaHtml(m)}</div>${messageFooterHtml(m)}</div>`;
   }
   if (m.error) {
     return `<div class="message-wrap error"><div class="message error">${esc(m.content)}</div>${messageFooterHtml(m)}</div>`;
@@ -37216,6 +37231,28 @@ function getInputText() {
   return extractContent(el, true).trim();
 }
 
+function normalizeMessageFileOwners(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const owners = {};
+  Object.keys(value).forEach(rawPath => {
+    const path = extractMessageFilePath(rawPath);
+    const agentId = String(value[rawPath] || '').trim();
+    if (path && path.startsWith('/') && agentId) owners[path] = agentId;
+  });
+  return owners;
+}
+
+function collectFileOwnersFromInput(root) {
+  if (!(root instanceof Element)) return {};
+  const owners = {};
+  root.querySelectorAll('.at-bubble[data-prefix="[FILE:"][data-agent-id]').forEach(bubble => {
+    const path = extractMessageFilePath(bubble.getAttribute('data-value') || '');
+    const agentId = String(bubble.getAttribute('data-agent-id') || '').trim();
+    if (path && path.startsWith('/') && agentId) owners[path] = agentId;
+  });
+  return owners;
+}
+
 function getInputRawText() {
   const el = document.getElementById('msgInput');
   return extractContent(el, false).trim();
@@ -37486,7 +37523,14 @@ function isLikelyStructuredPayloadText(text) {
 function extractRestoreAbnormalErrorText(raw) {
   const text = String(raw || '').trim();
   if (!text) return '服务端返回错误';
-  if (!isLikelyStructuredPayloadText(text)) return text;
+  if (!isLikelyStructuredPayloadText(text)) {
+    const interrupted = /^SSE\s+stream\s+interrupted(?:\s*:\s*(.+))?$/i.exec(text);
+    if (interrupted) {
+      const detail = String(interrupted[1] || '').trim();
+      return detail ? `网络异常，请稍后重试（${detail}）` : '网络异常，请稍后重试';
+    }
+    return text;
+  }
 
   if (/^data:\s*/m.test(text)) {
     let explicitMessage = '';
@@ -37862,6 +37906,7 @@ async function handleSend(event) {
   const chatId = String(state.activeChat || '').trim();
   if (chatId && isChatSendDispatching(chatId)) return false;
   const text = getInputText();
+  const fileOwners = collectFileOwnersFromInput(document.getElementById('msgInput'));
   if (event) {
     const confirmed = await maybePromptChatAgentChangeConfirm(chatId, text);
     if (!confirmed) return false;
@@ -37871,14 +37916,14 @@ async function handleSend(event) {
     const isStopMode = !!(btn && btn.classList.contains('stop'));
     const isSendButtonTrigger = !!(event && event.currentTarget === btn);
     const isManualStopTrigger = !!(isSendButtonTrigger && (!event || typeof event.detail !== 'number' || event.detail > 0));
-    if (text) return queueCenterMessageAfterBusy(chatId, text, getChatAgentId(chatId));
+    if (text) return queueCenterMessageAfterBusy(chatId, text, getChatAgentId(chatId), fileOwners);
     if (isStopMode && isManualStopTrigger) {
       if (!isChatCancelling(chatId)) return stopStreaming();
       return false;
     }
     return false;
   }
-  return sendCenterMessage(text, { clearInputAfterSend: true, toastOnSuccess: '' });
+  return sendCenterMessage(text, { clearInputAfterSend: true, toastOnSuccess: '', fileOwners });
 }
 
 async function retryCenterMessage(event) {
@@ -38248,6 +38293,8 @@ async function sendCenterMessage(rawText, options) {
       if (consumedQueueItem && consumedQueueItem.blocked) return false;
     }
     const userMsg = { role: 'user', content: text, createdAt: toChatTimestamp(new Date()) };
+    const fileOwners = normalizeMessageFileOwners(opts.fileOwners);
+    if (Object.keys(fileOwners).length) userMsg.fileOwners = fileOwners;
     if (requestSource) userMsg.requestSource = requestSource;
     if (Object.keys(requestMetadata).length > 0) userMsg.requestMetadata = requestMetadata;
     chat.messages.push(userMsg);
@@ -45941,6 +45988,7 @@ function insertBubbleAtCursor(display, value, targetEl, options) {
   const bubbleKind = opts.bubbleKind || 'default';
   const valuePrefix = opts.valuePrefix || '';
   const valueSuffix = opts.valueSuffix || '';
+  const ownerAgentId = String(opts.agentId || '').trim();
 
   // Restore saved range first, then focus
   if (atSavedRange && el.contains(atSavedRange.startContainer)) {
@@ -45969,6 +46017,7 @@ function insertBubbleAtCursor(display, value, targetEl, options) {
   bubble.setAttribute('data-prefix', valuePrefix);
   bubble.setAttribute('data-suffix', valueSuffix);
   bubble.setAttribute('data-bubble-kind', bubbleKind);
+  if (ownerAgentId) bubble.setAttribute('data-agent-id', ownerAgentId);
   bubble.innerHTML = buildBubbleHtml(display);
 
   range.deleteContents();
@@ -46007,6 +46056,7 @@ function atPickFile(idx) {
   const fullPath = atCurrentPath + e.name;
   hideAtFile();
   insertBubbleAtCursor('[FILE:' + e.name + ']', fullPath, null, {
+    agentId: getVfsRequestedAgentId(),
     valuePrefix: '[FILE:',
     valueSuffix: ']'
   });
@@ -48882,6 +48932,9 @@ async function uploadItemsToAgentTmp(uploadItems, options) {
     throw new Error((data && data.content) || ('上传失败: HTTP ' + response.status));
   }
   const dest = normalizeFsPath(data.dest || '');
+  if (!dest || !dest.startsWith('/')) {
+    throw new Error('上传失败：服务端未返回绝对附件路径');
+  }
   const uploadedRelPaths = Array.isArray(data.files) ? data.files.map(path => normalizeFsPath(path)).filter(Boolean) : [];
   const createdDirs = await ensureUploadedEmptyDirs(agentId, opts.emptyDirs || []);
   const uploadedAbsPaths = uploadedRelPaths.map(path => dest ? joinFsPath(dest, path) : path);
@@ -49163,6 +49216,7 @@ function buildBubbleDisplayFromPath(path) {
 function insertFileBubble(targetEl, absPath, options) {
   const displayPath = buildBubbleDisplayFromPath(absPath);
   insertBubbleAtCursor(displayPath, absPath, targetEl, {
+    agentId: options && options.agentId ? options.agentId : '',
     bubbleKind: options && options.bubbleKind ? options.bubbleKind : 'default',
     valuePrefix: '[FILE:',
     valueSuffix: ']'
@@ -49238,8 +49292,8 @@ async function uploadSystemItemsToBubbles(uploadItems, emptyDirs, targetEl, doma
       emptyDirs: dirs,
       abortController
     });
-    result.uploadedAbsPaths.forEach(absPath => insertFileBubble(targetEl, absPath));
-    result.createdDirs.forEach(relPath => insertFileBubble(targetEl, joinFsPath(result.dest, relPath)));
+    result.uploadedAbsPaths.forEach(absPath => insertFileBubble(targetEl, absPath, { agentId: result.agentId }));
+    result.createdDirs.forEach(relPath => insertFileBubble(targetEl, joinFsPath(result.dest, relPath), { agentId: result.agentId }));
     if (result.uploadedAbsPaths.length === 0 && result.createdDirs.length === 0) {
       throw new Error('上传完成，但没有返回可用路径');
     }
@@ -49260,6 +49314,7 @@ let feCurrentPath = '';
 let feCurrentContent = '';
 let feMode = 'view'; // 'view' or 'edit'
 let feAgentRelPath = '';
+let fePreviewAgentId = '';
 let feFileType = 'text'; // 'text', 'html', 'image', 'audio', 'video', 'pdf', 'unsupported'
 let feImageMime = '';
 let feImageExt = '';
@@ -50237,7 +50292,7 @@ function getFileEditorAppOpenState() {
     };
   }
   const chatId = String(state && state.activeChat || '').trim();
-  const agentId = String((chatId && getChatAgentId(chatId)) || state && state.settings && state.settings.agentId || '').trim();
+  const agentId = String(feGetPreviewAgentID() || (chatId && getChatAgentId(chatId)) || state && state.settings && state.settings.agentId || '').trim();
   if (!agentId) {
     return {
       available: false,
@@ -50372,9 +50427,12 @@ async function feOpen(absPath, options) {
   feResetImageGridTool();
   feCurrentPath = absPath;
   const normalizedPath = normalizeFsPath(absPath);
-  const normalizedWorkspace = normalizeFsPath(vfsWorkspace);
-  const workspaceRelativePath = normalizedWorkspace ? relativeFsPath(normalizedWorkspace, normalizedPath) : '';
-  feAgentRelPath = workspaceRelativePath || absPath.replace(vfsWorkspace + '/', '');
+  const normalizedWorkspace = normalizeFsPath(options && options.workspaceRoot ? options.workspaceRoot : vfsWorkspace);
+  const workspaceRelativePath = normalizedWorkspace && isPathWithinWorkspace(normalizedPath, normalizedWorkspace)
+    ? relativeFsPath(normalizedWorkspace, normalizedPath)
+    : '';
+  feAgentRelPath = workspaceRelativePath || normalizedPath;
+  fePreviewAgentId = String(options && options.agentId || '').trim();
   feFileType = detectFileType(absPath);
   feImageMime = '';
   feImageExt = absPath.includes('.') ? absPath.split('.').pop().toLowerCase() : '';
@@ -50426,7 +50484,7 @@ async function feOpen(absPath, options) {
     content.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px">加载中...</div>';
     showExclusiveOverlay(document.getElementById('fileEditorOverlay'));
     try {
-      const agentId = state.settings.agentId;
+      const agentId = feGetPreviewAgentID();
       const resp = await fetch('/api/raw?agentId=' + encodeURIComponent(agentId) + '&path=' + encodeURIComponent(feAgentRelPath));
       const data = await resp.json();
       if (data.status !== 0) {
@@ -50453,7 +50511,7 @@ async function feOpen(absPath, options) {
     content.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px">加载中...</div>';
     showExclusiveOverlay(document.getElementById('fileEditorOverlay'));
     try {
-      const agentId = state.settings.agentId;
+      const agentId = feGetPreviewAgentID();
       const resp = await fetch('/api/raw?agentId=' + encodeURIComponent(agentId) + '&path=' + encodeURIComponent(feAgentRelPath));
       const data = await resp.json();
       if (data.status !== 0) {
@@ -51368,6 +51426,7 @@ function feClose() {
   feCurrentPath = '';
   feCurrentContent = '';
   feAgentRelPath = '';
+  fePreviewAgentId = '';
   feFileType = 'text';
   feImageMime = '';
   feImageExt = '';
@@ -51393,7 +51452,7 @@ function feClose() {
 }
 
 async function feSave() {
-  const agentId = state.settings.agentId;
+  const agentId = feGetPreviewAgentID();
   if (!agentId) return;
   try {
     let contentToSave = feCurrentContent;
@@ -51955,6 +52014,7 @@ async function renderPdf(base64Data) {
 }
 
 function feGetPreviewAgentID() {
+  if (fePreviewAgentId) return fePreviewAgentId;
   const chatId = String(state && state.activeChat || '').trim();
   const chatAgentID = chatId && typeof getChatAgentId === 'function'
     ? String(getChatAgentId(chatId) || '').trim()
@@ -54094,6 +54154,22 @@ function decorateMessagePathHtml(inputHtml) {
   return doc.body.innerHTML;
 }
 
+function applyMessageFileOwnerData(scope) {
+  if (!(scope instanceof Element)) return;
+  const wrap = scope.closest('.message-wrap[data-file-owners]');
+  if (!wrap) return;
+  let owners = {};
+  try {
+    owners = normalizeMessageFileOwners(JSON.parse(String(wrap.getAttribute('data-file-owners') || '')));
+  } catch {}
+  if (!Object.keys(owners).length) return;
+  scope.querySelectorAll('a.message-file-link[data-file-path]').forEach(anchor => {
+    const filePath = extractMessageFilePath(anchor.getAttribute('data-file-path') || '');
+    const agentId = String(filePath && owners[filePath] || '').trim();
+    if (agentId) anchor.setAttribute('data-agent-id', agentId);
+  });
+}
+
 function decorateChatMessagePathLinks(root) {
   if (!root || !root.querySelectorAll) return;
   if (!getCachedRuntimeAgentDir()) {
@@ -54128,6 +54204,7 @@ function decorateChatMessagePathLinks(root) {
     const pending = [];
     while (walker.nextNode()) pending.push(walker.currentNode);
     pending.forEach(decorateMessagePathTextNode);
+    applyMessageFileOwnerData(scope);
   });
 }
 
@@ -54375,6 +54452,11 @@ function getMessagePathAnchorRawValue(anchor) {
   return String(anchor.getAttribute('data-raw-value') || anchor.getAttribute('data-file-path') || anchor.getAttribute('href') || '').trim();
 }
 
+function getMessagePathOwnerAgentId(element) {
+  if (!(element instanceof Element)) return '';
+  return String(element.getAttribute('data-agent-id') || '').trim();
+}
+
 function getMessagePathHttpCopyValue(value) {
   const normalized = normalizeRightSidebarUrlPreviewHref(value);
   return normalized || String(value || '').trim();
@@ -54404,7 +54486,10 @@ function buildMessageFileActionItems(actionState) {
     actions.push({
       label: '预览',
       onClick: async () => {
-        feOpen(actionState.filePath);
+        feOpen(actionState.filePath, {
+          agentId: actionState.agentId,
+          workspaceRoot: actionState.workspaceRoot
+        });
       }
     });
   }
@@ -54420,7 +54505,7 @@ function buildMessageFileActionItems(actionState) {
     actions.push({
       label: '打开目录',
       onClick: async () => {
-        await openResolvedFileDirectory(actionState.dirPath);
+        await openResolvedFileDirectory(actionState.dirPath, actionState);
       }
     });
   }
@@ -54475,10 +54560,57 @@ async function checkDirectoryExists(dirPath) {
   }
 }
 
-async function resolveMessageFileActionState(absPath, providedContext) {
+async function getWorkspaceForAgent(agentId) {
+  const resolvedAgentId = String(agentId || '').trim();
+  if (!resolvedAgentId) return '';
+  const cached = normalizeFsPath(vfsWorkspaceByAgent.get(resolvedAgentId) || '');
+  if (cached) return cached;
+  try {
+    const resp = await fetch('/api/workspace?agentId=' + encodeURIComponent(resolvedAgentId), { cache: 'no-store' });
+    if (!resp.ok) return '';
+    const workspace = normalizeFsPath((await resp.text()).trim());
+    if (workspace) vfsWorkspaceByAgent.set(resolvedAgentId, workspace);
+    return workspace;
+  } catch {
+    return '';
+  }
+}
+
+async function resolveMessageFileWorkspaceContext(filePath, currentContext, preferredAgentId) {
+  const current = currentContext || { agentId: '', workspaceRoot: '' };
+  const path = extractMessageFilePath(filePath);
+  if (!path || !path.startsWith('/')) return current;
+  const findMatch = (agentId, workspaceRoot) => {
+    const root = normalizeFsPath(workspaceRoot);
+    return root && isPathWithinWorkspace(path, root)
+      ? { agentId: String(agentId || '').trim(), workspaceRoot: root, agentDir: current.agentDir || '' }
+      : null;
+  };
+  const preferred = String(preferredAgentId || '').trim();
+  if (preferred) {
+    const matched = findMatch(preferred, await getWorkspaceForAgent(preferred));
+    if (matched) return matched;
+  }
+  const currentMatch = findMatch(current.agentId, current.workspaceRoot);
+  if (currentMatch) return currentMatch;
+  for (const [agentId, workspaceRoot] of vfsWorkspaceByAgent.entries()) {
+    const matched = findMatch(agentId, workspaceRoot);
+    if (matched) return matched;
+  }
+  const agentIds = await fetchAgentList();
+  const workspaces = await Promise.all(agentIds.map(async agentId => ({ agentId, workspaceRoot: await getWorkspaceForAgent(agentId) })));
+  for (const item of workspaces) {
+    const matched = findMatch(item.agentId, item.workspaceRoot);
+    if (matched) return matched;
+  }
+  return current;
+}
+
+async function resolveMessageFileActionState(absPath, providedContext, preferredAgentId) {
   const filePath = extractMessageFilePath(absPath);
   if (!filePath) return null;
-  const workspaceContext = providedContext || await getCurrentMessageWorkspaceContext();
+  const currentContext = providedContext || await getCurrentMessageWorkspaceContext();
+  const workspaceContext = await resolveMessageFileWorkspaceContext(filePath, currentContext, preferredAgentId);
   const resolvedPath = resolveMessageFilePathAgainstWorkspace(filePath, workspaceContext.workspaceRoot);
   if (!resolvedPath) return null;
   const isDirectoryPath = await checkDirectoryExists(resolvedPath);
@@ -54487,6 +54619,8 @@ async function resolveMessageFileActionState(absPath, providedContext) {
       rawPath: filePath,
       filePath: resolvedPath,
       dirPath: resolvedPath,
+      agentId: workspaceContext.agentId,
+      workspaceRoot: workspaceContext.workspaceRoot,
       fileExists: false,
       dirExists: true,
       previewable: false
@@ -54500,6 +54634,8 @@ async function resolveMessageFileActionState(absPath, providedContext) {
     rawPath: filePath,
     filePath: resolvedPath,
     dirPath,
+    agentId: workspaceContext.agentId,
+    workspaceRoot: workspaceContext.workspaceRoot,
     fileExists,
     dirExists,
     previewable: fileExists && detectFileType(resolvedPath) !== 'unsupported'
@@ -54530,6 +54666,7 @@ async function getCurrentMessageWorkspaceContext() {
       };
     }
     const workspaceRoot = normalizeFsPath((await resp.text()).trim());
+    if (workspaceRoot) vfsWorkspaceByAgent.set(agentId, workspaceRoot);
     return { agentId, workspaceRoot, agentDir };
   } catch {
     return {
@@ -54540,11 +54677,13 @@ async function getCurrentMessageWorkspaceContext() {
   }
 }
 
-async function openResolvedFileDirectory(dirPath) {
+async function openResolvedFileDirectory(dirPath, ownerContext) {
   if (!localAdminControlIsAvailable()) throw new Error('当前访问方式不支持打开目录');
   const targetDir = extractMessageFilePath(dirPath) || normalizeFsPath(dirPath);
   if (!targetDir) throw new Error('目录不存在');
-  const context = await getCurrentMessageWorkspaceContext();
+  const context = ownerContext && ownerContext.agentId && ownerContext.workspaceRoot
+    ? ownerContext
+    : await getCurrentMessageWorkspaceContext();
   const agentId = context.agentId;
   const workspaceRoot = context.workspaceRoot;
   const isTildePath = targetDir === '~' || targetDir.startsWith('~/');
@@ -54623,7 +54762,11 @@ async function showMessagePathActionsForAnchor(anchor) {
     if (actions.length) showSelectionActionBubble(rect, actions);
     return;
   }
-  const actionState = await resolveMessageFileActionState(anchor.getAttribute('data-file-path') || anchor.getAttribute('href') || '');
+  const actionState = await resolveMessageFileActionState(
+    anchor.getAttribute('data-file-path') || anchor.getAttribute('href') || '',
+    null,
+    getMessagePathOwnerAgentId(anchor)
+  );
   if (!actionState) return;
   const rawValue = getMessagePathAnchorRawValue(anchor);
   if (rawValue) actionState.rawPath = rawValue;
@@ -54662,7 +54805,7 @@ async function showInputBubbleActionsForElement(bubble) {
     if (actions.length) showSelectionActionBubble(rect, actions);
     return;
   }
-  const actionState = await resolveMessageFileActionState(rawValue);
+  const actionState = await resolveMessageFileActionState(rawValue, null, getMessagePathOwnerAgentId(bubble));
   if (!actionState) return;
   actionState.rawPath = rawValue;
   const actions = buildMessageFileActionItems(actionState);
@@ -54721,7 +54864,11 @@ async function showSelectedMessagePathActions(anchor) {
     return;
   }
   if (!selectionTarget.filePath) return;
-  const actionState = await resolveMessageFileActionState(selectionTarget.filePath, workspaceContext);
+  const actionState = await resolveMessageFileActionState(
+    selectionTarget.filePath,
+    workspaceContext,
+    getMessagePathOwnerAgentId(targetAnchor)
+  );
   if (!actionState) return;
   if (targetAnchor) {
     const rawValue = getMessagePathAnchorRawValue(targetAnchor);

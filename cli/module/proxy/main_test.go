@@ -18,6 +18,7 @@ import (
 	"knowledge/knowledgecore"
 	"log"
 	"math"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -986,7 +987,7 @@ func TestProxyChatCompletionsLogsAbnormalWhenUpstreamStreamBreaksMidResponse(t *
 	var abnormalCount int
 	for time.Now().Before(deadline) {
 		if err := db.QueryRow(`SELECT COUNT(*) FROM chat_log WHERE agent_id = ? AND chat_id = ? AND role = 'A' AND response_type = 'abnormal' AND content LIKE ?`,
-			"A", "chat-midstream", "SSE stream interrupted:%").Scan(&abnormalCount); err != nil {
+			"A", "chat-midstream", "网络异常，请稍后重试（%").Scan(&abnormalCount); err != nil {
 			t.Fatalf("count abnormal chat_log: %v", err)
 		}
 		if abnormalCount > 0 {
@@ -1082,8 +1083,8 @@ func TestProxyChatCompletionsLogsAbnormalWhenUpstreamEndsWithoutDoneMarker(t *te
 	deadline := time.Now().Add(2 * time.Second)
 	var abnormalCount int
 	for time.Now().Before(deadline) {
-		if err := db.QueryRow(`SELECT COUNT(*) FROM chat_log WHERE agent_id = ? AND chat_id = ? AND role = 'A' AND response_type = 'abnormal' AND content LIKE ?`,
-			"A", "chat-eof", "SSE stream interrupted:%").Scan(&abnormalCount); err != nil {
+		if err := db.QueryRow(`SELECT COUNT(*) FROM chat_log WHERE agent_id = ? AND chat_id = ? AND role = 'A' AND response_type = 'abnormal' AND content = ?`,
+			"A", "chat-eof", "网络异常，请稍后重试（EOF）").Scan(&abnormalCount); err != nil {
 			t.Fatalf("count abnormal chat_log: %v", err)
 		}
 		if abnormalCount > 0 {
@@ -7323,6 +7324,64 @@ func TestHandleWorkspace(t *testing.T) {
 		t.Errorf("unknown agentId: status = %d, want 404", resp4.StatusCode)
 	}
 	resp4.Body.Close()
+}
+
+func TestHandleUploadReturnsAbsoluteAgentTmpDestination(t *testing.T) {
+	agentRoot := t.TempDir()
+	workspace := filepath.Join(agentRoot, "agent-a")
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		t.Fatalf("mkdir workspace: %v", err)
+	}
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("pathsJson", `["nested/clip.mp4"]`); err != nil {
+		t.Fatalf("write pathsJson: %v", err)
+	}
+	part, err := writer.CreateFormFile("files", "clip.mp4")
+	if err != nil {
+		t.Fatalf("create form file: %v", err)
+	}
+	if _, err := part.Write([]byte("media")); err != nil {
+		t.Fatalf("write form file: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart writer: %v", err)
+	}
+
+	proxy := &ProxyServer{AgentDir: agentRoot}
+	req := httptest.NewRequest(http.MethodPost, "/api/upload?agentId=agent-a", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	rec := httptest.NewRecorder()
+	proxy.HandleUpload(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var response struct {
+		Status int      `json:"status"`
+		Dest   string   `json:"dest"`
+		Files  []string `json:"files"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.Status != 0 {
+		t.Fatalf("status payload = %d", response.Status)
+	}
+	wantDest := filepath.Join(workspace, "tmp")
+	if response.Dest != wantDest || !filepath.IsAbs(response.Dest) {
+		t.Fatalf("dest = %q, want absolute %q", response.Dest, wantDest)
+	}
+	if !reflect.DeepEqual(response.Files, []string{"nested/clip.mp4"}) {
+		t.Fatalf("files = %#v, want nested relative path", response.Files)
+	}
+	data, err := os.ReadFile(filepath.Join(wantDest, "nested", "clip.mp4"))
+	if err != nil {
+		t.Fatalf("read uploaded file: %v", err)
+	}
+	if string(data) != "media" {
+		t.Fatalf("uploaded data = %q, want media", data)
+	}
 }
 
 func TestHandleEdit(t *testing.T) {

@@ -962,13 +962,31 @@ windows_wsl_rootfs_url_for_target() {
   esac
 }
 
+windows_wsl_tsinghua_rootfs_url_for_target() {
+  target_name="$1"
+  case "$target_name" in
+    x86)
+      printf '%s' "https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/noble/release/ubuntu-base-24.04.3-base-amd64.tar.gz"
+      ;;
+    arm)
+      printf '%s' "https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/noble/release/ubuntu-base-24.04.3-base-arm64.tar.gz"
+      ;;
+    *)
+      echo "unknown linux target for Windows Tsinghua rootfs URL: $target_name" >&2
+      exit 1
+      ;;
+  esac
+}
+
 package_windows_wsl2_launcher() {
   target_name="$1"
   target_release_dir="$RELEASE_DIR/linux/$target_name"
   rootfs_url=""
+  tsinghua_rootfs_url=""
 
   echo "-> packaging Windows WSL2 launcher (linux/$target_name)"
   rootfs_url="$(windows_wsl_rootfs_url_for_target "$target_name")"
+  tsinghua_rootfs_url="$(windows_wsl_tsinghua_rootfs_url_for_target "$target_name")"
   copy_release_asset "$MODULE_DIR/build/install.bat" "$target_release_dir/install.bat"
   copy_release_asset "$MODULE_DIR/build/start.bat" "$target_release_dir/start.bat"
   copy_release_asset "$MODULE_DIR/build/install.ps1" "$target_release_dir/install.ps1"
@@ -980,6 +998,7 @@ package_windows_wsl2_launcher() {
   sed -i.bak \
     -e 's|^\$APP_DIR       = Join-Path \$PSScriptRoot "app"$|$APP_DIR       = $PSScriptRoot|' \
     -e "s|https://cloud-images.ubuntu.com/wsl/releases/noble/current/ubuntu-noble-wsl-amd64-wsl.rootfs.tar.gz|$rootfs_url|g" \
+    -e "s|https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/noble/release/ubuntu-base-24.04.3-base-amd64.tar.gz|$tsinghua_rootfs_url|g" \
     "$target_release_dir/install.ps1"
   rm -f "$target_release_dir/install.ps1.bak"
 }

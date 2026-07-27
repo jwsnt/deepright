@@ -1,5 +1,11 @@
 #Requires -Version 5.1
 
+[CmdletBinding()]
+param(
+    [ValidateSet("official", "tsinghua")]
+    [string]$UbuntuSource
+)
+
 # ---------- Fixed config ----------
 $DISTRO_NAME   = "deepright"
 $WSL_VHD_PATH  = "C:\WSL\deepright"
@@ -12,6 +18,9 @@ $LOCAL_SENTINEL_FILE = Join-Path $LOCAL_SENTINEL_DIR ".deepright_installed"
 $SHORTCUT_NAME = "DeepRight"
 $WSL_APT_TIMEOUT_SECONDS = 600
 $WSL_APT_TIMEOUT_KILL_AFTER_SECONDS = 30
+$UBUNTU_OFFICIAL_ROOTFS_URL = "https://cloud-images.ubuntu.com/wsl/releases/noble/current/ubuntu-noble-wsl-amd64-wsl.rootfs.tar.gz"
+$UBUNTU_TSINGHUA_ROOTFS_URL = "https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/noble/release/ubuntu-base-24.04.3-base-amd64.tar.gz"
+$script:usingTsinghuaAptMirror = $false
 
 # ---------- Log ----------
 function L_Step($m) { $l="`n========================================  $m"; Write-Host $l -F Cyan;   Add-Content -Path $LOG_FILE -Value $l -Encoding UTF8 }
@@ -58,12 +67,147 @@ function Download-FileWithProgress([string]$Url, [string]$Destination, [string]$
                 Write-Progress -Activity $Activity -Status ("{0:N1} MB downloaded" -f ($received / 1MB))
             }
         }
+        return
+    } catch {
+        $webRequestError = $_
+        L_Warn "Built-in HTTPS download failed; retrying with curl.exe"
+        Add-Content -Path $LOG_FILE -Value "download HttpWebRequest failed: url=$Url error=$webRequestError" -Encoding UTF8
     } finally {
         Write-Progress -Activity $Activity -Completed
         if ($output) { $output.Dispose() }
         if ($input) { $input.Dispose() }
         if ($response) { $response.Dispose() }
     }
+
+    Remove-Item -Path $Destination -Force -ErrorAction SilentlyContinue
+    $curl = Get-Command "curl.exe" -ErrorAction SilentlyContinue
+    if ($curl) {
+        $curlOutput = & $curl.Source --fail --location --retry 3 --connect-timeout 30 --output $Destination $Url 2>&1 | Out-String
+        $curlExitCode = $LASTEXITCODE
+        Add-Content -Path $LOG_FILE -Value "download curl.exe: url=$Url exitCode=$curlExitCode output=$curlOutput" -Encoding UTF8
+        if ($curlExitCode -eq 0 -and (Test-Path $Destination) -and (Get-Item $Destination).Length -gt 0) {
+            return
+        }
+        Remove-Item -Path $Destination -Force -ErrorAction SilentlyContinue
+        L_Warn "curl.exe download failed; retrying with Windows BITS"
+    } else {
+        L_Warn "curl.exe is unavailable; retrying with Windows BITS"
+    }
+
+    try {
+        Start-BitsTransfer -Source $Url -Destination $Destination -DisplayName "DeepRight Ubuntu Rootfs" -ErrorAction Stop
+        if ((Test-Path $Destination) -and (Get-Item $Destination).Length -gt 0) {
+            Add-Content -Path $LOG_FILE -Value "download BITS succeeded: url=$Url" -Encoding UTF8
+            return
+        }
+        throw "BITS completed without a downloaded file"
+    } catch {
+        $bitsError = $_
+        Remove-Item -Path $Destination -Force -ErrorAction SilentlyContinue
+        Add-Content -Path $LOG_FILE -Value "download BITS failed: url=$Url error=$bitsError" -Encoding UTF8
+        throw "HTTPS download failed with HttpWebRequest, curl.exe, and Windows BITS. $webRequestError; BITS: $bitsError"
+    }
+}
+
+function Select-UbuntuSource([string]$Preset) {
+    if ($Preset -eq "official" -or $Preset -eq "tsinghua") {
+        L_Info "Ubuntu download source selected by parameter: $Preset"
+        return $Preset
+    }
+
+    Write-Host ""
+    Write-Host "Please select the Ubuntu download source:" -ForegroundColor Cyan
+    Write-Host "  1. Microsoft official (recommended)" -ForegroundColor White
+    Write-Host "     Uses the official WSL Ubuntu channel; an official Rootfs is used automatically if needed." -ForegroundColor DarkGray
+    Write-Host "  2. Tsinghua mirror" -ForegroundColor White
+    Write-Host "     Downloads the Ubuntu Rootfs and configures the Tsinghua Ubuntu apt mirror automatically." -ForegroundColor DarkGray
+    Write-Host ""
+
+    while ($true) {
+        $choice = (Read-Host "Enter 1 or 2").Trim()
+        switch ($choice) {
+            "1" { L_Info "Ubuntu download source selected: Microsoft official"; return "official" }
+            "2" { L_Info "Ubuntu download source selected: Tsinghua mirror"; return "tsinghua" }
+            default { L_Warn "Please enter 1 or 2. No manual download or command is required after this choice." }
+        }
+    }
+}
+
+function Set-WslTsinghuaAptMirror([string]$DistroName) {
+    $mirrorScript = @'
+set -eu
+updated=0
+for source_file in /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list; do
+  [ -f "$source_file" ] || continue
+  if grep -Eq 'https?://(archive|security)\.ubuntu\.com/ubuntu/?|https?://ports\.ubuntu\.com/ubuntu-ports/?' "$source_file"; then
+    backup="${source_file}.deepright.bak"
+    [ -f "$backup" ] || cp "$source_file" "$backup"
+    sed -E -i \
+      -e 's@https?://(archive|security)\.ubuntu\.com/ubuntu/?@https://mirrors.tuna.tsinghua.edu.cn/ubuntu/@g' \
+      -e 's@https?://ports\.ubuntu\.com/ubuntu-ports/?@https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/@g' \
+      "$source_file"
+    updated=1
+  fi
+done
+if [ "$updated" -ne 1 ]; then
+  echo "Ubuntu apt source files do not contain a supported official Ubuntu endpoint" >&2
+  exit 1
+fi
+'@
+    $encodedScript = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($mirrorScript))
+    $output = & wsl.exe -d $DistroName -u root -- bash -c "printf '%s' '$encodedScript' | base64 -d | bash" 2>&1 | Out-String
+    $exitCode = $LASTEXITCODE
+    Add-Content -Path $LOG_FILE -Value "configure Tsinghua apt mirror: exitCode=$exitCode output=$output" -Encoding UTF8
+    if ($exitCode -ne 0) {
+        L_Err "Failed to configure the Tsinghua Ubuntu apt mirror: $($output.Trim())"
+        return $false
+    }
+    L_OK "Ubuntu apt source switched to Tsinghua mirror"
+    return $true
+}
+
+function Restore-WslOfficialAptSources([string]$DistroName) {
+    $restoreScript = @'
+set -eu
+restored=0
+for source_file in /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list; do
+  backup="${source_file}.deepright.bak"
+  [ -f "$backup" ] || continue
+  cp "$backup" "$source_file"
+  restored=1
+done
+if [ "$restored" -ne 1 ]; then
+  echo "No DeepRight Ubuntu apt source backup was found" >&2
+  exit 1
+fi
+'@
+    $encodedScript = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($restoreScript))
+    $output = & wsl.exe -d $DistroName -u root -- bash -c "printf '%s' '$encodedScript' | base64 -d | bash" 2>&1 | Out-String
+    $exitCode = $LASTEXITCODE
+    Add-Content -Path $LOG_FILE -Value "restore official Ubuntu apt sources: exitCode=$exitCode output=$output" -Encoding UTF8
+    if ($exitCode -ne 0) {
+        L_Err "Failed to restore the official Ubuntu apt sources: $($output.Trim())"
+        return $false
+    }
+    L_OK "Ubuntu apt source restored to the official backup"
+    return $true
+}
+
+function Get-WslAptSourceName {
+    if ($script:usingTsinghuaAptMirror) { return "tsinghua-apt" }
+    return "ubuntu-apt"
+}
+
+function Fallback-WslAptToOfficial {
+    if (-not $script:usingTsinghuaAptMirror) {
+        return $false
+    }
+    L_Warn "Tsinghua Ubuntu apt source failed; restoring the official Ubuntu source and retrying"
+    if (-not (Restore-WslOfficialAptSources -DistroName $DISTRO_NAME)) {
+        return $false
+    }
+    $script:usingTsinghuaAptMirror = $false
+    return $true
 }
 
 function Test-Admin {
@@ -161,7 +305,7 @@ function Test-WslTool([string]$cmd) {
 function Invoke-WslTimedInstallCommand([string]$Package, [string]$Source, [string]$Command) {
     $encodedCommand = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($Command))
     $wslScript = "set -o pipefail; encoded='$encodedCommand'; command=`$(printf '%s' `"`$encoded`" | base64 -d); timeout --signal=TERM --kill-after=${WSL_APT_TIMEOUT_KILL_AFTER_SECONDS}s ${WSL_APT_TIMEOUT_SECONDS}s bash -c `"`$command`""
-    $output = & wsl.exe -d $DISTRO_NAME -- bash -c $wslScript 2>&1 | Out-String
+    $output = & wsl.exe -d $DISTRO_NAME -u root -- bash -c $wslScript 2>&1 | Out-String
     $exitCode = $LASTEXITCODE
     $timedOut = ($exitCode -eq 124 -or $exitCode -eq 137)
     $result = if ($exitCode -eq 0) { "success" } elseif ($timedOut) { "timeout" } else { "failed" }
@@ -176,19 +320,27 @@ function Invoke-WslTimedInstallCommand([string]$Package, [string]$Source, [strin
 
 function Install-WslAptPackage([string]$Package) {
     L_Info "Installing $Package from Ubuntu apt (timeout: $WSL_APT_TIMEOUT_SECONDS seconds)..."
-    $result = Invoke-WslTimedInstallCommand -Package $Package -Source "ubuntu-apt" -Command "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -- $Package"
+    $command = "DEBIAN_FRONTEND=noninteractive apt-get install -y -- $Package"
+    $result = Invoke-WslTimedInstallCommand -Package $Package -Source (Get-WslAptSourceName) -Command $command
     if ($result.Success) {
         L_OK "$Package installed from Ubuntu apt"
         return $true
     }
+    if (Fallback-WslAptToOfficial) {
+        $result = Invoke-WslTimedInstallCommand -Package $Package -Source "ubuntu-apt-fallback" -Command $command
+        if ($result.Success) {
+            L_OK "$Package installed from the official Ubuntu apt fallback"
+            return $true
+        }
+    }
     $reason = if ($result.TimedOut) { "timed out after $WSL_APT_TIMEOUT_SECONDS seconds" } else { "failed with exit code $($result.ExitCode)" }
-    L_Err "$Package installation from Ubuntu apt $reason; no fallback source is configured, continuing"
+    L_Err "$Package installation from Ubuntu apt $reason, continuing"
     return $false
 }
 
 function Install-WslNodeJS {
     L_Info "Installing Node.js 20.x from NodeSource (timeout: $WSL_APT_TIMEOUT_SECONDS seconds)..."
-    $nodeSource = Invoke-WslTimedInstallCommand -Package "nodejs" -Source "nodesource-20" -Command "set -o pipefail; curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs"
+    $nodeSource = Invoke-WslTimedInstallCommand -Package "nodejs" -Source "nodesource-20" -Command "set -o pipefail; curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs"
     if ($nodeSource.Success) {
         L_OK "Node.js 20.x LTS + npm installed from NodeSource"
         return $true
@@ -196,10 +348,18 @@ function Install-WslNodeJS {
 
     $reason = if ($nodeSource.TimedOut) { "timed out after $WSL_APT_TIMEOUT_SECONDS seconds" } else { "failed with exit code $($nodeSource.ExitCode)" }
     L_Warn "NodeSource installation $reason; trying Ubuntu apt fallback"
-    $fallback = Invoke-WslTimedInstallCommand -Package "nodejs" -Source "ubuntu-apt" -Command "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs npm"
+    $fallbackCommand = "DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs npm"
+    $fallback = Invoke-WslTimedInstallCommand -Package "nodejs" -Source (Get-WslAptSourceName) -Command $fallbackCommand
     if ($fallback.Success) {
         L_OK "Node.js + npm installed from Ubuntu apt"
         return $true
+    }
+    if (Fallback-WslAptToOfficial) {
+        $fallback = Invoke-WslTimedInstallCommand -Package "nodejs" -Source "ubuntu-apt-fallback" -Command $fallbackCommand
+        if ($fallback.Success) {
+            L_OK "Node.js + npm installed from the official Ubuntu apt fallback"
+            return $true
+        }
     }
 
     $reason = if ($fallback.TimedOut) { "timed out after $WSL_APT_TIMEOUT_SECONDS seconds" } else { "failed with exit code $($fallback.ExitCode)" }
@@ -412,52 +572,70 @@ if ($distroExists) {
     # Nuke any stale registrations
     L_Info "Cleaning stale registrations..."
     Nuke-Distro -Name $DISTRO_NAME -VhdPath $WSL_VHD_PATH
-    & wsl.exe --unregister Ubuntu 2>&1 | Out-Null
-    Start-Sleep -Seconds 2
     L_OK "Cleanup done"
 
     # Get Ubuntu rootfs
     $rootfsFile = $null
+    $selectedUbuntuSource = Select-UbuntuSource -Preset $UbuntuSource
 
-    # Method 1: wsl --install -d Ubuntu
-    L_Info "Method 1: wsl --install -d Ubuntu..."
-    Invoke-WslWithLiveOutput -Description "Ubuntu install" -Arguments @("--install", "-d", "Ubuntu", "--no-launch")
-    Start-Sleep -Seconds 10
-
-    $ubuntuOk = Test-DistroExists -Name "Ubuntu"
-    if ($ubuntuOk) {
-        L_OK "Ubuntu installed via Method 1"
-        $TEMP_TAR = "C:\Temp\deepright-ubuntu.tar"
-        if (-not (Test-Path "C:\Temp")) { New-Item -ItemType Directory -Path "C:\Temp" -Force | Out-Null }
-        L_Info "Exporting Ubuntu..."
-        & wsl.exe --export Ubuntu $TEMP_TAR 2>&1 | Out-Null
-        if (Test-Path $TEMP_TAR) {
-            L_OK "Ubuntu exported"
-            & wsl.exe --unregister Ubuntu 2>&1 | Out-Null
-            Start-Sleep -Seconds 2
-            $rootfsFile = $TEMP_TAR
+    if ($selectedUbuntuSource -eq "official") {
+        # Prefer the standard Microsoft WSL distribution workflow. Never use
+        # an existing user-owned Ubuntu distro as a temporary export source.
+        if (Test-DistroExists -Name "Ubuntu") {
+            L_Info "A user-owned Ubuntu distro already exists; preserving it and using the official Rootfs fallback"
         } else {
-            L_Warn "Export failed, trying Method 2"
+            L_Info "Microsoft official: wsl --install -d Ubuntu..."
+            Invoke-WslWithLiveOutput -Description "Ubuntu install" -Arguments @("--install", "-d", "Ubuntu", "--no-launch")
+            Start-Sleep -Seconds 10
+
+            if (Test-DistroExists -Name "Ubuntu") {
+                L_OK "Temporary Ubuntu installed via the Microsoft official channel"
+                $TEMP_TAR = "C:\Temp\deepright-ubuntu.tar"
+                if (-not (Test-Path "C:\Temp")) { New-Item -ItemType Directory -Path "C:\Temp" -Force | Out-Null }
+                L_Info "Exporting the temporary Ubuntu instance..."
+                & wsl.exe --export Ubuntu $TEMP_TAR 2>&1 | Out-Null
+                if (Test-Path $TEMP_TAR) {
+                    L_OK "Temporary Ubuntu exported"
+                    & wsl.exe --unregister Ubuntu 2>&1 | Out-Null
+                    Start-Sleep -Seconds 2
+                    $rootfsFile = $TEMP_TAR
+                } else {
+                    L_Warn "Temporary Ubuntu export failed; removing only the installer-created instance and using the official Rootfs fallback"
+                    & wsl.exe --unregister Ubuntu 2>&1 | Out-Null
+                    Start-Sleep -Seconds 2
+                }
+            } else {
+                L_Warn "Microsoft official Ubuntu install failed; using the official Rootfs fallback"
+            }
         }
-    } else {
-        L_Warn "Method 1 failed, trying Method 2"
     }
 
-    # Method 2: direct download
     if (-not $rootfsFile) {
-        L_Info "Method 2: Direct rootfs download..."
-        $rootfsUrl = "https://cloud-images.ubuntu.com/wsl/releases/noble/current/ubuntu-noble-wsl-amd64-wsl.rootfs.tar.gz"
+        $rootfsUrl = if ($selectedUbuntuSource -eq "tsinghua") { $UBUNTU_TSINGHUA_ROOTFS_URL } else { $UBUNTU_OFFICIAL_ROOTFS_URL }
+        $sourceLabel = if ($selectedUbuntuSource -eq "tsinghua") { "Tsinghua mirror" } else { "Microsoft/Ubuntu official" }
         $dlDir = "C:\Temp"
         if (-not (Test-Path $dlDir)) { New-Item -ItemType Directory -Path $dlDir -Force | Out-Null }
-        $rootfsFile = Join-Path $dlDir "ubuntu-rootfs.tar.gz"
+        $rootfsFile = Join-Path $dlDir "deepright-ubuntu-$selectedUbuntuSource-rootfs.tar.gz"
 
+        L_Info "Downloading Ubuntu Rootfs from $sourceLabel..."
         L_Info "URL: $rootfsUrl"
         try {
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
             Download-FileWithProgress -Url $rootfsUrl -Destination $rootfsFile -Activity "Downloading Ubuntu rootfs"
         } catch {
+            if ($selectedUbuntuSource -ne "tsinghua") {
+                Remove-Item -Path $rootfsFile -Force -ErrorAction SilentlyContinue
+                L_Err "Download error: $_"; exit 1
+            }
+            $tsinghuaDownloadError = $_
+            L_Warn "Tsinghua HTTPS download failed; automatically falling back to the Ubuntu official WSL Rootfs"
             Remove-Item -Path $rootfsFile -Force -ErrorAction SilentlyContinue
-            L_Err "Download error: $_"; exit 1
+            try {
+                Download-FileWithProgress -Url $UBUNTU_OFFICIAL_ROOTFS_URL -Destination $rootfsFile -Activity "Downloading official Ubuntu rootfs"
+            } catch {
+                Remove-Item -Path $rootfsFile -Force -ErrorAction SilentlyContinue
+                L_Err "Tsinghua download failed: $tsinghuaDownloadError`nOfficial download failed: $_"; exit 1
+            }
         }
         if (-not (Test-Path $rootfsFile)) { L_Err "Download failed"; exit 1 }
         L_OK "Rootfs downloaded ($([math]::Round((Get-Item $rootfsFile).Length/1MB,1)) MB)"
@@ -495,6 +673,14 @@ if ($distroExists) {
     # Clean up tar
     Remove-Item $rootfsFile -Force -EA SilentlyContinue
 
+    if ($selectedUbuntuSource -eq "tsinghua") {
+        L_Info "Configuring the Tsinghua Ubuntu apt mirror..."
+        if (-not (Set-WslTsinghuaAptMirror -DistroName $DISTRO_NAME)) {
+            exit 1
+        }
+        $script:usingTsinghuaAptMirror = $true
+    }
+
     # Create user deepright
     L_Info "Creating user deepright..."
     & wsl.exe -d $DISTRO_NAME -u root -- useradd -m -s /bin/bash deepright 2>&1 | Out-Null
@@ -524,6 +710,7 @@ L_OK ".wslconfig already configured with networkingMode=mirrored"
 L_Step "Step 6/7: Install tools (git, npm, python3, ffmpeg, bubblewrap, xdg-open)"
 
 $aptPackages = @(
+    @{ Package = "sudo"; Command = "sudo" },
     @{ Package = "git"; Command = "git" },
     @{ Package = "python3"; Command = "python3" },
     @{ Package = "python3-pip"; Command = "pip3" },
@@ -541,7 +728,11 @@ if ($missingAptPackages.Count -eq 0 -and -not ($needNode -or $needNpm)) {
     L_OK "All tools already installed"
 } else {
     L_Info "Updating apt (timeout: $WSL_APT_TIMEOUT_SECONDS seconds)..."
-    $aptUpdate = Invoke-WslTimedInstallCommand -Package "apt-get update" -Source "ubuntu-apt" -Command "sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq"
+    $aptUpdateCommand = "DEBIAN_FRONTEND=noninteractive apt-get update -qq"
+    $aptUpdate = Invoke-WslTimedInstallCommand -Package "apt-get update" -Source (Get-WslAptSourceName) -Command $aptUpdateCommand
+    if (-not $aptUpdate.Success -and (Fallback-WslAptToOfficial)) {
+        $aptUpdate = Invoke-WslTimedInstallCommand -Package "apt-get update" -Source "ubuntu-apt-fallback" -Command $aptUpdateCommand
+    }
     if ($aptUpdate.Success) {
         L_OK "apt updated"
     } else {

@@ -40,6 +40,19 @@ WSL 内部还会生成并使用以下路径：
 - 如果环境缺失或损坏，会重新进入安装流程
 
 
+2.1 首次安装时如何选择 Ubuntu 下载来源
+
+首次创建 deepright WSL 发行版时，安装器会显示两个选项：
+- 1：Microsoft 官方（推荐）。安装器先通过官方 WSL Ubuntu 渠道安装；失败后自动下载官方 Rootfs 并导入。
+- 2：清华镜像。安装器自动下载清华大学镜像站的 Ubuntu 24.04 Base Rootfs、导入 deepright，并把 APT 源自动切换为清华镜像。
+
+选择后不需要手工下载文件、执行 wsl --import、创建 Linux 用户或编辑软件源。清华分支会在 amd64 使用 https://mirrors.tuna.tsinghua.edu.cn/ubuntu/，在 arm64 使用 https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/；原源文件会保留 .deepright.bak 备份。清华源更新或任一依赖安装失败时，安装器会自动恢复官方源并重试，后续依赖继续使用官方源。
+
+如果 PowerShell 内置 HTTPS 下载出现 TLS 或连接错误，安装器会自动改用 curl.exe，再自动尝试 Windows BITS。清华镜像的全部 HTTPS 下载器都失败时，安装器会自动回退到 Ubuntu 官方 WSL Rootfs；不使用 HTTP 下载，也不需要手工下载或导入。
+
+如果 deepright 已经存在且可用，安装器只刷新应用文件，不会重复询问或更换现有系统。安装器不会导出、注销、修改或删除用户自己安装的 Ubuntu 或其他 WSL 发行版。
+
+
 3. 重复执行 installer 会不会重复安装
 
 正常情况下不会。

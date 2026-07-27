@@ -8108,27 +8108,23 @@ func handleUpload(cfg *Config) http.HandlerFunc {
 			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "agentId is required"})
 			return
 		}
-		agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
-		metadata, err := getAgentOutput(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL)
+		workspace, err := getWorkspaceByAgentID(cfg, agentID)
 		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "agent metadata error: " + err.Error()})
-			return
-		}
-		var workspace string
-		for _, a := range metadata.Agents {
-			if a.AgentID == agentID {
-				workspace = a.Workspace
-				break
-			}
-		}
-		if workspace == "" {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "agent not found: " + agentID})
 			return
 		}
-		tmpDir := filepath.Join(workspace, "tmp")
-		os.MkdirAll(tmpDir, 0755)
+		tmpDir, err := filepath.Abs(filepath.Join(workspace, "tmp"))
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "resolve tmp directory failed: " + err.Error()})
+			return
+		}
+		if err := os.MkdirAll(tmpDir, 0755); err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "create tmp directory failed: " + err.Error()})
+			return
+		}
 		if err := r.ParseMultipartForm(200 << 20); err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "parse form failed: " + err.Error()})
@@ -8145,8 +8141,17 @@ func handleUpload(cfg *Config) http.HandlerFunc {
 			if i < len(paths) && paths[i] != "" {
 				relPath = paths[i]
 			}
-			destPath := filepath.Join(tmpDir, relPath)
-			os.MkdirAll(filepath.Dir(destPath), 0755)
+			cleanRelPath := filepath.Clean(filepath.FromSlash(relPath))
+			if cleanRelPath == "." || cleanRelPath == "" || cleanRelPath == ".." || filepath.IsAbs(cleanRelPath) || strings.HasPrefix(cleanRelPath, ".."+string(filepath.Separator)) {
+				continue
+			}
+			destPath := filepath.Join(tmpDir, cleanRelPath)
+			if !ensureWritablePathWithinRoot(tmpDir, destPath) {
+				continue
+			}
+			if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+				continue
+			}
 			src, err := fh.Open()
 			if err != nil {
 				continue
@@ -8156,8 +8161,10 @@ func handleUpload(cfg *Config) http.HandlerFunc {
 			if err != nil {
 				continue
 			}
-			os.WriteFile(destPath, data, 0644)
-			uploaded = append(uploaded, relPath)
+			if err := os.WriteFile(destPath, data, 0644); err != nil {
+				continue
+			}
+			uploaded = append(uploaded, filepath.ToSlash(cleanRelPath))
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{"status": 0, "agentId": agentID, "files": uploaded, "dest": tmpDir})
@@ -14445,20 +14452,22 @@ func normalizeResponseType(responseType string) string {
 }
 
 func buildSSEStreamInterruptedContent(err error) string {
+	const userMessage = "网络异常，请稍后重试"
 	if err == nil {
-		return "SSE stream interrupted"
+		return userMessage
 	}
 	detail := strings.TrimSpace(err.Error())
 	if detail == "" {
-		return "SSE stream interrupted"
+		return userMessage
 	}
-	return "SSE stream interrupted: " + detail
+	return fmt.Sprintf("%s（%s）", userMessage, detail)
 }
 
 func queueSSEStreamInterruptedLog(ch chan chatMsg, err error) bool {
 	if ch == nil || err == nil {
 		return false
 	}
+	log.Printf("SSE stream interrupted: %v", err)
 	ch <- chatMsg{
 		role:         "A",
 		responseType: "abnormal",

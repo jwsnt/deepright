@@ -57,6 +57,26 @@ install.bat
 - 在桌面和开始菜单创建带 `DeepRight.ico` 的启动快捷方式
 - 以 root 身份启动 `integration start`
 
+### Ubuntu 下载来源
+
+首次创建 `deepright` WSL 发行版时，安装器会显示一次来源选择：
+
+1. Microsoft 官方（推荐）：先走 `wsl --install -d Ubuntu`；若该渠道未成功，安装器会自动下载官方 WSL Rootfs 后导入。
+2. 清华镜像：自动下载清华大学镜像站的 Ubuntu 24.04 Base Rootfs、导入 `deepright`，并自动将 APT 源切换为清华镜像。
+
+选择后无需手工下载压缩包、执行 `wsl --import`、创建用户或编辑软件源。清华分支在 amd64 使用 `https://mirrors.tuna.tsinghua.edu.cn/ubuntu/`，在 arm64 使用 `https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/`；原有 `ubuntu.sources` 或 `sources.list` 会在同目录保留 `.deepright.bak` 备份。清华源的更新或任一依赖安装失败时，安装器会自动恢复官方源并重试该操作，后续依赖继续使用官方源。
+
+如果 PowerShell 内置 HTTPS 下载出现 TLS 或连接错误，安装器会自动依次尝试 Windows 自带的 `curl.exe` 和 BITS 下载。清华镜像的全部 HTTPS 下载器均失败时，安装器会自动回退到 Ubuntu 官方 WSL Rootfs；不使用 HTTP 下载。无需改链接、关闭证书校验或改为手工导入。
+
+若已存在健康的 `deepright` 发行版，安装器只刷新应用文件，不会再次询问或更换 Rootfs。安装器绝不会使用、导出或注销用户已有的 `Ubuntu` 或其他非 `deepright` 发行版。
+
+若需要以脚本方式预先指定来源，可在管理员 PowerShell 中执行：
+
+```powershell
+.\install.ps1 -UbuntuSource official
+.\install.ps1 -UbuntuSource tsinghua
+```
+
 ### 3. 后续启动
 
 安装完成后可直接双击：
@@ -86,7 +106,8 @@ sudo -n /usr/bin/env HOME=/home/deepright /app/integration start
 ### 4. apt 安装超时与 fallback
 
 - `apt-get update` 及每个软件包的一次安装尝试最多执行 10 分钟；超时后会终止对应安装进程，安装器继续处理后续软件包。
-- `git`、`python3`、`python3-pip`、`curl`、`build-essential`、`bubblewrap`、`xdg-utils` 按单个包安装，当前使用 Ubuntu apt 源。
+- `sudo`、`git`、`python3`、`python3-pip`、`curl`、`build-essential`、`ffmpeg`、`bubblewrap`、`xdg-utils` 按单个包安装。安装器以 root 执行这些 APT 操作，因此清华的精简 Base Rootfs 未预装 `sudo` 时也可自动补齐。
+- 选择清华镜像后，以上 APT 操作使用已自动切换的清华 Ubuntu 镜像；官方分支保留 Ubuntu 官方 APT 源。
 - Node.js 依次尝试 NodeSource 20.x 与 Ubuntu apt（`nodejs`、`npm`）两个源。
 - 最终无法安装的软件包会在控制台和 `install.log` 中以红色错误记录，但不会中断后续安装与应用启动。
 

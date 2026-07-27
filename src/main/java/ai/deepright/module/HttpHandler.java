@@ -70,6 +70,7 @@ public class HttpHandler extends NettyHttpHandler {
             IdleStateEvent event = IdleStateEvent.class.cast(evt);
             if (NettyWriter.isSse(ctx) && IdleState.WRITER_IDLE.equals(event.state())) {
                 // SSE 注释心跳
+                log.info("SSE heartbeat sent, remote={}", ctx.channel().remoteAddress());
                 ctx.writeAndFlush(new DefaultHttpContent(HttpHandler.SSE_HEARTBEAT_BUF.retainedDuplicate())).addListener(NettyAlarm.INSTANCE);
             } else {
                 if (log.isInfoEnabled()) {

@@ -17,8 +17,9 @@
 ### 需求介绍
 + Windows WSL 安装器在首次创建受管的 `deepright` 发行版前，必须提供两个明确选项：`1` 使用微软官方 Ubuntu 渠道，`2` 使用清华镜像。用户只负责选择其中一个选项；选择后的下载、导入、用户创建、依赖安装、应用复制和启动均须由安装器自动完成，不得要求手工下载 Rootfs、执行 `wsl --import`、编辑 APT 配置或运行额外命令。
 + 选择微软官方渠道时，安装器先使用官方 `wsl --install -d Ubuntu`，失败后可自动使用微软/Ubuntu 官方 WSL Rootfs 作为同一分支的兜底；选择清华镜像时，安装器直接下载与 Windows 发布架构匹配的 Ubuntu 24.04 Noble Base Rootfs（amd64 或 arm64），并通过 `wsl --import` 创建 `deepright`。清华分支不得依赖 Microsoft Store 或要求用户转到浏览器下载。
-+ 清华镜像导入后，安装器必须自动把 Ubuntu 的 APT 源切换为清华 Ubuntu 镜像：amd64 使用 `https://mirrors.tuna.tsinghua.edu.cn/ubuntu/`，arm64 使用 `https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/`。应保留原源文件备份，并同时兼容 Ubuntu 24.04 的 DEB822 `ubuntu.sources` 与传统 `sources.list`；后续 `apt-get update` 和依赖安装必须使用切换后的源。
++ 清华镜像导入后，安装器必须自动把 Ubuntu 的 APT 源切换为清华 Ubuntu 镜像：amd64 使用 `https://mirrors.tuna.tsinghua.edu.cn/ubuntu/`，arm64 使用 `https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/`。应保留原源文件备份，并同时兼容 Ubuntu 24.04 的 DEB822 `ubuntu.sources` 与传统 `sources.list`；后续 `apt-get update` 和依赖安装必须使用切换后的源。清华源的更新或任一依赖安装失败时，安装器必须自动恢复该备份的 Ubuntu 官方源、重试当前操作，且后续依赖继续使用官方源。
 + Ubuntu Base Rootfs 不保证预装 `sudo`。安装器必须以 root 自动完成 APT 操作并补齐 `sudo`，随后继续为 `deepright` 配置默认用户和免密 sudo；不得因精简 Rootfs 缺少 `sudo` 而中断。
++ Rootfs 下载的内置 .NET HTTPS 请求出现 TLS 或连接错误时，安装器必须自动依次尝试 Windows 自带的 `curl.exe` 与 BITS 下载。清华镜像的全部 HTTPS 下载器失败后，必须自动回退到 Ubuntu 官方 WSL Rootfs；不得使用 HTTP 下载、要求用户更换 URL、关闭证书校验、手工下载或重新执行导入步骤。官方回退同样失败时，返回两次尝试原因并保留安装日志。
 + 不得导出、注销、修改或删除用户已有的 `Ubuntu` 或其他非 `deepright` WSL 发行版。官方分支仅可注销本次安装器新建、用于临时导出的 Ubuntu 实例；`deepright` 之外的发行版始终视为用户数据。
 
 ### 编写代码

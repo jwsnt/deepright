@@ -3478,6 +3478,43 @@ func ensurePathWithinRoot(root, target string) bool {
 	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))
 }
 
+// ensureWritablePathWithinRoot validates the real, existing parent directory
+// before a write. A lexical child of root may still escape through a symlinked
+// directory, so reject that case and an existing target symlink.
+func ensureWritablePathWithinRoot(root, target string) bool {
+	if !ensurePathWithinRoot(root, target) {
+		return false
+	}
+	resolvedRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return false
+	}
+	parent := filepath.Dir(filepath.Clean(target))
+	for {
+		resolvedParent, err := filepath.EvalSymlinks(parent)
+		if err == nil {
+			if !ensurePathWithinRoot(resolvedRoot, resolvedParent) {
+				return false
+			}
+			break
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			return false
+		}
+		nextParent := filepath.Dir(parent)
+		if nextParent == parent {
+			return false
+		}
+		parent = nextParent
+	}
+	if info, err := os.Lstat(target); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		return false
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+	return true
+}
+
 func buildKnowledgeTree(root string) (*knowledgeTreeNode, error) {
 	root = filepath.Clean(root)
 	info, err := os.Stat(root)
@@ -4723,8 +4760,21 @@ func (p *ProxyServer) HandleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tmpDir := filepath.Join(workspace, "tmp")
-	os.MkdirAll(tmpDir, 0755)
+	tmpDir := filepath.Clean(filepath.Join(workspace, "tmp"))
+	if !filepath.IsAbs(tmpDir) {
+		var absErr error
+		tmpDir, absErr = filepath.Abs(tmpDir)
+		if absErr != nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "resolve tmp directory failed: " + absErr.Error()})
+			return
+		}
+	}
+	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "create tmp directory failed: " + err.Error()})
+		return
+	}
 
 	// Parse multipart form (max 200MB)
 	if err := r.ParseMultipartForm(200 << 20); err != nil {
@@ -4744,8 +4794,17 @@ func (p *ProxyServer) HandleUpload(w http.ResponseWriter, r *http.Request) {
 		if i < len(paths) && paths[i] != "" {
 			relPath = paths[i]
 		}
-		destPath := filepath.Join(tmpDir, relPath)
-		os.MkdirAll(filepath.Dir(destPath), 0755)
+		cleanRelPath := filepath.Clean(filepath.FromSlash(relPath))
+		if cleanRelPath == "." || cleanRelPath == "" || cleanRelPath == ".." || filepath.IsAbs(cleanRelPath) || strings.HasPrefix(cleanRelPath, ".."+string(filepath.Separator)) {
+			continue
+		}
+		destPath := filepath.Join(tmpDir, cleanRelPath)
+		if !ensureWritablePathWithinRoot(tmpDir, destPath) {
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+			continue
+		}
 
 		src, err := fh.Open()
 		if err != nil {
@@ -4756,8 +4815,10 @@ func (p *ProxyServer) HandleUpload(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			continue
 		}
-		os.WriteFile(destPath, data, 0644)
-		uploaded = append(uploaded, relPath)
+		if err := os.WriteFile(destPath, data, 0644); err != nil {
+			continue
+		}
+		uploaded = append(uploaded, filepath.ToSlash(cleanRelPath))
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -8890,20 +8951,22 @@ func detectResponseType(content string) string {
 }
 
 func buildSSEStreamInterruptedContent(err error) string {
+	const userMessage = "网络异常，请稍后重试"
 	if err == nil {
-		return "SSE stream interrupted"
+		return userMessage
 	}
 	detail := strings.TrimSpace(err.Error())
 	if detail == "" {
-		return "SSE stream interrupted"
+		return userMessage
 	}
-	return "SSE stream interrupted: " + detail
+	return fmt.Sprintf("%s（%s）", userMessage, detail)
 }
 
 func queueSSEStreamInterruptedLog(ch chan chatMsg, err error) bool {
 	if ch == nil || err == nil {
 		return false
 	}
+	log.Printf("SSE stream interrupted: %v", err)
 	ch <- chatMsg{
 		role:         "A",
 		responseType: "abnormal",

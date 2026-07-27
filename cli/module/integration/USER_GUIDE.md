@@ -1444,7 +1444,7 @@ curl -X POST 'http://127.0.0.1:8080/api/cron/create?agentId=demo-agent' \
 | GET | `/api/copy` | 复制指定 Agent 的工作目录与知识库到另一个已存在 Agent |
 | GET | `/api/agent/delete` | 删除 Agent 目录 |
 | GET | `/api/agent/create` | 在 Agent 下新建文件或目录 |
-| POST | `/api/upload` | 上传文件到 Agent 临时目录 |
+| POST | `/api/upload` | 上传文件到 Agent 临时目录；响应返回绝对 `dest` 与相对 `files` |
 | POST | `/api/config` | 更新 Agent 配置；也支持删除指定模型配置 |
 | GET/POST | `/api/token` | 保存或读取模型密钥 |
 | POST | `/api/message_insert/add` | 新增或覆盖一条待上传插入消息 |
@@ -3335,3 +3335,27 @@ Integration 提供 `POST /api/agent/audio?agentId=<agentId>&path=<relativePath>`
 - PNG 内容按二进制 Base64 解码后写入，不进行文本转换或图像转码。绝对路径、`~`、`..`、目录、跨 Agent 路径和工作区外符号链接仍会被拒绝。
 
 完整说明见 [iteration/20260726-9/USER_GUIDE.md](iteration/20260726-9/USER_GUIDE.md)。
+
+---
+
+## 迭代 20260727-1：Windows WSL Ubuntu 下载加速
+
+Windows 安装包首次创建受管的 `deepright` WSL 发行版时，会要求选择一次 Ubuntu 下载来源：`1` 为 Microsoft 官方，`2` 为清华镜像。选择后整个流程自动完成，包括 Rootfs 下载、`wsl --import`、`deepright` 用户初始化、依赖安装、应用复制和启动；用户不需要手工下载、解压或执行 WSL 命令。
+
+- Microsoft 官方分支优先通过 `wsl --install -d Ubuntu` 安装；失败时自动使用官方 WSL Rootfs 继续导入。
+- 清华分支自动下载 Ubuntu 24.04 Base Rootfs，并将 APT 源自动替换为清华镜像：amd64 为 `https://mirrors.tuna.tsinghua.edu.cn/ubuntu/`，arm64 为 `https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/`。`ubuntu.sources` 与传统 `sources.list` 都会被处理，修改前会生成 `.deepright.bak` 备份；清华源的更新或任一依赖安装失败时，会自动恢复官方源并重试，后续依赖继续使用官方源。
+- 清华 Rootfs 未带 `sudo` 时，安装器会以 root 执行 APT 操作并自动安装 `sudo`，再继续设置 `deepright` 的免密 sudo。
+- 内置 HTTPS 下载发生 TLS 或连接错误时，安装器会自动尝试 `curl.exe` 和 Windows BITS；清华镜像的全部 HTTPS 下载器均失败时，会自动回退到 Ubuntu 官方 WSL Rootfs，不使用 HTTP 下载。
+- 已存在健康 `deepright` 时仅刷新应用文件；安装器不会操作用户已有的 `Ubuntu` 或其他非 `deepright` WSL 发行版。
+
+完整说明见 [iteration/20260727-1/USER_GUIDE.md](iteration/20260727-1/USER_GUIDE.md)。
+
+---
+
+## 迭代 20260727-2：跨 Agent 附件路径
+
+`POST /api/upload?agentId=<agentId>` 成功后返回绝对 `dest` 和相对于该目录的 `files`，供 Site 生成稳定的附件绝对路径；上传文件仍只写入指定 Agent 的 `tmp/`。`GET /api/workspace?agentId=<agentId>` 返回同一 Agent 的绝对工作区，供 Site 将附件路径安全换算为媒体预览所需的相对路径。
+
+`GET/HEAD /api/media_preview` 的安全边界不变：请求必须携带目标 Agent 和该工作区内的相对媒体路径，绝对路径、跨 Agent 路径、路径逃逸和逃出工作区的符号链接都会被拒绝。
+
+完整说明见 [iteration/20260727-2/USER_GUIDE.md](iteration/20260727-2/USER_GUIDE.md)。
