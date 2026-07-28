@@ -6394,6 +6394,22 @@ type VideoTrimResponse struct {
 	Status  int    `json:"status"`
 }
 
+// VideoAudioExtractRequest deliberately carries no output path or command
+// options. The server derives the MP3 name and always writes it below the
+// requesting Agent's videos directory.
+type VideoAudioExtractRequest struct {
+	AgentID string `json:"agentId"`
+	Path    string `json:"path"`
+}
+
+type VideoAudioExtractResponse struct {
+	AgentID string `json:"agentId"`
+	Path    string `json:"path"`
+	SavedAs string `json:"savedAs,omitempty"`
+	Content string `json:"content,omitempty"`
+	Status  int    `json:"status"`
+}
+
 // VideoRecordConvertRequest refers only to a browser-recorded WebM that Site
 // staged under the requesting Agent's temporary workspace directory.
 type VideoRecordConvertRequest struct {
@@ -6555,6 +6571,12 @@ func handleFFmpegCheck() http.HandlerFunc {
 }
 
 func writeVideoTrimResp(w http.ResponseWriter, httpStatus int, resp VideoTrimResponse) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(httpStatus)
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+func writeVideoAudioExtractResp(w http.ResponseWriter, httpStatus int, resp VideoAudioExtractResponse) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(httpStatus)
 	_ = json.NewEncoder(w).Encode(resp)
@@ -6787,6 +6809,37 @@ func isSafeVideoTrimOutputName(name string) bool {
 	return isSafeSaveAsNewFilename(name) && strings.EqualFold(filepath.Ext(name), ".mp4") && len(strings.TrimSuffix(name, filepath.Ext(name))) > 0
 }
 
+func videoAudioExtractOutputName(sourceRelativePath string) string {
+	name := filepath.Base(sourceRelativePath)
+	base := strings.TrimSuffix(name, filepath.Ext(name))
+	if base == "" || base == "." {
+		base = "video"
+	}
+	return base + ".mp3"
+}
+
+// videoAudioExtractAvailableOutputPath finds an unused MP3 name. The final
+// os.Link in handleVideoAudioExtract remains the authoritative collision
+// guard, so a competing extraction can never overwrite an existing file.
+func videoAudioExtractAvailableOutputPath(workspace, outputName string, now time.Time) (string, error) {
+	for attempt := 0; attempt < 64; attempt++ {
+		candidateName := outputName
+		if attempt > 0 {
+			candidateName = appendTimestampToFilename(outputName, now.Add(time.Duration(attempt)*time.Nanosecond))
+		}
+		outputPath, err := resolveCaseInsensitiveUnderRoot(workspace, filepath.Join("videos", candidateName))
+		if err != nil || !ensureWritablePathWithinRoot(workspace, outputPath) {
+			return "", errors.New("无法在工作目录中创建 MP3")
+		}
+		if _, err := os.Lstat(outputPath); errors.Is(err, os.ErrNotExist) {
+			return outputPath, nil
+		} else if err != nil {
+			return "", fmt.Errorf("无法检查 MP3 输出路径: %w", err)
+		}
+	}
+	return "", errors.New("无法生成不重复的 MP3 文件名")
+}
+
 const (
 	videoTrimCropMinimumSize   = 0.001
 	videoTrimCropMaximumPoints = 48
@@ -6948,6 +7001,24 @@ func videoTrimProbeBitrate(ctx context.Context, ffprobePath, sourcePath string) 
 	return bitrate
 }
 
+// videoAudioExtractHasAudioStream keeps the user-facing no-audio case
+// distinct from a failed conversion. It uses only server-defined FFprobe
+// arguments and returns no stream details to the browser.
+func videoAudioExtractHasAudioStream(ctx context.Context, ffprobePath, sourcePath string) (bool, error) {
+	cmd := videoTrimCommandContextFn(ctx, ffprobePath,
+		"-v", "error",
+		"-select_streams", "a:0",
+		"-show_entries", "stream=index",
+		"-of", "default=noprint_wrappers=1:nokey=1",
+		sourcePath,
+	)
+	output, err := cmd.Output()
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(string(output)) != "", nil
+}
+
 func videoTrimCommandError(err error, output []byte) string {
 	message := strings.TrimSpace(string(output))
 	if len(message) > 800 {
@@ -7099,6 +7170,141 @@ func handleVideoTrim(cfg *Config) http.HandlerFunc {
 			return
 		}
 		writeVideoTrimResp(w, http.StatusOK, VideoTrimResponse{AgentID: request.AgentID, Path: request.Path, SavedAs: outputPath, Status: 0})
+	}
+}
+
+// handleVideoAudioExtract converts the first audio stream of a workspace video
+// into MP3. It never changes the source video, accepts no caller-selected
+// output path, and atomically creates the final file under videos/.
+func handleVideoAudioExtract(cfg *Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", http.MethodPost)
+			writeVideoAudioExtractResp(w, http.StatusMethodNotAllowed, VideoAudioExtractResponse{Content: "method not allowed", Status: 1})
+			return
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+		defer r.Body.Close()
+		var request VideoAudioExtractRequest
+		decoder := json.NewDecoder(r.Body)
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&request); err != nil {
+			writeVideoAudioExtractResp(w, http.StatusBadRequest, VideoAudioExtractResponse{Content: "请求体格式错误", Status: 1})
+			return
+		}
+		if err := decoder.Decode(&struct{}{}); err != io.EOF {
+			writeVideoAudioExtractResp(w, http.StatusBadRequest, VideoAudioExtractResponse{AgentID: request.AgentID, Path: request.Path, Content: "请求体只能包含一个 JSON 对象", Status: 1})
+			return
+		}
+		request.AgentID = strings.TrimSpace(request.AgentID)
+		request.Path = normalizeQuotedPathArg(request.Path)
+		if !isValidMediaPreviewAgentID(request.AgentID) || request.Path == "" {
+			writeVideoAudioExtractResp(w, http.StatusBadRequest, VideoAudioExtractResponse{AgentID: request.AgentID, Path: request.Path, Content: "agentId 和相对路径不能为空", Status: 1})
+			return
+		}
+
+		sourcePath, _, sourceStatus, sourceMessage := resolveMediaPreviewFile(cfg, request.AgentID, request.Path)
+		if sourceStatus != 0 {
+			writeVideoAudioExtractResp(w, sourceStatus, VideoAudioExtractResponse{AgentID: request.AgentID, Path: request.Path, Content: sourceMessage, Status: 1})
+			return
+		}
+		mimeType, _ := mediaPreviewMIMEType(sourcePath)
+		if !strings.HasPrefix(mimeType, "video/") {
+			writeVideoAudioExtractResp(w, http.StatusBadRequest, VideoAudioExtractResponse{AgentID: request.AgentID, Path: request.Path, Content: "仅支持从视频文件提取音频", Status: 1})
+			return
+		}
+		workspace, err := getWorkspaceByAgentID(cfg, request.AgentID)
+		if err != nil {
+			writeVideoAudioExtractResp(w, http.StatusNotFound, VideoAudioExtractResponse{AgentID: request.AgentID, Path: request.Path, Content: "agent not found", Status: 1})
+			return
+		}
+		sourceRelativePath, err := filepath.Rel(workspace, sourcePath)
+		if err != nil || sourceRelativePath == "." || strings.HasPrefix(sourceRelativePath, ".."+string(filepath.Separator)) {
+			writeVideoAudioExtractResp(w, http.StatusBadRequest, VideoAudioExtractResponse{AgentID: request.AgentID, Path: request.Path, Content: "path must be a workspace-relative video path", Status: 1})
+			return
+		}
+
+		ffmpegPath, ffmpegErr := videoTrimLookPathFn("ffmpeg")
+		ffprobePath, ffprobeErr := videoTrimLookPathFn("ffprobe")
+		if ffmpegErr != nil || ffprobeErr != nil {
+			writeVideoAudioExtractResp(w, http.StatusServiceUnavailable, VideoAudioExtractResponse{AgentID: request.AgentID, Path: request.Path, Content: "FFmpeg 或 FFprobe 未安装，无法提取音频", Status: 1})
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), videoTrimConversionTimeout)
+		defer cancel()
+		hasAudio, err := videoAudioExtractHasAudioStream(ctx, ffprobePath, sourcePath)
+		if err != nil {
+			writeVideoAudioExtractResp(w, http.StatusInternalServerError, VideoAudioExtractResponse{AgentID: request.AgentID, Path: request.Path, Content: "无法检测视频音轨", Status: 1})
+			return
+		}
+		if !hasAudio {
+			writeVideoAudioExtractResp(w, http.StatusBadRequest, VideoAudioExtractResponse{AgentID: request.AgentID, Path: request.Path, Content: "视频没有可提取的音轨", Status: 1})
+			return
+		}
+
+		outputName := videoAudioExtractOutputName(sourceRelativePath)
+		outputPath, err := videoAudioExtractAvailableOutputPath(workspace, outputName, time.Now())
+		if err != nil {
+			writeVideoAudioExtractResp(w, http.StatusInternalServerError, VideoAudioExtractResponse{AgentID: request.AgentID, Path: request.Path, Content: err.Error(), Status: 1})
+			return
+		}
+		if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil || !ensureWritablePathWithinRoot(workspace, outputPath) {
+			writeVideoAudioExtractResp(w, http.StatusInternalServerError, VideoAudioExtractResponse{AgentID: request.AgentID, Path: request.Path, Content: "无法创建 videos 目录", Status: 1})
+			return
+		}
+		temporaryPath := strings.TrimSuffix(outputPath, ".mp3") + "." + strconv.FormatInt(time.Now().UnixNano(), 10) + ".tmp.mp3"
+		if !ensureWritablePathWithinRoot(workspace, temporaryPath) {
+			writeVideoAudioExtractResp(w, http.StatusBadRequest, VideoAudioExtractResponse{AgentID: request.AgentID, Path: request.Path, Content: "无法在工作目录中创建临时 MP3", Status: 1})
+			return
+		}
+		defer os.Remove(temporaryPath)
+		args := []string{
+			"-hide_banner", "-loglevel", "error", "-nostdin",
+			"-i", sourcePath,
+			"-map", "0:a:0", "-vn",
+			"-c:a", "libmp3lame", "-q:a", "2",
+			"-f", "mp3", "-n", temporaryPath,
+		}
+		output, err := videoTrimCommandContextFn(ctx, ffmpegPath, args...).CombinedOutput()
+		if err != nil {
+			message := "音频提取失败：" + videoTrimCommandError(err, output)
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				message = "音频提取超时"
+			}
+			writeVideoAudioExtractResp(w, http.StatusInternalServerError, VideoAudioExtractResponse{AgentID: request.AgentID, Path: request.Path, Content: message, Status: 1})
+			return
+		}
+		info, err := os.Stat(temporaryPath)
+		if err != nil || info.Size() == 0 {
+			writeVideoAudioExtractResp(w, http.StatusInternalServerError, VideoAudioExtractResponse{AgentID: request.AgentID, Path: request.Path, Content: "音频提取未生成有效 MP3", Status: 1})
+			return
+		}
+		var linkErr error
+		for attempt := 0; attempt < 64; attempt++ {
+			linkErr = os.Link(temporaryPath, outputPath)
+			if linkErr == nil {
+				break
+			}
+			if !errors.Is(linkErr, fs.ErrExist) {
+				writeVideoAudioExtractResp(w, http.StatusInternalServerError, VideoAudioExtractResponse{AgentID: request.AgentID, Path: request.Path, Content: "保存提取的音频失败", Status: 1})
+				return
+			}
+			outputPath, err = videoAudioExtractAvailableOutputPath(workspace, outputName, time.Now().Add(time.Duration(attempt+1)*time.Nanosecond))
+			if err != nil {
+				writeVideoAudioExtractResp(w, http.StatusInternalServerError, VideoAudioExtractResponse{AgentID: request.AgentID, Path: request.Path, Content: err.Error(), Status: 1})
+				return
+			}
+		}
+		if linkErr != nil {
+			writeVideoAudioExtractResp(w, http.StatusInternalServerError, VideoAudioExtractResponse{AgentID: request.AgentID, Path: request.Path, Content: "无法生成不重复的 MP3 文件名", Status: 1})
+			return
+		}
+		if err := os.Remove(temporaryPath); err != nil {
+			_ = os.Remove(outputPath)
+			writeVideoAudioExtractResp(w, http.StatusInternalServerError, VideoAudioExtractResponse{AgentID: request.AgentID, Path: request.Path, Content: "清理临时 MP3 失败", Status: 1})
+			return
+		}
+		writeVideoAudioExtractResp(w, http.StatusOK, VideoAudioExtractResponse{AgentID: request.AgentID, Path: request.Path, SavedAs: outputPath, Status: 0})
 	}
 }
 
@@ -19435,6 +19641,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/media_preview", handleMediaPreview(&cfg))
 	mux.HandleFunc("/api/ffmpeg/check", handleFFmpegCheck())
 	mux.HandleFunc("/api/video_trim", handleVideoTrim(&cfg))
+	mux.HandleFunc("/api/video_audio_extract", handleVideoAudioExtract(&cfg))
 	mux.HandleFunc("/api/video_record_convert", handleVideoRecordConvert(&cfg))
 	mux.HandleFunc("/api/agent/audio", handleAgentAudioSave(&cfg))
 	mux.HandleFunc("/api/audio_mix", handleAudioMix(&cfg))

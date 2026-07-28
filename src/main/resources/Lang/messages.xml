@@ -21,7 +21,7 @@
     <entry key="request.expired.footer">[稍后检索长期记忆]</entry>
     <entry key="request.capacity">[正在使用 #model 当前上下文约为 #sizek]</entry>
     <entry key="rewrite.message">[正在压缩上下文，预计等待 1 至 2 分钟]</entry>
-    <entry key="retry.message">[服务将在 #delay 秒后重试，错误码 #code]</entry>
+    <entry key="retry.message">[请求将在 #delay 秒后重试，错误码 #code]</entry>
     <entry key="cli.general.message">[正在回传待执行任务]</entry>
     <entry key="cli.logic.message">[正在检查任务结果] #content</entry>
     <entry key="cli.insert">[已收到引导内容]</entry>
