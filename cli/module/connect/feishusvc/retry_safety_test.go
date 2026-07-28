@@ -49,8 +49,22 @@ func TestTextRetryReusesIdempotencyKey(t *testing.T) {
 		if err := json.Unmarshal([]byte(raw), &body); err != nil {
 			t.Fatalf("decode reply %d: %v; raw=%s", index+1, err, raw)
 		}
-		if got := body.UUID; got != idempotencyKey {
-			t.Fatalf("reply %d uuid = %q, want %q", index+1, got, idempotencyKey)
+		if got, want := body.UUID, childSendUUID(idempotencyKey, "text", 0); got != want {
+			t.Fatalf("reply %d uuid = %q, want %q", index+1, got, want)
 		}
+	}
+}
+
+func TestChildSendUUIDIsStableAndSeparatesMessageKinds(t *testing.T) {
+	const parent = "a28f7e3f-13cc-578b-b8b9-3e00cdff4f8d"
+	text := childSendUUID(parent, "text", 0)
+	if text == "" || text != childSendUUID(parent, "text", 0) {
+		t.Fatalf("text child UUID must be stable: %q", text)
+	}
+	if image := childSendUUID(parent, "image", 0); image == text {
+		t.Fatalf("image UUID must differ from text UUID: %q", image)
+	}
+	if nextImage := childSendUUID(parent, "image", 1); nextImage == childSendUUID(parent, "image", 0) {
+		t.Fatalf("image UUID must differ by index: %q", nextImage)
 	}
 }

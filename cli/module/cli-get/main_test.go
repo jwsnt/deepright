@@ -151,6 +151,14 @@ func TestHeartbeatRequestFormat(t *testing.T) {
 	}
 }
 
+func TestApplicationDataDirUsesAgentRootParent(t *testing.T) {
+	root := t.TempDir()
+	agentRoot := filepath.Join(root, "agent")
+	if got := applicationDataDir(agentRoot); got != root {
+		t.Fatalf("applicationDataDir(%q) = %q, want %q", agentRoot, got, root)
+	}
+}
+
 func TestNextHeartbeatBackoff(t *testing.T) {
 	tests := []struct {
 		name    string

@@ -425,6 +425,7 @@ func printHelp(w io.Writer) {
 	fmt.Fprintln(w, "  --content TEXT                  text message content, or a JSON object matching `feishu schema`")
 	fmt.Fprintln(w, "  --image PATHS                   comma separated image file paths")
 	fmt.Fprintln(w, "  --file PATHS                    comma separated file paths")
+	fmt.Fprintln(w, "  --idempotency-key UUID          stable key for safe completion-reply delivery")
 	fmt.Fprintln(w, "  --name NAME                     connect meta key/name, default feishu")
 	fmt.Fprintln(w, "  --connect-bin PATH              connect binary path, default connect")
 	fmt.Fprintln(w, "  --addr HOST:PORT                connect service address, default 127.0.0.1:18080")
@@ -534,11 +535,12 @@ func runSend(action string, flags map[string]string, stderr io.Writer) (*SendRes
 	service, err := newServiceBuilder(flags, logger, messageFile)
 	if err != nil {
 		writeTimestampedMessageLog(messageFile, logger, time.Now().Format(time.RFC3339), formatSendRequestLog(action, SendInput{
-			Action:  action,
-			Message: connectsvc.FirstValue(flags, "message"),
-			Content: connectsvc.FirstValue(flags, "content"),
-			Images:  splitCSVFlag(connectsvc.FirstValue(flags, "image", "images")),
-			Files:   splitCSVFlag(connectsvc.FirstValue(flags, "file", "files")),
+			Action:         action,
+			Message:        connectsvc.FirstValue(flags, "message"),
+			Content:        connectsvc.FirstValue(flags, "content"),
+			Images:         splitCSVFlag(connectsvc.FirstValue(flags, "image", "images")),
+			Files:          splitCSVFlag(connectsvc.FirstValue(flags, "file", "files")),
+			IdempotencyKey: connectsvc.FirstValue(flags, "idempotency-key"),
 		}))
 		writeTimestampedMessageLog(messageFile, logger, time.Now().Format(time.RFC3339), formatSendFailureLog(action, "build-service", nil, err))
 		return nil, err
@@ -546,11 +548,12 @@ func runSend(action string, flags map[string]string, stderr io.Writer) (*SendRes
 	sender := newSender(service, logger, messageFile)
 	sender.downloadDir = downloadDirForLog(connectsvc.FirstValue(flags, "log-file"))
 	result, err := sender.Send(context.Background(), SendInput{
-		Action:  action,
-		Message: connectsvc.FirstValue(flags, "message"),
-		Content: connectsvc.FirstValue(flags, "content"),
-		Images:  splitCSVFlag(connectsvc.FirstValue(flags, "image", "images")),
-		Files:   splitCSVFlag(connectsvc.FirstValue(flags, "file", "files")),
+		Action:         action,
+		Message:        connectsvc.FirstValue(flags, "message"),
+		Content:        connectsvc.FirstValue(flags, "content"),
+		Images:         splitCSVFlag(connectsvc.FirstValue(flags, "image", "images")),
+		Files:          splitCSVFlag(connectsvc.FirstValue(flags, "file", "files")),
+		IdempotencyKey: connectsvc.FirstValue(flags, "idempotency-key"),
 	})
 	if err != nil {
 		return nil, err

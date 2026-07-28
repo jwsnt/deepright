@@ -24,6 +24,8 @@ public class FeatureUtils {
 
     public static final String KEY_PORT = "port";
 
+    public static final String KEY_MCP = "mcp";
+
     public static String escapePath(WorkflowTask workTask, String path) throws Exception {
         return FeatureUtils.escapePath(FeatureFlag.isWindows(workTask), path);
     }
@@ -189,6 +191,10 @@ public class FeatureUtils {
     }
 
     public static String buildMcp(WorkflowTask workTask) throws Exception {
-        return MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_MCP);
+        return MapUtils.getString(workTask.getMetadata(), FeatureUtils.KEY_MCP);
+    }
+
+    public static String buildDir(WorkflowTask workTask) throws Exception {
+        return MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_DIR);
     }
 }

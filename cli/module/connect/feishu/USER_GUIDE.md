@@ -40,6 +40,8 @@
 - 消息快照查询迭代手册：[iteration/20260719-1/USER_GUIDE.md](iteration/20260719-1/USER_GUIDE.md)
 - 飞书 MCP 地址迭代需求：[iteration/20260723-1/REQUIREMENT.md](iteration/20260723-1/REQUIREMENT.md)
 - 飞书 MCP 地址迭代手册：[iteration/20260723-1/USER_GUIDE.md](iteration/20260723-1/USER_GUIDE.md)
+- 完成结果严格防重迭代需求：[iteration/20260728-1/REQUIREMENT.md](iteration/20260728-1/REQUIREMENT.md)
+- 完成结果严格防重迭代手册：[iteration/20260728-1/USER_GUIDE.md](iteration/20260728-1/USER_GUIDE.md)
 - 当前用户手册：[USER_GUIDE.md](USER_GUIDE.md)
 
 ## 固定输出命令
@@ -303,6 +305,16 @@
 - `send` 与 `init` 的参数和处理方式完全一致
 - `send` / `init` 只用于回复已有消息，不再支持省略原消息后直接新发一条消息
 - `send` / `init` 的整次发送执行超时为 180 秒；超时会直接返回失败
+
+### 完成结果严格防重
+
+通过 Connect / Proxy / Integration 自动回推的最终结果，以一次具体执行的 `task_detail.id` 为边界，而不是周期任务定义的 `task_meta.id`。执行完成且结果非空时，明细先进入 `pending`；一个进程用原子领取将其改为 `sending`，因此重复扫描、多个进程或插件重启都不会同时发送同一份结果。
+
+- 运行时为该明细保存固定的 RFC 4122 UUID，并通过 `--idempotency-key` 传给 `feishu send`；一般用户不需要手工传此参数。
+- 同一个 detail 的图片、文件、文本分别生成稳定且不同的子 UUID；同一次 API 重试复用同一个子 UUID。
+- 飞书 API 的 `uuid` 仅用于同一消息创建/回复接口的服务端幂等处理；DeepRight 不把它视为永久、跨未知时长的去重保证。无论飞书侧 UUID 的保留窗口如何，DeepRight 都不会在发送结果未知时自动重发。
+- 飞书调用失败、超时、进程在调用后退出，或本地更新 Connect 状态失败时，明细会进入 `unknown`。`unknown` 不参与自动扫描，必须由人工核实飞书是否已收到后再处理，系统绝不会自动换 UUID 重发。
+- 成功时明细进入 `sent` 并写入 `replied_at`；升级旧库时，历史已完成但未记录回推状态的第三方任务也会进入 `unknown`，避免升级后重发旧消息。
 
 如果 `--content` 直接传入的是符合 `feishu schema` 的 JSON Object，或者报文里是“说明文字 + JSON Object”的混合文本，插件都会先尝试提取其中第一段合法 JSON Object，再做一次归一化：
 

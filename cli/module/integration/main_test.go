@@ -660,7 +660,7 @@ func TestProxyChatCompletions(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(handleChatCompletions(cfg, proxyClient)))
 	defer server.Close()
 
-	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"HELLO WORLD"}],"stream":true,"metadata":{"plugins":["browser"],"port":9999}}`
+	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"HELLO WORLD"}],"stream":true,"metadata":{"dir":"/tmp/forged","plugins":["browser"],"port":9999}}`
 	req, _ := http.NewRequest("POST", server.URL, strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer sk-test")
@@ -697,6 +697,9 @@ func TestProxyChatCompletions(t *testing.T) {
 
 	// Verify metadata injected
 	meta := capturedBody["metadata"].(map[string]interface{})
+	if meta["dir"] != tmp {
+		t.Errorf("metadata.dir = %#v, want %q", meta["dir"], tmp)
+	}
 	if meta["deviceId"] != "test-dev" {
 		t.Errorf("deviceId = %v", meta["deviceId"])
 	}
@@ -10273,7 +10276,7 @@ func TestCliGetHeartbeatAndExecute(t *testing.T) {
 	}
 
 	// Test heartbeat
-	task, err := heartbeat(client, server.URL, metadata, &Config{Port: 18766})
+	task, err := heartbeat(client, server.URL, metadata, &Config{Port: 18766, AgentDir: filepath.Join(tmp, "agent")})
 	if err != nil {
 		t.Fatalf("heartbeat: %v", err)
 	}
@@ -10300,6 +10303,9 @@ func TestCliGetHeartbeatAndExecute(t *testing.T) {
 		t.Errorf("get stream should be absent: %v", capturedGet["stream"])
 	}
 	getMeta := capturedGet["metadata"].(map[string]interface{})
+	if getMeta["dir"] != tmp {
+		t.Errorf("get metadata.dir = %#v, want %q", getMeta["dir"], tmp)
+	}
 	if getMeta["deviceId"] != "d" {
 		t.Errorf("get deviceId = %v", getMeta["deviceId"])
 	}
@@ -13518,6 +13524,7 @@ func TestCronExecuteOnceInjectsMetaIDAndCronTypeIntoRequestMetadata(t *testing.T
 	}
 	defer os.Chdir(oldwd)
 	pluginDir := filepath.Join(tmp, "plugins")
+	t.Setenv(integrationRuntimeDirEnv, tmp)
 	t.Setenv(integrationPluginDirEnv, pluginDir)
 
 	if cronDB != nil {
@@ -13631,6 +13638,9 @@ func TestCronExecuteOnceInjectsMetaIDAndCronTypeIntoRequestMetadata(t *testing.T
 	}
 	if metadata["cron_type"] != "feishu" {
 		t.Fatalf("metadata cron_type = %v, want feishu", metadata["cron_type"])
+	}
+	if metadata["dir"] != tmp {
+		t.Fatalf("metadata dir = %v, want %s", metadata["dir"], tmp)
 	}
 	if _, exists := metadata["agent"]; exists {
 		t.Fatalf("metadata.agent should be absent: %+v", metadata["agent"])
@@ -13951,6 +13961,49 @@ func TestEnsureCronSchemaRemovesLegacySessionDisableColumns(t *testing.T) {
 	}
 	if metaContent != "保留的元数据" || detailContent != "保留的明细" {
 		t.Fatalf("legacy data was not preserved: meta=%q detail=%q", metaContent, detailContent)
+	}
+}
+
+func TestEnsureCronSchemaQuarantinesLegacyCompletedPluginReply(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`
+		CREATE TABLE task_detail (
+			id INTEGER PRIMARY KEY,
+			meta_id INTEGER NOT NULL DEFAULT 0,
+			exec_time INTEGER NOT NULL DEFAULT 0,
+			agent_id TEXT NOT NULL DEFAULT '',
+			chat_id TEXT NOT NULL DEFAULT '',
+			meta_ref TEXT NOT NULL DEFAULT '',
+			task_type TEXT NOT NULL DEFAULT 'cron',
+			model TEXT NOT NULL DEFAULT '',
+			thinking INTEGER NOT NULL DEFAULT 0,
+			content TEXT NOT NULL DEFAULT '',
+			response_schema TEXT NOT NULL DEFAULT '',
+			result_content TEXT NOT NULL DEFAULT '',
+			replied_at TEXT NOT NULL DEFAULT '',
+			started INTEGER NOT NULL DEFAULT 0
+		)
+	`); err != nil {
+		t.Fatalf("create legacy task_detail: %v", err)
+	}
+	if _, err := db.Exec(`
+		INSERT INTO task_detail (id, task_type, result_content, replied_at, started, exec_time)
+		VALUES (7, 'feishu', 'possibly delivered result', '', 3, 1)
+	`); err != nil {
+		t.Fatalf("seed legacy completed reply: %v", err)
+	}
+
+	ensureCronSchema(db)
+	var state string
+	if err := db.QueryRow(`SELECT reply_state FROM task_detail WHERE id = 7`).Scan(&state); err != nil {
+		t.Fatalf("read migrated reply state: %v", err)
+	}
+	if state != "unknown" {
+		t.Fatalf("legacy completed reply state = %q, want unknown", state)
 	}
 }
 
@@ -14470,7 +14523,7 @@ func TestSyncConnectPendingRequestsRepliesCompletedConnectTask(t *testing.T) {
 		t.Fatalf("insert task_meta: %v", err)
 	}
 	metaID, _ := metaRes.LastInsertId()
-	detailRes, err := cronDB.Exec(`INSERT INTO task_detail (meta_id, exec_time, agent_id, chat_id, meta_ref, task_type, model, thinking, content, result_content, started) VALUES (?, ?, 'A', 'chat-feishu', ?, 'feishu', 'OpenAI', 1, '需要回复的消息', '任务已完成，下面是结果', 3)`,
+	detailRes, err := cronDB.Exec(`INSERT INTO task_detail (meta_id, exec_time, agent_id, chat_id, meta_ref, task_type, model, thinking, content, result_content, reply_state, started) VALUES (?, ?, 'A', 'chat-feishu', ?, 'feishu', 'OpenAI', 1, '需要回复的消息', '任务已完成，下面是结果', 'pending', 3)`,
 		metaID, now.Add(-time.Minute).Unix(), fmt.Sprintf("%d,%d", earlier.ID, target.ID))
 	if err != nil {
 		t.Fatalf("insert task_detail: %v", err)
@@ -14651,7 +14704,7 @@ func TestNotifyCompletedConnectTasksSkipsWhenMetaRefTargetNotStarted(t *testing.
 		t.Fatalf("insert task_meta: %v", err)
 	}
 	metaID, _ := metaRes.LastInsertId()
-	detailRes, err := cronDB.Exec(`INSERT INTO task_detail (meta_id, exec_time, agent_id, chat_id, meta_ref, task_type, model, thinking, content, result_content, started) VALUES (?, ?, 'A', 'chat-feishu', ?, 'feishu', 'OpenAI', 1, '原始目标消息', '任务完成结果', 3)`,
+	detailRes, err := cronDB.Exec(`INSERT INTO task_detail (meta_id, exec_time, agent_id, chat_id, meta_ref, task_type, model, thinking, content, result_content, reply_state, started) VALUES (?, ?, 'A', 'chat-feishu', ?, 'feishu', 'OpenAI', 1, '原始目标消息', '任务完成结果', 'pending', 3)`,
 		metaID, now.Add(-time.Minute).Unix(), strconv.Itoa(target.ID))
 	if err != nil {
 		t.Fatalf("insert task_detail: %v", err)
@@ -15326,7 +15379,7 @@ func TestPluginsConfigHandlerCreatesAndUpdatesMeta(t *testing.T) {
 	}
 
 	restore := withIntegrationPluginSandbox(t, map[string][2]string{
-		"feishu": {`"飞书"`, pluginParamJSON("appId", "appSecret")},
+		"feishu": {`"飞书"`, pluginParamJSON("appId", "appSecret", "mcp_url")},
 	})
 	defer restore()
 	if err := os.MkdirAll(filepath.Join("agent", "A"), 0o755); err != nil {
@@ -15350,7 +15403,21 @@ func TestPluginsConfigHandlerCreatesAndUpdatesMeta(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(handlePluginsConfig(cfg)))
 	defer server.Close()
 
-	createResp, err := http.Post(server.URL+"/api/plugins/config?key=feishu&meta=%7B%22appId%22%3A%22cli-app%22%2C%22appSecret%22%3A%22cli-secret%22%7D&agentId=A&model=openai", "application/json", nil)
+	mcpURL := "https://mcp.example.test/stream/" + strings.Repeat("a", 512)
+	createBody, err := json.Marshal(map[string]any{
+		"key": "feishu",
+		"meta": map[string]string{
+			"appId":     "cli-app",
+			"appSecret": "cli-secret",
+			"mcp_url":   mcpURL,
+		},
+		"agentId": "A",
+		"model":   "openai",
+	})
+	if err != nil {
+		t.Fatalf("marshal config body: %v", err)
+	}
+	createResp, err := http.Post(server.URL+"/api/plugins/config", "application/json", bytes.NewReader(createBody))
 	if err != nil {
 		t.Fatalf("create request failed: %v", err)
 	}
@@ -15365,6 +15432,7 @@ func TestPluginsConfigHandlerCreatesAndUpdatesMeta(t *testing.T) {
 		Status int `json:"status"`
 		Data   struct {
 			Name          string `json:"name"`
+			Meta          string `json:"meta"`
 			AgentID       string `json:"agentId"`
 			Model         string `json:"model"`
 			Callback      string `json:"callback"`
@@ -15382,6 +15450,13 @@ func TestPluginsConfigHandlerCreatesAndUpdatesMeta(t *testing.T) {
 	}
 	if created.Data.Name != "feishu" || created.Data.AgentID != "A" || created.Data.Model != "openai" {
 		t.Fatalf("unexpected create payload: %+v", created.Data)
+	}
+	var createdMeta map[string]string
+	if err := json.Unmarshal([]byte(created.Data.Meta), &createdMeta); err != nil {
+		t.Fatalf("decode created meta: %v", err)
+	}
+	if createdMeta["mcp_url"] != mcpURL {
+		t.Fatal("mcp_url was not persisted from JSON configuration body")
 	}
 	if created.Data.Callback == "" || !filepath.IsAbs(created.Data.Callback) {
 		t.Fatalf("callback = %q, want absolute plugin path", created.Data.Callback)

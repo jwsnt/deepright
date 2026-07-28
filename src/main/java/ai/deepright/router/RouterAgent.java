@@ -57,6 +57,7 @@ public class RouterAgent {
         metadata.put(FeatureField.KEY_GIT, FeatureUtils.buildGit(workTask));
         metadata.put(FeatureField.KEY_SYS, FeatureUtils.buildSys(workTask));
         metadata.put(FeatureField.KEY_APP, FeatureUtils.buildApp(workTask));
+        metadata.put(FeatureField.KEY_DIR, FeatureUtils.buildDir(workTask));
         metadata.put(FeatureField.KEY_KNOWLEDGE_CONTENT, this.knowledge);
         metadata.put(FeatureField.KEY_WORKSPACE, this.workspace);
         metadata.put(FeatureField.KEY_THINKING, this.thinking);
@@ -66,6 +67,7 @@ public class RouterAgent {
         metadata.put(FeatureField.KEY_SOUL, this.soul);
         metadata.put(FeatureField.KEY_USER, this.user);
         routerDevice.setGateway(FeatureUtils.buildGateway(workTask));
+        routerDevice.setDir(FeatureUtils.buildDir(workTask));
         routerDevice.setDescription(this.description);
         routerDevice.setWorkspace(this.workspace);
         routerDevice.setProvider(this.provider);

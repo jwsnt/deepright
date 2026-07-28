@@ -32,7 +32,6 @@ import org.springframework.context.annotation.Configuration;
 
 import java.io.BufferedInputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
 
 @Getter
 @Setter
@@ -226,13 +225,9 @@ public class CliRag extends RagCondition implements RagService {
     }
 
     protected void updateDir(RagConfig ragConfig, RagData ragData) throws Exception {
-        // 首次从App推导
-        if (ragData.getQuery().isEntry()) {
-            ragData.getQuery().putMetadata(FeatureField.KEY_DIR, StringUtils.defaultIfEmpty(Paths.get(StringUtils.defaultIfEmpty(FeatureUtils.buildApp(ragData.getQuery()), "")).getParent().toString(), ""));
-        }
         String replace = MapUtils.getString(ragConfig.getGlobalConfig(), FeatureField.KEY_DIR);
         if (!StringUtils.isEmpty(replace)) {
-            RagService.updatePrompt(ragConfig, ragData, replace, ragData.getQuery().getMetadata(FeatureField.KEY_DIR, String.class));
+            RagService.updatePrompt(ragConfig, ragData, replace, FeatureUtils.buildDir(ragData.getQuery()));
         }
     }
 

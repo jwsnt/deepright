@@ -28,6 +28,9 @@ public class RouterSchema {
     @JsonPropertyDescription("The member agent unique ID")
     protected String agent;
 
+    @JsonPropertyDescription("The data directory of the device")
+    protected String dir;
+
     @JsonPropertyDescription("The operating system of the device (e.g., Darwin 23.4.0)")
     protected String sys;
 }

@@ -1197,8 +1197,8 @@ func (s *Sender) Send(ctx context.Context, input SendInput) (*SendResult, error)
 		}
 	}
 
-	for _, imagePath := range images {
-		record, err := s.sendImage(ctx, apis, "", messageID, imagePath)
+	for index, imagePath := range images {
+		record, err := s.sendImage(ctx, apis, "", messageID, imagePath, childSendUUID(input.IdempotencyKey, "image", index))
 		if err != nil {
 			s.writeMessageLog(at, formatSendFailureLog(action, "send-image", result, err))
 			return nil, err
@@ -1206,8 +1206,8 @@ func (s *Sender) Send(ctx context.Context, input SendInput) (*SendResult, error)
 		result.Sent = append(result.Sent, record)
 	}
 
-	for _, filePath := range files {
-		record, err := s.sendFile(ctx, apis, "", messageID, filePath)
+	for index, filePath := range files {
+		record, err := s.sendFile(ctx, apis, "", messageID, filePath, childSendUUID(input.IdempotencyKey, "file", index))
 		if err != nil {
 			s.writeMessageLog(at, formatSendFailureLog(action, "send-file", result, err))
 			return nil, err
@@ -1216,10 +1216,10 @@ func (s *Sender) Send(ctx context.Context, input SendInput) (*SendResult, error)
 	}
 
 	if content != "" {
-		record, err := s.sendText(ctx, apis, "", messageID, content, input.IdempotencyKey)
+		record, err := s.sendText(ctx, apis, "", messageID, content, childSendUUID(input.IdempotencyKey, "text", 0))
 		if err != nil {
 			if fallbackTriggered && !isSendRetryExhaustedError(err) {
-				fallbackRecord, fallbackErr := s.sendText(ctx, apis, "", messageID, "<消息异常>请登录客户端查看", "")
+				fallbackRecord, fallbackErr := s.sendText(ctx, apis, "", messageID, "<消息异常>请登录客户端查看", childSendUUID(input.IdempotencyKey, "fallback", 0))
 				if fallbackErr == nil {
 					result.Sent = append(result.Sent, fallbackRecord)
 					s.writeMessageLog(at, formatSendResultLog(action, result))
@@ -1328,6 +1328,21 @@ func (s *Sender) sendText(ctx context.Context, apis LarkAPISet, target, messageI
 		return SentRecord{}, err
 	}
 	return record, nil
+}
+
+// childSendUUID keeps each outward message of one completion reply stable
+// across retries while making text, image, file, and fallback messages
+// independent idempotency operations.
+func childSendUUID(parent, kind string, index int) string {
+	parent = strings.TrimSpace(parent)
+	if parent == "" {
+		return ""
+	}
+	digest := md5.Sum([]byte(fmt.Sprintf("%s:%s:%d", parent, strings.TrimSpace(kind), index)))
+	digest[6] = (digest[6] & 0x0f) | 0x30
+	digest[8] = (digest[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
+		digest[0:4], digest[4:6], digest[6:8], digest[8:10], digest[10:16])
 }
 
 var markdownImagePattern = regexp.MustCompile(`!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)`)
@@ -1452,9 +1467,11 @@ func buildFeishuMarkdownCardContent(content string) (string, error) {
 	return string(payload), nil
 }
 
-func (s *Sender) sendImage(ctx context.Context, apis LarkAPISet, target, messageID, imagePath string) (SentRecord, error) {
+func (s *Sender) sendImage(ctx context.Context, apis LarkAPISet, target, messageID, imagePath, idempotencyKey string) (SentRecord, error) {
 	var record SentRecord
-	idempotencyKey := newSendUUID()
+	if strings.TrimSpace(idempotencyKey) == "" {
+		idempotencyKey = newSendUUID()
+	}
 	err := s.retrySendOperation(ctx, "send-image", func() error {
 		attachmentCtx, cancel := attachmentTimeoutContext(ctx)
 		defer cancel()
@@ -1804,9 +1821,11 @@ func (s *Sender) writeSchemaLogs(payload normalizedSendPayload) {
 	}
 }
 
-func (s *Sender) sendFile(ctx context.Context, apis LarkAPISet, target, messageID, filePath string) (SentRecord, error) {
+func (s *Sender) sendFile(ctx context.Context, apis LarkAPISet, target, messageID, filePath, idempotencyKey string) (SentRecord, error) {
 	var record SentRecord
-	idempotencyKey := newSendUUID()
+	if strings.TrimSpace(idempotencyKey) == "" {
+		idempotencyKey = newSendUUID()
+	}
 	err := s.retrySendOperation(ctx, "send-file", func() error {
 		attachmentCtx, cancel := attachmentTimeoutContext(ctx)
 		defer cancel()

@@ -2369,6 +2369,37 @@ func buildCLIRequestMetadataMap(metadata *AgentOutput) map[string]interface{} {
 	return metaMap
 }
 
+// integrationApplicationDataDir resolves the application data root from the
+// configured Agent root. Agent workspaces are <dir>/agent/<agentId>, making
+// this value exactly two levels above a workspace.
+func integrationApplicationDataDir(agentDir string) string {
+	agentDir = strings.TrimSpace(agentDir)
+	if agentDir == "" {
+		return ""
+	}
+	absAgentDir, err := filepath.Abs(agentDir)
+	if err != nil {
+		return ""
+	}
+	parent := filepath.Dir(filepath.Clean(absAgentDir))
+	if parent == "." || parent == absAgentDir {
+		return ""
+	}
+	return parent
+}
+
+// injectApplicationDataDirMetadata makes dir runtime-owned metadata. It must
+// be called after merging request metadata so callers cannot forge the path.
+func injectApplicationDataDirMetadata(metaMap map[string]interface{}, agentDir string) {
+	if metaMap == nil {
+		return
+	}
+	delete(metaMap, "dir")
+	if dir := integrationApplicationDataDir(agentDir); dir != "" {
+		metaMap["dir"] = dir
+	}
+}
+
 func resolveCurrentPageSessionChatID() string {
 	if cronDB == nil {
 		return ""
@@ -2851,6 +2882,9 @@ func integrationMetadataPort(cfg *Config) int {
 
 func heartbeat(client *http.Client, host string, metadata *AgentOutput, cfg *Config) (*TaskContent, error) {
 	metaMap := buildCLIRequestMetadataMap(metadata)
+	if cfg != nil {
+		injectApplicationDataDirMetadata(metaMap, cfg.AgentDir)
+	}
 	currentChatID := resolveCurrentPageSessionChatID()
 	injectMCPMetadataForAgent(cfg, metadata, metaMap, resolveCurrentPageSessionAgentID(currentChatID))
 	metaMap["port"] = integrationMetadataPort(cfg)
@@ -3189,10 +3223,14 @@ func publishResult(client *http.Client, host string, result *ResultPayload, meta
 		result.Status,
 		rawResult,
 	)
+	metaMap := buildCLIRequestMetadataMap(metadata)
+	if cfg != nil {
+		injectApplicationDataDirMetadata(metaMap, cfg.AgentDir)
+	}
 	reqBody, _ := json.Marshal(map[string]interface{}{
 		"model":    "",
 		"messages": []Message{{Role: "user", Content: string(resultJSON)}},
-		"metadata": buildCLIRequestMetadataMap(metadata),
+		"metadata": metaMap,
 	})
 	url := strings.TrimRight(host, "/") + "/cli/pub"
 	resp, err := client.Post(url, "application/json", bytes.NewReader(reqBody))
@@ -13170,6 +13208,9 @@ func ensureCronSchema(db *sql.DB) {
 			response_schema TEXT NOT NULL DEFAULT '',
 			result_content TEXT NOT NULL DEFAULT '',
 			replied_at TEXT NOT NULL DEFAULT '',
+			reply_state TEXT NOT NULL DEFAULT '',
+			reply_uuid TEXT NOT NULL DEFAULT '',
+			reply_started_at INTEGER NOT NULL DEFAULT 0,
 			started INTEGER NOT NULL DEFAULT 0,
 			UNIQUE(meta_id, exec_time)
 		);
@@ -13232,6 +13273,9 @@ func ensureCronSchema(db *sql.DB) {
 		`ALTER TABLE task_detail ADD COLUMN router_disable INTEGER NOT NULL DEFAULT 1`,
 		`ALTER TABLE task_detail ADD COLUMN result_content TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE task_detail ADD COLUMN replied_at TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE task_detail ADD COLUMN reply_state TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE task_detail ADD COLUMN reply_uuid TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE task_detail ADD COLUMN reply_started_at INTEGER NOT NULL DEFAULT 0`,
 		`ALTER TABLE cron_meta_log ADD COLUMN chat_id TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE cron_meta_log ADD COLUMN task_type TEXT NOT NULL DEFAULT 'cron'`,
 		`ALTER TABLE cron_meta_log ADD COLUMN response_schema TEXT NOT NULL DEFAULT ''`,
@@ -13252,6 +13296,7 @@ func ensureCronSchema(db *sql.DB) {
 		`CREATE INDEX IF NOT EXISTS idx_detail_agent_exec_time_id ON task_detail(agent_id, exec_time DESC, id DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_detail_model_exec_time_id ON task_detail(model, exec_time DESC, id DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_detail_status_exec_time_id ON task_detail(started, exec_time DESC, id DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_detail_reply_dispatch ON task_detail(reply_state, started, exec_time DESC, id DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_detail_agent_model_status_exec_time_id ON task_detail(agent_id, model, started, exec_time DESC, id DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_detail_meta_status ON task_detail(meta_id, started)`,
 		`CREATE INDEX IF NOT EXISTS idx_meta_agent ON task_meta(agent_id)`,
@@ -13267,6 +13312,16 @@ func ensureCronSchema(db *sql.DB) {
 				log.Printf("[cron] ensure schema stmt failed: %s: %v", stmt, err)
 			}
 		}
+	}
+	// A legacy completed third-party task may have already reached its remote
+	// plugin before an older runtime crashed. Quarantine it instead of guessing
+	// and replaying a possibly delivered result after this upgrade.
+	if _, err := db.Exec(`
+		UPDATE task_detail
+		SET reply_state = 'unknown'
+		WHERE task_type != 'cron' AND started = 3 AND replied_at = '' AND reply_state = ''
+	`); err != nil {
+		log.Printf("[cron] quarantine legacy completion replies failed: %v", err)
 	}
 	for _, tableName := range []string{"task_meta", "task_detail", "cron_meta_log", "cron_detail_log"} {
 		ensureCronVerifyColumn(db, tableName)
@@ -16476,6 +16531,7 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 		// Merge request metadata onto the shared Agent metadata and forward the
 		// merged body as-is without any query-based metadata expansion.
 		sharedutil.MergeMetadataFields(metaMap, reqData["metadata"])
+		injectApplicationDataDirMetadata(metaMap, cfg.AgentDir)
 		injectMCPMetadata(cfg, metadata, metaMap)
 		metaMap["port"] = integrationMetadataPort(cfg)
 		// plugins is runtime-owned metadata. A client request can contain a stale
@@ -16551,6 +16607,7 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 		if mm, ok := reqData["metadata"].(map[string]interface{}); ok {
 			mm["type"] = chatType
 			pruneForwardedChatMetadata(mm)
+			injectApplicationDataDirMetadata(mm, cfg.AgentDir)
 		}
 
 		if err := normalizeForwardedChatRequest(reqData); err != nil {
@@ -22443,7 +22500,7 @@ func notifyCompletedConnectTasks(cfg *Config, svc *connectsvc.Service) {
 		return
 	}
 	connectsvc.DispatchCompletedPluginReplies(nil, cronDB, svc, sharedutil.DefaultTaskType, time.Now().Add(-24*time.Hour).Unix(), func(detailID int) error {
-		_, err := cronDB.Exec(`UPDATE task_detail SET replied_at = ? WHERE id = ?`, time.Now().Format(time.RFC3339), detailID)
+		_, err := cronDB.Exec(`UPDATE task_detail SET replied_at = ?, reply_state = 'sent' WHERE id = ? AND reply_state = 'sending'`, time.Now().Format(time.RFC3339), detailID)
 		return err
 	}, connectsvc.PluginCallbackRuntimeOptions{
 		ListMeta:     runConnectListMeta,
@@ -22647,6 +22704,7 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 		metaMap["thinking"] = t.Thinking
 		metaMap["verify"] = t.Verify
 		metaMap["router_disable"] = t.RouterDisable
+		injectApplicationDataDirMetadata(metaMap, cfg.AgentDir)
 		injectMCPMetadata(cfg, metadata, metaMap)
 		injectLiveAgentMediaIntoAgentList(metaMap)
 		injectLiveAgentKnowledgeIntoAgentList(metaMap)
@@ -22731,7 +22789,13 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 				return
 			}
 			resultContent := extractSSEAssistantText(payload)
-			cronDB.Exec(`UPDATE task_detail SET started = 3, result_content = ? WHERE id = ?`, resultContent, dID)
+			cronDB.Exec(`UPDATE task_detail
+				SET started = 3,
+					result_content = ?,
+					reply_state = CASE WHEN task_type != 'cron' AND ? != '' THEN 'pending' ELSE reply_state END,
+					reply_uuid = CASE WHEN task_type != 'cron' AND ? != '' THEN '' ELSE reply_uuid END,
+					reply_started_at = CASE WHEN task_type != 'cron' AND ? != '' THEN 0 ELSE reply_started_at END
+				WHERE id = ?`, resultContent, resultContent, resultContent, resultContent, dID)
 			logCronDetailStatusByID(cronDB, dID, "complete")
 			sendSSECompletionNotification(chatTypeScheduledTask, taskType, "", abnormalStream)
 		}(t.AgentID, chatID, body, detailID, token, t.TaskType)

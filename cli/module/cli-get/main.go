@@ -153,7 +153,32 @@ func generateDeviceID() string {
 }
 
 func getAgentOutput(root string, deviceID string, ttl time.Duration) (*AgentOutput, error) {
-	return agentcore.GetOutputWithPlugins(root, deviceID, ttl, detectPluginDir(), detectPluginRuntimes())
+	output, err := agentcore.GetOutputWithPlugins(root, deviceID, ttl, detectPluginDir(), detectPluginRuntimes())
+	if err != nil {
+		return nil, err
+	}
+	cloned := *output
+	cloned.Dir = applicationDataDir(root)
+	return &cloned, nil
+}
+
+// applicationDataDir resolves the application data root from the Agent root.
+// Agent workspaces live at <dir>/agent/<agentId>, so the application root is
+// the parent of the Agent root rather than the workspace itself.
+func applicationDataDir(agentDir string) string {
+	agentDir = strings.TrimSpace(agentDir)
+	if agentDir == "" {
+		return ""
+	}
+	absAgentDir, err := filepath.Abs(agentDir)
+	if err != nil {
+		return ""
+	}
+	parent := filepath.Dir(filepath.Clean(absAgentDir))
+	if parent == "." || parent == absAgentDir {
+		return ""
+	}
+	return parent
 }
 
 func detectPluginRuntimes() []agentcore.PluginRuntime {

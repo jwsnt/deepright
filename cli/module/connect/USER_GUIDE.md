@@ -289,6 +289,7 @@ curl "http://127.0.0.1:18080/api/connect/health"
 - `send` / `init` 只支持回复已有消息
 - 如果同时带文本和附件，插件会拆成多次飞书 API 调用分别发送
 - 每次执行 `send` 或 `init` 时，都会在 `feishu.log` 追加一条与实际命令一致的调用记录，例如 `send name=feishu target=oc_xxx replyTo=om_xxx types=text` 或 `init name=feishu target=oc_xxx replyTo=om_xxx types=text`
+- Connect 自动回推任务结果时，以 `task_detail.id` 作为幂等边界：任务领取后会持久化固定 UUID 并传给飞书 API。发送成功后写入 `replied_at`；发送超时、失败或本地状态回写失败时会标记为 `unknown`，停止自动重发，需人工确认。普通手工 `send` / `init` 不需要传 `--idempotency-key`。
 
 ## Email 启动与停止
 

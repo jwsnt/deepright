@@ -2266,12 +2266,14 @@ data: log file not found: release/plugins/feishu.log
 - 删除 Agent 时，会同步删除该 Agent 关联的全部任务元数据和全部任务明细
 - 每分钟执行前会先检查 Agent 是否已被删除，以及任务模型是否仍已配置密钥；不满足条件的待运行明细不会执行
 - 每分钟检查任务元数据时，如果发现 Agent 已删除，或任务模型不存在/未填写密钥，会清理对应元数据和未完成明细，保留已完成明细
-- 每分钟还会检查最近 24 小时内 `started = 3` 且 `task_type != cron` 的已完成明细，并尝试把任务最终文本结果通过对应插件自动回推给三方
+- 每分钟还会检查最近 24 小时内 `started = 3`、`reply_state = pending` 且 `task_type != cron` 的已完成明细，并尝试把任务最终文本结果通过对应插件自动回推给三方
 - 如果 `task_detail.result_content` 是 ```json ... ``` 或 ``` ... ``` 包裹的 JSON object / array，integration 会先去掉 Markdown 外壳并标准化为紧凑 JSON，再传给插件 `send`
 - 备忘录任务明细执行时，请求 `/v1/chat/completions` 的 metadata 会附带 `cron_type`
 - 普通周期任务写入 `cron_type=cron`
 - 插件桥接生成的任务写入对应插件 `key`，例如 `cron_type=feishu`
 - 自动回推只会处理 connect 原始消息状态仍为“已启动”的记录；成功后当前消息会更新为“已回复”，更早且仍为“已启动”的同插件消息会更新为“已完成”
+- 回推以 `task_detail.id` 为幂等边界。原子领取 `pending -> sending` 后才会调用插件，并为飞书 API 传递固定 UUID；同一 detail 不会因重复扫描而重复发送。
+- 飞书调用超时、失败或飞书调用后本地状态无法确认时，明细会进入 `unknown`，不再自动回推；人工确认优先于可能重复发送。
 - 未指定查询维度表示该维度全部匹配
 - 任务明细未指定时间条件时，默认优先返回当前时间之后的数据；已保留的已完成明细也会返回
 - 删除任务明细时，如果未指定时间条件，不会默认限制为未来数据

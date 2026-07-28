@@ -725,6 +725,9 @@ func ensureCronSchema(db *sql.DB) {
 			response_schema TEXT NOT NULL DEFAULT '',
 			result_content TEXT NOT NULL DEFAULT '',
 			replied_at TEXT NOT NULL DEFAULT '',
+			reply_state TEXT NOT NULL DEFAULT '',
+			reply_uuid TEXT NOT NULL DEFAULT '',
+			reply_started_at INTEGER NOT NULL DEFAULT 0,
 			started INTEGER NOT NULL DEFAULT 0,
 			UNIQUE(meta_id, exec_time)
 		);
@@ -780,6 +783,9 @@ func ensureCronSchema(db *sql.DB) {
 		`ALTER TABLE task_detail ADD COLUMN router_disable INTEGER NOT NULL DEFAULT 1`,
 		`ALTER TABLE task_detail ADD COLUMN result_content TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE task_detail ADD COLUMN replied_at TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE task_detail ADD COLUMN reply_state TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE task_detail ADD COLUMN reply_uuid TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE task_detail ADD COLUMN reply_started_at INTEGER NOT NULL DEFAULT 0`,
 		`ALTER TABLE cron_meta_log ADD COLUMN chat_id TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE cron_meta_log ADD COLUMN task_type TEXT NOT NULL DEFAULT 'cron'`,
 		`ALTER TABLE cron_meta_log ADD COLUMN response_schema TEXT NOT NULL DEFAULT ''`,
@@ -800,6 +806,7 @@ func ensureCronSchema(db *sql.DB) {
 		`CREATE INDEX IF NOT EXISTS idx_detail_agent_exec_time_id ON task_detail(agent_id, exec_time DESC, id DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_detail_model_exec_time_id ON task_detail(model, exec_time DESC, id DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_detail_status_exec_time_id ON task_detail(started, exec_time DESC, id DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_detail_reply_dispatch ON task_detail(reply_state, started, exec_time DESC, id DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_detail_agent_model_status_exec_time_id ON task_detail(agent_id, model, started, exec_time DESC, id DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_detail_meta_status ON task_detail(meta_id, started)`,
 		`CREATE INDEX IF NOT EXISTS idx_meta_agent ON task_meta(agent_id)`,
@@ -815,6 +822,15 @@ func ensureCronSchema(db *sql.DB) {
 				log.Printf("[cron] ensure schema stmt failed: %s: %v", stmt, err)
 			}
 		}
+	}
+	// Old completed plugin tasks might already have reached the remote plugin
+	// before a process exited. They must never be replayed after migration.
+	if _, err := db.Exec(`
+		UPDATE task_detail
+		SET reply_state = 'unknown'
+		WHERE task_type != 'cron' AND started = 3 AND replied_at = '' AND reply_state = ''
+	`); err != nil {
+		log.Printf("[cron] quarantine legacy completion replies failed: %v", err)
 	}
 	for _, tableName := range []string{"task_meta", "task_detail", "cron_meta_log", "cron_detail_log"} {
 		ensureCronVerifyColumn(db, tableName)
@@ -915,6 +931,34 @@ func getAgentOutputForChat(root string, deviceID string, ttl time.Duration, chat
 	}
 	cloned.Plugins = detectPluginKeys()
 	return &cloned, nil
+}
+
+// proxyApplicationDataDir resolves the application data root from the Agent
+// root. Agent workspaces live at <dir>/agent/<agentId>.
+func proxyApplicationDataDir(agentDir string) string {
+	agentDir = strings.TrimSpace(agentDir)
+	if agentDir == "" {
+		return ""
+	}
+	absAgentDir, err := filepath.Abs(agentDir)
+	if err != nil {
+		return ""
+	}
+	parent := filepath.Dir(filepath.Clean(absAgentDir))
+	if parent == "." || parent == absAgentDir {
+		return ""
+	}
+	return parent
+}
+
+func injectProxyApplicationDataDirMetadata(metaMap map[string]interface{}, agentDir string) {
+	if metaMap == nil {
+		return
+	}
+	delete(metaMap, "dir")
+	if dir := proxyApplicationDataDir(agentDir); dir != "" {
+		metaMap["dir"] = dir
+	}
 }
 
 func proxyKnowledgeRoot(agentDir string) (string, error) {
@@ -9374,7 +9418,7 @@ func notifyCompletedConnectTasks(p *ProxyServer, db *sql.DB, svc *connectsvc.Ser
 		return
 	}
 	connectsvc.DispatchCompletedPluginReplies(callbacks, db, svc, sharedutil.DefaultTaskType, time.Now().Add(-24*time.Hour).Unix(), func(detailID int) error {
-		_, err := db.Exec(`UPDATE task_detail SET replied_at = ? WHERE id = ?`, time.Now().Format(time.RFC3339), detailID)
+		_, err := db.Exec(`UPDATE task_detail SET replied_at = ?, reply_state = 'sent' WHERE id = ? AND reply_state = 'sending'`, time.Now().Format(time.RFC3339), detailID)
 		return err
 	}, connectsvc.PluginCallbackRuntimeOptions{
 		ListMeta:     runConnectListMeta,
@@ -9558,6 +9602,7 @@ func runDueTask(p *ProxyServer, db *sql.DB, task dueTask, alreadyStarted bool) b
 	metaMap["thinking"] = task.Thinking
 	metaMap["verify"] = task.Verify
 	metaMap["router_disable"] = task.RouterDisable
+	injectProxyApplicationDataDirMetadata(metaMap, p.AgentDir)
 	mediaByAgentID := injectLiveAgentMediaIntoAgentList(metaMap)
 	selectedAgent := selectedAgentMetadata(metadata, task.AgentID)
 	attachLiveAgentMedia(selectedAgent, workspaceForAgent(metadata, task.AgentID), mediaByAgentID[strings.TrimSpace(task.AgentID)])
@@ -9640,7 +9685,13 @@ func runDueTask(p *ProxyServer, db *sql.DB, task dueTask, alreadyStarted bool) b
 			return
 		}
 		resultContent := extractSSEAssistantText(payload)
-		_, _ = db.Exec(`UPDATE task_detail SET started = 3, result_content = ? WHERE id = ?`, resultContent, detailID)
+		_, _ = db.Exec(`UPDATE task_detail
+			SET started = 3,
+				result_content = ?,
+				reply_state = CASE WHEN task_type != 'cron' AND ? != '' THEN 'pending' ELSE reply_state END,
+				reply_uuid = CASE WHEN task_type != 'cron' AND ? != '' THEN '' ELSE reply_uuid END,
+				reply_started_at = CASE WHEN task_type != 'cron' AND ? != '' THEN 0 ELSE reply_started_at END
+			WHERE id = ?`, resultContent, resultContent, resultContent, resultContent, detailID)
 		logCronDetailStatusByID(db, detailID, "complete")
 	}()
 	return true
@@ -9953,6 +10004,7 @@ func (p *ProxyServer) HandleChatCompletions(w http.ResponseWriter, r *http.Reque
 	// Merge request metadata onto the shared Agent metadata and forward the
 	// merged body as-is without any query-based metadata expansion.
 	sharedutil.MergeMetadataFields(metaMap, reqData["metadata"])
+	injectProxyApplicationDataDirMetadata(metaMap, p.AgentDir)
 	if db, err := getDataDB(); err != nil {
 		log.Printf("provider config lookup failed: %v", err)
 		http.Error(w, "Failed to read provider config", http.StatusInternalServerError)

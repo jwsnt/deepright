@@ -101,6 +101,7 @@ type Agent struct {
 }
 
 type Output struct {
+	Dir       string     `json:"dir,omitempty"`
 	Timezone  string     `json:"timezone"`
 	DeviceID  string     `json:"deviceId"`
 	Terminal  string     `json:"terminal"`

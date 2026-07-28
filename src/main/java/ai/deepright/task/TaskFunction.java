@@ -347,6 +347,7 @@ public class TaskFunction extends BaseFunction implements TaskResult {
         metadata.put(FeatureField.KEY_ROUTER_UPSTREAM, routerDevice.key());
         metadata.put(FeatureField.KEY_OUTPUT, this.responseSchema);
         metadata.put(FeatureField.KEY_SYS, routerDevice.getSys());
+        metadata.put(FeatureField.KEY_DIR, routerDevice.getDir());
         metadata.put(FeatureField.KEY_ROUTER_DISABLE, true);
         metadata.put(FeatureField.KEY_DAEMON, true);
         metadata.put(FeatureField.KEY_TASK, true);

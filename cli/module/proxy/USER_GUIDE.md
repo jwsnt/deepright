@@ -698,14 +698,15 @@ curl 'http://127.0.0.1:8080/file/lastUpdate?file=/abs/path/to/USER.md'
 - 如果任务明细存在 `response_schema`，则还会把原始 Json String 追加到 `metadata.response_schema`
 - 如果当前启动目录存在 `knowledge` 目录，cron 执行请求的 metadata 也会同时带上 `knowledge`
 - 执行请求的 metadata 会附带 `META_ID`，内容为本轮聚合消息中的最后一条 request ID
-- 后台还会每分钟检查最近 24 小时内已完成的非 `cron` 任务明细
+- 后台还会每分钟检查最近 24 小时内已完成且 `reply_state=pending` 的非 `cron` 任务明细
 - 如果该明细通过 `META_ID/meta_ref` 关联到的 connect 原始消息状态仍为“已启动”，则会使用对应插件的 `send --message {} --content {}` 命令把任务最终文本结果回推给三方
 - 完成回推同样复用 `callback` 绝对路径，避免在 proxy 内写死任何插件二进制位置
 - 自动回推使用 `task_detail.result_content` 作为 `--content`，并将目标原始消息 JSON 作为 `--message`
 - 如果 `task_detail.result_content` 是 ```json ... ``` 或 ``` ... ``` 包裹的 JSON object / array，proxy 会先去掉 Markdown 外壳并标准化为紧凑 JSON，再传给插件 `send`
 - 如果插件自身会记录消息流水日志，则开始通知通常会记为 `init ...`，完成回推会记为 `send ...`
 - 回推成功后，当前原始消息状态会更新为“已回复”，并把更早且仍为“已启动”的同插件消息更新为“已完成”
-- 同一条已完成明细只会自动回推一次；成功后会写入 `task_detail.replied_at`
+- 回推以 `task_detail.id` 为幂等边界。发送前以原子状态迁移 `pending -> sending` 领取，因此并发扫描只能有一个进程调用插件；成功后写入 `task_detail.replied_at` 并标记 `sent`
+- 飞书调用或状态回写结果未知时，明细会标记为 `unknown`，不会自动重发；需人工确认，严格优先避免重复发送
 - 开始通知要求插件 `command` 返回 `init`；完成回推要求插件 `command` 返回 `send`
 
 ### 创建周期任务

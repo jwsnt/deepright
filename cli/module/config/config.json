@@ -47,6 +47,14 @@
     "scan": 2
   },
   "install_app": {
+    "wsl": [
+      "python3",
+      "node",
+      "curl",
+      "wget",
+      "git",
+      "npm"
+    ],
     "mac": [
       "python3",
       "git",

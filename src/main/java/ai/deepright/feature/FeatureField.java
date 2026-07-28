@@ -38,7 +38,7 @@ public interface FeatureField {
     // 是否开启思考模式
     public static final String KEY_THINKING = "thinking";
 
-    public static final String KEY_PROVIDER= "provider";
+    public static final String KEY_PROVIDER = "provider";
 
     public static final String KEY_GATEWAY = "gateway";
 
@@ -74,6 +74,4 @@ public interface FeatureField {
     public static final String KEY_APP = "app";
 
     public static final String KEY_GIT = "git";
-
-    public static final String KEY_MCP = "mcp";
 }

@@ -847,6 +847,7 @@ $aptPackages = @(
     @{ Package = "python3"; Command = "python3" },
     @{ Package = "python3-pip"; Command = "pip3" },
     @{ Package = "curl"; Command = "curl" },
+    @{ Package = "wget"; Command = "wget" },
     @{ Package = "build-essential"; Command = "make" },
     @{ Package = "ffmpeg"; Command = "ffmpeg" },
     @{ Package = "bubblewrap"; Command = "bwrap" },

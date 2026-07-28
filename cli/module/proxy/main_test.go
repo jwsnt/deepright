@@ -11040,6 +11040,9 @@ func TestCronExecuteOnceInjectsMetaIDIntoRequestMetadata(t *testing.T) {
 	if metadata["cron_type"] != "feishu" {
 		t.Fatalf("metadata cron_type = %v, want feishu", metadata["cron_type"])
 	}
+	if metadata["dir"] != tmp {
+		t.Fatalf("metadata dir = %v, want %s", metadata["dir"], tmp)
+	}
 	agentMeta, ok := metadata["agent"].(map[string]interface{})
 	if !ok {
 		t.Fatalf("metadata.agent missing: %+v", metadata)
@@ -11421,7 +11424,7 @@ func TestSyncConnectPendingRequestsRepliesCompletedConnectTask(t *testing.T) {
 		t.Fatalf("insert task_meta: %v", err)
 	}
 	metaID, _ := metaRes.LastInsertId()
-	detailRes, err := db.Exec(`INSERT INTO task_detail (meta_id, exec_time, agent_id, chat_id, meta_ref, task_type, model, thinking, content, result_content, started) VALUES (?, ?, 'A', 'chat-feishu', ?, 'feishu', 'OpenAI', 1, '需要回复的消息', '任务已完成，下面是结果', 3)`,
+	detailRes, err := db.Exec(`INSERT INTO task_detail (meta_id, exec_time, agent_id, chat_id, meta_ref, task_type, model, thinking, content, result_content, reply_state, started) VALUES (?, ?, 'A', 'chat-feishu', ?, 'feishu', 'OpenAI', 1, '需要回复的消息', '任务已完成，下面是结果', 'pending', 3)`,
 		metaID, now.Add(-time.Minute).Unix(), fmt.Sprintf("%d,%d", earlier.ID, target.ID))
 	if err != nil {
 		t.Fatalf("insert task_detail: %v", err)
@@ -11637,7 +11640,7 @@ func TestSyncConnectPendingRequestsSkipsCompletedReplyWhenMetaRefTargetNotStarte
 		t.Fatalf("insert task_meta: %v", err)
 	}
 	metaID, _ := metaRes.LastInsertId()
-	detailRes, err := db.Exec(`INSERT INTO task_detail (meta_id, exec_time, agent_id, chat_id, meta_ref, task_type, model, thinking, content, result_content, started) VALUES (?, ?, 'A', 'chat-feishu', ?, 'feishu', 'OpenAI', 1, '原始目标消息', '任务完成结果', 3)`,
+	detailRes, err := db.Exec(`INSERT INTO task_detail (meta_id, exec_time, agent_id, chat_id, meta_ref, task_type, model, thinking, content, result_content, reply_state, started) VALUES (?, ?, 'A', 'chat-feishu', ?, 'feishu', 'OpenAI', 1, '原始目标消息', '任务完成结果', 'pending', 3)`,
 		metaID, now.Add(-time.Minute).Unix(), strconv.Itoa(target.ID))
 	if err != nil {
 		t.Fatalf("insert task_detail: %v", err)
@@ -11778,7 +11781,7 @@ func TestSyncConnectPendingRequestsNormalizesReplyContentBeforePluginSend(t *tes
 		t.Fatalf("insert task_meta: %v", err)
 	}
 	metaID, _ := metaRes.LastInsertId()
-	detailRes, err := db.Exec(`INSERT INTO task_detail (meta_id, exec_time, agent_id, chat_id, meta_ref, task_type, model, thinking, content, result_content, started) VALUES (?, ?, 'A', 'chat-feishu', ?, 'feishu', 'OpenAI', 1, '原始目标消息', ?, 3)`,
+	detailRes, err := db.Exec(`INSERT INTO task_detail (meta_id, exec_time, agent_id, chat_id, meta_ref, task_type, model, thinking, content, result_content, reply_state, started) VALUES (?, ?, 'A', 'chat-feishu', ?, 'feishu', 'OpenAI', 1, '原始目标消息', ?, 'pending', 3)`,
 		metaID, now.Add(-time.Minute).Unix(), strconv.Itoa(target.ID), "```json\n{\n  \"hello\": \"world\"\n}\n```")
 	if err != nil {
 		t.Fatalf("insert task_detail: %v", err)
@@ -12231,7 +12234,7 @@ func TestSyncConnectPendingRequestsMarksCompletedReplySkippedWhenPluginHasNoSend
 		t.Fatalf("insert task_meta: %v", err)
 	}
 	metaID, _ := metaRes.LastInsertId()
-	detailRes, err := db.Exec(`INSERT INTO task_detail (meta_id, exec_time, agent_id, chat_id, meta_ref, task_type, model, thinking, content, result_content, started) VALUES (?, ?, 'A', 'chat-feishu', ?, 'feishu', 'OpenAI', 1, '原始目标消息', '任务完成结果', 3)`,
+	detailRes, err := db.Exec(`INSERT INTO task_detail (meta_id, exec_time, agent_id, chat_id, meta_ref, task_type, model, thinking, content, result_content, reply_state, started) VALUES (?, ?, 'A', 'chat-feishu', ?, 'feishu', 'OpenAI', 1, '原始目标消息', '任务完成结果', 'pending', 3)`,
 		metaID, now.Add(-time.Minute).Unix(), strconv.Itoa(target.ID))
 	if err != nil {
 		t.Fatalf("insert task_detail: %v", err)
