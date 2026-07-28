@@ -74,7 +74,7 @@ public class MediaFileDownloadInlineService extends MediaInlineServiceImpl {
     }
 
     protected String buildUrl(WorkflowTask workTask, String resource) throws Exception {
-        return !MediaTransferUtils.isNetwork(resource) ? this.httpProtocol.dataHost(resource) : resource;
+        return !MediaTransferUtils.isNetwork(resource) ? this.httpProtocol.dataHost(workTask, resource) : resource;
     }
 
     @Configuration

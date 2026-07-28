@@ -77,6 +77,111 @@ func pluginParamFields(keys ...string) connectsvc.PluginParamFields {
 	return fields
 }
 
+func TestHandleFilesIncludesModifiedAtForFilesDirectoriesAndPrefixResults(t *testing.T) {
+	root := t.TempDir()
+	filePath := filepath.Join(root, "alpha.txt")
+	dirPath := filepath.Join(root, "folder")
+	if err := os.WriteFile(filePath, []byte("alpha"), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+	if err := os.Mkdir(dirPath, 0o700); err != nil {
+		t.Fatalf("make directory: %v", err)
+	}
+	fileModifiedAt := time.Unix(1_700_000_000, 0)
+	dirModifiedAt := time.Unix(1_700_000_100, 0)
+	if err := os.Chtimes(filePath, fileModifiedAt, fileModifiedAt); err != nil {
+		t.Fatalf("set file timestamp: %v", err)
+	}
+	if err := os.Chtimes(dirPath, dirModifiedAt, dirModifiedAt); err != nil {
+		t.Fatalf("set directory timestamp: %v", err)
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "/api/files?path="+url.QueryEscape(root), nil)
+	response := httptest.NewRecorder()
+	handleFiles().ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("list status = %d, body = %s", response.Code, response.Body.String())
+	}
+	var entries []FileEntry
+	if err := json.NewDecoder(response.Body).Decode(&entries); err != nil {
+		t.Fatalf("decode entries: %v", err)
+	}
+	byName := make(map[string]FileEntry, len(entries))
+	for _, entry := range entries {
+		byName[entry.Name] = entry
+	}
+	if got := byName["alpha.txt"].ModifiedAt; got != fileModifiedAt.UnixMilli() {
+		t.Fatalf("file modifiedAt = %d, want %d", got, fileModifiedAt.UnixMilli())
+	}
+	if got := byName["folder"].ModifiedAt; got != dirModifiedAt.UnixMilli() {
+		t.Fatalf("directory modifiedAt = %d, want %d", got, dirModifiedAt.UnixMilli())
+	}
+
+	prefixRequest := httptest.NewRequest(http.MethodGet, "/api/files?path="+url.QueryEscape(filePath), nil)
+	prefixResponse := httptest.NewRecorder()
+	handleFiles().ServeHTTP(prefixResponse, prefixRequest)
+	if prefixResponse.Code != http.StatusOK {
+		t.Fatalf("prefix status = %d, body = %s", prefixResponse.Code, prefixResponse.Body.String())
+	}
+	var prefixEntries []FileEntry
+	if err := json.NewDecoder(prefixResponse.Body).Decode(&prefixEntries); err != nil {
+		t.Fatalf("decode prefix entries: %v", err)
+	}
+	if len(prefixEntries) != 1 || prefixEntries[0].Name != "alpha.txt" || prefixEntries[0].ModifiedAt != fileModifiedAt.UnixMilli() {
+		t.Fatalf("prefix entries = %#v", prefixEntries)
+	}
+}
+
+func TestHandleFilesSortsDirectoriesThenFilesByModifiedAt(t *testing.T) {
+	root := t.TempDir()
+	for _, name := range []string{"beta", "alpha"} {
+		if err := os.Mkdir(filepath.Join(root, name), 0o700); err != nil {
+			t.Fatalf("make directory %s: %v", name, err)
+		}
+	}
+	modifiedAt := map[string]time.Time{
+		"old.txt":    time.Unix(1_700_000_000, 0),
+		"new.txt":    time.Unix(1_700_000_200, 0),
+		"same-a.txt": time.Unix(1_700_000_100, 0),
+		"same-b.txt": time.Unix(1_700_000_100, 0),
+	}
+	for name, timestamp := range modifiedAt {
+		filePath := filepath.Join(root, name)
+		if err := os.WriteFile(filePath, []byte(name), 0o600); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+		if err := os.Chtimes(filePath, timestamp, timestamp); err != nil {
+			t.Fatalf("set timestamp for %s: %v", name, err)
+		}
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "/api/files?path="+url.QueryEscape(root), nil)
+	response := httptest.NewRecorder()
+	handleFiles().ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("list status = %d, body = %s", response.Code, response.Body.String())
+	}
+	var entries []FileEntry
+	if err := json.NewDecoder(response.Body).Decode(&entries); err != nil {
+		t.Fatalf("decode entries: %v", err)
+	}
+	got := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		got = append(got, entry.Type+":"+entry.Name)
+	}
+	want := []string{
+		"dir:alpha",
+		"dir:beta",
+		"file:new.txt",
+		"file:same-a.txt",
+		"file:same-b.txt",
+		"file:old.txt",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("sorted entries = %#v, want %#v", got, want)
+	}
+}
+
 func integrationTestMacRuntimeBaseDir(home string) string {
 	return runtimepaths.MacAppRuntimeBaseDir(home, integrationBundleID, integrationRuntimeAppDir)
 }
@@ -3954,6 +4059,30 @@ func TestHandleAgentAudioSaveAcceptsOnlyNewValidWorkspaceWAV(t *testing.T) {
 	}
 }
 
+func TestVideoTrimCropFilterSkipsRoundedHorizontalPolygonEdges(t *testing.T) {
+	crop, err := validateVideoTrimCrop(&VideoTrimCropRequest{
+		Shape: "polygon",
+		Points: []VideoTrimCropPoint{
+			{X: .1, Y: .5},
+			{X: .9, Y: .500000004},
+			{X: .5, Y: .9},
+		},
+	})
+	if err != nil {
+		t.Fatalf("validate polygon crop: %v", err)
+	}
+	filterGraph := videoTrimCropFilter(crop)
+	if strings.Contains(filterGraph, "/(0.00000000*H-0.00000000*H)") {
+		t.Errorf("filter graph retained a denominator that becomes zero after serialization: %q", filterGraph)
+	}
+	if !strings.Contains(filterGraph, "format=yuv444p,geq") || !strings.Contains(filterGraph, "maskedmerge") {
+		t.Errorf("polygon crop must use a controlled luma mask without discarding video chroma: %q", filterGraph)
+	}
+	if !strings.Contains(filterGraph, "[trimCropFill][trimCropSource][trimCropMask]maskedmerge") {
+		t.Errorf("maskedmerge must preserve source pixels inside the white selection mask: %q", filterGraph)
+	}
+}
+
 func TestHandleVideoTrimCreatesNewMP4WithoutChangingSource(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("test command shim uses POSIX sh")
@@ -4055,6 +4184,25 @@ func TestHandleVideoTrimCreatesNewMP4WithoutChangingSource(t *testing.T) {
 		t.Errorf("ffmpeg -c:a = %q, want aac", got)
 	}
 
+	// A full-video selection uses the media element's actual duration, which
+	// need not lie on the 0.5-second slider grid. It must still be exportable.
+	fullDurationBody, err := json.Marshal(VideoTrimRequest{AgentID: "agent-a", Path: "media/clip.mov", Start: 0, End: 12.4, OutputName: "完整时长.mp4"})
+	if err != nil {
+		t.Fatalf("marshal full-duration trim request: %v", err)
+	}
+	fullDurationResponse, err := http.Post(server.URL, "application/json", bytes.NewReader(fullDurationBody))
+	if err != nil {
+		t.Fatalf("POST full-duration video trim: %v", err)
+	}
+	defer fullDurationResponse.Body.Close()
+	if fullDurationResponse.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(fullDurationResponse.Body)
+		t.Fatalf("full-duration trim status = %d, body=%s", fullDurationResponse.StatusCode, body)
+	}
+	if got := findArg("-t"); got != "12.4" {
+		t.Errorf("ffmpeg -t = %q, want the exact full duration 12.4; args=%q", got, ffmpegArgs)
+	}
+
 	customBody, err := json.Marshal(VideoTrimRequest{AgentID: "agent-a", Path: "media/clip.mov", Start: 0, End: 1, OutputName: "选段.mp4"})
 	if err != nil {
 		t.Fatalf("marshal custom trim request: %v", err)
@@ -4079,7 +4227,59 @@ func TestHandleVideoTrimCreatesNewMP4WithoutChangingSource(t *testing.T) {
 		t.Errorf("custom trim directory = %q, want %q", got, want)
 	}
 
-	invalidBody, _ := json.Marshal(VideoTrimRequest{AgentID: "agent-a", Path: "media/clip.mov", Start: 1.25, End: 4})
+	cropBody, err := json.Marshal(VideoTrimRequest{
+		AgentID: "agent-a", Path: "media/clip.mov", Start: 0, End: 1, OutputName: "椭圆裁剪.mp4",
+		Crop: &VideoTrimCropRequest{Shape: "ellipse", Background: "white", X: .1, Y: .2, Width: .6, Height: .5},
+	})
+	if err != nil {
+		t.Fatalf("marshal cropped trim request: %v", err)
+	}
+	cropResponse, err := http.Post(server.URL, "application/json", bytes.NewReader(cropBody))
+	if err != nil {
+		t.Fatalf("POST cropped video trim: %v", err)
+	}
+	defer cropResponse.Body.Close()
+	if cropResponse.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(cropResponse.Body)
+		t.Fatalf("cropped trim status = %d, body=%s", cropResponse.StatusCode, body)
+	}
+	filterGraph := findArg("-filter_complex")
+	if !strings.Contains(filterGraph, "crop=w=ceil(iw*0.60000000)") || !strings.Contains(filterGraph, "scale2ref") || !strings.Contains(filterGraph, "format=yuv444p,geq=lum='if(") || !strings.Contains(filterGraph, "[trimCropFill][trimCropSource][trimCropMask]maskedmerge") || !strings.Contains(filterGraph, "lut=y=255:u=128:v=128") || !strings.Contains(filterGraph, "[trimCropOutput]") {
+		t.Errorf("cropped trim did not build the expected server-controlled filter graph: %q", filterGraph)
+	}
+
+	polygonBody, err := json.Marshal(VideoTrimRequest{
+		AgentID: "agent-a", Path: "media/clip.mov", Start: 0, End: 1, OutputName: "钢笔裁剪.mp4",
+		Crop: &VideoTrimCropRequest{Shape: "polygon", Background: "black", Points: []VideoTrimCropPoint{{X: .2, Y: .15}, {X: .8, Y: .2}, {X: .65, Y: .8}, {X: .25, Y: .7}}},
+	})
+	if err != nil {
+		t.Fatalf("marshal polygon trim request: %v", err)
+	}
+	polygonResponse, err := http.Post(server.URL, "application/json", bytes.NewReader(polygonBody))
+	if err != nil {
+		t.Fatalf("POST polygon video trim: %v", err)
+	}
+	defer polygonResponse.Body.Close()
+	if polygonResponse.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(polygonResponse.Body)
+		t.Fatalf("polygon trim status = %d, body=%s", polygonResponse.StatusCode, body)
+	}
+	if filterGraph := findArg("-filter_complex"); !strings.Contains(filterGraph, "mod(") || !strings.Contains(filterGraph, "format=yuv444p,geq") || !strings.Contains(filterGraph, "[trimCropFill][trimCropSource][trimCropMask]maskedmerge") || !strings.Contains(filterGraph, "lut=y=0:u=128:v=128") || strings.Contains(filterGraph, "polygon") {
+		t.Errorf("polygon trim must compile normalized points into the controlled mask graph: %q", filterGraph)
+	}
+
+	invalidCropBody, _ := json.Marshal(VideoTrimRequest{AgentID: "agent-a", Path: "media/clip.mov", Start: 0, End: 1, Crop: &VideoTrimCropRequest{Shape: "polygon", Points: []VideoTrimCropPoint{{X: .1, Y: .1}, {X: .1, Y: .1}, {X: .1, Y: .1}}}})
+	invalidCropResponse, err := http.Post(server.URL, "application/json", bytes.NewReader(invalidCropBody))
+	if err != nil {
+		t.Fatalf("POST invalid crop: %v", err)
+	}
+	defer invalidCropResponse.Body.Close()
+	if invalidCropResponse.StatusCode != http.StatusBadRequest {
+		body, _ := io.ReadAll(invalidCropResponse.Body)
+		t.Errorf("invalid crop status = %d, want 400, body=%s", invalidCropResponse.StatusCode, body)
+	}
+
+	invalidBody, _ := json.Marshal(VideoTrimRequest{AgentID: "agent-a", Path: "media/clip.mov", Start: 4, End: 1})
 	invalidResponse, err := http.Post(server.URL, "application/json", bytes.NewReader(invalidBody))
 	if err != nil {
 		t.Fatalf("POST invalid video trim: %v", err)

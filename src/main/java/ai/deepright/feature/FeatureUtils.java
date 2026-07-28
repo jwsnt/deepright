@@ -20,6 +20,8 @@ public class FeatureUtils {
 
     public static final String KEY_AGENTS = "agents";
 
+    public static final String KEY_HOST = "Host";
+
     public static final String KEY_PORT = "port";
 
     public static String escapePath(WorkflowTask workTask, String path) throws Exception {
@@ -144,6 +146,14 @@ public class FeatureUtils {
 
     public static String buildOrigin(Map<String, Object> metadata) throws Exception {
         return MapUtils.getString(metadata, FeatureField.KEY_ORIGIN, FeatureUtils.KEY_LOCALHOST + ":" + MapUtils.getString(metadata, FeatureUtils.KEY_PORT));
+    }
+
+    public static String buildHost(WorkflowTask workTask) throws Exception {
+        return FeatureUtils.buildHost(workTask.getMetadata());
+    }
+
+    public static String buildHost(Map<String, Object> metadata) throws Exception {
+        return MapUtils.getString(metadata, FeatureUtils.KEY_HOST);
     }
 
     public static String buildUser(Map<String, Object> metadata) throws Exception {

@@ -345,7 +345,7 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
         CliPubData sourceData = this.fetch(workTask, source, path, why);
         WorkflowException.checkCondition(!(sourceData.isOk()), sourceData.getCmd());
         String targetFile = FeatureUtils.escapePath(FeatureFlag.isWindows(target.getSys()), target.getWorkspace() + File.separator + "tmp" + File.separator + FilenameUtils.getName(path));
-        String command = StringUtils.equalsIgnoreCase(CliPubData.URL, sourceData.getEncode()) ? CliPubSub.buildPushURL(workTask, this.httpProtocol.dataHost(sourceData.getCmd()), targetFile) : CliPubSub.buildPushCmd(workTask, this.sysStore, this.oversize, sourceData.getCmd(), targetFile);
+        String command = StringUtils.equalsIgnoreCase(CliPubData.URL, sourceData.getEncode()) ? CliPubSub.buildPushURL(workTask, this.httpProtocol.dataHost(workTask, sourceData.getCmd()), targetFile) : CliPubSub.buildPushCmd(workTask, this.sysStore, this.oversize, sourceData.getCmd(), targetFile);
         CliPubData targetData = this.command(workTask, CliSubOps.builder()
                 .app(List.of("cat", "curl", "mkdir"))
                 .w(List.of(targetFile))

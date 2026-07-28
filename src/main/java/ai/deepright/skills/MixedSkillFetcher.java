@@ -183,6 +183,7 @@ public class MixedSkillFetcher extends FileSystemFetcher {
         data = this.updateSys(workTask, name, path, data);
         data = this.updateApp(workTask, name, path, data);
         data = this.updateDir(workTask, name, path, data);
+        data = this.updateGit(workTask, name, path, data);
         data = this.updateMcp(workTask, name, path, data);
         return data;
     }
@@ -239,6 +240,10 @@ public class MixedSkillFetcher extends FileSystemFetcher {
 
     protected String updateDir(WorkflowTask workTask, String name, String path, String data) throws Exception {
         return data.replace("#dir", this.buildDir(workTask));
+    }
+
+    protected String updateGit(WorkflowTask workTask, String name, String path, String data) throws Exception {
+        return data.replace("#git", StringUtils.defaultIfEmpty(FeatureUtils.buildGit(workTask), ""));
     }
 
     protected String updateMcp(WorkflowTask workTask, String name, String path, String data) throws Exception {

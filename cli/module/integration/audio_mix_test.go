@@ -98,10 +98,71 @@ func TestHandleAudioMixBuildsRestrictedWAVProject(t *testing.T) {
 	}
 }
 
+func TestHandleAudioMixPreviewStreamsTemporaryWAV(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test command shim uses POSIX sh")
+	}
+	root := t.TempDir()
+	sourcePath := filepath.Join(root, "agent-a", "sources", "voice.any")
+	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
+		t.Fatalf("mkdir source: %v", err)
+	}
+	if err := os.WriteFile(sourcePath, []byte("preview-audio"), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	previousLookPath := videoTrimLookPathFn
+	previousCommand := videoTrimCommandContextFn
+	t.Cleanup(func() {
+		videoTrimLookPathFn = previousLookPath
+		videoTrimCommandContextFn = previousCommand
+	})
+	videoTrimLookPathFn = func(name string) (string, error) {
+		if name != "ffmpeg" && name != "ffprobe" {
+			return "", errors.New("unexpected executable")
+		}
+		return name, nil
+	}
+	videoTrimCommandContextFn = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		if name == "ffprobe" {
+			return exec.CommandContext(ctx, "sh", "-c", "printf 'audio\\n12.5\\n'")
+		}
+		return exec.CommandContext(ctx, "sh", "-c", "cp \"$1\" \"$2\"", "audio-mix-preview-test", sourcePath, args[len(args)-1])
+	}
+	request := AudioMixRequest{AgentID: "agent-a", OutputName: "preview.wav", SampleRate: 44100, BitDepth: 16, Tracks: []AudioMixTrack{{
+		Path: "sources/voice.any", TrimStart: 0, TrimEnd: 2, Speed: 1, Volume: 1, LeftVolume: 1, RightVolume: 1,
+	}}}
+	body, err := json.Marshal(request)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	recorder := httptest.NewRecorder()
+	handleAudioMixPreview(&Config{AgentDir: root}).ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/audio_mix_preview", bytes.NewReader(body)))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", recorder.Code, recorder.Body.String())
+	}
+	if contentType := recorder.Header().Get("Content-Type"); contentType != "audio/wav" {
+		t.Fatalf("content type = %q", contentType)
+	}
+	if !bytes.Equal(recorder.Body.Bytes(), []byte("preview-audio")) {
+		t.Fatalf("preview body = %q", recorder.Body.Bytes())
+	}
+	if _, err := os.Stat(filepath.Join(root, "agent-a", "audios")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("preview created audios output: %v", err)
+	}
+}
+
 func TestHandleAudioMixRejectsInvalidProject(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "agent-a"), 0o755); err != nil {
 		t.Fatalf("mkdir workspace: %v", err)
+	}
+	previousLookPath := videoTrimLookPathFn
+	t.Cleanup(func() { videoTrimLookPathFn = previousLookPath })
+	videoTrimLookPathFn = func(name string) (string, error) {
+		if name != "ffmpeg" && name != "ffprobe" {
+			return "", errors.New("unexpected executable")
+		}
+		return name, nil
 	}
 	request := AudioMixRequest{
 		AgentID: "agent-a", OutputName: "invalid.wav", SampleRate: 44100, BitDepth: 16,

@@ -4878,6 +4878,7 @@ func mergeIntegrationRuntimeSkillNames(base, runtime []string) []string {
 type FileEntry struct {
 	Name                   string `json:"name"`
 	Type                   string `json:"type"`
+	ModifiedAt             int64  `json:"modifiedAt"`
 	HasSkill               bool   `json:"hasSkill,omitempty"`
 	SkillDisabled          bool   `json:"skillDisabled,omitempty"`
 	SkillDisabledSelf      bool   `json:"skillDisabledSelf,omitempty"`
@@ -4952,6 +4953,9 @@ func handleFiles() http.HandlerFunc {
 				t = "dir"
 			}
 			item := FileEntry{Name: e.Name(), Type: t}
+			if entryInfo, infoErr := e.Info(); infoErr == nil {
+				item.ModifiedAt = entryInfo.ModTime().UnixMilli()
+			}
 			if e.IsDir() {
 				entryPath := filepath.Join(searchDir, e.Name())
 				item.HasSkill = hasDirectSkillMarkdown(entryPath)
@@ -4962,6 +4966,20 @@ func handleFiles() http.HandlerFunc {
 			}
 			result = append(result, item)
 		}
+		// Keep the API order aligned with the virtual file system.  The Site also
+		// applies this ordering defensively, but returning a deterministic order
+		// prevents a raw directory enumeration from bypassing the user-visible
+		// "folders first, newest files first" rule.
+		sort.SliceStable(result, func(i, j int) bool {
+			left, right := result[i], result[j]
+			if left.Type != right.Type {
+				return left.Type == "dir"
+			}
+			if left.Type == "file" && left.ModifiedAt != right.ModifiedAt {
+				return left.ModifiedAt > right.ModifiedAt
+			}
+			return strings.ToLower(left.Name) < strings.ToLower(right.Name)
+		})
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(result)
 	}
@@ -6332,11 +6350,40 @@ func handleMediaPreview(cfg *Config) http.HandlerFunc {
 }
 
 type VideoTrimRequest struct {
-	AgentID    string  `json:"agentId"`
-	Path       string  `json:"path"`
-	Start      float64 `json:"start"`
-	End        float64 `json:"end"`
-	OutputName string  `json:"outputName,omitempty"`
+	AgentID    string                `json:"agentId"`
+	Path       string                `json:"path"`
+	Start      float64               `json:"start"`
+	End        float64               `json:"end"`
+	OutputName string                `json:"outputName,omitempty"`
+	Crop       *VideoTrimCropRequest `json:"crop,omitempty"`
+}
+
+// VideoTrimCropRequest deliberately contains only normalized geometry. It is
+// converted to a fixed, server-generated FFmpeg graph after validation; Site
+// never gets to supply a filter expression or command argument.
+type VideoTrimCropRequest struct {
+	Shape      string               `json:"shape"`
+	Background string               `json:"background,omitempty"`
+	X          float64              `json:"x,omitempty"`
+	Y          float64              `json:"y,omitempty"`
+	Width      float64              `json:"width,omitempty"`
+	Height     float64              `json:"height,omitempty"`
+	Points     []VideoTrimCropPoint `json:"points,omitempty"`
+}
+
+type VideoTrimCropPoint struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+}
+
+type validatedVideoTrimCrop struct {
+	Shape      string
+	Background string
+	X          float64
+	Y          float64
+	Width      float64
+	Height     float64
+	Points     []VideoTrimCropPoint
 }
 
 type VideoTrimResponse struct {
@@ -6708,10 +6755,6 @@ func handleVideoRecordConvert(cfg *Config) http.HandlerFunc {
 	}
 }
 
-func isHalfSecondValue(value float64) bool {
-	return math.Abs(value*2-math.Round(value*2)) < 1e-9
-}
-
 func formatVideoTrimSeconds(value float64) string {
 	return strconv.FormatFloat(value, 'f', -1, 64)
 }
@@ -6742,6 +6785,148 @@ func videoTrimOutputRelativePath(sourceRelativePath string, now time.Time) strin
 
 func isSafeVideoTrimOutputName(name string) bool {
 	return isSafeSaveAsNewFilename(name) && strings.EqualFold(filepath.Ext(name), ".mp4") && len(strings.TrimSuffix(name, filepath.Ext(name))) > 0
+}
+
+const (
+	videoTrimCropMinimumSize   = 0.001
+	videoTrimCropMaximumPoints = 48
+	// Keep source-canvas output for high-resolution pen crops. Such filters can
+	// legitimately take longer than simple time-only trimming, so they get a
+	// bounded but more practical conversion window.
+	videoTrimConversionTimeout = 15 * time.Minute
+)
+
+func isValidVideoTrimCropCoordinate(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0) && value >= 0 && value <= 1
+}
+
+func videoTrimCropNumber(value float64) string {
+	return strconv.FormatFloat(value, 'f', 8, 64)
+}
+
+func videoTrimCropRoundedNumber(value float64) float64 {
+	rounded, err := strconv.ParseFloat(videoTrimCropNumber(value), 64)
+	if err != nil {
+		return 0
+	}
+	return rounded
+}
+
+func validateVideoTrimCrop(request *VideoTrimCropRequest) (*validatedVideoTrimCrop, error) {
+	if request == nil {
+		return nil, nil
+	}
+	crop := &validatedVideoTrimCrop{
+		Shape:      strings.ToLower(strings.TrimSpace(request.Shape)),
+		Background: strings.ToLower(strings.TrimSpace(request.Background)),
+	}
+	if crop.Background == "" {
+		crop.Background = "black"
+	}
+	if crop.Background != "black" && crop.Background != "white" {
+		return nil, errors.New("补边色仅支持 black 或 white")
+	}
+	switch crop.Shape {
+	case "rect", "ellipse":
+		if !isValidVideoTrimCropCoordinate(request.X) || !isValidVideoTrimCropCoordinate(request.Y) ||
+			!isValidVideoTrimCropCoordinate(request.Width) || !isValidVideoTrimCropCoordinate(request.Height) ||
+			request.Width < videoTrimCropMinimumSize || request.Height < videoTrimCropMinimumSize ||
+			request.X+request.Width > 1+1e-9 || request.Y+request.Height > 1+1e-9 {
+			return nil, errors.New("裁剪范围必须位于源画面内且具有有效面积")
+		}
+		crop.X = request.X
+		crop.Y = request.Y
+		crop.Width = request.Width
+		crop.Height = request.Height
+		return crop, nil
+	case "polygon":
+		if len(request.Points) < 3 || len(request.Points) > videoTrimCropMaximumPoints {
+			return nil, fmt.Errorf("钢笔闭合区域必须包含 3 到 %d 个点", videoTrimCropMaximumPoints)
+		}
+		minX, minY, maxX, maxY := 1.0, 1.0, 0.0, 0.0
+		areaTwice := 0.0
+		crop.Points = make([]VideoTrimCropPoint, len(request.Points))
+		for index, point := range request.Points {
+			if !isValidVideoTrimCropCoordinate(point.X) || !isValidVideoTrimCropCoordinate(point.Y) {
+				return nil, errors.New("钢笔闭合区域的坐标必须位于源画面内")
+			}
+			crop.Points[index] = point
+			minX = math.Min(minX, point.X)
+			minY = math.Min(minY, point.Y)
+			maxX = math.Max(maxX, point.X)
+			maxY = math.Max(maxY, point.Y)
+			next := request.Points[(index+1)%len(request.Points)]
+			areaTwice += point.X*next.Y - next.X*point.Y
+		}
+		if maxX-minX < videoTrimCropMinimumSize || maxY-minY < videoTrimCropMinimumSize || math.Abs(areaTwice) < videoTrimCropMinimumSize*videoTrimCropMinimumSize {
+			return nil, errors.New("钢笔闭合区域必须具有有效面积")
+		}
+		crop.X = minX
+		crop.Y = minY
+		crop.Width = maxX - minX
+		crop.Height = maxY - minY
+		return crop, nil
+	default:
+		return nil, errors.New("裁剪形状仅支持 rect、ellipse 或 polygon")
+	}
+}
+
+func videoTrimCropInsideExpression(crop *validatedVideoTrimCrop) string {
+	if crop.Shape == "ellipse" {
+		return "lte((X-W/2)*(X-W/2)/(W*W/4)+(Y-H/2)*(Y-H/2)/(H*H/4)\\,1)"
+	}
+	terms := make([]string, 0, len(crop.Points))
+	for index, first := range crop.Points {
+		second := crop.Points[(index+1)%len(crop.Points)]
+		// Round before comparing because the same eight-decimal representation is
+		// later embedded in FFmpeg's expression. Without this, two nearly-level
+		// pen points could serialize to the same Y and leave a zero denominator.
+		firstX := videoTrimCropRoundedNumber((first.X - crop.X) / crop.Width)
+		firstY := videoTrimCropRoundedNumber((first.Y - crop.Y) / crop.Height)
+		secondX := videoTrimCropRoundedNumber((second.X - crop.X) / crop.Width)
+		secondY := videoTrimCropRoundedNumber((second.Y - crop.Y) / crop.Height)
+		if firstY == secondY {
+			continue
+		}
+		fx, fy := videoTrimCropNumber(firstX), videoTrimCropNumber(firstY)
+		sx, sy := videoTrimCropNumber(secondX), videoTrimCropNumber(secondY)
+		terms = append(terms, "gt(0\\,(Y-"+fy+"*H)*(Y-"+sy+"*H))*gt("+fx+"*W+(Y-"+fy+"*H)*("+sx+"*W-"+fx+"*W)/("+sy+"*H-"+fy+"*H)\\,X)")
+	}
+	return "mod(" + strings.Join(terms, "+") + "\\,2)"
+}
+
+func videoTrimCropFilter(crop *validatedVideoTrimCrop) string {
+	width, height := videoTrimCropNumber(crop.Width), videoTrimCropNumber(crop.Height)
+	x, y := videoTrimCropNumber(crop.X), videoTrimCropNumber(crop.Y)
+	selection := "crop=w=ceil(iw*" + width + "):h=ceil(ih*" + height + "):x=floor(iw*" + x + "):y=floor(ih*" + y + ")"
+	backgroundLuma := "0"
+	if crop.Background == "white" {
+		backgroundLuma = "255"
+	}
+	selectionFilter := "[trimCropInput]" + selection + "[trimCropSelection];"
+	if crop.Shape != "rect" {
+		inside := videoTrimCropInsideExpression(crop)
+		// Generate the shape in the luma channel of a neutral YUV mask. A gray
+		// mask makes some FFmpeg builds negotiate maskedmerge down to grayscale,
+		// which removes the selected video's color. Keeping all three inputs in
+		// yuv444p preserves its chroma while evaluating the shape only once.
+		// Composite with the mask before scale/overlay. maskedmerge selects its
+		// second input wherever the mask is white, so the fill must be first and
+		// the source second. This
+		// avoids alpha-pixel-format negotiation in
+		// older FFmpeg builds, which caused ellipse selections to fail despite
+		// valid source dimensions.
+		selectionFilter = "[trimCropInput]" + selection + ",split=3[trimCropSourceRaw][trimCropMaskSource][trimCropFillSource];" +
+			"[trimCropSourceRaw]format=yuv444p[trimCropSource];" +
+			"[trimCropMaskSource]format=yuv444p,geq=lum='if(" + inside + "\\,255\\,0)':cb=128:cr=128[trimCropMask];" +
+			"[trimCropFillSource]format=yuv444p,lut=y=" + backgroundLuma + ":u=128:v=128[trimCropFill];" +
+			"[trimCropFill][trimCropSource][trimCropMask]maskedmerge[trimCropSelection];"
+	}
+	return "[0:v]split=2[trimCropBase][trimCropInput];" +
+		selectionFilter +
+		"[trimCropSelection][trimCropBase]scale2ref=w=ref_w:h=ref_h:force_original_aspect_ratio=decrease[trimCropScaled][trimCropBaseRef];" +
+		"[trimCropBaseRef]format=yuv444p,lut=y=" + backgroundLuma + ":u=128:v=128[trimCropBackground];" +
+		"[trimCropBackground][trimCropScaled]overlay=(W-w)/2:(H-h)/2:shortest=1,pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0:" + crop.Background + ",format=yuv420p[trimCropOutput]"
 }
 
 func videoTrimProbeBitrate(ctx context.Context, ffprobePath, sourcePath string) int64 {
@@ -6776,7 +6961,7 @@ func videoTrimCommandError(err error, output []byte) string {
 
 // handleVideoTrim creates a new MP4 from a video in the requesting Agent's
 // workspace. It never edits the source and deliberately fixes the codecs to
-// H.264/AAC so the selected half-second interval can be re-encoded accurately.
+// H.264/AAC so the selected interval can be re-encoded accurately.
 func handleVideoTrim(cfg *Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -6804,12 +6989,22 @@ func handleVideoTrim(cfg *Config) http.HandlerFunc {
 			writeVideoTrimResp(w, http.StatusBadRequest, VideoTrimResponse{AgentID: request.AgentID, Path: request.Path, Content: "agentId 和相对路径不能为空", Status: 1})
 			return
 		}
-		if !isHalfSecondValue(request.Start) || !isHalfSecondValue(request.End) || math.IsNaN(request.Start) || math.IsNaN(request.End) || math.IsInf(request.Start, 0) || math.IsInf(request.End, 0) || request.Start < 0 || request.End <= request.Start {
-			writeVideoTrimResp(w, http.StatusBadRequest, VideoTrimResponse{AgentID: request.AgentID, Path: request.Path, Content: "开始和结束时间必须是有效的 0.5 秒刻度，且结束时间大于开始时间", Status: 1})
+		// The range sliders use 0.5-second steps, but the initial end value is the
+		// media's real duration. That duration commonly has a fractional tail (for
+		// example 12.4s), and represents the user's "whole video" selection.
+		// Accept any finite non-negative time rather than rejecting a valid full
+		// duration merely because it is not exactly on a slider tick.
+		if math.IsNaN(request.Start) || math.IsNaN(request.End) || math.IsInf(request.Start, 0) || math.IsInf(request.End, 0) || request.Start < 0 || request.End <= request.Start {
+			writeVideoTrimResp(w, http.StatusBadRequest, VideoTrimResponse{AgentID: request.AgentID, Path: request.Path, Content: "开始和结束时间必须为有效的非负秒数，且结束时间大于开始时间", Status: 1})
 			return
 		}
 		if request.OutputName != "" && !isSafeVideoTrimOutputName(request.OutputName) {
 			writeVideoTrimResp(w, http.StatusBadRequest, VideoTrimResponse{AgentID: request.AgentID, Path: request.Path, Content: "新视频文件名必须是有效的 .mp4 文件名", Status: 1})
+			return
+		}
+		crop, err := validateVideoTrimCrop(request.Crop)
+		if err != nil {
+			writeVideoTrimResp(w, http.StatusBadRequest, VideoTrimResponse{AgentID: request.AgentID, Path: request.Path, Content: err.Error(), Status: 1})
 			return
 		}
 
@@ -6860,7 +7055,7 @@ func handleVideoTrim(cfg *Config) http.HandlerFunc {
 			writeVideoTrimResp(w, http.StatusServiceUnavailable, VideoTrimResponse{AgentID: request.AgentID, Path: request.Path, Content: "FFmpeg 或 FFprobe 未安装，无法生成新视频", Status: 1})
 			return
 		}
-		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
+		ctx, cancel := context.WithTimeout(r.Context(), videoTrimConversionTimeout)
 		defer cancel()
 		bitrate := videoTrimProbeBitrate(ctx, ffprobePath, sourcePath)
 		temporaryPath := strings.TrimSuffix(outputPath, ".mp4") + "." + strconv.FormatInt(time.Now().UnixNano(), 10) + ".tmp.mp4"
@@ -6874,9 +7069,13 @@ func handleVideoTrim(cfg *Config) http.HandlerFunc {
 			"-ss", formatVideoTrimSeconds(request.Start),
 			"-i", sourcePath,
 			"-t", formatVideoTrimSeconds(request.End - request.Start),
-			"-map", "0:v:0?", "-map", "0:a?",
-			"-c:v", "libx264", "-c:a", "aac",
 		}
+		if crop != nil {
+			args = append(args, "-filter_complex", videoTrimCropFilter(crop), "-map", "[trimCropOutput]")
+		} else {
+			args = append(args, "-map", "0:v:0?")
+		}
+		args = append(args, "-map", "0:a?", "-c:v", "libx264", "-c:a", "aac")
 		if bitrate > 0 {
 			args = append(args, "-b:v", strconv.FormatInt(bitrate, 10))
 		}
@@ -7111,7 +7310,6 @@ type AudioMixTrack struct {
 	Volume      float64          `json:"volume"`
 	LeftVolume  float64          `json:"leftVolume"`
 	RightVolume float64          `json:"rightVolume"`
-	Muted       bool             `json:"muted"`
 	FadeIn      float64          `json:"fadeIn"`
 	FadeOut     float64          `json:"fadeOut"`
 	Effects     []AudioMixEffect `json:"effects"`
@@ -7307,12 +7505,8 @@ func audioMixTrackFilter(index int, track AudioMixTrack, duration float64, copie
 		filters = append(filters, strings.Join(outputs, "")+"concat=n="+strconv.Itoa(copies)+":v=0:a=1")
 	}
 	filters = append(filters, "atrim=duration="+audioMixFormatFloat(duration), "aformat=channel_layouts=stereo")
-	volume := track.Volume
-	if track.Muted {
-		volume = 0
-	}
 	filters = append(filters,
-		"volume="+audioMixFormatFloat(volume),
+		"volume="+audioMixFormatFloat(track.Volume),
 		"pan=stereo|c0="+audioMixFormatFloat(track.LeftVolume)+"*c0|c1="+audioMixFormatFloat(track.RightVolume)+"*c1",
 	)
 	if track.FadeIn > 0 {
@@ -7480,6 +7674,141 @@ func handleAudioMix(cfg *Config) http.HandlerFunc {
 		}
 		flushAgentCache()
 		writeAudioMixResp(w, http.StatusOK, AudioMixResponse{AgentID: request.AgentID, Path: filepath.ToSlash(outputRelativePath), SavedAs: outputPath, Content: "混音已保存", Status: 0})
+	}
+}
+
+// handleAudioMixPreview renders the same constrained project as audio_mix, but
+// streams a temporary WAV back to the browser and never writes an audios/ file.
+func handleAudioMixPreview(cfg *Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", http.MethodPost)
+			writeAudioMixResp(w, http.StatusMethodNotAllowed, AudioMixResponse{Content: "method not allowed", Status: 1})
+			return
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+		defer r.Body.Close()
+		var request AudioMixRequest
+		decoder := json.NewDecoder(r.Body)
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&request); err != nil {
+			writeAudioMixResp(w, http.StatusBadRequest, AudioMixResponse{Content: "请求体格式错误", Status: 1})
+			return
+		}
+		if err := decoder.Decode(&struct{}{}); err != io.EOF {
+			writeAudioMixResp(w, http.StatusBadRequest, AudioMixResponse{AgentID: request.AgentID, Content: "请求体只能包含一个 JSON 对象", Status: 1})
+			return
+		}
+		request.AgentID = strings.TrimSpace(request.AgentID)
+		request.OutputName = strings.TrimSpace(normalizeQuotedPathArg(request.OutputName))
+		if !isValidMediaPreviewAgentID(request.AgentID) || !isSafeAudioMixOutputName(request.OutputName) {
+			writeAudioMixResp(w, http.StatusBadRequest, AudioMixResponse{AgentID: request.AgentID, Content: "agentId 和输出文件名必须有效，且输出必须为 .wav", Status: 1})
+			return
+		}
+		if request.SampleRate != 44100 && request.SampleRate != 48000 {
+			writeAudioMixResp(w, http.StatusBadRequest, AudioMixResponse{AgentID: request.AgentID, Content: "采样率只支持 44100 或 48000", Status: 1})
+			return
+		}
+		if request.BitDepth != 16 && request.BitDepth != 24 {
+			writeAudioMixResp(w, http.StatusBadRequest, AudioMixResponse{AgentID: request.AgentID, Content: "位深只支持 16 或 24", Status: 1})
+			return
+		}
+		if len(request.Tracks) == 0 || len(request.Tracks) > audioMixMaxTracks {
+			writeAudioMixResp(w, http.StatusBadRequest, AudioMixResponse{AgentID: request.AgentID, Content: "音轨数量必须在 1 到 64 之间", Status: 1})
+			return
+		}
+		workspace, err := getWorkspaceByAgentID(cfg, request.AgentID)
+		if err != nil {
+			writeAudioMixResp(w, http.StatusNotFound, AudioMixResponse{AgentID: request.AgentID, Content: "agent not found", Status: 1})
+			return
+		}
+		ffmpegPath, ffmpegErr := videoTrimLookPathFn("ffmpeg")
+		ffprobePath, ffprobeErr := videoTrimLookPathFn("ffprobe")
+		if ffmpegErr != nil || ffprobeErr != nil {
+			writeAudioMixResp(w, http.StatusServiceUnavailable, AudioMixResponse{AgentID: request.AgentID, Content: "FFmpeg 或 FFprobe 未安装，无法试听混音", Status: 1})
+			return
+		}
+		previewDir, err := os.MkdirTemp("", "deepright-audio-mix-preview-"+strconv.FormatInt(time.Now().UnixNano(), 10)+"-")
+		if err != nil {
+			writeAudioMixResp(w, http.StatusInternalServerError, AudioMixResponse{AgentID: request.AgentID, Content: "无法创建试听临时 WAV", Status: 1})
+			return
+		}
+		defer os.RemoveAll(previewDir)
+		temporaryPath := filepath.Join(previewDir, "mix-preview-"+strconv.FormatInt(time.Now().UnixNano(), 10)+".wav")
+
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Minute)
+		defer cancel()
+		inputArgs := []string{"-hide_banner", "-loglevel", "error", "-nostdin"}
+		filterParts := make([]string, 0, len(request.Tracks)+1)
+		labels := make([]string, 0, len(request.Tracks))
+		for index, track := range request.Tracks {
+			sourcePath, err := audioMixResolveSource(workspace, track.Path)
+			if err != nil {
+				writeAudioMixResp(w, http.StatusBadRequest, AudioMixResponse{AgentID: request.AgentID, Content: "第 " + strconv.Itoa(index+1) + " 段音轨无效：" + err.Error(), Status: 1})
+				return
+			}
+			sourceDuration, err := audioMixProbeSource(ctx, ffprobePath, sourcePath)
+			if err != nil || track.TrimEnd > sourceDuration+0.001 {
+				message := "源文件不含可解析音频流"
+				if err != nil {
+					message = err.Error()
+				} else {
+					message = "裁剪范围超出源文件时长"
+				}
+				writeAudioMixResp(w, http.StatusBadRequest, AudioMixResponse{AgentID: request.AgentID, Content: "第 " + strconv.Itoa(index+1) + " 段音轨无效：" + message, Status: 1})
+				return
+			}
+			if track.TrimEnd == 0 {
+				track.TrimEnd = sourceDuration
+			}
+			duration, copies, err := audioMixTrackDuration(track)
+			if err != nil {
+				writeAudioMixResp(w, http.StatusBadRequest, AudioMixResponse{AgentID: request.AgentID, Content: "第 " + strconv.Itoa(index+1) + " 段音轨无效：" + err.Error(), Status: 1})
+				return
+			}
+			inputArgs = append(inputArgs, "-i", sourcePath)
+			filter, err := audioMixTrackFilter(index, track, duration, copies)
+			if err != nil {
+				writeAudioMixResp(w, http.StatusBadRequest, AudioMixResponse{AgentID: request.AgentID, Content: "第 " + strconv.Itoa(index+1) + " 段音轨无效：" + err.Error(), Status: 1})
+				return
+			}
+			filterParts = append(filterParts, filter)
+			labels = append(labels, "[m"+strconv.Itoa(index)+"]")
+		}
+		filterParts = append(filterParts, strings.Join(labels, "")+"amix=inputs="+strconv.Itoa(len(labels))+":duration=longest:dropout_transition=0,alimiter=limit=0.99,aformat=channel_layouts=stereo[mixout]")
+		args := append(inputArgs, "-filter_complex", strings.Join(filterParts, ";"), "-map", "[mixout]", "-ar", strconv.Itoa(request.SampleRate), "-ac", "2")
+		if request.BitDepth == 24 {
+			args = append(args, "-c:a", "pcm_s24le")
+		} else {
+			args = append(args, "-c:a", "pcm_s16le")
+		}
+		args = append(args, "-f", "wav", "-n", temporaryPath)
+		output, err := videoTrimCommandContextFn(ctx, ffmpegPath, args...).CombinedOutput()
+		if err != nil {
+			message := "音频试听失败：" + videoTrimCommandError(err, output)
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				message = "音频试听超时"
+			}
+			writeAudioMixResp(w, http.StatusInternalServerError, AudioMixResponse{AgentID: request.AgentID, Content: message, Status: 1})
+			return
+		}
+		info, err := os.Stat(temporaryPath)
+		if err != nil || info.Size() == 0 {
+			writeAudioMixResp(w, http.StatusInternalServerError, AudioMixResponse{AgentID: request.AgentID, Content: "试听 WAV 未生成有效输出", Status: 1})
+			return
+		}
+		preview, err := os.Open(temporaryPath)
+		if err != nil {
+			writeAudioMixResp(w, http.StatusInternalServerError, AudioMixResponse{AgentID: request.AgentID, Content: "无法读取试听 WAV", Status: 1})
+			return
+		}
+		defer preview.Close()
+		w.Header().Set("Content-Type", "audio/wav")
+		w.Header().Set("Content-Length", strconv.FormatInt(info.Size(), 10))
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Content-Disposition", "inline; filename=\"mix-preview.wav\"")
+		_, _ = io.Copy(w, preview)
 	}
 }
 
@@ -19109,6 +19438,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/video_record_convert", handleVideoRecordConvert(&cfg))
 	mux.HandleFunc("/api/agent/audio", handleAgentAudioSave(&cfg))
 	mux.HandleFunc("/api/audio_mix", handleAudioMix(&cfg))
+	mux.HandleFunc("/api/audio_mix_preview", handleAudioMixPreview(&cfg))
 	mux.HandleFunc("/file/lastUpdate", handleFileLastUpdate(&cfg))
 	mux.HandleFunc("/api/heartbeat", handleHeartbeat())
 	mux.HandleFunc("/api/log_cleanup_status", handleLogCleanupStatus())

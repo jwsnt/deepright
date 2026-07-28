@@ -1,9 +1,10 @@
 package ai.deepright.module;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
+import ai.deepright.feature.FeatureUtils;
 import ai.open.right.utils.IPUtils;
+import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.media.MediaTransferUtils;
+import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +16,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
@@ -33,12 +35,30 @@ public class HttpProtocol {
 
     protected String data;
 
-    public String dataHost(String url) throws Exception {
-        return MediaTransferUtils.isNetwork(url) ? url : (this.host() + this.data() + "?name=" + URLEncoder.encode(Paths.get(url).getFileName().toString(), StandardCharsets.UTF_8));
+    @PostConstruct
+    public void init() throws Exception {
+        if (!StringUtils.isEmpty(this.host)) {
+            // 配置完整 Host 时，使用其协议生成基于请求 Host 的下载地址
+            String scheme = URI.create(this.host).getScheme();
+            if (!StringUtils.isEmpty(scheme)) {
+                this.protocol = scheme + "://";
+            }
+        }
+    }
+
+    public String dataHost(WorkflowTask workTask, String url) throws Exception {
+        // 先从Http Host头取（格式为host:port，不带协议头）
+        return MediaTransferUtils.isNetwork(url) ? url : (this.host(workTask) + this.data() + "?name=" + URLEncoder.encode(Paths.get(url).getFileName().toString(), StandardCharsets.UTF_8));
     }
 
     public String dataHost() throws Exception {
         return this.host() + this.data() + "?name=";
+    }
+
+    public String host(WorkflowTask workTask) throws Exception {
+        // metadata.Host 由 HTTP Host header 注入，优先使用请求实际访问的 Host
+        String host = FeatureUtils.buildHost(workTask);
+        return !StringUtils.isEmpty(host) ? this.protocol + host : this.host();
     }
 
     public String host() throws Exception {
