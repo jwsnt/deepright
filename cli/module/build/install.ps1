@@ -166,6 +166,11 @@ fi
     return $true
 }
 
+function Test-WslTsinghuaAptMirror([string]$DistroName) {
+    & wsl.exe -d $DistroName -u root -- bash -c "grep -Rqs 'mirrors\\.tuna\\.tsinghua\\.edu\\.cn' /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null" | Out-Null
+    return ($LASTEXITCODE -eq 0)
+}
+
 function Restore-WslOfficialAptSources([string]$DistroName) {
     $restoreScript = @'
 set -eu
@@ -207,6 +212,40 @@ function Fallback-WslAptToOfficial {
         return $false
     }
     $script:usingTsinghuaAptMirror = $false
+    return $true
+}
+
+function Update-WslTsinghuaCaCertificates {
+    # The Tsinghua Ubuntu Base Rootfs has no system CA bundle. Its regular APT
+    # source is HTTPS, so use an HTTP bootstrap source only for this initial
+    # package: APT verifies Ubuntu's signed Release and package metadata. Once
+    # ca-certificates is installed, all configured sources remain HTTPS.
+    L_Info "Bootstrapping CA certificates from the Tsinghua Ubuntu apt mirror..."
+    $caUpdateCommand = @'
+set -eu
+bootstrap_source=/tmp/deepright-ca-bootstrap.list
+cleanup() { rm -f "$bootstrap_source"; }
+trap cleanup EXIT
+cat > "$bootstrap_source" <<'EOF'
+deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ noble main universe restricted multiverse
+deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ noble-updates main universe restricted multiverse
+deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ noble-backports main universe restricted multiverse
+deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ noble-security main universe restricted multiverse
+EOF
+apt_options='-o Dir::Etc::sourcelist=/tmp/deepright-ca-bootstrap.list -o Dir::Etc::sourceparts=-'
+DEBIAN_FRONTEND=noninteractive apt-get $apt_options update -qq
+DEBIAN_FRONTEND=noninteractive apt-get $apt_options install -y --reinstall ca-certificates
+update-ca-certificates
+'@
+    $caUpdate = Invoke-WslTimedTsinghuaBootstrapCommand -Command $caUpdateCommand
+    if (-not $caUpdate.Success) {
+        $reason = if ($caUpdate.TimedOut) { "timed out after $WSL_APT_TIMEOUT_SECONDS seconds" } else { "failed with exit code $($caUpdate.ExitCode)" }
+        $details = if ([string]::IsNullOrWhiteSpace($caUpdate.Output)) { "" } else { "`n$($caUpdate.Output)" }
+        L_Err "Unable to bootstrap CA certificates: $reason$details"
+        return $false
+    }
+
+    L_OK "CA certificates refreshed for the Tsinghua Ubuntu image"
     return $true
 }
 
@@ -354,6 +393,26 @@ function Invoke-WslTimedInstallCommand([string]$Package, [string]$Source, [strin
     $timedOut = ($exitCode -eq 124 -or $exitCode -eq 137)
     $result = if ($exitCode -eq 0) { "success" } elseif ($timedOut) { "timeout" } else { "failed" }
     Add-Content -Path $LOG_FILE -Value "apt attempt: package=$Package source=$Source timeoutSeconds=$WSL_APT_TIMEOUT_SECONDS result=$result exitCode=$exitCode command=$Command output=$output" -Encoding UTF8
+    return [PSCustomObject]@{
+        Success = ($exitCode -eq 0)
+        TimedOut = $timedOut
+        ExitCode = $exitCode
+        Output = $output.Trim()
+    }
+}
+
+function Invoke-WslTimedTsinghuaBootstrapCommand([string]$Command) {
+    # Keep this separate from the normal one-line APT command wrapper. The CA
+    # bootstrap is a multiline shell program, so pass it as Base64 on stdin
+    # instead of allowing PowerShell native-command argument parsing to expand
+    # it before WSL receives it.
+    $encodedCommand = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($Command))
+    $wslScript = "set -o pipefail; printf '%s' '$encodedCommand' | base64 -d | timeout --signal=TERM --kill-after=${WSL_APT_TIMEOUT_KILL_AFTER_SECONDS}s ${WSL_APT_TIMEOUT_SECONDS}s bash"
+    $output = & wsl.exe -d $DISTRO_NAME -u root -- bash -c $wslScript 2>&1 | Out-String
+    $exitCode = $LASTEXITCODE
+    $timedOut = ($exitCode -eq 124 -or $exitCode -eq 137)
+    $result = if ($exitCode -eq 0) { "success" } elseif ($timedOut) { "timeout" } else { "failed" }
+    Add-Content -Path $LOG_FILE -Value "Tsinghua CA bootstrap: timeoutSeconds=$WSL_APT_TIMEOUT_SECONDS result=$result exitCode=$exitCode output=$output" -Encoding UTF8
     return [PSCustomObject]@{
         Success = ($exitCode -eq 0)
         TimedOut = $timedOut
@@ -620,6 +679,17 @@ if ($distroExists) {
         L_OK "Default user set to deepright"
     }
 
+    # An interrupted earlier Tsinghua installation can leave the distro
+    # imported without a CA bundle. Repair only that existing Tsinghua distro
+    # so rerunning the installer never requires manual Linux commands.
+    if (Test-WslTsinghuaAptMirror -DistroName $DISTRO_NAME) {
+        $script:usingTsinghuaAptMirror = $true
+        if (-not (Update-WslTsinghuaCaCertificates)) {
+            L_Err "Existing Tsinghua Ubuntu image cannot continue without current CA certificates"
+            exit 1
+        }
+    }
+
 } else {
     L_Info "deepright not found, performing full install..."
 
@@ -736,6 +806,11 @@ if ($distroExists) {
             exit 1
         }
         $script:usingTsinghuaAptMirror = $true
+
+        if (-not (Update-WslTsinghuaCaCertificates)) {
+            L_Err "Tsinghua Ubuntu image setup cannot continue without current CA certificates"
+            exit 1
+        }
     }
 
     # Create user deepright
@@ -891,7 +966,7 @@ WRAPPER_PATH="/home/deepright/start-deepright.sh"
 # not include sudo, and root does not need it.  Keep the wrapper usable when
 # launched directly by the deepright user as well.
 if [ "$(id -u)" -eq 0 ]; then
-  ELEVATE=()
+  ELEVATE=(env)
   LAUNCH_COMMAND="/usr/bin/env HOME=/home/deepright TERM=xterm-256color /app/integration start"
 else
   if ! command -v sudo >/dev/null 2>&1 || ! sudo -n true; then

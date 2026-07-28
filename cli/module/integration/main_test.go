@@ -4416,8 +4416,37 @@ func TestHandleVideoAudioExtractCreatesTimestampedMP3AndRejectsVideoWithoutAudio
 		t.Errorf("ffmpeg -c:a = %q, want libmp3lame", got)
 	}
 
+	audioServer := httptest.NewServer(handleVideoAudioExtractToAudio(&Config{AgentDir: root}))
+	defer audioServer.Close()
+	audioResponse, err := http.Post(audioServer.URL, "application/json", bytes.NewReader(requestBody))
+	if err != nil {
+		t.Fatalf("POST original-track audio extraction: %v", err)
+	}
+	defer audioResponse.Body.Close()
+	if audioResponse.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(audioResponse.Body)
+		t.Fatalf("original-track audio extraction status = %d, body=%s", audioResponse.StatusCode, body)
+	}
+	var audioResult VideoAudioExtractResponse
+	if err := json.NewDecoder(audioResponse.Body).Decode(&audioResult); err != nil {
+		t.Fatalf("decode original-track audio extraction response: %v", err)
+	}
+	resolvedWorkspace, err := filepath.EvalSymlinks(workspace)
+	if err != nil {
+		t.Fatalf("resolve workspace path: %v", err)
+	}
+	if want := filepath.Join(resolvedWorkspace, "audios", "demo.mp3"); audioResult.SavedAs != want {
+		t.Fatalf("original-track audio output = %q, want %q", audioResult.SavedAs, want)
+	}
+	if saved, err := os.ReadFile(audioResult.SavedAs); err != nil || !bytes.Equal(saved, source) {
+		t.Fatalf("original-track saved MP3 = %q, err=%v; want copied output", saved, err)
+	}
+	if _, err := os.Stat(filepath.Join(workspace, "videos", "demo.mp3")); err != nil {
+		t.Fatalf("legacy videos MP3 missing after audio-directory extraction: %v", err)
+	}
+
 	hasAudio = false
-	noAudioResponse, err := http.Post(server.URL, "application/json", bytes.NewReader(requestBody))
+	noAudioResponse, err := http.Post(audioServer.URL, "application/json", bytes.NewReader(requestBody))
 	if err != nil {
 		t.Fatalf("POST no-audio extraction: %v", err)
 	}
@@ -4433,12 +4462,159 @@ func TestHandleVideoAudioExtractCreatesTimestampedMP3AndRejectsVideoWithoutAudio
 	if !strings.Contains(noAudioResult.Content, "没有可提取的音轨") {
 		t.Errorf("no-audio response = %+v, want no-audio message", noAudioResult)
 	}
-	entries, err := os.ReadDir(filepath.Join(workspace, "videos"))
+	entries, err := os.ReadDir(filepath.Join(workspace, "audios"))
 	if err != nil {
-		t.Fatalf("read videos directory: %v", err)
+		t.Fatalf("read audios directory: %v", err)
 	}
-	if len(entries) != 2 {
-		t.Errorf("videos after no-audio request = %d files, want 2", len(entries))
+	if len(entries) != 1 {
+		t.Errorf("audios after no-audio request = %d files, want 1", len(entries))
+	}
+}
+
+func TestHandleVideoAudioEditKeepsVideoAndTimestampsExistingOutput(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test command shim uses POSIX sh")
+	}
+	root := t.TempDir()
+	workspace := filepath.Join(root, "agent-a")
+	sourcePath := filepath.Join(workspace, "clips", "demo.mp4")
+	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
+		t.Fatalf("mkdir source directory: %v", err)
+	}
+	source := []byte("original-video-content")
+	if err := os.WriteFile(sourcePath, source, 0o644); err != nil {
+		t.Fatalf("write source video: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(workspace, "videos"), 0o755); err != nil {
+		t.Fatalf("mkdir videos directory: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(workspace, "videos", "demo_edit.mp4"), []byte("existing"), 0o644); err != nil {
+		t.Fatalf("write existing MP4: %v", err)
+	}
+
+	previousLookPath := videoTrimLookPathFn
+	previousCommand := videoTrimCommandContextFn
+	t.Cleanup(func() {
+		videoTrimLookPathFn = previousLookPath
+		videoTrimCommandContextFn = previousCommand
+	})
+	videoTrimLookPathFn = func(name string) (string, error) { return name, nil }
+	var ffmpegArgs []string
+	videoTrimCommandContextFn = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		if name == "ffprobe" {
+			for _, arg := range args {
+				if arg == "format=duration" {
+					return exec.CommandContext(ctx, "sh", "-c", "printf 4")
+				}
+			}
+			return exec.CommandContext(ctx, "sh", "-c", "printf 1")
+		}
+		if name == "ffmpeg" {
+			ffmpegArgs = append([]string(nil), args...)
+			return exec.CommandContext(ctx, "sh", "-c", "cp \"$1\" \"$2\"", "video-audio-edit-test", sourcePath, args[len(args)-1])
+		}
+		return exec.CommandContext(ctx, "sh", "-c", "exit 1")
+	}
+
+	server := httptest.NewServer(handleVideoAudioEdit(&Config{AgentDir: root}))
+	defer server.Close()
+	body, err := json.Marshal(VideoAudioEditRequest{AgentID: "agent-a", Path: "clips/demo.mp4", Tracks: []VideoAudioEditTrack{{Original: true, AudioMixTrack: AudioMixTrack{TrimStart: 0, TrimEnd: 0, Start: 0, Speed: 1, Volume: 1, LeftVolume: 1, RightVolume: 1}}}})
+	if err != nil {
+		t.Fatalf("marshal video audio edit request: %v", err)
+	}
+	response, err := http.Post(server.URL, "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("POST video audio edit: %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		responseBody, _ := io.ReadAll(response.Body)
+		t.Fatalf("video audio edit status = %d, body=%s", response.StatusCode, responseBody)
+	}
+	var result VideoAudioEditResponse
+	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
+		t.Fatalf("decode video audio edit response: %v", err)
+	}
+	if result.Status != 0 || !result.Renamed || result.SavedAs == "" {
+		t.Fatalf("unexpected video audio edit response: %+v", result)
+	}
+	if matched, err := regexp.MatchString(`/videos/demo_edit_\d{8}_\d{6}_\d{9}\.mp4$`, filepath.ToSlash(result.SavedAs)); err != nil || !matched {
+		t.Fatalf("audio edit output path = %q, want timestamped MP4 (match=%v err=%v)", result.SavedAs, matched, err)
+	}
+	if saved, err := os.ReadFile(result.SavedAs); err != nil || !bytes.Equal(saved, source) {
+		t.Fatalf("saved MP4 = %q, err=%v; want copied output", saved, err)
+	}
+	if current, err := os.ReadFile(sourcePath); err != nil || !bytes.Equal(current, source) {
+		t.Fatalf("source video changed to %q, err=%v; want %q", current, err, source)
+	}
+	contains := func(want string) bool {
+		for _, arg := range ffmpegArgs {
+			if arg == want {
+				return true
+			}
+		}
+		return false
+	}
+	if !contains("0:v:0?") || !contains("[videoAudioEditMix]") || !contains("copy") || !contains("aac") {
+		t.Errorf("ffmpeg args = %q, want source video mapping and copy/AAC codecs", ffmpegArgs)
+	}
+}
+
+func TestHandleVideoAudioEditPreviewStreamsTemporaryWAV(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test command shim uses POSIX sh")
+	}
+	root := t.TempDir()
+	workspace := filepath.Join(root, "agent-a")
+	sourcePath := filepath.Join(workspace, "clips", "demo.mp4")
+	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
+		t.Fatalf("mkdir source directory: %v", err)
+	}
+	source := []byte("temporary-preview-audio")
+	if err := os.WriteFile(sourcePath, source, 0o644); err != nil {
+		t.Fatalf("write source video: %v", err)
+	}
+	previousLookPath := videoTrimLookPathFn
+	previousCommand := videoTrimCommandContextFn
+	t.Cleanup(func() {
+		videoTrimLookPathFn = previousLookPath
+		videoTrimCommandContextFn = previousCommand
+	})
+	videoTrimLookPathFn = func(name string) (string, error) { return name, nil }
+	videoTrimCommandContextFn = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		if name == "ffprobe" {
+			for _, arg := range args {
+				if arg == "format=duration" {
+					return exec.CommandContext(ctx, "sh", "-c", "printf 4")
+				}
+			}
+			return exec.CommandContext(ctx, "sh", "-c", "printf 1")
+		}
+		if name == "ffmpeg" {
+			return exec.CommandContext(ctx, "sh", "-c", "cp \"$1\" \"$2\"", "video-audio-preview-test", sourcePath, args[len(args)-1])
+		}
+		return exec.CommandContext(ctx, "sh", "-c", "exit 1")
+	}
+	server := httptest.NewServer(handleVideoAudioEditPreview(&Config{AgentDir: root}))
+	defer server.Close()
+	body, err := json.Marshal(VideoAudioEditRequest{AgentID: "agent-a", Path: "clips/demo.mp4", Tracks: []VideoAudioEditTrack{{Original: true, AudioMixTrack: AudioMixTrack{TrimStart: 0, TrimEnd: 0, Start: 0, Speed: 1, Volume: 1, LeftVolume: 1, RightVolume: 1}}}})
+	if err != nil {
+		t.Fatalf("marshal preview request: %v", err)
+	}
+	response, err := http.Post(server.URL, "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("POST video audio preview: %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK || !strings.HasPrefix(response.Header.Get("Content-Type"), "audio/wav") {
+		responseBody, _ := io.ReadAll(response.Body)
+		t.Fatalf("preview status=%d type=%q body=%s", response.StatusCode, response.Header.Get("Content-Type"), responseBody)
+	}
+	if data, err := io.ReadAll(response.Body); err != nil || !bytes.Equal(data, source) {
+		t.Fatalf("preview body=%q err=%v; want temporary audio", data, err)
+	}
+	if _, err := os.Stat(filepath.Join(workspace, "videos")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("preview created videos directory: %v", err)
 	}
 }
 
