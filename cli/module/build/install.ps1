@@ -886,16 +886,30 @@ set -u
 LOG_PATH="/home/deepright/deepright/integration.log"
 PID_FILE="/home/deepright/deepright/integration.pid"
 WRAPPER_PATH="/home/deepright/start-deepright.sh"
-LAUNCH_COMMAND="sudo -n /usr/bin/env HOME=/home/deepright TERM=xterm-256color /app/integration start"
 
-if ! sudo -n mkdir -p "$(dirname "$LOG_PATH")"; then
+# start.bat invokes this wrapper as root.  Minimal Ubuntu rootfs images may
+# not include sudo, and root does not need it.  Keep the wrapper usable when
+# launched directly by the deepright user as well.
+if [ "$(id -u)" -eq 0 ]; then
+  ELEVATE=()
+  LAUNCH_COMMAND="/usr/bin/env HOME=/home/deepright TERM=xterm-256color /app/integration start"
+else
+  if ! command -v sudo >/dev/null 2>&1 || ! sudo -n true; then
+    printf '%s\n' "integration must be started as root, or with passwordless sudo installed" >&2
+    exit 1
+  fi
+  ELEVATE=(sudo -n)
+  LAUNCH_COMMAND="sudo -n /usr/bin/env HOME=/home/deepright TERM=xterm-256color /app/integration start"
+fi
+
+if ! "${ELEVATE[@]}" mkdir -p "$(dirname "$LOG_PATH")"; then
   printf '%s\n' "failed to create integration log directory" >&2
   exit 1
 fi
 
 log_launch() {
   if ! printf '%s [integration launcher] %s\n' "$(date --iso-8601=seconds)" "$*" \
-    | sudo -n tee -a "$LOG_PATH" >/dev/null; then
+    | "${ELEVATE[@]}" tee -a "$LOG_PATH" >/dev/null; then
     printf '%s\n' "failed to write integration log" >&2
     return 1
   fi
@@ -904,8 +918,8 @@ log_launch() {
 if ! log_launch "start requested wrapper=$WRAPPER_PATH command=$LAUNCH_COMMAND log_path=$LOG_PATH pid_file=$PID_FILE launcher_pid=$$ launcher_uid=$(id -u)"; then
   exit 1
 fi
-setsid sudo -n /usr/bin/env HOME=/home/deepright TERM=xterm-256color /app/integration start 2>&1 \
-  | sudo -n tee -a "$LOG_PATH" >/dev/null
+setsid "${ELEVATE[@]}" /usr/bin/env HOME=/home/deepright TERM=xterm-256color /app/integration start 2>&1 \
+  | "${ELEVATE[@]}" tee -a "$LOG_PATH" >/dev/null
 pipeline_status=("${PIPESTATUS[@]}")
 status=${pipeline_status[0]}
 if [ "${pipeline_status[1]}" -ne 0 ]; then
@@ -928,8 +942,11 @@ log_launch "start completed exit_code=$status integration_pid=${pid:-unknown} in
 exit "$status"
 '@
 $startWrapperBase64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($startWrapper))
-& wsl.exe -d $DISTRO_NAME -u deepright -- bash -c "printf '%s' '$startWrapperBase64' | base64 -d > /home/deepright/start-deepright.sh"
-& wsl.exe -d $DISTRO_NAME -u deepright -- chmod +x /home/deepright/start-deepright.sh
+& wsl.exe -d $DISTRO_NAME -u root -- bash -c "printf '%s' '$startWrapperBase64' | base64 -d > /home/deepright/start-deepright.sh && chown deepright:deepright /home/deepright/start-deepright.sh && chmod 755 /home/deepright/start-deepright.sh"
+if ($LASTEXITCODE -ne 0) {
+    L_Err "Failed to create WSL start wrapper"
+    exit 1
+}
 L_OK "Wrapper script: /home/deepright/start-deepright.sh"
 
 # ====================================================================
@@ -1033,6 +1050,14 @@ Write-Host ""
 # ---- Start integration ----
 L_Step "Starting integration service"
 Write-Host ""
-& wsl.exe -d $DISTRO_NAME -- bash /home/deepright/start-deepright.sh 2>&1 | Write-Host
+$startOutput = & wsl.exe -d $DISTRO_NAME -u root -- bash /home/deepright/start-deepright.sh 2>&1 | Out-String
+$startExitCode = $LASTEXITCODE
+if (-not [string]::IsNullOrWhiteSpace($startOutput)) {
+    Write-Host $startOutput.TrimEnd()
+}
 Write-Host ""
+if ($startExitCode -ne 0) {
+    L_Err "Integration failed to start (exit code $startExitCode)"
+    exit $startExitCode
+}
 L_OK "Integration started"

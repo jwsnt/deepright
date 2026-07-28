@@ -4280,6 +4280,10 @@ body.quick-fan-transition-active{cursor:progress}
 .file-editor-panel.auto-size{width:auto;height:auto;min-width:300px;min-height:200px}
 .file-editor-panel.image-editor{width:min(1000px,calc(100vw - 32px))}
 .file-editor-panel.image-editor .file-editor-content{min-height:0}
+.file-editor-panel.media-preview{width:min(960px,calc(100vw - 32px))}
+.file-editor-panel.media-preview .file-editor-content{display:flex;align-items:center;justify-content:center;min-height:0;overflow:auto}
+.file-editor-panel.media-preview .fe-video-stage{flex:0 1 auto;max-height:100%}
+.file-editor-panel.media-preview .fe-video-stage .fe-video{max-height:100%;object-fit:contain}
 .file-editor-panel:not(.auto-size){height:700px}
 .file-editor-header{padding:8px 12px;font-size:12px;color:var(--text-muted);border-bottom:1px solid color-mix(in srgb,var(--border) 56%,rgba(255,255,255,.26));display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:linear-gradient(180deg,rgba(255,255,255,.58),rgba(255,255,255,.3))}
 #fileEditorPath{color:#40577f;font-weight:600;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -6561,6 +6565,13 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
         <input class="fe-media-trim-filename-input" id="feMediaTrimFilenameInput" type="text" autocomplete="off" spellcheck="false" aria-label="新文件名" onkeydown="feHandleMediaTrimFilenameKeydown(event)" />
         <div class="fe-media-trim-filename-error" id="feMediaTrimFilenameError" role="alert"></div>
         <div class="fe-media-trim-filename-actions"><button type="button" onclick="feCancelMediaTrimFilename()">取消</button><button class="confirm" type="button" onclick="feConfirmMediaTrimFilename()">确认保存</button></div>
+      </div>
+    </div>
+    <div class="fe-media-trim-filename-dialog" id="feVideoAudioExtractConfirmDialog" role="dialog" aria-modal="true" aria-labelledby="feVideoAudioExtractConfirmTitle" aria-describedby="feVideoAudioExtractConfirmDesc" hidden>
+      <div class="fe-media-trim-filename-card">
+        <h3 id="feVideoAudioExtractConfirmTitle">提取音频</h3>
+        <p id="feVideoAudioExtractConfirmDesc">是否提取此视频的音频？</p>
+        <div class="fe-media-trim-filename-actions"><button type="button" onclick="feCancelVideoAudioExtractConfirm()">取消</button><button class="confirm" type="button" id="feVideoAudioExtractConfirmBtn" onclick="feConfirmVideoAudioExtract()">确认</button></div>
       </div>
     </div>
   </div>
@@ -51067,6 +51078,7 @@ let feFFmpegInstallOrigin = '';
 let feMediaTrimFilenameRequest = null;
 let feVideoFrameSavePending = false;
 let feVideoAudioExtractPending = false;
+let feVideoAudioExtractConfirmOpen = false;
 let feImageGridState = {
   active: false,
   xLines: [],
@@ -51770,6 +51782,7 @@ function feEnterColorPicker() {
 }
 
 function feToggleColorPicker() {
+  if (feVideoTrimState.active) feCancelVideoTrim();
   if (feColorPickerActive) feExitColorPicker();
   else feEnterColorPicker();
 }
@@ -51879,6 +51892,7 @@ function feEnterCoordinatePicker() {
 }
 
 function feToggleCoordinatePicker() {
+  if (feVideoTrimState.active) feCancelVideoTrim();
   if (feCoordinatePickerActive || feCoordinatePickerDialogVisible) feCancelCoordinatePicker();
   else feShowCoordinatePickerDialog();
 }
@@ -52517,6 +52531,7 @@ async function feOpen(absPath, options) {
   const content = document.getElementById('fileEditorContent');
   feRevokePreviewBlobUrls(content);
   panel.classList.toggle('image-editor', feFileType === 'image');
+  panel.classList.toggle('media-preview', feFileType === 'audio' || feFileType === 'video');
 
   // Unsupported: show message only
   if (feFileType === 'unsupported') {
@@ -52581,7 +52596,8 @@ async function feOpen(absPath, options) {
 
   // Audio/video: stream through the Agent-scoped preview endpoint; focused media tools stay in the preview overlay.
   if (feFileType === 'audio' || feFileType === 'video') {
-    panel.classList.add('auto-size');
+    panel.classList.remove('auto-size');
+    panel.classList.add('media-preview');
     tabs.style.display = 'none';
     actions.style.display = 'none';
     showExclusiveOverlay(document.getElementById('fileEditorOverlay'));
@@ -52598,7 +52614,7 @@ async function feOpen(absPath, options) {
   }
 
   // Text / HTML: load via /api/data, show tabs and actions
-  panel.classList.remove('auto-size', 'image-editor');
+  panel.classList.remove('auto-size', 'image-editor', 'media-preview');
   tabs.style.display = '';
   actions.style.display = '';
   feUpdateTabs();
@@ -53509,7 +53525,7 @@ function feClose() {
   feRevokePreviewBlobUrls(content);
   setOverlayVisible(document.getElementById('fileEditorOverlay'), false);
   const panel = document.querySelector('.file-editor-panel');
-  panel.classList.remove('auto-size', 'image-editor');
+  panel.classList.remove('auto-size', 'image-editor', 'media-preview');
   feCurrentPath = '';
   feCurrentContent = '';
   feAgentRelPath = '';
@@ -54012,6 +54028,18 @@ function handleOverlayKeyboardShortcuts(event) {
 }
 
 document.addEventListener('keydown', e => {
+  if (feVideoAudioExtractConfirmDialogOpen()) {
+    if (!e.isComposing && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'Escape') {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      feCancelVideoAudioExtractConfirm();
+    } else if (!e.isComposing && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      feConfirmVideoAudioExtract();
+    }
+    return;
+  }
   if (feFFmpegInstallDialogOpen()) {
     if (!e.isComposing && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'Escape') {
       e.preventDefault();
@@ -54442,9 +54470,9 @@ function feUpdateVideoTrimButton() {
   if (!button) return;
   const available = feFileType === 'video' && feMediaElement() instanceof HTMLVideoElement;
   button.hidden = !available;
-  button.disabled = !available || feVideoTrimState.active || feVideoTrimState.saving || feVideoTrimCheckPending || feVideoAudioExtractPending;
+  button.disabled = !available || feVideoTrimState.saving || feVideoTrimCheckPending || feVideoAudioExtractPending || feVideoFrameSavePending;
   button.setAttribute('aria-pressed', feVideoTrimState.active ? 'true' : 'false');
-  button.title = feVideoAudioExtractPending ? '正在提取音频' : (feVideoTrimCheckPending ? '正在检查视频编辑环境' : (feVideoTrimState.active ? '正在编辑视频' : '编辑视频'));
+  button.title = feVideoAudioExtractPending ? '正在提取音频' : (feVideoTrimCheckPending ? '正在检查视频编辑环境' : (feVideoTrimState.active ? '退出视频剪辑' : '编辑视频'));
   button.setAttribute('aria-label', button.title);
 }
 
@@ -54453,10 +54481,10 @@ function feUpdateVideoAudioExtractButton() {
   const media = feMediaElement();
   if (!button) return;
   const available = feFileType === 'video' && media instanceof HTMLVideoElement;
-  const blockedByEditing = feVideoTrimState.active || feVideoTrimCheckPending;
+  const blockedByChecking = feVideoTrimCheckPending;
   button.hidden = !available;
-  button.disabled = !available || blockedByEditing || feVideoAudioExtractPending || feVideoFrameSavePending;
-  button.title = feVideoAudioExtractPending ? '正在提取音频' : (blockedByEditing ? '视频编辑时不可提取音频' : '提取音频');
+  button.disabled = !available || blockedByChecking || feVideoAudioExtractPending || feVideoFrameSavePending;
+  button.title = feVideoAudioExtractPending ? '正在提取音频' : (blockedByChecking ? '正在检查视频编辑环境' : '提取音频');
   button.setAttribute('aria-label', button.title);
 }
 
@@ -54466,12 +54494,12 @@ function feUpdateVideoFrameButton() {
   if (!button) return;
   const available = feFileType === 'video' && media instanceof HTMLVideoElement;
   const frameReady = available && media.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && media.videoWidth > 0 && media.videoHeight > 0;
-  const blockedByEditing = feVideoTrimState.active || feVideoTrimCheckPending || feVideoAudioExtractPending;
+  const blockedByChecking = feVideoTrimCheckPending || feVideoAudioExtractPending;
   const playing = available && !media.paused;
   button.hidden = !available;
-  button.disabled = !frameReady || playing || blockedByEditing || feVideoFrameSavePending;
+  button.disabled = !frameReady || playing || blockedByChecking || feVideoFrameSavePending;
   button.classList.toggle('video-frame-playing', playing);
-  button.title = feVideoFrameSavePending ? '正在保存图片' : (feVideoAudioExtractPending ? '正在提取音频' : (blockedByEditing ? '视频编辑时不可提取帧' : (playing ? '请先暂停视频' : (!frameReady ? '正在读取当前视频帧' : '提取帧'))));
+  button.title = feVideoFrameSavePending ? '正在保存图片' : (feVideoAudioExtractPending ? '正在提取音频' : (feVideoTrimCheckPending ? '正在检查视频编辑环境' : (playing ? '请先暂停视频' : (!frameReady ? '正在读取当前视频帧' : '提取帧'))));
   button.setAttribute('aria-label', button.title);
 }
 
@@ -54879,6 +54907,8 @@ function feSyncVideoTrimUI() {
     feSetVideoTrimSummary(summary, false);
   }
   feRenderVideoCropOverlay();
+  feUpdateColorPickerButton();
+  feUpdateCoordinatePickerButton();
   feUpdateVideoTrimButton();
   feUpdateVideoAudioExtractButton();
   feUpdateVideoFrameButton();
@@ -54921,6 +54951,9 @@ function feResetVideoFrame() {
 
 function feResetVideoAudioExtract() {
   feVideoAudioExtractPending = false;
+  feVideoAudioExtractConfirmOpen = false;
+  const dialog = document.getElementById('feVideoAudioExtractConfirmDialog');
+  if (dialog) dialog.hidden = true;
   const button = document.getElementById('feVideoAudioExtractBtn');
   if (!button) return;
   button.hidden = true;
@@ -54962,7 +54995,7 @@ function feCancelFFmpegInstall() {
     document.querySelector('#vfsCreatePanel .vfs-create-actions .btn-primary')?.focus({ preventScroll: true });
     return;
   }
-  const button = document.getElementById('feVideoTrimBtn');
+  const button = document.getElementById(origin === 'video-audio-extract' ? 'feVideoAudioExtractBtn' : 'feVideoTrimBtn');
   if (button && !button.disabled) button.focus({ preventScroll: true });
 }
 
@@ -54993,6 +55026,10 @@ async function feConfirmFFmpegInstall() {
 
 async function feEnterVideoTrim() {
   if (feVideoTrimCheckPending || feVideoAudioExtractPending || feFFmpegInstallDialogOpen()) return;
+  if (feVideoTrimState.active) {
+    feCancelVideoTrim();
+    return;
+  }
   const media = feMediaElement();
   const duration = feGetVideoTrimDuration();
   if (!(media instanceof HTMLVideoElement) || !duration) {
@@ -55016,8 +55053,8 @@ async function feEnterVideoTrim() {
       return;
     }
     try { media.pause(); } catch {}
-    feResetColorPicker();
-    feResetCoordinatePicker();
+    feExitColorPicker();
+    feCancelCoordinatePicker();
     feVideoTrimState.active = true;
     feVideoTrimState.saving = false;
     feVideoTrimState.start = 0;
@@ -55256,7 +55293,8 @@ async function feSaveVideoTrim() {
 }
 
 async function feExtractVideoFrame() {
-  if (feVideoFrameSavePending || feVideoAudioExtractPending || feVideoTrimState.active || feVideoTrimCheckPending) return;
+  if (feVideoFrameSavePending || feVideoAudioExtractPending || feVideoTrimCheckPending) return;
+  if (feVideoTrimState.active) feCancelVideoTrim();
   const media = feMediaElement();
   if (!(media instanceof HTMLVideoElement)) return;
   if (!media.paused) {
@@ -55331,14 +55369,90 @@ async function feExtractVideoFrame() {
   }
 }
 
-async function feExtractVideoAudio() {
-  if (feVideoAudioExtractPending || feVideoFrameSavePending || feVideoTrimState.active || feVideoTrimCheckPending) return;
+function feVideoAudioExtractConfirmDialogOpen() {
+  const dialog = document.getElementById('feVideoAudioExtractConfirmDialog');
+  return feVideoAudioExtractConfirmOpen && !!dialog && !dialog.hidden;
+}
+
+function feShowVideoAudioExtractConfirm() {
+  const dialog = document.getElementById('feVideoAudioExtractConfirmDialog');
+  const confirm = document.getElementById('feVideoAudioExtractConfirmBtn');
+  if (!dialog || !confirm) {
+    feSetMediaStatus('无法显示提取音频确认');
+    return;
+  }
+  feVideoAudioExtractConfirmOpen = true;
+  dialog.hidden = false;
+  window.setTimeout(() => confirm.focus({ preventScroll: true }), 0);
+}
+
+function feCancelVideoAudioExtractConfirm() {
+  const wasOpen = feVideoAudioExtractConfirmDialogOpen();
+  const dialog = document.getElementById('feVideoAudioExtractConfirmDialog');
+  if (dialog) dialog.hidden = true;
+  feVideoAudioExtractConfirmOpen = false;
+  const button = document.getElementById('feVideoAudioExtractBtn');
+  if (wasOpen && button && !button.disabled) button.focus({ preventScroll: true });
+}
+
+function feConfirmVideoAudioExtract() {
+  if (!feVideoAudioExtractConfirmDialogOpen()) return;
+  const dialog = document.getElementById('feVideoAudioExtractConfirmDialog');
+  if (dialog) dialog.hidden = true;
+  feVideoAudioExtractConfirmOpen = false;
+  void feStartVideoAudioExtract();
+}
+
+function feExtractVideoAudio() {
+  if (feVideoAudioExtractPending || feVideoFrameSavePending || feVideoTrimCheckPending || feVideoAudioExtractConfirmDialogOpen()) return;
   const media = feMediaElement();
   const agentId = feGetPreviewAgentID();
   if (!(media instanceof HTMLVideoElement) || !agentId || !feAgentRelPath || feAgentRelPath.startsWith('/')) {
     feSetMediaStatus('无法确定需要提取的视频或 Agent 工作目录');
     return;
   }
+  feShowVideoAudioExtractConfirm();
+}
+
+async function feStartVideoAudioExtract() {
+  if (feVideoAudioExtractPending || feVideoFrameSavePending || feVideoTrimCheckPending) return;
+  if (feVideoTrimState.active) feCancelVideoTrim();
+  const media = feMediaElement();
+  const agentId = feGetPreviewAgentID();
+  if (!(media instanceof HTMLVideoElement) || !agentId || !feAgentRelPath || feAgentRelPath.startsWith('/')) {
+    feSetMediaStatus('无法确定需要提取的视频或 Agent 工作目录');
+    return;
+  }
+  const checkRequest = ++feVideoTrimCheckRequest;
+  feVideoTrimCheckPending = true;
+  feSetMediaStatus('正在检查视频编辑环境…');
+  feUpdateVideoAudioExtractButton();
+  feUpdateVideoFrameButton();
+  feUpdateVideoTrimButton();
+  try {
+    const response = await fetch('/api/ffmpeg/check?_=' + Date.now(), { cache: 'no-store' });
+    let result = null;
+    try { result = await response.json(); } catch {}
+    if (checkRequest !== feVideoTrimCheckRequest || media !== feMediaElement()) return;
+    if (!response.ok || !result || result.status !== 0) throw new Error(result && result.content || '无法检查 FFmpeg 配置');
+    if (!result.available) {
+      feShowFFmpegInstallDialog(result.install, 'video-audio-extract');
+      return;
+    }
+  } catch (error) {
+    if (checkRequest === feVideoTrimCheckRequest && media === feMediaElement()) {
+      feSetMediaStatus('视频编辑环境检查失败：' + (error && error.message || '请稍后重试'));
+    }
+    return;
+  } finally {
+    if (checkRequest === feVideoTrimCheckRequest) {
+      feVideoTrimCheckPending = false;
+      feUpdateVideoAudioExtractButton();
+      feUpdateVideoFrameButton();
+      feUpdateVideoTrimButton();
+    }
+  }
+  if (media !== feMediaElement()) return;
   feVideoAudioExtractPending = true;
   feSetMediaStatus('正在提取音频…');
   feSyncMediaTrimSaveLock();

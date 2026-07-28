@@ -87,13 +87,13 @@ start.bat
 
 也可以直接使用安装时自动创建的 `DeepRight` 桌面/开始菜单快捷方式，图标与应用主站点资源保持一致。
 
-该脚本会在 WSL 中以非交互式 sudo 执行：
+快速启动入口会以 root 运行包装脚本，并直接执行：
 
 ```sh
-sudo -n /usr/bin/env HOME=/home/deepright /app/integration start
+/usr/bin/env HOME=/home/deepright /app/integration start
 ```
 
-安装器会为 `deepright` 配置免密 sudo；`-n` 确保启动过程不会等待密码输入。虽然进程以 root 运行，HOME 保持为 `/home/deepright`，因此会继续使用原有的 agent 和运行时数据目录。
+直接从 `deepright` 用户执行包装脚本时，它会使用配置好的免密 `sudo`。因此精简 Ubuntu Rootfs 尚未安装 `sudo` 时，Windows 启动入口仍可正常运行。进程以 root 身份运行，但 HOME 保持为 `/home/deepright`，因此会继续使用原有的 agent 和运行时数据目录。
 
 每次启动会在以下日志文件记录包装脚本路径、完整启动命令、PID 文件路径、启动器 PID、退出码，以及最终 integration 进程的 PID、UID、用户名：
 
