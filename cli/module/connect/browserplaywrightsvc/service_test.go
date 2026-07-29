@@ -248,6 +248,52 @@ func TestShouldUseFreshNavigationPage(t *testing.T) {
 	}
 }
 
+func TestSessionRequiresCDPReconnect(t *testing.T) {
+	tests := []struct {
+		name       string
+		currentCDP string
+		flags      map[string]string
+		want       bool
+	}{
+		{
+			name:       "no cdp supplied",
+			currentCDP: "ws://127.0.0.1:9222/devtools/browser/first",
+			flags:      map[string]string{},
+			want:       false,
+		},
+		{
+			name:       "same cdp",
+			currentCDP: "ws://127.0.0.1:9222/devtools/browser/first",
+			flags: map[string]string{
+				"cdp": "ws://127.0.0.1:9222/devtools/browser/first",
+			},
+			want: false,
+		},
+		{
+			name:       "new browser cdp",
+			currentCDP: "ws://127.0.0.1:9222/devtools/browser/first",
+			flags: map[string]string{
+				"cdp": "ws://127.0.0.1:9222/devtools/browser/restarted",
+			},
+			want: true,
+		},
+		{
+			name:       "attach cdp to a local session",
+			currentCDP: "",
+			flags: map[string]string{
+				"cdp": "ws://127.0.0.1:9222/devtools/browser/restarted",
+			},
+			want: true,
+		},
+	}
+
+	for _, tc := range tests {
+		if got := sessionRequiresCDPReconnect(tc.currentCDP, tc.flags); got != tc.want {
+			t.Fatalf("%s: sessionRequiresCDPReconnect(%q, %+v) = %v, want %v", tc.name, tc.currentCDP, tc.flags, got, tc.want)
+		}
+	}
+}
+
 func TestAttachWithoutCDPRequiresFlagOrSavedConfig(t *testing.T) {
 	svc := newDaemonService(Options{StateDir: t.TempDir()}, log.New(io.Discard, "", 0))
 

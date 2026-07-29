@@ -247,7 +247,12 @@ func (d *daemonService) execute(req CommandRequest) (*CommandResult, error) {
 
 func (d *daemonService) ensureSession(name, command string, flags map[string]string) (*liveSession, error) {
 	if existing := d.sessions[name]; existing != nil {
-		return existing, nil
+		if !sessionRequiresCDPReconnect(existing.config.CDP, flags) {
+			return existing, nil
+		}
+		if err := d.closeSessionWithReason(name, "session_cdp_changed"); err != nil {
+			return nil, err
+		}
 	}
 	config, err := d.loadOrCreateConfig(name, flags)
 	if err != nil {
@@ -312,6 +317,18 @@ func (d *daemonService) ensureSession(name, command string, flags map[string]str
 	}
 	d.sessions[name] = sess
 	return sess, nil
+}
+
+// sessionRequiresCDPReconnect reports whether a command resolved a different
+// CDP endpoint for an existing session. Managed instances may restart Chrome
+// while keeping the same Agent@Chat session and user-data-dir; the Playwright
+// connection, unlike the profile, cannot survive that process replacement.
+func sessionRequiresCDPReconnect(currentCDP string, flags map[string]string) bool {
+	nextCDP, ok := flags["cdp"]
+	if !ok {
+		return false
+	}
+	return strings.TrimSpace(currentCDP) != strings.TrimSpace(nextCDP)
 }
 
 func (d *daemonService) attachSessionHooks(sess *liveSession) {
