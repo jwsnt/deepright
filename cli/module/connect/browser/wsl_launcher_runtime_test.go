@@ -35,6 +35,38 @@ func TestBrowserResolveLauncherScriptPathRecreatesMissingLauncher(t *testing.T) 
 	if !strings.Contains(text, `exec "$BROWSER_BIN" __wsl-instance acquire "$@"`) {
 		t.Fatalf("launcher script missing acquire command: %s", text)
 	}
+	if !strings.Contains(text, browserLauncherScriptMarker) {
+		t.Fatalf("launcher script missing version marker: %s", text)
+	}
+}
+
+func TestBrowserResolveLauncherScriptPathRecreatesOutdatedLauncher(t *testing.T) {
+	restore := stubBrowserRuntime()
+	defer restore()
+
+	pluginDir := t.TempDir()
+	browserExecutablePathFn = func() (string, error) {
+		return filepath.Join(pluginDir, "browser"), nil
+	}
+	if err := os.WriteFile(filepath.Join(pluginDir, "browser"), []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	launcherPath := filepath.Join(pluginDir, browserLauncherScriptName)
+	if err := os.WriteFile(launcherPath, []byte("#!/bin/sh\ninvalid ()\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	scriptPath, err := browserResolveLauncherScriptPath(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content, err := os.ReadFile(scriptPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !browserLauncherScriptIsCurrent(scriptPath) {
+		t.Fatalf("outdated launcher was not replaced: %s", content)
+	}
 }
 
 func TestBrowserResolveInstanceInitRuntimeConfigUsesRecordedIntegrationConfig(t *testing.T) {

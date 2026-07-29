@@ -16,10 +16,12 @@ import (
 
 const (
 	browserLauncherScriptName     = "browser_launcher.sh"
+	browserLauncherScriptMarker   = "# DeepRight browser launcher v1"
 	browserLauncherScriptTimeout  = 45 * time.Second
 	browserWSLForceRecreateEnv    = "DEEPRIGHT_BROWSER_WSL_FORCE_RECREATE"
 	browserWSLInitTimeoutEnv      = "DEEPRIGHT_BROWSER_INIT_TIMEOUT_SECONDS"
 	browserEmbeddedLauncherScript = `#!/bin/sh
+# DeepRight browser launcher v1
 
 set -eu
 
@@ -77,7 +79,7 @@ func browserResolveLauncherScriptPath(flags map[string]string) (string, error) {
 	}
 	for _, candidate := range candidates {
 		info, statErr := os.Stat(candidate)
-		if statErr != nil || info.IsDir() {
+		if statErr != nil || info.IsDir() || !browserLauncherScriptIsCurrent(candidate) {
 			continue
 		}
 		if absPath, absErr := filepath.Abs(candidate); absErr == nil {
@@ -93,6 +95,16 @@ func browserResolveLauncherScriptPath(flags map[string]string) (string, error) {
 		return absPath, nil
 	}
 	return materialized, nil
+}
+
+func browserLauncherScriptIsCurrent(path string) bool {
+	content, err := browserReadFileFn(path)
+	if err != nil {
+		return false
+	}
+	script := string(content)
+	return strings.Contains(script, browserLauncherScriptMarker) &&
+		strings.Contains(script, `exec "$BROWSER_BIN" __wsl-instance acquire "$@"`)
 }
 
 func browserRunWSLLauncher(ctx context.Context, flags map[string]string, agentID, chatID string, headless, forceRecreate bool, chromePath string) (browserWSLLauncherRunResult, error) {

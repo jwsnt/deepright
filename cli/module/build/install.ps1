@@ -914,9 +914,23 @@ $WSL_APP_TARGET = "/app"
 if (Test-Path $APP_DIR) {
     $fs = Get-ChildItem -Path $APP_DIR -Recurse -File -EA SilentlyContinue
     if ($fs.Count -eq 0) {
-        L_Warn "app dir is empty, skipping"
-        L_Info "Place program files in: $APP_DIR then re-run"
+        L_Err "app dir is empty; refusing to install an incomplete release"
+        L_Info "Place the complete release, including plugins/, in: $APP_DIR then re-run"
+        exit 1
     } else {
+        $sourcePluginsDir = Join-Path $APP_DIR "plugins"
+        if (-not (Test-Path -Path $sourcePluginsDir -PathType Container)) {
+            L_Err "Release plugins directory is missing: $sourcePluginsDir"
+            L_Err "Refusing to continue because WSL plugins must be refreshed from the current release"
+            exit 1
+        }
+        $sourcePluginFiles = @(Get-ChildItem -Path $sourcePluginsDir -Recurse -File -EA SilentlyContinue)
+        if ($sourcePluginFiles.Count -eq 0) {
+            L_Err "Release plugins directory is empty: $sourcePluginsDir"
+            L_Err "Refusing to continue because WSL plugins must be refreshed from the current release"
+            exit 1
+        }
+
         if ($copyAppOnlyMode) {
             L_Info "Fast path enabled: force refreshing app files in ${WSL_APP_TARGET}/"
         } else {
@@ -926,19 +940,40 @@ if (Test-Path $APP_DIR) {
         L_Info "Source app dir: $APP_DIR"
         L_Info "Target WSL dir: ${WSL_APP_TARGET}/"
         L_Info "Copying $($fs.Count) files..."
+        L_Info "Refreshing $($sourcePluginFiles.Count) plugin files from the current release"
         L_Info "Clearing existing ${WSL_APP_TARGET}/ contents before copy"
         $wp = WslPath -P $APP_DIR
-        $copyOut = & wsl.exe -d $DISTRO_NAME -u root -- bash -lc "set -e; mkdir -p '${WSL_APP_TARGET}'; find '${WSL_APP_TARGET}' -mindepth 1 -maxdepth 1 -exec rm -rf {} +; cp -a '${wp}'/. '${WSL_APP_TARGET}/'; chown -R deepright:deepright '${WSL_APP_TARGET}/'; chmod -R u+rw '${WSL_APP_TARGET}/'" 2>&1 | Out-String
+        $copyCommand = @"
+set -e
+source_plugins='${wp}/plugins'
+target_app='${WSL_APP_TARGET}'
+target_plugins="`$target_app/plugins"
+test -d "`$source_plugins"
+find "`$source_plugins" -type f -print -quit | grep -q .
+mkdir -p "`$target_app"
+find "`$target_app" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+cp -a '${wp}'/. "`$target_app/"
+test -d "`$target_plugins"
+find "`$target_plugins" -type f -print -quit | grep -q .
+diff -qr "`$source_plugins" "`$target_plugins"
+chown -R deepright:deepright "`$target_app/"
+chmod -R u+rw "`$target_app/"
+"@
+        $copyCommandBase64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($copyCommand))
+        $copyRunner = "set -e; printf '%s' '$copyCommandBase64' | base64 -d | bash"
+        $copyOut = & wsl.exe -d $DISTRO_NAME -u root -- bash -lc $copyRunner 2>&1 | Out-String
+        $copyExitCode = $LASTEXITCODE
         if (-not [string]::IsNullOrWhiteSpace($copyOut)) {
             Add-Content -Path $LOG_FILE -Value "copy-app: $copyOut" -Encoding UTF8
             Write-Host $copyOut -ForegroundColor DarkGray
         }
-        if ($LASTEXITCODE -eq 0) {
-            L_OK "App package force-copied to ${WSL_APP_TARGET}/"
+        if ($copyExitCode -eq 0) {
+            L_OK "App package and plugins force-copied to ${WSL_APP_TARGET}/"
             $cl = & wsl.exe -d $DISTRO_NAME -- bash -lc "echo '[WSL /app]'; ls -la '${WSL_APP_TARGET}/'; echo; if [ -d '${WSL_APP_TARGET}/plugins' ]; then echo '[WSL /app/plugins]'; ls -la '${WSL_APP_TARGET}/plugins'; fi" 2>&1 | Out-String
             Write-Host $cl -F DarkGray
         } else {
-            L_Err "App package refresh failed"
+            L_Err "App package or plugins refresh verification failed (exit code $copyExitCode)"
+            L_Err "Installation stopped so WSL cannot run with stale or partial plugins"
             if ($copyAppOnlyMode) {
                 L_Info "If the distro is actually missing, remove the local sentinel and rerun the installer for a full install"
             }
@@ -946,9 +981,9 @@ if (Test-Path $APP_DIR) {
         }
     }
 } else {
-    L_Warn "app dir not found: $APP_DIR"
-    New-Item -ItemType Directory -Path $APP_DIR -Force | Out-Null
-    L_Info "Created empty app dir"
+    L_Err "Release app dir not found: $APP_DIR"
+    L_Err "Installation stopped because the current release and its plugins cannot be copied"
+    exit 1
 }
 
 # ====================================================================

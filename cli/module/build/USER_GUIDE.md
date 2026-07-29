@@ -120,7 +120,8 @@ WSL 包装脚本只负责等待服务在 `config/config.json` 的 `port` 上就�
 - 已安装的 WSL2 不会重复安装
 - 已存在且健康的 `deepright` 发行版不会重复导入
 - apt 依赖只补齐缺失项
-- release 目录会重新覆盖复制，确保 WSL 中的运行文件与当前包一致
+- 每次安装都会先清空 WSL 的 `/app`，再覆盖复制当前 release；其中 `plugins/` 必须存在且非空
+- 复制完成后，安装器会校验 WSL 的 `/app/plugins` 与当前 release 的 `plugins/` 内容一致；缺失、复制失败或校验不一致都会报错并终止安装，避免使用旧版或残缺插件
 - Ubuntu rootfs 会根据 Windows 主机架构自动选择 `amd64` 或 `arm64`
 
 ## 默认约定
