@@ -51,7 +51,7 @@ function Write-RemovalPreview([string]$Path, [string]$Label) {
     }
 }
 
-function Remove-PathIfExists([string]$Path, [string]$Label) {
+function Remove-PathIfExists([string]$Path, [string]$Label, [switch]$AllowDelayedCleanup) {
     if (-not (Test-Path -LiteralPath $Path)) {
         L_Info "$Label not found: $Path"
         return
@@ -62,6 +62,11 @@ function Remove-PathIfExists([string]$Path, [string]$Label) {
         Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
         L_OK "$Label removed: $Path"
     } catch {
+        if ($AllowDelayedCleanup) {
+            L_Warn "$Label is still in use; cleanup will continue after the uninstaller exits: $Path"
+            Start-DelayedDelete -Path $Path
+            return
+        }
         L_Err "$Label remove failed: $Path"
         throw
     }
@@ -186,8 +191,24 @@ function Start-DelayedDelete([string]$Path) {
 
     try {
         Write-RemovalPreview -Path $Path -Label "Delayed cleanup target"
-        Start-Process -FilePath "cmd.exe" -WindowStyle Hidden -ArgumentList "/c", "ping 127.0.0.1 -n 4 >nul && rmdir /s /q `"$Path`""
-        L_Info "Scheduled cleanup: $Path"
+        $escapedPath = $Path.Replace("'", "''")
+        $cleanupScript = @"
+Start-Sleep -Seconds 2
+`$targetPath = '$escapedPath'
+for (`$attempt = 0; `$attempt -lt 60; `$attempt++) {
+    try {
+        if (-not (Test-Path -LiteralPath `$targetPath)) { exit 0 }
+        Remove-Item -LiteralPath `$targetPath -Recurse -Force -ErrorAction Stop
+        exit 0
+    } catch {
+        Start-Sleep -Seconds 1
+    }
+}
+exit 1
+"@
+        $encodedScript = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($cleanupScript))
+        Start-Process -FilePath "powershell.exe" -WindowStyle Hidden -ArgumentList @("-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-EncodedCommand", $encodedScript)
+        L_Info "Scheduled deferred cleanup (up to 60 seconds): $Path"
     } catch {
         L_Warn "Failed to schedule cleanup: $Path"
     }
@@ -252,7 +273,10 @@ try {
         L_Step "Step 2/3: Remove Windows install state and extracted payload"
     }
     Remove-PathIfExists -Path $LOCAL_SENTINEL_FILE -Label "Install sentinel file"
-    Remove-PathIfExists -Path $LOCAL_CACHE_DIR -Label "Local extracted payload directory"
+    # The installer, Explorer, or a just-closed launcher can retain a handle
+    # under this cache briefly. Do not abort an otherwise valid uninstall;
+    # the detached cleanup process retries after this script has exited.
+    Remove-PathIfExists -Path $LOCAL_CACHE_DIR -Label "Local extracted payload directory" -AllowDelayedCleanup
 
     if ($RemoveAll) {
         L_Step "Step 3/4: Remove WSL distro"

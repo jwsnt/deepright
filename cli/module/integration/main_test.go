@@ -2988,79 +2988,30 @@ func TestIntegrationDetectInstallAppInstalledFindsCommonMacUserBin(t *testing.T)
 	}
 }
 
-func TestHandleInstallAppMergesConfiguredEntries(t *testing.T) {
-	oldwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
+func TestIntegrationWSLInstallAppDetectionIgnoresWindowsExecutables(t *testing.T) {
+	oldPlatformFn := integrationInstallAppPlatformKeyFn
+	oldLookPathFn := integrationInstallAppLookPathFn
+	oldStatFn := integrationInstallAppStatFn
+	integrationInstallAppPlatformKeyFn = func() string { return "wsl" }
+	integrationInstallAppLookPathFn = func(string) (string, error) { return "", exec.ErrNotFound }
+	integrationInstallAppStatFn = func(string) (os.FileInfo, error) {
+		return testOpenSystemTargetFileInfo{}, nil
 	}
-	tmp := t.TempDir()
-	if err := os.Chdir(tmp); err != nil {
-		t.Fatalf("chdir: %v", err)
-	}
-	defer os.Chdir(oldwd)
-
-	writeRuntimeConfig(map[string]interface{}{
-		"install_app": "node,git,node,python,python3",
-	})
-
-	oldDetectorFn := integrationInstallAppDetectorFn
-	oldNowFn := integrationInstallAppNowFn
-	integrationInstallAppDetectorFn = func(string) bool { return false }
-	integrationInstallAppNowFn = func() time.Time {
-		return time.Unix(1710000000, 0)
-	}
-	integrationResetInstallAppAvailabilityCache()
 	defer func() {
-		integrationInstallAppDetectorFn = oldDetectorFn
-		integrationInstallAppNowFn = oldNowFn
-		integrationResetInstallAppAvailabilityCache()
+		integrationInstallAppPlatformKeyFn = oldPlatformFn
+		integrationInstallAppLookPathFn = oldLookPathFn
+		integrationInstallAppStatFn = oldStatFn
 	}()
 
-	server := httptest.NewServer(handleInstallApp())
-	defer server.Close()
-
-	resp, err := http.Get(server.URL + "/install_app")
-	if err != nil {
-		t.Fatalf("GET /install_app failed: %v", err)
+	if candidates := integrationInstallAppCommandCandidates("curl"); !reflect.DeepEqual(candidates, []string{"curl"}) {
+		t.Fatalf("WSL command candidates = %#v, want only curl", candidates)
 	}
-	defer resp.Body.Close()
-
-	var apps []string
-	if err := json.NewDecoder(resp.Body).Decode(&apps); err != nil {
-		t.Fatalf("decode response failed: %v", err)
-	}
-
-	has := func(target string) bool {
-		for _, item := range apps {
-			if strings.EqualFold(item, target) {
-				return true
-			}
-		}
-		return false
-	}
-
-	if !has("node") || !has("python") {
-		t.Fatalf("install_app = %#v, want merged configured entries", apps)
-	}
-	countGit := 0
-	countPython3 := 0
-	for _, item := range apps {
-		if strings.EqualFold(item, "git") {
-			countGit++
-		}
-		if strings.EqualFold(item, "python3") {
-			countPython3++
-		}
-	}
-	if countGit > 1 {
-		t.Fatalf("install_app git duplicated: %#v", apps)
-	}
-	if countPython3 > 1 {
-		t.Fatalf("install_app python3 duplicated: %#v", apps)
+	if integrationDetectInstallAppInstalled("curl") {
+		t.Fatal("Windows executable paths must not make curl appear installed in WSL")
 	}
 }
 
-func TestHandleInstallAppMergesCurrentOSConfigEntries(t *testing.T) {
+func TestHandleInstallAppUsesCurrentOSConfigOnly(t *testing.T) {
 	oldwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("getwd: %v", err)
@@ -3076,7 +3027,9 @@ func TestHandleInstallAppMergesCurrentOSConfigEntries(t *testing.T) {
 	}
 	if err := os.WriteFile(filepath.Join(tmp, "config", "config.json"), []byte(`{
   "install_app": {
-    "linux": ["node", "git", "node"],
+	"interval": 17,
+	"content": "请安装 $namelist",
+    "linux": ["node", "git", "node", "python"],
     "wsl": ["docker"],
     "mac": ["xcode"]
   }
@@ -3084,10 +3037,6 @@ func TestHandleInstallAppMergesCurrentOSConfigEntries(t *testing.T) {
 `), 0o644); err != nil {
 		t.Fatalf("write config.json: %v", err)
 	}
-	writeRuntimeConfig(map[string]interface{}{
-		"install_app": "python,git,python3",
-	})
-
 	oldPlatformFn := integrationInstallAppPlatformKeyFn
 	oldDetectorFn := integrationInstallAppDetectorFn
 	oldNowFn := integrationInstallAppNowFn
@@ -3133,7 +3082,7 @@ func TestHandleInstallAppMergesCurrentOSConfigEntries(t *testing.T) {
 		t.Fatalf("install_app = %#v, want installed app filtered out", apps)
 	}
 	if !has("python") {
-		t.Fatalf("install_app = %#v, want missing runtime entry kept", apps)
+		t.Fatalf("install_app = %#v, want missing configured entry kept", apps)
 	}
 	if has("docker") || has("xcode") {
 		t.Fatalf("install_app = %#v, want only current OS config entries", apps)
@@ -3150,6 +3099,98 @@ func TestHandleInstallAppMergesCurrentOSConfigEntries(t *testing.T) {
 	}
 	if countGit > 1 {
 		t.Fatalf("install_app git duplicated: %#v", apps)
+	}
+}
+
+func TestIntegrationInstallAppConfigReadsTemplateIntervalAndCurrentPlatform(t *testing.T) {
+	config := integrationInstallAppConfigFromValue(map[string]interface{}{
+		"interval": json.Number("17"),
+		"content":  "请安装 $namelist",
+		"linux":    []interface{}{"node", "git"},
+		"wsl":      []interface{}{"docker"},
+		"mac":      []interface{}{"xcode"},
+	}, "linux")
+
+	if config.Interval != 17 {
+		t.Fatalf("interval = %d, want 17", config.Interval)
+	}
+	if config.Content != "请安装 $namelist" {
+		t.Fatalf("content = %q", config.Content)
+	}
+	if got := strings.Join(config.Apps, ","); got != "node,git" {
+		t.Fatalf("apps = %q, want node,git", got)
+	}
+}
+
+func TestIntegrationInstallAppConfigRejectsNonIntegerInterval(t *testing.T) {
+	config := integrationInstallAppConfigFromValue(map[string]interface{}{
+		"interval": 0.5,
+	}, "linux")
+	if config.Interval != defaultInstallAppIntervalMinutes {
+		t.Fatalf("interval = %d, want default %d", config.Interval, defaultInstallAppIntervalMinutes)
+	}
+}
+
+func TestHandleInstallAppDetailsReadsConfigTemplateAndInterval(t *testing.T) {
+	tmp := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tmp, "config"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, "config", "config.json"), []byte(`{
+  "install_app": {
+    "interval": 17,
+    "content": "请安装 $namelist",
+    "linux": ["node"]
+  }
+}
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	originalExecutable := integrationExecutableFn
+	originalPlatform := integrationInstallAppPlatformKeyFn
+	originalDetector := integrationInstallAppDetectorFn
+	integrationExecutableFn = func() (string, error) { return filepath.Join(tmp, "integration"), nil }
+	integrationInstallAppPlatformKeyFn = func() string { return "linux" }
+	integrationInstallAppDetectorFn = func(string) bool { return false }
+	integrationResetInstallAppAvailabilityCache()
+	defer func() {
+		integrationExecutableFn = originalExecutable
+		integrationInstallAppPlatformKeyFn = originalPlatform
+		integrationInstallAppDetectorFn = originalDetector
+		integrationResetInstallAppAvailabilityCache()
+	}()
+
+	server := httptest.NewServer(handleInstallApp())
+	defer server.Close()
+	resp, err := http.Get(server.URL + "/install_app?details=1")
+	if err != nil {
+		t.Fatalf("GET /install_app?details=1 failed: %v", err)
+	}
+	defer resp.Body.Close()
+	var details struct {
+		Apps     []string `json:"apps"`
+		Interval int      `json:"interval"`
+		Content  string   `json:"content"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&details); err != nil {
+		t.Fatalf("decode details response failed: %v", err)
+	}
+	if details.Interval != 17 || details.Content != "请安装 $namelist" {
+		t.Fatalf("details = %#v, want config interval and content", details)
+	}
+	hasNode := false
+	for _, app := range details.Apps {
+		if app == "node" {
+			hasNode = true
+			break
+		}
+	}
+	if !hasNode {
+		t.Fatalf("details apps = %#v, want node", details.Apps)
+	}
+	if got := resp.Header.Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("details Cache-Control = %q, want no-store", got)
 	}
 }
 
@@ -4323,7 +4364,7 @@ func TestHandleVideoTrimCreatesNewMP4WithoutChangingSource(t *testing.T) {
 	}
 }
 
-func TestHandleVideoAudioExtractCreatesTimestampedMP3AndRejectsVideoWithoutAudio(t *testing.T) {
+func TestHandleVideoAudioExtractToAudioCreatesTimestampedMP3AndRejectsVideoWithoutAudio(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("test command shim uses POSIX sh")
 	}
@@ -4337,10 +4378,10 @@ func TestHandleVideoAudioExtractCreatesTimestampedMP3AndRejectsVideoWithoutAudio
 	if err := os.WriteFile(sourcePath, source, 0o644); err != nil {
 		t.Fatalf("write source video: %v", err)
 	}
-	if err := os.MkdirAll(filepath.Join(workspace, "videos"), 0o755); err != nil {
-		t.Fatalf("mkdir videos directory: %v", err)
+	if err := os.MkdirAll(filepath.Join(workspace, "audios"), 0o755); err != nil {
+		t.Fatalf("mkdir audios directory: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(workspace, "videos", "demo.mp3"), []byte("existing"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(workspace, "audios", "demo.mp3"), []byte("existing"), 0o644); err != nil {
 		t.Fatalf("write existing MP3: %v", err)
 	}
 
@@ -4373,7 +4414,7 @@ func TestHandleVideoAudioExtractCreatesTimestampedMP3AndRejectsVideoWithoutAudio
 		}
 	}
 
-	server := httptest.NewServer(handleVideoAudioExtract(&Config{AgentDir: root}))
+	server := httptest.NewServer(handleVideoAudioExtractToAudio(&Config{AgentDir: root}))
 	defer server.Close()
 	requestBody, err := json.Marshal(VideoAudioExtractRequest{AgentID: "agent-a", Path: "clips/demo.mp4"})
 	if err != nil {
@@ -4395,8 +4436,8 @@ func TestHandleVideoAudioExtractCreatesTimestampedMP3AndRejectsVideoWithoutAudio
 	if result.Status != 0 || result.AgentID != "agent-a" || result.Path != "clips/demo.mp4" || result.SavedAs == "" {
 		t.Fatalf("unexpected audio extraction response: %+v", result)
 	}
-	if matched, err := regexp.MatchString(`/videos/demo_\d{8}_\d{6}_\d{9}\.mp3$`, filepath.ToSlash(result.SavedAs)); err != nil || !matched {
-		t.Fatalf("audio output path = %q, want timestamped MP3 (match=%v err=%v)", result.SavedAs, matched, err)
+	if matched, err := regexp.MatchString(`/audios/demo_\d{8}_\d{6}_\d{9}\.mp3$`, filepath.ToSlash(result.SavedAs)); err != nil || !matched {
+		t.Fatalf("audio output path = %q, want audios timestamped MP3 (match=%v err=%v)", result.SavedAs, matched, err)
 	}
 	if saved, err := os.ReadFile(result.SavedAs); err != nil || !bytes.Equal(saved, source) {
 		t.Fatalf("saved MP3 = %q, err=%v; want copied output", saved, err)
@@ -4419,37 +4460,8 @@ func TestHandleVideoAudioExtractCreatesTimestampedMP3AndRejectsVideoWithoutAudio
 		t.Errorf("ffmpeg -c:a = %q, want libmp3lame", got)
 	}
 
-	audioServer := httptest.NewServer(handleVideoAudioExtractToAudio(&Config{AgentDir: root}))
-	defer audioServer.Close()
-	audioResponse, err := http.Post(audioServer.URL, "application/json", bytes.NewReader(requestBody))
-	if err != nil {
-		t.Fatalf("POST original-track audio extraction: %v", err)
-	}
-	defer audioResponse.Body.Close()
-	if audioResponse.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(audioResponse.Body)
-		t.Fatalf("original-track audio extraction status = %d, body=%s", audioResponse.StatusCode, body)
-	}
-	var audioResult VideoAudioExtractResponse
-	if err := json.NewDecoder(audioResponse.Body).Decode(&audioResult); err != nil {
-		t.Fatalf("decode original-track audio extraction response: %v", err)
-	}
-	resolvedWorkspace, err := filepath.EvalSymlinks(workspace)
-	if err != nil {
-		t.Fatalf("resolve workspace path: %v", err)
-	}
-	if want := filepath.Join(resolvedWorkspace, "audios", "demo.mp3"); audioResult.SavedAs != want {
-		t.Fatalf("original-track audio output = %q, want %q", audioResult.SavedAs, want)
-	}
-	if saved, err := os.ReadFile(audioResult.SavedAs); err != nil || !bytes.Equal(saved, source) {
-		t.Fatalf("original-track saved MP3 = %q, err=%v; want copied output", saved, err)
-	}
-	if _, err := os.Stat(filepath.Join(workspace, "videos", "demo.mp3")); err != nil {
-		t.Fatalf("legacy videos MP3 missing after audio-directory extraction: %v", err)
-	}
-
 	hasAudio = false
-	noAudioResponse, err := http.Post(audioServer.URL, "application/json", bytes.NewReader(requestBody))
+	noAudioResponse, err := http.Post(server.URL, "application/json", bytes.NewReader(requestBody))
 	if err != nil {
 		t.Fatalf("POST no-audio extraction: %v", err)
 	}
@@ -4469,8 +4481,8 @@ func TestHandleVideoAudioExtractCreatesTimestampedMP3AndRejectsVideoWithoutAudio
 	if err != nil {
 		t.Fatalf("read audios directory: %v", err)
 	}
-	if len(entries) != 1 {
-		t.Errorf("audios after no-audio request = %d files, want 1", len(entries))
+	if len(entries) != 2 {
+		t.Errorf("audios after no-audio request = %d files, want 2", len(entries))
 	}
 }
 
@@ -6720,6 +6732,31 @@ func TestStartIntegrationProcessCleansStartupPIDFilesBeforeLaunch(t *testing.T) 
 	}
 }
 
+func TestIntegrationClientRuntimeConfigExposesVersion(t *testing.T) {
+	config := integrationClientRuntimeConfig(map[string]interface{}{
+		"version":   "0.1",
+		"agent-dir": "/tmp/agents",
+		"shortcut":  []interface{}{"好的", "继续"},
+		"provider":  map[string]interface{}{"private": "must not be exposed"},
+	})
+	if got := config["version"]; got != "0.1" {
+		t.Fatalf("version = %#v, want 0.1", got)
+	}
+	if got := config["agent-dir"]; got != "/tmp/agents" {
+		t.Fatalf("agent-dir = %#v, want /tmp/agents", got)
+	}
+	if got, want := config["shortcut"], []interface{}{"好的", "继续"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("shortcut = %#v, want %#v", got, want)
+	}
+	if _, ok := config["provider"]; ok {
+		t.Fatalf("provider should not be exposed: %#v", config)
+	}
+	withoutShortcut := integrationClientRuntimeConfig(map[string]interface{}{"version": "0.2"})
+	if _, ok := withoutShortcut["shortcut"]; ok {
+		t.Fatalf("missing shortcut = %#v, want omitted", withoutShortcut["shortcut"])
+	}
+}
+
 func TestStartIntegrationProcessOpensBrowserWhenAlreadyRunning(t *testing.T) {
 	oldTokenFn := integrationSiteVersionTokenFn
 	integrationSiteVersionTokenFn = func() string { return "site-version-token" }
@@ -8171,7 +8208,17 @@ func TestWriteRuntimeConfigStoresHTTPFieldsUnderConfigHTTP(t *testing.T) {
 	if err := os.MkdirAll(configDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(`{"host":"http://example.com","http":{"debug":false}}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(`{
+  "host": "http://example.com",
+  "http": {"debug": false},
+  "install_app": {
+    "interval": 60,
+    "content": "请安装 $namelist",
+    "linux": ["python3"],
+    "wsl": ["python3"],
+    "mac": ["python3"]
+  }
+}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -8211,6 +8258,13 @@ func TestWriteRuntimeConfigStoresHTTPFieldsUnderConfigHTTP(t *testing.T) {
 	}
 	if cfg["host"] != "http://example.com" {
 		t.Fatalf("host = %v, want preserved host", cfg["host"])
+	}
+	installApp, ok := cfg["install_app"].(map[string]any)
+	if !ok || installApp["content"] != "请安装 $namelist" {
+		t.Fatalf("install_app was overwritten: %#v", cfg["install_app"])
+	}
+	if apps, ok := installApp["linux"].([]any); !ok || len(apps) != 1 || apps[0] != "python3" {
+		t.Fatalf("install_app.linux = %#v, want [python3]", installApp["linux"])
 	}
 }
 
@@ -8403,6 +8457,45 @@ func TestAppStaticExplicitIndexDoesNotRedirect(t *testing.T) {
 	}
 	if strings.TrimSpace(string(body)) != "APP HOME" {
 		t.Fatalf("GET explicit index body = %q", strings.TrimSpace(string(body)))
+	}
+}
+
+func TestAppStaticMissingExplicitIndexReturnsNotFound(t *testing.T) {
+	tmp := t.TempDir()
+	agentRoot := filepath.Join(tmp, "agent")
+	appRoot := filepath.Join(agentRoot, "demo-agent", "app")
+	if err := os.MkdirAll(appRoot, 0o755); err != nil {
+		t.Fatalf("mkdir app root: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appRoot, "visible.txt"), []byte("directory content\n"), 0o644); err != nil {
+		t.Fatalf("write app file: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	registerAppStatic(mux, &Config{AgentDir: agentRoot})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	client := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	resp, err := client.Get(server.URL + "/mapping/demo-agent/index.html")
+	if err != nil {
+		t.Fatalf("GET missing index: %v", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("GET missing index status = %d, body = %s", resp.StatusCode, string(body))
+	}
+	if location := resp.Header.Get("Location"); strings.TrimSpace(location) != "" {
+		t.Fatalf("GET missing index should not redirect, Location = %q", location)
+	}
+	if strings.Contains(string(body), "visible.txt") {
+		t.Fatalf("GET missing index unexpectedly returned a directory listing: %q", string(body))
 	}
 }
 
@@ -9625,6 +9718,9 @@ func TestBindIntegrationServeFlagsCLIOverridesStartupConfig(t *testing.T) {
 	}
 	if logFile != "startup.log" {
 		t.Fatalf("log-file = %q, want startup.log", logFile)
+	}
+	if fs.Lookup("install_app") != nil {
+		t.Fatal("--install_app must not be supported; install_app is read from config/config.json")
 	}
 }
 

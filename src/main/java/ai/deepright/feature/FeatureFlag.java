@@ -114,7 +114,7 @@ public class FeatureFlag {
     }
 
     public static Boolean isWsl(String sys) throws Exception {
-        return StringUtils.containsIgnoreCase(sys, "wsl");
+        return StringUtils.containsIgnoreCase(sys, FeatureField.KEY_WSL);
     }
 
     // 是否为后台线程

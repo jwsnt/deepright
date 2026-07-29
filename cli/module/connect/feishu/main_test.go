@@ -1348,11 +1348,15 @@ type stubLocalFeishuConnectClient struct {
 	requests []connectsvc.RequestInput
 	metaErr  error
 	addErr   error
+	meta     *connectsvc.Meta
 }
 
 func (s *stubLocalFeishuConnectClient) GetMeta(_ context.Context, name string) (*connectsvc.Meta, error) {
 	if s.metaErr != nil {
 		return nil, s.metaErr
+	}
+	if s.meta != nil {
+		return s.meta, nil
 	}
 	return &connectsvc.Meta{Name: name, Meta: `{"appId":"demo","appSecret":"secret"}`}, nil
 }
@@ -1381,6 +1385,171 @@ func (s *stubLocalFeishuConnectClient) Requests() []connectsvc.RequestInput {
 	out := make([]connectsvc.RequestInput, len(s.requests))
 	copy(out, s.requests)
 	return out
+}
+
+type localFeishuSessionFactoryFunc func(*connectsvc.Meta, feishusvc.Config, *log.Logger, string) (feishusvc.Session, error)
+
+func (fn localFeishuSessionFactoryFunc) New(meta *connectsvc.Meta, cfg feishusvc.Config, logger *log.Logger, downloadDir string) (feishusvc.Session, error) {
+	return fn(meta, cfg, logger, downloadDir)
+}
+
+type localFeishuBlockingSession struct {
+	events  chan feishusvc.SessionEvent
+	started chan struct{}
+}
+
+func (s *localFeishuBlockingSession) Events() <-chan feishusvc.SessionEvent {
+	return s.events
+}
+
+func (s *localFeishuBlockingSession) Run(ctx context.Context) error {
+	select {
+	case s.started <- struct{}{}:
+	default:
+	}
+	<-ctx.Done()
+	return nil
+}
+
+type localFeishuLogWriter struct {
+	lines chan string
+}
+
+func (w localFeishuLogWriter) Write(data []byte) (int, error) {
+	select {
+	case w.lines <- string(data):
+	default:
+	}
+	return len(data), nil
+}
+
+func TestLocalFeishuStartupConfigValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		cfg     feishusvc.Config
+		wantErr string
+		mcpOnly bool
+	}{
+		{name: "credential pair", cfg: feishusvc.Config{AppID: "app", AppSecret: "secret"}},
+		{name: "credential pair with mcp url", cfg: feishusvc.Config{AppID: "app", AppSecret: "secret", MCPURL: "https://mcp.example"}},
+		{name: "mcp url only", cfg: feishusvc.Config{MCPURL: "https://mcp.example"}, mcpOnly: true},
+		{name: "app id only", cfg: feishusvc.Config{AppID: "app"}, wantErr: "must be provided together"},
+		{name: "app secret only", cfg: feishusvc.Config{AppSecret: "secret"}, wantErr: "must be provided together"},
+		{name: "empty", cfg: feishusvc.Config{}, wantErr: "appId and appSecret, or mcp_url"},
+		{name: "existing mock mode", cfg: feishusvc.Config{Mode: "mock"}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := validateLocalFeishuStartupConfig(test.cfg)
+			if test.wantErr == "" && err != nil {
+				t.Fatalf("validateLocalFeishuStartupConfig() error = %v", err)
+			}
+			if test.wantErr != "" && (err == nil || !strings.Contains(err.Error(), test.wantErr)) {
+				t.Fatalf("validateLocalFeishuStartupConfig() error = %v, want %q", err, test.wantErr)
+			}
+			if got := isMCPOnlyLocalFeishuConfig(test.cfg); got != test.mcpOnly {
+				t.Fatalf("isMCPOnlyLocalFeishuConfig() = %t, want %t", got, test.mcpOnly)
+			}
+		})
+	}
+}
+
+func TestLocalFeishuMCPOnlyStartupSkipsLongConnection(t *testing.T) {
+	logLines := make(chan string, 2)
+	factoryCalls := make(chan struct{}, 1)
+	svc := &localFeishuService{
+		name: "feishu",
+		client: &stubLocalFeishuConnectClient{meta: &connectsvc.Meta{
+			Name: "feishu",
+			Meta: `{"mcp_url":"https://mcp.example"}`,
+		}},
+		factory: localFeishuSessionFactoryFunc(func(*connectsvc.Meta, feishusvc.Config, *log.Logger, string) (feishusvc.Session, error) {
+			factoryCalls <- struct{}{}
+			return nil, errors.New("long connection must not be created")
+		}),
+		logger: log.New(localFeishuLogWriter{lines: logLines}, "", 0),
+	}
+	if err := svc.ValidateStartup(context.Background()); err != nil {
+		t.Fatalf("ValidateStartup() error = %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := make(chan error, 1)
+	go func() { errCh <- svc.Run(ctx) }()
+	select {
+	case line := <-logLines:
+		if !strings.Contains(line, "stage=started") || !strings.Contains(line, "mode=mcp-only") || !strings.Contains(line, "long_connection=false") {
+			t.Fatalf("mcp-only log = %q", line)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("mcp-only startup did not log")
+	}
+	select {
+	case <-factoryCalls:
+		t.Fatal("mcp-only startup created a long connection")
+	default:
+	}
+	cancel()
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("Run() error = %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("mcp-only startup did not stop after context cancellation")
+	}
+}
+
+func TestLocalFeishuCredentialStartupCreatesLongConnection(t *testing.T) {
+	session := &localFeishuBlockingSession{
+		events:  make(chan feishusvc.SessionEvent),
+		started: make(chan struct{}, 1),
+	}
+	factoryCalls := make(chan feishusvc.Config, 1)
+	svc := &localFeishuService{
+		name: "feishu",
+		client: &stubLocalFeishuConnectClient{meta: &connectsvc.Meta{
+			Name: "feishu",
+			Meta: `{"appId":"app","appSecret":"secret","mcp_url":"https://mcp.example"}`,
+		}},
+		factory: localFeishuSessionFactoryFunc(func(_ *connectsvc.Meta, cfg feishusvc.Config, _ *log.Logger, _ string) (feishusvc.Session, error) {
+			factoryCalls <- cfg
+			return session, nil
+		}),
+		logger:            log.New(io.Discard, "", 0),
+		heartbeatInterval: time.Second,
+		heartbeatTimeout:  2 * time.Second,
+		scanInterval:      time.Second,
+		expireWindow:      time.Minute,
+		reconnectDelay:    time.Millisecond,
+		nowFn:             time.Now,
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := make(chan error, 1)
+	go func() { errCh <- svc.Run(ctx) }()
+	select {
+	case cfg := <-factoryCalls:
+		if cfg.AppID != "app" || cfg.AppSecret != "secret" || cfg.MCPURL != "https://mcp.example" {
+			t.Fatalf("long connection config = %+v", cfg)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("credential startup did not create a long connection")
+	}
+	select {
+	case <-session.started:
+	case <-time.After(time.Second):
+		t.Fatal("long connection did not run")
+	}
+	cancel()
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("Run() error = %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("credential startup did not stop after context cancellation")
+	}
 }
 
 func TestLocalFeishuServiceStopsAfterThreeLoadConfigFailures(t *testing.T) {

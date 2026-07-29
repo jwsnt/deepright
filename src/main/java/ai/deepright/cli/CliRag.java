@@ -52,6 +52,8 @@ public class CliRag extends RagCondition implements RagService {
 
     protected String template4sandbox;
 
+    protected String template4mainWsl;
+
     protected Integer truncate4soul;
 
     protected Integer truncate4user;
@@ -61,8 +63,10 @@ public class CliRag extends RagCondition implements RagService {
     public void init() throws Exception {
         this.template4workspace = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4workspace).openStream()), StandardCharsets.UTF_8);
         this.template4sandbox = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4sandbox).openStream()), StandardCharsets.UTF_8);
+        this.template4mainWsl = IOUtils.toString(new BufferedInputStream(this.resourceService.url(this.template4mainWsl).openStream()), StandardCharsets.UTF_8);
         WorkflowException.checkCondition(StringUtils.isEmpty(this.template4workspace), "The template workspace must not be empty");
         WorkflowException.checkCondition(StringUtils.isEmpty(this.template4sandbox), "The template sandbox must not be empty");
+        WorkflowException.checkCondition(StringUtils.isEmpty(this.template4mainWsl), "The template mainWsl must not be empty");
     }
 
     @Override
@@ -87,6 +91,7 @@ public class CliRag extends RagCondition implements RagService {
         this.updateSys(ragConfig, ragData);
         this.updateApp(ragConfig, ragData);
         this.updateDir(ragConfig, ragData);
+        this.updateWsl(ragConfig, ragData);
         return new RagAtOnce(ragConfig);
     }
 
@@ -224,6 +229,14 @@ public class CliRag extends RagCondition implements RagService {
         }
     }
 
+    protected void updateWsl(RagConfig ragConfig, RagData ragData) throws Exception {
+        String replace = MapUtils.getString(ragConfig.getGlobalConfig(), FeatureField.KEY_WSL);
+        if (!StringUtils.isEmpty(replace)) {
+            RagService.updatePrompt(ragConfig, ragData, replace, FeatureFlag.isWsl(ragData.getQuery()) ? this.template4mainWsl : "");
+        }
+    }
+
+
     protected void updateDir(RagConfig ragConfig, RagData ragData) throws Exception {
         String replace = MapUtils.getString(ragConfig.getGlobalConfig(), FeatureField.KEY_DIR);
         if (!StringUtils.isEmpty(replace)) {
@@ -268,6 +281,9 @@ public class CliRag extends RagCondition implements RagService {
 
         @Value("${cli.rag.template.sandbox:classpath:config/main/workspace_sandbox.md}")
         protected String template4sandbox;
+
+        @Value("${cli.rag.template.mainWsl:classpath:config/main/main_wsl.md}")
+        protected String template4mainWsl;
 
         @Value("${cli.truncate.soul:5120}")
         protected Integer truncate4soul;

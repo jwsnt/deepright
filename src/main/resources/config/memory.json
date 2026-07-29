@@ -106,6 +106,7 @@
             "chat": "#chat",
             "user": "#user",
             "soul": "#soul",
+            "wsl": "#wsl",
             "sys": "#sys",
             "app": "#app"
           },

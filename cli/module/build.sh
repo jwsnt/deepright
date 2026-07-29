@@ -294,6 +294,35 @@ replace_release_document_port() {
   done
 }
 
+replace_windows_wsl_launcher_port() {
+  target_release_dir="$1"
+  port=$(config_document_port)
+  start_script="$target_release_dir/start.bat"
+  install_script="$target_release_dir/install.ps1"
+
+  if [ ! -f "$start_script" ] || [ ! -f "$install_script" ]; then
+    echo "missing packaged Windows launcher scripts for port replacement: $target_release_dir" >&2
+    exit 1
+  fi
+
+  # The first browser opening happens from install.ps1 before a user has used
+  # the desktop shortcut. Bake the configured port into both scripts, so that
+  # a failed runtime config lookup never falls back to 8080.
+  sed "s|set \"DEEPRIGHT_PORT=8080\"|set \"DEEPRIGHT_PORT=$port\"|" "$start_script" > "$start_script.tmp"
+  mv "$start_script.tmp" "$start_script"
+  sed "s|\\\$launchPort = 8080|\\\$launchPort = $port|" "$install_script" > "$install_script.tmp"
+  mv "$install_script.tmp" "$install_script"
+
+  if ! grep -F "set \"DEEPRIGHT_PORT=$port\"" "$start_script" >/dev/null 2>&1; then
+    echo "failed to bake config port into Windows start launcher: $start_script" >&2
+    exit 1
+  fi
+  if ! grep -F "\$launchPort = $port" "$install_script" >/dev/null 2>&1; then
+    echo "failed to bake config port into Windows installer launcher: $install_script" >&2
+    exit 1
+  fi
+}
+
 build_mac_app_icon() {
   src_png="$1"
   out_icns="$2"
@@ -1001,6 +1030,7 @@ package_windows_wsl2_launcher() {
     -e "s|https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/noble/release/ubuntu-base-24.04.3-base-amd64.tar.gz|$tsinghua_rootfs_url|g" \
     "$target_release_dir/install.ps1"
   rm -f "$target_release_dir/install.ps1.bak"
+  replace_windows_wsl_launcher_port "$target_release_dir"
 }
 
 build_windows_single_file_installers() {

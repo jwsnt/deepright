@@ -19,6 +19,7 @@ import (
 	"io/fs"
 	"knowledge/knowledgecore"
 	"log"
+	"math"
 
 	"net"
 	"net/http"
@@ -102,8 +103,6 @@ func detectRequiredInstallApps() []string {
 	}
 	return apps
 }
-
-func parseInstallApps(raw string) []string { return agentcore.ParseInstallApps(raw) }
 
 func mergeInstallApps(base []string, extras ...string) []string {
 	return agentcore.MergeInstallApps(base, extras...)
@@ -247,7 +246,7 @@ func proxyInstallAppNameVariants(name string) []string {
 
 func proxyInstallAppCommandCandidates(name string) []string {
 	candidates := proxyInstallAppNameVariants(name)
-	if proxyInstallAppPlatformKeyFn() == "wsl" || runtime.GOOS == "windows" {
+	if runtime.GOOS == "windows" {
 		base := append([]string(nil), candidates...)
 		for _, candidate := range base {
 			if !strings.HasSuffix(strings.ToLower(candidate), ".exe") {
@@ -436,39 +435,6 @@ func proxyDetectInstallAppInstalled(name string) bool {
 			}
 		}
 		return proxyInstallAppExists(paths)
-	case "wsl":
-		executables := proxyInstallAppCommandCandidates(name)
-		baseDirs := []string{}
-		if runtime.GOOS == "windows" {
-			for _, dir := range []string{os.Getenv("ProgramFiles"), os.Getenv("ProgramFiles(x86)"), os.Getenv("LocalAppData")} {
-				dir = strings.TrimSpace(dir)
-				if dir != "" {
-					baseDirs = append(baseDirs, dir)
-				}
-			}
-		} else {
-			baseDirs = append(baseDirs,
-				"/mnt/c/Program Files",
-				"/mnt/c/Program Files (x86)",
-				"/mnt/c/Users/*/AppData/Local",
-			)
-		}
-		directPaths := make([]string, 0, len(baseDirs)*len(executables)*2)
-		globPatterns := make([]string, 0, len(baseDirs)*len(executables)*3)
-		for _, baseDir := range baseDirs {
-			for _, executable := range executables {
-				directPaths = append(directPaths,
-					filepath.Join(baseDir, executable),
-					filepath.Join(baseDir, "*", executable),
-				)
-				globPatterns = append(globPatterns,
-					filepath.Join(baseDir, "*", "Application", executable),
-					filepath.Join(baseDir, "*", "*", "Application", executable),
-					filepath.Join(baseDir, "*", "*", executable),
-				)
-			}
-		}
-		return proxyInstallAppExists(directPaths) || proxyInstallAppMatchesAnyGlob(globPatterns)
 	default:
 		return false
 	}
@@ -1372,7 +1338,6 @@ type ProxyServer struct {
 	ConnectTimeout          time.Duration
 	KnowledgeUpdateInterval time.Duration
 	KnowledgeUpdateLock     time.Duration
-	InstallApps             []string
 	Client                  *http.Client
 	ConnectCacheTTL         time.Duration
 	AutoReply               string
@@ -1908,7 +1873,55 @@ func configuredProxySandboxApp() string {
 	return configuredProxyStringValue("sandbox_app")
 }
 
-func configuredProxyInstallApps() []string {
+const defaultInstallAppIntervalMinutes = 60
+
+type proxyInstallAppConfig struct {
+	Apps     []string
+	Interval int
+	Content  string
+}
+
+func proxyInstallAppInterval(value interface{}) int {
+	interval := defaultInstallAppIntervalMinutes
+	switch typed := value.(type) {
+	case float64:
+		if typed >= 1 && math.Trunc(typed) == typed {
+			interval = int(typed)
+		}
+	case int:
+		if typed > 0 {
+			interval = typed
+		}
+	case json.Number:
+		if parsed, err := typed.Int64(); err == nil && parsed > 0 {
+			interval = int(parsed)
+		}
+	case string:
+		if parsed, err := strconv.Atoi(strings.TrimSpace(typed)); err == nil && parsed > 0 {
+			interval = parsed
+		}
+	}
+	return interval
+}
+
+func proxyInstallAppConfigFromValue(raw interface{}, platform string) proxyInstallAppConfig {
+	config := proxyInstallAppConfig{
+		Apps:     proxyInstallAppsFromConfigValue(raw, platform),
+		Interval: defaultInstallAppIntervalMinutes,
+		Content:  "请安装 $namelist",
+	}
+	value, ok := raw.(map[string]interface{})
+	if !ok {
+		return config
+	}
+	config.Interval = proxyInstallAppInterval(value["interval"])
+	if content := strings.TrimSpace(fmt.Sprint(value["content"])); content != "" && content != "<nil>" {
+		config.Content = content
+	}
+	return config
+}
+
+func configuredProxyInstallAppConfig() proxyInstallAppConfig {
 	platform := proxyInstallAppPlatformKeyFn()
 	for _, path := range proxyConfigPaths() {
 		data, err := os.ReadFile(path)
@@ -1923,9 +1936,12 @@ func configuredProxyInstallApps() []string {
 		if !ok {
 			continue
 		}
-		return proxyInstallAppsFromConfigValue(value, platform)
+		return proxyInstallAppConfigFromValue(value, platform)
 	}
-	return nil
+	return proxyInstallAppConfig{
+		Interval: defaultInstallAppIntervalMinutes,
+		Content:  "请安装 $namelist",
+	}
 }
 
 func configuredProxyIntValue(key string) (int, bool) {
@@ -10297,16 +10313,31 @@ func (p *ProxyServer) HandleChatCompletions(w http.ResponseWriter, r *http.Reque
 	cancel()
 }
 
-// HandleInstallApp serves GET /install_app, returning required app install keys.
+// HandleInstallApp serves GET /install_app. The default response remains the
+// legacy app-name array; details=1 additionally returns the UI scan settings
+// sourced from config/config.json.
 func (p *ProxyServer) HandleInstallApp(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	configured := configuredProxyInstallApps()
-	configured = mergeInstallApps(configured, strings.Join(p.InstallApps, ","))
-	apps := proxyFilterMissingInstallApps(mergeInstallApps(detectRequiredInstallApps(), strings.Join(configured, ",")))
+	config := configuredProxyInstallAppConfig()
+	if r.URL.Query().Get("details") == "1" {
+		// A details request is the browser's scheduled scan. Do not let the
+		// server-side availability cache extend its configured scan interval.
+		proxyResetInstallAppAvailabilityCache()
+	}
+	apps := proxyFilterMissingInstallApps(mergeInstallApps(detectRequiredInstallApps(), strings.Join(config.Apps, ",")))
 	w.Header().Set("Content-Type", "application/json")
+	if r.URL.Query().Get("details") == "1" {
+		w.Header().Set("Cache-Control", "no-store")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"apps":     apps,
+			"interval": config.Interval,
+			"content":  config.Content,
+		})
+		return
+	}
 	w.Header().Set("Cache-Control", "max-age=300")
 	json.NewEncoder(w).Encode(apps)
 }
@@ -10327,7 +10358,6 @@ type serveOptions struct {
 	connectTimeoutMs          int
 	knowledgeUpdateIntervalMs int
 	knowledgeUpdateLockMs     int
-	installApp                string
 	reply                     string
 	pluginExecTimeoutMs       int
 }
@@ -10583,7 +10613,6 @@ func newServeFlagSet(name string, opts *serveOptions) *flag.FlagSet {
 	fs.IntVar(&opts.connectTimeoutMs, "connect_timeout", 15000, "upstream connect timeout in ms")
 	fs.IntVar(&opts.knowledgeUpdateIntervalMs, "knowledge_update_interval", 7200000, "knowledge lastUpdate refresh interval in ms")
 	fs.IntVar(&opts.knowledgeUpdateLockMs, "knowledge_update_lock", 1800000, "knowledge refresh request lock window in ms")
-	fs.StringVar(&opts.installApp, "install_app", "", "extra install_app entries, comma separated")
 	fs.StringVar(&opts.reply, "reply", "", "reply text sent once per plugin when scheduled details are created")
 	fs.IntVar(&opts.pluginExecTimeoutMs, "plugin_exec_timeout", defaultPluginExecTimeoutMs, "plugin exec timeout in ms")
 	return fs
@@ -10632,7 +10661,6 @@ func runServe(opts serveOptions) {
 		"connect_timeout":           opts.connectTimeoutMs,
 		"knowledge_update_interval": opts.knowledgeUpdateIntervalMs,
 		"knowledge_update_lock":     opts.knowledgeUpdateLockMs,
-		"install_app":               opts.installApp,
 		"reply":                     opts.reply,
 		"plugin_exec_timeout":       opts.pluginExecTimeoutMs,
 	})
@@ -10674,7 +10702,6 @@ func runServe(opts serveOptions) {
 		ConnectTimeout:          connectTimeout,
 		KnowledgeUpdateInterval: time.Duration(opts.knowledgeUpdateIntervalMs) * time.Millisecond,
 		KnowledgeUpdateLock:     time.Duration(opts.knowledgeUpdateLockMs) * time.Millisecond,
-		InstallApps:             parseInstallApps(opts.installApp),
 		Client:                  client,
 		ConnectCacheTTL:         time.Duration(opts.connectCacheMs) * time.Millisecond,
 		AutoReply:               strings.TrimSpace(opts.reply),
@@ -11465,7 +11492,6 @@ func printHelp() {
 	fmt.Println("  --connect_timeout=MS  上游连接超时（毫秒）")
 	fmt.Println("  --knowledge_update_interval=MS  knowledge.lastUpdate 透传阈值，默认 7200000")
 	fmt.Println("  --knowledge_update_lock=MS      knowledge 更新申请锁窗口，默认 1800000")
-	fmt.Println("  --install_app=CSV     额外 install_app 条目，逗号分隔，接口返回会自动去重合并")
 	fmt.Println("  --reply=TEXT          三方插件开始执行时的推送文案")
 	fmt.Println("")
 	fmt.Println("Plugin log options:")
@@ -11574,7 +11600,6 @@ func printHelp() {
 	fmt.Println("  proxy --agent-dir ./agents --port 8080")
 	fmt.Println("  proxy serve --agent-dir ./agents --site ./site")
 	fmt.Println("  proxy serve --agent-dir ./agents --knowledge_update_interval 7200000 --knowledge_update_lock 1800000")
-	fmt.Println("  proxy serve --agent-dir ./agents --install_app git,node")
 	fmt.Println("  proxy connect meta-create --key feishu --meta '{\"appId\":\"cli-app\"}' --callback ignored --agent A --model OpenAI")
 	fmt.Println("  proxy connect meta-get --key feishu")
 	fmt.Println("  proxy connect meta-list")

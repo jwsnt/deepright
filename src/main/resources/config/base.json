@@ -15,6 +15,7 @@
             "chat": "#chat",
             "user": "#user",
             "soul": "#soul",
+            "wsl": "#wsl",
             "sys": "#sys",
             "dir": "#dir",
             "app": "#app"

@@ -2447,66 +2447,30 @@ func TestProxyDetectInstallAppInstalledFindsCommonMacUserBin(t *testing.T) {
 	}
 }
 
-func TestHandleInstallAppMergesConfiguredEntries(t *testing.T) {
-	oldDetectorFn := proxyInstallAppDetectorFn
-	oldNowFn := proxyInstallAppNowFn
-	proxyInstallAppDetectorFn = func(string) bool { return false }
-	proxyInstallAppNowFn = func() time.Time {
-		return time.Unix(1710000000, 0)
+func TestProxyWSLInstallAppDetectionIgnoresWindowsExecutables(t *testing.T) {
+	oldPlatformFn := proxyInstallAppPlatformKeyFn
+	oldLookPathFn := proxyInstallAppLookPathFn
+	oldStatFn := proxyInstallAppStatFn
+	proxyInstallAppPlatformKeyFn = func() string { return "wsl" }
+	proxyInstallAppLookPathFn = func(string) (string, error) { return "", exec.ErrNotFound }
+	proxyInstallAppStatFn = func(string) (os.FileInfo, error) {
+		return testOpenFolderSystemFileInfo{}, nil
 	}
-	proxyResetInstallAppAvailabilityCache()
 	defer func() {
-		proxyInstallAppDetectorFn = oldDetectorFn
-		proxyInstallAppNowFn = oldNowFn
-		proxyResetInstallAppAvailabilityCache()
+		proxyInstallAppPlatformKeyFn = oldPlatformFn
+		proxyInstallAppLookPathFn = oldLookPathFn
+		proxyInstallAppStatFn = oldStatFn
 	}()
 
-	proxy := &ProxyServer{InstallApps: []string{"node", "git", "node", "python", "python3"}}
-	server := httptest.NewServer(http.HandlerFunc(proxy.HandleInstallApp))
-	defer server.Close()
-
-	resp, err := http.Get(server.URL + "/install_app")
-	if err != nil {
-		t.Fatalf("GET /install_app failed: %v", err)
+	if candidates := proxyInstallAppCommandCandidates("curl"); !reflect.DeepEqual(candidates, []string{"curl"}) {
+		t.Fatalf("WSL command candidates = %#v, want only curl", candidates)
 	}
-	defer resp.Body.Close()
-
-	var apps []string
-	if err := json.NewDecoder(resp.Body).Decode(&apps); err != nil {
-		t.Fatalf("decode response failed: %v", err)
-	}
-
-	has := func(target string) bool {
-		for _, item := range apps {
-			if strings.EqualFold(item, target) {
-				return true
-			}
-		}
-		return false
-	}
-
-	if !has("node") || !has("python") {
-		t.Fatalf("install_app = %#v, want merged configured entries", apps)
-	}
-	countGit := 0
-	countPython3 := 0
-	for _, item := range apps {
-		if strings.EqualFold(item, "git") {
-			countGit++
-		}
-		if strings.EqualFold(item, "python3") {
-			countPython3++
-		}
-	}
-	if countGit > 1 {
-		t.Fatalf("install_app git duplicated: %#v", apps)
-	}
-	if countPython3 > 1 {
-		t.Fatalf("install_app python3 duplicated: %#v", apps)
+	if proxyDetectInstallAppInstalled("curl") {
+		t.Fatal("Windows executable paths must not make curl appear installed in WSL")
 	}
 }
 
-func TestHandleInstallAppMergesCurrentOSConfigEntries(t *testing.T) {
+func TestHandleInstallAppUsesCurrentOSConfigOnly(t *testing.T) {
 	oldwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("getwd: %v", err)
@@ -2522,7 +2486,9 @@ func TestHandleInstallAppMergesCurrentOSConfigEntries(t *testing.T) {
 	}
 	if err := os.WriteFile(filepath.Join(tmp, "config", "config.json"), []byte(`{
   "install_app": {
-    "linux": ["node", "git", "node"],
+	"interval": 17,
+	"content": "请安装 $namelist",
+    "linux": ["node", "git", "node", "python"],
     "wsl": ["docker"],
     "mac": ["xcode"]
   }
@@ -2549,7 +2515,7 @@ func TestHandleInstallAppMergesCurrentOSConfigEntries(t *testing.T) {
 		proxyResetInstallAppAvailabilityCache()
 	}()
 
-	proxy := &ProxyServer{InstallApps: []string{"python", "git", "python3"}}
+	proxy := &ProxyServer{}
 	server := httptest.NewServer(http.HandlerFunc(proxy.HandleInstallApp))
 	defer server.Close()
 
@@ -2577,7 +2543,7 @@ func TestHandleInstallAppMergesCurrentOSConfigEntries(t *testing.T) {
 		t.Fatalf("install_app = %#v, want installed app filtered out", apps)
 	}
 	if !has("python") {
-		t.Fatalf("install_app = %#v, want missing CLI entry kept", apps)
+		t.Fatalf("install_app = %#v, want missing configured entry kept", apps)
 	}
 	if has("docker") || has("xcode") {
 		t.Fatalf("install_app = %#v, want only current OS config entries", apps)
@@ -2594,6 +2560,55 @@ func TestHandleInstallAppMergesCurrentOSConfigEntries(t *testing.T) {
 	}
 	if countGit > 1 {
 		t.Fatalf("install_app git duplicated: %#v", apps)
+	}
+
+	detailsResp, err := http.Get(server.URL + "/install_app?details=1")
+	if err != nil {
+		t.Fatalf("GET /install_app?details=1 failed: %v", err)
+	}
+	defer detailsResp.Body.Close()
+	var details struct {
+		Apps     []string `json:"apps"`
+		Interval int      `json:"interval"`
+		Content  string   `json:"content"`
+	}
+	if err := json.NewDecoder(detailsResp.Body).Decode(&details); err != nil {
+		t.Fatalf("decode details response failed: %v", err)
+	}
+	if details.Interval != 17 || details.Content != "请安装 $namelist" {
+		t.Fatalf("details = %#v, want config interval and content", details)
+	}
+	if got := detailsResp.Header.Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("details Cache-Control = %q, want no-store", got)
+	}
+}
+
+func TestProxyInstallAppConfigReadsTemplateIntervalAndCurrentPlatform(t *testing.T) {
+	config := proxyInstallAppConfigFromValue(map[string]interface{}{
+		"interval": float64(17),
+		"content":  "请安装 $namelist",
+		"linux":    []interface{}{"node", "git"},
+		"wsl":      []interface{}{"docker"},
+		"mac":      []interface{}{"xcode"},
+	}, "linux")
+
+	if config.Interval != 17 {
+		t.Fatalf("interval = %d, want 17", config.Interval)
+	}
+	if config.Content != "请安装 $namelist" {
+		t.Fatalf("content = %q", config.Content)
+	}
+	if got := strings.Join(config.Apps, ","); got != "node,git" {
+		t.Fatalf("apps = %q, want node,git", got)
+	}
+}
+
+func TestProxyInstallAppConfigRejectsNonIntegerInterval(t *testing.T) {
+	config := proxyInstallAppConfigFromValue(map[string]interface{}{
+		"interval": 0.5,
+	}, "linux")
+	if config.Interval != defaultInstallAppIntervalMinutes {
+		t.Fatalf("interval = %d, want default %d", config.Interval, defaultInstallAppIntervalMinutes)
 	}
 }
 
@@ -12556,6 +12571,9 @@ func TestNewServeFlagSetUsesConfiguredPortUnlessOverridden(t *testing.T) {
 	var opts serveOptions
 	fs := newServeFlagSet("serve", &opts)
 	fs.SetOutput(io.Discard)
+	if fs.Lookup("install_app") != nil {
+		t.Fatal("--install_app must not be supported; install_app is read from config/config.json")
+	}
 	if err := fs.Parse(nil); err != nil {
 		t.Fatalf("parse defaults: %v", err)
 	}
@@ -12571,6 +12589,51 @@ func TestNewServeFlagSetUsesConfiguredPortUnlessOverridden(t *testing.T) {
 	}
 	if overridden.port != 18081 {
 		t.Fatalf("overridden port = %d, want 18081", overridden.port)
+	}
+}
+
+func TestWriteProxyStartupConfigPreservesInstallApp(t *testing.T) {
+	tempDir := t.TempDir()
+	configDir := filepath.Join(tempDir, "config")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("mkdir config: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(`{
+  "install_app": {
+    "interval": 60,
+    "content": "请安装 $namelist",
+    "linux": ["python3"],
+    "wsl": ["python3"],
+    "mac": ["python3"]
+  }
+}`), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	previousDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(previousDir) })
+
+	writeProxyStartupConfig(map[string]interface{}{"port": 18081})
+
+	data, err := os.ReadFile(filepath.Join(configDir, "config.json"))
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	var config map[string]any
+	if err := json.Unmarshal(data, &config); err != nil {
+		t.Fatalf("decode config: %v", err)
+	}
+	installApp, ok := config["install_app"].(map[string]any)
+	if !ok || installApp["content"] != "请安装 $namelist" {
+		t.Fatalf("install_app was overwritten: %#v", config["install_app"])
+	}
+	if apps, ok := installApp["linux"].([]any); !ok || len(apps) != 1 || apps[0] != "python3" {
+		t.Fatalf("install_app.linux = %#v, want [python3]", installApp["linux"])
 	}
 }
 

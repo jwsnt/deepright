@@ -963,19 +963,21 @@ LOG_PATH="/home/deepright/deepright/integration.log"
 PID_FILE="/home/deepright/deepright/integration.pid"
 WRAPPER_PATH="/home/deepright/start-deepright.sh"
 
-# start.bat invokes this wrapper as root.  Minimal Ubuntu rootfs images may
-# not include sudo, and root does not need it.  Keep the wrapper usable when
-# launched directly by the deepright user as well.
+# start.bat invokes this wrapper as root. Minimal Ubuntu rootfs images may
+# not include sudo, and root does not need it. Keep the wrapper usable when
+# launched directly by the deepright user as well. The Windows launcher opens
+# the browser after this command returns: a root-owned WSL process cannot
+# reliably activate a browser in the interactive Windows desktop session.
 if [ "$(id -u)" -eq 0 ]; then
   ELEVATE=(env)
-  LAUNCH_COMMAND="/usr/bin/env HOME=/home/deepright TERM=xterm-256color /app/integration start"
+  LAUNCH_COMMAND="/usr/bin/env HOME=/home/deepright TERM=xterm-256color DEEPRIGHT_INTEGRATION_SKIP_BROWSER=1 /app/integration start"
 else
   if ! command -v sudo >/dev/null 2>&1 || ! sudo -n true; then
     printf '%s\n' "integration must be started as root, or with passwordless sudo installed" >&2
     exit 1
   fi
   ELEVATE=(sudo -n)
-  LAUNCH_COMMAND="sudo -n /usr/bin/env HOME=/home/deepright TERM=xterm-256color /app/integration start"
+  LAUNCH_COMMAND="sudo -n /usr/bin/env HOME=/home/deepright TERM=xterm-256color DEEPRIGHT_INTEGRATION_SKIP_BROWSER=1 /app/integration start"
 fi
 
 if ! "${ELEVATE[@]}" mkdir -p "$(dirname "$LOG_PATH")"; then
@@ -994,7 +996,7 @@ log_launch() {
 if ! log_launch "start requested wrapper=$WRAPPER_PATH command=$LAUNCH_COMMAND log_path=$LOG_PATH pid_file=$PID_FILE launcher_pid=$$ launcher_uid=$(id -u)"; then
   exit 1
 fi
-setsid "${ELEVATE[@]}" /usr/bin/env HOME=/home/deepright TERM=xterm-256color /app/integration start 2>&1 \
+setsid "${ELEVATE[@]}" /usr/bin/env HOME=/home/deepright TERM=xterm-256color DEEPRIGHT_INTEGRATION_SKIP_BROWSER=1 /app/integration start 2>&1 \
   | "${ELEVATE[@]}" tee -a "$LOG_PATH" >/dev/null
 pipeline_status=("${PIPESTATUS[@]}")
 status=${pipeline_status[0]}
@@ -1137,3 +1139,22 @@ if ($startExitCode -ne 0) {
     exit $startExitCode
 }
 L_OK "Integration started"
+
+# Open from this PowerShell process, which belongs to the active Windows
+# desktop session. The WSL root service deliberately skips its own opener.
+$launchPort = 8080
+try {
+    $runtimeConfig = Get-Content -Raw -Path (Join-Path $APP_DIR "config\config.json") | ConvertFrom-Json
+    $configuredPort = 0
+    if ([int]::TryParse([string]$runtimeConfig.port, [ref]$configuredPort) -and $configuredPort -gt 0 -and $configuredPort -le 65535) {
+        $launchPort = $configuredPort
+    }
+} catch {
+    L_Warn "Unable to read the configured service port; opening the default port 8080"
+}
+try {
+    Start-Process "http://localhost:$launchPort/launch"
+    L_OK "Opening http://localhost:$launchPort/launch"
+} catch {
+    L_Warn "Integration is running, but the browser could not be opened: $_"
+}

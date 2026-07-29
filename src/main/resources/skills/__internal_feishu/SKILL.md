@@ -1,6 +1,6 @@
 ---
 name: __internal_feishu
-description: 通过飞书（feishu）插件处理已接收消息和用户明确授权的飞书MCP操作。触发词：飞书、feishu、飞书MCP、飞书回复、飞书消息、飞书附件、主动发送飞书消息、飞书Open API。
+description: 处理飞书（Feishu/Lark）相关功能，包括附件、文档、日历、任务及 Open API/MCP 操作。当飞书专用能力与浏览器均可完成任务时，优先使用本技能，仅在本技能及其集成能力无法完成时才使用浏览器（Browser）
 ---
 
 ### 安全与范围

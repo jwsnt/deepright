@@ -172,7 +172,6 @@ Integration 在每次启动时读取 `config/config.json.temp`：
 | `--connect_timeout` | 否 | `15000` | 上游服务连接超时（毫秒） | proxy |
 | `--knowledge_update_interval` | 否 | `7200000` | knowledge `lastUpdate` 透传阈值（毫秒） | proxy |
 | `--knowledge_update_lock` | 否 | `1800000` | knowledge 更新申请锁窗口（毫秒） | proxy |
-| `--install_app` | 否 | 空 | 额外待安装应用，逗号分隔，会合并到 `/install_app` 返回中 | proxy |
 | `--reply` | 否 | `<开始执行>可通过新消息更新任务内容` | 三方插件开始执行时的推送文案 | proxy |
 | `--sleep` | 否 | `3000` | cli-get 心跳请求失败或非 200 时的重试等待时间（毫秒） | cli-get |
 | `--thread` | 否 | `20` | 执行 Worker 数量 | cli-get |
@@ -645,17 +644,22 @@ curl http://127.0.0.1:8080/install_app
 说明：
 
 - `GET /install_app` 返回当前机器待安装应用的 JSON 字符串数组
+- `GET /install_app?details=1` 返回 `apps`、`interval`、`content` 三个字段，供 Site 按配置周期提示安装；详情响应不缓存，扫描时会重新判断安装状态
 - 当前已收口的检测项为 `git` 和 `python3`
 - 主应用 `config/config.json` 可配置 `install_app`，并按当前操作系统读取 `linux`、`wsl`、`mac` 对应数组
 - Linux 读取 `install_app.linux`，macOS 读取 `install_app.mac`，Windows/WSL 读取 `install_app.wsl`
-- 启动时可通过 `--install_app a,b,c` 追加自定义待安装应用
+- WSL 仅以 WSL 进程可直接执行的命令判断安装状态，不会把 Windows 宿主机 `.exe` 或 `/mnt/c` 中的软件计为已安装
+- `install_app.interval` 是正整数分钟，缺失或无效时为 `60`；`install_app.content` 是会话请求模板，Site 会替换其中的 `$namelist`
 - `install_app` 中的每个元素都表示一个本地应用名；接口会按当前操作系统检查是否已安装，已安装项不会出现在返回列表中
-- 接口会把自动探测结果、`config/config.json` 当前系统对应配置、`--install_app` 指定值做去重合并，并对安装状态缓存 5 分钟
+- `install_app` 唯一从主应用资源目录的 `config/config.json` 读取；macOS、Linux 和 Windows／WSL 均不支持 `--install_app`，服务启动或重启也不会写入、覆盖该对象
+- 接口会把自动探测结果与 `config/config.json` 当前系统对应配置做去重合并，并对安装状态缓存 5 分钟
 - `config/config.json` 示例：
 
 ```json
 {
   "install_app": {
+    "interval": 60,
+    "content": "请安装 $namelist",
     "linux": ["node", "python"],
     "wsl": ["node", "python", "docker"],
     "mac": ["node", "python", "xcode-select"]
@@ -667,18 +671,6 @@ curl http://127.0.0.1:8080/install_app
 
 ```json
 ["git", "python3"]
-```
-
-- 如果使用：
-
-```bash
-./integration --install_app node,python,git,python3
-```
-
-则接口可能返回：
-
-```json
-["git", "node", "python", "python3"]
 ```
 
 - 如果未检测到任何已支持应用，则返回空数组 `[]`
@@ -2470,14 +2462,14 @@ CLI：
 
 ## 迭代 20260614-2：/install_app 区分操作系统与已安装检测
 
-本轮迭代把 `install_app` 的配置来源升级为主应用 `config/config.json` 的按操作系统结构，同时保持 `--install_app` 仍然作为额外追加项。
+`install_app` 按主应用 `config/config.json` 的操作系统结构读取；当前版本不提供 `--install_app` 追加参数。
 
 适用规则：
 
 - Linux 读取 `install_app.linux`
 - macOS 读取 `install_app.mac`
 - Windows 和 WSL 读取 `install_app.wsl`
-- `--install_app` 依旧使用逗号分隔字符串，并与当前系统配置、自动探测结果统一去重合并
+- 所有待检查应用均在 `config/config.json` 对应平台数组中配置；服务启动不会写回或覆盖 `install_app` 对象
 - 每个 `install_app` 元素都表示一个本地应用名；当前系统如果已安装该应用，就不会出现在 `/install_app` 返回中
 - 应用安装状态会缓存 5 分钟
 
@@ -2493,10 +2485,9 @@ CLI：
 }
 ```
 
-示例：
+查询示例：
 
 ```bash
-./integration --install_app git,python3
 curl http://127.0.0.1:8080/install_app
 ```
 
@@ -2504,7 +2495,6 @@ curl http://127.0.0.1:8080/install_app
 
 - 当前机器自动探测缺失的 `git`、`python3`
 - `config/config.json` 中当前操作系统对应的数组
-- `--install_app` 传入的额外条目
 
 ---
 
@@ -3435,3 +3425,27 @@ Site 使用此字段显示目录和文件的排序，以及最近创建或修改
 - 输出先在受限工作区生成临时 MP4，再以原子创建提交最终文件；校验、探测、依赖、转码、超时或提交失败均清理临时文件，源视频与已有文件保持不变。运行环境须同时具备 `ffmpeg` 和 `ffprobe`。
 
 完整说明见 [iteration/20260728-3/USER_GUIDE.md](iteration/20260728-3/USER_GUIDE.md)。
+
+---
+
+## 迭代 20260729-1：应用安装检查
+
+Integration 从主应用资源目录的 `config/config.json.install_app` 读取当前平台的应用列表、扫描间隔和会话请求模板。macOS 使用 `mac`，Windows／WSL 使用 `wsl`，普通 Linux 使用 `linux`；不支持 `--install_app` 参数，且服务启动不会写回或覆盖该配置对象；只会报告尚未安装的应用，不会执行安装。
+
+`GET /install_app` 保持原有字符串数组响应；`GET /install_app?details=1` 额外返回 `apps`、`interval` 和 `content`，并且不缓存，以便下一周期及时识别刚安装的应用。
+
+完整说明见 [iteration/20260729-1/USER_GUIDE.md](iteration/20260729-1/USER_GUIDE.md)。
+
+---
+
+## 迭代 20260729-2：快捷回复运行配置
+
+`config/config.json` 可选配置 `shortcut` 字符串数组，例如：
+
+```json
+"shortcut": ["好的", "同意", "执行"]
+```
+
+`GET /api/runtime_config` 会在成功响应的受控 `config` 对象中透传该字段，供 Site 渲染最后一条已完成 SSE 响应的快捷回复列表。该接口不写入配置；字段不存在时保持省略。`provider`、模型密钥和其它未列入白名单的字段不会因为此扩展而暴露。
+
+完整说明见 [iteration/20260729-2/USER_GUIDE.md](iteration/20260729-2/USER_GUIDE.md)。

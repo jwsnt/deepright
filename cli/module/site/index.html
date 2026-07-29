@@ -328,6 +328,7 @@ a{color:var(--accent);text-decoration:none}
 .sidebar-storage-indicator svg{width:13px;height:13px;display:block}
 .sidebar-storage-indicator.is-warning{color:#c53f36;background:linear-gradient(180deg,rgba(255,241,239,.98),rgba(255,203,197,.96));box-shadow:inset 0 1px 0 rgba(255,255,255,.86),0 4px 11px rgba(197,63,54,.24)}
 .sidebar-storage-indicator.is-warning:hover,.sidebar-storage-indicator.is-warning:focus-visible{box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 6px 15px rgba(197,63,54,.3),0 0 0 2px rgba(222,106,95,.2)}
+.sidebar-storage-indicator.install-app-replaced{display:none}
 [data-theme="dark"] .sidebar-storage-indicator{color:#aec5ff;background:linear-gradient(180deg,rgba(57,74,118,.94),rgba(43,58,98,.92));box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 6px 14px rgba(0,0,0,.26)}
 [data-theme="dark"] .sidebar-storage-indicator:hover,[data-theme="dark"] .sidebar-storage-indicator:focus-visible{box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 8px 16px rgba(0,0,0,.28),0 0 0 2px rgba(174,197,255,.12)}
 [data-theme="dark"] .sidebar-storage-indicator.is-warning{color:#ffd0ca;background:linear-gradient(180deg,rgba(132,52,49,.96),rgba(92,37,39,.94));box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 6px 14px rgba(0,0,0,.3)}
@@ -1118,8 +1119,9 @@ animation:queuedInsertExplosion .62s ease-out both}
 [data-theme="dark"] .message .md-content .message-code-block-action{box-shadow:0 0 0 1px var(--code-block-action-ring),0 10px 24px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.08)}
 [data-theme="dark"] .message .md-content .message-code-block-action:hover,[data-theme="dark"] .message .md-content .message-code-block-action:focus-visible{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 22%,var(--code-block-action-ring) 78%),0 14px 28px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.12)}
 .message.assistant .message-meta,.message.user .message-meta{margin-top:6px;text-align:right;font-size:10px;line-height:1.2;font-weight:300}
-.message.assistant .message-meta{display:flex;align-items:flex-end;justify-content:flex-end;min-height:18px}
+.message.assistant .message-meta{display:flex;align-items:flex-end;justify-content:flex-end;min-height:18px;opacity:1;visibility:visible;transform:translateY(0);transition:opacity .16s ease,transform .16s ease,visibility 0s linear 0s}
 .message.assistant .message-meta{color:var(--text-muted)}
+.message.assistant .message-meta.shortcut-replies-open{opacity:0;visibility:hidden;transform:translateY(-2px);pointer-events:none;transition:opacity .16s ease,transform .16s ease,visibility 0s linear .16s}
 .message.assistant .message-meta .message-meta-agent{font-weight:700;text-decoration:underline;text-underline-offset:2px;cursor:pointer;transition:color .16s ease}
 .message.assistant .message-meta .message-meta-agent:hover{color:var(--accent)}
 .message.user .message-meta{color:rgba(255,255,255,.82)}
@@ -1202,6 +1204,13 @@ animation:queuedInsertExplosion .62s ease-out both}
 .assistant-thinking-panel__content::-webkit-scrollbar-thumb{background:rgba(var(--accent-rgb),.5);border:2px solid transparent;border-radius:999px;background-clip:padding-box}
 .assistant-thinking-panel__content::-webkit-scrollbar-thumb:hover{background-color:rgba(var(--accent-rgb),.72)}
 .assistant-thinking-panel__content .assistant-explosion-beacon__item{flex:0 0 auto}
+.assistant-shortcut-fan{position:fixed;left:0;top:0;width:0;height:0;z-index:58;pointer-events:none;isolation:isolate}
+.assistant-shortcut-fan__items{position:absolute;right:0;top:0;display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:3px;width:max-content;max-width:var(--assistant-shortcut-max-width,260px);min-height:22px;box-sizing:border-box;padding:0;border:0;background:transparent;box-shadow:none;opacity:0;pointer-events:none;transform:translateY(-50%) scale(.94);transform-origin:100% 50%;transition:opacity .16s ease,transform .16s cubic-bezier(.22,1,.36,1)}
+.assistant-shortcut-fan.open .assistant-shortcut-fan__items{opacity:1;pointer-events:auto;transform:translateY(-50%) scale(1)}
+.assistant-shortcut-fan__action{height:22px;min-width:0;max-width:92px;padding:0 5px;border:1px solid rgba(219,104,52,.3);border-radius:5px;background:linear-gradient(180deg,#fffaf6,#ffe5d4);box-shadow:inset 0 1px 0 rgba(255,255,255,.92);color:#9d411e;font:650 9px/1.1 inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;transition:transform .14s ease,border-color .14s ease,background-color .14s ease,color .14s ease,box-shadow .14s ease}
+.assistant-shortcut-fan__action:hover,.assistant-shortcut-fan__action:focus-visible{border-color:rgba(191,70,23,.68);background:#fff2e8;color:#7d2f13;box-shadow:0 0 0 2px rgba(232,104,45,.12),inset 0 1px 0 rgba(255,255,255,.96);outline:none;transform:translateY(-1px)}
+[data-theme="dark"] .assistant-shortcut-fan__action{border-color:rgba(92,202,255,.32);background:linear-gradient(180deg,rgba(32,75,113,.98),rgba(21,52,86,.98));box-shadow:inset 0 1px 0 rgba(190,242,255,.1);color:#c4f1ff}
+[data-theme="dark"] .assistant-shortcut-fan__action:hover,[data-theme="dark"] .assistant-shortcut-fan__action:focus-visible{border-color:rgba(123,224,255,.74);background:rgba(39,101,146,.98);color:#f0fcff;box-shadow:0 0 0 2px rgba(91,207,255,.13),inset 0 1px 0 rgba(219,250,255,.14)}
 .message-footer{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:18px;padding:0 18px;box-sizing:border-box;pointer-events:none}
 .message-footer-process-slot{flex:1 1 auto;display:flex;align-items:center;min-width:0;box-sizing:border-box}
 .message.assistant.has-task-badges{padding-top:14px}
@@ -1235,18 +1244,19 @@ animation:queuedInsertExplosion .62s ease-out both}
 [data-theme="dark"] .message-task-badge{color:rgba(24,12,8,.84)}
 .message.error{background:linear-gradient(145deg,rgba(255,120,134,.18),rgba(255,255,255,.12));border:1px solid rgba(255,90,107,.38);color:var(--error)}
 .message-actions{position:static;display:flex;align-items:center;justify-content:flex-end;gap:6px;z-index:40;pointer-events:auto;max-width:100%;flex:0 0 auto}
-.message-copy-btn,.message-retry-btn,.message-edit-btn,.message-scroll-top-btn,.message-thinking-btn{width:15px;height:15px;padding:0;border:none;border-radius:999px;background:transparent;color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.55;transition:opacity .16s ease,transform .16s ease,color .16s ease,background-color .16s ease,box-shadow .16s ease,filter .16s ease;pointer-events:auto;appearance:none;-webkit-appearance:none;box-shadow:none}
+.message-copy-btn,.message-retry-btn,.message-edit-btn,.message-scroll-top-btn,.message-thinking-btn,.message-shortcut-btn{width:15px;height:15px;padding:0;border:none;border-radius:999px;background:transparent;color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.55;transition:opacity .16s ease,transform .16s ease,color .16s ease,background-color .16s ease,box-shadow .16s ease,filter .16s ease;pointer-events:auto;appearance:none;-webkit-appearance:none;box-shadow:none}
+.message-shortcut-btn:disabled{cursor:not-allowed;opacity:.26;transform:none;filter:saturate(.4);pointer-events:none}
 .message-scroll-top-btn{display:none}
 .message-scroll-top-btn.show{display:flex}
-.message-copy-btn:hover,.message-copy-btn:focus-visible,.message-retry-btn:hover,.message-retry-btn:focus-visible,.message-edit-btn:hover,.message-edit-btn:focus-visible,.message-scroll-top-btn:hover,.message-scroll-top-btn:focus-visible,.message-thinking-btn:hover,.message-thinking-btn:focus-visible{opacity:1;transform:translateY(-1px);color:var(--text-primary);background:rgba(var(--accent-rgb),.08);box-shadow:0 0 0 1px rgba(var(--accent-rgb),.14);outline:none}
-.message-copy-btn svg,.message-retry-btn svg,.message-edit-btn svg,.message-scroll-top-btn svg,.message-thinking-btn svg{width:15px;height:15px;display:block;fill:currentColor}
+.message-copy-btn:hover,.message-copy-btn:focus-visible,.message-retry-btn:hover,.message-retry-btn:focus-visible,.message-edit-btn:hover,.message-edit-btn:focus-visible,.message-scroll-top-btn:hover,.message-scroll-top-btn:focus-visible,.message-thinking-btn:hover,.message-thinking-btn:focus-visible,.message-shortcut-btn:hover,.message-shortcut-btn:focus-visible{opacity:1;transform:translateY(-1px);color:var(--text-primary);background:rgba(var(--accent-rgb),.08);box-shadow:0 0 0 1px rgba(var(--accent-rgb),.14);outline:none}
+.message-copy-btn svg,.message-retry-btn svg,.message-edit-btn svg,.message-scroll-top-btn svg,.message-thinking-btn svg,.message-shortcut-btn svg{width:15px;height:15px;display:block;fill:currentColor}
 .message-scroll-top-btn svg{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.message-thinking-btn svg{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.message-thinking-btn svg,.message-shortcut-btn svg{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .message-thinking-btn.is-lit{opacity:1;color:rgb(var(--accent-soft-rgb));background:radial-gradient(circle at 35% 28%,var(--glass-highlight),rgba(var(--accent-soft-rgb),.42) 36%,rgba(var(--accent-rgb),.2) 72%);box-shadow:0 0 0 1px rgba(var(--accent-rgb),.3),0 0 9px rgba(var(--accent-rgb),.32),0 0 18px rgba(var(--accent-soft-rgb),.16);filter:drop-shadow(0 0 3px rgba(var(--accent-soft-rgb),.36))}
 .message-thinking-btn.wiki-thinking-collected{animation:messageThinkingBulbCollected .9s cubic-bezier(.18,.84,.24,1) both}
 @keyframes messageThinkingBulbCollected{0%,52%{transform:scale(.78);filter:brightness(.92) drop-shadow(0 0 0 rgba(var(--accent-soft-rgb),0));box-shadow:0 0 0 1px rgba(var(--accent-rgb),.22),0 0 0 rgba(var(--accent-rgb),0)}70%{transform:scale(1.58);filter:brightness(1.52) drop-shadow(0 0 10px rgba(var(--accent-soft-rgb),.9));box-shadow:0 0 0 7px rgba(var(--accent-rgb),.16),0 0 28px rgba(var(--accent-soft-rgb),.78),0 0 46px rgba(var(--accent-rgb),.4)}84%{transform:scale(1.18);filter:brightness(1.26) drop-shadow(0 0 6px rgba(var(--accent-soft-rgb),.58));box-shadow:0 0 0 3px rgba(var(--accent-rgb),.18),0 0 16px rgba(var(--accent-soft-rgb),.5),0 0 28px rgba(var(--accent-rgb),.24)}100%{transform:scale(1);filter:brightness(1) drop-shadow(0 0 3px rgba(var(--accent-soft-rgb),.36));box-shadow:0 0 0 1px rgba(var(--accent-rgb),.3),0 0 9px rgba(var(--accent-rgb),.32),0 0 18px rgba(var(--accent-soft-rgb),.16)}}
 .message-retry-btn:disabled,.message-edit-btn:disabled,.message-scroll-top-btn:disabled{opacity:.22;cursor:not-allowed;pointer-events:none;transform:none}
-[data-theme="dark"] .message-copy-btn:hover,[data-theme="dark"] .message-copy-btn:focus-visible,[data-theme="dark"] .message-retry-btn:hover,[data-theme="dark"] .message-retry-btn:focus-visible,[data-theme="dark"] .message-edit-btn:hover,[data-theme="dark"] .message-edit-btn:focus-visible,[data-theme="dark"] .message-scroll-top-btn:hover,[data-theme="dark"] .message-scroll-top-btn:focus-visible,[data-theme="dark"] .message-thinking-btn:hover,[data-theme="dark"] .message-thinking-btn:focus-visible{background:rgba(var(--accent-rgb),.14);box-shadow:0 0 0 1px rgba(var(--accent-soft-rgb),.18)}
+[data-theme="dark"] .message-copy-btn:hover,[data-theme="dark"] .message-copy-btn:focus-visible,[data-theme="dark"] .message-retry-btn:hover,[data-theme="dark"] .message-retry-btn:focus-visible,[data-theme="dark"] .message-edit-btn:hover,[data-theme="dark"] .message-edit-btn:focus-visible,[data-theme="dark"] .message-scroll-top-btn:hover,[data-theme="dark"] .message-scroll-top-btn:focus-visible,[data-theme="dark"] .message-thinking-btn:hover,[data-theme="dark"] .message-thinking-btn:focus-visible,[data-theme="dark"] .message-shortcut-btn:hover,[data-theme="dark"] .message-shortcut-btn:focus-visible{background:rgba(var(--accent-rgb),.14);box-shadow:0 0 0 1px rgba(var(--accent-soft-rgb),.18)}
 .chat-scroll-bottom-btn{position:fixed;left:0;top:0;width:22px;height:22px;padding:0;border:none;border-radius:8px;background:linear-gradient(180deg,rgba(255,255,255,.94),rgba(255,236,224,.9));color:#8a544c;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 10px 24px rgba(91,34,29,.12),inset 0 1px 0 rgba(255,255,255,.94);transition:opacity .18s ease,transform .18s ease,filter .18s ease,color .18s ease,background-color .18s ease,box-shadow .18s ease;opacity:0;visibility:hidden;pointer-events:none;transform:translateY(8px) scale(.92);z-index:6}
 .chat-scroll-bottom-btn.show{opacity:.5;visibility:visible;pointer-events:auto;transform:translateY(0) scale(1)}
 .chat-scroll-bottom-btn:hover,.chat-scroll-bottom-btn:focus-visible{opacity:.72;color:var(--text-primary);background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(255,227,205,.96));box-shadow:0 14px 28px rgba(91,34,29,.16),inset 0 1px 0 rgba(255,255,255,.98);outline:none}
@@ -2232,6 +2242,7 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .settings-panel h3{font-size:17px;margin-bottom:14px;color:var(--text-primary)}
 .settings-title{display:flex;align-items:center;gap:8px;margin-bottom:14px}
 .settings-title h3{margin:0}
+.settings-version{display:inline-flex;align-items:center;min-height:20px;padding:2px 7px;border:1px solid color-mix(in srgb,var(--border) 84%,var(--accent) 16%);border-radius:999px;background:color-mix(in srgb,var(--modal-field-bg) 88%,transparent);color:var(--text-muted);font-size:11px;font-weight:700;letter-spacing:.03em;line-height:1;white-space:nowrap;user-select:none}
 .settings-copy-btn{width:20px;height:20px;border:none;border-radius:999px;background:transparent;color:var(--text-muted);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition);padding:0}
 .settings-copy-btn svg{width:14px;height:14px;animation:settingsCopySpin 6s linear infinite}
 .settings-host-btn svg{animation:none}
@@ -3329,6 +3340,8 @@ body.meta-preview-focus .main::before,body.meta-preview-focus .main::after{opaci
 .plugin-modal-config-section{padding-top:3px;padding-bottom:15px}
 .plugin-modal-section + .plugin-modal-section{border-top:1px solid color-mix(in srgb,var(--border) 88%,transparent)}
 .plugin-modal-section-title{font-size:12px;font-weight:600;color:var(--text-secondary);letter-spacing:.04em;text-transform:uppercase}
+.plugin-modal-meta-heading{display:grid;grid-template-columns:112px minmax(0,1fr);align-items:baseline;gap:12px;min-width:0}
+.plugin-modal-meta-validation-error{min-width:0;color:#df3f48;font:inherit;letter-spacing:normal;text-align:left;text-transform:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .plugin-modal-config{display:flex;flex-direction:column;align-items:stretch;gap:5px;margin-top:1px;overflow:visible}
 .plugin-modal-config-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;overflow:visible}
 .plugin-modal-config-row-secondary{margin-top:-1px}
@@ -5642,7 +5655,10 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
           <div class="plugin-modal-config-empty" id="pluginModalConfigEmpty">当前插件未开放容器配置项</div>
         </div>
         <div class="plugin-modal-section plugin-modal-meta-section" id="pluginModalMetaSection">
-          <div class="plugin-modal-section-title">插件参数</div>
+          <div class="plugin-modal-section-title plugin-modal-meta-heading">
+            <span>插件参数</span>
+            <span class="plugin-modal-meta-validation-error" id="pluginModalMetaValidationError" role="alert" aria-live="polite" hidden></span>
+          </div>
           <div class="plugin-meta-list" id="pluginMetaList"></div>
         </div>
       </div>
@@ -6662,6 +6678,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
           <button class="settings-copy-btn" id="settingsCopyDeviceBtn" type="button" onclick="copyRuntimeDeviceId()" title="复制 deviceId">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="10" height="10" rx="2"/><path d="M15 9V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/></svg>
           </button>
+          <span class="settings-version" id="settingsVersion" hidden aria-label="版本号"></span>
         </div>
         <div class="form-group">
           <div class="agent-select-wrap">
@@ -8135,9 +8152,13 @@ let installAppState = {
   requestSeq: 0,
   popoverOpen: false,
   loading: false,
-  firstItem: ''
+  pendingItems: [],
+  intervalMinutes: 60,
+  promptTemplate: '请安装 $namelist',
+  nextScanAt: 0,
+  suppressedUntil: 0,
+  cooldownTimer: 0
 };
-const INSTALL_APP_REFRESH_INTERVAL_SEC = 60;
 const PAGE_TASK_SCHEDULER_INTERVAL_SEC = 10;
 const PAGE_TASK_SCHEDULER_INTERVAL_ENERGY_SAVER_SEC = 15;
 const PAGE_TASK_HEARTBEAT_INTERVAL_SEC = 30;
@@ -10364,6 +10385,8 @@ const PLUGIN_MODAL_BROWSER_RESTART_CONFIRM_HINT = [
 ];
 const EMAIL_PLUGIN_INTERVAL_FIELD = 'email_pop3_interval';
 const EMAIL_PLUGIN_INTERVAL_RECOMMENDED_SECONDS = 300;
+const FEISHU_APP_ID_FIELD = 'appId';
+const FEISHU_APP_SECRET_FIELD = 'appSecret';
 const FEISHU_MCP_URL_FIELD = 'mcp_url';
 const FEISHU_MCP_DOCUMENT_URL = 'https://open.feishu.cn/page/mcp/7616252843057548502';
 const CHAT_SKILL_HOLD_MS = 15000;
@@ -23949,30 +23972,75 @@ function registerMessageImageCache() {
 function normalizeInstallAppItems(data) {
   const source = Array.isArray(data)
     ? data
-    : (data && Array.isArray(data.data) ? data.data : []);
+    : (data && Array.isArray(data.apps) ? data.apps : (data && Array.isArray(data.data) ? data.data : []));
   return source
     .map(item => typeof item === 'string' ? item.trim() : '')
     .filter(Boolean);
+}
+
+function normalizeInstallAppIntervalMinutes(value) {
+  const interval = Number(value);
+  return Number.isFinite(interval) && interval > 0 ? Math.max(1, Math.floor(interval)) : 60;
+}
+
+function getInstallAppRefreshIntervalMs() {
+  return normalizeInstallAppIntervalMinutes(installAppState.intervalMinutes) * 60 * 1000;
+}
+
+function isInstallAppIndicatorSuppressed() {
+  const until = Number(installAppState.suppressedUntil || 0);
+  return Number.isFinite(until) && until > Date.now();
+}
+
+function scheduleInstallAppCooldownScan() {
+  if (installAppState.cooldownTimer) {
+    clearTimeout(installAppState.cooldownTimer);
+    installAppState.cooldownTimer = 0;
+  }
+  const delay = Number(installAppState.suppressedUntil || 0) - Date.now();
+  if (!(delay > 0)) return;
+  installAppState.cooldownTimer = window.setTimeout(() => {
+    installAppState.cooldownTimer = 0;
+    if (isInstallAppIndicatorSuppressed()) return;
+    void refreshInstallAppIndicator({ force: true });
+  }, delay + 20);
+}
+
+function suppressInstallAppIndicator() {
+  installAppState.suppressedUntil = Date.now() + getInstallAppRefreshIntervalMs();
+  installAppState.items = [];
+  installAppState.pendingItems = [];
+  installAppState.nextScanAt = installAppState.suppressedUntil;
+  scheduleInstallAppCooldownScan();
+  renderInstallAppIndicator();
 }
 
 function renderInstallAppIndicator() {
   const el = document.getElementById('installAppIndicator');
   if (!el) return;
   const items = Array.isArray(installAppState.items) ? installAppState.items : [];
-  const visible = items.length > 0;
+  const visible = items.length > 0 && !isInstallAppIndicatorSuppressed();
   const loading = !!installAppState.loading;
+  const storageButton = document.getElementById('chatStorageStatsBtn');
   el.classList.toggle('show', visible);
   el.classList.toggle('loading', loading);
   el.setAttribute('aria-hidden', visible ? 'false' : 'true');
   el.disabled = !visible || loading;
   el.setAttribute('aria-busy', loading ? 'true' : 'false');
   el.title = visible ? ((loading ? '正在读取待安装应用...' : '待安装应用：') + items.join('、')) : '';
+  if (storageButton) storageButton.classList.toggle('install-app-replaced', visible);
 }
 
-async function refreshInstallAppIndicator() {
+async function refreshInstallAppIndicator(options) {
+  const opts = options || {};
+  const now = Date.now();
+  if (!opts.force && Number(installAppState.nextScanAt || 0) > now) {
+    renderInstallAppIndicator();
+    return installAppState.items;
+  }
   const seq = ++installAppState.requestSeq;
   try {
-    const resp = await fetchExecApi('/install_app?_=' + Date.now(), { cache: 'no-store' });
+    const resp = await fetchExecApi('/install_app?details=1&_=' + now, { cache: 'no-store' });
     if (!resp.ok) throw new Error('install_app request failed');
     const contentType = resp.headers.get('content-type') || '';
     let data = null;
@@ -23984,17 +24052,23 @@ async function refreshInstallAppIndicator() {
     }
     if (seq !== installAppState.requestSeq) return;
     installAppState.items = normalizeInstallAppItems(data);
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      installAppState.intervalMinutes = normalizeInstallAppIntervalMinutes(data.interval);
+      const content = String(data.content || '').trim();
+      if (content) installAppState.promptTemplate = content;
+    }
   } catch {
     if (seq !== installAppState.requestSeq) return;
     installAppState.items = [];
   }
+  installAppState.nextScanAt = Date.now() + getInstallAppRefreshIntervalMs();
   renderInstallAppIndicator();
   return installAppState.items;
 }
 
 function startInstallAppPolling() {
   renderInstallAppIndicator();
-  refreshInstallAppIndicator();
+  refreshInstallAppIndicator({ force: true });
 }
 
 function setInstallAppError(message) {
@@ -24002,8 +24076,14 @@ function setInstallAppError(message) {
   if (el) el.textContent = message || '';
 }
 
-function buildInstallAppPrompt(item) {
-  return '帮我安装' + String(item || '').trim();
+function buildInstallAppPrompt(items) {
+  const nameList = (Array.isArray(items) ? items : [])
+    .map(item => String(item || '').trim())
+    .filter(Boolean)
+    .join('、');
+  if (!nameList) return '';
+  const template = String(installAppState.promptTemplate || '请安装 $namelist');
+  return template.split('$namelist').join(nameList);
 }
 
 function getDocTidyFileName(name, type) {
@@ -24396,11 +24476,13 @@ async function submitSoulTidyPrompt() {
 
 function closeInstallAppPopover() {
   const overlay = document.getElementById('installAppOverlay');
+  const shouldSuppress = !!installAppState.popoverOpen;
   if (!overlay) return;
   setOverlayVisible(overlay, false);
   installAppState.popoverOpen = false;
-  installAppState.firstItem = '';
+  installAppState.pendingItems = [];
   setInstallAppError('');
+  if (shouldSuppress) suppressInstallAppIndicator();
 }
 
 function handleInstallAppOverlayClick(event) {
@@ -24408,11 +24490,15 @@ function handleInstallAppOverlayClick(event) {
   closeInstallAppPopover();
 }
 
-function populateInstallAppPopover(item) {
+function populateInstallAppPopover(items) {
   const desc = document.getElementById('installAppDesc');
   const firstItemEl = document.getElementById('installAppFirstItem');
-  if (desc) desc.textContent = '检测到当前环境存在待安装应用，是否需要安装 ' + item + '？';
-  if (firstItemEl) firstItemEl.innerHTML = '<strong>待安装应用</strong>' + esc(item);
+  const names = (Array.isArray(items) ? items : [])
+    .map(item => String(item || '').trim())
+    .filter(Boolean);
+  const nameList = names.join('、');
+  if (desc) desc.textContent = '检测到当前环境存在待安装应用，是否需要在当前会话中自动发起安装请求？';
+  if (firstItemEl) firstItemEl.innerHTML = '<strong>待安装应用</strong>' + esc(nameList);
 }
 
 async function openInstallAppPopover(event) {
@@ -24429,8 +24515,7 @@ async function openInstallAppPopover(event) {
   renderInstallAppIndicator();
   try {
     const items = await refreshInstallAppIndicator();
-    const firstItem = String(items && items[0] || '').trim();
-    if (!firstItem) {
+    if (!Array.isArray(items) || items.length === 0) {
       closeInstallAppPopover();
       vfsShowUploadToast('当前没有待安装应用', true);
       return;
@@ -24443,8 +24528,8 @@ async function openInstallAppPopover(event) {
     hideModelSelectToast();
     hideInputReloadConfirm();
     closeAllSkillExtractPopovers();
-    installAppState.firstItem = firstItem;
-    populateInstallAppPopover(firstItem);
+    installAppState.pendingItems = items.slice();
+    populateInstallAppPopover(installAppState.pendingItems);
     setInstallAppError('');
     const overlay = document.getElementById('installAppOverlay');
     if (!overlay) return;
@@ -24474,8 +24559,9 @@ function toggleInstallAppPopover(event) {
 }
 
 async function submitInstallAppPrompt() {
-  const item = String(installAppState.firstItem || '').trim();
-  if (!item) {
+  const items = Array.isArray(installAppState.pendingItems) ? installAppState.pendingItems.slice() : [];
+  const promptText = buildInstallAppPrompt(items);
+  if (!promptText) {
     setInstallAppError('待安装应用不存在，请重新点击小灯泡');
     return;
   }
@@ -24503,9 +24589,15 @@ async function submitInstallAppPrompt() {
     setInstallAppError(getModelTokenErrorMessage(state.selectedModel));
     return;
   }
+  const input = document.getElementById('msgInput');
+  if (input) {
+    setEditablePlainText(input, promptText);
+    chatDrafts[chatId] = input.innerHTML;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
   closeInstallAppPopover();
-  await sendCenterMessage(buildInstallAppPrompt(item), {
-    clearInputAfterSend: false,
+  await sendCenterMessage(promptText, {
+    clearInputAfterSend: true,
     toastOnSuccess: '',
     requestSource: 'install_app'
   });
@@ -25345,6 +25437,7 @@ async function init() {
     }
     if (!e.target.closest('.swarm-model-wrap')) closeSwarmModelDropdown();
     if (!e.target.closest('.top-action-cluster')) closeQuickFanMenu();
+    if (!e.target.closest('#assistantShortcutFan') && !e.target.closest('.message-shortcut-btn')) closeAssistantShortcutModal({ restoreFocus: false });
     if (!e.target.closest('.plugin-modal-model')) pluginModalCloseModelDropdown();
     if (!e.target.closest('.at-menu') && !e.target.closest('.at-file-panel') && !e.target.closest('.at-skill-panel') && !e.target.closest('#msgInput') && !e.target.closest('#rsNoteInput') && !e.target.closest('#messageEditInput') && !e.target.closest('#pageAnnotationInput')) hideAllAt();
     if (!e.target.closest('#vfsSkillIndicator') && !e.target.closest('#skillExtractRangePopover') && !e.target.closest('#skillExtractGitPopover') && !e.target.closest('#skillExtractGoalPopover')) closeAllSkillExtractPopovers();
@@ -25370,7 +25463,9 @@ async function init() {
     }
   });
   document.addEventListener('click', handleMessageCodeBlockAction);
+  document.addEventListener('scroll', () => closeAssistantShortcutModal({ restoreFocus: false }), true);
   window.addEventListener('resize', scheduleLayoutSync);
+  window.addEventListener('resize', () => closeAssistantShortcutModal({ restoreFocus: false }));
   window.addEventListener('resize', scheduleChatScrollControlsSync);
   window.addEventListener('resize', scheduleCliSubScrollBottomButtonSync);
   window.addEventListener('resize', pluginModalSyncModelDropdownPosition);
@@ -27844,6 +27939,7 @@ function bindPluginMetaPlaceholderPreview() {
   list.addEventListener('input', event => {
     const input = getInput(event.target);
     if (!(input instanceof HTMLInputElement)) return;
+    pluginModalRefreshFeishuMetaValidationError();
     if (pluginMetaPlaceholderPreviewState.hoverInput === input || pluginMetaPlaceholderPreviewState.focusInput === input || pluginMetaPlaceholderPreviewState.input === input) {
       syncPluginMetaPlaceholderPreview(input);
     }
@@ -27868,6 +27964,37 @@ function pluginModalCollectMetaInput() {
     meta[field] = String(input.value || '');
   });
   return meta;
+}
+
+function pluginModalValidateFeishuMetaInput(plugin, metaInput) {
+  if (!isFeishuPlugin(plugin)) return '';
+  const meta = metaInput && typeof metaInput === 'object' && !Array.isArray(metaInput)
+    ? metaInput
+    : {};
+  const appID = String(meta[FEISHU_APP_ID_FIELD] || '').trim();
+  const appSecret = String(meta[FEISHU_APP_SECRET_FIELD] || '').trim();
+  const mcpURL = String(meta[FEISHU_MCP_URL_FIELD] || '').trim();
+  if ((appID && !appSecret) || (!appID && appSecret)) {
+    return 'appId 和 appSecret 必须同时填写';
+  }
+  if (!appID && !appSecret && !mcpURL) {
+    return '请填写 appId 和 appSecret，或 mcp_url';
+  }
+  return '';
+}
+
+function pluginModalSetMetaValidationError(message) {
+  const error = document.getElementById('pluginModalMetaValidationError');
+  if (!error) return;
+  const text = String(message || '').trim();
+  error.textContent = text;
+  error.hidden = !text;
+}
+
+function pluginModalRefreshFeishuMetaValidationError() {
+  const error = document.getElementById('pluginModalMetaValidationError');
+  if (!error || error.hidden) return;
+  pluginModalSetMetaValidationError(pluginModalValidateFeishuMetaInput(pluginModalState.plugin, pluginModalCollectMetaInput()));
 }
 
 function openFeishuMcpDocument(event) {
@@ -28052,6 +28179,8 @@ function pluginModalBuildActionPayload() {
   const payloadModel = supportsProvider ? selectedModel : '';
   if (!pluginName) throw new Error('当前插件不存在');
   if (!pluginKey) throw new Error('当前插件缺少运行时 key');
+  const feishuMetaError = pluginModalValidateFeishuMetaInput(plugin, metaInput);
+  if (feishuMetaError) throw new Error(feishuMetaError);
   if (supportsAgent && !payloadAgentId) throw new Error('请先选择 Agent');
   if (supportsProvider) {
     const providerModelError = pluginModalResolveProviderModelValidationError(payloadModel);
@@ -28127,6 +28256,12 @@ async function pluginModalStartPluginFlow(options) {
   let payload;
   const plugin = pluginModalState.plugin;
   const pluginName = plugin && plugin.name ? plugin.name : '插件';
+  const feishuMetaError = pluginModalValidateFeishuMetaInput(plugin, pluginModalCollectMetaInput());
+  if (feishuMetaError) {
+    pluginModalSetMetaValidationError(feishuMetaError);
+    return;
+  }
+  pluginModalSetMetaValidationError('');
   try {
     payload = pluginModalBuildActionPayload();
   } catch (err) {
@@ -28255,6 +28390,7 @@ function renderPluginModalMeta(plugin) {
   if (!list) return;
   bindPluginMetaPlaceholderPreview();
   hidePluginMetaPlaceholderPreview();
+  pluginModalSetMetaValidationError('');
   if (isRemoteReadonlySiteAccess()) {
     list.innerHTML = '';
     return;
@@ -32022,6 +32158,7 @@ function syncActiveChatAsyncControls() {
   syncQueuedCenterInputUI(activeChatId);
   syncCenterComposerState(activeChatId, { flashSend: !busy });
   syncVisibleMessageRetryButtons(activeChatId);
+  syncVisibleAssistantShortcutButtons(activeChatId);
   syncCenterMessageEditUI();
   return busy;
 }
@@ -32874,6 +33011,7 @@ async function checkAgentConfig(agentId) {
 
 // ===== Messages =====
 function renderMessages(options) {
+  closeAssistantShortcutModal({ restoreFocus: false });
   const container = document.getElementById('chatContainer');
   const opts = options || {};
   const lowPowerRendering = isLowPowerRenderingEnabled();
@@ -33782,6 +33920,7 @@ function primeStreamingTypeSwap(streamKey, msgEl, assistantMsgOverride) {
 function flushStreamingMessage(streamKey) {
   const stateItem = streamRenderQueue[streamKey];
   if (!stateItem) return;
+  closeAssistantShortcutModal({ restoreFocus: false });
   stateItem.frame = null;
   if ((stateItem.holdUntil || 0) > Date.now()) return;
   const lowPowerRendering = isLowPowerRenderingEnabled();
@@ -33916,6 +34055,7 @@ function messageActionsHtml(m) {
     actions.push(messageCopyButtonHtml(m));
   } else {
     actions.push(messageCopyButtonHtml(m));
+    if (shouldShowAssistantShortcutButton(m)) actions.push(messageShortcutButtonHtml());
     if (shouldShowAssistantThinkingButton(m)) actions.push(messageThinkingButtonHtml(m));
   }
   return `<div class="message-actions">${actions.join('')}</div>`;
@@ -33943,6 +34083,12 @@ function messageCopyButtonHtml(m) {
 function messageThinkingButtonHtml(message) {
   const lit = message && message.hadThinkingSnapshots === true ? ' is-lit' : '';
   return `<button type="button" class="message-thinking-btn${lit}" onclick="openLatestAssistantThinkingModal(event)" title="查看思考过程" aria-label="查看思考过程"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6"></path><path d="M10 21h4"></path><path d="M12 3a6 6 0 0 0-3.87 10.58c.77.67 1.37 1.5 1.68 2.42h4.38c.31-.92.91-1.75 1.68-2.42A6 6 0 0 0 12 3Z"></path></svg></button>`;
+}
+
+function messageShortcutButtonHtml() {
+  const disabled = isAssistantShortcutInteractionDisabled(state.activeChat);
+  const title = disabled ? '正在等待 SSE 响应完成' : '快捷回复';
+  return `<button type="button" class="message-shortcut-btn" onclick="openLatestAssistantShortcutModal(event)" title="${title}" aria-label="快捷回复" aria-disabled="${disabled ? 'true' : 'false'}"${disabled ? ' disabled' : ''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v6a2.5 2.5 0 0 1-2.5 2.5H11l-4.5 4v-4A2.5 2.5 0 0 1 5 12.5Z"></path><path d="M8.5 8.5h7M8.5 11.5h4.5"></path></svg></button>`;
 }
 
 function unwrapStructuredResultSource(text) {
@@ -34196,6 +34342,62 @@ function shouldShowAssistantThinkingButton(message) {
   return getAssistantExplosionSnapshots(latest).length > 0 || hasAssistantThinkingSnapshotsCleared(latest);
 }
 
+let assistantShortcutConfigLoadRequest = null;
+
+function normalizeAssistantShortcutReplies(value) {
+  if (!Array.isArray(value)) return [];
+  const replies = [];
+  const seen = new Set();
+  value.forEach(item => {
+    if (typeof item !== 'string') return;
+    const text = item.trim();
+    if (!text || seen.has(text)) return;
+    seen.add(text);
+    replies.push(text);
+  });
+  return replies;
+}
+
+function getCachedAssistantShortcutReplies() {
+  return normalizeAssistantShortcutReplies(runtimeConfigCache && runtimeConfigCache.shortcut);
+}
+
+function ensureAssistantShortcutConfigLoaded() {
+  if (runtimeConfigCache || assistantShortcutConfigLoadRequest) return;
+  assistantShortcutConfigLoadRequest = readRuntimeConfig(false)
+    .then(() => {
+      if (state.activeChat) renderMessages();
+    })
+    .catch(() => {})
+    .finally(() => {
+      assistantShortcutConfigLoadRequest = null;
+    });
+}
+
+function shouldShowAssistantShortcutButton(message) {
+  const chat = state.chats[state.activeChat];
+  const latest = getLatestSuccessfulCenterAssistantResponseMessage(chat);
+  if (!latest || latest !== message) return false;
+  const replies = getCachedAssistantShortcutReplies();
+  if (!replies.length) ensureAssistantShortcutConfigLoaded();
+  return replies.length > 0;
+}
+
+function isAssistantShortcutInteractionDisabled(chatId) {
+  const resolvedChatId = String(chatId || state.activeChat || '').trim();
+  return !resolvedChatId || isChatBusy(resolvedChatId) || isChatSendDispatching(resolvedChatId);
+}
+
+function syncVisibleAssistantShortcutButtons(chatId) {
+  const disabled = isAssistantShortcutInteractionDisabled(chatId);
+  document.querySelectorAll('.message-shortcut-btn').forEach(button => {
+    button.disabled = disabled;
+    button.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+    button.title = disabled ? '正在等待 SSE 响应完成' : '快捷回复';
+  });
+  if (disabled) closeAssistantShortcutModal({ restoreFocus: false });
+}
+
 function restoreRenderedAssistantExplosionBeacons(container, messages) {
   if (!container || !Array.isArray(messages) || !messages.length) return;
   const assistantMessages = messages.filter(message => (
@@ -34255,6 +34457,9 @@ let assistantExplosionFloatingPopover = null;
 let assistantExplosionActiveBeacon = null;
 let assistantExplosionRepositionQueued = false;
 let assistantThinkingModalTrigger = null;
+let assistantShortcutFanTrigger = null;
+let assistantShortcutFanCloseTimer = 0;
+let assistantShortcutFanMeta = null;
 
 function assistantExplosionBeaconListHtml(snapshots) {
   return snapshots.map((item, index) => (
@@ -34306,6 +34511,130 @@ function openLatestAssistantThinkingModal(event) {
     try { content.focus({ preventScroll: true }); } catch { content.focus(); }
   });
   return true;
+}
+
+function assistantShortcutListHtml(replies) {
+  return replies.map(reply => {
+    const text = String(reply || '');
+    const attribute = esc(text).replace(/"/g, '&quot;');
+    return `<button type="button" class="assistant-shortcut-fan__action" data-shortcut-text="${attribute}" title="${attribute}" aria-label="发送快捷回复：${attribute}" onclick="sendAssistantShortcutReply(event)">${esc(text)}</button>`;
+  }).join('');
+}
+
+function ensureAssistantShortcutFan() {
+  let fan = document.getElementById('assistantShortcutFan');
+  if (fan) return fan;
+  fan = document.createElement('div');
+  fan.id = 'assistantShortcutFan';
+  fan.className = 'assistant-shortcut-fan';
+  fan.setAttribute('aria-hidden', 'true');
+  fan.innerHTML = '<div class="assistant-shortcut-fan__items"></div>';
+  document.body.appendChild(fan);
+  return fan;
+}
+
+function renderAssistantShortcutFan(replies, trigger) {
+  const fan = ensureAssistantShortcutFan();
+  const items = fan.querySelector('.assistant-shortcut-fan__items');
+  if (!items || !(trigger instanceof HTMLElement)) return null;
+  const wrap = trigger.closest('.message-wrap');
+  const message = wrap && wrap.querySelector('.message.assistant');
+  const meta = message && message.querySelector('.message-meta');
+  const anchor = meta instanceof HTMLElement ? meta : trigger;
+  const anchorRect = anchor.getBoundingClientRect();
+  const messageRect = message instanceof HTMLElement ? message.getBoundingClientRect() : anchorRect;
+  const viewportWidth = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+  const maxWidth = Math.max(92, Math.min(messageRect.width - 28, viewportWidth - 24));
+  fan.style.left = Math.round(anchorRect.right) + 'px';
+  fan.style.top = Math.round(anchorRect.top + anchorRect.height / 2) + 'px';
+  fan.style.setProperty('--assistant-shortcut-max-width', Math.round(maxWidth) + 'px');
+  if (assistantShortcutFanMeta && assistantShortcutFanMeta !== meta && assistantShortcutFanMeta.isConnected) {
+    assistantShortcutFanMeta.classList.remove('shortcut-replies-open');
+  }
+  assistantShortcutFanMeta = meta instanceof HTMLElement ? meta : null;
+  if (assistantShortcutFanMeta) assistantShortcutFanMeta.classList.add('shortcut-replies-open');
+  items.innerHTML = assistantShortcutListHtml(replies);
+  return fan;
+}
+
+function closeAssistantShortcutModal(options) {
+  const opts = options && typeof options === 'object' ? options : {};
+  const fan = document.getElementById('assistantShortcutFan');
+  const wasVisible = !!(fan && fan.classList.contains('open'));
+  if (assistantShortcutFanCloseTimer) {
+    clearTimeout(assistantShortcutFanCloseTimer);
+    assistantShortcutFanCloseTimer = 0;
+  }
+  if (fan) {
+    fan.classList.remove('open');
+    fan.setAttribute('aria-hidden', 'true');
+    assistantShortcutFanCloseTimer = window.setTimeout(() => {
+      if (!fan.classList.contains('open')) {
+        const items = fan.querySelector('.assistant-shortcut-fan__items');
+        if (items) items.innerHTML = '';
+      }
+      assistantShortcutFanCloseTimer = 0;
+    }, 340);
+  }
+  if (assistantShortcutFanMeta && assistantShortcutFanMeta.isConnected) {
+    assistantShortcutFanMeta.classList.remove('shortcut-replies-open');
+  }
+  assistantShortcutFanMeta = null;
+  const trigger = assistantShortcutFanTrigger;
+  assistantShortcutFanTrigger = null;
+  if (wasVisible && opts.restoreFocus !== false && trigger instanceof HTMLElement && trigger.isConnected) {
+    try { trigger.focus({ preventScroll: true }); } catch { trigger.focus(); }
+  }
+}
+
+async function openLatestAssistantShortcutModal(event) {
+  const trigger = event && event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  const chat = state.chats[state.activeChat];
+  if (!getLatestSuccessfulCenterAssistantResponseMessage(chat)) return false;
+  if (isAssistantShortcutInteractionDisabled(state.activeChat)) return false;
+  let replies = [];
+  try {
+    replies = normalizeAssistantShortcutReplies((await readRuntimeConfig(true)).shortcut);
+  } catch {
+    vfsShowUploadToast('快捷回复配置读取失败', true);
+    return false;
+  }
+  if (!replies.length) {
+    if (state.activeChat) renderMessages();
+    vfsShowUploadToast('当前没有可用的快捷回复', true);
+    return false;
+  }
+  if (!trigger) return false;
+  const fan = document.getElementById('assistantShortcutFan');
+  if (fan && fan.classList.contains('open') && assistantShortcutFanTrigger === trigger) {
+    closeAssistantShortcutModal();
+    return true;
+  }
+  closeAssistantShortcutModal({ restoreFocus: false });
+  const nextFan = renderAssistantShortcutFan(replies, trigger);
+  if (!nextFan) return false;
+  assistantShortcutFanTrigger = trigger;
+  nextFan.setAttribute('aria-hidden', 'false');
+  requestAnimationFrame(() => nextFan.classList.add('open'));
+  return true;
+}
+
+async function sendAssistantShortcutReply(event) {
+  if (event) {
+    if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  const button = event && event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+  const text = String(button && button.dataset.shortcutText || '').trim();
+  if (!text) return false;
+  closeAssistantShortcutModal({ restoreFocus: false });
+  setCenterInputPlainText(text);
+  return sendCenterMessage(text, { clearInputAfterSend: true, toastOnSuccess: '' });
 }
 
 function assistantExplosionBeaconHtml(message) {
@@ -36778,6 +37107,26 @@ async function readRuntimeConfig(force) {
     return await runtimeConfigRequest;
   } finally {
     runtimeConfigRequest = null;
+  }
+}
+
+function renderSettingsVersion(config) {
+  const el = document.getElementById('settingsVersion');
+  if (!el) return;
+  const version = String(config && config.version || '').trim();
+  el.textContent = version ? 'v' + version : '';
+  el.title = version ? '版本号：' + version : '';
+  el.hidden = !version;
+}
+
+async function refreshSettingsVersion() {
+  renderSettingsVersion(runtimeConfigCache);
+  try {
+    // Read from the runtime config every time Settings opens so the displayed
+    // value always follows config/config.json rather than a bundled constant.
+    renderSettingsVersion(await readRuntimeConfig(true));
+  } catch {
+    // Keep a previously read version visible if the transient request fails.
   }
 }
 
@@ -40280,6 +40629,7 @@ async function openSettings() {
   hideNewAgentInput();
   hideAgentImportChooser();
   showExclusiveOverlay(document.getElementById('settingsOverlay'), getSettingsPanel());
+  void refreshSettingsVersion();
   promoteOnboardingToModelsIntro();
   clearSettingsErrorState();
   initSettingsOnboardingDraft();
@@ -40392,11 +40742,12 @@ function captureSettingsOverlayPointerDown(e) {
 }
 
 function handleOverlayClick(e) {
-  if (isSettingsCopyTransitionLocked()) return;
   if (e.target !== e.currentTarget) return;
-  const shouldKeepOpen = settingsOverlayPointerDownHadEditableFocus || hasSettingsEditableFocus();
   settingsOverlayPointerDownHadEditableFocus = false;
-  if (!shouldKeepOpen) closeSettings(false);
+  // Settings changes are draft-only until the user explicitly saves or
+  // cancels. Clicking the backdrop must never discard that draft.
+  e.preventDefault();
+  e.stopPropagation();
 }
 
 // ===== Open Folder =====
@@ -54142,6 +54493,7 @@ document.addEventListener('keydown', e => {
     return;
   }
   if (e.key === 'Escape') closeQuickFanMenu();
+  if (e.key === 'Escape') closeAssistantShortcutModal();
   if (e.key === 'Escape') closeAllSkillExtractPopovers();
   if (e.key === 'Escape') closeInstallAppPopover();
   if (e.key === 'Escape') closeSoulTidyPopover();
@@ -56205,8 +56557,10 @@ const MESSAGE_PATH_BOUNDARY_BEFORE = /[\s`"'([{<（【《“‘,.:;!?，。；�
 const MESSAGE_PATH_BOUNDARY_AFTER = /[\s`"')\]}>,.:;!?，。；：！？、）】》”’]/;
 const MESSAGE_TARGET_TERMINATOR = /[,.!?;:，。；：！？、]/;
 const MESSAGE_TARGET_EMBEDDED_START = /[.:](?=(?:https?:\/\/|www\.|file:\/\/\/|~\/|\/|(?:skills|tmp)(?:\/|$)|(?:SOUL|USER)\.md))/i;
-const MESSAGE_HTTP_BASECASE = /^(?:https?:\/\/|www\.)[^\s`"'()[\]{}<>|,;!，。；：！？、（）【】《》“”‘’]+/i;
-const MESSAGE_LINK_MATCHER = /https?:\/\/[^\s`"'()[\]{}<>|,;!，。；：！？、（）【】《》“”‘’]+|www\.[^\s`"'()[\]{}<>|,;!，。；：！？、（）【】《》“”‘’]+|file:\/\/\/[^\s`"'()[\]{}<>|,:;!?，。；：！？、（）【】《》“”‘’]+|~\/[^\s`"'()[\]{}<>|,:;!?，。；：！？、（）【】《》“”‘’]*|\/[^\s`"'()[\]{}<>|,:;!?，。；：！？、（）【】《》“”‘’]+|(?:skills|tmp)(?:\/[^\s`"'()[\]{}<>|,:;!?，。；：！？、（）【】《》“”‘’]+)*|(?:SOUL|USER)\.md/g;
+// HTTP URL 仅支持 ASCII。这样诸如“github.com/owner/repo帮我看看”中的中文
+// 会保留为普通消息文本，而不会被编码进 URL 或包含在链接气泡中。
+const MESSAGE_HTTP_BASECASE = /^(?:https?:\/\/|www\.)[A-Za-z0-9._~:/?@#$%&*+=-]+/i;
+const MESSAGE_LINK_MATCHER = /https?:\/\/[A-Za-z0-9._~:/?@#$%&*+=-]+|www\.[A-Za-z0-9._~:/?@#$%&*+=-]+|file:\/\/\/[^\s`"'()[\]{}<>|,:;!?，。；：！？、（）【】《》“”‘’]+|~\/[^\s`"'()[\]{}<>|,:;!?，。；：！？、（）【】《》“”‘’]*|\/[^\s`"'()[\]{}<>|,:;!?，。；：！？、（）【】《》“”‘’]+|(?:skills|tmp)(?:\/[^\s`"'()[\]{}<>|,:;!?，。；：！？、（）【】《》“”‘’]+)*|(?:SOUL|USER)\.md/g;
 const MESSAGE_FILE_TOKEN_MATCHER = /\[FILE:[^\]\n\r]+\]/gi;
 const MESSAGE_INLINE_TOKEN_MATCHER = /\[(FILE|SKILL|TEAM):\s*([^\]\n\r]+?)\s*\]/gi;
 const MESSAGE_QUOTED_FILE_TOKEN_MATCHER = /"(?:file:\/\/\/|\/|~\/)[^"\n\r]+?"|'(?:file:\/\/\/|\/|~\/)[^'\n\r]+?'/g;
@@ -56633,6 +56987,12 @@ function isValidMessagePathBoundary(text, start, end) {
   return true;
 }
 
+function isValidHttpMessageBoundary(text, start, end) {
+  if (isValidMessagePathBoundary(text, start, end)) return true;
+  const after = end < text.length ? text[end] : '';
+  return !!after && /\p{Script=Han}/u.test(after);
+}
+
 function hasOverlappingMessageMatch(matches, start, end) {
   return matches.some(match => start < match.end && end > match.start);
 }
@@ -56730,7 +57090,7 @@ function findMessagePathMatches(text) {
     if (httpLink) {
       const httpEnd = start + httpLink.text.length;
       if (hasOverlappingMessageMatch(matches, start, httpEnd)) continue;
-      if (!isValidMessagePathBoundary(source, start, httpEnd)) continue;
+      if (!isValidHttpMessageBoundary(source, start, httpEnd)) continue;
       matches.push({ start, end: httpEnd, text: httpLink.text, href: httpLink.href, kind: 'http' });
       continue;
     }
@@ -56953,7 +57313,11 @@ function splitMessagePathAnchorAtTerminator(anchor) {
   if (!anchor || !anchor.parentNode) return false;
   const rawText = String(anchor.textContent || '');
   const match = findMessagePathMatches(rawText).find(item => item.start === 0);
-  if (!match || match.end >= rawText.length || !MESSAGE_TARGET_TERMINATOR.test(rawText[match.end])) return false;
+  if (!match || match.end >= rawText.length) return false;
+  const nextCharacter = rawText[match.end];
+  const shouldSplit = MESSAGE_TARGET_TERMINATOR.test(nextCharacter)
+    || (match.kind === 'http' && isValidHttpMessageBoundary(rawText, match.start, match.end));
+  if (!shouldSplit) return false;
   const ownerDoc = anchor.ownerDocument || document;
   const fragment = ownerDoc.createDocumentFragment();
   const pathAnchor = ownerDoc.createElement('a');
@@ -58701,7 +59065,7 @@ function pageTaskSchedulerStep() {
     runPageTask('heartbeat', checkHeartbeat);
   }
 
-  if (!lowPowerBusy && visible && shouldRunPageTask(getPageTaskIntervalSec('installApp', INSTALL_APP_REFRESH_INTERVAL_SEC))) {
+  if (!lowPowerBusy && visible && Date.now() >= Number(installAppState.nextScanAt || 0)) {
     runPageTask('installApp', refreshInstallAppIndicator);
   }
 

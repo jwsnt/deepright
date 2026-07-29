@@ -442,9 +442,10 @@ curl http://127.0.0.1:8080/install_app
 - 当前已收口的自动检测项为 `git` 和 `python3`
 - 主应用 `config/config.json` 可配置 `install_app`，并按当前操作系统读取 `linux`、`wsl`、`mac` 对应数组
 - Linux 读取 `install_app.linux`，macOS 读取 `install_app.mac`，Windows/WSL 读取 `install_app.wsl`
-- 启动时可通过 `--install_app a,b,c` 追加自定义待安装应用
+- WSL 仅以 WSL 进程可直接执行的命令判断安装状态，不会把 Windows 宿主机 `.exe` 或 `/mnt/c` 中的软件计为已安装
 - `install_app` 中的每个元素都表示一个本地应用名；接口会按当前操作系统检查是否已安装，已安装项不会出现在返回列表中
-- 接口会把自动探测结果、`config/config.json` 当前系统对应配置、`--install_app` 指定值做去重合并，并对安装状态缓存 5 分钟
+- `install_app` 唯一从主应用资源目录的 `config/config.json` 读取；macOS、Linux 和 Windows／WSL 均不支持 `--install_app`，服务启动或重启也不会写入、覆盖该对象
+- 接口会把自动探测结果与 `config/config.json` 当前系统对应配置做去重合并，并对安装状态缓存 5 分钟
 - `config/config.json` 示例：
 
 ```json
@@ -461,18 +462,6 @@ curl http://127.0.0.1:8080/install_app
 
 ```json
 ["git", "python3"]
-```
-
-- 如果启动参数为：
-
-```bash
-./proxy serve --agent-dir ./agents --install_app node,python,git,python3
-```
-
-则接口可能返回：
-
-```json
-["git", "node", "python", "python3"]
 ```
 
 - 如果当前支持的应用都已安装，则返回空数组 `[]`
@@ -1819,14 +1808,14 @@ CLI 用法：
 
 ## 迭代 20260614-1：/install_app 区分操作系统与已安装检测
 
-本轮迭代把 `GET /install_app` 的配置来源升级为主应用 `config/config.json` 的按操作系统结构，同时保留 `--install_app` 作为额外追加项。
+`GET /install_app` 按主应用 `config/config.json` 的操作系统结构读取；当前版本不提供 `--install_app` 追加参数。
 
 适用规则：
 
 - Linux 读取 `install_app.linux`
 - macOS 读取 `install_app.mac`
 - Windows 和 WSL 读取 `install_app.wsl`
-- `--install_app` 依旧使用逗号分隔字符串，并与当前系统配置、自动探测结果统一去重合并
+- 所有待检查应用均在 `config/config.json` 对应平台数组中配置；服务启动不会写回或覆盖 `install_app` 对象
 - 每个 `install_app` 元素都表示一个本地应用名；当前系统如果已安装该应用，就不会出现在 `/install_app` 返回中
 - 应用安装状态会缓存 5 分钟
 
@@ -1842,10 +1831,9 @@ CLI 用法：
 }
 ```
 
-示例：
+查询示例：
 
 ```bash
-./proxy serve --agent-dir ./agents --install_app git,python3
 curl http://127.0.0.1:8080/install_app
 ```
 
@@ -1853,7 +1841,6 @@ curl http://127.0.0.1:8080/install_app
 
 - 当前机器自动探测缺失的 `git`、`python3`
 - `config/config.json` 中当前操作系统对应的数组
-- `--install_app` 传入的额外条目
 
 ---
 

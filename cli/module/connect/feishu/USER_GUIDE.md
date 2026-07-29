@@ -6,7 +6,7 @@
 
 当前插件提供两类能力：
 
-- `start` / `stop`：启动或停止飞书长连接接收服务，把收到的消息推入 `connect add-request`
+- `start` / `stop`：启动或停止飞书插件；完整飞书凭证组会启动长连接接收服务并把收到的消息推入 `connect add-request`，仅配置 MCP 地址时会启动为无长连接运行态
 - `send` / `init`：基于 `connect add-request` 的原始报文回复飞书文本、图片、文件消息
 
 接收侧会把 10 分钟内尚未推送的同会话待处理消息放入本地待处理队列。只要队列中已经出现文本消息，就会把同批次中的图片/文件资源归一化后和文本一起推送；如果 10 分钟内始终只有图片或文件，则标记过期并丢弃。成功推送 `connect add-request` 后，插件会立即回复 `<已收到>任务将在30秒内批量执行，可通过新消息更新内容。`。
@@ -15,7 +15,7 @@
 
 - `command` 固定返回 `["command","help","name","param","scope","schema","openid","search","init","send","start","stop"]`
 - `help` 打印插件使用手册
-- `param` 固定返回带字段说明的示例对象数组，字段 key 固定为 `appId`、`appSecret`、`mcp_url`；其中 `mcp_url` 为可选的飞书 MCP 地址
+- `param` 固定返回带字段说明的示例对象数组，字段 key 固定为 `appId`、`appSecret`、`mcp_url`；`appId` 与 `appSecret` 必须成对填写，`mcp_url` 可单独作为启动配置
 - `name` 固定返回 `{"key":"feishu","name":"飞书"}`
 - `scope` 固定返回 `["reuse","agent","provider","thinking","swarm"]`
 - `schema` 固定返回飞书插件响应 JSON Schema
@@ -40,6 +40,8 @@
 - 消息快照查询迭代手册：[iteration/20260719-1/USER_GUIDE.md](iteration/20260719-1/USER_GUIDE.md)
 - 飞书 MCP 地址迭代需求：[iteration/20260723-1/REQUIREMENT.md](iteration/20260723-1/REQUIREMENT.md)
 - 飞书 MCP 地址迭代手册：[iteration/20260723-1/USER_GUIDE.md](iteration/20260723-1/USER_GUIDE.md)
+- 飞书凭证组与 MCP 启动迭代需求：[iteration/20260729-1/REQUIREMENT.md](iteration/20260729-1/REQUIREMENT.md)
+- 飞书凭证组与 MCP 启动迭代手册：[iteration/20260729-1/USER_GUIDE.md](iteration/20260729-1/USER_GUIDE.md)
 - 完成结果严格防重迭代需求：[iteration/20260728-1/REQUIREMENT.md](iteration/20260728-1/REQUIREMENT.md)
 - 完成结果严格防重迭代手册：[iteration/20260728-1/USER_GUIDE.md](iteration/20260728-1/USER_GUIDE.md)
 - 当前用户手册：[USER_GUIDE.md](USER_GUIDE.md)
@@ -207,7 +209,9 @@
 }
 ```
 
-`param` 返回的是字段说明示例，不是运行时真实值；`meta-create` / `meta-update` 里仍然使用同名字段传入真实配置。`mcp_url` 可省略，默认留空。
+`param` 返回的是字段说明示例，不是运行时真实值；`meta-create` / `meta-update` 里仍然使用同名字段传入真实配置。`mcp_url` 字段本身可省略，但整个配置必须至少提供以下任意一种：完整的 `appId` + `appSecret` 凭证组，或非空的 `mcp_url`。
+
+`appId` 与 `appSecret` 是一组凭证：填写任意一个时必须同时填写另一个。只填写其中一个、或三个字段都为空时，`start` 与已启动插件的重启都会失败。此规则以运行时 `key=feishu` 查找配置；`name` 仅作展示，不能替代该 key。
 
 通常通过 `integration` 顶层命令写入：
 
@@ -239,6 +243,12 @@
 ```bash
 ../plugins/feishu stop
 ```
+
+启动与重启会按保存的元数据选择运行方式：
+
+- 同时填写 `appId` 和 `appSecret` 时，插件先验证凭证，再建立原有飞书长连接；是否填写 `mcp_url` 不影响此行为。
+- 仅填写 `mcp_url` 时，插件会成功进入已启动状态，但不会验证飞书凭证、建立长连接或接收／发送飞书消息。可继续使用原有 `stop` 关闭该运行态。
+- 仅填写一个凭证或三项均为空时，插件拒绝启动，并在运行日志中记录校验失败原因。
 
 常见参数：
 
@@ -416,6 +426,8 @@
 
 - `./feishu.log`：消息流水日志；接收消息和主动 `send` / `init` 时都会追加一行
 - `./feishu.runtime.log`：运行诊断日志
+
+启动日志会区分凭证组长连接、仅 `mcp_url` 启动和启动校验失败。仅 `mcp_url` 模式会记录 `mode=mcp-only` 和 `long_connection=false`；日志不会记录 `appSecret` 明文或完整敏感配置。
 
 执行 `send` 或 `init` 时，`feishu.log` 会按阶段追加记录：
 

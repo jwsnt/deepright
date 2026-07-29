@@ -274,7 +274,6 @@ type pooledDB struct {
 - `ConnectTimeout`
 - `KnowledgeUpdateInterval`
 - `KnowledgeUpdateLock`
-- `InstallApps`
 - `Client`
 - `ConnectCacheTTL`
 - `AutoReply`
@@ -909,13 +908,12 @@ CLI `proxy log-skill ...` 直接复用同一导出函数 `exportRoundLog(...)`�
 
 ### `/install_app`
 
-`HandleInstallApp(...)` 的返回值由三部分合并而来：
+`HandleInstallApp(...)` 的返回值由两部分合并而来：
 
 1. 代码静态探测的必需依赖
-2. `ProxyServer.InstallApps`
-3. `config/config.json` 里的 `install_app`
+2. `config/config.json` 里的 `install_app` 当前平台数组
 
-然后再过滤掉当前机器已经安装的项。
+应用清单不支持 CLI 追加，Proxy 启动也不会写回或覆盖 `install_app` 配置对象；然后再过滤掉当前机器已经安装的项。
 
 ## HTTP 路由收口
 

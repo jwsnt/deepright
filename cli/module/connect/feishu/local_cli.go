@@ -103,6 +103,7 @@ func runForegroundLocalFeishu(flags map[string]string, stderr io.Writer) int {
 
 func startBackgroundLocalFeishu(flags map[string]string) (*feishusvc.StartResult, error) {
 	if err := validateBackgroundStartupLocalFeishu(flags); err != nil {
+		writeStartupValidationFailureLocalFeishu(flags, err)
 		return nil, err
 	}
 
@@ -181,6 +182,27 @@ func validateBackgroundStartupLocalFeishu(flags map[string]string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	return service.ValidateStartup(ctx)
+}
+
+func writeStartupValidationFailureLocalFeishu(flags map[string]string, startupErr error) {
+	if startupErr == nil {
+		return
+	}
+	logFile := strings.TrimSpace(connectsvc.FirstValue(flags, "log-file"))
+	if logFile == "" {
+		logFile = defaultFeishuLogFile
+	}
+	runtimeLog := runtimeLogPathForLocalFeishu(logFile)
+	if err := ensureParentDirLocalFeishu(runtimeLog); err != nil {
+		return
+	}
+	file, err := os.OpenFile(runtimeLog, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+	logger := log.New(file, "[feishu] ", log.LstdFlags)
+	logger.Printf("stage=startup-validation-failed name=%s err=%s", firstNonEmptyLocalFeishu(connectsvc.FirstValue(flags, "name"), feishusvc.DefaultName), quoteLogValueLocalFeishu(startupErr.Error()))
 }
 
 func stopProcessLocalFeishu(flags map[string]string) (*feishusvc.StartResult, error) {

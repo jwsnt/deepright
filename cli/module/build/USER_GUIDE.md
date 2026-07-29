@@ -53,7 +53,7 @@ install.bat
 - 创建 `deepright` Ubuntu 实例
 - 创建默认用户 `deepright`
 - 安装缺失依赖
-- 复制 release 文件到 WSL 中的 `~/deepright`
+- 复制 release 文件到 WSL 中的 `/app`
 - 在桌面和开始菜单创建带 `DeepRight.ico` 的启动快捷方式
 - 以 root 身份启动 `integration start`
 
@@ -90,10 +90,14 @@ start.bat
 快速启动入口会以 root 运行包装脚本，并直接执行：
 
 ```sh
-/usr/bin/env HOME=/home/deepright /app/integration start
+/usr/bin/env HOME=/home/deepright TERM=xterm-256color DEEPRIGHT_INTEGRATION_SKIP_BROWSER=1 /app/integration start
 ```
 
 直接从 `deepright` 用户执行包装脚本时，它会使用配置好的免密 `sudo`。因此精简 Ubuntu Rootfs 尚未安装 `sudo` 时，Windows 启动入口仍可正常运行。进程以 root 身份运行，但 HOME 保持为 `/home/deepright`，因此会继续使用原有的 agent 和运行时数据目录。
+
+WSL 包装脚本只负责等待服务在 `config/config.json` 的 `port` 上就绪，不在 WSL/root 会话中打开浏览器。`start.bat` 与首次安装器会在当前 Windows 桌面会话中打开 `http://localhost:<port>/launch`；因此即使服务以 root 身份运行，双击桌面快捷方式也会使用当前用户的默认浏览器。
+
+构建 Windows/WSL 发布包时，会读取 `config/config.json.port` 并将该端口写入发布物中的 `start.bat` 与 `install.ps1`。因此首次安装完成后的自动打开也不会回退到 `8080`。
 
 每次启动会在以下日志文件记录包装脚本路径、完整启动命令、PID 文件路径、启动器 PID、退出码，以及最终 integration 进程的 PID、UID、用户名：
 
@@ -124,7 +128,8 @@ start.bat
 - WSL 发行版别名：`deepright`
 - WSL 默认用户：`deepright`
 - Windows 受管目录：`C:\WSL`
-- WSL 安装目录：`/home/deepright/deepright`
+- WSL 应用目录：`/app`
+- WSL 运行数据目录：`/home/deepright/deepright`
 
 ## 常见问题
 
@@ -151,7 +156,7 @@ bcdedit /set hypervisorlaunchtype auto
 
 ### 双击 `start.bat` 提示未安装
 
-说明当前 `deepright` 发行版中还没有生成 `~/.integration`。请先执行 `install.bat` 完成安装。
+说明当前 `deepright` 发行版中缺少 `/app/integration` 或 `/home/deepright/start-deepright.sh`。请先执行 `install.bat` 完成安装。
 
 ### 想跳过自动启动
 

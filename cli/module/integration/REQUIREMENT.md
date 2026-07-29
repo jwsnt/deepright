@@ -252,7 +252,7 @@
     ```
         + 其中Linux系统使用linux，Mac系统使用mac，Windows（WSL）使用wsl
         + 数据结构不变，依旧是string array
-        + --install_app参数不变，如果存在所有操作系统结构都要追加
+        + 不支持--install_app参数，所有平台仅使用config.json中当前操作系统对应的数组
     + 所有install_app的元素表示一个本地应用名称，需要检查是否已安装，已安装则从返回列表中删除
         + 不同操作系统判断方式不同
         + 接口缓存5分钟

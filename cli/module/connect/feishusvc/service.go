@@ -254,6 +254,7 @@ type SentRecord struct {
 type Config struct {
 	AppID                 string        `json:"appId"`
 	AppSecret             string        `json:"appSecret"`
+	MCPURL                string        `json:"mcp_url"`
 	Mode                  string        `json:"mode,omitempty"`
 	HeartbeatIntervalSec  int           `json:"heartbeatIntervalSec,omitempty"`
 	HeartbeatTimeoutSec   int           `json:"heartbeatTimeoutSec,omitempty"`

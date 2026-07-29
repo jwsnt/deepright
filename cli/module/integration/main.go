@@ -236,7 +236,7 @@ func integrationInstallAppNameVariants(name string) []string {
 
 func integrationInstallAppCommandCandidates(name string) []string {
 	candidates := integrationInstallAppNameVariants(name)
-	if integrationInstallAppPlatformKeyFn() == "wsl" || runtime.GOOS == "windows" {
+	if runtime.GOOS == "windows" {
 		base := append([]string(nil), candidates...)
 		for _, candidate := range base {
 			if !strings.HasSuffix(strings.ToLower(candidate), ".exe") {
@@ -425,39 +425,6 @@ func integrationDetectInstallAppInstalled(name string) bool {
 			}
 		}
 		return integrationInstallAppExists(paths)
-	case "wsl":
-		executables := integrationInstallAppCommandCandidates(name)
-		baseDirs := []string{}
-		if runtime.GOOS == "windows" {
-			for _, dir := range []string{os.Getenv("ProgramFiles"), os.Getenv("ProgramFiles(x86)"), os.Getenv("LocalAppData")} {
-				dir = strings.TrimSpace(dir)
-				if dir != "" {
-					baseDirs = append(baseDirs, dir)
-				}
-			}
-		} else {
-			baseDirs = append(baseDirs,
-				"/mnt/c/Program Files",
-				"/mnt/c/Program Files (x86)",
-				"/mnt/c/Users/*/AppData/Local",
-			)
-		}
-		directPaths := make([]string, 0, len(baseDirs)*len(executables)*2)
-		globPatterns := make([]string, 0, len(baseDirs)*len(executables)*3)
-		for _, baseDir := range baseDirs {
-			for _, executable := range executables {
-				directPaths = append(directPaths,
-					filepath.Join(baseDir, executable),
-					filepath.Join(baseDir, "*", executable),
-				)
-				globPatterns = append(globPatterns,
-					filepath.Join(baseDir, "*", "Application", executable),
-					filepath.Join(baseDir, "*", "*", "Application", executable),
-					filepath.Join(baseDir, "*", "*", executable),
-				)
-			}
-		}
-		return integrationInstallAppExists(directPaths) || integrationInstallAppMatchesAnyGlob(globPatterns)
 	default:
 		return false
 	}
@@ -882,8 +849,6 @@ func detectRequiredInstallApps() []string {
 	}
 	return apps
 }
-
-func parseInstallApps(raw string) []string { return agentcore.ParseInstallApps(raw) }
 
 func mergeInstallApps(base []string, extras ...string) []string {
 	return agentcore.MergeInstallApps(base, extras...)
@@ -5493,6 +5458,13 @@ func handleAppStatic(cfg *Config) http.HandlerFunc {
 			defer file.Close()
 			http.ServeContent(w, r, info.Name(), info.ModTime(), file)
 			return
+		} else if os.IsNotExist(statErr) && path.Base(relPath) == "index.html" {
+			// net/http's FileServer redirects any request ending in index.html to
+			// its containing directory before it checks whether the file exists.
+			// An explicit missing app page must remain a 404 rather than exposing
+			// that directory's listing.
+			http.NotFound(w, r)
+			return
 		}
 
 		served := r.Clone(r.Context())
@@ -7273,14 +7245,8 @@ func handleVideoTrim(cfg *Config) http.HandlerFunc {
 	}
 }
 
-// handleVideoAudioExtract keeps the legacy video-directory extraction route.
-func handleVideoAudioExtract(cfg *Config) http.HandlerFunc {
-	return handleVideoAudioExtractToDirectory(cfg, "videos")
-}
-
 // handleVideoAudioExtractToAudio is used by the original-track control in
-// video audio editing. It has the same narrow input contract as extraction to
-// videos/, but persists the MP3 under audios/ for later reuse.
+// video audio editing and persists the MP3 under audios/ for later reuse.
 func handleVideoAudioExtractToAudio(cfg *Config) http.HandlerFunc {
 	return handleVideoAudioExtractToDirectory(cfg, "audios")
 }
@@ -11413,8 +11379,10 @@ var integrationClientRuntimeConfigFields = []string{
 	"default-dir",
 	"site",
 	"resources-dir",
+	"version",
 	"knowledge",
 	"skills_git_install",
+	"shortcut",
 }
 
 func integrationClientRuntimeConfig(raw map[string]interface{}) map[string]interface{} {
@@ -16851,8 +16819,24 @@ func handleInstallApp() http.HandlerFunc {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		apps := integrationFilterMissingInstallApps(mergeInstallApps(detectRequiredInstallApps(), cfgRuntimeInstallApps()))
+		config := integrationConfiguredInstallAppConfig()
+		if r.URL.Query().Get("details") == "1" {
+			// The browser calls this endpoint on its configured scan interval.
+			// Clear the availability cache so a just-installed app is observed on
+			// the next scan instead of up to five minutes later.
+			integrationResetInstallAppAvailabilityCache()
+		}
+		apps := integrationFilterMissingInstallApps(mergeInstallApps(detectRequiredInstallApps(), strings.Join(config.Apps, ",")))
 		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Query().Get("details") == "1" {
+			w.Header().Set("Cache-Control", "no-store")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"apps":     apps,
+				"interval": config.Interval,
+				"content":  config.Content,
+			})
+			return
+		}
 		w.Header().Set("Cache-Control", "max-age=300")
 		json.NewEncoder(w).Encode(apps)
 	}
@@ -16941,17 +16925,63 @@ probe();
 	}
 }
 
-func cfgRuntimeInstallApps() string {
-	apps := integrationConfiguredInstallApps()
-	return strings.Join(apps, ",")
+const defaultInstallAppIntervalMinutes = 60
+
+type integrationInstallAppConfig struct {
+	Apps     []string
+	Interval int
+	Content  string
 }
 
-func integrationConfiguredInstallApps() []string {
-	values, _, err := readIntegrationStartupConfig()
-	if err != nil || values == nil {
-		return nil
+func integrationInstallAppInterval(value interface{}) int {
+	interval := defaultInstallAppIntervalMinutes
+	switch typed := value.(type) {
+	case float64:
+		if typed >= 1 && math.Trunc(typed) == typed {
+			interval = int(typed)
+		}
+	case int:
+		if typed > 0 {
+			interval = typed
+		}
+	case json.Number:
+		if parsed, err := typed.Int64(); err == nil && parsed > 0 {
+			interval = int(parsed)
+		}
+	case string:
+		if parsed, err := strconv.Atoi(strings.TrimSpace(typed)); err == nil && parsed > 0 {
+			interval = parsed
+		}
 	}
-	return integrationInstallAppsFromConfigValue(values["install_app"], integrationInstallAppPlatformKeyFn())
+	return interval
+}
+
+func integrationInstallAppConfigFromValue(raw interface{}, platform string) integrationInstallAppConfig {
+	config := integrationInstallAppConfig{
+		Apps:     integrationInstallAppsFromConfigValue(raw, platform),
+		Interval: defaultInstallAppIntervalMinutes,
+		Content:  "请安装 $namelist",
+	}
+	value, ok := raw.(map[string]interface{})
+	if !ok {
+		return config
+	}
+	config.Interval = integrationInstallAppInterval(value["interval"])
+	if content := strings.TrimSpace(fmt.Sprint(value["content"])); content != "" && content != "<nil>" {
+		config.Content = content
+	}
+	return config
+}
+
+func integrationConfiguredInstallAppConfig() integrationInstallAppConfig {
+	values, _, err := readIntegrationStartupConfigRaw()
+	if err != nil || values == nil {
+		return integrationInstallAppConfig{
+			Interval: defaultInstallAppIntervalMinutes,
+			Content:  "请安装 $namelist",
+		}
+	}
+	return integrationInstallAppConfigFromValue(values["install_app"], integrationInstallAppPlatformKeyFn())
 }
 
 func closeActiveConn(ac *activeConn) {
@@ -17218,7 +17248,6 @@ type Config struct {
 	ConnectTimeoutMs          int
 	KnowledgeUpdateIntervalMs int
 	KnowledgeUpdateLockMs     int
-	InstallApp                string
 	Reply                     string
 
 	// cli-get specific
@@ -17404,7 +17433,6 @@ func defaultIntegrationStartupOptions() integrationStartupOptions {
 			ConnectTimeoutMs:          15000,
 			KnowledgeUpdateIntervalMs: 7200000,
 			KnowledgeUpdateLockMs:     1800000,
-			InstallApp:                "",
 			Reply:                     "",
 			SleepMs:                   3000,
 			Thread:                    20,
@@ -17441,7 +17469,6 @@ var integrationStartupConfigKeys = map[string]string{
 	"connecttimeout":          "connect_timeout",
 	"knowledgeupdateinterval": "knowledge_update_interval",
 	"knowledgeupdatelock":     "knowledge_update_lock",
-	"installapp":              "install_app",
 	"reply":                   "reply",
 	"sleep":                   "sleep",
 	"thread":                  "thread",
@@ -17815,10 +17842,6 @@ func applyIntegrationStartupConfig(opts *integrationStartupOptions, values map[s
 			if err := assignIntegrationStartupConfigInt(raw, key, &opts.Config.KnowledgeUpdateLockMs); err != nil {
 				return err
 			}
-		case "install_app":
-			if value, ok := raw.(string); ok {
-				opts.Config.InstallApp = strings.TrimSpace(value)
-			}
 		case "reply":
 			opts.Config.Reply = strings.TrimSpace(fmt.Sprint(raw))
 		case "sleep":
@@ -17953,7 +17976,6 @@ func bindIntegrationServeFlags(fs *flag.FlagSet, cfg *Config, pidFileFlag, logFi
 	fs.IntVar(&cfg.ConnectTimeoutMs, "connect_timeout", defaults.Config.ConnectTimeoutMs, "upstream connect timeout in ms")
 	fs.IntVar(&cfg.KnowledgeUpdateIntervalMs, "knowledge_update_interval", defaults.Config.KnowledgeUpdateIntervalMs, "knowledge lastUpdate refresh interval in ms")
 	fs.IntVar(&cfg.KnowledgeUpdateLockMs, "knowledge_update_lock", defaults.Config.KnowledgeUpdateLockMs, "knowledge refresh request lock window in ms")
-	fs.StringVar(&cfg.InstallApp, "install_app", defaults.Config.InstallApp, "extra install_app entries, comma separated")
 	fs.StringVar(&cfg.Reply, "reply", defaults.Config.Reply, "reply text sent once per plugin when scheduled details are created")
 	fs.IntVar(&cfg.SleepMs, "sleep", defaults.Config.SleepMs, "cli-get heartbeat error sleep in ms")
 	fs.IntVar(&cfg.Thread, "thread", defaults.Config.Thread, "cli-get worker pool size")
@@ -18661,7 +18683,6 @@ func printCLIHelp() {
 	fmt.Println("  --connect_timeout=MS            上游连接超时（毫秒）")
 	fmt.Println("  --knowledge_update_interval=MS  knowledge.lastUpdate 透传阈值，默认 7200000")
 	fmt.Println("  --knowledge_update_lock=MS      knowledge 更新申请锁窗口，默认 1800000")
-	fmt.Println("  --install_app=CSV               额外 install_app 条目，逗号分隔，接口返回会自动去重合并")
 	fmt.Println("  --pid-file=PATH    后台进程 pid 文件，默认当前应用目录下的 integration.pid（WSL 为 ~/deepright/integration.pid）")
 	fmt.Println("  --log-file=PATH    后台进程日志文件，默认当前应用目录下的 integration.log（WSL 为 ~/deepright/integration.log）")
 	fmt.Println("")
@@ -20010,7 +20031,6 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 		"connect_timeout":           cfg.ConnectTimeoutMs,
 		"knowledge_update_interval": cfg.KnowledgeUpdateIntervalMs,
 		"knowledge_update_lock":     cfg.KnowledgeUpdateLockMs,
-		"install_app":               cfg.InstallApp,
 		"reply":                     cfg.Reply,
 		"sleep":                     cfg.SleepMs,
 		"thread":                    cfg.Thread,
@@ -20073,7 +20093,6 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/media_preview", handleMediaPreview(&cfg))
 	mux.HandleFunc("/api/ffmpeg/check", handleFFmpegCheck())
 	mux.HandleFunc("/api/video_trim", handleVideoTrim(&cfg))
-	mux.HandleFunc("/api/video_audio_extract", handleVideoAudioExtract(&cfg))
 	mux.HandleFunc("/api/video_audio_extract_to_audio", handleVideoAudioExtractToAudio(&cfg))
 	mux.HandleFunc("/api/video_audio_edit", handleVideoAudioEdit(&cfg))
 	mux.HandleFunc("/api/video_audio_edit_preview", handleVideoAudioEditPreview(&cfg))

@@ -91,8 +91,9 @@ npx --yes @modelcontextprotocol/inspector@1.0.0 --cli \
 
 | 现象 | 处理方式 |
 | --- | --- |
-| `Method is required` | 为调用补充`--method`，先使用`tools/list` |
-| 参数不识别 | 使用`--cli -- node <server-entry.js> --help` 查看该固定版本的实际CLI参数 |
+| Inspector的npm下载超时或阻塞 | 确认阻塞在npm下载后，可仅本次使用`npx --registry=https://registry.npmmirror.com`重试，不得执行`npm config set registry`修改全局配置 |
 | Stdio连接或初始化失败 | 检查入口、依赖、环境变量和启动参数，确保 Server 日志仅写入 `stderr`，`stdout`只输出MCP协议 |
-| `tools/call`参数错误 | 重新执行`tools/list`，严格按`inputSchema`重建参数 |
+| 参数不识别 | 使用`--cli -- node <server-entry.js> --help` 查看该固定版本的实际CLI参数 |
 | 远程连接失败 | 核对受控HTTPS URL、显式transport、认证方式和证书，不要绕过TLS校验 |
+| `tools/call`参数错误 | 重新执行`tools/list`，严格按`inputSchema`重建参数 |
+| `Method is required` | 为调用补充`--method`，先使用`tools/list` |

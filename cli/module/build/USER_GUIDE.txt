@@ -35,6 +35,8 @@ WSL 内部还会生成并使用以下路径：
 - 双击桌面上的 DeepRight 快捷方式
 - 或从开始菜单启动 DeepRight
 
+启动器会先等待 WSL 中的服务就绪，再在当前 Windows 登录会话中用默认浏览器打开 `http://localhost:<config.json 的 port>/launch`。浏览器不依赖 WSL/root 进程启动，因此服务以 root 身份运行时也能正常打开页面。
+
 也可以再次双击原 installer.exe：
 - 如果本地安装状态正常，会直接启动
 - 如果环境缺失或损坏，会重新进入安装流程
@@ -94,6 +96,8 @@ installer 会先检查：
 - 删除 C:\ProgramData\deepright\.deepright_installed
 - 保留 C:\ProgramData\deepright 目录及其其他内容
 - 删除 %LocalAppData%\DeepRight
+
+如果该缓存目录正被卸载器、资源管理器或刚关闭的启动器占用，卸载器会在自身退出后自动重试删除最多 60 秒，不会将卸载标记为失败。
 
 第三步：删除 WSL 中的应用程序文件，但保留现有数据目录
 以管理员身份打开 PowerShell，执行：

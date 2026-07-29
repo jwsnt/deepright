@@ -1,6 +1,6 @@
 {
   "host": "https://www.deepright.cn",
-  "version": "1.0",
+  "version": "0.1",
   "port": 57896,
   "skills": [
     "__internal_mcp"
@@ -47,6 +47,16 @@
     "scan": 2
   },
   "install_app": {
+    "interval": 60,
+    "content": "请安装 $namelist",
+    "linux": [
+      "python3",
+      "node",
+      "curl",
+      "wget",
+      "git",
+      "npm"
+    ],
     "wsl": [
       "python3",
       "node",
@@ -141,5 +151,10 @@
   "mcp": {
     "interval": 30,
     "file": "mcp.json"
-  }
+  },
+  "shortcut": [
+    "好的",
+    "执行",
+    "重试"
+  ]
 }

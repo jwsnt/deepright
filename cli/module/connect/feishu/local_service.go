@@ -209,6 +209,11 @@ func (s *localFeishuService) Run(ctx context.Context) error {
 		if cfg.ReconnectDelayMS > 0 {
 			s.reconnectDelay = time.Duration(cfg.ReconnectDelayMS) * time.Millisecond
 		}
+		if isMCPOnlyLocalFeishuConfig(cfg) {
+			s.logf("stage=started name=%s mode=mcp-only long_connection=false app_credentials_configured=false mcp_url_configured=true", s.serviceName())
+			<-ctx.Done()
+			return nil
+		}
 
 		session, err := s.factory.New(meta, cfg, s.logger, s.downloadDir)
 		if err != nil {
@@ -251,13 +256,8 @@ func (s *localFeishuService) loadConfig(ctx context.Context) (*connectsvc.Meta, 
 	if cfg.Mode == "" {
 		cfg.Mode = "feishu"
 	}
-	if cfg.Mode != "mock" {
-		if strings.TrimSpace(cfg.AppID) == "" {
-			return nil, feishusvc.Config{}, errors.New("meta.appId is required")
-		}
-		if strings.TrimSpace(cfg.AppSecret) == "" {
-			return nil, feishusvc.Config{}, errors.New("meta.appSecret is required")
-		}
+	if err := validateLocalFeishuStartupConfig(cfg); err != nil {
+		return nil, feishusvc.Config{}, err
 	}
 	return meta, cfg, nil
 }
@@ -267,7 +267,33 @@ func (s *localFeishuService) ValidateStartup(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if isMCPOnlyLocalFeishuConfig(cfg) {
+		return nil
+	}
 	return feishusvc.ValidateConfig(ctx, cfg)
+}
+
+func validateLocalFeishuStartupConfig(cfg feishusvc.Config) error {
+	if strings.EqualFold(strings.TrimSpace(cfg.Mode), "mock") {
+		return nil
+	}
+	appIDConfigured := strings.TrimSpace(cfg.AppID) != ""
+	appSecretConfigured := strings.TrimSpace(cfg.AppSecret) != ""
+	mcpURLConfigured := strings.TrimSpace(cfg.MCPURL) != ""
+	if appIDConfigured != appSecretConfigured {
+		return errors.New("meta.appId and meta.appSecret must be provided together")
+	}
+	if !appIDConfigured && !mcpURLConfigured {
+		return errors.New("meta requires appId and appSecret, or mcp_url")
+	}
+	return nil
+}
+
+func isMCPOnlyLocalFeishuConfig(cfg feishusvc.Config) bool {
+	return !strings.EqualFold(strings.TrimSpace(cfg.Mode), "mock") &&
+		strings.TrimSpace(cfg.AppID) == "" &&
+		strings.TrimSpace(cfg.AppSecret) == "" &&
+		strings.TrimSpace(cfg.MCPURL) != ""
 }
 
 func (s *localFeishuService) runSession(ctx context.Context, meta *connectsvc.Meta, session feishusvc.Session) error {
