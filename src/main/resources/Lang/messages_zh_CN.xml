@@ -17,6 +17,7 @@
     <entry key="knowledge.init.message">[正在加载知识库]</entry>
     <entry key="skills.hint.recall">[正在阅读 #skill 方法]</entry>
     <entry key="skills.hint.init">[正在加载 #skill]</entry>
+    <entry key="request.repeat.footer">[调整策略，避免循环思考]</entry>
     <entry key="request.expired.message">正在尝试恢复会话。</entry>
     <entry key="request.expired.footer">[稍后检索长期记忆]</entry>
     <entry key="request.capacity">[正在使用 #model 当前上下文约为 #sizek]</entry>

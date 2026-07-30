@@ -74,6 +74,12 @@ public class RequestExpiredRag extends RagCondition implements RagService {
         return new RagAtOnce(ragConfig);
     }
 
+    @Override
+    protected Boolean allowed(RagConfig ragConfig, RagData ragData) throws Exception {
+        // 跳过测试请求
+        return super.allowed(ragConfig, ragData) && !FeatureFlag.isTest(ragData.getQuery());
+    }
+
     protected String buildHistoryExpired(RagConfig ragConfig, RagData ragData, Long expired) throws Exception {
         String template = this.template4expired.replace("#expired", String.valueOf(TimeUnit.MINUTES.convert(expired, TimeUnit.MILLISECONDS)));
         if (log.isWarnEnabled() && !TemplateChecker.check(template)) {
@@ -126,7 +132,7 @@ public class RequestExpiredRag extends RagCondition implements RagService {
     protected void notifyFooter(RagConfig ragConfig, RagData ragData) throws Exception {
         this.notifierService.notify(Segment.build(ragData.getQuery(), Segment.SegmentConfig.builder()
                 .content(new StringBuffer(XmlResourceLang.get(RequestExpiredRag.LANG_KEY_REQUEST_EXPIRED_FOOTER)))
-                .metadata(CliPrinter.process(MultiSourceFlag.WARN))
+                .metadata(CliPrinter.process(RequestExpiredRag.RAG_KEY))
                 .workflow(ragData.getQuery().getWorkflow())
                 .notifier(Notifier.SOURCE)
                 .build()), ragData.getQuery(), ragData.getQuery());

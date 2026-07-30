@@ -6,7 +6,6 @@ import ai.deepright.lang.XmlResourceLang;
 import ai.deepright.llm.notifier.MultiSourceFlag;
 import ai.deepright.llm.provider.RequestContextBuilder;
 import ai.open.right.WorkflowException;
-import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.resouce.ResourceService;
 import ai.open.right.utils.SplitUtils;
 import ai.open.right.workflow.flow.WorkflowTask;
@@ -163,7 +162,7 @@ public class CliInsertRag extends RagCondition implements CliInsertService, RagS
     @Override
     protected Boolean allowed(RagConfig ragConfig, RagData ragData) throws Exception {
         // 不为Task和后台任务
-        return super.allowed(ragConfig, ragData) && !FeatureFlag.isTask(ragData.getQuery()) && !FeatureFlag.isDaemon(ragData.getQuery()) && !FeatureFlag.isSilent(ragData.getQuery());
+        return super.allowed(ragConfig, ragData) && !FeatureFlag.isTest(ragData.getQuery()) && !FeatureFlag.isTask(ragData.getQuery()) && !FeatureFlag.isDaemon(ragData.getQuery()) && !FeatureFlag.isSilent(ragData.getQuery());
     }
 
     protected void notify(WorkflowTask workTask, List<CliInsert> inserts) throws Exception {

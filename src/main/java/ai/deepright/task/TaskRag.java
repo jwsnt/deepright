@@ -87,6 +87,12 @@ public class TaskRag extends RagCondition implements RagService {
         return new RagAtOnce(ragConfig);
     }
 
+    @Override
+    protected Boolean allowed(RagConfig ragConfig, RagData ragData) throws Exception {
+        // 跳过测试请求
+        return super.allowed(ragConfig, ragData) && !FeatureFlag.isTest(ragData.getQuery());
+    }
+
     protected String buildSchema(RagConfig ragConfig, RagData ragData) throws Exception {
         if (SplitUtils.equals(ragData.getQuery(), MultiSourceNotifier.MAIN) && (FeatureFlag.isTask(ragData.getQuery()) || FeatureFlag.isResponseSchema(ragData.getQuery()))) {
             String responseSchema = null;

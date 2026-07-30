@@ -25,6 +25,9 @@
           "sort": 5
         },
         {
+          "key": "rag_repeat"
+        },
+        {
           "key": "rag_insert"
         },
         {

@@ -55,6 +55,12 @@ public class RequestModelRag extends RagCondition implements RagService {
         return new RagAtOnce(ragConfig);
     }
 
+    @Override
+    protected Boolean allowed(RagConfig ragConfig, RagData ragData) throws Exception {
+        // 跳过测试请求
+        return super.allowed(ragConfig, ragData) && !FeatureFlag.isTest(ragData.getQuery());
+    }
+
     protected void notify(RagConfig ragConfig, RagData ragData, String content) throws Exception {
         if (!FeatureFlag.isSilent(ragData.getQuery())) {
             Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
