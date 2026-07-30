@@ -1636,10 +1636,11 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 .rs-row-divider{grid-column:span 2;height:30px;background:var(--bg-sidebar);display:flex;align-items:center;justify-content:space-between;padding:0 10px;font-size:11px;color:var(--text-muted);gap:10px}
 .rs-row-title{display:flex;align-items:center;gap:6px;min-width:0;flex:1 1 auto;width:100%}
 .rs-row-title span{white-space:nowrap}
-.rs-cmd-toggle{width:18px;height:18px;border:1px solid var(--accent);border-radius:5px;background:var(--bg-card);color:rgb(var(--accent-soft-rgb));display:inline-flex;align-items:center;justify-content:center;padding:0;box-shadow:0 0 4px rgba(var(--accent-rgb),.50),0 0 10px rgba(var(--accent-rgb),.30),inset 0 0 6px rgba(var(--accent-rgb),.12);cursor:pointer;transition:var(--transition)}
-.rs-cmd-toggle:hover{transform:translateY(-1px);box-shadow:0 0 6px rgba(var(--accent-rgb),.58),0 0 14px rgba(var(--accent-rgb),.38),inset 0 0 8px rgba(var(--accent-rgb),.18)}
-[data-theme="dark"] .rs-cmd-toggle,[data-theme="dark"] .rs-wiki-refresh,[data-theme="dark"] .rs-cli-expand-btn{border-color:rgba(84,220,255,.34);background:linear-gradient(180deg,rgba(20,54,79,.96),rgba(10,31,49,.94));color:#8ef4ff;box-shadow:0 10px 20px rgba(0,0,0,.22),0 0 0 1px rgba(220,251,255,.06) inset,0 0 14px rgba(0,212,255,.12)}
-[data-theme="dark"] .rs-cmd-toggle:hover,[data-theme="dark"] .rs-cmd-toggle:focus-visible,[data-theme="dark"] .rs-wiki-refresh:hover,[data-theme="dark"] .rs-wiki-refresh:focus-visible,[data-theme="dark"] .rs-cli-expand-btn:hover,[data-theme="dark"] .rs-cli-expand-btn:focus-visible{border-color:rgba(126,244,255,.5);background:linear-gradient(180deg,rgba(27,70,100,.98),rgba(13,43,65,.96));color:#dffcff;box-shadow:0 12px 24px rgba(0,0,0,.24),0 0 0 1px rgba(230,253,255,.1) inset,0 0 18px rgba(0,212,255,.18);outline:none}
+.rs-cmd-toggle,.rs-miniapp-build-btn{width:18px;height:18px;border:1px solid var(--accent);border-radius:5px;background:var(--bg-card);color:rgb(var(--accent-soft-rgb));display:inline-flex;align-items:center;justify-content:center;padding:0;box-shadow:0 0 4px rgba(var(--accent-rgb),.50),0 0 10px rgba(var(--accent-rgb),.30),inset 0 0 6px rgba(var(--accent-rgb),.12);cursor:pointer;transition:var(--transition)}
+.rs-cmd-toggle:hover,.rs-miniapp-build-btn:hover{transform:translateY(-1px);box-shadow:0 0 6px rgba(var(--accent-rgb),.58),0 0 14px rgba(var(--accent-rgb),.38),inset 0 0 8px rgba(var(--accent-rgb),.18)}
+.rs-miniapp-build-btn:focus-visible{outline:none;transform:translateY(-1px);box-shadow:0 0 0 2px rgba(var(--accent-rgb),.18),0 0 6px rgba(var(--accent-rgb),.58),0 0 14px rgba(var(--accent-rgb),.38),inset 0 0 8px rgba(var(--accent-rgb),.18)}
+[data-theme="dark"] .rs-cmd-toggle,[data-theme="dark"] .rs-miniapp-build-btn,[data-theme="dark"] .rs-wiki-refresh,[data-theme="dark"] .rs-cli-expand-btn{border-color:rgba(84,220,255,.34);background:linear-gradient(180deg,rgba(20,54,79,.96),rgba(10,31,49,.94));color:#8ef4ff;box-shadow:0 10px 20px rgba(0,0,0,.22),0 0 0 1px rgba(220,251,255,.06) inset,0 0 14px rgba(0,212,255,.12)}
+[data-theme="dark"] .rs-cmd-toggle:hover,[data-theme="dark"] .rs-cmd-toggle:focus-visible,[data-theme="dark"] .rs-miniapp-build-btn:hover,[data-theme="dark"] .rs-miniapp-build-btn:focus-visible,[data-theme="dark"] .rs-wiki-refresh:hover,[data-theme="dark"] .rs-wiki-refresh:focus-visible,[data-theme="dark"] .rs-cli-expand-btn:hover,[data-theme="dark"] .rs-cli-expand-btn:focus-visible{border-color:rgba(126,244,255,.5);background:linear-gradient(180deg,rgba(27,70,100,.98),rgba(13,43,65,.96));color:#dffcff;box-shadow:0 12px 24px rgba(0,0,0,.24),0 0 0 1px rgba(230,253,255,.1) inset,0 0 18px rgba(0,212,255,.18);outline:none}
 .cmd-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding-left:20px;padding-right:20px;box-sizing:border-box;background:var(--modal-overlay-bg);backdrop-filter:blur(var(--modal-overlay-blur));-webkit-backdrop-filter:blur(var(--modal-overlay-blur));opacity:0;visibility:hidden;pointer-events:none;transition:opacity .24s ease,visibility 0s linear .24s;z-index:210}
 .cmd-overlay.show{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .24s ease}
 .cmd-panel{width:min(500px,calc(100vw - 40px));height:114px;background:linear-gradient(180deg,var(--modal-panel-bg-strong),var(--modal-panel-bg));border:1px solid var(--modal-panel-border);border-radius:24px;box-shadow:0 22px 58px rgba(16,24,40,.22);padding:0;display:flex;flex-direction:column;position:relative;overflow:hidden;transform:translateY(10px) scale(.98);transition:transform .24s cubic-bezier(.22,1,.36,1);backdrop-filter:none;-webkit-backdrop-filter:none}
@@ -4195,6 +4196,20 @@ body.quick-fan-transition-active{cursor:progress}
 .skill-extract-actions button:hover{background:rgba(255,255,255,.82);color:#1f3a67}
 .skill-extract-actions .primary{background:linear-gradient(135deg,var(--accent),rgb(var(--accent-soft-rgb)));border-color:transparent;color:#fff;font-weight:700;box-shadow:0 12px 28px rgba(var(--accent-soft-rgb),.24)}
 .skill-extract-actions .primary:hover{background:var(--accent-hover);color:#fff}
+.miniapp-build-popover{width:min(520px,calc(100vw - 40px))}
+.miniapp-build-functions{display:flex;flex-direction:column;gap:7px}
+.miniapp-build-functions-head{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#5b7299;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.miniapp-build-function-list{display:flex;flex-direction:column;gap:7px}
+.miniapp-build-function-row{display:flex;align-items:center;gap:7px;min-width:0}
+.miniapp-build-function-row input{flex:1;min-width:0;width:100%;height:34px;padding:0 11px;border:1px solid rgba(var(--accent-rgb),.18);border-radius:12px;background:rgba(255,252,248,.9);color:var(--text-primary);font-size:12px;outline:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.78);transition:var(--transition)}
+.miniapp-build-function-row input::placeholder{color:#7c90b1}
+.miniapp-build-function-row input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(var(--accent-soft-rgb),.14)}
+.miniapp-build-function-add,.miniapp-build-function-remove{width:24px;height:24px;flex:0 0 24px;padding:0;border:1px solid rgba(var(--accent-rgb),.22);border-radius:8px;background:rgba(255,255,255,.6);color:rgb(var(--accent-rgb));font:700 16px/1 ui-sans-serif,system-ui,sans-serif;cursor:pointer;transition:var(--transition)}
+.miniapp-build-function-add:hover,.miniapp-build-function-add:focus-visible,.miniapp-build-function-remove:hover,.miniapp-build-function-remove:focus-visible{border-color:rgba(var(--accent-rgb),.5);background:rgba(var(--accent-rgb),.10);outline:none;transform:translateY(-1px)}
+[data-theme="dark"] .miniapp-build-functions-head{color:#9fb7df}
+[data-theme="dark"] .miniapp-build-function-row input{background-color:rgba(255,255,255,.08);border-color:rgba(169,190,227,.18);color:#ecf3ff;box-shadow:none}
+[data-theme="dark"] .miniapp-build-function-row input::placeholder{color:#8fa8d1}
+[data-theme="dark"] .miniapp-build-function-add,[data-theme="dark"] .miniapp-build-function-remove{background:rgba(255,255,255,.08);border-color:rgba(169,190,227,.18);color:#bcefff}
 .install-app-popover{width:min(460px,calc(100vw - 40px))}
 .install-app-popover h4{display:flex;align-items:center;gap:8px}
 .install-app-popover h4 svg{width:16px;height:16px;flex-shrink:0;color:#c7923d;filter:drop-shadow(0 0 10px rgba(var(--warm-rgb),.24))}
@@ -5140,6 +5155,9 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
       <div class="rs-row-divider" id="rsCliSubHeader">
         <div class="rs-row-title">
           <span>正在执行的系统指令</span>
+          <button type="button" class="rs-miniapp-build-btn" id="miniappBuildBtn" title="构建迷你应用" aria-label="构建迷你应用" onclick="openMiniappBuildPopover(event)">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"></rect><path d="M8 9h8M8 13h4M15 16h1"></path></svg>
+          </button>
           <div class="rs-row-actions">
             <button type="button" class="rs-cmd-toggle" id="cmdToggleBtn" title="CMD" onclick="cmdTogglePanel(event)">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
@@ -6936,6 +6954,26 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     </div>
   </div>
 </div>
+<div class="skill-extract-overlay" id="miniappBuildOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="30" onclick="handleMiniappBuildOverlayClick(event)" aria-hidden="true">
+  <div class="skill-extract-popover miniapp-build-popover" id="miniappBuildPopover" role="dialog" aria-modal="true" aria-labelledby="miniappBuildTitle" aria-describedby="miniappBuildDesc" onclick="event.stopPropagation()">
+    <h4 id="miniappBuildTitle">构建迷你应用</h4>
+    <p class="skill-extract-popover-desc" id="miniappBuildDesc">输入 CLI 名称或 Git 地址，确认后会自动在当前会话中发起构建请求</p>
+    <div class="skill-extract-form">
+      <label class="skill-extract-field" id="miniappBuildNameField">
+        <input id="miniappBuildNameInput" type="text" placeholder="https://github.com/owner/repo 或 CLI名称" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="CLI 名称或 Git 地址" />
+      </label>
+      <div class="miniapp-build-functions" id="miniappBuildFunctions">
+        <div class="miniapp-build-functions-head"><span>功能列表（可选）</span><button type="button" class="miniapp-build-function-add" id="miniappBuildFunctionAddBtn" title="增加功能" aria-label="增加功能" onclick="addMiniappBuildFunction()">+</button></div>
+        <div class="miniapp-build-function-list" id="miniappBuildFunctionList"></div>
+      </div>
+      <div class="skill-extract-error" id="miniappBuildError"></div>
+      <div class="skill-extract-actions">
+        <button type="button" onclick="closeMiniappBuildPopover()">取消</button>
+        <button type="button" class="primary" id="miniappBuildConfirmBtn" onclick="submitMiniappBuildPrompt()">确认</button>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="skill-extract-overlay" id="skillExtractGoalOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="30" onclick="handleSkillExtractOverlayClick(event,'goal')" aria-hidden="true">
   <div class="skill-extract-popover" id="skillExtractGoalPopover" onclick="event.stopPropagation()">
     <h4>提炼目标</h4>
@@ -8553,6 +8591,14 @@ let skillExtractState = {
   lastSizeK: 0,
   lastRange: { round: '1', start: '', close: '' },
   gitInstallUrl: ''
+};
+let miniappBuildState = {
+  open: false,
+  name: '',
+  functions: [],
+  anchorChatId: '',
+  anchorAgentId: '',
+  submitting: false
 };
 const DEFAULT_CONSUME_LIMIT = 500;
 let consumeState = {
@@ -14961,6 +15007,7 @@ function overlayShowState(el) {
   if (el.id === 'pluginModalOverlay' && pluginModalState.visible) return true;
   if (el.id === 'skillExtractRangeOverlay' && skillExtractState.rangeOpen) return true;
   if (el.id === 'skillExtractGitOverlay' && skillExtractState.gitInstallOpen) return true;
+  if (el.id === 'miniappBuildOverlay' && miniappBuildState.open) return true;
   if (el.id === 'skillExtractGoalOverlay' && skillExtractState.goalOpen) return true;
   if (el.id === 'installAppOverlay' && installAppState.popoverOpen) return true;
   if (el.id === 'soulTidyOverlay' && soulTidyState.popoverOpen) return true;
@@ -15061,6 +15108,9 @@ function hideExclusiveOverlayById(id) {
       return true;
     case 'skillExtractGitOverlay':
       closeSkillExtractGitPopover();
+      return true;
+    case 'miniappBuildOverlay':
+      closeMiniappBuildPopover();
       return true;
     case 'skillExtractGoalOverlay':
       closeSkillExtractGoalPopover();
@@ -24689,6 +24739,229 @@ function getActiveSkillExtractBinding() {
   const chatId = String(state.activeChat || '').trim();
   const agentId = String(getChatAgentId(chatId) || '').trim();
   return { chatId, agentId };
+}
+
+function createDefaultMiniappBuildFunctions() {
+  return [];
+}
+
+function normalizeMiniappBuildFunctionDrafts(values) {
+  if (!Array.isArray(values)) return createDefaultMiniappBuildFunctions();
+  return values.map(value => String(value || ''));
+}
+
+function resetMiniappBuildDraftState() {
+  miniappBuildState.name = '';
+  miniappBuildState.functions = createDefaultMiniappBuildFunctions();
+  miniappBuildState.anchorChatId = '';
+  miniappBuildState.anchorAgentId = '';
+  miniappBuildState.submitting = false;
+}
+
+function setMiniappBuildError(message) {
+  const el = document.getElementById('miniappBuildError');
+  if (el) el.textContent = message || '';
+}
+
+function syncMiniappBuildDraftFromForm() {
+  const nameInput = document.getElementById('miniappBuildNameInput');
+  if (nameInput) miniappBuildState.name = String(nameInput.value || '');
+  const functionInputs = document.querySelectorAll('#miniappBuildFunctionList .miniapp-build-function-input');
+  if (functionInputs.length) {
+    miniappBuildState.functions = Array.from(functionInputs, input => String(input.value || ''));
+  } else {
+    miniappBuildState.functions = [];
+  }
+}
+
+function renderMiniappBuildFunctionRows(focusIndex) {
+  const list = document.getElementById('miniappBuildFunctionList');
+  if (!list) return;
+  const values = normalizeMiniappBuildFunctionDrafts(miniappBuildState.functions);
+  miniappBuildState.functions = values;
+  list.replaceChildren();
+  values.forEach((value, index) => {
+    const row = document.createElement('div');
+    row.className = 'miniapp-build-function-row';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'miniapp-build-function-input';
+    input.placeholder = '例如：登录、数据展示';
+    input.autocomplete = 'off';
+    input.value = value;
+    input.setAttribute('aria-label', '功能 ' + (index + 1));
+    input.addEventListener('input', () => {
+      miniappBuildState.functions[index] = String(input.value || '');
+    });
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'miniapp-build-function-remove';
+    remove.textContent = '−';
+    remove.title = '删除功能';
+    remove.setAttribute('aria-label', '删除功能 ' + (index + 1));
+    remove.addEventListener('click', () => removeMiniappBuildFunction(index));
+    row.append(input, remove);
+    list.appendChild(row);
+  });
+  if (Number.isInteger(focusIndex) && focusIndex >= 0) {
+    const input = list.querySelectorAll('.miniapp-build-function-input')[focusIndex];
+    if (input) window.setTimeout(() => input.focus(), 0);
+  }
+}
+
+function addMiniappBuildFunction() {
+  if (miniappBuildState.submitting) return;
+  syncMiniappBuildDraftFromForm();
+  miniappBuildState.functions.push('');
+  renderMiniappBuildFunctionRows(miniappBuildState.functions.length - 1);
+}
+
+function removeMiniappBuildFunction(index) {
+  if (miniappBuildState.submitting) return;
+  syncMiniappBuildDraftFromForm();
+  if (!Number.isInteger(index) || index < 0 || index >= miniappBuildState.functions.length) return;
+  miniappBuildState.functions.splice(index, 1);
+  renderMiniappBuildFunctionRows(Math.max(0, index - 1));
+}
+
+function getMiniappBuildTemplate(runtimeConfig) {
+  const miniapp = runtimeConfig && typeof runtimeConfig === 'object' && !Array.isArray(runtimeConfig)
+    ? runtimeConfig.miniapp
+    : null;
+  if (!miniapp || typeof miniapp !== 'object' || Array.isArray(miniapp)) {
+    throw new Error('未配置 miniapp');
+  }
+  const build = typeof miniapp.build === 'string' ? miniapp.build.trim() : '';
+  const fallbackFunction = typeof miniapp.function === 'string' ? miniapp.function.trim() : '';
+  if (!build) throw new Error('miniapp.build 不能为空');
+  if (!build.includes('$name')) throw new Error('miniapp.build 未包含 $name 变量');
+  if (!build.includes('$function')) throw new Error('miniapp.build 未包含 $function 变量');
+  if (!fallbackFunction) throw new Error('miniapp.function 不能为空');
+  return { build, fallbackFunction };
+}
+
+async function buildMiniappBuildPrompt(name, functions) {
+  const runtimeConfig = await readRuntimeConfig(true);
+  const template = getMiniappBuildTemplate(runtimeConfig);
+  const functionText = functions.length ? functions.join('、') : template.fallbackFunction;
+  return template.build.split('$name').join(name).split('$function').join(functionText);
+}
+
+function closeMiniappBuildPopover(options = {}) {
+  const overlay = document.getElementById('miniappBuildOverlay');
+  if (!overlay) return;
+  if (miniappBuildState.open && !options.discardDraft) syncMiniappBuildDraftFromForm();
+  setOverlayVisible(overlay, false);
+  miniappBuildState.open = false;
+  miniappBuildState.submitting = false;
+  setMiniappBuildError('');
+}
+
+function handleMiniappBuildOverlayClick(event) {
+  if (!event || event.target !== event.currentTarget) return;
+  closeMiniappBuildPopover();
+}
+
+function openMiniappBuildPopover(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  if (miniappBuildState.submitting) return;
+  const binding = getActiveSkillExtractBinding();
+  if (!binding.chatId || !binding.agentId) {
+    vfsShowUploadToast('当前没有可用的 Agent 或会话', true);
+    return;
+  }
+  miniappBuildState.anchorChatId = binding.chatId;
+  miniappBuildState.anchorAgentId = binding.agentId;
+  const overlay = document.getElementById('miniappBuildOverlay');
+  const input = document.getElementById('miniappBuildNameInput');
+  if (!overlay || !input) return;
+  input.value = miniappBuildState.name || '';
+  renderMiniappBuildFunctionRows();
+  setMiniappBuildError('');
+  showExclusiveOverlay(overlay);
+  miniappBuildState.open = true;
+  window.setTimeout(() => {
+    input.focus();
+    if (typeof input.select === 'function') input.select();
+  }, 20);
+}
+
+async function submitMiniappBuildPrompt() {
+  if (miniappBuildState.submitting) return;
+  syncMiniappBuildDraftFromForm();
+  const name = String(miniappBuildState.name || '').trim();
+  if (!name) {
+    setMiniappBuildError('CLI 名称或 Git 地址不能为空');
+    return;
+  }
+  const binding = getActiveSkillExtractBinding();
+  if (!binding.chatId || !binding.agentId) {
+    setMiniappBuildError('当前没有可用的 Agent 或会话');
+    return;
+  }
+  if (binding.chatId !== miniappBuildState.anchorChatId || binding.agentId !== miniappBuildState.anchorAgentId) {
+    setMiniappBuildError('会话已切换，请重新打开构建迷你应用');
+    return;
+  }
+  if (isChatBusy(binding.chatId)) {
+    setMiniappBuildError('当前会话正在处理中，请稍后再发送');
+    return;
+  }
+  const valid = await checkAgentValidity(binding.chatId);
+  if (!valid) {
+    setMiniappBuildError('当前 Agent 不可用，请重新选择后再发送');
+    return;
+  }
+  if (!state.selectedModel) {
+    showModelSelectToast();
+    setMiniappBuildError('请先选择模型');
+    return;
+  }
+  const key = getModelToken(state.selectedModel);
+  if (!key) {
+    setMiniappBuildError(getModelTokenErrorMessage(state.selectedModel));
+    return;
+  }
+  const functions = miniappBuildState.functions
+    .map(value => String(value || '').trim())
+    .filter(Boolean);
+  let prompt = '';
+  try {
+    prompt = await buildMiniappBuildPrompt(name, functions);
+  } catch (err) {
+    const message = String(err && err.message || err || '读取构建配置失败');
+    setMiniappBuildError('无法发起构建请求：' + message);
+    return;
+  }
+  setCenterInputPlainText(prompt);
+  miniappBuildState.submitting = true;
+  const confirm = document.getElementById('miniappBuildConfirmBtn');
+  if (confirm) confirm.disabled = true;
+  let dispatched = false;
+  void sendCenterMessage(prompt, {
+    clearInputAfterSend: true,
+    toastOnSuccess: '',
+    requestSource: 'miniapp_build',
+    onDispatched: () => {
+      dispatched = true;
+      closeMiniappBuildPopover({ discardDraft: true });
+      resetMiniappBuildDraftState();
+      if (confirm) confirm.disabled = false;
+    }
+  }).then(sent => {
+    if (sent || dispatched) return;
+    miniappBuildState.submitting = false;
+    if (confirm) confirm.disabled = false;
+    if (miniappBuildState.open) setMiniappBuildError('当前请求未能发送，请检查会话、Agent 和模型后重试');
+  }).catch(() => {
+    if (dispatched) return;
+    miniappBuildState.submitting = false;
+    if (confirm) confirm.disabled = false;
+    if (miniappBuildState.open) setMiniappBuildError('当前请求未能发送，请稍后重试');
+  });
 }
 
 function formatSkillExtractDatetime(value) {
@@ -39158,6 +39431,9 @@ async function sendCenterMessage(rawText, options) {
     chat.lastMsg = text;
     if (chat.messages.length > MAX_STORE) chat.messages = chat.messages.slice(-MAX_STORE);
     saveChats();
+    if (typeof opts.onDispatched === 'function') {
+      try { opts.onDispatched({ chatId, text, userMsg }); } catch {}
+    }
     if (opts.clearInputAfterSend) {
       if (isActiveChat()) {
         clearInput();

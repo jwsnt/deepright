@@ -11383,6 +11383,7 @@ var integrationClientRuntimeConfigFields = []string{
 	"knowledge",
 	"skills_git_install",
 	"shortcut",
+	"miniapp",
 }
 
 func integrationClientRuntimeConfig(raw map[string]interface{}) map[string]interface{} {
@@ -17320,6 +17321,85 @@ type integrationStartupStatus struct {
 
 const defaultUpstreamHost = "https://www.deepright.cn"
 
+const integrationPersistentSettingsTable = "integration_persistent_settings"
+
+// integrationPersistentHostDBOpenFn is replaceable by tests so host settings
+// can be verified without touching the user's shared application database.
+var integrationPersistentHostDBOpenFn = func() (*sql.DB, error) {
+	appDir := strings.TrimSpace(integrationAppDir())
+	if appDir == "" {
+		return nil, errors.New("resolve integration settings directory failed")
+	}
+	if err := os.MkdirAll(appDir, 0o755); err != nil {
+		return nil, err
+	}
+	return knowledgecore.OpenSharedDB(appDir)
+}
+
+func ensureIntegrationPersistentSettingsTable(db *sql.DB) error {
+	if db == nil {
+		return errors.New("integration settings database is not initialized")
+	}
+	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS ` + integrationPersistentSettingsTable + ` (
+		key TEXT PRIMARY KEY,
+		value TEXT NOT NULL
+	)`)
+	return err
+}
+
+func readIntegrationPersistentHost() (string, bool, error) {
+	db, err := integrationPersistentHostDBOpenFn()
+	if err != nil {
+		return "", false, fmt.Errorf("open integration settings: %w", err)
+	}
+	if err := ensureIntegrationPersistentSettingsTable(db); err != nil {
+		return "", false, fmt.Errorf("initialize integration settings: %w", err)
+	}
+
+	var host string
+	err = db.QueryRow(`SELECT value FROM `+integrationPersistentSettingsTable+` WHERE key = ?`, "host").Scan(&host)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("read persisted service address: %w", err)
+	}
+	normalized, err := runtimehost.Validate(host)
+	if err != nil {
+		return "", false, fmt.Errorf("validate persisted service address: %w", err)
+	}
+	return normalized, true, nil
+}
+
+func writeIntegrationPersistentHost(host string) error {
+	db, err := integrationPersistentHostDBOpenFn()
+	if err != nil {
+		return fmt.Errorf("open integration settings: %w", err)
+	}
+	if err := ensureIntegrationPersistentSettingsTable(db); err != nil {
+		return fmt.Errorf("initialize integration settings: %w", err)
+	}
+	if _, err := db.Exec(`INSERT INTO `+integrationPersistentSettingsTable+`(key, value) VALUES(?, ?)
+		ON CONFLICT(key) DO UPDATE SET value = excluded.value`, "host", host); err != nil {
+		return fmt.Errorf("save persisted service address: %w", err)
+	}
+	return nil
+}
+
+func deleteIntegrationPersistentHost() error {
+	db, err := integrationPersistentHostDBOpenFn()
+	if err != nil {
+		return fmt.Errorf("open integration settings: %w", err)
+	}
+	if err := ensureIntegrationPersistentSettingsTable(db); err != nil {
+		return fmt.Errorf("initialize integration settings: %w", err)
+	}
+	if _, err := db.Exec(`DELETE FROM `+integrationPersistentSettingsTable+` WHERE key = ?`, "host"); err != nil {
+		return fmt.Errorf("delete persisted service address: %w", err)
+	}
+	return nil
+}
+
 func (cfg *Config) ensureRuntimeHostState() *runtimehost.State {
 	if cfg == nil {
 		return runtimehost.New(defaultUpstreamHost)
@@ -17370,15 +17450,26 @@ func (cfg *Config) setPersistentHost(host string) (runtimehost.Snapshot, error) 
 	if err != nil {
 		return runtimehost.Snapshot{}, err
 	}
-	if err := updateIntegrationStartupConfig(map[string]interface{}{"host": normalized}); err != nil {
-		return runtimehost.Snapshot{}, fmt.Errorf("save config/config.json failed: %w", err)
+	if err := writeIntegrationPersistentHost(normalized); err != nil {
+		return runtimehost.Snapshot{}, err
 	}
 	cfg.Host = normalized
 	return cfg.ensureRuntimeHostState().Set(normalized)
 }
 
 func (cfg *Config) resetPersistentHost() (runtimehost.Snapshot, error) {
-	return cfg.setPersistentHost(defaultUpstreamHost)
+	if cfg == nil {
+		return runtimehost.Snapshot{}, fmt.Errorf("service address is not initialized")
+	}
+	host, err := integrationConfiguredDefaultHost()
+	if err != nil {
+		return runtimehost.Snapshot{}, err
+	}
+	if err := deleteIntegrationPersistentHost(); err != nil {
+		return runtimehost.Snapshot{}, err
+	}
+	cfg.Host = host
+	return cfg.ensureRuntimeHostState().Set(host)
 }
 
 func (cfg *Config) ensureStandaloneState() *integrationstandalone.State {
@@ -17498,12 +17589,22 @@ func normalizeIntegrationStartupConfigKey(key string) string {
 	return key
 }
 
-func integrationStartupConfigPath() string {
+// integrationBundledStartupConfigPath identifies the static configuration
+// shipped with the application. In a macOS app bundle it is a signed resource
+// and must never be changed after distribution.
+func integrationBundledStartupConfigPath() string {
 	resourcesDir := strings.TrimSpace(integrationResourcesDir())
 	if resourcesDir == "" {
 		return ""
 	}
 	return filepath.Join(resourcesDir, "config", "config.json")
+}
+
+// integrationStartupConfigPath is always the shipped static configuration.
+// User-selected settings are kept separately in the shared SQLite database so
+// a newer application package can supply new configuration fields on upgrade.
+func integrationStartupConfigPath() string {
+	return integrationBundledStartupConfigPath()
 }
 
 func readIntegrationStartupConfigRaw() (map[string]interface{}, string, error) {
@@ -17528,69 +17629,6 @@ func readIntegrationStartupConfigRaw() (map[string]interface{}, string, error) {
 		raw = map[string]interface{}{}
 	}
 	return raw, path, nil
-}
-
-var integrationStartupConfigWriteMu sync.Mutex
-
-func updateIntegrationStartupConfig(values map[string]interface{}) error {
-	if len(values) == 0 {
-		return nil
-	}
-	integrationStartupConfigWriteMu.Lock()
-	defer integrationStartupConfigWriteMu.Unlock()
-
-	raw, configPath, err := readIntegrationStartupConfigRaw()
-	if err != nil {
-		return err
-	}
-	if raw == nil {
-		raw = map[string]interface{}{}
-	}
-	for key, value := range values {
-		key = strings.TrimSpace(key)
-		if key != "" {
-			raw[key] = value
-		}
-	}
-	if strings.TrimSpace(configPath) == "" {
-		return fmt.Errorf("resolve config/config.json path failed")
-	}
-	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
-		return err
-	}
-	encoded, err := json.MarshalIndent(raw, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	mode := fs.FileMode(0o644)
-	if info, statErr := os.Stat(configPath); statErr == nil {
-		mode = info.Mode().Perm()
-	} else if !errors.Is(statErr, os.ErrNotExist) {
-		return statErr
-	}
-	temporary, err := os.CreateTemp(filepath.Dir(configPath), ".config.json-*")
-	if err != nil {
-		return err
-	}
-	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
-	if err := temporary.Chmod(mode); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if _, err := temporary.Write(append(encoded, '\n')); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Sync(); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Close(); err != nil {
-		return err
-	}
-	return os.Rename(temporaryPath, configPath)
 }
 
 func readIntegrationStartupConfig() (map[string]interface{}, string, error) {
@@ -17935,6 +17973,28 @@ func loadIntegrationStartupOptions() (integrationStartupOptions, string, error) 
 	return loadIntegrationStartupOptionsWithPortOverride(false)
 }
 
+// integrationConfiguredDefaultHost returns the host from the static packaged
+// configuration without applying a user's SQLite override.
+func integrationConfiguredDefaultHost() (string, error) {
+	opts := defaultIntegrationStartupOptions()
+	values, _, err := readIntegrationStartupConfig()
+	if err != nil {
+		return "", err
+	}
+	if err := applyIntegrationStartupConfig(&opts, values); err != nil {
+		return "", err
+	}
+	host := strings.TrimSpace(opts.Config.Host)
+	if host == "" {
+		host = defaultUpstreamHost
+	}
+	normalized, err := runtimehost.Validate(host)
+	if err != nil {
+		return "", fmt.Errorf("validate configured service address: %w", err)
+	}
+	return normalized, nil
+}
+
 func loadIntegrationStartupOptionsWithPortOverride(portOverridden bool) (integrationStartupOptions, string, error) {
 	opts := defaultIntegrationStartupOptions()
 	values, path, err := readIntegrationStartupConfig()
@@ -17947,6 +18007,11 @@ func loadIntegrationStartupOptionsWithPortOverride(portOverridden bool) (integra
 	}
 	if err := applyIntegrationStartupConfig(&opts, values); err != nil {
 		return opts, path, err
+	}
+	if host, found, err := readIntegrationPersistentHost(); err != nil {
+		return opts, path, err
+	} else if found {
+		opts.Config.Host = host
 	}
 	return opts, path, nil
 }
@@ -18016,81 +18081,6 @@ func integrationFlagValue(fs *flag.FlagSet, name string) (string, bool) {
 		return "", false
 	}
 	return strings.TrimSpace(item.Value.String()), true
-}
-
-func writeRuntimeConfig(data map[string]interface{}) {
-	if runtimeDir := strings.TrimSpace(integrationBundleRuntimeBaseDir()); runtimeDir != "" {
-		data["app-dir"] = runtimeDir
-		if resourcesDir := strings.TrimSpace(integrationResourcesDir()); resourcesDir != "" {
-			data["resources-dir"] = resourcesDir
-		}
-	}
-	if raw, ok := data["default-dir"].(string); ok {
-		data["default-dir"] = integrationResourcePathArg(raw)
-	}
-	if raw, ok := data["site"].(string); ok {
-		data["site"] = integrationResourcePathArg(raw)
-	}
-	appDir := ""
-	if raw, ok := data["app-dir"].(string); ok {
-		appDir = strings.TrimSpace(raw)
-	}
-	if appDir == "" {
-		appDir = integrationResourcesDir()
-	}
-	raw, path, err := readIntegrationStartupConfigRaw()
-	if err != nil {
-		log.Printf("config/config.json: read failed: %v", err)
-		return
-	}
-	if raw == nil {
-		raw = map[string]interface{}{}
-	}
-	for _, key := range []string{"http_timeout", "http_connect_timeout", "http_socket_timeout", "http_debug"} {
-		delete(raw, key)
-	}
-	httpSection := map[string]interface{}{}
-	if existing, ok := raw["http"].(map[string]interface{}); ok && existing != nil {
-		for key, value := range existing {
-			httpSection[key] = value
-		}
-	}
-	for key, value := range data {
-		switch key {
-		case "http_timeout":
-			httpSection["http_timeout"] = value
-		case "http_connect_timeout":
-			httpSection["http_connect_timeout"] = value
-		case "http_socket_timeout":
-			httpSection["http_socket_timeout"] = value
-		case "http_debug":
-			httpSection["debug"] = value
-		default:
-			raw[key] = value
-		}
-	}
-	if len(httpSection) > 0 {
-		raw["http"] = httpSection
-	}
-	if strings.TrimSpace(path) == "" {
-		path = integrationStartupConfigPath()
-	}
-	if strings.TrimSpace(path) == "" {
-		log.Printf("config/config.json: resolve path failed")
-		return
-	}
-	out, err := json.MarshalIndent(raw, "", "  ")
-	if err != nil {
-		log.Printf("config/config.json: marshal failed: %v", err)
-		return
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		log.Printf("config/config.json: prepare dir failed: %v", err)
-		return
-	}
-	if err := os.WriteFile(path, append(out, '\n'), 0o644); err != nil {
-		log.Printf("config/config.json: write failed: %v", err)
-	}
 }
 
 func removeIntegrationRuntimeConfigFiles(runtimeCfg map[string]string) ([]string, error) {
@@ -20000,10 +19990,6 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	if strings.TrimSpace(startupDir) == "" {
 		return reportStartupFailure("error: resolve startup dir failed")
 	}
-	currentAppDir := integrationResourcesDir()
-	if strings.TrimSpace(currentAppDir) == "" {
-		currentAppDir = startupDir
-	}
 	if _, err := knowledgecore.OpenSharedDB(startupDir); err != nil {
 		return reportStartupFailure("error: init knowledge runtime: %v", err)
 	}
@@ -20015,37 +20001,6 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 		return reportStartupFailure("error: init knowledge dir: %v", err)
 	}
 
-	writeRuntimeConfig(map[string]interface{}{
-		"app":                       firstNonEmpty(resolveExecutablePath(os.Args[0]), os.Args[0]),
-		"app-dir":                   currentAppDir,
-		"resources-dir":             integrationResourcesDir(),
-		"db":                        resolveIntegrationDBPath(),
-		"port":                      cfg.Port,
-		"host":                      cfg.Host,
-		"agent-dir":                 cfg.AgentDir,
-		"default-dir":               cfg.DefaultDir,
-		"device":                    cfg.Device,
-		"agent-cache":               cfg.AgentCacheMs,
-		"connect-cache":             cfg.ConnectCacheMs,
-		"site":                      cfg.Site,
-		"connect_timeout":           cfg.ConnectTimeoutMs,
-		"knowledge_update_interval": cfg.KnowledgeUpdateIntervalMs,
-		"knowledge_update_lock":     cfg.KnowledgeUpdateLockMs,
-		"reply":                     cfg.Reply,
-		"sleep":                     cfg.SleepMs,
-		"thread":                    cfg.Thread,
-		"queue":                     cfg.Queue,
-		"retry_interval":            cfg.RetryIntervalMs,
-		"retry_times":               cfg.RetryTimes,
-		"http_timeout":              cfg.HTTPTimeout,
-		"http_connect_timeout":      cfg.HTTPConnTimeout,
-		"http_socket_timeout":       cfg.HTTPSocketTimeout,
-		"http_debug":                cfg.HTTPDebug,
-		"idle_timeout":              cfg.IdleTimeout,
-		"plugin_exec_timeout":       cfg.PluginExecTimeout,
-		"pid-file":                  pidFile,
-		"log-file":                  integrationLogFilePath(map[string]string{"log-file": logFileFlag}),
-	})
 	if cfg.DeviceState != nil {
 		cfg.DeviceState.captureConfigVersion()
 	}

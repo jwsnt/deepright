@@ -1,15 +1,14 @@
 package main
 
 import (
-	"encoding/json"
+	"bytes"
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 )
 
-func TestWriteRuntimeConfigStoresBundledRuntimeConfigOutsideSignedBundle(t *testing.T) {
+func TestBundledConfigIsAlwaysReadInsteadOfLegacyRuntimeConfig(t *testing.T) {
 	if runtime.GOOS != "darwin" {
 		t.Skip("bundle runtime layout is only used on darwin")
 	}
@@ -17,50 +16,51 @@ func TestWriteRuntimeConfigStoresBundledRuntimeConfigOutsideSignedBundle(t *test
 	bundleRoot := filepath.Join(t.TempDir(), "DeepRight.app")
 	macOSDir := filepath.Join(bundleRoot, "Contents", "MacOS")
 	resourcesDir := filepath.Join(bundleRoot, "Contents", "Resources")
-	if err := os.MkdirAll(macOSDir, 0o755); err != nil {
+	bundledConfigPath := filepath.Join(resourcesDir, "config", "config.json")
+	if err := os.MkdirAll(filepath.Dir(bundledConfigPath), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(resourcesDir, 0o755); err != nil {
+	bundledConfig := []byte(`{"version":"2","miniapp":{"function":"new"},"host":"https://bundle.example.com"}` + "\n")
+	if err := os.WriteFile(bundledConfigPath, bundledConfig, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	originalExecutable := integrationExecutableFn
+	originalHome := integrationUserHomeFn
 	defer func() {
 		integrationExecutableFn = originalExecutable
+		integrationUserHomeFn = originalHome
 	}()
 	integrationExecutableFn = func() (string, error) {
 		return filepath.Join(macOSDir, "integration"), nil
 	}
+	home := t.TempDir()
+	integrationUserHomeFn = func() (string, error) { return home, nil }
 
-	writeRuntimeConfig(map[string]interface{}{
-		"app":           filepath.Join(macOSDir, "integration"),
-		"app-dir":       resourcesDir,
-		"resources-dir": resourcesDir,
-		"db":            filepath.Join(resourcesDir, "data"),
-	})
+	legacyRuntimePath := filepath.Join(integrationTestMacRuntimeBaseDir(home), "config", "config.json")
+	if err := os.MkdirAll(filepath.Dir(legacyRuntimePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(legacyRuntimePath, []byte(`{"version":"1","miniapp":{"function":"stale"},"host":"https://stale.example.com"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
-	configPath := filepath.Join(resourcesDir, "config", "config.json")
-	data, err := os.ReadFile(configPath)
+	raw, path, err := readIntegrationStartupConfigRaw()
 	if err != nil {
-		t.Fatalf("read config/config.json: %v", err)
+		t.Fatalf("read bundled config: %v", err)
 	}
-	var cfg map[string]any
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		t.Fatalf("unmarshal config/config.json: %v", err)
+	if path != bundledConfigPath || raw["version"] != "2" {
+		t.Fatalf("read config = %#v from %q, want bundled config", raw, path)
 	}
-	wantAppDir := resourcesDir
-	if runtimeDir := strings.TrimSpace(integrationBundleRuntimeBaseDir()); runtimeDir != "" {
-		wantAppDir = runtimeDir
+	if got := readRuntimeConfig(); got["host"] != "https://bundle.example.com" {
+		t.Fatalf("host = %q, want bundled value", got["host"])
 	}
-	if cfg["app-dir"] != wantAppDir {
-		t.Fatalf("app-dir = %v, want %q", cfg["app-dir"], wantAppDir)
-	}
-	if cfg["resources-dir"] != resourcesDir {
-		t.Fatalf("resources-dir = %v, want %q", cfg["resources-dir"], resourcesDir)
+	if got, err := os.ReadFile(bundledConfigPath); err != nil || !bytes.Equal(got, bundledConfig) {
+		t.Fatalf("bundled config changed: data=%q err=%v", got, err)
 	}
 }
 
-func TestReadRuntimeConfigUsesBundledConfigDirectory(t *testing.T) {
+func TestStartupConfigReadDoesNotCreateRuntimeConfig(t *testing.T) {
 	if runtime.GOOS != "darwin" {
 		t.Skip("bundle runtime layout is only used on darwin")
 	}
@@ -68,37 +68,29 @@ func TestReadRuntimeConfigUsesBundledConfigDirectory(t *testing.T) {
 	bundleRoot := filepath.Join(t.TempDir(), "DeepRight.app")
 	macOSDir := filepath.Join(bundleRoot, "Contents", "MacOS")
 	resourcesDir := filepath.Join(bundleRoot, "Contents", "Resources")
-	if err := os.MkdirAll(macOSDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
 	if err := os.MkdirAll(filepath.Join(resourcesDir, "config"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(resourcesDir, "config", "config.json"), []byte("{\"app-dir\":\"/runtime\"}\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(resourcesDir, "config", "config.json"), []byte(`{"host":"https://bundle.example.com"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	originalExecutable := integrationExecutableFn
-	originalWD, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
+	originalHome := integrationUserHomeFn
 	defer func() {
 		integrationExecutableFn = originalExecutable
-		_ = os.Chdir(originalWD)
+		integrationUserHomeFn = originalHome
 	}()
 	integrationExecutableFn = func() (string, error) {
 		return filepath.Join(macOSDir, "integration"), nil
 	}
-	if err := os.Chdir(t.TempDir()); err != nil {
-		t.Fatal(err)
-	}
+	home := t.TempDir()
+	integrationUserHomeFn = func() (string, error) { return home, nil }
 
-	cfg := readRuntimeConfig()
-	if cfg == nil {
-		t.Fatal("expected runtime config")
+	if _, _, err := loadIntegrationStartupOptions(); err != nil {
+		t.Fatalf("load startup config: %v", err)
 	}
-	if cfg["app-dir"] != "/runtime" {
-		t.Fatalf("app-dir = %q, want /runtime", cfg["app-dir"])
+	if _, err := os.Stat(filepath.Join(integrationTestMacRuntimeBaseDir(home), "config", "config.json")); !os.IsNotExist(err) {
+		t.Fatalf("runtime config must not be created, stat err = %v", err)
 	}
 }

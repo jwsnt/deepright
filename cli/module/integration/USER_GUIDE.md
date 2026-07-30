@@ -53,7 +53,7 @@ cd /path/to/deepright/cli/module/integration
 ./integration --agent-dir agent --default-dir config --site site --host http://xxx.com
 ```
 
-也支持在应用目录下的 `config/config.json` 作为启动配置。也就是与 `integration` 同目录的 `config` 文件夹内固定读取：
+目录形式的发布包支持在应用目录下的 `config/config.json` 作为启动配置，也就是与 `integration` 同目录的 `config` 文件夹内读取。macOS `.app` 的配置位置和读写规则见后文“macOS `.app` 配置与代码签名保护”。
 
 ```json
 {
@@ -159,10 +159,10 @@ Integration 在每次启动时读取 `config/config.json.temp`：
 
 | 参数 | 必填 | 默认值 | 说明 | 模块 |
 |------|------|--------|------|------|
-| `--agent-dir` | 否 | macOS: `~/Library/Application Support/deepright/agent`；WSL: `~/deepright/agent`；其他系统: `./agent` | Agent 根目录路径；目录不存在时自动创建；若目录为空则自动补齐 `DEF_AGENT`，并确保 `DEF_AGENT/skills` 存在 | 共享 |
+| `--agent-dir` | 否 | macOS: `~/Library/Containers/cn.deepright.integration/Data/Library/Application Support/deepright/agent`；WSL: `~/deepright/agent`；其他系统: `./agent` | Agent 根目录路径；目录不存在时自动创建；若目录为空则自动补齐 `DEF_AGENT`，并确保 `DEF_AGENT/skills` 存在 | 共享 |
 | `--default-dir` | 否 | `./config` | 新建 Agent 和空 `agent-dir` 启动补齐 `DEF_AGENT` 时使用的默认模板目录；会复制其中的模板文件，并为 Agent 单独初始化空 `config.json` | 共享 |
 | `--port` | 否 | `8080` | HTTP 服务端口 | proxy + static + cron API |
-| `--host` | 否 | 已保存的 `config/config.json.host`，未配置时为 `https://www.deepright.cn` | 上游服务地址 | proxy + cli-get + cron执行 |
+| `--host` | 否 | SQLite 中保存的 `host`，否则为静态 `config/config.json.host`，再否则为 `https://www.deepright.cn` | 上游服务地址 | proxy + cli-get + cron执行 |
 | `--device` | 否 | 自动生成 | 设备ID | 共享 |
 | `--agent-cache` | 否 | `120000` | Agent 元数据缓存 TTL（毫秒） | 共享 |
 | `--site` | 否 | `./site` | 静态站点目录；默认取当前应用目录下的 `site` | static |
@@ -261,7 +261,7 @@ Integration 服务使用同一个全局 `deviceId` 快照构建 Agent 元数据�
 
 ### 启动行为
 
-- 未传 `--agent-dir` 时，macOS 默认使用 `~/Library/Application Support/deepright/agent`，WSL 默认使用 `~/deepright/agent`，其他系统默认使用启动目录下的 `./agent`
+- 未传 `--agent-dir` 时，macOS 默认使用 `~/Library/Containers/cn.deepright.integration/Data/Library/Application Support/deepright/agent`，WSL 默认使用 `~/deepright/agent`，其他系统默认使用启动目录下的 `./agent`
 - 如果默认或显式指定的 `agent` 目录不存在，程序会在启动时自动创建
 - 如果 `agent` 目录为空（包含刚自动创建完成的场景），程序会先把 `default-dir` 中除根 `config.json` 外的内容复制到 `DEF_AGENT/`，再额外写入一个空的 `DEF_AGENT/config.json`，并确保 `DEF_AGENT/skills` 存在
 - 未传 `--default-dir` 时，默认使用启动目录下的 `./config`
@@ -271,7 +271,7 @@ Integration 服务使用同一个全局 `deviceId` 快照构建 Agent 元数据�
 - `GET /api/copy?source_agentId=...&target_agentId=...` 会把 source Agent 的 `app/`、`data/`、`skills/`、`SOUL.md`、`USER.md`、`Knowledge.md` / `knowledge.md`，以及 `knowledge/<agentId>` 同步到已存在的 target Agent，但不会覆盖 target 的 `config.json`
 - 如果 `default-dir` 不存在、不是目录，或复制过程中出错，启动补齐与 `/api/agent/init` 都会失败；`/api/agent/init` 还会回滚刚创建的空 Agent 目录
 - 未传 `--site` 时，默认使用启动目录下的 `./site`
-- macOS 下共享 sqlite 固定使用 `~/Library/Application Support/deepright/data`，知识库目录固定使用 `~/Library/Application Support/deepright/knowledge`
+- macOS 下共享 sqlite 固定使用 `~/Library/Containers/cn.deepright.integration/Data/Library/Application Support/deepright/data`，知识库目录固定使用 `~/Library/Containers/cn.deepright.integration/Data/Library/Application Support/deepright/knowledge`
 - WSL 下共享运行目录固定使用 `~/deepright`
 - WSL 下插件目录固定使用 `~/deepright/plugins`
 - WSL 下知识库目录固定使用 `~/deepright/knowledge`
@@ -362,7 +362,7 @@ module/release/
 补充说明：
 
 - `build.sh` 会把 `module/config` 打包到交付物的 `config/` 目录；其中 `config/config.json` 仅供主应用启动读取，不会把其中字段复制进新建 Agent；其他模板文件或目录供新建 Agent / 补齐 `DEF_AGENT` 时复制
-- macOS `.app` 形态下，主应用配置固定读取 `integration.app/Contents/Resources/config/config.json`；普通目录交付形态下固定读取应用同级 `config/config.json`
+- macOS `.app` 形态下，`Contents/Resources/config/config.json` 是只读的包内静态配置，并且每次启动均从此处读取；普通目录交付形态读取应用同级 `config/config.json`。服务不会写回任一主应用配置文件，用户主动设置的服务地址仅保存到共享 SQLite
 - `plugins/browser` 是浏览器插件二进制，收口了 Playwright、CDP 实例管理和 Chrome Cookie 导出能力
 - `plugins/browser name` 固定返回 `{"key":"browser","name":"浏览器"}`
 - `plugins/browser param` 固定返回 `["cookie_path"]`
@@ -651,7 +651,7 @@ curl http://127.0.0.1:8080/install_app
 - WSL 仅以 WSL 进程可直接执行的命令判断安装状态，不会把 Windows 宿主机 `.exe` 或 `/mnt/c` 中的软件计为已安装
 - `install_app.interval` 是正整数分钟，缺失或无效时为 `60`；`install_app.content` 是会话请求模板，Site 会替换其中的 `$namelist`
 - `install_app` 中的每个元素都表示一个本地应用名；接口会按当前操作系统检查是否已安装，已安装项不会出现在返回列表中
-- `install_app` 唯一从主应用资源目录的 `config/config.json` 读取；macOS、Linux 和 Windows／WSL 均不支持 `--install_app`，服务启动或重启也不会写入、覆盖该对象
+- `install_app` 唯一从主应用活动 `config/config.json` 读取；macOS、Linux 和 Windows／WSL 均不支持 `--install_app`，服务启动或重启也不会写入、覆盖该对象
 - 接口会把自动探测结果与 `config/config.json` 当前系统对应配置做去重合并，并对安装状态缓存 5 分钟
 - `config/config.json` 示例：
 
@@ -830,43 +830,25 @@ curl http://127.0.0.1:8080/install_app
 - `start` 在等待就绪期间如果子进程提前退出，也会优先透传子进程上报的失败原因，而不是只给出笼统超时
 - `stop` 在目标进程已经不存在时仍会按成功处理；如果插件 PID 已缺失、插件进程已退出，生命周期日志会记录 `plugin stop skipped` 或清理陈旧 PID，而不会把整个停止流程判为失败
 
-### `config/config.json` 运行态字段
+### 静态 `config/config.json` 与运行状态
 
-- 以 HTTP 服务模式启动 `integration` 时，会把解析后的实际运行参数直接写回主应用 `config/config.json`
-- 本地 HTTP 端口的优先级为：显式 `--port`、`config/config.json` 的 `port`、默认 `8080`；端口必须介于 `1` 与 `65535` 之间
-- 文件中会同时保留静态启动配置和运行态字段；例如 `app`、`app-dir`、`resources-dir`、`db`
-- 其中 `db` 会写入应用启动目录下 `data` 的绝对路径
-- `integration stop` 不会删除主应用 `config/config.json`
-- `knowledge` 元数据会基于 `agent-dir` 和共享 sqlite 共同解析；也就是说：
-  - 知识库目录固定取 `--agent-dir/knowledge`
-  - 共享 sqlite 仍默认取 `<app-dir>/data`
+- `config/config.json` 是发布包提供的静态默认配置。HTTP 服务启动不会写回 `app`、`app-dir`、`resources-dir`、`db`、PID、日志、端口、超时、缓存、重试或设备等派生值。
+- 本地 HTTP 端口的优先级为：显式 `--port`、静态 `config/config.json` 的 `port`、默认 `8080`；端口必须介于 `1` 与 `65535` 之间。
+- `knowledge` 元数据继续基于 `agent-dir` 和共享 SQLite 解析；知识库目录固定取 `--agent-dir/knowledge`，共享 SQLite 默认取 `<app-dir>/data`。
 
-示例：
+### macOS `.app` 配置与代码签名保护
 
-```json
-{
-  "app": "/absolute/path/to/integration",
-  "app-dir": "/absolute/path/to",
-  "db": "/absolute/path/to/data",
-  "port": 8080,
-  "host": "https://www.deepright.cn",
-  "agent-dir": "/absolute/path/to/agent",
-  "device": "",
-  "agent-cache": 120000,
-  "site": "/absolute/path/to/site",
-  "connect_timeout": 15000,
-  "sleep": 3000,
-  "thread": 20,
-  "queue": 1000,
-  "retry_interval": 10000,
-  "retry_times": 1,
-  "http_timeout": 45000,
-  "http_connect_timeout": 15000,
-  "http_socket_timeout": 45000,
-  "http_debug": false,
-  "idle_timeout": 90
-}
+macOS `.app` 的 `Contents/Resources/config/config.json` 是签名保护的静态配置，每次启动、重启和 `GET /api/runtime_config` 都从这里读取，绝不可在安装后修改。运行目录不再创建或读取 `config/config.json`；旧版本遗留的同名文件会被忽略，因此升级发布包后的新配置字段能立即生效。
+
+只有用户主动修改的服务地址会持久化到：
+
+```text
+~/Library/Containers/cn.deepright.integration/Data/Library/Application Support/deepright/data
 ```
+
+该 SQLite 数据库中的 `integration_persistent_settings` 表保存 `host` 覆盖项。地址优先级为：显式 `--host` > SQLite `host` > 静态 `config.json.host` > `https://www.deepright.cn`。重置服务地址会删除 SQLite 覆盖项并恢复静态配置地址。
+
+直接运行的 macOS 命令行二进制、WSL 和 Linux 同样从可执行文件同级 `config/config.json` 读取静态默认值；服务启动不写回该文件，用户服务地址存放在共享 SQLite。Agent 工作目录中的 `config.json` 不参与上述规则。
 
 ## CLI 示例
 
@@ -2422,10 +2404,10 @@ CLI：
 
 ## 迭代 20260607-3：macOS 固定运行目录
 
-- macOS 下共享运行时目录固定为 `~/Library/Application Support/deepright`
-- 共享 sqlite 固定读写 `~/Library/Application Support/deepright/data`
-- `knowledge` 目录固定为 `~/Library/Application Support/deepright/knowledge`
-- `--agent-dir` 默认固定为 `~/Library/Application Support/deepright/agent`
+- macOS 下共享运行时目录固定为 `~/Library/Containers/cn.deepright.integration/Data/Library/Application Support/deepright`
+- 共享 sqlite 固定读写 `~/Library/Containers/cn.deepright.integration/Data/Library/Application Support/deepright/data`
+- `knowledge` 目录固定为 `~/Library/Containers/cn.deepright.integration/Data/Library/Application Support/deepright/knowledge`
+- `--agent-dir` 默认固定为 `~/Library/Containers/cn.deepright.integration/Data/Library/Application Support/deepright/agent`
 - 如果 `integration` 以 `.app` 形式运行，插件固定从 `integration.app/Contents/Resources/plugins` 读取
 - `config`、`site` 等资源目录也会优先按 `.app` 的 `Contents/Resources` 解析，避免误读 `Contents/MacOS`
 
@@ -2783,7 +2765,7 @@ config/
 
 ## 变更说明
 
-- `integration.app` 双击启动时，会先检查安装包内 `plugins/` 与运行时 `~/Library/Application Support/deepright/plugins/` 的插件二进制是否一致
+- `integration.app` 双击启动时，会先检查安装包内 `plugins/` 与运行时 `~/Library/Containers/cn.deepright.integration/Data/Library/Application Support/deepright/plugins/` 的插件二进制是否一致
 - 只有插件 `MD5` 不一致时，才会更新运行时插件
 - 如果检测到插件需要更新，但当前 `8080` 端口已被占用，则不会覆盖运行中的插件二进制，而是弹窗提示“有插件需要更新，请重启应用”
 - 如果检测到插件需要更新，且当前未启动，则会先完成插件同步，再继续启动应用
@@ -2810,13 +2792,13 @@ integration plugins sync-bundled
   "status": 0,
   "data": {
     "bundledPluginDir": "/Applications/DeepRight.app/Contents/Resources/plugins",
-    "runtimePluginDir": "/Users/demo/Library/Application Support/deepright/plugins",
+    "runtimePluginDir": "/Users/demo/Library/Containers/cn.deepright.integration/Data/Library/Application Support/deepright/plugins",
     "needsUpdate": true,
     "pending": [
       {
         "name": "browser",
         "sourcePath": "/Applications/DeepRight.app/Contents/Resources/plugins/browser",
-        "targetPath": "/Users/demo/Library/Application Support/deepright/plugins/browser",
+        "targetPath": "/Users/demo/Library/Containers/cn.deepright.integration/Data/Library/Application Support/deepright/plugins/browser",
         "sourceMD5": "xxx",
         "targetMD5": "yyy"
       }
@@ -2862,7 +2844,7 @@ integration plugins sync-bundled
 ## 说明
 
 - 该行为仅在 `integration` 运行于 Windows WSL 时生效
-- macOS 仍保持 `~/Library/Application Support/deepright`
+- macOS 仍保持 `~/Library/Containers/cn.deepright.integration/Data/Library/Application Support/deepright`
 - 普通 Linux 仍保持当前应用目录下的相对路径默认值
 
 ---
@@ -3142,7 +3124,7 @@ Integration 新增本机接口 `POST /api/model/test`，供设置页测试尚未
 
 ## 迭代 20260718-2：从 Git 安装 Skill
 
-在 Site 的「提炼 Skill」浮层中，点击「从Git安装」并输入 Git 地址后，页面会通过 Integration 的 `/api/runtime_config` 读取应用实际 `config/config.json` 中的 `skills_git_install` 文案，将其中每一处 `$git_path` 替换为输入的原始文本，并作为当前 Agent 会话的一条消息自动发送。该接口使用应用资源目录解析配置，不依赖服务进程的当前目录：macOS 为 `integration.app/Contents/Resources/config/config.json`，WSL 默认为 `~/deepright/config/config.json`。
+在 Site 的「提炼 Skill」浮层中，点击「从Git安装」并输入 Git 地址后，页面会通过 Integration 的 `/api/runtime_config` 读取主应用静态 `config/config.json` 中的 `skills_git_install` 文案，将其中每一处 `$git_path` 替换为输入的原始文本，并作为当前 Agent 会话的一条消息自动发送。macOS `.app` 始终读取 `Contents/Resources/config/config.json`；WSL 使用可执行文件同级的 `config/config.json`。接口不读取旧运行时配置，因此升级包后的模板会立即生效。
 
 - 页面只负责读取模板、文本替换和发送；仓库拉取、Skill 解析、资源安装与覆盖确认均由 Agent 处理。
 - 仅当输入 `trim()` 后为空时会阻止发送。HTTP/HTTPS 地址在会话中按既有样式显示为可点击 URL 气泡；SSH 等其他非空 Git 地址也会原样发送。
@@ -3189,9 +3171,9 @@ Integration 提供同源只读接口 `GET /api/media_preview?agentId=<agentId>&p
 
 `/api/host` 及 `integration host` 用于查看和修改当前服务地址。修改只接受绝对 `http` 或 `https` URL，且不能包含查询串或片段。
 
-- `POST` 或 `PUT /api/host` 会立即切换当前地址，并持久化写入应用资源目录中的 `config/config.json.host`。
-- `DELETE /api/host` 或 `POST /api/host?reset=true` 会立即恢复默认地址 `https://www.deepright.cn` 并持久化。
-- 接口仅允许本机管理请求；配置写入失败时不会切换当前地址，并会返回错误。
+- `POST` 或 `PUT /api/host` 会立即切换当前地址，并将规范化后的地址持久化到共享 SQLite 的 `integration_persistent_settings` 表；绝不修改主应用 `config/config.json` 或应用资源目录。
+- `DELETE /api/host` 或 `POST /api/host?reset=true` 会删除 SQLite 覆盖项，并立即恢复静态 `config/config.json.host`；静态值缺失时使用默认地址 `https://www.deepright.cn`。
+- 接口仅允许本机管理请求；SQLite 写入失败时不会切换当前地址，并会返回错误。
 - CLI 对应为 `integration host get`、`integration host set --value <URL>` 和 `integration host reset`；三者与 HTTP 接口使用相同的持久化语义。
 
 ---
@@ -3262,7 +3244,7 @@ Site 的视频和图片预览均可提取一个或多个坐标。该交互完全
 
 视频预览进入编辑模式前，Site 会调用同源 `GET /api/ffmpeg/check`。接口只检查本机命令搜索路径中是否同时存在 `ffmpeg` 和 `ffprobe`，不执行安装命令、不创建文件，也不修改视频或 Agent 工作区。
 
-主应用资源目录的 `config/config.json` 必须包含：
+主应用活动 `config/config.json` 必须包含：
 
 ```json
 {
@@ -3430,7 +3412,7 @@ Site 使用此字段显示目录和文件的排序，以及最近创建或修改
 
 ## 迭代 20260729-1：应用安装检查
 
-Integration 从主应用资源目录的 `config/config.json.install_app` 读取当前平台的应用列表、扫描间隔和会话请求模板。macOS 使用 `mac`，Windows／WSL 使用 `wsl`，普通 Linux 使用 `linux`；不支持 `--install_app` 参数，且服务启动不会写回或覆盖该配置对象；只会报告尚未安装的应用，不会执行安装。
+Integration 从主应用活动 `config/config.json.install_app` 读取当前平台的应用列表、扫描间隔和会话请求模板。macOS 使用 `mac`，Windows／WSL 使用 `wsl`，普通 Linux 使用 `linux`；不支持 `--install_app` 参数，且服务启动不会写回或覆盖该对象；只会报告尚未安装的应用，不会执行安装。
 
 `GET /install_app` 保持原有字符串数组响应；`GET /install_app?details=1` 额外返回 `apps`、`interval` 和 `content`，并且不缓存，以便下一周期及时识别刚安装的应用。
 
@@ -3449,3 +3431,13 @@ Integration 从主应用资源目录的 `config/config.json.install_app` 读取�
 `GET /api/runtime_config` 会在成功响应的受控 `config` 对象中透传该字段，供 Site 渲染最后一条已完成 SSE 响应的快捷回复列表。该接口不写入配置；字段不存在时保持省略。`provider`、模型密钥和其它未列入白名单的字段不会因为此扩展而暴露。
 
 完整说明见 [iteration/20260729-2/USER_GUIDE.md](iteration/20260729-2/USER_GUIDE.md)。
+
+---
+
+## 迭代 20260730-1：迷你应用运行配置
+
+`config/config.json` 可选配置 `miniapp.build` 和 `miniapp.function`。前者是含 `$name`、`$function` 的构建请求模板，后者是用户未填写任何功能时的默认描述。
+
+`GET /api/runtime_config` 只读地受控透传完整 `miniapp` 对象，供 Site 在确认时读取最新模板。接口不读取 Agent 工作目录配置、不执行 CLI 或构建，也不扩大配置白名单；`provider`、模型密钥和其它非公开字段继续不会返回给浏览器。
+
+完整说明见 [iteration/20260730-1/USER_GUIDE.md](iteration/20260730-1/USER_GUIDE.md)。

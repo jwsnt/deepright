@@ -157,5 +157,9 @@
     "好的",
     "执行",
     "重试"
-  ]
+  ],
+  "miniapp": {
+    "build": "请使用 [SKILL:__internal_cli] 为 $name 的 $function 构建迷你应用",
+    "function": "全部功能"
+  }
 }

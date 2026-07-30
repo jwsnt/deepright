@@ -5904,6 +5904,7 @@ func TestReadRuntimeConfigPrefersBundledResourcesDirectory(t *testing.T) {
 	}
 
 	bundleRoot := filepath.Join(t.TempDir(), "integration.app")
+	useIntegrationRuntimeHome(t, t.TempDir())
 	macOSDir := filepath.Join(bundleRoot, "Contents", "MacOS")
 	resourcesDir := filepath.Join(bundleRoot, "Contents", "Resources")
 	if err := os.MkdirAll(macOSDir, 0o755); err != nil {
@@ -5937,6 +5938,7 @@ func TestReadRuntimeConfigReturnsNilWhenBundledConfigMissing(t *testing.T) {
 	}
 
 	bundleRoot := filepath.Join(t.TempDir(), "integration.app")
+	useIntegrationRuntimeHome(t, t.TempDir())
 	macOSDir := filepath.Join(bundleRoot, "Contents", "MacOS")
 	if err := os.MkdirAll(macOSDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -8093,6 +8095,7 @@ func TestMergeIntegrationRuntimeFlagsRebasesMovedReleasePaths(t *testing.T) {
 
 func TestMergeIntegrationRuntimeFlagsRebasesMovedBundleResourcePaths(t *testing.T) {
 	bundleRoot := filepath.Join(t.TempDir(), "DeepRight.app")
+	useIntegrationRuntimeHome(t, t.TempDir())
 	oldBundleRoot := filepath.Join(t.TempDir(), "OldDeepRight.app")
 	macOSDir := filepath.Join(bundleRoot, "Contents", "MacOS")
 	configDir := filepath.Join(bundleRoot, "Contents", "Resources", "config")
@@ -8154,159 +8157,6 @@ func TestMergeIntegrationRuntimeFlagsDoesNotFallbackHTTPSettingsFromRuntime(t *t
 	}
 	if got["http_socket_timeout"] != "" {
 		t.Fatalf("http_socket_timeout = %q, want empty", got["http_socket_timeout"])
-	}
-}
-
-func TestWriteRuntimeConfigUsesStartupDirectorySemantics(t *testing.T) {
-	tempDir := t.TempDir()
-	useIntegrationExecutableDir(t, tempDir)
-
-	originalWD, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(tempDir); err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(originalWD) }()
-
-	startupDir, err := filepath.Abs(tempDir)
-	if err != nil {
-		t.Fatalf("abs startup dir: %v", err)
-	}
-	writeRuntimeConfig(map[string]interface{}{
-		"app":     "/tmp/fake/integration",
-		"app-dir": startupDir,
-		"db":      filepath.Join(startupDir, "data"),
-	})
-
-	data, err := os.ReadFile(filepath.Join(tempDir, "config", "config.json"))
-	if err != nil {
-		t.Fatalf("read config/config.json: %v", err)
-	}
-	var cfg map[string]any
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		t.Fatalf("unmarshal config/config.json: %v", err)
-	}
-	wantAppDir := startupDir
-	if runtimeDir := strings.TrimSpace(integrationBundleRuntimeBaseDir()); runtimeDir != "" {
-		wantAppDir = runtimeDir
-	}
-	if cfg["app-dir"] != wantAppDir {
-		t.Fatalf("app-dir = %v, want %q", cfg["app-dir"], wantAppDir)
-	}
-	if cfg["db"] != filepath.Join(startupDir, "data") {
-		t.Fatalf("db = %v, want %q", cfg["db"], filepath.Join(startupDir, "data"))
-	}
-}
-
-func TestWriteRuntimeConfigStoresHTTPFieldsUnderConfigHTTP(t *testing.T) {
-	tempDir := t.TempDir()
-	useIntegrationExecutableDir(t, tempDir)
-
-	configDir := filepath.Join(tempDir, "config")
-	if err := os.MkdirAll(configDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(`{
-  "host": "http://example.com",
-  "http": {"debug": false},
-  "install_app": {
-    "interval": 60,
-    "content": "请安装 $namelist",
-    "linux": ["python3"],
-    "wsl": ["python3"],
-    "mac": ["python3"]
-  }
-}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	writeRuntimeConfig(map[string]interface{}{
-		"http_timeout":         45000,
-		"http_connect_timeout": 15000,
-		"http_socket_timeout":  47000,
-		"http_debug":           true,
-	})
-
-	data, err := os.ReadFile(filepath.Join(configDir, "config.json"))
-	if err != nil {
-		t.Fatalf("read config/config.json: %v", err)
-	}
-	var cfg map[string]any
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		t.Fatalf("unmarshal config/config.json: %v", err)
-	}
-	if _, ok := cfg["http_timeout"]; ok {
-		t.Fatalf("legacy top-level http_timeout should be absent: %#v", cfg)
-	}
-	httpCfg, ok := cfg["http"].(map[string]any)
-	if !ok {
-		t.Fatalf("http = %#v, want object", cfg["http"])
-	}
-	if httpCfg["http_timeout"] != float64(45000) {
-		t.Fatalf("http.http_timeout = %v", httpCfg["http_timeout"])
-	}
-	if httpCfg["http_connect_timeout"] != float64(15000) {
-		t.Fatalf("http.http_connect_timeout = %v", httpCfg["http_connect_timeout"])
-	}
-	if httpCfg["http_socket_timeout"] != float64(47000) {
-		t.Fatalf("http.http_socket_timeout = %v", httpCfg["http_socket_timeout"])
-	}
-	if httpCfg["debug"] != true {
-		t.Fatalf("http.debug = %v", httpCfg["debug"])
-	}
-	if cfg["host"] != "http://example.com" {
-		t.Fatalf("host = %v, want preserved host", cfg["host"])
-	}
-	installApp, ok := cfg["install_app"].(map[string]any)
-	if !ok || installApp["content"] != "请安装 $namelist" {
-		t.Fatalf("install_app was overwritten: %#v", cfg["install_app"])
-	}
-	if apps, ok := installApp["linux"].([]any); !ok || len(apps) != 1 || apps[0] != "python3" {
-		t.Fatalf("install_app.linux = %#v, want [python3]", installApp["linux"])
-	}
-}
-
-func TestWriteRuntimeConfigStoresBundledResourcePathsAsRelative(t *testing.T) {
-	bundleRoot := filepath.Join(t.TempDir(), "DeepRight.app")
-	macOSDir := filepath.Join(bundleRoot, "Contents", "MacOS")
-	configDir := filepath.Join(bundleRoot, "Contents", "Resources", "config")
-	siteDir := filepath.Join(bundleRoot, "Contents", "Resources", "site")
-	if err := os.MkdirAll(macOSDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(configDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(siteDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	originalExecutable := integrationExecutableFn
-	defer func() { integrationExecutableFn = originalExecutable }()
-	integrationExecutableFn = func() (string, error) {
-		return filepath.Join(macOSDir, "integration"), nil
-	}
-
-	writeRuntimeConfig(map[string]interface{}{
-		"default-dir": configDir,
-		"site":        siteDir,
-	})
-
-	data, err := os.ReadFile(filepath.Join(configDir, "config.json"))
-	if err != nil {
-		t.Fatalf("read config/config.json: %v", err)
-	}
-	var cfg map[string]any
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		t.Fatalf("unmarshal config/config.json: %v", err)
-	}
-	if cfg["default-dir"] != "config" {
-		t.Fatalf("default-dir = %v, want %q", cfg["default-dir"], "config")
-	}
-	if cfg["site"] != "site" {
-		t.Fatalf("site = %v, want %q", cfg["site"], "site")
 	}
 }
 
@@ -8903,6 +8753,15 @@ func useIntegrationExecutableDir(t *testing.T, dir string) {
 	t.Setenv(integrationRuntimeDirEnv, "")
 }
 
+func useIntegrationRuntimeHome(t *testing.T, home string) {
+	t.Helper()
+	originalHome := integrationUserHomeFn
+	integrationUserHomeFn = func() (string, error) { return home, nil }
+	t.Cleanup(func() {
+		integrationUserHomeFn = originalHome
+	})
+}
+
 func writeIntegrationDeviceConfig(t *testing.T, root, content string) string {
 	t.Helper()
 	configDir := filepath.Join(root, "config")
@@ -9092,6 +8951,7 @@ func useBundledIntegrationExecutable(t *testing.T, bundleRoot string) {
 	t.Cleanup(func() {
 		integrationExecutableFn = originalExecutable
 	})
+	useIntegrationRuntimeHome(t, t.TempDir())
 	t.Setenv(integrationRuntimeDirEnv, "")
 }
 
@@ -9148,6 +9008,63 @@ func TestLoadIntegrationStartupOptionsReadsConfigDirectoryConfig(t *testing.T) {
 	}
 	if opts.LogFile != "custom.log" {
 		t.Fatalf("log-file = %q, want custom.log", opts.LogFile)
+	}
+}
+
+func TestStartupHostPrecedenceUsesSQLiteWithoutChangingStaticConfig(t *testing.T) {
+	tempDir := t.TempDir()
+	useIntegrationExecutableDir(t, tempDir)
+	configDir := filepath.Join(tempDir, "config")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	configPath := filepath.Join(configDir, "config.json")
+	staticConfig := []byte(`{"host":"https://bundle.example.com"}` + "\n")
+	if err := os.WriteFile(configPath, staticConfig, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	originalDBOpen := integrationPersistentHostDBOpenFn
+	dbPath := filepath.Join(t.TempDir(), "data")
+	integrationPersistentHostDBOpenFn = func() (*sql.DB, error) {
+		return sql.Open("sqlite", dbPath)
+	}
+	t.Cleanup(func() { integrationPersistentHostDBOpenFn = originalDBOpen })
+	if err := writeIntegrationPersistentHost("https://saved.example.com/path"); err != nil {
+		t.Fatalf("save host: %v", err)
+	}
+
+	opts, _, err := loadIntegrationStartupOptions()
+	if err != nil {
+		t.Fatalf("load startup options: %v", err)
+	}
+	if opts.Config.Host != "https://saved.example.com/path" {
+		t.Fatalf("startup host = %q, want SQLite host", opts.Config.Host)
+	}
+	if got, err := os.ReadFile(configPath); err != nil || !bytes.Equal(got, staticConfig) {
+		t.Fatalf("static config changed: data=%q err=%v", got, err)
+	}
+
+	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	var cfg Config
+	bindIntegrationServeFlags(fs, &cfg, nil, nil, nil, opts)
+	if err := fs.Parse([]string{"--host", "https://cli.example.com"}); err != nil {
+		t.Fatalf("parse --host: %v", err)
+	}
+	if cfg.Host != "https://cli.example.com" {
+		t.Fatalf("explicit host = %q, want CLI host", cfg.Host)
+	}
+
+	cfg.Host = opts.Config.Host
+	if _, err := cfg.resetPersistentHost(); err != nil {
+		t.Fatalf("reset persistent host: %v", err)
+	}
+	if cfg.currentHost() != "https://bundle.example.com" {
+		t.Fatalf("reset host = %q, want static host", cfg.currentHost())
+	}
+	if _, found, err := readIntegrationPersistentHost(); err != nil || found {
+		t.Fatalf("persistent host after reset = found:%t err:%v", found, err)
 	}
 }
 
@@ -16879,11 +16796,21 @@ func TestRunIntegrationStandaloneCLIRejectsInvalidPort(t *testing.T) {
 func TestHandleRuntimeHost(t *testing.T) {
 	tempDir := t.TempDir()
 	useIntegrationExecutableDir(t, tempDir)
-	writeIntegrationDeviceConfig(t, tempDir, `{
+	configPath := writeIntegrationDeviceConfig(t, tempDir, `{
   "host": "https://www.deepright.cn",
   "http": {"debug": false},
   "preserved": "value"
 }`)
+	originalConfig, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("read static config: %v", err)
+	}
+	originalDBOpen := integrationPersistentHostDBOpenFn
+	dbPath := filepath.Join(t.TempDir(), "data")
+	integrationPersistentHostDBOpenFn = func() (*sql.DB, error) {
+		return sql.Open("sqlite", dbPath)
+	}
+	t.Cleanup(func() { integrationPersistentHostDBOpenFn = originalDBOpen })
 	cfg := &Config{Host: "https://www.deepright.cn"}
 
 	decode := func(t *testing.T, recorder *httptest.ResponseRecorder) struct {
@@ -16932,19 +16859,25 @@ func TestHandleRuntimeHost(t *testing.T) {
 	if got := cfg.currentHost(); got != "https://staging.deepright.cn/base" {
 		t.Fatalf("cfg.currentHost() = %q, want %q", got, "https://staging.deepright.cn/base")
 	}
-	configData, err := os.ReadFile(filepath.Join(tempDir, "config", "config.json"))
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
-		t.Fatalf("read persisted config: %v", err)
+		t.Fatalf("open persisted settings: %v", err)
 	}
-	var persisted map[string]any
-	if err := json.Unmarshal(configData, &persisted); err != nil {
-		t.Fatalf("decode persisted config: %v", err)
+	var savedHost string
+	if err := db.QueryRow(`SELECT value FROM integration_persistent_settings WHERE key = 'host'`).Scan(&savedHost); err != nil {
+		_ = db.Close()
+		t.Fatalf("read persisted host: %v", err)
 	}
-	if persisted["host"] != "https://staging.deepright.cn/base" || persisted["preserved"] != "value" {
-		t.Fatalf("unexpected persisted config: %#v", persisted)
+	_ = db.Close()
+	if savedHost != "https://staging.deepright.cn/base" {
+		t.Fatalf("persisted host = %q", savedHost)
 	}
-	if _, ok := persisted["http"].(map[string]any); !ok {
-		t.Fatalf("http config was not preserved: %#v", persisted)
+	configData, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("read static config: %v", err)
+	}
+	if !bytes.Equal(configData, originalConfig) {
+		t.Fatalf("static config was modified: %q", configData)
 	}
 	startup, _, err := loadIntegrationStartupOptions()
 	if err != nil {
@@ -16963,15 +16896,12 @@ func TestHandleRuntimeHost(t *testing.T) {
 	if resetPayload.Status != 0 || resetPayload.Data.Host != defaultUpstreamHost {
 		t.Fatalf("unexpected reset payload: %#v", resetPayload)
 	}
-	configData, err = os.ReadFile(filepath.Join(tempDir, "config", "config.json"))
+	configData, err = os.ReadFile(configPath)
 	if err != nil {
-		t.Fatalf("read reset config: %v", err)
+		t.Fatalf("read static config after reset: %v", err)
 	}
-	if err := json.Unmarshal(configData, &persisted); err != nil {
-		t.Fatalf("decode reset config: %v", err)
-	}
-	if persisted["host"] != defaultUpstreamHost {
-		t.Fatalf("reset host = %v, want %q", persisted["host"], defaultUpstreamHost)
+	if !bytes.Equal(configData, originalConfig) {
+		t.Fatalf("static config changed after reset: %q", configData)
 	}
 }
 
@@ -16991,12 +16921,12 @@ func TestHandleRuntimeHostRejectsRemoteRequest(t *testing.T) {
 	}
 }
 
-func TestHandleRuntimeHostDoesNotApplyValueWhenConfigSaveFails(t *testing.T) {
-	tempDir := t.TempDir()
-	useIntegrationExecutableDir(t, tempDir)
-	if err := os.WriteFile(filepath.Join(tempDir, "config"), []byte("not a directory"), 0o644); err != nil {
-		t.Fatalf("create blocking config path: %v", err)
+func TestHandleRuntimeHostDoesNotApplyValueWhenSettingsSaveFails(t *testing.T) {
+	originalDBOpen := integrationPersistentHostDBOpenFn
+	integrationPersistentHostDBOpenFn = func() (*sql.DB, error) {
+		return nil, errors.New("settings database unavailable")
 	}
+	t.Cleanup(func() { integrationPersistentHostDBOpenFn = originalDBOpen })
 	cfg := &Config{Host: defaultUpstreamHost}
 	req := httptest.NewRequest(http.MethodPost, "/api/host", strings.NewReader(`{"host":"https://staging.deepright.cn"}`))
 	req.RemoteAddr = "127.0.0.1:34567"
