@@ -21,7 +21,10 @@
   },
   "http": {
     "heartbeat": 3,
-    "debug": false
+    "debug": false,
+    "timeout": {
+      "read": 300
+    }
   },
   "feishu": {
     "lastMessage": 72
@@ -160,6 +163,7 @@
   ],
   "miniapp": {
     "build": "请使用 [SKILL:__internal_cli] 为 $name 的 $function 构建迷你应用",
-    "function": "全部功能"
+    "function": "全部功能",
+    "recover": 30
   }
 }

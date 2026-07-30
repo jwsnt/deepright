@@ -1525,6 +1525,7 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 .rs-timeline li .tl-status-running{color:color-mix(in srgb,var(--accent) 84%,var(--text-primary) 16%);background:rgba(var(--accent-rgb),.14);border-color:rgba(var(--accent-rgb),.28)}
 .rs-timeline li .tl-status-skipped{color:#666;background:rgba(120,120,120,.12);border-color:rgba(120,120,120,.2)}
 .rs-timeline li .tl-status-done{color:#197a37;background:rgba(52,199,89,.14);border-color:rgba(52,199,89,.28)}
+.rs-timeline li .tl-status-failed{color:var(--error);background:rgba(255,69,58,.12);border-color:rgba(255,69,58,.28)}
 .rs-timeline li .tl-status-unknown{color:var(--text-muted);background:rgba(128,128,128,.12);border-color:rgba(128,128,128,.2)}
 [data-theme="light"] .rs-timeline li .tl-status-done{color:#b65431;background:rgba(232,128,84,.14);border-color:rgba(232,128,84,.3)}
 .rs-timeline li .tl-del{width:12px;height:12px;border:none;background:transparent;cursor:pointer;opacity:0;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity .2s,transform .2s,background .2s,box-shadow .2s,border-color .2s,color .2s}
@@ -4133,6 +4134,8 @@ body.quick-fan-transition-active{cursor:progress}
 .vfs-miniapp-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:3px 7px;align-items:center}
 .vfs-miniapp-grid-head{padding:3px 7px;color:var(--text-muted);font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
 .vfs-miniapp-file{min-width:0;overflow:hidden;padding:6px 7px;border:0;border-radius:7px;background:transparent;color:var(--text-primary);font:inherit;font-size:11px;line-height:1.3;text-align:left;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.vfs-miniapp-file[draggable="true"]{cursor:grab}
+.vfs-miniapp-file[draggable="true"]:active{cursor:grabbing}
 .vfs-miniapp-file:hover,.vfs-miniapp-file:focus-visible{background:rgba(var(--accent-rgb),.10);color:var(--accent);outline:none}
 .vfs-miniapp-file.empty{color:var(--text-muted);cursor:default}
 .vfs-miniapp-file.empty:hover{background:transparent;color:var(--text-muted)}
@@ -4276,7 +4279,9 @@ body.quick-fan-transition-active{cursor:progress}
 .vfs-item{padding:5px 12px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:var(--transition)}
 .vfs-item:hover{background:var(--bg-card)}
 .vfs-item.selected{background:rgba(var(--accent-rgb),.15)}
-.vfs-item.recent-file{background:linear-gradient(90deg,rgba(var(--accent-rgb),.24),rgba(var(--accent-rgb),.08) 62%,transparent);box-shadow:inset 2px 0 0 rgba(var(--accent-rgb),.9),0 0 0 1px rgba(var(--accent-rgb),.14);animation:vfsRecentFilePulse 1.05s ease-in-out infinite}
+.vfs-item.vfs-drop-target{background:linear-gradient(90deg,rgba(var(--accent-rgb),.28),rgba(var(--accent-rgb),.1) 68%,transparent);box-shadow:inset 3px 0 0 var(--accent),0 0 0 1px rgba(var(--accent-rgb),.34),0 0 18px rgba(var(--accent-rgb),.18);color:var(--text-primary)}
+.vfs-item.vfs-drop-target .vfs-name{font-weight:650}
+.vfs-item.recent-file,.vfs-item.recent-upload-target{background:linear-gradient(90deg,rgba(var(--accent-rgb),.24),rgba(var(--accent-rgb),.08) 62%,transparent);box-shadow:inset 2px 0 0 rgba(var(--accent-rgb),.9),0 0 0 1px rgba(var(--accent-rgb),.14);animation:vfsRecentFilePulse 1.05s ease-in-out infinite}
 .vfs-item.warning-path{background:linear-gradient(90deg,rgba(217,48,37,.16),rgba(255,140,0,.08) 48%,transparent);box-shadow:inset 2px 0 0 rgba(217,48,37,.72);animation:vfsWarningPulse .38s steps(2,end) infinite}
 .vfs-item.warning-file .vfs-name{color:var(--error);font-weight:600;text-shadow:0 0 10px rgba(217,48,37,.24)}
 .vfs-item.onboarding-mcp-file-target{background:linear-gradient(90deg,rgba(var(--accent-rgb),.22),rgba(var(--accent-rgb),.08));box-shadow:inset 2px 0 0 rgba(var(--accent-rgb),.86),0 0 0 1px rgba(var(--accent-rgb),.2),0 0 18px rgba(var(--accent-rgb),.16);animation:onboardingMCPFilePulse 1.1s ease-in-out infinite}
@@ -5409,7 +5414,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
       <div class="memo-query-field"><label id="memoQueryEndLabel" for="memoQueryEnd">原始时间（止）</label><input id="memoQueryEnd" data-memo-query-field="end" type="datetime-local" step="60" onchange="memoQueryMarkDirty()"></div>
       <div class="memo-query-field"><label for="memoQueryAgent">Agent</label><select id="memoQueryAgent" data-memo-query-field="agent" onchange="memoQueryMarkDirty()"><option value="">不限</option></select></div>
       <div class="memo-query-field"><label for="memoQueryModel">模型</label><select id="memoQueryModel" data-memo-query-field="model" onchange="memoQueryMarkDirty()"><option value="">不限</option></select></div>
-      <div class="memo-query-field"><label for="memoQueryStatus">状态</label><select id="memoQueryStatus" data-memo-query-field="status" onchange="memoQueryMarkDirty()"><option value="">不限</option><option value="0">待执行</option><option value="1">已启动</option><option value="2">无需启动</option><option value="3">已完成</option></select></div>
+      <div class="memo-query-field"><label for="memoQueryStatus">状态</label><select id="memoQueryStatus" data-memo-query-field="status" onchange="memoQueryMarkDirty()"><option value="">不限</option><option value="0">待执行</option><option value="1">已启动</option><option value="2">无需启动</option><option value="3">已完成</option><option value="4">失败</option></select></div>
       <div class="memo-query-field wide"><label for="memoQueryContent">任务内容（模糊）</label><input id="memoQueryContent" data-memo-query-field="content" type="search" autocomplete="off" placeholder="模糊匹配任务内容" oninput="memoQueryMarkDirty()"></div>
       <div class="memo-query-actions"><button class="memo-query-action" type="button" onclick="memoQueryResetCurrent()">重置</button><button class="memo-query-action primary" id="memoQuerySubmitBtn" type="submit">查询</button></div>
     </form>
@@ -47472,6 +47477,7 @@ let vfsInitialized = false;
 let vfsRecentFileTimer = null;
 let vfsRecentFileRenderGeneration = 0;
 let vfsRecentFilePointerMoveGeneration = -1;
+const vfsRecentUploadTargetExpiries = new Map();
 let vfsMiniappItems = [];
 let vfsMiniappPopoverOpen = false;
 const VFS_RECENT_FILE_WINDOW_MS = 30 * 1000;
@@ -47534,6 +47540,23 @@ function vfsIsRecentFile(entry, now = Date.now()) {
   return modifiedAt > 0 && age >= 0 && age < VFS_RECENT_FILE_WINDOW_MS;
 }
 
+function vfsMarkRecentUploadTarget(agentId, absPath, now = Date.now()) {
+  if (String(agentId || '').trim() !== String(vfsAgentId || '').trim()) return;
+  const path = normalizeFsPath(absPath);
+  if (!path) return;
+  vfsRecentUploadTargetExpiries.set(path, now + VFS_RECENT_FILE_WINDOW_MS);
+}
+
+function vfsIsRecentUploadTarget(absPath, now = Date.now()) {
+  const path = normalizeFsPath(absPath);
+  const expiresAt = Number(vfsRecentUploadTargetExpiries.get(path));
+  if (!path || !Number.isFinite(expiresAt) || expiresAt <= now) {
+    if (path) vfsRecentUploadTargetExpiries.delete(path);
+    return false;
+  }
+  return true;
+}
+
 function vfsScheduleRecentFileExpiry(entries) {
   if (vfsRecentFileTimer) {
     clearTimeout(vfsRecentFileTimer);
@@ -47542,6 +47565,10 @@ function vfsScheduleRecentFileExpiry(entries) {
   const now = Date.now();
   const dismissals = vfsReadRecentFileDismissals(now);
   const deadlines = Object.values(dismissals).map(record => Number(record.expiresAt)).filter(Number.isFinite);
+  vfsRecentUploadTargetExpiries.forEach((expiresAt, path) => {
+    if (Number.isFinite(expiresAt) && expiresAt > now) deadlines.push(expiresAt);
+    else vfsRecentUploadTargetExpiries.delete(path);
+  });
   (Array.isArray(entries) ? entries : []).forEach(entry => {
     if (vfsIsRecentFile(entry, now)) {
       const absPath = joinFsPath(vfsCurrentPath, entry.name);
@@ -47650,6 +47677,9 @@ function vfsRenderMiniappList() {
     }
     item.type = 'button';
     item.title = file.name;
+    item.draggable = true;
+    item.setAttribute('aria-description', '可拖拽到输入框添加为文件附件');
+    item.addEventListener('dragstart', event => vfsStartMiniappFileDrag(event, file.name));
     item.addEventListener('click', event => {
       event.preventDefault();
       event.stopPropagation();
@@ -47662,6 +47692,29 @@ function vfsRenderMiniappList() {
     appendFile(pair.markdown);
   });
   list.appendChild(grid);
+}
+
+function vfsSetDragPaths(event, paths) {
+  const transfer = event && event.dataTransfer;
+  const values = (Array.isArray(paths) ? paths : [])
+    .map(path => String(path || '').trim())
+    .filter(Boolean);
+  if (!transfer || values.length === 0) return false;
+  const joined = values.join('\n');
+  transfer.effectAllowed = 'copy';
+  transfer.setData('text/plain', joined);
+  transfer.setData('application/x-vfs-path', joined);
+  const agentId = String(vfsAgentId || '').trim();
+  if (agentId) transfer.setData('application/x-vfs-agent-id', agentId);
+  return true;
+}
+
+function vfsStartMiniappFileDrag(event, name) {
+  const fileName = String(name || '').trim();
+  const exists = vfsMiniappItems.some(entry => entry && entry.type === 'file' && entry.name === fileName);
+  if (!fileName || !exists || !vfsIsCurrentMiniappDirectory() || !vfsSetDragPaths(event, [joinFsPath(vfsCurrentPath, fileName)])) {
+    event.preventDefault();
+  }
 }
 
 function vfsHideMiniappPopover() {
@@ -47982,6 +48035,7 @@ function vfsRender(entries) {
     const modifiedAt = vfsModifiedAtValue(e.modifiedAt);
     const recentFileVersionKey = vfsRecentFileVersionKey(absPath, modifiedAt);
     const isRecentFile = vfsIsRecentFile(e, now) && !!recentFileVersionKey && !recentDismissals[recentFileVersionKey];
+    const isRecentUploadTarget = e.type === 'dir' && vfsIsRecentUploadTarget(absPath, now);
     const sel = vfsSelected.has(absPath) ? ' selected' : '';
     const warning = getVfsWarningForPath(absPath);
     const repairWarning = getSkillRepairTargetForPath(absPath);
@@ -48027,7 +48081,7 @@ function vfsRender(entries) {
       : icon;
     const skillDisableTourItemId = skillDisabled && isSkillDisableTourTargetPath(absPath) ? ' id="vfsSkillDisableTourItem"' : '';
     const vfsEditTourCls = vfsEditTourState.sourcePath && absPath === vfsEditTourState.sourcePath ? ' vfs-edit-tour-source' : '';
-    const cls = `${sel}${isRecentFile ? ' recent-file' : ''}${inChain ? ' warning-path' : ''}${warning ? ' warning-file' : ''}${vfsEditTourCls}`;
+    const cls = `${sel}${isRecentFile ? ' recent-file' : ''}${isRecentUploadTarget ? ' recent-upload-target' : ''}${inChain ? ' warning-path' : ''}${warning ? ' warning-file' : ''}${vfsEditTourCls}`;
     return `<div class="vfs-item${cls}"${skillDisableTourItemId || itemId} data-vfs-name="${esc(e.name)}" data-vfs-type="${e.type}" data-vfs-path="${esc(absPath)}" data-vfs-modified-at="${modifiedAt}" draggable="true" onmouseenter="vfsHover(event,'${esc(e.name)}','${e.type}',${modifiedAt})" ondragstart="vfsDragStart(event,'${esc(absPath)}')" onclick="vfsClick(event,'${esc(e.name)}','${e.type}',${modifiedAt})" ondblclick="vfsDoubleClick(event,'${esc(e.name)}','${e.type}')">${skillIcon}<span class="vfs-name">${esc(e.name)}</span><span class="vfs-actions">${repairBtn}${warningBtn}${copyPath}${del}${dl}${soulBtn}</span></div>`;
   }).join('');
   vfsRecentFileRenderGeneration += 1;
@@ -48089,9 +48143,7 @@ function vfsDragStart(e, absPath) {
     vfsRender(JSON.parse(vfsLastJson || '[]'));
   }
   const paths = Array.from(vfsSelected);
-  const joined = paths.join('\n');
-  e.dataTransfer.setData('text/plain', joined);
-  e.dataTransfer.setData('application/x-vfs-path', joined);
+  vfsSetDragPaths(e, paths);
 }
 
 async function vfsClick(e, name, type, modifiedAt) {
@@ -51413,13 +51465,28 @@ function vfsUploadDir() {
 
 let vfsUploadAbort = null;
 
-async function ensureUploadedEmptyDirs(agentId, dirPaths) {
+function getVfsUploadDestinationRelativePath(targetDir) {
+  if (typeof targetDir !== 'string' || !targetDir.trim()) return null;
+  const workspace = normalizeFsPath(vfsWorkspace);
+  const target = normalizeFsPath(targetDir);
+  if (!workspace || !target || (target !== workspace && !target.startsWith(workspace + '/'))) return null;
+  return target === workspace ? '.' : target.slice(workspace.length + 1);
+}
+
+function getVfsUploadDestinationLabel(dest) {
+  const relative = getVfsUploadDestinationRelativePath(dest);
+  return relative && relative !== '.' ? relative : '根目录';
+}
+
+async function ensureUploadedEmptyDirs(agentId, dirPaths, destinationRelPath) {
   const pending = Array.from(new Set((dirPaths || []).map(path => normalizeFsPath(path)).filter(Boolean)));
   if (!agentId || pending.length === 0) return [];
+  const destination = destinationRelPath && destinationRelPath !== '.' ? destinationRelPath : '';
   const created = [];
   for (const relPath of pending) {
     try {
-      const resp = await fetch('/api/agent/create?agentId=' + encodeURIComponent(agentId) + '&name=' + encodeURIComponent('tmp/' + relPath) + '&type=0');
+      const fullPath = joinFsPath(destination, relPath);
+      const resp = await fetch('/api/agent/create?agentId=' + encodeURIComponent(agentId) + '&name=' + encodeURIComponent(fullPath) + '&type=0');
       const data = await resp.json().catch(() => null);
       if (resp.ok && data && data.status === 0) {
         created.push(relPath);
@@ -51435,31 +51502,8 @@ async function ensureUploadedEmptyDirs(agentId, dirPaths) {
   return created;
 }
 
-function buildUploadToastContent(uploadItems, uploadedRelPaths, createdDirs) {
-  const uploaded = Array.isArray(uploadedRelPaths) ? uploadedRelPaths : [];
-  const emptyDirs = Array.isArray(createdDirs) ? createdDirs : [];
-  const dirSet = new Set();
-  uploaded.forEach(path => {
-    const normalized = normalizeFsPath(path);
-    if (!normalized) return;
-    const parts = normalized.split('/');
-    if (parts.length > 1) dirSet.add('tmp/' + parts[0]);
-    else dirSet.add('tmp');
-  });
-  emptyDirs.forEach(path => {
-    const normalized = normalizeFsPath(path);
-    if (!normalized) return;
-    const root = normalized.split('/')[0] || normalized;
-    dirSet.add('tmp/' + root);
-  });
-  if (dirSet.size > 0) return Array.from(dirSet).join(' ');
-  const first = Array.isArray(uploadItems) && uploadItems.length > 0 ? uploadItems[0] : null;
-  if (first && first.relativePath) {
-    const normalized = normalizeFsPath(first.relativePath);
-    const root = normalized.split('/')[0] || normalized;
-    return 'tmp/' + root;
-  }
-  return 'tmp';
+function buildUploadToastContent(dest) {
+  return getVfsUploadDestinationLabel(dest);
 }
 
 async function uploadItemsToAgentTmp(uploadItems, options) {
@@ -51477,7 +51521,11 @@ async function uploadItemsToAgentTmp(uploadItems, options) {
   });
   formData.append('pathsJson', JSON.stringify(allPaths));
   const abortCtrl = opts.abortController || new AbortController();
-  const response = await fetch('/api/upload?agentId=' + encodeURIComponent(agentId), {
+  const requestedDest = getVfsUploadDestinationRelativePath(opts.targetDir);
+  let uploadURL = '/api/upload?agentId=' + encodeURIComponent(agentId);
+  if (requestedDest !== null) uploadURL += '&dest=' + encodeURIComponent(requestedDest);
+  if (opts.preferTmp) uploadURL += '&preferTmp=1';
+  const response = await fetch(uploadURL, {
     method: 'POST',
     body: formData,
     signal: abortCtrl.signal
@@ -51492,7 +51540,7 @@ async function uploadItemsToAgentTmp(uploadItems, options) {
     throw new Error('上传失败：服务端未返回绝对附件路径');
   }
   const uploadedRelPaths = Array.isArray(data.files) ? data.files.map(path => normalizeFsPath(path)).filter(Boolean) : [];
-  const createdDirs = await ensureUploadedEmptyDirs(agentId, opts.emptyDirs || []);
+  const createdDirs = await ensureUploadedEmptyDirs(agentId, opts.emptyDirs || [], getVfsUploadDestinationRelativePath(dest));
   const uploadedAbsPaths = uploadedRelPaths.map(path => dest ? joinFsPath(dest, path) : path);
   return {
     agentId,
@@ -51500,7 +51548,7 @@ async function uploadItemsToAgentTmp(uploadItems, options) {
     uploadedRelPaths,
     uploadedAbsPaths,
     createdDirs,
-    toastContent: buildUploadToastContent(items, uploadedRelPaths, createdDirs)
+    toastContent: buildUploadToastContent(dest)
   };
 }
 
@@ -51522,7 +51570,7 @@ function resetVfsUploadInputs() {
   if (dirInput) dirInput.value = '';
 }
 
-async function vfsUploadFiles(files) {
+async function vfsUploadFiles(files, targetDir, preferTmp) {
   const uploadItems = normalizeUploadFileItems(files);
   if (uploadItems.length === 0) return;
   const agentId = state.settings.agentId;
@@ -51539,7 +51587,8 @@ async function vfsUploadFiles(files) {
     });
   }
   try {
-    const result = await uploadItemsToAgentTmp(uploadItems, { agentId, abortController: vfsUploadAbort });
+    const result = await uploadItemsToAgentTmp(uploadItems, { agentId, abortController: vfsUploadAbort, targetDir, preferTmp });
+    vfsMarkRecentUploadTarget(result.agentId, result.dest);
     vfsShowUploadToast(result.toastContent, false);
   } catch (e) {
     if (e.name === 'AbortError') {
@@ -51559,13 +51608,71 @@ async function vfsUploadFiles(files) {
   }
 }
 
+function vfsGetDropDirectoryTarget(event, vfsList) {
+  const source = event && event.target;
+  if (!(source instanceof Element)) return null;
+  const item = source.closest('.vfs-item[data-vfs-type="dir"]');
+  return item && vfsList.contains(item) ? item : null;
+}
+
+function vfsGetCurrentDirectoryTmpTarget(vfsList) {
+  const currentPath = normalizeFsPath(vfsCurrentPath);
+  if (!currentPath) return null;
+  return Array.from(vfsList.querySelectorAll('.vfs-item[data-vfs-type="dir"]')).find(item =>
+    String(item.dataset.vfsName || '') === 'tmp' && normalizeFsPath(item.dataset.vfsPath || '') === joinFsPath(currentPath, 'tmp')
+  ) || null;
+}
+
+function vfsClearDropDirectoryTarget(vfsList) {
+  vfsList.querySelectorAll('.vfs-item.vfs-drop-target').forEach(item => item.classList.remove('vfs-drop-target'));
+}
+
+function vfsSetDropDirectoryTarget(event, vfsList) {
+  // A background drop uses the current directory's tmp child when present,
+  // so highlight that exact directory before the file is released.
+  const target = vfsGetDropDirectoryTarget(event, vfsList) || (vfsDropContainsSystemFiles(event) ? vfsGetCurrentDirectoryTmpTarget(vfsList) : null);
+  vfsClearDropDirectoryTarget(vfsList);
+  if (target) target.classList.add('vfs-drop-target');
+  return target;
+}
+
+function vfsDropContainsSystemFiles(event) {
+  const transfer = event && event.dataTransfer;
+  if (!transfer) return false;
+  if (transfer.files && transfer.files.length > 0) return true;
+  return Array.from(transfer.types || []).includes('Files');
+}
+
 // Drag & drop on VFS list
 document.addEventListener('DOMContentLoaded', () => {
   const vfsList = document.getElementById('vfsList');
   if (!vfsList) return;
-  ['dragenter','dragover'].forEach(ev => vfsList.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); vfsList.style.background = 'var(--bg-card)'; }));
-  ['dragleave','drop'].forEach(ev => vfsList.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); vfsList.style.background = ''; }));
+  ['dragenter', 'dragover'].forEach(ev => vfsList.addEventListener(ev, e => {
+    e.preventDefault();
+    e.stopPropagation();
+    vfsList.style.background = 'var(--bg-card)';
+    const target = vfsSetDropDirectoryTarget(e, vfsList);
+    if (target && e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+  }));
+  vfsList.addEventListener('dragleave', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!vfsList.contains(e.relatedTarget)) {
+      vfsList.style.background = '';
+      vfsClearDropDirectoryTarget(vfsList);
+    }
+  });
   vfsList.addEventListener('drop', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    const targetItem = vfsGetDropDirectoryTarget(e, vfsList);
+    // A directory row takes precedence. A background drop belongs to the
+    // currently browsed directory and uses its existing tmp child first.
+    const targetDir = targetItem ? String(targetItem.dataset.vfsPath || '') : String(vfsCurrentPath || '');
+    const preferTmp = !targetItem;
+    vfsList.style.background = '';
+    vfsClearDropDirectoryTarget(vfsList);
+    if (!vfsDropContainsSystemFiles(e)) return;
     const items = e.dataTransfer.items;
     if (items && items.length > 0) {
       const files = [];
@@ -51591,12 +51698,12 @@ document.addEventListener('DOMContentLoaded', () => {
               emptyDirSet.delete(normalizeFsPath(current));
             });
           });
-          if (files.length > 0 || emptyDirSet.size > 0) uploadFileList(files, Array.from(emptyDirSet));
+          if (files.length > 0 || emptyDirSet.size > 0) uploadFileList(files, Array.from(emptyDirSet), targetDir, preferTmp);
         });
         return;
       }
       // Fallback: regular files
-      vfsUploadFiles(e.dataTransfer.files);
+      vfsUploadFiles(e.dataTransfer.files, targetDir, preferTmp);
     }
   });
 });
@@ -51628,7 +51735,7 @@ function traverseEntry(entry, path, files, dirs) {
   });
 }
 
-async function uploadFileList(files, emptyDirs) {
+async function uploadFileList(files, emptyDirs, targetDir, preferTmp) {
   const agentId = state.settings.agentId;
   if (!agentId) return;
   const prog = document.getElementById('vfsUploadProgress');
@@ -51645,7 +51752,8 @@ async function uploadFileList(files, emptyDirs) {
     });
   }
   try {
-    const result = await uploadItemsToAgentTmp(uploadItems, { agentId, abortController: vfsUploadAbort, emptyDirs: pendingDirs });
+    const result = await uploadItemsToAgentTmp(uploadItems, { agentId, abortController: vfsUploadAbort, emptyDirs: pendingDirs, targetDir, preferTmp });
+    vfsMarkRecentUploadTarget(result.agentId, result.dest);
     vfsShowUploadToast(result.toastContent, false);
   } catch (e) {
     if (e.name === 'AbortError') {
@@ -51777,6 +51885,11 @@ function insertFileBubble(targetEl, absPath, options) {
     valuePrefix: '[FILE:',
     valueSuffix: ']'
   });
+}
+
+function getVfsDropOwnerAgentId(dataTransfer) {
+  if (!dataTransfer || typeof dataTransfer.getData !== 'function') return '';
+  return String(dataTransfer.getData('application/x-vfs-agent-id') || '').trim();
 }
 
 async function extractSystemDropItemsFromDataTransfer(dataTransfer) {
@@ -59664,9 +59777,10 @@ document.addEventListener('DOMContentLoaded', () => {
     inputArea.classList.remove('drag-over', 'drag-denied');
     const vfsPath = e.dataTransfer.getData('application/x-vfs-path');
     if (vfsPath) {
+      const ownerAgentId = getVfsDropOwnerAgentId(e.dataTransfer);
       const paths = vfsPath.split('\n').filter(p => p.trim());
       for (const p of paths) {
-        insertFileBubble(msgInput, p);
+        insertFileBubble(msgInput, p, { agentId: ownerAgentId });
       }
       return;
     }
@@ -59716,7 +59830,8 @@ document.addEventListener('DOMContentLoaded', () => {
     input.focus();
     const vfsPath = event.dataTransfer.getData('application/x-vfs-path');
     if (vfsPath) {
-      vfsPath.split('\n').filter(path => path.trim()).forEach(path => insertFileBubble(input, path));
+      const ownerAgentId = getVfsDropOwnerAgentId(event.dataTransfer);
+      vfsPath.split('\n').filter(path => path.trim()).forEach(path => insertFileBubble(input, path, { agentId: ownerAgentId }));
       return;
     }
     const hasSystemFiles = (event.dataTransfer.files && event.dataTransfer.files.length > 0) || (event.dataTransfer.items && event.dataTransfer.items.length > 0);
@@ -60083,8 +60198,8 @@ async function _doRenderTimeline(requestSeq) {
     memoDetailPreviewSyncAfterTimelineRefresh(agentId, date, details);
     const now = Date.now() / 1000;
     const soon = 30 * 60; // 30 minutes
-    const startedLabels = { 0: '待执行', 1: '已启动', 2: '无需启动', 3: '已完成' };
-    const startedClassMap = { 0: 'pending', 1: 'running', 2: 'skipped', 3: 'done' };
+    const startedLabels = { 0: '待执行', 1: '已启动', 2: '无需启动', 3: '已完成', 4: '失败' };
+    const startedClassMap = { 0: 'pending', 1: 'running', 2: 'skipped', 3: 'done', 4: 'failed' };
     let nearestPendingId = null;
     let nearestPendingDistance = Infinity;
     details.forEach((d) => {
@@ -60111,7 +60226,7 @@ async function _doRenderTimeline(requestSeq) {
       let actionBtn = '';
       if (d.started === 0) {
         actionBtn = '<button class="tl-del" onclick="event.stopPropagation();tlIgnoreShow(' + d.id + ',this)" title="忽略"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>';
-      } else if (d.started === 3) {
+      } else if (d.started === 3 || d.started === 4) {
         actionBtn = '<button class="tl-del tl-view' + (isMemoCompletionTarget ? ' onboarding-memo-detail-view-target' : '') + '"' + (isMemoCompletionTarget ? ' id="memoCompletionTourViewBtn"' : '') + ' onclick="event.stopPropagation();tlViewShow(' + d.id + ',' + d.metaId + ',this)" title="查看会话"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>';
       } else {
         actionBtn = '<span style="width:12px;flex-shrink:0;display:inline-block"></span>';
@@ -60985,7 +61100,7 @@ const RS_META_PREVIEW_FIELD_IDS = {
   status: 'rsMetaCenterPreviewStatus'
 };
 const MEMO_DETAIL_CYCLE_LABELS = { 0: '仅一次', 1: '工作日', 2: '自然日', 3: '每小时', 4: '每15分钟', 5: '每30分钟' };
-const MEMO_DETAIL_STATUS_LABELS = { 0: '待执行', 1: '已启动', 2: '无需启动', 3: '已完成' };
+const MEMO_DETAIL_STATUS_LABELS = { 0: '待执行', 1: '已启动', 2: '无需启动', 3: '已完成', 4: '失败' };
 const MEMO_DETAIL_PREVIEW_OPEN_DELAY_MS = 500;
 const MEMO_DETAIL_PREVIEW_CLOSE_DELAY_MS = 500;
 const MEMO_QUERY_CACHE_KEY = 'deepright.memo-query-cache.v1';
@@ -61654,7 +61769,7 @@ function memoPreviewRunBegin(sourceType, source) {
   const sourceId = String(source.id || '').trim();
   const agentId = String(source.agentId || state.settings.agentId || '').trim();
   if (!sourceId || !agentId || document.getElementById('rsSaveLock')?.classList.contains('show')) return;
-  if (sourceType === 'detail' && ![0, 2, 3].includes(Number(source.started))) return;
+  if (sourceType === 'detail' && ![0, 2, 3, 4].includes(Number(source.started))) return;
   memoPreviewRunState.sourceType = sourceType;
   memoPreviewRunState.sourceId = sourceId;
   memoPreviewRunState.agentId = agentId;
@@ -61689,7 +61804,7 @@ async function memoPreviewRunSubmit() {
   const sourceId = memoPreviewRunState.sourceId;
   const agentId = memoPreviewRunState.agentId;
   const source = sourceType === 'detail' ? memoDetailPreviewState.detail : memoMetaPreviewState.meta;
-  if (!source || String(source.id || '') !== sourceId || String(source.agentId || state.settings.agentId || '') !== agentId || (sourceType === 'detail' && ![0, 2, 3].includes(Number(source.started)))) {
+  if (!source || String(source.id || '') !== sourceId || String(source.agentId || state.settings.agentId || '') !== agentId || (sourceType === 'detail' && ![0, 2, 3, 4].includes(Number(source.started)))) {
     memoPreviewRunCancel();
     vfsShowUploadToast('任务状态已变化，请刷新后重试', true);
     return;
@@ -61876,10 +61991,10 @@ function memoDetailPreviewActionMarkup(editing, saving) {
   const detail = memoDetailPreviewState.detail || {};
   const started = Number(detail.started);
   const disabled = (saving || memoDetailPreviewState.deleting || memoPreviewRunIsFor('detail', memoDetailPreviewState.detailId)) ? ' disabled' : '';
-  const viewButton = started === 3
+  const viewButton = (started === 3 || started === 4)
     ? '<button type="button" class="rs-meta-center-action" onclick="memoDetailPreviewView()" title="查看会话" aria-label="查看会话"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>'
     : '';
-  const runButton = [0, 2, 3].includes(started)
+  const runButton = [0, 2, 3, 4].includes(started)
     ? '<button type="button" class="rs-meta-center-action" onclick="memoDetailPreviewRun()" title="运行备忘录" aria-label="运行备忘录"' + disabled + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 5 11 7-11 7z"/></svg></button>'
     : '';
   if (!editing) {
@@ -61892,7 +62007,7 @@ function memoDetailPreviewActionMarkup(editing, saving) {
 }
 function memoDetailPreviewView() {
   const detail = memoDetailPreviewState.detail;
-  if (!detail || Number(detail.started) !== 3 || memoDetailPreviewState.editing || memoDetailPreviewState.saving || memoDetailPreviewState.deleting) return;
+  if (!detail || ![3, 4].includes(Number(detail.started)) || memoDetailPreviewState.editing || memoDetailPreviewState.saving || memoDetailPreviewState.deleting) return;
   const viewDetail = memoDetailPreviewClone(detail);
   memoDetailPreviewHide();
   // Open after the action-button click finishes bubbling. Otherwise the
@@ -62784,8 +62899,9 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault(); dc = 0; noteInput.classList.remove('drag-over', 'drag-denied'); noteInput.focus();
     const vfsPath = e.dataTransfer.getData('application/x-vfs-path');
     if (vfsPath) {
+      const ownerAgentId = getVfsDropOwnerAgentId(e.dataTransfer);
       vfsPath.split('\n').filter(p => p.trim()).forEach(p => {
-        insertFileBubble(noteInput, p);
+        insertFileBubble(noteInput, p, { agentId: ownerAgentId });
       });
       return;
     }

@@ -3441,3 +3441,35 @@ Integration 从主应用活动 `config/config.json.install_app` 读取当前平�
 `GET /api/runtime_config` 只读地受控透传完整 `miniapp` 对象，供 Site 在确认时读取最新模板。接口不读取 Agent 工作目录配置、不执行 CLI 或构建，也不扩大配置白名单；`provider`、模型密钥和其它非公开字段继续不会返回给浏览器。
 
 完整说明见 [iteration/20260730-1/USER_GUIDE.md](iteration/20260730-1/USER_GUIDE.md)。
+
+---
+
+## 迭代 20260730-3：迷你应用参考文档自动恢复
+
+主应用静态 `config/config.json` 的 `miniapp` 对象新增 `recover`，单位为分钟：
+
+```json
+"miniapp": {
+  "build": "请使用 [SKILL:__internal_cli] 为 $name 的 $function 构建迷你应用",
+  "function": "全部功能",
+  "recover": 30
+}
+```
+
+Integration 启动后会立即检查每个合法 Agent，之后每隔 `recover` 分钟检查一次。检查和恢复仅针对 `app/API.md`、`app/CANVAS.md`、`app/DESIGN.md`；缺失、类型不正确、内容不同或权限不同的单个文件才会从当前 `default-dir/app/` 的对应发布文档恢复。该来源与创建 Agent 时复制的来源相同，因此会保留构建时已替换的文档端口；其它 `app/` 文件和未变化文档不会被写入。
+
+`recover` 必须是正整数。`miniapp` 或 `recover` 缺失、格式错误、为零或超过可表示范围时，该后台任务会禁用并记录日志，不使用隐式默认值。单个文件恢复失败不会中断其它文件或其它 Agent；符号链接逃出 Agent 工作目录会被拒绝并记录。`GET /api/runtime_config` 仍只读地透传完整 `miniapp` 对象，不会报告或修改恢复状态。
+
+完整说明见 [iteration/20260730-3/USER_GUIDE.md](iteration/20260730-3/USER_GUIDE.md)。
+
+---
+
+## 迭代 20260730-4：定时备忘录 SSE 读取超时与失败状态
+
+主应用静态 `config/config.json` 可在 `http.timeout.read` 中配置定时备忘录 SSE 的读取空闲超时，单位为秒。每次收到任意 SSE 字节都会重新计时，因此该值不是整次请求的最长执行时间；长时间正常持续输出的任务不会因此中断。
+
+值缺失、不是正整数、为零或超过 `time.Duration` 可表示范围时，Integration 会在日志中记录 `http.timeout.read` 配置错误，并使用 `120` 秒。该超时只用于定时备忘录的 SSE 响应正文，不改变普通对话、心跳、其它 HTTP 调用或 `/restore` 接口。
+
+定时备忘录出现请求创建或转发失败、SSE 空闲超时、读取错误、非 2xx、业务异常，或者流结束时缺少 `data: [DONE]`，会记录异常聊天日志并将任务状态设为 `4`（失败）。失败是终态，不会被定时扫描自动重试；需要再次执行时可由用户显式创建新的运行任务。备忘录时间线、详情和查询结果都会显示“失败”，且可查看该任务已保存的会话记录。
+
+完整说明见 [iteration/20260730-4/USER_GUIDE.md](iteration/20260730-4/USER_GUIDE.md)。

@@ -1944,3 +1944,15 @@ Header 中 `Authorization` 为对应模型的密钥。
 浮层默认不显示功能项；点击 `+` 后增加功能输入，每项后的 `−` 可删除。空白项忽略，多个功能按顺序以全角顿号 `、` 连接。没有有效功能时会使用 `config/config.json.miniapp.function`。确认时页面重新读取 `miniapp.build`，替换全部 `$name` 与 `$function` 后先写入当前会话输入框，再沿用普通发送链路自动发送；浏览器不会直接运行 CLI 或构建应用。取消、遮罩点击或 `Esc` 会保留草稿，发送成功后清空。
 
 完整说明见 [iteration/20260730-1/USER_GUIDE.md](iteration/20260730-1/USER_GUIDE.md)。
+
+---
+
+## 迭代 20260730-2：迷你应用参考文档保护
+
+`API.md`、`CANVAS.md` 和 `DESIGN.md` 是每个 Agent `app/` 目录内的受保护参考文档。`__internal_miniapp` 必须先阅读它们，但不得新增、修改、覆盖、移动或删除这些文件；迷你应用自身仍可正常创建和更新其它 HTML、资源与同名 README。
+
+迷你应用访问 Integration API 时应使用相对 `/api/...` 路径或当前页面 `location.origin`，不能把文档示例中的 `localhost:#port` 当作固定服务地址。这样页面会使用实际启动端口，而不是旧的 `8080` 示例端口。
+
+`miniapp.recover` 是服务端的文档恢复周期配置；Site 继续只读获取完整的 `miniapp` 对象，不在浏览器或 Agent 配置中记录恢复状态。
+
+完整说明见 [iteration/20260730-2/USER_GUIDE.md](iteration/20260730-2/USER_GUIDE.md)。

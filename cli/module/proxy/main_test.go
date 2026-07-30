@@ -7344,7 +7344,7 @@ func TestHandleWorkspace(t *testing.T) {
 func TestHandleUploadReturnsAbsoluteAgentTmpDestination(t *testing.T) {
 	agentRoot := t.TempDir()
 	workspace := filepath.Join(agentRoot, "agent-a")
-	if err := os.MkdirAll(workspace, 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(workspace, "tmp"), 0o755); err != nil {
 		t.Fatalf("mkdir workspace: %v", err)
 	}
 
@@ -7396,6 +7396,108 @@ func TestHandleUploadReturnsAbsoluteAgentTmpDestination(t *testing.T) {
 	}
 	if string(data) != "media" {
 		t.Fatalf("uploaded data = %q, want media", data)
+	}
+}
+
+func TestHandleUploadUsesRequestedDirectoryAndFallsBackToWorkspaceRoot(t *testing.T) {
+	agentRoot := t.TempDir()
+	workspace := filepath.Join(agentRoot, "agent-a")
+	targetDir := filepath.Join(workspace, "assets")
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		t.Fatalf("mkdir target directory: %v", err)
+	}
+
+	newUploadRequest := func(dest string) *http.Request {
+		var body bytes.Buffer
+		writer := multipart.NewWriter(&body)
+		if err := writer.WriteField("pathsJson", `["nested/clip.mp4"]`); err != nil {
+			t.Fatalf("write pathsJson: %v", err)
+		}
+		part, err := writer.CreateFormFile("files", "clip.mp4")
+		if err != nil {
+			t.Fatalf("create form file: %v", err)
+		}
+		if _, err := part.Write([]byte("media")); err != nil {
+			t.Fatalf("write form file: %v", err)
+		}
+		if err := writer.Close(); err != nil {
+			t.Fatalf("close multipart writer: %v", err)
+		}
+		requestURL := "/api/upload?agentId=agent-a"
+		if dest != "" {
+			requestURL += "&dest=" + url.QueryEscape(dest)
+		}
+		req := httptest.NewRequest(http.MethodPost, requestURL, &body)
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+		return req
+	}
+	decodeDest := func(rec *httptest.ResponseRecorder) string {
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+		}
+		var response struct {
+			Status int    `json:"status"`
+			Dest   string `json:"dest"`
+		}
+		if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		if response.Status != 0 {
+			t.Fatalf("status payload = %d", response.Status)
+		}
+		return response.Dest
+	}
+
+	proxy := &ProxyServer{AgentDir: agentRoot}
+	explicitRec := httptest.NewRecorder()
+	proxy.HandleUpload(explicitRec, newUploadRequest("assets"))
+	if got := decodeDest(explicitRec); got != targetDir {
+		t.Fatalf("explicit destination = %q, want %q", got, targetDir)
+	}
+	if _, err := os.Stat(filepath.Join(targetDir, "nested", "clip.mp4")); err != nil {
+		t.Fatalf("uploaded file missing from requested directory: %v", err)
+	}
+
+	fallbackRec := httptest.NewRecorder()
+	proxy.HandleUpload(fallbackRec, newUploadRequest(""))
+	if got := decodeDest(fallbackRec); got != workspace {
+		t.Fatalf("fallback destination = %q, want workspace root %q", got, workspace)
+	}
+	if _, err := os.Stat(filepath.Join(workspace, "nested", "clip.mp4")); err != nil {
+		t.Fatalf("uploaded file missing from workspace root: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(workspace, "tmp")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("tmp should not be created by fallback, stat error = %v", err)
+	}
+}
+
+func TestResolveUploadDestinationPrefersCurrentDirectoryTmp(t *testing.T) {
+	workspace := t.TempDir()
+	withTmp := filepath.Join(workspace, "images-with-tmp")
+	withoutTmp := filepath.Join(workspace, "images-without-tmp")
+	if err := os.MkdirAll(filepath.Join(withTmp, "tmp"), 0o755); err != nil {
+		t.Fatalf("mkdir current tmp: %v", err)
+	}
+	if err := os.MkdirAll(withoutTmp, 0o755); err != nil {
+		t.Fatalf("mkdir current directory: %v", err)
+	}
+
+	gotWithTmp, err := resolveUploadDestination(workspace, "images-with-tmp", true, true)
+	if err != nil {
+		t.Fatalf("resolve current tmp destination: %v", err)
+	}
+	wantWithTmp, _ := filepath.Abs(filepath.Join(withTmp, "tmp"))
+	if gotWithTmp != wantWithTmp {
+		t.Fatalf("destination with tmp = %q, want %q", gotWithTmp, wantWithTmp)
+	}
+
+	gotWithoutTmp, err := resolveUploadDestination(workspace, "images-without-tmp", true, true)
+	if err != nil {
+		t.Fatalf("resolve current root destination: %v", err)
+	}
+	wantWithoutTmp, _ := filepath.Abs(withoutTmp)
+	if gotWithoutTmp != wantWithoutTmp {
+		t.Fatalf("destination without tmp = %q, want %q", gotWithoutTmp, wantWithoutTmp)
 	}
 }
 

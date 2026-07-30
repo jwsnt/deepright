@@ -7,6 +7,7 @@ description: 在当前Agent的app目录中制作可通过站内iframe预览的�
 + 开始制作前，先阅读以下资料，并以其当前内容为准：
     + `#workspace/app/DESIGN.md`：站内页面的视觉语言、主题与布局基线
     + `#workspace/app/API.md`：可调用的Integration API、页面URL上下文约定与静态资源映射规则
++ `#workspace/app/API.md`、`#workspace/app/CANVAS.md`、`#workspace/app/DESIGN.md` 是受保护的只读参考资料。不得新增、修改、覆盖、移动或删除这三个文件；它们由 Integration 定期恢复为创建当前 Agent 时复制的发布版本。
 + 迷你应用及其资源必须放在当前Agent的`app/`目录中，站内静态访问地址为：
 ```text
 #origin/mapping/#agentId/<相对路径>
@@ -52,7 +53,7 @@ description: 在当前Agent的app目录中制作可通过站内iframe预览的�
 
 ### API与数据处理
 + 先查阅`#workspace/app/API.md`，再决定接口、方法、参数和响应格式，不要猜测接口或依赖未记录的内部实现
-+ 优先使用同源的Integration API，处理网络失败、非成功状态码、超时和取消请求
++ 优先使用同源的Integration API（例如相对路径 `/api/files` 或当前 `location.origin`）；不得依据文档示例硬编码 `localhost`、`127.0.0.1` 或任何固定端口。处理网络失败、非成功状态码、超时和取消请求
 + 不在HTML、JavaScript、URL或本地存储中写入Token、Cookie、密码或其他凭据
 + 仅请求完成当前功能所需的数据，不要把完整API响应、iframe页面内容或大体积数据无目的地持久化到localStorage
 + 如需保存UI偏好，只保存最小且非敏感的状态，并按Agent/Chat上下文隔离，避免跨会话串扰

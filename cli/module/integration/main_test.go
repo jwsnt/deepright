@@ -1231,11 +1231,13 @@ func TestExtractCompletionNotificationPromptUsesLastUserMessage(t *testing.T) {
 }
 
 func TestCronExecuteOnceSendsNotificationOnCompletion(t *testing.T) {
+	disableIntegrationManagedRuntimeForTest(t)
 	oldwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("getwd: %v", err)
 	}
 	tmp := t.TempDir()
+	t.Setenv(integrationRuntimeDirEnv, filepath.Join(tmp, "runtime"))
 	if err := os.Chdir(tmp); err != nil {
 		t.Fatalf("chdir: %v", err)
 	}
@@ -1334,6 +1336,165 @@ func TestCronExecuteOnceSendsNotificationOnCompletion(t *testing.T) {
 	if got[0].Message != "备忘录任务已完成" {
 		t.Fatalf("notification message = %q, want %q", got[0].Message, "备忘录任务已完成")
 	}
+	var started int
+	if err := cronDB.QueryRow(`SELECT started FROM task_detail WHERE chat_id = 'chat-cron'`).Scan(&started); err != nil {
+		t.Fatalf("query completed task status: %v", err)
+	}
+	if started != 3 {
+		t.Fatalf("completed task started = %d, want 3", started)
+	}
+}
+
+func setupCronExecuteOnceStreamTest(t *testing.T, upstreamURL string, idleTimeout time.Duration) (*Config, *connectsvc.Service, int) {
+	t.Helper()
+	disableIntegrationNotificationsForTest(t)
+	disableIntegrationManagedRuntimeForTest(t)
+	tmp := t.TempDir()
+	t.Setenv(integrationRuntimeDirEnv, filepath.Join(tmp, "runtime"))
+	if cronDB != nil {
+		_ = cronDB.Close()
+		cronDB = nil
+	}
+	t.Cleanup(func() {
+		if cronDB != nil {
+			_ = cronDB.Close()
+			cronDB = nil
+		}
+	})
+
+	agentRoot := filepath.Join(tmp, "agents")
+	agentDir := filepath.Join(agentRoot, "A")
+	if err := os.MkdirAll(agentDir, 0o755); err != nil {
+		t.Fatalf("mkdir agent: %v", err)
+	}
+	for name, content := range map[string]string{"SOUL.md": "soul", "USER.md": "user"} {
+		if err := os.WriteFile(filepath.Join(agentDir, name), []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+
+	initCronDB()
+	if cronDB == nil {
+		t.Fatal("cronDB should not be nil")
+	}
+	if err := ensureTokenStore(cronDB); err != nil {
+		t.Fatalf("ensureTokenStore: %v", err)
+	}
+	if err := writeTokenStore(cronDB, map[string]string{"OpenAI": "Bearer scheduled-token"}); err != nil {
+		t.Fatalf("writeTokenStore: %v", err)
+	}
+	metaRes, err := cronDB.Exec(`INSERT INTO task_meta (cycle, raw_time, agent_id, chat_id, task_type, model, thinking, cron, content) VALUES (0, ?, 'A', 'chat-cron-stream', 'cron', 'OpenAI', 0, '', '测试备忘录')`, time.Now().Format("2006-01-02 15:04"))
+	if err != nil {
+		t.Fatalf("insert task_meta: %v", err)
+	}
+	metaID, _ := metaRes.LastInsertId()
+	detailRes, err := cronDB.Exec(`INSERT INTO task_detail (meta_id, exec_time, agent_id, chat_id, task_type, model, thinking, content, started) VALUES (?, ?, 'A', 'chat-cron-stream', 'cron', 'OpenAI', 0, '测试备忘录', 0)`, metaID, time.Now().Unix())
+	if err != nil {
+		t.Fatalf("insert task_detail: %v", err)
+	}
+	detailID, err := detailRes.LastInsertId()
+	if err != nil {
+		t.Fatalf("read task_detail id: %v", err)
+	}
+
+	connectSvc, err := newIntegrationConnectService(agentRoot)
+	if err != nil {
+		t.Fatalf("newIntegrationConnectService: %v", err)
+	}
+	t.Cleanup(func() { _ = connectSvc.Close() })
+	return &Config{
+		Host:                     upstreamURL,
+		AgentDir:                 agentRoot,
+		Device:                   "dev",
+		AgentCacheMs:             120000,
+		ScheduledTaskReadTimeout: idleTimeout,
+	}, connectSvc, int(detailID)
+}
+
+func waitForCronDetailStarted(t *testing.T, detailID, want int) {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		var got int
+		err := cronDB.QueryRow(`SELECT started FROM task_detail WHERE id = ?`, detailID).Scan(&got)
+		if err != nil {
+			t.Fatalf("query task detail %d: %v", detailID, err)
+		}
+		if got == want {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	var got int
+	_ = cronDB.QueryRow(`SELECT started FROM task_detail WHERE id = ?`, detailID).Scan(&got)
+	t.Fatalf("task detail %d started = %d, want %d", detailID, got, want)
+}
+
+func assertCronStreamInterruptedLog(t *testing.T, chatID, expectedRaw string) {
+	t.Helper()
+	rows, err := cronDB.Query(`SELECT response_type, content FROM chat_log WHERE chat_id = ? AND role = 'A' ORDER BY id`, chatID)
+	if err != nil {
+		t.Fatalf("query chat logs: %v", err)
+	}
+	defer rows.Close()
+	var entries []struct {
+		responseType string
+		content      string
+	}
+	for rows.Next() {
+		var entry struct {
+			responseType string
+			content      string
+		}
+		if err := rows.Scan(&entry.responseType, &entry.content); err != nil {
+			t.Fatalf("scan chat log: %v", err)
+		}
+		entries = append(entries, entry)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate chat logs: %v", err)
+	}
+	if expectedRaw != "" {
+		if len(entries) != 2 || entries[0].content != expectedRaw || entries[0].responseType != "normal" {
+			t.Fatalf("preserved SSE log = %#v, want raw normal record followed by abnormal terminal record", entries)
+		}
+	} else if len(entries) != 1 {
+		t.Fatalf("chat logs = %#v, want one abnormal terminal record", entries)
+	}
+	last := entries[len(entries)-1]
+	if last.responseType != "abnormal" || last.content != "连接已中断，请重试" {
+		t.Fatalf("terminal SSE log = %#v, want abnormal interruption record", last)
+	}
+}
+
+func TestCronExecuteOnceMarksFailedWhenSSEEndsWithoutDone(t *testing.T) {
+	const rawSSE = "data: {\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n\n"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, rawSSE)
+	}))
+	defer upstream.Close()
+
+	cfg, connectSvc, detailID := setupCronExecuteOnceStreamTest(t, upstream.URL, time.Second)
+	cronExecuteOnce(cfg, &http.Client{}, connectSvc)
+	waitForCronDetailStarted(t, detailID, cronDetailStartedFailed)
+	assertCronStreamInterruptedLog(t, "chat-cron-stream", rawSSE)
+}
+
+func TestCronExecuteOnceMarksFailedWhenSSEReadIsIdle(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+		<-r.Context().Done()
+	}))
+	defer upstream.Close()
+
+	cfg, connectSvc, detailID := setupCronExecuteOnceStreamTest(t, upstream.URL, 30*time.Millisecond)
+	cronExecuteOnce(cfg, &http.Client{}, connectSvc)
+	waitForCronDetailStarted(t, detailID, cronDetailStartedFailed)
+	assertCronStreamInterruptedLog(t, "chat-cron-stream", "")
 }
 
 func TestProxyChatCompletionsFallsBackToStoredTokenWhenAuthorizationMasked(t *testing.T) {
@@ -3647,7 +3808,7 @@ func TestHandleRawSupportsAbsolutePath(t *testing.T) {
 func TestHandleUploadReturnsAbsoluteAgentTmpDestination(t *testing.T) {
 	agentRoot := t.TempDir()
 	workspace := filepath.Join(agentRoot, "agent-a")
-	if err := os.MkdirAll(workspace, 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(workspace, "tmp"), 0o755); err != nil {
 		t.Fatalf("mkdir workspace: %v", err)
 	}
 
@@ -3702,6 +3863,111 @@ func TestHandleUploadReturnsAbsoluteAgentTmpDestination(t *testing.T) {
 	}
 	if string(data) != "media" {
 		t.Fatalf("uploaded data = %q, want media", data)
+	}
+}
+
+func TestHandleUploadUsesRequestedDirectoryAndFallsBackToWorkspaceRoot(t *testing.T) {
+	agentRoot := t.TempDir()
+	workspace := filepath.Join(agentRoot, "agent-a")
+	targetDir := filepath.Join(workspace, "assets")
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		t.Fatalf("mkdir target directory: %v", err)
+	}
+	resolvedWorkspace, err := getWorkspaceByAgentID(&Config{AgentDir: agentRoot}, "agent-a")
+	if err != nil {
+		t.Fatalf("resolve workspace: %v", err)
+	}
+
+	newUploadRequest := func(dest string) *http.Request {
+		var body bytes.Buffer
+		writer := multipart.NewWriter(&body)
+		if err := writer.WriteField("pathsJson", `["nested/clip.mp4"]`); err != nil {
+			t.Fatalf("write pathsJson: %v", err)
+		}
+		part, err := writer.CreateFormFile("files", "clip.mp4")
+		if err != nil {
+			t.Fatalf("create form file: %v", err)
+		}
+		if _, err := part.Write([]byte("media")); err != nil {
+			t.Fatalf("write form file: %v", err)
+		}
+		if err := writer.Close(); err != nil {
+			t.Fatalf("close multipart writer: %v", err)
+		}
+		requestURL := "/api/upload?agentId=agent-a"
+		if dest != "" {
+			requestURL += "&dest=" + url.QueryEscape(dest)
+		}
+		req := httptest.NewRequest(http.MethodPost, requestURL, &body)
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+		return req
+	}
+	decodeDest := func(rec *httptest.ResponseRecorder) string {
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+		}
+		var response struct {
+			Status int    `json:"status"`
+			Dest   string `json:"dest"`
+		}
+		if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		if response.Status != 0 {
+			t.Fatalf("status payload = %d", response.Status)
+		}
+		return response.Dest
+	}
+
+	explicitRec := httptest.NewRecorder()
+	handleUpload(&Config{AgentDir: agentRoot})(explicitRec, newUploadRequest("assets"))
+	if got, want := decodeDest(explicitRec), filepath.Join(resolvedWorkspace, "assets"); got != want {
+		t.Fatalf("explicit destination = %q, want %q", got, want)
+	}
+	if _, err := os.Stat(filepath.Join(targetDir, "nested", "clip.mp4")); err != nil {
+		t.Fatalf("uploaded file missing from requested directory: %v", err)
+	}
+
+	fallbackRec := httptest.NewRecorder()
+	handleUpload(&Config{AgentDir: agentRoot})(fallbackRec, newUploadRequest(""))
+	if got := decodeDest(fallbackRec); got != resolvedWorkspace {
+		t.Fatalf("fallback destination = %q, want workspace root %q", got, resolvedWorkspace)
+	}
+	if _, err := os.Stat(filepath.Join(workspace, "nested", "clip.mp4")); err != nil {
+		t.Fatalf("uploaded file missing from workspace root: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(workspace, "tmp")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("tmp should not be created by fallback, stat error = %v", err)
+	}
+}
+
+func TestResolveUploadDestinationPrefersCurrentDirectoryTmp(t *testing.T) {
+	workspace := t.TempDir()
+	withTmp := filepath.Join(workspace, "images-with-tmp")
+	withoutTmp := filepath.Join(workspace, "images-without-tmp")
+	if err := os.MkdirAll(filepath.Join(withTmp, "tmp"), 0o755); err != nil {
+		t.Fatalf("mkdir current tmp: %v", err)
+	}
+	if err := os.MkdirAll(withoutTmp, 0o755); err != nil {
+		t.Fatalf("mkdir current directory: %v", err)
+	}
+
+	gotWithTmp, err := resolveUploadDestination(workspace, "images-with-tmp", true, true)
+	if err != nil {
+		t.Fatalf("resolve current tmp destination: %v", err)
+	}
+	wantWithTmp, _ := filepath.Abs(filepath.Join(withTmp, "tmp"))
+	if gotWithTmp != wantWithTmp {
+		t.Fatalf("destination with tmp = %q, want %q", gotWithTmp, wantWithTmp)
+	}
+
+	gotWithoutTmp, err := resolveUploadDestination(workspace, "images-without-tmp", true, true)
+	if err != nil {
+		t.Fatalf("resolve current root destination: %v", err)
+	}
+	wantWithoutTmp, _ := filepath.Abs(withoutTmp)
+	if gotWithoutTmp != wantWithoutTmp {
+		t.Fatalf("destination without tmp = %q, want %q", gotWithoutTmp, wantWithoutTmp)
 	}
 }
 
@@ -9171,6 +9437,204 @@ func TestReadIntegrationTempCleanupConfig(t *testing.T) {
 	}
 }
 
+func TestReadIntegrationMiniappRecoveryConfig(t *testing.T) {
+	tests := []struct {
+		name      string
+		config    string
+		want      integrationMiniappRecoveryConfig
+		wantError string
+	}{
+		{name: "valid", config: `{"miniapp":{"recover":30}}`, want: integrationMiniappRecoveryConfig{ScanInterval: 30 * time.Minute}},
+		{name: "missing miniapp", config: `{}`, wantError: "config/config.json.miniapp is required"},
+		{name: "miniapp is not object", config: `{"miniapp":30}`, wantError: "config/config.json.miniapp must be an object"},
+		{name: "missing recover", config: `{"miniapp":{}}`, wantError: "config/config.json.miniapp.recover"},
+		{name: "zero recover", config: `{"miniapp":{"recover":0}}`, wantError: "config/config.json.miniapp.recover"},
+		{name: "fractional recover", config: `{"miniapp":{"recover":1.5}}`, wantError: "config/config.json.miniapp.recover"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			appDir := t.TempDir()
+			useIntegrationExecutableDir(t, appDir)
+			configDir := filepath.Join(appDir, "config")
+			if err := os.MkdirAll(configDir, 0o755); err != nil {
+				t.Fatalf("mkdir config: %v", err)
+			}
+			if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(tt.config), 0o644); err != nil {
+				t.Fatalf("write config: %v", err)
+			}
+
+			got, err := readIntegrationMiniappRecoveryConfig()
+			if tt.wantError != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantError) {
+					t.Fatalf("error = %v, want %q", err, tt.wantError)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("readIntegrationMiniappRecoveryConfig: %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("config = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRecoverIntegrationMiniappDocumentsRestoresOnlyChangedFiles(t *testing.T) {
+	root := t.TempDir()
+	defaultDir := filepath.Join(root, "config")
+	sourceAppDir := filepath.Join(defaultDir, "app")
+	if err := os.MkdirAll(sourceAppDir, 0o755); err != nil {
+		t.Fatalf("mkdir source app: %v", err)
+	}
+	sourceContent := map[string]string{
+		"API.md":    "api source\n",
+		"CANVAS.md": "canvas source\n",
+		"DESIGN.md": "design source\n",
+	}
+	for document, content := range sourceContent {
+		if err := os.WriteFile(filepath.Join(sourceAppDir, document), []byte(content), 0o644); err != nil {
+			t.Fatalf("write source %s: %v", document, err)
+		}
+	}
+
+	agentRoot := filepath.Join(root, "agent")
+	for _, agentID := range []string{"agent-a", "agent-b"} {
+		appDir := filepath.Join(agentRoot, agentID, "app")
+		if err := os.MkdirAll(appDir, 0o755); err != nil {
+			t.Fatalf("mkdir %s app: %v", agentID, err)
+		}
+		for document, content := range sourceContent {
+			if err := os.WriteFile(filepath.Join(appDir, document), []byte(content), 0o644); err != nil {
+				t.Fatalf("write %s %s: %v", agentID, document, err)
+			}
+		}
+	}
+	agentAAppDir := filepath.Join(agentRoot, "agent-a", "app")
+	agentBAppDir := filepath.Join(agentRoot, "agent-b", "app")
+	if err := os.WriteFile(filepath.Join(agentAAppDir, "API.md"), []byte("changed\n"), 0o644); err != nil {
+		t.Fatalf("change API.md: %v", err)
+	}
+	if err := os.Remove(filepath.Join(agentAAppDir, "CANVAS.md")); err != nil {
+		t.Fatalf("remove CANVAS.md: %v", err)
+	}
+	if runtime.GOOS == "windows" {
+		if err := os.WriteFile(filepath.Join(agentAAppDir, "DESIGN.md"), []byte("changed design\n"), 0o644); err != nil {
+			t.Fatalf("change DESIGN.md: %v", err)
+		}
+	} else if err := os.Chmod(filepath.Join(agentAAppDir, "DESIGN.md"), 0o600); err != nil {
+		t.Fatalf("change DESIGN.md mode: %v", err)
+	}
+	if err := os.Remove(filepath.Join(agentBAppDir, "API.md")); err != nil {
+		t.Fatalf("remove agent-b API.md: %v", err)
+	}
+	if err := os.Mkdir(filepath.Join(agentBAppDir, "API.md"), 0o755); err != nil {
+		t.Fatalf("replace agent-b API.md with directory: %v", err)
+	}
+
+	summary, err := recoverIntegrationMiniappDocuments(agentRoot, defaultDir)
+	if err != nil {
+		t.Fatalf("recoverIntegrationMiniappDocuments: %v", err)
+	}
+	if summary.AgentCount != 2 {
+		t.Fatalf("agent count = %d, want 2", summary.AgentCount)
+	}
+	if len(summary.Events) != 4 {
+		t.Fatalf("events = %#v, want four individual restores", summary.Events)
+	}
+	restored := map[string]bool{}
+	for _, event := range summary.Events {
+		if event.Action != "restore" {
+			t.Fatalf("unexpected event = %#v", event)
+		}
+		restored[event.Agent+":"+event.Document] = true
+	}
+	for document, want := range sourceContent {
+		if !restored["agent-a:"+document] {
+			t.Fatalf("agent-a %s was not restored", document)
+		}
+		got, err := os.ReadFile(filepath.Join(agentAAppDir, document))
+		if err != nil || string(got) != want {
+			t.Fatalf("agent-a %s = %q, err=%v, want %q", document, string(got), err, want)
+		}
+	}
+	if !restored["agent-b:API.md"] {
+		t.Fatal("agent-b API.md directory was not restored")
+	}
+	if got, err := os.ReadFile(filepath.Join(agentBAppDir, "API.md")); err != nil || string(got) != sourceContent["API.md"] {
+		t.Fatalf("agent-b API.md = %q, err=%v, want %q", string(got), err, sourceContent["API.md"])
+	}
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(filepath.Join(agentAAppDir, "DESIGN.md"))
+		if err != nil {
+			t.Fatalf("stat restored DESIGN.md: %v", err)
+		}
+		if got := info.Mode().Perm(); got != 0o644 {
+			t.Fatalf("DESIGN.md mode = %o, want %o", got, 0o644)
+		}
+	}
+
+	summary, err = recoverIntegrationMiniappDocuments(agentRoot, defaultDir)
+	if err != nil {
+		t.Fatalf("repeat recoverIntegrationMiniappDocuments: %v", err)
+	}
+	if len(summary.Events) != 0 {
+		t.Fatalf("unchanged documents should not be rewritten: %#v", summary.Events)
+	}
+}
+
+func TestRecoverIntegrationMiniappDocumentsRejectsEscapingAppSymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("creating symlinks requires additional privileges on Windows")
+	}
+	root := t.TempDir()
+	defaultDir := filepath.Join(root, "config")
+	sourceAppDir := filepath.Join(defaultDir, "app")
+	if err := os.MkdirAll(sourceAppDir, 0o755); err != nil {
+		t.Fatalf("mkdir source app: %v", err)
+	}
+	for _, document := range integrationMiniappProtectedDocuments {
+		if err := os.WriteFile(filepath.Join(sourceAppDir, document), []byte(document), 0o644); err != nil {
+			t.Fatalf("write source %s: %v", document, err)
+		}
+	}
+	agentRoot := filepath.Join(root, "agent")
+	workspace := filepath.Join(agentRoot, "agent-a")
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		t.Fatalf("mkdir workspace: %v", err)
+	}
+	escapedDir := t.TempDir()
+	if err := os.Symlink(escapedDir, filepath.Join(workspace, "app")); err != nil {
+		t.Fatalf("create app symlink: %v", err)
+	}
+	// Matching external files must still be rejected: the scanner may not
+	// silently accept an app directory that points outside the workspace.
+	for _, document := range integrationMiniappProtectedDocuments {
+		if err := os.WriteFile(filepath.Join(escapedDir, document), []byte(document), 0o644); err != nil {
+			t.Fatalf("write escaped %s: %v", document, err)
+		}
+	}
+
+	summary, err := recoverIntegrationMiniappDocuments(agentRoot, defaultDir)
+	if err != nil {
+		t.Fatalf("recoverIntegrationMiniappDocuments: %v", err)
+	}
+	if len(summary.Events) != len(integrationMiniappProtectedDocuments) {
+		t.Fatalf("events = %#v, want one error per protected document", summary.Events)
+	}
+	for _, event := range summary.Events {
+		if event.Action != "error" || !strings.Contains(event.Reason, "escapes agent workspace") {
+			t.Fatalf("unexpected event = %#v", event)
+		}
+	}
+	for _, document := range integrationMiniappProtectedDocuments {
+		got, err := os.ReadFile(filepath.Join(escapedDir, document))
+		if err != nil || string(got) != document {
+			t.Fatalf("escaped document %s was modified: %q, err=%v", document, string(got), err)
+		}
+	}
+}
+
 func TestRunIntegrationForegroundRejectsMissingAtConfig(t *testing.T) {
 	appDir := t.TempDir()
 	useIntegrationExecutableDir(t, appDir)
@@ -9394,6 +9858,48 @@ func TestLoadIntegrationStartupOptionsReadsNestedHTTPConfig(t *testing.T) {
 	}
 	if !opts.Config.HTTPDebug {
 		t.Fatal("http_debug = false, want true")
+	}
+}
+
+func TestLoadIntegrationStartupOptionsReadsScheduledTaskSSEIdleTimeout(t *testing.T) {
+	tempDir := t.TempDir()
+	useIntegrationExecutableDir(t, tempDir)
+	configDir := filepath.Join(tempDir, "config")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	configPath := filepath.Join(configDir, "config.json")
+	if err := os.WriteFile(configPath, []byte(`{"http":{"timeout":{"read":7}}}`), 0o644); err != nil {
+		t.Fatalf("write valid config.json: %v", err)
+	}
+
+	opts, path, err := loadIntegrationStartupOptions()
+	if err != nil {
+		t.Fatalf("load valid startup options: %v", err)
+	}
+	if path != configPath {
+		t.Fatalf("path = %q, want %q", path, configPath)
+	}
+	if opts.Config.ScheduledTaskReadTimeout != 7*time.Second {
+		t.Fatalf("scheduled task read timeout = %s, want 7s", opts.Config.ScheduledTaskReadTimeout)
+	}
+
+	if err := os.WriteFile(configPath, []byte(`{"http":{"timeout":{"read":0}}}`), 0o644); err != nil {
+		t.Fatalf("write invalid config.json: %v", err)
+	}
+	var logs bytes.Buffer
+	previousLogOutput := log.Writer()
+	log.SetOutput(&logs)
+	t.Cleanup(func() { log.SetOutput(previousLogOutput) })
+	opts, _, err = loadIntegrationStartupOptions()
+	if err != nil {
+		t.Fatalf("load startup options with invalid optional timeout: %v", err)
+	}
+	if opts.Config.ScheduledTaskReadTimeout != defaultScheduledTaskReadTimeout {
+		t.Fatalf("scheduled task read timeout = %s, want default %s", opts.Config.ScheduledTaskReadTimeout, defaultScheduledTaskReadTimeout)
+	}
+	if !strings.Contains(logs.String(), "http.timeout.read") || !strings.Contains(logs.String(), "using default 2m0s") {
+		t.Fatalf("fallback log = %q, want http.timeout.read default record", logs.String())
 	}
 }
 

@@ -4788,7 +4788,54 @@ func (p *ProxyServer) HandleAgentCreate(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(map[string]interface{}{"status": 0, "agentId": agentID, "name": cleanName, "type": createType})
 }
 
-// HandleUpload serves POST /api/upload, uploading files/folders to agent tmp directory.
+// resolveUploadDestination keeps uploads inside an Agent workspace. A caller
+// may explicitly name an existing relative directory with the dest query
+// parameter. When preferTmp is set, use that directory's existing tmp child.
+// Without a destination, use the workspace tmp and fall back to its root.
+func resolveUploadDestination(workspace, requestedDest string, hasRequestedDest, preferTmp bool) (string, error) {
+	workspaceAbs, err := filepath.Abs(workspace)
+	if err != nil {
+		return "", fmt.Errorf("resolve workspace directory failed: %w", err)
+	}
+	if hasRequestedDest {
+		cleanDest := filepath.Clean(filepath.FromSlash(requestedDest))
+		if filepath.IsAbs(cleanDest) || cleanDest == ".." || strings.HasPrefix(cleanDest, ".."+string(filepath.Separator)) {
+			return "", fmt.Errorf("invalid upload destination")
+		}
+		destination := workspaceAbs
+		if cleanDest != "." && cleanDest != "" {
+			destination = filepath.Join(workspaceAbs, cleanDest)
+		}
+		info, err := os.Stat(destination)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return "", fmt.Errorf("upload destination does not exist")
+			}
+			return "", fmt.Errorf("read upload destination failed: %w", err)
+		}
+		if !info.IsDir() {
+			return "", fmt.Errorf("upload destination is not a directory")
+		}
+		if destination != workspaceAbs && !ensureWritablePathWithinRoot(workspaceAbs, destination) {
+			return "", fmt.Errorf("invalid upload destination")
+		}
+		if preferTmp {
+			tmpDir := filepath.Join(destination, "tmp")
+			if info, err := os.Stat(tmpDir); err == nil && info.IsDir() && ensureWritablePathWithinRoot(workspaceAbs, tmpDir) {
+				return tmpDir, nil
+			}
+		}
+		return destination, nil
+	}
+
+	tmpDir := filepath.Join(workspaceAbs, "tmp")
+	if info, err := os.Stat(tmpDir); err == nil && info.IsDir() && ensureWritablePathWithinRoot(workspaceAbs, tmpDir) {
+		return tmpDir, nil
+	}
+	return workspaceAbs, nil
+}
+
+// HandleUpload serves POST /api/upload, uploading files/folders to an agent workspace directory.
 func (p *ProxyServer) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -4821,19 +4868,12 @@ func (p *ProxyServer) HandleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tmpDir := filepath.Clean(filepath.Join(workspace, "tmp"))
-	if !filepath.IsAbs(tmpDir) {
-		var absErr error
-		tmpDir, absErr = filepath.Abs(tmpDir)
-		if absErr != nil {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "resolve tmp directory failed: " + absErr.Error()})
-			return
-		}
-	}
-	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+	_, hasRequestedDest := r.URL.Query()["dest"]
+	preferTmp := r.URL.Query().Get("preferTmp") == "1"
+	uploadDir, err := resolveUploadDestination(workspace, r.URL.Query().Get("dest"), hasRequestedDest, preferTmp)
+	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "create tmp directory failed: " + err.Error()})
+		json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": err.Error()})
 		return
 	}
 
@@ -4859,8 +4899,8 @@ func (p *ProxyServer) HandleUpload(w http.ResponseWriter, r *http.Request) {
 		if cleanRelPath == "." || cleanRelPath == "" || cleanRelPath == ".." || filepath.IsAbs(cleanRelPath) || strings.HasPrefix(cleanRelPath, ".."+string(filepath.Separator)) {
 			continue
 		}
-		destPath := filepath.Join(tmpDir, cleanRelPath)
-		if !ensureWritablePathWithinRoot(tmpDir, destPath) {
+		destPath := filepath.Join(uploadDir, cleanRelPath)
+		if !ensureWritablePathWithinRoot(uploadDir, destPath) {
 			continue
 		}
 		if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
@@ -4883,7 +4923,7 @@ func (p *ProxyServer) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"status": 0, "agentId": agentID, "files": uploaded, "dest": tmpDir})
+	json.NewEncoder(w).Encode(map[string]interface{}{"status": 0, "agentId": agentID, "files": uploaded, "dest": uploadDir})
 }
 
 // AgentConfig represents the config.json structure.

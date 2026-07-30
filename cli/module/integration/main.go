@@ -9617,8 +9617,56 @@ func handleAgentCreate(cfg *Config) http.HandlerFunc {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Proxy: /api/upload — upload files to agent tmp
+// Proxy: /api/upload — upload files to an agent workspace directory
 // ═══════════════════════════════════════════════════════════════════════════
+
+// resolveUploadDestination keeps uploads inside an Agent workspace.  A caller
+// may explicitly name an existing relative directory with the dest query
+// parameter. When preferTmp is set, that directory's existing tmp child takes
+// precedence. The legacy/default destination is the workspace tmp when it
+// already exists; a workspace without tmp receives the upload at its root.
+func resolveUploadDestination(workspace, requestedDest string, hasRequestedDest, preferTmp bool) (string, error) {
+	workspaceAbs, err := filepath.Abs(workspace)
+	if err != nil {
+		return "", fmt.Errorf("resolve workspace directory failed: %w", err)
+	}
+	if hasRequestedDest {
+		cleanDest := filepath.Clean(filepath.FromSlash(requestedDest))
+		if filepath.IsAbs(cleanDest) || cleanDest == ".." || strings.HasPrefix(cleanDest, ".."+string(filepath.Separator)) {
+			return "", fmt.Errorf("invalid upload destination")
+		}
+		destination := workspaceAbs
+		if cleanDest != "." && cleanDest != "" {
+			destination = filepath.Join(workspaceAbs, cleanDest)
+		}
+		info, err := os.Stat(destination)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return "", fmt.Errorf("upload destination does not exist")
+			}
+			return "", fmt.Errorf("read upload destination failed: %w", err)
+		}
+		if !info.IsDir() {
+			return "", fmt.Errorf("upload destination is not a directory")
+		}
+		if destination != workspaceAbs && !ensureWritablePathWithinRoot(workspaceAbs, destination) {
+			return "", fmt.Errorf("invalid upload destination")
+		}
+		if preferTmp {
+			tmpDir := filepath.Join(destination, "tmp")
+			if info, err := os.Stat(tmpDir); err == nil && info.IsDir() && ensureWritablePathWithinRoot(workspaceAbs, tmpDir) {
+				return tmpDir, nil
+			}
+		}
+		return destination, nil
+	}
+
+	tmpDir := filepath.Join(workspaceAbs, "tmp")
+	if info, err := os.Stat(tmpDir); err == nil && info.IsDir() && ensureWritablePathWithinRoot(workspaceAbs, tmpDir) {
+		return tmpDir, nil
+	}
+	return workspaceAbs, nil
+}
 
 func handleUpload(cfg *Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -9638,15 +9686,12 @@ func handleUpload(cfg *Config) http.HandlerFunc {
 			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "agent not found: " + agentID})
 			return
 		}
-		tmpDir, err := filepath.Abs(filepath.Join(workspace, "tmp"))
+		_, hasRequestedDest := r.URL.Query()["dest"]
+		preferTmp := r.URL.Query().Get("preferTmp") == "1"
+		uploadDir, err := resolveUploadDestination(workspace, r.URL.Query().Get("dest"), hasRequestedDest, preferTmp)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "resolve tmp directory failed: " + err.Error()})
-			return
-		}
-		if err := os.MkdirAll(tmpDir, 0755); err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "create tmp directory failed: " + err.Error()})
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": err.Error()})
 			return
 		}
 		if err := r.ParseMultipartForm(200 << 20); err != nil {
@@ -9669,8 +9714,8 @@ func handleUpload(cfg *Config) http.HandlerFunc {
 			if cleanRelPath == "." || cleanRelPath == "" || cleanRelPath == ".." || filepath.IsAbs(cleanRelPath) || strings.HasPrefix(cleanRelPath, ".."+string(filepath.Separator)) {
 				continue
 			}
-			destPath := filepath.Join(tmpDir, cleanRelPath)
-			if !ensureWritablePathWithinRoot(tmpDir, destPath) {
+			destPath := filepath.Join(uploadDir, cleanRelPath)
+			if !ensureWritablePathWithinRoot(uploadDir, destPath) {
 				continue
 			}
 			if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
@@ -9691,7 +9736,7 @@ func handleUpload(cfg *Config) http.HandlerFunc {
 			uploaded = append(uploaded, filepath.ToSlash(cleanRelPath))
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{"status": 0, "agentId": agentID, "files": uploaded, "dest": tmpDir})
+		json.NewEncoder(w).Encode(map[string]interface{}{"status": 0, "agentId": agentID, "files": uploaded, "dest": uploadDir})
 	}
 }
 
@@ -12187,7 +12232,7 @@ func deleteCronMetas(db *sql.DB, filter cronMetaFilter, explicitID string) (int6
 		return 0, nil, err
 	}
 	for _, metaID := range metaIDs {
-		if _, err := tx.Exec(`DELETE FROM task_detail WHERE meta_id = ? AND started != 3`, metaID); err != nil {
+		if _, err := tx.Exec(`DELETE FROM task_detail WHERE meta_id = ? AND started NOT IN (3, 4)`, metaID); err != nil {
 			return 0, nil, err
 		}
 	}
@@ -12347,7 +12392,7 @@ func loadCronDetailsByMetaIDs(queryer interface {
 		LEFT JOIN task_meta m ON m.id = d.meta_id
 		WHERE d.meta_id IN (%s)`, selectMetaRef, cronVerifySelectExpr(queryer, "task_detail", "d.verify"), cronRouterDisableSelectExpr(queryer, "task_detail", "d.router_disable"), placeholders(len(metaIDs)))
 	if unfinishedOnly {
-		query += ` AND d.started != 3`
+		query += ` AND d.started NOT IN (3, 4)`
 	}
 	query += ` ORDER BY d.id`
 	rows, err := queryer.Query(query, intsToInterfaces(metaIDs)...)
@@ -12531,7 +12576,7 @@ func cleanupCronMetaIDsWithAction(db *sql.DB, metaIDs []int, action string) erro
 	defer tx.Rollback()
 
 	for _, metaID := range metaIDs {
-		if _, err := tx.Exec(`DELETE FROM task_detail WHERE meta_id = ? AND started != 3`, metaID); err != nil {
+		if _, err := tx.Exec(`DELETE FROM task_detail WHERE meta_id = ? AND started NOT IN (3, 4)`, metaID); err != nil {
 			return err
 		}
 	}
@@ -13883,7 +13928,7 @@ func createCronDetailRun(agentID string, req cronDetailRunRequest, now time.Time
 		if err == nil && source.Started == 1 {
 			err = fmt.Errorf("已启动的任务不能重跑")
 		}
-		if err == nil && source.Started != 0 && source.Started != 2 && source.Started != 3 {
+		if err == nil && source.Started != 0 && source.Started != 2 && source.Started != 3 && source.Started != cronDetailStartedFailed {
 			err = fmt.Errorf("task detail cannot be run")
 		}
 	} else {
@@ -17264,6 +17309,11 @@ type Config struct {
 	IdleTimeout       int
 	PluginExecTimeout int
 	SkillExtractRound int
+	// ScheduledTaskReadTimeout is the SSE body idle timeout used only by
+	// scheduled memo execution. It is intentionally distinct from the cli-get
+	// HTTP timeout fields above, which must not impose a total duration on a
+	// long-running streamed response.
+	ScheduledTaskReadTimeout time.Duration
 
 	// Per-Agent MCP metadata refresh state.
 	mcpStateMu sync.Mutex
@@ -17281,15 +17331,16 @@ type integrationStartupOptions struct {
 }
 
 const (
-	integrationServicePort      = 8080
-	integrationDefaultPIDFile   = "integration.pid"
-	integrationDefaultLogFile   = "integration.log"
-	integrationLogRetentionDays = 3
-	integrationStopWait         = 15 * time.Second
-	integrationShutdownTimeout  = 5 * time.Second
-	integrationReadyPath        = "/api/heartbeat"
-	defaultPluginExecTimeoutMs  = 600000
-	integrationSkipBrowserEnv   = "DEEPRIGHT_INTEGRATION_SKIP_BROWSER"
+	integrationServicePort          = 8080
+	integrationDefaultPIDFile       = "integration.pid"
+	integrationDefaultLogFile       = "integration.log"
+	integrationLogRetentionDays     = 3
+	integrationStopWait             = 15 * time.Second
+	integrationShutdownTimeout      = 5 * time.Second
+	integrationReadyPath            = "/api/heartbeat"
+	defaultPluginExecTimeoutMs      = 600000
+	defaultScheduledTaskReadTimeout = 120 * time.Second
+	integrationSkipBrowserEnv       = "DEEPRIGHT_INTEGRATION_SKIP_BROWSER"
 )
 
 var integrationStartWait = 5 * time.Second
@@ -17537,6 +17588,7 @@ func defaultIntegrationStartupOptions() integrationStartupOptions {
 			IdleTimeout:               90,
 			PluginExecTimeout:         defaultPluginExecTimeoutMs,
 			SkillExtractRound:         10,
+			ScheduledTaskReadTimeout:  defaultScheduledTaskReadTimeout,
 		},
 		PIDFile: integrationDefaultPIDFile,
 		LogFile: integrationDefaultLogFile,
@@ -17629,6 +17681,58 @@ func readIntegrationStartupConfigRaw() (map[string]interface{}, string, error) {
 		raw = map[string]interface{}{}
 	}
 	return raw, path, nil
+}
+
+// readScheduledTaskReadTimeout reads the only timeout that applies to the
+// scheduled memo SSE body. Keep it outside the flattened HTTP configuration:
+// the existing HTTP fields configure other clients and must not turn this
+// stream's idle timeout into a request-wide deadline.
+func readScheduledTaskReadTimeout() time.Duration {
+	raw, path, err := readIntegrationStartupConfigRaw()
+	if err != nil {
+		log.Printf("[cron] invalid config/config.json http.timeout.read: read %s failed: %v; using default %s", path, err, defaultScheduledTaskReadTimeout)
+		return defaultScheduledTaskReadTimeout
+	}
+
+	invalid := func(reason string) time.Duration {
+		if strings.TrimSpace(path) == "" {
+			path = "config/config.json"
+		}
+		log.Printf("[cron] invalid config/config.json http.timeout.read in %s: %s; using default %s", path, reason, defaultScheduledTaskReadTimeout)
+		return defaultScheduledTaskReadTimeout
+	}
+	httpRaw, ok := raw["http"]
+	if !ok {
+		return invalid("value is missing")
+	}
+	httpValues, ok := httpRaw.(map[string]interface{})
+	if !ok || httpValues == nil {
+		return invalid("http must be an object")
+	}
+	timeoutRaw, ok := httpValues["timeout"]
+	if !ok {
+		return invalid("timeout is missing")
+	}
+	timeoutValues, ok := timeoutRaw.(map[string]interface{})
+	if !ok || timeoutValues == nil {
+		return invalid("timeout must be an object")
+	}
+	readRaw, ok := timeoutValues["read"]
+	if !ok {
+		return invalid("value is missing")
+	}
+	secondsNumber, ok := readRaw.(json.Number)
+	if !ok {
+		return invalid("must be a positive integer in seconds")
+	}
+	seconds, err := secondsNumber.Int64()
+	if err != nil || seconds <= 0 {
+		return invalid("must be a positive integer in seconds")
+	}
+	if seconds > int64(^uint64(0)>>1)/int64(time.Second) {
+		return invalid("exceeds time.Duration range")
+	}
+	return time.Duration(seconds) * time.Second
 }
 
 func readIntegrationStartupConfig() (map[string]interface{}, string, error) {
@@ -18008,6 +18112,9 @@ func loadIntegrationStartupOptionsWithPortOverride(portOverridden bool) (integra
 	if err := applyIntegrationStartupConfig(&opts, values); err != nil {
 		return opts, path, err
 	}
+	// This has a fallback-and-log contract instead of making a malformed
+	// optional timeout prevent Integration from starting.
+	opts.Config.ScheduledTaskReadTimeout = readScheduledTaskReadTimeout()
 	if host, found, err := readIntegrationPersistentHost(); err != nil {
 		return opts, path, err
 	} else if found {
@@ -20184,6 +20291,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	initCronDB()
 	startIntegrationLogRetentionCleanup(ctx)
 	startIntegrationTempCleanup(ctx, cfg.AgentDir)
+	startIntegrationMiniappDocumentRecovery(ctx, cfg.AgentDir, cfg.DefaultDir)
 	startCronCheck(ctx, &cfg)
 	startIntegrationMCPRefresh(ctx, &cfg)
 	startCronExecutor(ctx, &cfg, proxyClient, connectSvc)
@@ -21045,6 +21153,255 @@ func nextAvailableBackupPath(dir, name string) (string, error) {
 			return "", err
 		}
 	}
+}
+
+// integrationMiniappRecoveryConfig controls the periodic restoration of the
+// three static documents which are copied into every Agent's app directory.
+// The interval deliberately has no fallback: an operator must opt in through
+// config/config.json.miniapp.recover.
+type integrationMiniappRecoveryConfig struct {
+	ScanInterval time.Duration
+}
+
+type integrationMiniappDocumentSource struct {
+	Content []byte
+	Mode    fs.FileMode
+	Path    string
+}
+
+type integrationMiniappRecoveryEvent struct {
+	Action   string
+	Agent    string
+	Document string
+	Source   string
+	Target   string
+	Reason   string
+}
+
+type integrationMiniappRecoverySummary struct {
+	AgentCount int
+	Events     []integrationMiniappRecoveryEvent
+}
+
+var integrationMiniappProtectedDocuments = []string{"API.md", "CANVAS.md", "DESIGN.md"}
+
+func readIntegrationMiniappRecoveryConfig() (integrationMiniappRecoveryConfig, error) {
+	raw, _, err := readIntegrationStartupConfigRaw()
+	if err != nil {
+		return integrationMiniappRecoveryConfig{}, fmt.Errorf("read config/config.json.miniapp: %w", err)
+	}
+	miniappRaw, ok := raw["miniapp"]
+	if !ok {
+		return integrationMiniappRecoveryConfig{}, fmt.Errorf("config/config.json.miniapp is required")
+	}
+	miniapp, ok := miniappRaw.(map[string]interface{})
+	if !ok || miniapp == nil {
+		return integrationMiniappRecoveryConfig{}, fmt.Errorf("config/config.json.miniapp must be an object")
+	}
+	minutes, err := integrationMiniappPositiveMinutes(miniapp["recover"], "config/config.json.miniapp.recover")
+	if err != nil {
+		return integrationMiniappRecoveryConfig{}, err
+	}
+	return integrationMiniappRecoveryConfig{ScanInterval: time.Duration(minutes) * time.Minute}, nil
+}
+
+func integrationMiniappPositiveMinutes(raw interface{}, label string) (int64, error) {
+	value, ok := raw.(json.Number)
+	if !ok {
+		return 0, fmt.Errorf("%s must be a positive integer in minutes", label)
+	}
+	minutes, err := value.Int64()
+	if err != nil || minutes <= 0 || minutes > int64((1<<63-1)/int64(time.Minute)) {
+		return 0, fmt.Errorf("%s must be a positive integer in minutes", label)
+	}
+	return minutes, nil
+}
+
+func readIntegrationMiniappDocumentSources(defaultDir string) (map[string]integrationMiniappDocumentSource, error) {
+	resolvedDefaultDir, err := resolveServeDefaultDir(defaultDir)
+	if err != nil {
+		return nil, err
+	}
+	sourceDir := filepath.Join(resolvedDefaultDir, "app")
+	sources := make(map[string]integrationMiniappDocumentSource, len(integrationMiniappProtectedDocuments))
+	for _, document := range integrationMiniappProtectedDocuments {
+		sourcePath := filepath.Join(sourceDir, document)
+		info, err := os.Stat(sourcePath)
+		if err != nil {
+			return nil, fmt.Errorf("read miniapp source %s: %w", sourcePath, err)
+		}
+		if !info.Mode().IsRegular() {
+			return nil, fmt.Errorf("miniapp source is not a regular file: %s", sourcePath)
+		}
+		content, err := os.ReadFile(sourcePath)
+		if err != nil {
+			return nil, fmt.Errorf("read miniapp source %s: %w", sourcePath, err)
+		}
+		sources[document] = integrationMiniappDocumentSource{
+			Content: content,
+			Mode:    info.Mode().Perm(),
+			Path:    sourcePath,
+		}
+	}
+	return sources, nil
+}
+
+func integrationMiniappDocumentNeedsRecovery(target string, source integrationMiniappDocumentSource) (bool, error) {
+	info, err := os.Lstat(target)
+	if errors.Is(err, os.ErrNotExist) {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if !info.Mode().IsRegular() || info.Mode().Perm() != source.Mode {
+		return true, nil
+	}
+	content, err := os.ReadFile(target)
+	if err != nil {
+		return false, err
+	}
+	return !bytes.Equal(content, source.Content), nil
+}
+
+func restoreIntegrationMiniappDocument(workspace, document string, source integrationMiniappDocumentSource) error {
+	appDir := filepath.Join(workspace, "app")
+	if !ensureWritablePathWithinRoot(workspace, appDir) {
+		return fmt.Errorf("app directory escapes agent workspace")
+	}
+	if err := os.MkdirAll(appDir, 0o755); err != nil {
+		return fmt.Errorf("create app directory: %w", err)
+	}
+	target := filepath.Join(appDir, document)
+	if !ensurePathWithinRoot(workspace, target) {
+		return fmt.Errorf("target escapes agent workspace")
+	}
+	if _, err := os.Lstat(target); err == nil {
+		// Do not recursively delete a non-empty directory placed at a protected
+		// document path.  It may contain unrelated user data; report the single
+		// document recovery failure instead.
+		if err := os.Remove(target); err != nil {
+			return fmt.Errorf("replace protected document: %w", err)
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("inspect protected document: %w", err)
+	}
+	if !ensureWritablePathWithinRoot(workspace, target) {
+		return fmt.Errorf("target escapes agent workspace")
+	}
+	if err := os.WriteFile(target, source.Content, source.Mode); err != nil {
+		return fmt.Errorf("write protected document: %w", err)
+	}
+	if err := os.Chmod(target, source.Mode); err != nil {
+		return fmt.Errorf("set protected document permissions: %w", err)
+	}
+	return nil
+}
+
+func recoverIntegrationMiniappDocuments(agentRoot, defaultDir string) (integrationMiniappRecoverySummary, error) {
+	sources, err := readIntegrationMiniappDocumentSources(defaultDir)
+	if err != nil {
+		return integrationMiniappRecoverySummary{}, err
+	}
+	entries, err := os.ReadDir(agentRoot)
+	if err != nil {
+		return integrationMiniappRecoverySummary{}, err
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		return strings.ToLower(entries[i].Name()) < strings.ToLower(entries[j].Name())
+	})
+
+	summary := integrationMiniappRecoverySummary{}
+	for _, entry := range entries {
+		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+		agentID := strings.TrimSpace(entry.Name())
+		if err := integrationagentarchive.ValidateAgentID(agentID); err != nil {
+			continue
+		}
+		summary.AgentCount++
+		workspace := filepath.Join(agentRoot, entry.Name())
+		appDir := filepath.Join(workspace, "app")
+		// Validate the app directory before comparing individual documents.  If
+		// it escapes through a symlink, an identical external file must not turn
+		// the scan into a silent no-op.
+		if !ensureWritablePathWithinRoot(workspace, appDir) {
+			for _, document := range integrationMiniappProtectedDocuments {
+				source := sources[document]
+				summary.Events = append(summary.Events, integrationMiniappRecoveryEvent{
+					Action: "error", Agent: agentID, Document: document, Source: source.Path,
+					Target: filepath.Join(appDir, document), Reason: "app directory escapes agent workspace",
+				})
+			}
+			continue
+		}
+		for _, document := range integrationMiniappProtectedDocuments {
+			source := sources[document]
+			target := filepath.Join(workspace, "app", document)
+			needsRecovery, err := integrationMiniappDocumentNeedsRecovery(target, source)
+			if err != nil {
+				summary.Events = append(summary.Events, integrationMiniappRecoveryEvent{
+					Action: "error", Agent: agentID, Document: document, Source: source.Path, Target: target, Reason: err.Error(),
+				})
+				continue
+			}
+			if !needsRecovery {
+				continue
+			}
+			if err := restoreIntegrationMiniappDocument(workspace, document, source); err != nil {
+				summary.Events = append(summary.Events, integrationMiniappRecoveryEvent{
+					Action: "error", Agent: agentID, Document: document, Source: source.Path, Target: target, Reason: err.Error(),
+				})
+				continue
+			}
+			summary.Events = append(summary.Events, integrationMiniappRecoveryEvent{
+				Action: "restore", Agent: agentID, Document: document, Source: source.Path, Target: target,
+			})
+		}
+	}
+	return summary, nil
+}
+
+// startIntegrationMiniappDocumentRecovery performs an immediate scan and then
+// restores only changed protected miniapp documents at the configured cadence.
+func startIntegrationMiniappDocumentRecovery(ctx context.Context, agentRoot, defaultDir string) {
+	if ctx == nil || strings.TrimSpace(agentRoot) == "" {
+		return
+	}
+	go func() {
+		config, err := readIntegrationMiniappRecoveryConfig()
+		if err != nil {
+			log.Printf("[miniapp] document recovery disabled: %v", err)
+			return
+		}
+		run := func() {
+			summary, err := recoverIntegrationMiniappDocuments(agentRoot, defaultDir)
+			if err != nil {
+				log.Printf("[miniapp] document recovery scan failed: %v", err)
+				return
+			}
+			for _, event := range summary.Events {
+				if event.Action == "restore" {
+					log.Printf("[miniapp] restored agent=%s document=%s source=%s target=%s", event.Agent, event.Document, event.Source, event.Target)
+				} else {
+					log.Printf("[miniapp] recovery failed agent=%s document=%s source=%s target=%s reason=%s", event.Agent, event.Document, event.Source, event.Target, event.Reason)
+				}
+			}
+		}
+		run()
+
+		ticker := time.NewTicker(config.ScanInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				run()
+			}
+		}
+	}()
 }
 
 // integrationTempCleanupConfig is read from config/config.json once for each
@@ -22521,6 +22878,115 @@ func syncConnectPendingRequests(cfg *Config, svc *connectsvc.Service) {
 	})
 }
 
+const cronDetailStartedFailed = 4
+
+var errScheduledTaskSSEReadIdleTimeout = errors.New("scheduled task SSE read idle timeout")
+
+type scheduledTaskSSEReadChunk struct {
+	data []byte
+	err  error
+}
+
+func scheduledTaskReadTimeout(cfg *Config) time.Duration {
+	if cfg != nil && cfg.ScheduledTaskReadTimeout > 0 {
+		return cfg.ScheduledTaskReadTimeout
+	}
+	return defaultScheduledTaskReadTimeout
+}
+
+// readScheduledTaskSSEBody applies an idle timeout to a single scheduled memo
+// SSE response. It deliberately does not use http.Client.Timeout: that value
+// is a total request deadline and would incorrectly stop healthy long-running
+// streams. Closing the body interrupts the blocked transport read on timeout.
+func readScheduledTaskSSEBody(body io.ReadCloser, idleTimeout time.Duration) ([]byte, error) {
+	if body == nil {
+		return nil, fmt.Errorf("scheduled task SSE response body is nil")
+	}
+	if idleTimeout <= 0 {
+		idleTimeout = defaultScheduledTaskReadTimeout
+	}
+
+	chunks := make(chan scheduledTaskSSEReadChunk, 1)
+	stop := make(chan struct{})
+	go func() {
+		defer close(chunks)
+		buffer := make([]byte, 32*1024)
+		emit := func(chunk scheduledTaskSSEReadChunk) bool {
+			select {
+			case chunks <- chunk:
+				return true
+			case <-stop:
+				return false
+			}
+		}
+		for {
+			n, err := body.Read(buffer)
+			if n > 0 {
+				data := append([]byte(nil), buffer[:n]...)
+				if !emit(scheduledTaskSSEReadChunk{data: data}) {
+					return
+				}
+			}
+			if err != nil {
+				emit(scheduledTaskSSEReadChunk{err: err})
+				return
+			}
+		}
+	}()
+	defer close(stop)
+
+	timer := time.NewTimer(idleTimeout)
+	defer timer.Stop()
+	resetTimer := func() {
+		if !timer.Stop() {
+			select {
+			case <-timer.C:
+			default:
+			}
+		}
+		timer.Reset(idleTimeout)
+	}
+
+	payload := make([]byte, 0, 1024)
+	for {
+		select {
+		case chunk, ok := <-chunks:
+			if !ok {
+				return payload, io.ErrUnexpectedEOF
+			}
+			if len(chunk.data) > 0 {
+				payload = append(payload, chunk.data...)
+				resetTimer()
+			}
+			if chunk.err != nil {
+				if errors.Is(chunk.err, io.EOF) {
+					return payload, nil
+				}
+				return payload, chunk.err
+			}
+		case <-timer.C:
+			_ = body.Close()
+			return payload, errScheduledTaskSSEReadIdleTimeout
+		}
+	}
+}
+
+func failScheduledTaskDetail(detailID int, agentID, chatID string, cause error) {
+	if cause == nil {
+		cause = errors.New("scheduled task stream failed")
+	}
+	log.Printf("[cron] scheduled task failed: detail=%d agent=%s chat=%s err=%v", detailID, agentID, chatID, cause)
+	appendChatLogDB(agentID, chatID, chatTypeScheduledTask, "A", "abnormal", buildSSEStreamInterruptedContent(cause))
+	if cronDB == nil {
+		return
+	}
+	if _, err := cronDB.Exec(`UPDATE task_detail SET started = ? WHERE id = ?`, cronDetailStartedFailed, detailID); err != nil {
+		log.Printf("[cron] mark scheduled task failed: detail=%d err=%v", detailID, err)
+		return
+	}
+	logCronDetailStatusByID(cronDB, detailID, "failed")
+}
+
 func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connectsvc.Service) {
 	if cronDB == nil || connectSvc == nil {
 		return
@@ -22663,8 +23129,7 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 		agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
 		metadata, err := getAgentOutputForChat(cfg.AgentDir, cfg.effectiveDeviceID(), agentTTL, chatID)
 		if err != nil {
-			cronDB.Exec(`UPDATE task_detail SET started = 0 WHERE id = ?`, t.ID)
-			logCronDetailStatusByID(cronDB, t.ID, "reset_started")
+			failScheduledTaskDetail(t.ID, t.AgentID, chatID, fmt.Errorf("build task metadata: %w", err))
 			continue
 		}
 		metaBytes, _ := json.Marshal(metadata)
@@ -22695,8 +23160,7 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 		modelCfg, err := lookupTokenConfigByModel(cronDB, t.Model)
 		if err != nil {
 			log.Printf("[cron] read task model config failed: detail=%d model=%s err=%v", t.ID, t.Model, err)
-			cronDB.Exec(`UPDATE task_detail SET started = 0 WHERE id = ?`, t.ID)
-			logCronDetailStatusByID(cronDB, t.ID, "reset_started")
+			failScheduledTaskDetail(t.ID, t.AgentID, chatID, fmt.Errorf("read task model config: %w", err))
 			continue
 		}
 		// Scheduled and Connect-triggered tasks bypass handleChatCompletions, so
@@ -22733,8 +23197,7 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 			targetURL := strings.TrimRight(cfg.currentHost(), "/") + "/v1/chat/completions"
 			req, err := http.NewRequest(http.MethodPost, targetURL, bytes.NewReader(reqBody))
 			if err != nil {
-				cronDB.Exec(`UPDATE task_detail SET started = 0 WHERE id = ?`, dID)
-				logCronDetailStatusByID(cronDB, dID, "reset_started")
+				failScheduledTaskDetail(dID, agentID, cID, fmt.Errorf("create upstream request: %w", err))
 				return
 			}
 			req.Header.Set("Content-Type", "application/json")
@@ -22745,21 +23208,32 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 
 			resp, err := proxyClient.Do(req)
 			if err != nil {
-				cronDB.Exec(`UPDATE task_detail SET started = 0 WHERE id = ?`, dID)
-				logCronDetailStatusByID(cronDB, dID, "reset_started")
+				failScheduledTaskDetail(dID, agentID, cID, fmt.Errorf("forward upstream request: %w", err))
+				sendSSECompletionNotification(chatTypeScheduledTask, taskType, "", true)
 				return
 			}
 			defer resp.Body.Close()
 
-			payload, readErr := io.ReadAll(resp.Body)
+			payload, readErr := readScheduledTaskSSEBody(resp.Body, scheduledTaskReadTimeout(cfg))
 			if len(payload) > 0 {
 				appendChatLogDB(agentID, cID, chatTypeScheduledTask, "A", detectResponseType(string(payload)), string(payload))
 			}
-			abnormalStream := readErr != nil || resp.StatusCode < 200 || resp.StatusCode >= 300 || detectResponseType(string(payload)) == "abnormal"
-			if readErr != nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
-				cronDB.Exec(`UPDATE task_detail SET started = 0 WHERE id = ?`, dID)
-				logCronDetailStatusByID(cronDB, dID, "reset_started")
-				sendSSECompletionNotification(chatTypeScheduledTask, taskType, "", abnormalStream)
+			responseType := detectResponseType(string(payload))
+			abnormalStream := readErr != nil || resp.StatusCode < 200 || resp.StatusCode >= 300 || responseType == "abnormal"
+			var failure error
+			switch {
+			case readErr != nil:
+				failure = fmt.Errorf("read upstream SSE response: %w", readErr)
+			case resp.StatusCode < 200 || resp.StatusCode >= 300:
+				failure = fmt.Errorf("upstream returned HTTP %d", resp.StatusCode)
+			case responseType == "abnormal":
+				failure = errors.New("upstream returned an abnormal SSE response")
+			case !sseEventHasDoneMarker(string(payload)):
+				failure = errors.New("upstream SSE response ended without data: [DONE]")
+			}
+			if failure != nil {
+				failScheduledTaskDetail(dID, agentID, cID, failure)
+				sendSSECompletionNotification(chatTypeScheduledTask, taskType, "", true)
 				return
 			}
 			resultContent := extractSSEAssistantText(payload)
