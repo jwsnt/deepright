@@ -21,7 +21,8 @@ curl -I file:///Users/path/project/plan.md
 curl -I http://localhost:8000/sample.txt
 ```
 ### 最少授权
-+ 尽可能少申请权限以免打扰用户，若当前任务已明确涉及工作目录外的数据检查或用户已授权，可使用如下磁盘检查方法
++ 仅在当前任务明确涉及多个应用数据目录，且用户已授权检查该目录时，可使用下列范围固定的磁盘检查方法，避免逐目录探测或反复触发权限交互，不得将该方式扩展到`~/Library`或其他宽泛根目录
++ macOS：
 ```
 du -sh ~/Library/"Application Support"/*/ 2>/dev/null | sort -rh
 ```

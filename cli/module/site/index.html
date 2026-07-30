@@ -4116,6 +4116,29 @@ body.quick-fan-transition-active{cursor:progress}
 .vfs-header .vfs-act-btn{border:none;background:none;cursor:pointer;color:var(--text-muted);padding:2px 4px;font-size:10px;display:flex;align-items:center;opacity:.5;transition:var(--transition)}
 .vfs-header .vfs-act-btn:hover{opacity:1;color:var(--text-primary)}
 .vfs-header .vfs-act-btn svg{width:12px;height:12px}
+.vfs-header .vfs-miniapp-trigger{display:none}
+.vfs-header .vfs-miniapp-trigger.show{display:flex}
+.vfs-miniapp-popover{position:absolute;top:34px;right:8px;z-index:6;display:flex;flex-direction:column;width:min(440px,calc(100% - 16px));height:min(220px,calc(100% - 42px));max-height:calc(100% - 42px);overflow:hidden;border:1px solid rgba(var(--accent-rgb),.24);border-radius:12px;background:linear-gradient(180deg,rgba(255,253,250,.99),rgba(250,239,230,.99));box-shadow:0 16px 34px rgba(16,24,40,.22),inset 0 1px 0 rgba(255,255,255,.9);opacity:0;visibility:hidden;pointer-events:none;transform:translateY(-6px) scale(.98);transform-origin:top right;transition:opacity .18s ease,transform .18s ease,visibility 0s linear .18s}
+.vfs-miniapp-popover.show{opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0) scale(1);transition:opacity .18s ease,transform .18s ease,visibility 0s linear 0s}
+.vfs-miniapp-popover-header{display:flex;align-items:center;gap:8px;min-height:36px;padding:0 8px 0 12px;border-bottom:1px solid var(--border);color:var(--text-primary);font-size:12px;font-weight:700}
+.vfs-miniapp-popover-header span{flex:1;min-width:0}
+.vfs-miniapp-close{display:grid;place-items:center;width:25px;height:25px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--text-muted);cursor:pointer}
+.vfs-miniapp-close:hover,.vfs-miniapp-close:focus-visible{background:rgba(var(--accent-rgb),.10);color:var(--text-primary);outline:none}
+.vfs-miniapp-close svg{width:14px;height:14px}
+.vfs-miniapp-list{flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:scroll;padding:7px;scrollbar-color:color-mix(in srgb,var(--border) 62%,var(--accent) 38%) transparent;scrollbar-width:thin;scrollbar-gutter:stable}
+.vfs-miniapp-list::-webkit-scrollbar{width:8px}
+.vfs-miniapp-list::-webkit-scrollbar-track{background:rgba(255,255,255,.32);border-radius:999px}
+.vfs-miniapp-list::-webkit-scrollbar-thumb{border:2px solid transparent;border-radius:999px;background:color-mix(in srgb,var(--border) 62%,var(--accent) 38%);background-clip:padding-box}
+.vfs-miniapp-list::-webkit-scrollbar-thumb:hover{background:var(--accent);background-clip:padding-box}
+.vfs-miniapp-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:3px 7px;align-items:center}
+.vfs-miniapp-grid-head{padding:3px 7px;color:var(--text-muted);font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.vfs-miniapp-file{min-width:0;overflow:hidden;padding:6px 7px;border:0;border-radius:7px;background:transparent;color:var(--text-primary);font:inherit;font-size:11px;line-height:1.3;text-align:left;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.vfs-miniapp-file:hover,.vfs-miniapp-file:focus-visible{background:rgba(var(--accent-rgb),.10);color:var(--accent);outline:none}
+.vfs-miniapp-file.empty{color:var(--text-muted);cursor:default}
+.vfs-miniapp-file.empty:hover{background:transparent;color:var(--text-muted)}
+.vfs-miniapp-empty{padding:18px 12px;color:var(--text-muted);font-size:11px;line-height:1.5;text-align:center}
+[data-theme="dark"] .vfs-miniapp-popover{border-color:rgba(126,220,255,.28);background:linear-gradient(180deg,rgba(23,39,66,.98),rgba(15,27,47,.98));box-shadow:0 18px 38px rgba(0,0,0,.4)}
+[data-theme="dark"] .vfs-miniapp-list::-webkit-scrollbar-track{background:rgba(0,0,0,.16)}
 .vfs-header .vfs-act-btn.glow svg{filter:drop-shadow(0 0 2px var(--accent));animation:vfsGlow 1.5s ease-in-out infinite}
 @keyframes vfsSkillPulse{0%,100%{transform:translateX(0) scale(1);box-shadow:0 0 0 1px var(--warm-pill-ring) inset,0 0 16px var(--warm-pill-glow-strong),0 0 26px var(--warm-pill-glow)}50%{transform:translateX(0) scale(1.03);box-shadow:0 0 0 1px color-mix(in srgb,var(--warm-pill-ring) 78%,#fff 22%) inset,0 0 20px color-mix(in srgb,var(--warm-pill-glow-strong) 82%,#fff 18%),0 0 32px color-mix(in srgb,var(--warm-pill-glow) 88%,#fff 12%)}}
 @keyframes vfsSkillShimmer{0%{transform:translateX(-160%)}55%{transform:translateX(140%)}100%{transform:translateX(140%)}}
@@ -4284,10 +4307,10 @@ body.quick-fan-transition-active{cursor:progress}
 .vfs-item .vfs-warning-btn{width:16px;height:16px;border:none;background:transparent;color:var(--error);display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;cursor:pointer;animation:vfsWarningPulse .32s steps(2,end) infinite}
 .vfs-item .vfs-warning-btn:hover{color:#ff7a18;transform:scale(1.08)}
 .vfs-item .vfs-warning-btn svg{width:16px;height:16px;color:currentColor}
-.vfs-item .vfs-del{width:15px;height:15px;border:none;background:transparent;cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity .16s ease,visibility 0s linear .16s}
-.vfs-item:hover .vfs-del{opacity:.5;visibility:visible;pointer-events:auto;transition:opacity .16s ease}
-.vfs-item .vfs-del:hover{opacity:1}
-.vfs-item .vfs-del svg{width:15px;height:15px;color:var(--text-muted)}
+.vfs-item .vfs-path-copy,.vfs-item .vfs-del{width:15px;height:15px;border:none;background:transparent;cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity .16s ease,visibility 0s linear .16s}
+.vfs-item:hover .vfs-path-copy,.vfs-item:hover .vfs-del{opacity:.5;visibility:visible;pointer-events:auto;transition:opacity .16s ease}
+.vfs-item .vfs-path-copy:hover,.vfs-item .vfs-del:hover{opacity:1}
+.vfs-item .vfs-path-copy svg,.vfs-item .vfs-del svg{width:15px;height:15px;color:var(--text-muted)}
 .vfs-item .vfs-dl{width:18px;height:18px;border:none;background:transparent;cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity .16s ease,visibility 0s linear .16s}
 .vfs-item:hover .vfs-dl{opacity:.5;visibility:visible;pointer-events:auto;transition:opacity .16s ease}
 .vfs-item .vfs-dl:hover{opacity:1}
@@ -4813,6 +4836,9 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
         <div class="vfs-upload-progress" id="vfsUploadProgress" onclick="vfsUploadCancel()" title="取消上传"></div>
         <span class="vfs-path" id="vfsPath"></span>
         <div class="vfs-actions">
+          <button class="vfs-act-btn vfs-miniapp-trigger" id="vfsMiniappTrigger" type="button" onclick="vfsToggleMiniappPopover(event)" title="迷你应用" aria-label="迷你应用" aria-expanded="false" aria-controls="vfsMiniappPopover">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"></rect><rect x="14" y="4" width="6" height="6" rx="1"></rect><rect x="4" y="14" width="6" height="6" rx="1"></rect><rect x="14" y="14" width="6" height="6" rx="1"></rect></svg>
+          </button>
           <button class="vfs-act-btn" id="vfsCreateBtn" onclick="vfsShowCreate(event)" title="新建">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </button>
@@ -4824,6 +4850,10 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
           </button>
         </div>
       </div>
+      <section class="vfs-miniapp-popover" id="vfsMiniappPopover" role="dialog" aria-modal="false" aria-label="迷你应用列表" aria-hidden="true" onclick="event.stopPropagation()">
+        <div class="vfs-miniapp-popover-header"><span>迷你应用</span><button class="vfs-miniapp-close" type="button" onclick="vfsHideMiniappPopover()" aria-label="关闭迷你应用列表" title="关闭"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+        <div class="vfs-miniapp-list" id="vfsMiniappList"></div>
+      </section>
       <div class="vfs-list" id="vfsList"></div>
       <div class="vfs-warning-popover" id="vfsWarningPopover" data-overlay-base data-overlay-domain="left" data-overlay-order="26" aria-hidden="true" onclick="event.stopPropagation()">
         <div class="vfs-warning-popover-title">文件解析异常</div>
@@ -47442,6 +47472,8 @@ let vfsInitialized = false;
 let vfsRecentFileTimer = null;
 let vfsRecentFileRenderGeneration = 0;
 let vfsRecentFilePointerMoveGeneration = -1;
+let vfsMiniappItems = [];
+let vfsMiniappPopoverOpen = false;
 const VFS_RECENT_FILE_WINDOW_MS = 30 * 1000;
 const VFS_RECENT_FILE_DISMISSALS_STORAGE_KEY = 'deepright.vfs.recent-file-dismissals.v1';
 const VFS_RECENT_FILE_ROOT_EXEMPTIONS = new Set(['config.json', 'Knowledge.md', 'mcp.json', 'SOUL.md', 'USER.md']);
@@ -47540,6 +47572,156 @@ function vfsDismissRecentFile(absPath, modifiedAt) {
   return true;
 }
 
+function vfsIsCurrentMiniappDirectory() {
+  const currentPath = normalizeFsPath(vfsCurrentPath);
+  const miniappPath = normalizeFsPath(joinFsPath(vfsWorkspace, 'app'));
+  return !!currentPath && !!miniappPath && currentPath === miniappPath;
+}
+
+function vfsMiniappFileStem(name) {
+  return String(name || '').replace(/\.[^.]+$/, '').toLocaleLowerCase();
+}
+
+function vfsGetMiniappPairs(entries) {
+  const files = (Array.isArray(entries) ? entries : []).filter(entry => entry && entry.type === 'file' && typeof entry.name === 'string');
+  const htmlFiles = files
+    .filter(entry => /\.html?$/i.test(entry.name))
+    .sort((left, right) => left.name.localeCompare(right.name));
+  const markdownFiles = files.filter(entry => /\.md$/i.test(entry.name));
+  const usedMarkdownNames = new Set();
+  const pairedMarkdownByHtml = new Map();
+
+  // Pair longer prefixes first, so `report-detail.html` cannot be claimed by
+  // the shorter `report.html` when both applications exist in the directory.
+  htmlFiles.slice().sort((left, right) => {
+    const lengthDifference = vfsMiniappFileStem(right.name).length - vfsMiniappFileStem(left.name).length;
+    return lengthDifference || left.name.localeCompare(right.name);
+  }).forEach(htmlFile => {
+    const htmlStem = vfsMiniappFileStem(htmlFile.name);
+    const candidates = markdownFiles
+      .filter(markdownFile => !usedMarkdownNames.has(markdownFile.name))
+      .map(markdownFile => {
+        const markdownStem = vfsMiniappFileStem(markdownFile.name);
+        if (!markdownStem.startsWith(htmlStem)) return null;
+        const suffix = markdownStem.slice(htmlStem.length);
+        const rank = !suffix ? 0 : (/^[_.-]/.test(suffix) ? 1 : 2);
+        return { markdownFile, rank };
+      })
+      .filter(Boolean)
+      .sort((left, right) => left.rank - right.rank || left.markdownFile.name.length - right.markdownFile.name.length || left.markdownFile.name.localeCompare(right.markdownFile.name));
+    if (!candidates.length) return;
+    const matched = candidates[0].markdownFile;
+    usedMarkdownNames.add(matched.name);
+    pairedMarkdownByHtml.set(htmlFile.name, matched);
+  });
+
+  return htmlFiles.map(htmlFile => ({ html: htmlFile, markdown: pairedMarkdownByHtml.get(htmlFile.name) || null }));
+}
+
+function vfsRenderMiniappList() {
+  const list = document.getElementById('vfsMiniappList');
+  if (!list) return;
+  const pairs = vfsGetMiniappPairs(vfsMiniappItems);
+  list.replaceChildren();
+  if (!pairs.length) {
+    const empty = document.createElement('div');
+    empty.className = 'vfs-miniapp-empty';
+    empty.textContent = '当前 app 目录中没有 HTML 迷你应用';
+    list.appendChild(empty);
+    return;
+  }
+
+  const grid = document.createElement('div');
+  grid.className = 'vfs-miniapp-grid';
+  ['HTML', 'MD'].forEach(label => {
+    const head = document.createElement('div');
+    head.className = 'vfs-miniapp-grid-head';
+    head.textContent = label;
+    grid.appendChild(head);
+  });
+  const appendFile = file => {
+    const item = document.createElement(file ? 'button' : 'span');
+    item.className = 'vfs-miniapp-file' + (file ? '' : ' empty');
+    item.textContent = file ? file.name : '';
+    if (!file) {
+      item.setAttribute('aria-label', '没有对应的 Markdown 文件');
+      grid.appendChild(item);
+      return;
+    }
+    item.type = 'button';
+    item.title = file.name;
+    item.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      vfsOpenMiniappFile(file.name);
+    });
+    grid.appendChild(item);
+  };
+  pairs.forEach(pair => {
+    appendFile(pair.html);
+    appendFile(pair.markdown);
+  });
+  list.appendChild(grid);
+}
+
+function vfsHideMiniappPopover() {
+  const popover = document.getElementById('vfsMiniappPopover');
+  const trigger = document.getElementById('vfsMiniappTrigger');
+  vfsMiniappPopoverOpen = false;
+  if (popover) {
+    popover.classList.remove('show');
+    popover.setAttribute('aria-hidden', 'true');
+  }
+  if (trigger) trigger.setAttribute('aria-expanded', 'false');
+}
+
+function vfsToggleMiniappPopover(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  if (!vfsIsCurrentMiniappDirectory()) {
+    vfsHideMiniappPopover();
+    return;
+  }
+  if (vfsMiniappPopoverOpen) {
+    vfsHideMiniappPopover();
+    return;
+  }
+  vfsRenderMiniappList();
+  const popover = document.getElementById('vfsMiniappPopover');
+  const trigger = document.getElementById('vfsMiniappTrigger');
+  if (!popover || !trigger) return;
+  vfsMiniappPopoverOpen = true;
+  popover.classList.add('show');
+  popover.setAttribute('aria-hidden', 'false');
+  trigger.setAttribute('aria-expanded', 'true');
+}
+
+function vfsOpenMiniappFile(name) {
+  const fileName = String(name || '').trim();
+  const exists = vfsMiniappItems.some(entry => entry && entry.type === 'file' && entry.name === fileName);
+  if (!fileName || !exists || !vfsIsCurrentMiniappDirectory()) return;
+  vfsHideMiniappPopover();
+  // Keep previews identical to opening the same entry from the VFS list.
+  feOpen(joinFsPath(vfsCurrentPath, fileName));
+}
+
+function vfsSyncMiniappControl(entries) {
+  const trigger = document.getElementById('vfsMiniappTrigger');
+  const available = vfsIsCurrentMiniappDirectory();
+  vfsMiniappItems = available && Array.isArray(entries) ? entries.slice() : [];
+  if (trigger) {
+    trigger.classList.toggle('show', available);
+    trigger.setAttribute('aria-hidden', available ? 'false' : 'true');
+  }
+  if (!available) {
+    vfsHideMiniappPopover();
+    return;
+  }
+  if (vfsMiniappPopoverOpen) vfsRenderMiniappList();
+}
+
 async function vfsNavigateToOutputDirectory(agentId, directory) {
   const targetAgentId = String(agentId || '').trim();
   const targetDirectory = String(directory || '').trim().replace(/^\/+|\/+$/g, '');
@@ -47547,6 +47729,7 @@ async function vfsNavigateToOutputDirectory(agentId, directory) {
   if (!targetAgentId || !targetDirectory || !sameAgent(getVfsRequestedAgentId(), targetAgentId)) return false;
   if (!sameAgent(vfsAgentId, targetAgentId) || !vfsWorkspace) await vfsLoadWorkspace();
   if (!sameAgent(vfsAgentId, targetAgentId) || !vfsWorkspace) return false;
+  vfsHideMiniappPopover();
   vfsCurrentPath = joinFsPath(vfsWorkspace, targetDirectory);
   vfsSelected.clear();
   vfsLastJson = '';
@@ -47596,6 +47779,11 @@ function vfsInit() {
         hideVfsWarningPopover();
       }
     }
+    const miniappPopover = document.getElementById('vfsMiniappPopover');
+    const miniappTrigger = document.getElementById('vfsMiniappTrigger');
+    if (vfsMiniappPopoverOpen && miniappPopover && !(miniappPopover.contains(e.target) || (miniappTrigger && miniappTrigger.contains(e.target)))) {
+      vfsHideMiniappPopover();
+    }
   });
   return initialLoad;
 }
@@ -47608,6 +47796,7 @@ async function vfsLoadWorkspace() {
     clearTimeout(vfsRecentFileTimer);
     vfsRecentFileTimer = null;
   }
+  vfsHideMiniappPopover();
   vfsCurrentPath = '';
   vfsLastJson = '';
   vfsSelected.clear();
@@ -47767,6 +47956,7 @@ function vfsRender(entries) {
   pathEl.textContent = relPath === '.' ? '' : relPath;
   pathEl.classList.toggle('warning-active', getVfsWarningChain(vfsCurrentPath).size > 0);
   const list = document.getElementById('vfsList');
+  vfsSyncMiniappControl(entries);
   const warningChain = getVfsWarningChain(vfsCurrentPath);
   const now = Date.now();
   const recentDismissals = vfsReadRecentFileDismissals(now);
@@ -47785,6 +47975,7 @@ function vfsRender(entries) {
     const icon = e.type === 'dir'
       ? defaultFolderIcon
       : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+    const copyPath = '<button class="vfs-path-copy" onclick="event.stopPropagation();vfsCopyPath(\'' + esc(e.name) + '\')" title="复制文件路径" aria-label="复制文件路径"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"/></svg></button>';
     const del = '<button class="vfs-del" onclick="event.stopPropagation();vfsRequestDel(event,\'' + esc(e.name) + '\',\'' + e.type + '\')" title="删除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>';
     const dl = '<button class="vfs-dl" onclick="event.stopPropagation();vfsDownload(event,\'' + esc(e.name) + '\')" title="下载"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>';
     const absPath = vfsCurrentPath + '/' + e.name;
@@ -47837,7 +48028,7 @@ function vfsRender(entries) {
     const skillDisableTourItemId = skillDisabled && isSkillDisableTourTargetPath(absPath) ? ' id="vfsSkillDisableTourItem"' : '';
     const vfsEditTourCls = vfsEditTourState.sourcePath && absPath === vfsEditTourState.sourcePath ? ' vfs-edit-tour-source' : '';
     const cls = `${sel}${isRecentFile ? ' recent-file' : ''}${inChain ? ' warning-path' : ''}${warning ? ' warning-file' : ''}${vfsEditTourCls}`;
-    return `<div class="vfs-item${cls}"${skillDisableTourItemId || itemId} data-vfs-name="${esc(e.name)}" data-vfs-type="${e.type}" data-vfs-path="${esc(absPath)}" data-vfs-modified-at="${modifiedAt}" draggable="true" onmouseenter="vfsHover(event,'${esc(e.name)}','${e.type}',${modifiedAt})" ondragstart="vfsDragStart(event,'${esc(absPath)}')" onclick="vfsClick(event,'${esc(e.name)}','${e.type}',${modifiedAt})" ondblclick="vfsDoubleClick(event,'${esc(e.name)}','${e.type}')">${skillIcon}<span class="vfs-name">${esc(e.name)}</span><span class="vfs-actions">${repairBtn}${warningBtn}${del}${dl}${soulBtn}</span></div>`;
+    return `<div class="vfs-item${cls}"${skillDisableTourItemId || itemId} data-vfs-name="${esc(e.name)}" data-vfs-type="${e.type}" data-vfs-path="${esc(absPath)}" data-vfs-modified-at="${modifiedAt}" draggable="true" onmouseenter="vfsHover(event,'${esc(e.name)}','${e.type}',${modifiedAt})" ondragstart="vfsDragStart(event,'${esc(absPath)}')" onclick="vfsClick(event,'${esc(e.name)}','${e.type}',${modifiedAt})" ondblclick="vfsDoubleClick(event,'${esc(e.name)}','${e.type}')">${skillIcon}<span class="vfs-name">${esc(e.name)}</span><span class="vfs-actions">${repairBtn}${warningBtn}${copyPath}${del}${dl}${soulBtn}</span></div>`;
   }).join('');
   vfsRecentFileRenderGeneration += 1;
   vfsScheduleRecentFileExpiry(entries);
@@ -47979,6 +48170,7 @@ async function vfsClick(e, name, type, modifiedAt) {
   hideVfsWarningPopover();
   hideVfsRepairPopover();
   if (type === 'dir') {
+    vfsHideMiniappPopover();
     vfsCurrentPath = vfsCurrentPath + '/' + name;
     vfsLastJson = '';
     vfsRefresh();
@@ -48025,6 +48217,7 @@ function vfsGoUp() {
   if (!vfsCurrentPath || vfsCurrentPath === vfsWorkspace) return;
   hideVfsWarningPopover();
   hideVfsRepairPopover();
+  vfsHideMiniappPopover();
   const parts = vfsCurrentPath.split('/');
   parts.pop();
   vfsCurrentPath = parts.join('/') || vfsWorkspace;
@@ -48034,6 +48227,16 @@ function vfsGoUp() {
 
 // VFS Delete
 let vfsDelPending = null; // {name, type}
+
+async function vfsCopyPath(name) {
+  const absolutePath = joinFsPath(vfsCurrentPath, name);
+  try {
+    await copyTextToClipboard(absolutePath);
+    vfsShowUploadToast('绝对路径已复制到系统剪贴板', false, { placement: 'vfs' });
+  } catch (err) {
+    vfsShowUploadToast('绝对路径复制失败', true, { placement: 'vfs' });
+  }
+}
 
 async function vfsRequestDel(event, name, type) {
   if (isOnboardingActive() && isVfsDragTourOnboardingStep(onboardingState.step)) {
