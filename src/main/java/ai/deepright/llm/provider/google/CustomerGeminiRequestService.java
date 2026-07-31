@@ -84,16 +84,16 @@ public class CustomerGeminiRequestService extends GeminiRequestService {
         @Value("${gemini.model.multiOutput:gemini-3.1-flash-image-preview}")
         protected String multiOutput;
 
-        @Value("${gemini.model.multiInput:gemini-3.5-flash}")
+        @Value("${gemini.model.multiInput:gemini-3.6-flash}")
         protected String multiInput;
 
         @Value("${gemini.model.thinking:gemini-3.1-pro-preview}")
         protected String thinking;
 
-        @Value("${gemini.model.fast:gemini-3.5-flash}")
+        @Value("${gemini.model.fast:gemini-3.6-flash}")
         protected String fast;
 
-        @Value("${gemini.model.base:gemini-3.5-flash}")
+        @Value("${gemini.model.base:gemini-3.6-flash}")
         protected String base;
 
         @Value("${gemini.model.rate:0.65}")

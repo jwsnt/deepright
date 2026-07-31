@@ -11438,7 +11438,22 @@ func integrationClientRuntimeConfig(raw map[string]interface{}) map[string]inter
 			config[key] = value
 		}
 	}
+	config["runtime-platform"] = integrationClientRuntimePlatform()
 	return config
+}
+
+func integrationClientRuntimePlatform() string {
+	switch integrationRuntimeGOOS {
+	case "linux":
+		if integrationBrowserIsWSL() {
+			return "wsl"
+		}
+		return "linux"
+	case "darwin":
+		return "macos"
+	default:
+		return integrationRuntimeGOOS
+	}
 }
 
 func handleRuntimeConfig() http.HandlerFunc {
@@ -20146,6 +20161,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/skills_warning", handleSkillsWarning(&cfg))
 	mux.HandleFunc("/mcp_warning", handleMCPWarning(&cfg))
 	mux.HandleFunc("/api/files", handleFiles())
+	mux.HandleFunc("/api/backup/status", handleBackupStatus(&cfg))
 	mux.HandleFunc("/api/data", handleData())
 	mux.HandleFunc("/api/workspace", handleWorkspace(&cfg))
 	mux.HandleFunc("/api/url_preview_probe", handleURLPreviewProbe(proxyClient))
@@ -20291,6 +20307,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	initCronDB()
 	startIntegrationLogRetentionCleanup(ctx)
 	startIntegrationTempCleanup(ctx, cfg.AgentDir)
+	startIntegrationAgentBackups(ctx, cfg.AgentDir)
 	startIntegrationMiniappDocumentRecovery(ctx, cfg.AgentDir, cfg.DefaultDir)
 	startCronCheck(ctx, &cfg)
 	startIntegrationMCPRefresh(ctx, &cfg)

@@ -30,18 +30,17 @@ const (
 )
 
 var (
-	browserWSLDetectFn                = browserIsWSLSystem
-	browserWSLPathWindowsFn           = browserWSLPathToWindows
-	browserWSLPathUnixFn              = browserWSLPathToUnix
-	browserWSLProcessExistsFn         = browserWSLWindowsProcessExists
-	browserWSLWindowsPortFreeFn       = browserIsWSLWindowsPortFree
-	browserWSLBootstrapLifecycleFn    = browserRunWSLBootstrapLifecycle
-	browserWSLAgentRootDirFn          = browserDefaultWSLAgentRoot
-	browserWSLBaseUserDataDirFn       = browserDefaultWSLChromeBase
-	browserWSLTerminateProcessFn      = browserTerminateWSLWindowsProcess
-	browserWSLCommandStartProcessFn   = browserStartAttachedChromeProcess
-	browserWSLCommandWaitForExitFn    = browserWaitForChromeProcessExit
-	browserWSLCleanupChromeUserDataFn = browserCleanupWSLChromeUserData
+	browserWSLDetectFn              = browserIsWSLSystem
+	browserWSLPathWindowsFn         = browserWSLPathToWindows
+	browserWSLPathUnixFn            = browserWSLPathToUnix
+	browserWSLProcessExistsFn       = browserWSLWindowsProcessExists
+	browserWSLWindowsPortFreeFn     = browserIsWSLWindowsPortFree
+	browserWSLBootstrapLifecycleFn  = browserRunWSLBootstrapLifecycle
+	browserWSLAgentRootDirFn        = browserDefaultWSLAgentRoot
+	browserWSLBaseUserDataDirFn     = browserDefaultWSLChromeBase
+	browserWSLTerminateProcessFn    = browserTerminateWSLWindowsProcess
+	browserWSLCommandStartProcessFn = browserStartAttachedChromeProcess
+	browserWSLCommandWaitForExitFn  = browserWaitForChromeProcessExit
 )
 
 func browserDefaultWSLRuntimeRoot() string {
@@ -126,17 +125,6 @@ func browserRunWSLBootstrapLifecycle(flags map[string]string) error {
 		}, err)
 		return err
 	}
-	if err := browserWSLCleanupChromeUserDataFn(launchProfileDir); err != nil {
-		browserLogWSLLifecycleEvent("browser_start_wsl_cdp", "cleanup_error", map[string]any{
-			"chromePath":       chromePath,
-			"profileDir":       profileDir,
-			"launchProfileDir": launchProfileDir,
-			"port":             browserWSLBootstrapPort,
-			"command":          commandLine,
-		}, err)
-		return err
-	}
-
 	browserLogWSLLifecycleEvent("browser_start_wsl_cdp", "launch_command", map[string]any{
 		"chromePath":       chromePath,
 		"profileDir":       profileDir,
@@ -714,75 +702,6 @@ func browserWSLManagedChromeProfileDir(port int) string {
 	return browserWSLManagedProfileRoot + `\chrome_` + strconv.Itoa(port)
 }
 
-func browserCleanupWSLChromeUserData(profileDir string) error {
-	windowsProfileDir, err := browserResolveWSLChromeProfileCleanupDir(profileDir)
-	if err != nil {
-		return err
-	}
-	script := browserWSLChromeLockCleanupScript(windowsProfileDir)
-	output, err := exec.Command(
-		browserWSLPowerShellPath,
-		"-NoProfile",
-		"-NonInteractive",
-		"-EncodedCommand",
-		browserWSLEncodePowerShellCommand(script),
-	).CombinedOutput()
-	if err == nil {
-		return nil
-	}
-	message := strings.TrimSpace(string(output))
-	if message == "" {
-		return fmt.Errorf("cleanup chrome lock files failed for %s: %w", windowsProfileDir, err)
-	}
-	return fmt.Errorf("cleanup chrome lock files failed for %s: %w: %s", windowsProfileDir, err, message)
-}
-
-func browserResolveWSLChromeProfileCleanupDir(profileDir string) (string, error) {
-	profileDir = strings.TrimSpace(profileDir)
-	if profileDir == "" {
-		return "", fmt.Errorf("wsl chrome profile dir is required")
-	}
-	if len(profileDir) >= 3 && profileDir[1] == ':' && (profileDir[2] == '\\' || profileDir[2] == '/') {
-		return strings.ReplaceAll(profileDir, "/", `\`), nil
-	}
-	windowsProfileDir, err := browserWSLPathWindowsFn(profileDir)
-	if err != nil {
-		return "", err
-	}
-	windowsProfileDir = strings.TrimSpace(windowsProfileDir)
-	if windowsProfileDir == "" {
-		return "", fmt.Errorf("resolved empty windows profile dir for %s", profileDir)
-	}
-	return strings.ReplaceAll(windowsProfileDir, "/", `\`), nil
-}
-
-func browserWSLChromeLockCleanupScript(profileDir string) string {
-	lockNames := browserChromeUserDataLockNames("windows")
-	quotedNames := make([]string, 0, len(lockNames))
-	for _, name := range lockNames {
-		quotedNames = append(quotedNames, "'"+strings.ReplaceAll(strings.TrimSpace(name), "'", "''")+"'")
-	}
-	return fmt.Sprintf(`$ErrorActionPreference = 'Stop'
-$profileDir = '%s'
-if (-not (Test-Path -LiteralPath $profileDir)) { exit 0 }
-$lockNames = @(%s)
-$targets = Get-ChildItem -LiteralPath $profileDir -Force -Recurse -ErrorAction SilentlyContinue |
-  Where-Object {
-    $lockNames -contains $_.Name -or
-    $_.Name -like '*.lock' -or
-    $_.Name -like '*-journal'
-  } |
-  Select-Object -ExpandProperty FullName -Unique |
-  Sort-Object Length -Descending
-foreach ($target in $targets) {
-  Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction Stop
-  if (Test-Path -LiteralPath $target) {
-    throw "failed to remove lock entry: $target"
-  }
-}
-`, strings.ReplaceAll(profileDir, "'", "''"), strings.Join(quotedNames, ", "))
-}
-
 func browserWSLEncodePowerShellCommand(script string) string {
 	encoded := utf16.Encode([]rune(script))
 	bytes := make([]byte, 0, len(encoded)*2)
@@ -837,7 +756,6 @@ func browserTerminateWSLManagedInstance(item browserInstanceRecord) error {
 	if pid <= 0 {
 		if item.Port > 0 {
 			if free, err := browserWSLWindowsPortFreeFn(item.Port); err == nil && free {
-				browserWSLBestEffortCleanupProfileLocks(item)
 				return nil
 			}
 		}
@@ -846,7 +764,6 @@ func browserTerminateWSLManagedInstance(item browserInstanceRecord) error {
 	if err := browserWSLTerminateProcessFn(pid, item.Port); err != nil {
 		return err
 	}
-	browserWSLBestEffortCleanupProfileLocks(item)
 	return nil
 }
 
@@ -934,36 +851,6 @@ func browserWSLNetstatContainsPID(pid int) (bool, error) {
 		}
 	}
 	return false, nil
-}
-
-func browserWSLBestEffortCleanupProfileLocks(item browserInstanceRecord) {
-	profileDir := strings.TrimSpace(item.ProfileDir)
-	if profileDir == "" {
-		if value, ok := browserWSLInstanceLookupUserDataDir(item.AgentID, item.ChatID); ok {
-			profileDir = value
-		}
-	}
-	if profileDir == "" {
-		return
-	}
-	if err := browserWSLCleanupChromeUserDataFn(profileDir); err != nil {
-		browserShutdownTrace("instance.shutdown.lock_cleanup.warn", map[string]any{
-			"agentId":    item.AgentID,
-			"chatId":     item.ChatID,
-			"pid":        item.PID,
-			"port":       item.Port,
-			"profileDir": profileDir,
-			"error":      err.Error(),
-		})
-		return
-	}
-	browserShutdownTrace("instance.shutdown.lock_cleanup.ok", map[string]any{
-		"agentId":    item.AgentID,
-		"chatId":     item.ChatID,
-		"pid":        item.PID,
-		"port":       item.Port,
-		"profileDir": profileDir,
-	})
 }
 
 func browserIsWSLWindowsPortFree(port int) (bool, error) {

@@ -27,8 +27,8 @@ curl -I http://localhost:8000/sample.txt
 du -sh ~/Library/"Application Support"/*/ 2>/dev/null | sort -rh
 ```
 ### 网页文件
-+ 静态网页及其资源可以放在`#workspace/app`，并使用`#origin/mapping/#agentId/$页面名称`访问，其中`/mapping/#agentId`为固定路径
-+ 路径`mapping/#agentId/$页面名称`映射目录`#workspace/app`
++ 静态网页及其资源可以放在`#workspace/app`，并使用`#origin/mapping/#agentId/<相对路径>`访问，其中`/mapping/#agentId/`为固定前缀，`<相对路径>`应替换为当前值
++ 路径`mapping/#agentId/<相对路径>`映射目录`#workspace/app`
 + 该服务为主进程静态资源映射，禁止重启或终止
 ### 写在最后
 + 有交付物必须要附带，过程可以弱化，在用户需要复盘或跟踪时再细化，结论附最后

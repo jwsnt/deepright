@@ -930,7 +930,7 @@ func TestBrowserInitInstanceOnWSLDoesNotRetryDifferentPortsAfterLauncherFailure(
 	}
 }
 
-func TestBrowserPrepareChromeUserDataDirOnWSLCleansLocksBeforeLaunch(t *testing.T) {
+func TestBrowserPrepareChromeUserDataDirOnWSLDoesNotCleanLocks(t *testing.T) {
 	restore := stubBrowserRuntime()
 	defer restore()
 
@@ -942,40 +942,16 @@ func TestBrowserPrepareChromeUserDataDirOnWSLCleansLocksBeforeLaunch(t *testing.
 	browserWSLDetectFn = func() (bool, error) {
 		return true, nil
 	}
-	cleanedProfiles := []string{}
-	browserWSLCleanupChromeUserDataFn = func(profileDir string) error {
-		cleanedProfiles = append(cleanedProfiles, profileDir)
-		return nil
+	lockPath := filepath.Join(profileDir, "SingletonLock")
+	if err := os.WriteFile(lockPath, []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
 	}
 
 	if err := browserPrepareChromeUserDataDir(map[string]string{}, profileDir); err != nil {
 		t.Fatal(err)
 	}
-	if len(cleanedProfiles) != 1 || cleanedProfiles[0] != profileDir {
-		t.Fatalf("cleaned profiles = %v, want [%q]", cleanedProfiles, profileDir)
-	}
-}
-
-func TestBrowserPrepareChromeUserDataDirOnWSLCleanupFailureStopsInit(t *testing.T) {
-	restore := stubBrowserRuntime()
-	defer restore()
-
-	profileDir := filepath.Join(t.TempDir(), "chrome_58354")
-	if err := os.MkdirAll(profileDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	browserWSLDetectFn = func() (bool, error) {
-		return true, nil
-	}
-	wantErr := errors.New("cleanup failed")
-	browserWSLCleanupChromeUserDataFn = func(profileDir string) error {
-		return wantErr
-	}
-
-	err := browserPrepareChromeUserDataDir(map[string]string{}, profileDir)
-	if !errors.Is(err, wantErr) {
-		t.Fatalf("err = %v, want %v", err, wantErr)
+	if _, err := os.Stat(lockPath); err != nil {
+		t.Fatalf("WSL profile lock was removed: %v", err)
 	}
 }
 
@@ -1299,7 +1275,7 @@ func TestBrowserDestroyMissingStateFallbackItemsOnWSLOnlyUsesBrowserData(t *test
 	}
 }
 
-func TestBrowserTerminateManagedInstanceOnWSLUsesWindowsHostForceKillAndIgnoresLockCleanupFailure(t *testing.T) {
+func TestBrowserTerminateManagedInstanceOnWSLUsesWindowsHostForceKillWithoutLockCleanup(t *testing.T) {
 	restore := stubBrowserRuntime()
 	defer restore()
 
@@ -1314,15 +1290,6 @@ func TestBrowserTerminateManagedInstanceOnWSLUsesWindowsHostForceKillAndIgnoresL
 		}
 		return nil
 	}
-	cleanupCalls := 0
-	browserWSLCleanupChromeUserDataFn = func(profileDir string) error {
-		cleanupCalls++
-		if profileDir != `C:\ProgramData\deepright\chrome_ab12` {
-			t.Fatalf("unexpected profileDir: %q", profileDir)
-		}
-		return errors.New("lock cleanup failed")
-	}
-
 	err := browserTerminateManagedInstance(browserInstanceRecord{
 		AgentID:    "agent-a",
 		ChatID:     "chat-001",
@@ -1335,9 +1302,6 @@ func TestBrowserTerminateManagedInstanceOnWSLUsesWindowsHostForceKillAndIgnoresL
 	}
 	if forceCalls != 1 {
 		t.Fatalf("forceCalls = %d, want 1", forceCalls)
-	}
-	if cleanupCalls != 1 {
-		t.Fatalf("cleanupCalls = %d, want 1", cleanupCalls)
 	}
 }
 

@@ -54,8 +54,7 @@ type browserWSLInstanceVersion struct {
 }
 
 var (
-	browserWSLInstanceLookupRecordFn  = browserWSLInstanceLookupRecord
-	browserWSLInstanceCopyDirectoryFn = browserCopyWSLChromeUserDataWithProgress
+	browserWSLInstanceLookupRecordFn = browserWSLInstanceLookupRecord
 )
 
 func browserWSLInstanceCommand(args []string) int {
@@ -262,9 +261,6 @@ func browserWSLInstanceRestartStaleRecord(agentID, chatID string, item browserWS
 		}
 		return browserWSLInstanceRecord{}, false, err
 	}
-	if err := browserWSLInstanceCleanupProfileLocks(profileUnix); err != nil {
-		return browserWSLInstanceRecord{}, false, err
-	}
 	if err := browserWSLInstanceWaitForPortRelease(item.Port, 5*time.Second); err != nil {
 		return browserWSLInstanceRecord{}, false, err
 	}
@@ -416,7 +412,11 @@ func browserWSLInstanceProbeRecord(item browserWSLInstanceRecord) (browserWSLIns
 }
 
 func browserWSLInstanceReserveProfileDir() (string, string, error) {
-	if err := os.MkdirAll(browserWSLInstanceProfileRoot, 0o755); err != nil {
+	return browserWSLInstanceReserveProfileDirAt(browserWSLInstanceProfileRoot, browserWSLInstanceProfileRootW)
+}
+
+func browserWSLInstanceReserveProfileDirAt(profileRootUnix, profileRootWin string) (string, string, error) {
+	if err := os.MkdirAll(profileRootUnix, 0o755); err != nil {
 		return "", "", fmt.Errorf("create profile root failed: %w", err)
 	}
 
@@ -426,7 +426,7 @@ func browserWSLInstanceReserveProfileDir() (string, string, error) {
 			return "", "", err
 		}
 		dirName := "chrome_" + suffix
-		profileUnix := filepath.Join(browserWSLInstanceProfileRoot, dirName)
+		profileUnix := filepath.Join(profileRootUnix, dirName)
 		if _, err := os.Stat(profileUnix); err == nil {
 			continue
 		} else if !errors.Is(err, os.ErrNotExist) {
@@ -438,100 +438,9 @@ func browserWSLInstanceReserveProfileDir() (string, string, error) {
 			}
 			return "", "", fmt.Errorf("reserve profile dir failed: %w", err)
 		}
-		profileWin := browserWSLInstanceProfileRootW + `\` + dirName
-		if err := browserWSLInstanceSeedReservedProfileDir(profileWin, profileUnix); err != nil {
-			_ = os.RemoveAll(profileUnix)
-			return "", "", err
-		}
-		return profileWin, profileUnix, nil
+		return strings.TrimRight(profileRootWin, `\/`) + `\` + dirName, profileUnix, nil
 	}
 	return "", "", errors.New("allocate unique chrome user-data-dir failed")
-}
-
-func browserWSLInstanceSeedReservedProfileDir(profileWin, profileUnix string) error {
-	sourceWin := browserWSLChromeDefRoot
-	fields := map[string]any{
-		"profileDir": profileWin,
-		"sourceDir":  sourceWin,
-	}
-
-	sourceUnix, err := browserWSLInstanceWindowsToUnixPath(sourceWin)
-	if err != nil {
-		browserWSLInstanceTraceSeedSkip(fields, "resolve_source_error", err)
-		return browserWSLInstanceResetReservedProfileDir(profileUnix)
-	}
-	fields["sourceDir"] = sourceWin
-
-	sourceInfo, err := os.Stat(sourceUnix)
-	switch {
-	case errors.Is(err, os.ErrNotExist):
-		browserWSLInstanceTraceSeedSkip(fields, "source_missing", err)
-		return browserWSLInstanceResetReservedProfileDir(profileUnix)
-	case err != nil:
-		browserWSLInstanceTraceSeedSkip(fields, "source_stat_error", err)
-		return browserWSLInstanceResetReservedProfileDir(profileUnix)
-	case !sourceInfo.IsDir():
-		browserWSLInstanceTraceSeedSkip(fields, "source_not_dir", fmt.Errorf("chrome_def is not a directory: %s", sourceWin))
-		return browserWSLInstanceResetReservedProfileDir(profileUnix)
-	}
-
-	browserCreateTrace("instance.wsl.user_data.seed.begin", fields)
-	copyStats, err := browserWSLInstanceCopyDirectoryFn(
-		sourceUnix,
-		profileUnix,
-		browserInstanceUserDataProgressTracer("instance.wsl.user_data.seed.progress", fields),
-		browserInstanceUserDataSkipTracer("instance.wsl.user_data.seed.skip", fields),
-	)
-	if err != nil {
-		browserWSLInstanceTraceSeedSkip(fields, "copy_error", err)
-		return browserWSLInstanceResetReservedProfileDir(profileUnix)
-	}
-
-	if err := browserWSLCleanupChromeUserDataFn(profileWin); err != nil {
-		cleanupFields := map[string]any{
-			"profileDir": profileWin,
-			"sourceDir":  sourceWin,
-			"error":      err.Error(),
-		}
-		browserCreateTrace("instance.wsl.user_data.seed.cleanup.warn", cleanupFields)
-	}
-
-	readyFields := map[string]any{
-		"profileDir": profileWin,
-		"sourceDir":  sourceWin,
-		"files":      copyStats.Files,
-		"dirs":       copyStats.Dirs,
-		"bytes":      copyStats.Bytes,
-	}
-	browserCreateTrace("instance.wsl.user_data.seed.ok", readyFields)
-	return nil
-}
-
-func browserWSLInstanceResetReservedProfileDir(profileUnix string) error {
-	profileUnix = strings.TrimSpace(profileUnix)
-	if profileUnix == "" {
-		return errors.New("profile dir is required")
-	}
-	if err := os.RemoveAll(profileUnix); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("reset reserved profile dir failed: %w", err)
-	}
-	if err := os.MkdirAll(profileUnix, 0o755); err != nil {
-		return fmt.Errorf("create reserved profile dir failed: %w", err)
-	}
-	return nil
-}
-
-func browserWSLInstanceTraceSeedSkip(fields map[string]any, reason string, err error) {
-	traceFields := map[string]any{
-		"reason": reason,
-	}
-	for key, value := range fields {
-		traceFields[key] = value
-	}
-	if err != nil {
-		traceFields["error"] = err.Error()
-	}
-	browserCreateTrace("instance.wsl.user_data.seed.skip", traceFields)
 }
 
 func browserWSLInstanceStartChrome(chromePath string, port int, profileWin string, headless bool) (int, error) {
@@ -786,53 +695,6 @@ if (-not [string]::IsNullOrWhiteSpace($match.Groups[2].Value)) {
 		return "", false
 	}
 	return value, true
-}
-
-func browserWSLInstanceCleanupProfileLocks(profileUnix string) error {
-	profileUnix = strings.TrimSpace(profileUnix)
-	if profileUnix == "" {
-		return nil
-	}
-	if _, err := os.Stat(profileUnix); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
-		}
-		return err
-	}
-	return filepath.Walk(profileUnix, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			if errors.Is(err, os.ErrNotExist) {
-				return nil
-			}
-			return err
-		}
-		if info == nil || path == profileUnix {
-			return nil
-		}
-		if !browserWSLInstanceShouldRemoveLockEntry(info.Name()) {
-			return nil
-		}
-		if err := os.RemoveAll(path); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return err
-		}
-		if info.IsDir() {
-			return filepath.SkipDir
-		}
-		return nil
-	})
-}
-
-func browserWSLInstanceShouldRemoveLockEntry(name string) bool {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return false
-	}
-	switch strings.ToUpper(name) {
-	case "LOCK", "LOCKFILE", "SINGLETONLOCK", "SINGLETONCOOKIE", "SINGLETONSOCKET", "DEVTOOLSACTIVEPORT":
-		return true
-	}
-	lowerName := strings.ToLower(name)
-	return strings.HasSuffix(lowerName, ".lock") || strings.HasSuffix(lowerName, "-journal")
 }
 
 func browserWSLInstanceRemoveProfile(profileWin string) error {

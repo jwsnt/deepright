@@ -264,7 +264,7 @@ a{color:var(--accent);text-decoration:none}
 .sidebar-toggle svg,.right-sidebar-toggle svg{width:18px;height:18px;display:block}
 .sidebar.collapsed{width:48px;min-width:48px;overflow:hidden}
 .sidebar.collapsed .sidebar-header{padding:12px 10px;justify-content:flex-start}
-.sidebar.collapsed .sidebar-header .logo,.sidebar.collapsed .sidebar-header .cli-get-queue-status,.sidebar.collapsed .sidebar-header>svg:first-child,.sidebar.collapsed .top-action-cluster,.sidebar.collapsed .sidebar-section-header,.sidebar.collapsed .chat-list,.sidebar.collapsed .vfs,.sidebar.collapsed .sidebar-footer{display:none}
+.sidebar.collapsed .sidebar-header .logo,.sidebar.collapsed .sidebar-header .cli-get-queue-status,.sidebar.collapsed .sidebar-header>svg:first-child,.sidebar.collapsed .browser-recommendation,.sidebar.collapsed .top-action-cluster,.sidebar.collapsed .sidebar-section-header,.sidebar.collapsed .chat-list,.sidebar.collapsed .vfs,.sidebar.collapsed .sidebar-footer{display:none}
 .sidebar.collapsed .sidebar-toggle{margin-left:0}
 .sidebar.collapsed .sidebar-toggle.has-chat-completion-beacon{color:var(--completion-beacon-color);background:var(--completion-beacon-bg);box-shadow:0 0 0 1px var(--completion-beacon-ring),0 0 16px var(--completion-beacon-glow);animation:leftSidebarCompletionBeacon 1.1s ease-in-out infinite}
 .sidebar.collapsed .sidebar-toggle.has-chat-completion-beacon svg{filter:drop-shadow(0 0 6px var(--completion-beacon-glow-strong))}
@@ -273,6 +273,11 @@ a{color:var(--accent);text-decoration:none}
 [data-theme="dark"] .cli-get-queue-status::after{border-bottom-color:rgba(10,14,24,.96)}
 @keyframes leftSidebarCompletionBeacon{0%,100%{box-shadow:0 0 0 1px var(--completion-beacon-bg),0 0 0 rgba(0,0,0,0);filter:brightness(.96)}50%{box-shadow:0 0 0 1px var(--completion-beacon-ring),0 0 22px var(--completion-beacon-glow-strong),0 0 34px var(--completion-beacon-glow);filter:brightness(1.22)}}
 .top-action-cluster{position:relative;display:flex;align-items:center;gap:8px;margin:8px 16px;min-height:48px;isolation:isolate;z-index:6}
+.browser-recommendation{display:none;align-items:center;gap:7px;min-height:36px;margin:2px 16px 0;padding:7px 10px;border:1px solid rgba(var(--accent-rgb),.2);border-radius:10px;background:linear-gradient(180deg,rgba(255,250,246,.9),rgba(255,237,225,.82));box-shadow:inset 0 1px 0 rgba(255,255,255,.86),0 8px 18px rgba(var(--accent-rgb),.08);color:var(--text-secondary);font-size:12px;font-weight:600;line-height:1.35}
+.browser-recommendation.show{display:flex}
+.browser-recommendation svg{width:16px;height:16px;flex:0 0 auto;color:var(--accent)}
+[data-theme="dark"] .browser-recommendation{border-color:rgba(84,220,255,.24);background:linear-gradient(180deg,rgba(15,43,68,.9),rgba(10,29,50,.86));box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 10px 22px rgba(0,0,0,.2);color:#d7eafa}
+[data-theme="dark"] .browser-recommendation svg{color:#76e9ff}
 .chat-list{transition:filter .26s ease,opacity .26s ease}
 .sidebar.fan-menu-open .top-action-cluster .new-chat-btn-wrap,.sidebar.fan-menu-open .sidebar-section-header,.sidebar.fan-menu-open .chat-list{filter:blur(8px);opacity:.42;pointer-events:none;user-select:none}
 .quick-fan-anchor{position:relative;display:flex;align-items:center;justify-content:center;flex:0 0 44px}
@@ -4779,6 +4784,10 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
       </button>
     </div>
+    <div class="browser-recommendation" id="browserRecommendation" role="status" aria-live="polite" aria-hidden="true">
+      <svg class="chrome-logo" viewBox="0 0 24 24" aria-hidden="true"><path fill="#ea4335" d="M12 7h8.66A10 10 0 0 0 3.34 5.75l4.33 7.5A5 5 0 0 1 12 7Z"/><path fill="#34a853" d="m7.67 13.25-4.33-7.5A10 10 0 0 0 12 22l4.33-7.5a5 5 0 0 1-8.66-6.25Z"/><path fill="#fbbc04" d="M16.33 14.5 12 22a10 10 0 0 0 8.66-15H12a5 5 0 0 1 4.33 7.5Z"/><circle cx="12" cy="12" r="4.3" fill="#4285f4"/><circle cx="12" cy="12" r="2.3" fill="#d8ecff"/></svg>
+      <span>使用 Chrome 获得最佳体验</span>
+    </div>
     <div class="top-action-cluster">
       <div class="new-chat-btn-wrap">
         <button class="new-chat-btn" id="newChatBtn" onclick="handleNewChatButtonClick()">
@@ -7748,6 +7757,25 @@ function isCurrentRuntimeMacOS() {
   const platform = getRuntimePlatformHint();
   if (isCurrentRuntimeWindows()) return false;
   return /\bmac/i.test(platform) || /\bmac os x\b/i.test(ua) || /\bmacintosh\b/i.test(ua);
+}
+
+function isCurrentBrowserChrome() {
+  const uaData = navigator.userAgentData;
+  const brands = uaData && Array.isArray(uaData.brands)
+    ? uaData.brands.map(item => String(item && item.brand || '').toLowerCase())
+    : [];
+  if (brands.includes('google chrome')) return true;
+  if (brands.length > 0) return false;
+  const ua = String(navigator.userAgent || '');
+  return /(?:Chrome|CriOS)\//.test(ua) && !/(?:Edg|EdgiOS|EdgA|OPR|Opera|SamsungBrowser|UCBrowser|YaBrowser|FxiOS)\//.test(ua);
+}
+
+function renderBrowserRecommendation() {
+  const el = document.getElementById('browserRecommendation');
+  if (!el) return;
+  const visible = !isCurrentBrowserChrome();
+  el.classList.toggle('show', visible);
+  el.setAttribute('aria-hidden', visible ? 'false' : 'true');
 }
 
 function buildBrowserPerfProfile(archHints) {
@@ -25671,6 +25699,7 @@ async function init() {
   startSkillsWarningTimer();
   startMCPWarningTimer();
   startInstallAppPolling();
+  renderBrowserRecommendation();
   renderQuickFanMenu();
   updateStandaloneButton();
   finalizeBootShell();
@@ -28352,9 +28381,20 @@ async function isCurrentRuntimeWindowsOrWSL() {
   }
 }
 
+async function isCurrentRuntimeWSL() {
+  try {
+    const runtime = await readRuntimeConfig(false);
+    return String(runtime && runtime['runtime-platform'] || '').trim().toLowerCase() === 'wsl';
+  } catch {
+    return false;
+  }
+}
+
 async function pluginModalShouldShowBrowserRestartConfirm() {
   if (!isBrowserPlugin(pluginModalState.plugin)) return false;
   if (pluginModalState.browserRestartConfirmVisible) return false;
+  // WSL starts Browser with an isolated empty profile; it does not copy the host browser login state.
+  if (await isCurrentRuntimeWSL()) return false;
   return await isCurrentRuntimeWindowsOrWSL();
 }
 
@@ -47775,6 +47815,46 @@ function vfsSyncMiniappControl(entries) {
   if (vfsMiniappPopoverOpen) vfsRenderMiniappList();
 }
 
+function vfsBackupDirectoryForCurrentPath() {
+  const currentPath = normalizeFsPath(vfsCurrentPath);
+  const workspace = normalizeFsPath(vfsWorkspace);
+  if (!currentPath || !workspace) return '';
+  for (const directory of ['skills', 'app']) {
+    if (currentPath === joinFsPath(workspace, directory)) return directory;
+  }
+  return '';
+}
+
+function vfsFormatBackupTime(timestamp) {
+  const value = Number(timestamp);
+  if (!Number.isFinite(value) || value <= 0) return '';
+  try {
+    return new Intl.DateTimeFormat('zh-CN', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+    }).format(new Date(value));
+  } catch {
+    return new Date(value).toLocaleString();
+  }
+}
+
+// Request the status after a directory transition instead of adding it to the
+// files response, so the ordinary VFS listing API remains unchanged.
+async function vfsNotifyLastBackupTime() {
+  const directory = vfsBackupDirectoryForCurrentPath();
+  const agentId = String(vfsAgentId || '').trim();
+  const requestPath = normalizeFsPath(vfsCurrentPath);
+  if (!directory || !agentId || !requestPath) return;
+  try {
+    const response = await fetch('/api/backup/status?agentId=' + encodeURIComponent(agentId) + '&directory=' + encodeURIComponent(directory), { cache: 'no-store' });
+    if (!response.ok) return;
+    const payload = await response.json().catch(() => null);
+    if (!payload || Number(payload.status) !== 0 || agentId !== String(vfsAgentId || '').trim() || requestPath !== normalizeFsPath(vfsCurrentPath)) return;
+    const formatted = vfsFormatBackupTime(payload.lastBackupAt);
+    vfsShowUploadToast(formatted ? (directory + ' 最后备份：' + formatted) : (directory + ' 暂无已提交备份'), false, { placement: 'vfs' });
+  } catch {}
+}
+
 async function vfsNavigateToOutputDirectory(agentId, directory) {
   const targetAgentId = String(agentId || '').trim();
   const targetDirectory = String(directory || '').trim().replace(/^\/+|\/+$/g, '');
@@ -47786,6 +47866,7 @@ async function vfsNavigateToOutputDirectory(agentId, directory) {
   vfsCurrentPath = joinFsPath(vfsWorkspace, targetDirectory);
   vfsSelected.clear();
   vfsLastJson = '';
+  vfsNotifyLastBackupTime();
   await vfsRefresh();
   return true;
 }
@@ -48225,6 +48306,7 @@ async function vfsClick(e, name, type, modifiedAt) {
     vfsHideMiniappPopover();
     vfsCurrentPath = vfsCurrentPath + '/' + name;
     vfsLastJson = '';
+    vfsNotifyLastBackupTime();
     vfsRefresh();
   } else {
     feOpen(absPath);
@@ -48274,6 +48356,7 @@ function vfsGoUp() {
   parts.pop();
   vfsCurrentPath = parts.join('/') || vfsWorkspace;
   vfsLastJson = '';
+  vfsNotifyLastBackupTime();
   vfsRefresh();
 }
 

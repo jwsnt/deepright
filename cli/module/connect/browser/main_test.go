@@ -24,6 +24,7 @@ func stubBrowserRuntime() func() {
 	oldPlaywrightStopFn := playwrightStopFn
 	oldBrowserExecutablePathFn := browserExecutablePathFn
 	oldBrowserRuntimeGOOSFn := browserRuntimeGOOSFn
+	oldBrowserUserHomeDirFn := browserUserHomeDirFn
 	oldBrowserReadFileFn := browserReadFileFn
 	oldBrowserWriteFileFn := browserWriteFileFn
 	oldBrowserMkdirAllFn := browserMkdirAllFn
@@ -59,7 +60,6 @@ func stubBrowserRuntime() func() {
 	oldBrowserWSLTerminateProcessFn := browserWSLTerminateProcessFn
 	oldBrowserWSLCommandStartProcessFn := browserWSLCommandStartProcessFn
 	oldBrowserWSLCommandWaitForExitFn := browserWSLCommandWaitForExitFn
-	oldBrowserWSLCleanupChromeUserDataFn := browserWSLCleanupChromeUserDataFn
 	oldBrowserWSLInstanceLookupRecordFn := browserWSLInstanceLookupRecordFn
 	oldBrowserAttachedCommandStartProcessFn := browserAttachedCommandStartProcessFn
 	oldBrowserAttachedCommandWaitForExitFn := browserAttachedCommandWaitForExitFn
@@ -73,9 +73,10 @@ func stubBrowserRuntime() func() {
 	oldBrowserLifecycleProbeInterval := browserLifecycleProbeInterval
 	oldBrowserLifecycleProbeTimeout := browserLifecycleProbeTimeout
 	oldBrowserSleepFn := browserSleepFn
-	oldBrowserPrepareWSLChromeDefForStartFn := browserPrepareWSLChromeDefForStartFn
-	oldBrowserWSLCommandCombinedOutputFn := browserWSLCommandCombinedOutputFn
-	oldBrowserMaybeCleanupWSLProgramDataChromeDirsFn := browserMaybeCleanupWSLProgramDataChromeDirsFn
+	oldBrowserProfileCleanupStartFn := browserProfileCleanupStartFn
+	oldBrowserProfileCleanupStopFn := browserProfileCleanupStopFn
+	oldBrowserProfileCleanupScanFn := browserProfileCleanupScanFn
+	oldBrowserProfileCleanupExecFn := browserProfileCleanupExecFn
 
 	playwrightRunCLIFn = func(args []string, stdout, stderr io.Writer) int {
 		switch len(args) {
@@ -99,6 +100,7 @@ func stubBrowserRuntime() func() {
 	}
 	browserExecutablePathFn = os.Executable
 	browserRuntimeGOOSFn = func() string { return runtime.GOOS }
+	browserUserHomeDirFn = os.UserHomeDir
 	browserReadFileFn = os.ReadFile
 	browserWriteFileFn = os.WriteFile
 	browserMkdirAllFn = os.MkdirAll
@@ -136,7 +138,6 @@ func stubBrowserRuntime() func() {
 	browserWSLTerminateProcessFn = browserTerminateWSLWindowsProcess
 	browserWSLCommandStartProcessFn = browserStartAttachedChromeProcess
 	browserWSLCommandWaitForExitFn = browserWaitForChromeProcessExit
-	browserWSLCleanupChromeUserDataFn = browserCleanupWSLChromeUserData
 	browserWSLInstanceLookupRecordFn = browserWSLInstanceLookupRecord
 	browserAttachedCommandStartProcessFn = browserStartAttachedChromeProcessDirect
 	browserAttachedCommandWaitForExitFn = browserWaitForChromeProcessExit
@@ -152,9 +153,10 @@ func stubBrowserRuntime() func() {
 	browserLifecycleProbeInterval = 5 * time.Second
 	browserLifecycleProbeTimeout = time.Minute
 	browserSleepFn = time.Sleep
-	browserPrepareWSLChromeDefForStartFn = browserPrepareWSLChromeDefForStart
-	browserWSLCommandCombinedOutputFn = browserRunWSLCommandCombinedOutput
-	browserMaybeCleanupWSLProgramDataChromeDirsFn = browserMaybeCleanupWSLProgramDataChromeDirs
+	browserProfileCleanupStartFn = func() error { return nil }
+	browserProfileCleanupStopFn = func() error { return nil }
+	browserProfileCleanupScanFn = browserRunProfileCleanupScan
+	browserProfileCleanupExecFn = exec.Command
 
 	return func() {
 		playwrightRunCLIFn = oldPlaywrightRunCLIFn
@@ -162,6 +164,7 @@ func stubBrowserRuntime() func() {
 		playwrightStopFn = oldPlaywrightStopFn
 		browserExecutablePathFn = oldBrowserExecutablePathFn
 		browserRuntimeGOOSFn = oldBrowserRuntimeGOOSFn
+		browserUserHomeDirFn = oldBrowserUserHomeDirFn
 		browserReadFileFn = oldBrowserReadFileFn
 		browserWriteFileFn = oldBrowserWriteFileFn
 		browserMkdirAllFn = oldBrowserMkdirAllFn
@@ -197,7 +200,6 @@ func stubBrowserRuntime() func() {
 		browserWSLTerminateProcessFn = oldBrowserWSLTerminateProcessFn
 		browserWSLCommandStartProcessFn = oldBrowserWSLCommandStartProcessFn
 		browserWSLCommandWaitForExitFn = oldBrowserWSLCommandWaitForExitFn
-		browserWSLCleanupChromeUserDataFn = oldBrowserWSLCleanupChromeUserDataFn
 		browserWSLInstanceLookupRecordFn = oldBrowserWSLInstanceLookupRecordFn
 		browserAttachedCommandStartProcessFn = oldBrowserAttachedCommandStartProcessFn
 		browserAttachedCommandWaitForExitFn = oldBrowserAttachedCommandWaitForExitFn
@@ -211,9 +213,10 @@ func stubBrowserRuntime() func() {
 		browserLifecycleProbeInterval = oldBrowserLifecycleProbeInterval
 		browserLifecycleProbeTimeout = oldBrowserLifecycleProbeTimeout
 		browserSleepFn = oldBrowserSleepFn
-		browserPrepareWSLChromeDefForStartFn = oldBrowserPrepareWSLChromeDefForStartFn
-		browserWSLCommandCombinedOutputFn = oldBrowserWSLCommandCombinedOutputFn
-		browserMaybeCleanupWSLProgramDataChromeDirsFn = oldBrowserMaybeCleanupWSLProgramDataChromeDirsFn
+		browserProfileCleanupStartFn = oldBrowserProfileCleanupStartFn
+		browserProfileCleanupStopFn = oldBrowserProfileCleanupStopFn
+		browserProfileCleanupScanFn = oldBrowserProfileCleanupScanFn
+		browserProfileCleanupExecFn = oldBrowserProfileCleanupExecFn
 	}
 }
 
@@ -286,7 +289,7 @@ func TestHelpHidesLifecycleCommands(t *testing.T) {
 		"./browser instance shutdown --agentId agent-a --chatId chat-001",
 		"./browser shutdown --agentId agent-a --chatId chat-001",
 		"/mnt/c/Program Files/Google/Chrome/Application/chrome.exe",
-		"C:\\ProgramData\\deepright\\chrome_def",
+		"empty C:\\ProgramData\\deepright\\chrome_<suffix> directory",
 	} {
 		if !strings.Contains(text, wanted) {
 			t.Fatalf("help output missing %q\n%s", wanted, text)
@@ -969,84 +972,6 @@ func TestPluginLifecycleUsesUnifiedRestartFlow(t *testing.T) {
 	}
 }
 
-func TestPluginLifecycleStartOnWSLRefreshSuccessDoesNotRestartIntegration(t *testing.T) {
-	restore := stubBrowserRuntime()
-	defer restore()
-
-	exeDir := t.TempDir()
-	browserExecutablePathFn = func() (string, error) {
-		return filepath.Join(exeDir, "browser"), nil
-	}
-
-	refreshCalls := 0
-	restartCalls := 0
-	browserPrepareWSLChromeDefForStartFn = func(flags map[string]string) (bool, error) {
-		refreshCalls++
-		return true, nil
-	}
-	instanceRestartFn = func(flags map[string]string) error {
-		restartCalls++
-		return nil
-	}
-	instanceListFn = func(flags map[string]string) ([]browserInstanceRecord, error) {
-		return nil, nil
-	}
-
-	stdout := &bytes.Buffer{}
-	stderr := &bytes.Buffer{}
-	if code := runCLI([]string{"start"}, stdout, stderr); code != 0 {
-		t.Fatalf("start exit code = %d, stderr = %s", code, stderr.String())
-	}
-	if strings.TrimSpace(stdout.String()) != "OK" {
-		t.Fatalf("stdout = %q", stdout.String())
-	}
-	if refreshCalls != 1 {
-		t.Fatalf("refresh calls = %d, want 1", refreshCalls)
-	}
-	if restartCalls != 1 {
-		t.Fatalf("restart calls = %d, want 1", restartCalls)
-	}
-}
-
-func TestPluginLifecycleStartOnWSLRefreshFailureDoesNotBlockStart(t *testing.T) {
-	restore := stubBrowserRuntime()
-	defer restore()
-
-	exeDir := t.TempDir()
-	browserExecutablePathFn = func() (string, error) {
-		return filepath.Join(exeDir, "browser"), nil
-	}
-
-	refreshCalls := 0
-	restartCalls := 0
-	browserPrepareWSLChromeDefForStartFn = func(flags map[string]string) (bool, error) {
-		refreshCalls++
-		return false, errors.New("copy failed")
-	}
-	instanceRestartFn = func(flags map[string]string) error {
-		restartCalls++
-		return nil
-	}
-	instanceListFn = func(flags map[string]string) ([]browserInstanceRecord, error) {
-		return nil, nil
-	}
-
-	stdout := &bytes.Buffer{}
-	stderr := &bytes.Buffer{}
-	if code := runCLI([]string{"start"}, stdout, stderr); code != 0 {
-		t.Fatalf("start exit code = %d, stderr = %s", code, stderr.String())
-	}
-	if strings.TrimSpace(stdout.String()) != "OK" {
-		t.Fatalf("stdout = %q", stdout.String())
-	}
-	if refreshCalls != 1 {
-		t.Fatalf("refresh calls = %d, want 1", refreshCalls)
-	}
-	if restartCalls != 1 {
-		t.Fatalf("restart calls = %d, want 1", restartCalls)
-	}
-}
-
 func TestPluginStopDoesNotBlockOnShutdownErrors(t *testing.T) {
 	restore := stubBrowserRuntime()
 	defer restore()
@@ -1080,43 +1005,5 @@ func TestPluginStopDoesNotBlockOnShutdownErrors(t *testing.T) {
 	}
 	if shutdownCalls != 2 {
 		t.Fatalf("shutdown calls = %d, want 2", shutdownCalls)
-	}
-}
-
-func TestPluginStopRunsWSLProgramDataCleanupAfterStopFlow(t *testing.T) {
-	restore := stubBrowserRuntime()
-	defer restore()
-
-	exeDir := t.TempDir()
-	browserExecutablePathFn = func() (string, error) {
-		return filepath.Join(exeDir, "browser"), nil
-	}
-
-	order := []string{}
-	playwrightStopFn = func(opts browserplaywrightsvc.Options) (*browserplaywrightsvc.StartResult, error) {
-		order = append(order, "playwright-stop")
-		return &browserplaywrightsvc.StartResult{Status: "stopped"}, nil
-	}
-	instanceListFn = func(flags map[string]string) ([]browserInstanceRecord, error) {
-		order = append(order, "instance-list")
-		return nil, nil
-	}
-	browserMaybeCleanupWSLProgramDataChromeDirsFn = func() {
-		order = append(order, "wsl-programdata-cleanup")
-	}
-
-	stdout := &bytes.Buffer{}
-	stderr := &bytes.Buffer{}
-	if code := runCLI([]string{"stop"}, stdout, stderr); code != 0 {
-		t.Fatalf("stop exit code = %d, stderr = %s", code, stderr.String())
-	}
-	if strings.TrimSpace(stdout.String()) != "OK" {
-		t.Fatalf("stdout = %q", stdout.String())
-	}
-	if len(order) < 3 {
-		t.Fatalf("order = %v", order)
-	}
-	if order[len(order)-1] != "wsl-programdata-cleanup" {
-		t.Fatalf("cleanup should run last, order = %v", order)
 	}
 }

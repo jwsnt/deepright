@@ -39,11 +39,17 @@
     "interval": 60
   },
   "browser": {
-    "init_timeout": 300
+    "init_timeout": 300,
+    "clear": 72,
+    "scan": 2
   },
   "remote": {
     "exec_timeout": 300,
     "scp_timeout": 300
+  },
+  "backup": {
+    "skills": 30,
+    "app": 30
   },
   "temp": {
     "clear": 168,

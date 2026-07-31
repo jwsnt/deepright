@@ -14,6 +14,7 @@ import (
 
 	"connect/browserplaywrightsvc"
 	"connect/connectsvc"
+	"runtimepaths"
 )
 
 const (
@@ -106,6 +107,8 @@ func runCLI(args []string, stdout, stderr io.Writer) int {
 		return runDaemonCommand(rest, stdout, stderr)
 	case "__daemon":
 		return playwrightRunCLIFn(withDefaultBrowserUserAgent(append([]string{"__daemon"}, rest...)), stdout, stderr)
+	case browserProfileCleanupCommand:
+		return runBrowserProfileCleanupCommand(rest, stderr)
 	case "__log-filter":
 		flags, err := connectsvc.ParseFlags(rest)
 		if err != nil {
@@ -379,7 +382,6 @@ func runPluginLifecycleCommand(command string, args []string, stdout, stderr io.
 	browserLogInstanceListEvent(command, "before", beforeItems)
 	switch command {
 	case "start":
-		_, _ = browserPrepareWSLChromeDefForStartFn(flags)
 		if err := instanceRestartFn(normalizedFlags); err != nil {
 			fmt.Fprintln(stderr, err.Error())
 			return 1
@@ -398,8 +400,14 @@ func runPluginLifecycleCommand(command string, args []string, stdout, stderr io.
 				return 1
 			}
 		}
+		if err := browserProfileCleanupStartFn(); err != nil {
+			browserLogAsyncLifecycleEvent("browser_profile_cleanup", "worker_start_error", nil, 0, err)
+		}
 		browserLogPluginDaemonEvent(command, result)
 	case "stop":
+		if err := browserProfileCleanupStopFn(); err != nil {
+			browserLogAsyncLifecycleEvent("browser_profile_cleanup", "worker_stop_error", nil, 0, err)
+		}
 		result, err := playwrightStopFn(pluginOpts)
 		if err != nil {
 			fmt.Fprintln(stderr, err.Error())
@@ -422,7 +430,6 @@ func runPluginLifecycleCommand(command string, args []string, stdout, stderr io.
 	}
 	browserLogInstanceListEvent(command, "after", afterItems)
 	if command == "stop" {
-		browserMaybeCleanupWSLProgramDataChromeDirsFn()
 		browserMaybeRemoveRecordedConnectBin()
 	}
 	fmt.Fprintln(stdout, "OK")
@@ -622,20 +629,73 @@ func browserIntegrationPluginsRootFromConnectBin(connectBin string) (string, boo
 	if err != nil {
 		return "", false, err
 	}
+	appDir, err := browserResolveIntegrationAppDir(runtimePath, cfg)
+	if err != nil {
+		return "", false, err
+	}
+	if appDir == "" {
+		return "", false, fmt.Errorf("resolve integration app directory from %s", runtimePath)
+	}
+	return filepath.Join(appDir, "plugins"), true, nil
+}
+
+// browserResolveIntegrationAppDir follows Integration's runtime-directory
+// rules. app-dir/app are retained as compatibility overrides for older
+// deployments, while current static configuration deliberately omits them.
+func browserResolveIntegrationAppDir(runtimePath string, cfg map[string]string) (string, error) {
 	appDir := strings.TrimSpace(cfg["app-dir"])
 	if appDir == "" {
-		appPath := strings.TrimSpace(cfg["app"])
-		if appPath != "" {
+		if appPath := strings.TrimSpace(cfg["app"]); appPath != "" {
 			appDir = filepath.Dir(appPath)
 		}
 	}
-	if appDir == "" {
-		return "", false, fmt.Errorf("browser runtime configuration is incomplete: app-dir is missing from %s; restart integration to initialize the runtime before starting Browser", runtimePath)
+	if appDir != "" {
+		if abs, err := filepath.Abs(appDir); err == nil {
+			return abs, nil
+		}
+		return filepath.Clean(appDir), nil
 	}
-	if abs, err := filepath.Abs(appDir); err == nil {
-		appDir = abs
+
+	homeDir, homeErr := browserUserHomeDirFn()
+	switch {
+	case browserRuntimeGOOSFn() == "darwin":
+		if homeErr != nil {
+			return "", fmt.Errorf("resolve macOS Browser runtime directory: %w", homeErr)
+		}
+		if strings.TrimSpace(homeDir) == "" {
+			return "", fmt.Errorf("resolve macOS Browser runtime directory: home directory is empty")
+		}
+		return runtimepaths.MacAppRuntimeBaseDir(homeDir, runtimepaths.DeepRightMacBundleIdentifier, runtimepaths.DeepRightAppName), nil
+	case browserRuntimeGOOSFn() == "linux":
+		isWSL, err := browserWSLDetectFn()
+		if err != nil {
+			return "", err
+		}
+		if isWSL {
+			if homeErr != nil {
+				return "", fmt.Errorf("resolve WSL Browser runtime directory: %w", homeErr)
+			}
+			if strings.TrimSpace(homeDir) == "" {
+				return "", fmt.Errorf("resolve WSL Browser runtime directory: home directory is empty")
+			}
+			return filepath.Join(homeDir, "deepright"), nil
+		}
 	}
-	return filepath.Join(appDir, "plugins"), true, nil
+
+	// Directory-style releases keep config/config.json beside the application.
+	// This fallback does not apply on macOS or WSL, whose runtime locations are
+	// fixed and intentionally separate from the signed/static configuration.
+	runtimeDir := filepath.Dir(strings.TrimSpace(runtimePath))
+	if filepath.Base(runtimeDir) == "config" {
+		runtimeDir = filepath.Dir(runtimeDir)
+	}
+	if runtimeDir == "" || runtimeDir == "." {
+		return "", nil
+	}
+	if abs, err := filepath.Abs(runtimeDir); err == nil {
+		return abs, nil
+	}
+	return filepath.Clean(runtimeDir), nil
 }
 
 func browserResolveBundledIntegrationRuntimePath(connectBin string) string {
@@ -1131,7 +1191,7 @@ func printHelp(w io.Writer) {
 	fmt.Fprintln(w, "    using <agent workspace>/chrome_${port} on macOS/Linux and C:\\ProgramData\\deepright\\chrome_${suffix} on WSL")
 	fmt.Fprintln(w, "  - on WSL, browser resolves Chrome from browser meta chrome first, then falls back to /mnt/c/Program Files/Google/Chrome/Application/chrome.exe")
 	fmt.Fprintln(w, "  - on WSL, instance create uses browser_launcher.sh beside the plugin for browser_instance_wsl launch/reuse logic; if the packaged plugin is missing that script, browser recreates it automatically before launch")
-	fmt.Fprintln(w, "  - on WSL, a fresh managed profile best-effort seeds from C:\\ProgramData\\deepright\\chrome_def; missing source or copy failures only write logs and fall back to an empty profile dir")
+	fmt.Fprintln(w, "  - on WSL, each fresh managed profile starts as an empty C:\\ProgramData\\deepright\\chrome_<suffix> directory; it does not copy system Chrome data or clean profile locks")
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "Shared Flags:")
 	fmt.Fprintln(w, "  --session NAME             Playwright session name for direct commands")
@@ -1201,7 +1261,7 @@ func printInstanceHelp(w io.Writer) {
 	fmt.Fprintln(w, "  - without a recorded integration runtime, create still accepts --headless none for standalone headed mode")
 	fmt.Fprintln(w, "  - outside WSL, create reuses the managed chrome_${port} directory when it already exists")
 	fmt.Fprintln(w, "  - on WSL, create calls browser_launcher.sh beside the plugin; profileDir still stays in the normal CLI response, and its value comes from the launcher-returned user-data-dir")
-	fmt.Fprintln(w, "  - on WSL, browser_instance_wsl uses C:\\ProgramData\\deepright\\chrome_${suffix}; when that directory is new it best-effort seeds from C:\\ProgramData\\deepright\\chrome_def and only logs missing-source/copy failures")
+	fmt.Fprintln(w, "  - on WSL, browser_instance_wsl uses a new empty C:\\ProgramData\\deepright\\chrome_${suffix} directory and never copies system Chrome data")
 	fmt.Fprintln(w, "  - on macOS/Linux/Windows, create clones a filtered copy of the current-system Chrome User Data root when chrome_${port} does not exist")
 	fmt.Fprintln(w, "    filtering CacheStorage, OptGuideOnDeviceModel, and other volatile cache paths while keeping login storage such as WebStorage/IndexedDB/Local Storage")
 	fmt.Fprintln(w, "  - create/get/list JSON also include profileDir so the resolved managed user-data-dir is visible")

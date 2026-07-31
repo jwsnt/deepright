@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -274,71 +273,5 @@ func TestBrowserWaitForAttachedWSLProcessExitFallsBackToUnixProbeOutsideWSL(t *t
 	}
 	if sleepCalls != 2 {
 		t.Fatalf("sleep calls = %d, want 2", sleepCalls)
-	}
-}
-
-func TestBrowserCleanupWSLChromeUserDataAcceptsWindowsStyleProfileDir(t *testing.T) {
-	got, err := browserResolveWSLChromeProfileCleanupDir(`C:\temp\chrome_12345`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got != `C:\temp\chrome_12345` {
-		t.Fatalf("cleanup dir = %q, want %q", got, `C:\temp\chrome_12345`)
-	}
-}
-
-func TestBrowserCleanupWSLChromeUserDataConvertsUnixProfileDir(t *testing.T) {
-	restore := stubBrowserRuntime()
-	defer restore()
-
-	browserWSLPathWindowsFn = func(path string) (string, error) {
-		if path != filepath.Join("/mnt/c/temp", "chrome_12345") {
-			t.Fatalf("unexpected unix profile dir: %q", path)
-		}
-		return `C:\temp\chrome_12345`, nil
-	}
-
-	got, err := browserResolveWSLChromeProfileCleanupDir(filepath.Join("/mnt/c/temp", "chrome_12345"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got != `C:\temp\chrome_12345` {
-		t.Fatalf("cleanup dir = %q, want %q", got, `C:\temp\chrome_12345`)
-	}
-}
-
-func TestBrowserRunWSLBootstrapLifecycleStopsWhenCleanupFails(t *testing.T) {
-	restore := stubBrowserRuntime()
-	defer restore()
-
-	pluginDir := t.TempDir()
-	chromePath := filepath.Join(pluginDir, "chrome.exe")
-	if err := os.WriteFile(chromePath, []byte("fake"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	browserWSLDetectFn = func() (bool, error) {
-		return true, nil
-	}
-	browserWSLPathUnixFn = func(path string) (string, error) {
-		return filepath.Join(pluginDir, "chrome_29876"), nil
-	}
-	browserPortAvailableFn = func(port int) bool {
-		return true
-	}
-	browserCDPVersionFn = func(port int) (browserCDPVersion, error) {
-		return browserCDPVersion{}, errors.New("not ready")
-	}
-	wantErr := errors.New("cleanup failed")
-	browserWSLCleanupChromeUserDataFn = func(profileDir string) error {
-		if profileDir != `C:\temp\chrome_29876` {
-			t.Fatalf("cleanup profile dir = %q, want %q", profileDir, `C:\temp\chrome_29876`)
-		}
-		return wantErr
-	}
-
-	err := browserRunWSLBootstrapLifecycle(map[string]string{"chrome": chromePath})
-	if !errors.Is(err, wantErr) {
-		t.Fatalf("err = %v, want %v", err, wantErr)
 	}
 }

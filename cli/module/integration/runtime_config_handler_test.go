@@ -44,6 +44,27 @@ func TestIntegrationClientRuntimeConfigReturnsOnlyClientFields(t *testing.T) {
 	}
 }
 
+func TestIntegrationClientRuntimeConfigReportsWSLRuntime(t *testing.T) {
+	oldGOOS := integrationRuntimeGOOS
+	oldGetenv := integrationBrowserGetenvFn
+	t.Cleanup(func() {
+		integrationRuntimeGOOS = oldGOOS
+		integrationBrowserGetenvFn = oldGetenv
+	})
+	integrationRuntimeGOOS = "linux"
+	integrationBrowserGetenvFn = func(key string) string {
+		if key == "WSL_DISTRO_NAME" {
+			return "Ubuntu"
+		}
+		return ""
+	}
+
+	got := integrationClientRuntimeConfig(map[string]interface{}{})
+	if got["runtime-platform"] != "wsl" {
+		t.Fatalf("runtime-platform = %#v, want wsl", got["runtime-platform"])
+	}
+}
+
 func TestHandleRuntimeConfigReadsIntegrationConfigForMacAndWSLLayouts(t *testing.T) {
 	cases := []struct {
 		name       string

@@ -55,15 +55,15 @@ func TestBrowserRenderLogLineKeepsFullLauncherRequestAndResponse(t *testing.T) {
 func TestBrowserRenderLogLineIncludesCopySourceAndTarget(t *testing.T) {
 	line := browserRenderLogLine(map[string]any{
 		"timestamp": "2026-07-15T12:00:00Z",
-		"event":     "browser_start_wsl_chrome_def",
+		"event":     "browser_create_trace",
 		"stage":     "copy_begin",
-		"sourceDir": `C:\Users\jiawei.shen\AppData\Local\Google\Chrome\User Data`,
-		"targetDir": `C:\ProgramData\deepright\chrome_def`,
+		"sourceDir": `/Users/test/Library/Application Support/Google/Chrome`,
+		"targetDir": `/tmp/chrome_12345`,
 	})
 
 	for _, wanted := range []string{
-		`复制来源=C:\Users\jiawei.shen\AppData\Local\Google\Chrome\User Data`,
-		`复制目标=C:\ProgramData\deepright\chrome_def`,
+		`复制来源=/Users/test/Library/Application Support/Google/Chrome`,
+		`复制目标=/tmp/chrome_12345`,
 	} {
 		if !strings.Contains(line, wanted) {
 			t.Fatalf("log line should contain %q, got: %s", wanted, line)
@@ -75,14 +75,14 @@ func TestBrowserRenderLogLineUsesProfileDirAsCopyTarget(t *testing.T) {
 	line := browserRenderLogLine(map[string]any{
 		"timestamp":  "2026-07-15T12:00:00Z",
 		"event":      "browser_create_trace",
-		"stage":      "instance.wsl.user_data.seed.begin",
-		"sourceDir":  `C:\ProgramData\deepright\chrome_def`,
-		"profileDir": `C:\ProgramData\deepright\chrome_ab12`,
+		"stage":      "instance.user_data.copy.begin",
+		"sourceDir":  `/Users/test/Chrome`,
+		"profileDir": `/tmp/chrome_ab12`,
 	})
 
 	for _, wanted := range []string{
-		`复制来源=C:\ProgramData\deepright\chrome_def`,
-		`复制目标=C:\ProgramData\deepright\chrome_ab12`,
+		`复制来源=/Users/test/Chrome`,
+		`复制目标=/tmp/chrome_ab12`,
 	} {
 		if !strings.Contains(line, wanted) {
 			t.Fatalf("log line should contain %q, got: %s", wanted, line)

@@ -1779,17 +1779,6 @@ func browserMaybeCleanupPreparedChromeUserData(profileDir string) error {
 		"profileDir": profileDir,
 	})
 	if isWSL, err := browserWSLDetectFn(); err == nil && isWSL {
-		if err := browserWSLCleanupChromeUserDataFn(profileDir); err != nil {
-			browserCreateTrace("instance.user_data.prepare.error", map[string]any{
-				"profileDir": profileDir,
-				"error":      err.Error(),
-				"stage":      "cleanup_locks",
-			})
-			return err
-		}
-		browserCreateTrace("instance.user_data.cleanup.ok", map[string]any{
-			"profileDir": profileDir,
-		})
 		return nil
 	}
 	if err := browserCleanupClonedChromeUserData(profileDir); err != nil {

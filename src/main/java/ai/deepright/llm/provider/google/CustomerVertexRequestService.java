@@ -84,16 +84,16 @@ public class CustomerVertexRequestService extends VertexRequestService {
         @Value("${vertex.model.multiOutput:gemini-3.1-flash-image}")
         protected String multiOutput;
 
-        @Value("${vertex.model.multiInput:gemini-3.5-flash}")
+        @Value("${vertex.model.multiInput:gemini-3.6-flash}")
         protected String multiInput;
 
-        @Value("${vertex.model.thinking:gemini-3.5-flash}")
+        @Value("${vertex.model.thinking:gemini-3.6-flash}")
         protected String thinking;
 
-        @Value("${vertex.model.fast:gemini-3.5-flash}")
+        @Value("${vertex.model.fast:gemini-3.6-flash}")
         protected String fast;
 
-        @Value("${vertex.model.base:gemini-3.5-flash}")
+        @Value("${vertex.model.base:gemini-3.6-flash}")
         protected String base;
 
         @Value("${vertex.model.rate:0.65}")
