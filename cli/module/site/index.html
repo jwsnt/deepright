@@ -1251,6 +1251,7 @@ animation:queuedInsertExplosion .62s ease-out both}
 .message-actions{position:static;display:flex;align-items:center;justify-content:flex-end;gap:6px;z-index:40;pointer-events:auto;max-width:100%;flex:0 0 auto}
 .message-copy-btn,.message-retry-btn,.message-edit-btn,.message-scroll-top-btn,.message-thinking-btn,.message-shortcut-btn{width:15px;height:15px;padding:0;border:none;border-radius:999px;background:transparent;color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.55;transition:opacity .16s ease,transform .16s ease,color .16s ease,background-color .16s ease,box-shadow .16s ease,filter .16s ease;pointer-events:auto;appearance:none;-webkit-appearance:none;box-shadow:none}
 .message-shortcut-btn:disabled{cursor:not-allowed;opacity:.26;transform:none;filter:saturate(.4);pointer-events:none}
+.message-shortcut-btn.onboarding-assistant-shortcut-tour-target{opacity:1!important;transform:translateY(-1px) scale(1.14)!important;color:var(--text-primary);background:rgba(var(--accent-rgb),.14);box-shadow:0 0 0 2px rgba(var(--accent-rgb),.28),0 0 16px rgba(var(--accent-rgb),.2)}
 .message-scroll-top-btn{display:none}
 .message-scroll-top-btn.show{display:flex}
 .message-copy-btn:hover,.message-copy-btn:focus-visible,.message-retry-btn:hover,.message-retry-btn:focus-visible,.message-edit-btn:hover,.message-edit-btn:focus-visible,.message-scroll-top-btn:hover,.message-scroll-top-btn:focus-visible,.message-thinking-btn:hover,.message-thinking-btn:focus-visible,.message-shortcut-btn:hover,.message-shortcut-btn:focus-visible{opacity:1;transform:translateY(-1px);color:var(--text-primary);background:rgba(var(--accent-rgb),.08);box-shadow:0 0 0 1px rgba(var(--accent-rgb),.14);outline:none}
@@ -2581,6 +2582,15 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .skill-extract-onboarding-layer .onboarding-card{position:absolute;z-index:8;min-width:220px;max-width:calc(100% - 24px);padding:16px 16px 14px;border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(240,246,255,.9));border:1px solid rgba(124,152,214,.34);box-shadow:0 18px 42px rgba(16,24,40,.18),inset 0 1px 0 rgba(255,255,255,.78);pointer-events:auto;display:flex;flex-direction:column;box-sizing:border-box;overflow:visible}
 [data-theme="dark"] .skill-extract-onboarding-layer .onboarding-card{background:linear-gradient(180deg,rgba(15,27,49,.96),rgba(10,20,38,.92));border-color:rgba(169,190,227,.2);box-shadow:0 22px 46px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.08)}
 .skill-extract-onboarding-layer .onboarding-card .onboarding-card-btn{pointer-events:auto}
+.miniapp-build-onboarding-layer{position:absolute;inset:0;z-index:12;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .24s ease,visibility 0s linear .24s;overflow:visible}
+.miniapp-build-onboarding-layer.show{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .24s ease}
+.miniapp-build-onboarding-layer .onboarding-blocker{position:absolute;background:rgba(235,241,252,.58);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);pointer-events:auto}
+[data-theme="dark"] .miniapp-build-onboarding-layer .onboarding-blocker{background:rgba(8,15,29,.54)}
+.miniapp-build-onboarding-layer .onboarding-spotlight{position:absolute;z-index:1;border-radius:20px;border:1px solid rgba(144,173,255,.95);box-shadow:0 0 0 1px rgba(144,173,255,.5),0 24px 48px rgba(74,98,168,.18);pointer-events:none}
+[data-theme="dark"] .miniapp-build-onboarding-layer .onboarding-spotlight{border-color:rgba(171,196,255,.95);box-shadow:0 0 0 1px rgba(171,196,255,.46),0 24px 48px rgba(0,0,0,.28)}
+.miniapp-build-onboarding-layer .onboarding-card{position:absolute;z-index:8;min-width:220px;max-width:calc(100% - 24px);padding:16px 16px 14px;border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(240,246,255,.9));border:1px solid rgba(124,152,214,.34);box-shadow:0 18px 42px rgba(16,24,40,.18),inset 0 1px 0 rgba(255,255,255,.78);pointer-events:auto;display:flex;flex-direction:column;box-sizing:border-box;overflow:visible}
+[data-theme="dark"] .miniapp-build-onboarding-layer .onboarding-card{background:linear-gradient(180deg,rgba(15,27,49,.96),rgba(10,20,38,.92));border-color:rgba(169,190,227,.2);box-shadow:0 22px 46px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.08)}
+.miniapp-build-onboarding-layer .onboarding-card .onboarding-card-btn{pointer-events:auto}
 .skill-goal-input-demo{position:absolute;inset:0;z-index:2;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s ease,visibility 0s linear .2s}
 .skill-goal-input-demo.show{opacity:1;visibility:visible;transition:opacity .2s ease}
 .skill-goal-input-demo-cursor{position:absolute;width:22px;height:30px;color:#fff;filter:drop-shadow(0 10px 18px rgba(16,24,40,.2));transition:left .32s cubic-bezier(.22,1,.36,1),top .32s cubic-bezier(.22,1,.36,1),transform .18s ease,filter .18s ease}
@@ -4228,6 +4238,7 @@ body.quick-fan-transition-active{cursor:progress}
 .skill-extract-actions .primary{background:linear-gradient(135deg,var(--accent),rgb(var(--accent-soft-rgb)));border-color:transparent;color:#fff;font-weight:700;box-shadow:0 12px 28px rgba(var(--accent-soft-rgb),.24)}
 .skill-extract-actions .primary:hover{background:var(--accent-hover);color:#fff}
 .miniapp-build-popover{width:min(520px,calc(100vw - 40px))}
+.skill-extract-popover > .miniapp-build-onboarding-layer{position:absolute;inset:0;z-index:12}
 .miniapp-build-functions{display:flex;flex-direction:column;gap:7px}
 .miniapp-build-functions-head{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#5b7299;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
 .miniapp-build-function-list{display:flex;flex-direction:column;gap:7px}
@@ -4237,10 +4248,14 @@ body.quick-fan-transition-active{cursor:progress}
 .miniapp-build-function-row input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(var(--accent-soft-rgb),.14)}
 .miniapp-build-function-add,.miniapp-build-function-remove{width:24px;height:24px;flex:0 0 24px;padding:0;border:1px solid rgba(var(--accent-rgb),.22);border-radius:8px;background:rgba(255,255,255,.6);color:rgb(var(--accent-rgb));font:700 16px/1 ui-sans-serif,system-ui,sans-serif;cursor:pointer;transition:var(--transition)}
 .miniapp-build-function-add:hover,.miniapp-build-function-add:focus-visible,.miniapp-build-function-remove:hover,.miniapp-build-function-remove:focus-visible{border-color:rgba(var(--accent-rgb),.5);background:rgba(var(--accent-rgb),.10);outline:none;transform:translateY(-1px)}
+.miniapp-build-reference{display:flex;flex-direction:column;gap:7px}.miniapp-build-reference-head{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#5b7299;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}.miniapp-build-reference-browse{padding:0;border:0;background:transparent;color:rgb(var(--accent-rgb));font:600 11px/1 inherit;cursor:pointer}.miniapp-build-reference-browse:hover,.miniapp-build-reference-browse:focus-visible{color:var(--accent-hover);outline:none;text-decoration:underline}.miniapp-build-reference-row{display:flex;align-items:center;gap:7px;min-width:0}.miniapp-build-reference-row input{flex:1;min-width:0;width:100%;height:34px;padding:0 11px;border:1px solid rgba(var(--accent-rgb),.18);border-radius:12px;background:rgba(255,252,248,.9);color:var(--text-primary);font-size:12px;outline:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.78);transition:var(--transition)}.miniapp-build-reference-row input::placeholder{color:#7c90b1}.miniapp-build-reference-row input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(var(--accent-soft-rgb),.14)}.miniapp-build-reference-clear{width:24px;height:24px;flex:0 0 24px;padding:0;border:1px solid rgba(var(--accent-rgb),.22);border-radius:8px;background:rgba(255,255,255,.6);color:rgb(var(--accent-rgb));font:700 16px/1 ui-sans-serif,system-ui,sans-serif;cursor:pointer;transition:var(--transition)}.miniapp-build-reference-clear:hover,.miniapp-build-reference-clear:focus-visible{border-color:rgba(var(--accent-rgb),.5);background:rgba(var(--accent-rgb),.10);outline:none;transform:translateY(-1px)}.miniapp-build-reference-picker{display:flex;flex-direction:column;gap:7px;max-height:196px;padding:8px;border:1px solid rgba(var(--accent-rgb),.16);border-radius:14px;background:rgba(255,255,255,.42);box-shadow:inset 0 1px 0 rgba(255,255,255,.7)}.miniapp-build-reference-picker[hidden]{display:none}.miniapp-build-reference-picker-nav{display:flex;align-items:center;gap:7px;min-width:0}.miniapp-build-reference-picker-up{width:24px;height:24px;flex:0 0 24px;padding:0;border:1px solid rgba(var(--accent-rgb),.18);border-radius:8px;background:rgba(255,255,255,.56);color:rgb(var(--accent-rgb));font-size:16px;line-height:1;cursor:pointer}.miniapp-build-reference-picker-up:disabled{opacity:.4;cursor:not-allowed}.miniapp-build-reference-picker-path{min-width:0;overflow:hidden;color:var(--text-secondary);font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;text-overflow:ellipsis;white-space:nowrap}.miniapp-build-reference-picker-list{display:flex;min-height:42px;flex-direction:column;overflow:auto;border-radius:10px;background:rgba(255,255,255,.34)}.miniapp-build-reference-picker-item{display:flex;align-items:center;gap:7px;width:100%;min-height:30px;padding:5px 7px;border:0;border-bottom:1px solid rgba(var(--accent-rgb),.08);background:transparent;color:var(--text-primary);font:12px/1.35 inherit;text-align:left;cursor:pointer}.miniapp-build-reference-picker-item:last-child{border-bottom:0}.miniapp-build-reference-picker-item:hover,.miniapp-build-reference-picker-item:focus-visible{outline:none;background:rgba(var(--accent-rgb),.1)}.miniapp-build-reference-picker-item svg{width:14px;height:14px;flex:0 0 14px;color:var(--text-muted)}.miniapp-build-reference-picker-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.miniapp-build-reference-picker-item.dir .miniapp-build-reference-picker-tail{margin-left:auto;color:var(--text-muted);font-size:15px}.miniapp-build-reference-picker-empty{padding:9px;color:var(--text-muted);font-size:11px;line-height:1.5}
+.miniapp-build-reference-head-actions{display:flex;align-items:center;gap:4px}.miniapp-build-reference-toggle,.miniapp-build-reference-vfs{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;padding:0;border:1px solid rgba(var(--accent-rgb),.22);border-radius:8px;background:rgba(255,255,255,.6);color:rgb(var(--accent-rgb));cursor:pointer;transition:var(--transition)}.miniapp-build-reference-toggle svg,.miniapp-build-reference-vfs svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.miniapp-build-reference-toggle[aria-expanded="true"] svg{transform:rotate(180deg)}.miniapp-build-reference-toggle:hover,.miniapp-build-reference-toggle:focus-visible,.miniapp-build-reference-vfs:hover,.miniapp-build-reference-vfs:focus-visible{border-color:rgba(var(--accent-rgb),.5);background:rgba(var(--accent-rgb),.10);outline:none;transform:translateY(-1px)}.miniapp-build-reference-toggle[aria-expanded="true"]:hover,.miniapp-build-reference-toggle[aria-expanded="true"]:focus-visible{transform:translateY(-1px)}.miniapp-build-reference-content[hidden]{display:none}
 [data-theme="dark"] .miniapp-build-functions-head{color:#9fb7df}
 [data-theme="dark"] .miniapp-build-function-row input{background-color:rgba(255,255,255,.08);border-color:rgba(169,190,227,.18);color:#ecf3ff;box-shadow:none}
 [data-theme="dark"] .miniapp-build-function-row input::placeholder{color:#8fa8d1}
 [data-theme="dark"] .miniapp-build-function-add,[data-theme="dark"] .miniapp-build-function-remove{background:rgba(255,255,255,.08);border-color:rgba(169,190,227,.18);color:#bcefff}
+[data-theme="dark"] .miniapp-build-reference-head{color:#9fb7df}[data-theme="dark"] .miniapp-build-reference-row input{background-color:rgba(255,255,255,.08);border-color:rgba(169,190,227,.18);color:#ecf3ff;box-shadow:none}[data-theme="dark"] .miniapp-build-reference-row input::placeholder{color:#8fa8d1}[data-theme="dark"] .miniapp-build-reference-clear,[data-theme="dark"] .miniapp-build-reference-picker-up{background:rgba(255,255,255,.08);border-color:rgba(169,190,227,.18);color:#bcefff}[data-theme="dark"] .miniapp-build-reference-picker{background:rgba(255,255,255,.04);border-color:rgba(169,190,227,.18)}[data-theme="dark"] .miniapp-build-reference-picker-list{background:rgba(0,0,0,.12)}
+[data-theme="dark"] .miniapp-build-reference-toggle,[data-theme="dark"] .miniapp-build-reference-vfs{background:rgba(255,255,255,.08);border-color:rgba(169,190,227,.18);color:#bcefff}
 .install-app-popover{width:min(460px,calc(100vw - 40px))}
 .install-app-popover h4{display:flex;align-items:center;gap:8px}
 .install-app-popover h4 svg{width:16px;height:16px;flex-shrink:0;color:#c7923d;filter:drop-shadow(0 0 10px rgba(var(--warm-rgb),.24))}
@@ -7010,10 +7025,41 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
         <div class="miniapp-build-functions-head"><span>功能列表（可选）</span><button type="button" class="miniapp-build-function-add" id="miniappBuildFunctionAddBtn" title="增加功能" aria-label="增加功能" onclick="addMiniappBuildFunction()">+</button></div>
         <div class="miniapp-build-function-list" id="miniappBuildFunctionList"></div>
       </div>
+      <div class="miniapp-build-reference" id="miniappBuildReference">
+        <div class="miniapp-build-reference-head"><span>参考文档（可选，仅 .md）</span><div class="miniapp-build-reference-head-actions"><button type="button" class="miniapp-build-reference-vfs" id="miniappBuildReferenceBrowseBtn" title="从虚拟文件系统选择 Markdown 文件" aria-label="从虚拟文件系统选择 Markdown 文件" onclick="toggleMiniappBuildReferencePicker()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M8 12h8M8 16h5"/></svg></button><button type="button" class="miniapp-build-reference-toggle" id="miniappBuildReferenceToggle" title="展开参考文档" aria-label="展开参考文档" aria-controls="miniappBuildReferenceContent" aria-expanded="false" onclick="toggleMiniappBuildReferencePanel()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div></div>
+        <div class="miniapp-build-reference-content" id="miniappBuildReferenceContent" hidden>
+          <div class="miniapp-build-reference-row">
+            <input id="miniappBuildReferenceInput" type="text" placeholder="Markdown 文件系统绝对路径" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="参考 Markdown 文档的文件系统绝对路径" />
+            <button type="button" class="miniapp-build-reference-clear" title="清除参考文档" aria-label="清除参考文档" onclick="clearMiniappBuildReference()">×</button>
+          </div>
+          <div class="miniapp-build-reference-picker" id="miniappBuildReferencePicker" hidden>
+            <div class="miniapp-build-reference-picker-nav"><button type="button" class="miniapp-build-reference-picker-up" id="miniappBuildReferencePickerUp" title="返回上级目录" aria-label="返回上级目录" onclick="miniappBuildReferencePickerGoUp()">←</button><span class="miniapp-build-reference-picker-path" id="miniappBuildReferencePickerPath"></span></div>
+            <div class="miniapp-build-reference-picker-list" id="miniappBuildReferencePickerList"></div>
+          </div>
+        </div>
+      </div>
       <div class="skill-extract-error" id="miniappBuildError"></div>
       <div class="skill-extract-actions">
         <button type="button" onclick="closeMiniappBuildPopover()">取消</button>
         <button type="button" class="primary" id="miniappBuildConfirmBtn" onclick="submitMiniappBuildPrompt()">确认</button>
+      </div>
+    </div>
+    <div class="miniapp-build-onboarding-layer" id="miniappBuildReferenceOnboardingLayer" aria-hidden="true" inert>
+      <div class="onboarding-blocker onboarding-blocker-top"></div>
+      <div class="onboarding-blocker onboarding-blocker-left"></div>
+      <div class="onboarding-blocker onboarding-blocker-right"></div>
+      <div class="onboarding-blocker onboarding-blocker-bottom"></div>
+      <div class="onboarding-spotlight"></div>
+      <div class="onboarding-card">
+        <div class="onboarding-card-head">
+          <div class="onboarding-card-kicker">新手引导</div>
+          <button class="onboarding-card-close hidden" type="button" onclick="handleOnboardingDismiss(event)" title="跳过当前引导" aria-label="跳过当前引导"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5.25v13.5L15.2 12 5 5.25Zm10.8 0v13.5H19V5.25h-3.2Z"/></svg></button>
+        </div>
+        <div class="onboarding-card-text"></div>
+        <div class="onboarding-card-actions">
+          <button class="onboarding-card-btn secondary onboarding-card-btn-secondary hidden" type="button" data-onboarding-action="secondary" onclick="handleOnboardingAction(event)"></button>
+          <button class="onboarding-card-btn onboarding-card-btn-primary hidden" type="button" data-onboarding-action="primary" onclick="handleOnboardingAction(event)"></button>
+        </div>
       </div>
     </div>
   </div>
@@ -7286,6 +7332,8 @@ const STANDALONE_MODE_SWITCH_RECORD_KEY = 'deepright_standalone_mode_switch_reco
 const MODEL_SWITCH_TOUR_CLICK_KEY = 'deepright_model_switch_tour_clicked';
 const MESSAGE_URL_TOUR_CLICK_KEY = 'deepright_message_url_tour_clicked';
 const SSE_503_TOUR_CLICK_KEY = 'deepright_sse_503_tour_clicked';
+const ASSISTANT_SHORTCUT_TOUR_CLICK_KEY = 'deepright_assistant_shortcut_tour_clicked';
+const MINIAPP_BUILD_REFERENCE_TOUR_OPEN_KEY = 'deepright_miniapp_build_reference_tour_opened';
 const PAGE_ANNOTATION_TOUR_CLICK_KEY = 'deepright_page_annotation_tour_clicked';
 const AGENT_TRANSFER_TOUR_AUTO_ADVANCE_MS = 2000;
 const MODEL_SAVE_VERIFY_DEMO_TEXT = 'Hello World';
@@ -8018,6 +8066,14 @@ let sse503TourState = {
   forcedStopButton: false,
   revealedTokenInput: null
 };
+let assistantShortcutTourState = {
+  pendingStart: false,
+  chatId: '',
+  messageKey: ''
+};
+let miniappBuildReferenceTourState = {
+  pendingStart: false
+};
 let vfsDragTourState = {
   demoDone: false,
   demoTimer: 0
@@ -8659,6 +8715,16 @@ let miniappBuildState = {
   open: false,
   name: '',
   functions: [],
+  reference: '',
+  referenceExpanded: false,
+  referencePickerOpen: false,
+  referencePickerRoot: '',
+  referencePickerPath: '',
+  referencePickerEntries: [],
+  referencePickerLoading: false,
+  referencePickerError: '',
+  referencePickerAgentId: '',
+  referencePickerRequestSeq: 0,
   anchorChatId: '',
   anchorAgentId: '',
   submitting: false
@@ -11367,6 +11433,34 @@ function markSse503TourClickRecord() {
   } catch {}
 }
 
+function hasAssistantShortcutTourClickRecord() {
+  try {
+    return localStorage.getItem(ASSISTANT_SHORTCUT_TOUR_CLICK_KEY) === '1';
+  } catch {
+    return true;
+  }
+}
+
+function markAssistantShortcutTourClickRecord() {
+  try {
+    localStorage.setItem(ASSISTANT_SHORTCUT_TOUR_CLICK_KEY, '1');
+  } catch {}
+}
+
+function hasMiniappBuildReferenceTourOpenRecord() {
+  try {
+    return localStorage.getItem(MINIAPP_BUILD_REFERENCE_TOUR_OPEN_KEY) === '1';
+  } catch {
+    return true;
+  }
+}
+
+function markMiniappBuildReferenceTourOpenRecord() {
+  try {
+    localStorage.setItem(MINIAPP_BUILD_REFERENCE_TOUR_OPEN_KEY, '1');
+  } catch {}
+}
+
 function isOnboardingActive() {
   return !!(onboardingState && onboardingState.active && onboardingState.step);
 }
@@ -12164,6 +12258,38 @@ function getOnboardingStepConfig(step) {
         cardPlacement: 'above',
         cardWidth: 356,
         cardMinHeight: 118,
+        cardOffsetY: 16
+      };
+    case 'assistant-shortcut-tour': {
+      const selector = getAssistantShortcutTourTargetSelector();
+      if (!selector) return null;
+      return {
+        domain: 'center',
+        selector,
+        message: '使用快捷回复自动提问。',
+        actionLabel: '完成',
+        padding: 8,
+        highlightPadding: 12,
+        cardPlacement: 'above-left',
+        cardWidth: 280,
+        cardMinHeight: 112,
+        cardOffsetX: 0,
+        cardOffsetY: 16,
+        targetClass: 'onboarding-assistant-shortcut-tour-target'
+      };
+    }
+    case 'miniapp-build-reference-tour':
+      return {
+        domain: 'center',
+        selector: '#miniappBuildReference',
+        message: '添加READ_ME.md来优化迷你应用的功能。',
+        actionLabel: '完成',
+        padding: 8,
+        highlightPadding: 12,
+        cardPlacement: 'below-left',
+        cardWidth: 300,
+        cardMinHeight: 112,
+        cardOffsetX: 0,
         cardOffsetY: 16
       };
     case 'input-token-logo':
@@ -14402,6 +14528,7 @@ function clearDeferredOnboardingStarts(options = {}) {
   if (browserSkillTourState) browserSkillTourState.pendingStart = false;
   if (swarmSaveSuccessTourState) swarmSaveSuccessTourState.pendingStart = false;
   if (sse503TourState) sse503TourState.pendingStart = false;
+  if (assistantShortcutTourState) clearAssistantShortcutTourState();
   if (clearPersistent) {
     clearBrowserPluginHoverTourPendingRecord();
     clearPendingModelSaveVerifyTourRecord();
@@ -15173,7 +15300,7 @@ function hideExclusiveOverlayById(id) {
       closeSkillExtractGitPopover();
       return true;
     case 'miniappBuildOverlay':
-      closeMiniappBuildPopover();
+      closeMiniappBuildPopover({ force: true });
       return true;
     case 'skillExtractGoalOverlay':
       closeSkillExtractGoalPopover();
@@ -15932,6 +16059,14 @@ function isModelSaveVerifyTourOnboardingStep(step) {
 
 function isSse503TourOnboardingStep(step) {
   return ['sse-503-response', 'sse-503-settings', 'sse-503-stop'].includes(String(step || '').trim());
+}
+
+function isAssistantShortcutTourOnboardingStep(step) {
+  return String(step || '').trim() === 'assistant-shortcut-tour';
+}
+
+function isMiniappBuildReferenceTourOnboardingStep(step) {
+  return String(step || '').trim() === 'miniapp-build-reference-tour';
 }
 
 function isSandboxTourOnboardingStep(step) {
@@ -21226,6 +21361,111 @@ function syncSkillExtractOnboardingLayer(config, targetRect) {
   });
 }
 
+function syncContainedOnboardingLayer(layer, active, config, targetRect) {
+  if (!layer) return false;
+  layer.classList.toggle('show', active);
+  layer.setAttribute('aria-hidden', active ? 'false' : 'true');
+  layer.setAttribute('data-onboarding-active', active ? '1' : '0');
+  layer.setAttribute('data-onboarding-step', active ? String(onboardingState.step || '') : '');
+  if ('inert' in layer) layer.inert = !active;
+  const card = layer.querySelector('.onboarding-card');
+  if (!active) {
+    layer.classList.remove('has-card', 'has-target');
+    if (card) resetOnboardingCardLayout(card);
+    syncOnboardingCardContent(layer, null);
+    return false;
+  }
+  const layerRect = layer.getBoundingClientRect();
+  const cardState = syncOnboardingCardContent(layer, config);
+  const resolvedConfig = getResolvedOnboardingCardConfig(config, cardState);
+  if (!targetRect || !layerRect.width || !layerRect.height) {
+    setOnboardingFullMask(layer);
+    layer.classList.add('has-card');
+    setOnboardingCard(layer, resolvedConfig, false);
+    return false;
+  }
+  const padding = Number(config.padding || 12);
+  const highlightPadding = Number(config.highlightPadding || padding);
+  const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+  const maskLeft = clamp(targetRect.left - layerRect.left - padding, 0, Math.max(0, layerRect.width - 56));
+  const maskTop = clamp(targetRect.top - layerRect.top - padding, 0, Math.max(0, layerRect.height - 40));
+  const maskWidth = clamp(targetRect.width + padding * 2, 56, Math.max(56, layerRect.width - maskLeft));
+  const maskHeight = clamp(targetRect.height + padding * 2, 36, Math.max(36, layerRect.height - maskTop));
+  const highlightLeft = clamp(targetRect.left - layerRect.left - highlightPadding, 0, Math.max(0, layerRect.width - 56));
+  const highlightTop = clamp(targetRect.top - layerRect.top - highlightPadding, 0, Math.max(0, layerRect.height - 40));
+  const highlightWidth = clamp(targetRect.width + highlightPadding * 2, 56, Math.max(56, layerRect.width - highlightLeft));
+  const highlightHeight = clamp(targetRect.height + highlightPadding * 2, 36, Math.max(36, layerRect.height - highlightTop));
+  const topBlocker = layer.querySelector('.onboarding-blocker-top');
+  const leftBlocker = layer.querySelector('.onboarding-blocker-left');
+  const rightBlocker = layer.querySelector('.onboarding-blocker-right');
+  const bottomBlocker = layer.querySelector('.onboarding-blocker-bottom');
+  const spotlight = layer.querySelector('.onboarding-spotlight');
+  if (topBlocker) Object.assign(topBlocker.style, { left: '0px', top: '0px', width: `${layerRect.width}px`, height: `${maskTop}px` });
+  if (leftBlocker) Object.assign(leftBlocker.style, { left: '0px', top: `${maskTop}px`, width: `${maskLeft}px`, height: `${maskHeight}px` });
+  if (rightBlocker) Object.assign(rightBlocker.style, { left: `${maskLeft + maskWidth}px`, top: `${maskTop}px`, width: `${Math.max(0, layerRect.width - maskLeft - maskWidth)}px`, height: `${maskHeight}px` });
+  if (bottomBlocker) Object.assign(bottomBlocker.style, { left: '0px', top: `${maskTop + maskHeight}px`, width: `${layerRect.width}px`, height: `${Math.max(0, layerRect.height - maskTop - maskHeight)}px` });
+  if (spotlight) Object.assign(spotlight.style, { left: `${highlightLeft}px`, top: `${highlightTop}px`, width: `${highlightWidth}px`, height: `${highlightHeight}px` });
+  layer.style.setProperty('--onboarding-left', `${highlightLeft}px`);
+  layer.style.setProperty('--onboarding-top', `${highlightTop}px`);
+  layer.style.setProperty('--onboarding-width', `${highlightWidth}px`);
+  layer.style.setProperty('--onboarding-height', `${highlightHeight}px`);
+  layer.classList.add('has-target');
+  setOnboardingCard(layer, resolvedConfig, true);
+  return true;
+}
+
+function setMiniappBuildReferenceTourContentInert(active) {
+  const popover = document.getElementById('miniappBuildPopover');
+  if (!popover) return;
+  Array.from(popover.children).forEach(child => {
+    if (child.id === 'miniappBuildReferenceOnboardingLayer') return;
+    if ('inert' in child) child.inert = !!active;
+  });
+}
+
+function syncMiniappBuildReferenceOnboardingLayer(config, targetRect) {
+  const layer = document.getElementById('miniappBuildReferenceOnboardingLayer');
+  const active = !!(
+    isOnboardingActive() &&
+    isMiniappBuildReferenceTourOnboardingStep(onboardingState.step) &&
+    miniappBuildState.open &&
+    config
+  );
+  setMiniappBuildReferenceTourContentInert(active);
+  const hasTarget = syncContainedOnboardingLayer(layer, active, config, targetRect);
+  if (!active) return;
+  requestAnimationFrame(() => {
+    if (!isOnboardingActive() || !isMiniappBuildReferenceTourOnboardingStep(onboardingState.step)) return;
+    const button = layer && layer.querySelector('.onboarding-card-btn-primary:not(.hidden)');
+    if (button instanceof HTMLElement) button.focus({ preventScroll: true });
+  });
+  return hasTarget;
+}
+
+document.addEventListener('keydown', event => {
+  if (!isOnboardingActive() || !isMiniappBuildReferenceTourOnboardingStep(onboardingState.step)) return;
+  const layer = document.getElementById('miniappBuildReferenceOnboardingLayer');
+  const button = layer && layer.querySelector('.onboarding-card-btn-primary:not(.hidden)');
+  if (!(button instanceof HTMLButtonElement)) return;
+  if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    button.click();
+    return;
+  }
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  if (event.key === 'Tab') button.focus({ preventScroll: true });
+}, true);
+
+document.addEventListener('focusin', event => {
+  if (!isOnboardingActive() || !isMiniappBuildReferenceTourOnboardingStep(onboardingState.step)) return;
+  const layer = document.getElementById('miniappBuildReferenceOnboardingLayer');
+  const button = layer && layer.querySelector('.onboarding-card-btn-primary:not(.hidden)');
+  if (!(layer instanceof HTMLElement) || !(button instanceof HTMLButtonElement) || layer.contains(event.target)) return;
+  button.focus({ preventScroll: true });
+}, true);
+
 function syncOnboardingOverlayDomain(overlay, domain, config, target, targetRect) {
   if (!overlay) return;
   const active = !!config;
@@ -21255,6 +21495,12 @@ function syncOnboardingOverlayDomain(overlay, domain, config, target, targetRect
     return;
   }
   if (domain === 'center' && isMemoMetaPreviewTourOnboardingStep(onboardingState.step)) {
+    setOverlayVisible(overlay, false);
+    overlay.classList.remove('has-card');
+    overlay.classList.remove('has-target');
+    return;
+  }
+  if (isMiniappBuildReferenceTourOnboardingStep(onboardingState.step) && miniappBuildState.open) {
     setOverlayVisible(overlay, false);
     overlay.classList.remove('has-card');
     overlay.classList.remove('has-target');
@@ -21323,6 +21569,10 @@ function syncOnboardingOverlays() {
     cancelAnimationFrame(onboardingState.syncFrame);
     onboardingState.syncFrame = 0;
   }
+  if (isOnboardingActive() && isAssistantShortcutTourOnboardingStep(onboardingState.step) && !resolveAssistantShortcutTourTarget()) {
+    stopOnboarding(false);
+    return;
+  }
   if (isOnboardingActive() && isMessageUrlTourOnboardingStep(onboardingState.step)) {
     syncMessageUrlTourBubble();
   }
@@ -21346,6 +21596,7 @@ function syncOnboardingOverlays() {
   syncSettingsOnboardingLayer(isOnboardingActive() ? config : null, target, primaryTargetRect);
   syncMemoMetaPreviewOnboardingLayer(isOnboardingActive() ? config : null, primaryTargetRect);
   syncSkillExtractOnboardingLayer(isOnboardingActive() ? config : null, primaryTargetRect);
+  syncMiniappBuildReferenceOnboardingLayer(isOnboardingActive() ? config : null, primaryTargetRect);
   syncSkillTourGoalInputDemo(primaryTargetRect);
   syncMemoTourAgentHint(primaryTargetRect);
   syncMemoTaskTourDemo();
@@ -21380,6 +21631,13 @@ function setOnboardingStep(step) {
   }
   if (isModelSwitchTourOnboardingStep(next)) {
     closeCenterInputTransientUi();
+  }
+  if (isAssistantShortcutTourOnboardingStep(next)) {
+    const ok = syncAssistantShortcutTourStep(next);
+    if (!ok) {
+      stopOnboarding(false);
+      return;
+    }
   }
   if (isSwarmSaveSuccessTourOnboardingStep(next)) {
     closeCenterInputTransientUi();
@@ -21915,6 +22173,10 @@ function stopOnboarding(markComplete) {
   resetSkillTourGoalInputDemoState({ restoreDefault: false });
   closeCenterInputTransientUi();
   clearSse503TourVisualState();
+  if (isAssistantShortcutTourOnboardingStep(lastStep)) {
+    closeAssistantShortcutModal({ restoreFocus: false });
+    clearAssistantShortcutTourState();
+  }
   if (markComplete) {
     try { localStorage.setItem(ONBOARDING_COMPLETE_KEY, '1'); } catch {}
     onboardingState.eligible = false;
@@ -21940,6 +22202,7 @@ function stopOnboarding(markComplete) {
   });
   syncVfsDragTourDemo(null, null);
   syncSkillExtractOnboardingLayer(null, null);
+  syncMiniappBuildReferenceOnboardingLayer(null, null);
   syncSkillTourGoalInputDemo(null);
   syncMemoTourAgentHint(null);
   syncMemoTaskTourDemo();
@@ -22185,6 +22448,18 @@ function stopOnboarding(markComplete) {
       startSse503TourOnboarding();
     }, 160);
   }
+  if (assistantShortcutTourState.pendingStart && !hasAssistantShortcutTourClickRecord()) {
+    window.setTimeout(() => {
+      if (!assistantShortcutTourState.pendingStart || hasAssistantShortcutTourClickRecord() || isOnboardingActive()) return;
+      void startAssistantShortcutTourOnboarding();
+    }, 160);
+  }
+  if (miniappBuildReferenceTourState.pendingStart && !hasMiniappBuildReferenceTourOpenRecord()) {
+    window.setTimeout(() => {
+      if (!miniappBuildReferenceTourState.pendingStart || hasMiniappBuildReferenceTourOpenRecord() || isOnboardingActive()) return;
+      startMiniappBuildReferenceTourOnboarding();
+    }, 160);
+  }
 }
 
 function isSettingsOpen() {
@@ -22310,6 +22585,16 @@ function isAssistantSuccessfulCompletedMessage(msg) {
     msg.streamStatus === '完成' &&
     normalizeMessageText(msg.content)
   );
+}
+
+function hasSuccessfulCompletedAssistantResponseOutsideSession(sessionToken) {
+  const excludedSessionToken = String(sessionToken || '').trim();
+  return Object.values(state.chats || {}).some(chat => (
+    Array.isArray(chat && chat.messages) && chat.messages.some(message => (
+      isAssistantSuccessfulCompletedMessage(message) &&
+      (!excludedSessionToken || String(message.streamSessionToken || '').trim() !== excludedSessionToken)
+    ))
+  ));
 }
 
 function chatHasSuccessfulCompletedAssistantResponse(chat) {
@@ -23245,6 +23530,12 @@ function handleOnboardingAction(event) {
       stopOnboarding(false);
       return;
     case 'model-switch-tour-button':
+      stopOnboarding(false);
+      return;
+    case 'assistant-shortcut-tour':
+      stopOnboarding(false);
+      return;
+    case 'miniapp-build-reference-tour':
       stopOnboarding(false);
       return;
     case 'input-model-select':
@@ -24816,6 +25107,16 @@ function normalizeMiniappBuildFunctionDrafts(values) {
 function resetMiniappBuildDraftState() {
   miniappBuildState.name = '';
   miniappBuildState.functions = createDefaultMiniappBuildFunctions();
+  miniappBuildState.reference = '';
+  miniappBuildState.referenceExpanded = false;
+  miniappBuildState.referencePickerOpen = false;
+  miniappBuildState.referencePickerRoot = '';
+  miniappBuildState.referencePickerPath = '';
+  miniappBuildState.referencePickerEntries = [];
+  miniappBuildState.referencePickerLoading = false;
+  miniappBuildState.referencePickerError = '';
+  miniappBuildState.referencePickerAgentId = '';
+  miniappBuildState.referencePickerRequestSeq += 1;
   miniappBuildState.anchorChatId = '';
   miniappBuildState.anchorAgentId = '';
   miniappBuildState.submitting = false;
@@ -24835,6 +25136,8 @@ function syncMiniappBuildDraftFromForm() {
   } else {
     miniappBuildState.functions = [];
   }
+  const referenceInput = document.getElementById('miniappBuildReferenceInput');
+  if (referenceInput) miniappBuildState.reference = String(referenceInput.value || '');
 }
 
 function renderMiniappBuildFunctionRows(focusIndex) {
@@ -24887,6 +25190,216 @@ function removeMiniappBuildFunction(index) {
   renderMiniappBuildFunctionRows(Math.max(0, index - 1));
 }
 
+function isAbsoluteMiniappBuildReferencePath(path) {
+  const value = String(path || '').trim();
+  return value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value) || value.startsWith('\\\\');
+}
+
+function isMiniappBuildReferenceMarkdown(path) {
+  return /\.md$/i.test(String(path || '').trim());
+}
+
+function renderMiniappBuildReferencePanel() {
+  const content = document.getElementById('miniappBuildReferenceContent');
+  const toggle = document.getElementById('miniappBuildReferenceToggle');
+  if (content) content.hidden = !miniappBuildState.referenceExpanded;
+  if (toggle) {
+    toggle.setAttribute('aria-expanded', miniappBuildState.referenceExpanded ? 'true' : 'false');
+    toggle.title = miniappBuildState.referenceExpanded ? '收起参考文档' : '展开参考文档';
+    toggle.setAttribute('aria-label', toggle.title);
+  }
+}
+
+function toggleMiniappBuildReferencePanel() {
+  if (miniappBuildState.submitting) return;
+  syncMiniappBuildDraftFromForm();
+  miniappBuildState.referenceExpanded = !miniappBuildState.referenceExpanded;
+  if (!miniappBuildState.referenceExpanded) miniappBuildState.referencePickerOpen = false;
+  renderMiniappBuildReferencePanel();
+  renderMiniappBuildReferencePicker();
+}
+
+function miniappBuildReferencePickerContains(path) {
+  const root = normalizeFsPath(miniappBuildState.referencePickerRoot);
+  const candidate = normalizeFsPath(path);
+  return !!root && !!candidate && (candidate === root || candidate.startsWith(root + '/'));
+}
+
+function miniappBuildReferencePickerIcon(type) {
+  return type === 'dir'
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+}
+
+function renderMiniappBuildReferencePicker() {
+  const picker = document.getElementById('miniappBuildReferencePicker');
+  const path = document.getElementById('miniappBuildReferencePickerPath');
+  const up = document.getElementById('miniappBuildReferencePickerUp');
+  const list = document.getElementById('miniappBuildReferencePickerList');
+  if (!picker || !path || !up || !list) return;
+  picker.hidden = !miniappBuildState.referenceExpanded || !miniappBuildState.referencePickerOpen;
+  if (picker.hidden) return;
+  const currentPath = String(miniappBuildState.referencePickerPath || '');
+  path.textContent = currentPath || '正在读取工作区…';
+  path.title = currentPath;
+  up.disabled = miniappBuildState.referencePickerLoading || !currentPath || !miniappBuildReferencePickerContains(getFsDirname(currentPath)) || normalizeFsPath(currentPath) === normalizeFsPath(miniappBuildState.referencePickerRoot);
+  list.replaceChildren();
+  const makeMessage = message => {
+    const item = document.createElement('div');
+    item.className = 'miniapp-build-reference-picker-empty';
+    item.textContent = message;
+    list.appendChild(item);
+  };
+  if (miniappBuildState.referencePickerLoading) {
+    makeMessage('正在读取目录…');
+    return;
+  }
+  if (miniappBuildState.referencePickerError) {
+    makeMessage(miniappBuildState.referencePickerError);
+    return;
+  }
+  const entries = (Array.isArray(miniappBuildState.referencePickerEntries) ? miniappBuildState.referencePickerEntries : []).filter(entry => entry && (entry.type === 'dir' || (entry.type === 'file' && isMiniappBuildReferenceMarkdown(entry.name)))).slice().sort((left, right) => {
+    if (left.type !== right.type) return left.type === 'dir' ? -1 : 1;
+    if (left.type === 'file') {
+      const modifiedAt = Number(right.modifiedAt || 0) - Number(left.modifiedAt || 0);
+      if (modifiedAt) return modifiedAt;
+    }
+    return String(left.name || '').localeCompare(String(right.name || ''));
+  });
+  if (!entries.length) {
+    makeMessage('此目录没有 Markdown 文件');
+    return;
+  }
+  entries.forEach(entry => {
+    if (!entry || (entry.type !== 'dir' && entry.type !== 'file') || !String(entry.name || '')) return;
+    if (entry.type === 'file' && !isMiniappBuildReferenceMarkdown(entry.name)) return;
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'miniapp-build-reference-picker-item ' + entry.type;
+    item.title = String(entry.name);
+    const icon = document.createElement('span');
+    icon.innerHTML = miniappBuildReferencePickerIcon(entry.type);
+    const name = document.createElement('span');
+    name.className = 'miniapp-build-reference-picker-name';
+    name.textContent = String(entry.name);
+    item.append(icon, name);
+    if (entry.type === 'dir') {
+      const tail = document.createElement('span');
+      tail.className = 'miniapp-build-reference-picker-tail';
+      tail.textContent = '›';
+      item.appendChild(tail);
+      item.addEventListener('click', () => miniappBuildReferencePickerEnter(entry.name));
+    } else {
+      item.addEventListener('click', () => selectMiniappBuildReference(joinFsPath(currentPath, entry.name)));
+    }
+    list.appendChild(item);
+  });
+}
+
+async function loadMiniappBuildReferencePicker() {
+  const path = normalizeFsPath(miniappBuildState.referencePickerPath);
+  if (!miniappBuildState.referencePickerOpen || !path) return;
+  const requestSeq = ++miniappBuildState.referencePickerRequestSeq;
+  miniappBuildState.referencePickerLoading = true;
+  miniappBuildState.referencePickerError = '';
+  renderMiniappBuildReferencePicker();
+  try {
+    let url = '/api/files?path=' + encodeURIComponent(path + '/');
+    if (miniappBuildState.anchorChatId) url += '&chatId=' + encodeURIComponent(miniappBuildState.anchorChatId);
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) throw new Error('无法读取目录');
+    const entries = await response.json();
+    if (requestSeq !== miniappBuildState.referencePickerRequestSeq || path !== normalizeFsPath(miniappBuildState.referencePickerPath)) return;
+    miniappBuildState.referencePickerEntries = Array.isArray(entries) ? entries : [];
+  } catch (error) {
+    if (requestSeq !== miniappBuildState.referencePickerRequestSeq || path !== normalizeFsPath(miniappBuildState.referencePickerPath)) return;
+    miniappBuildState.referencePickerEntries = [];
+    miniappBuildState.referencePickerError = String(error && error.message || '无法读取目录');
+  } finally {
+    if (requestSeq !== miniappBuildState.referencePickerRequestSeq || path !== normalizeFsPath(miniappBuildState.referencePickerPath)) return;
+    miniappBuildState.referencePickerLoading = false;
+    renderMiniappBuildReferencePicker();
+  }
+}
+
+async function toggleMiniappBuildReferencePicker() {
+  if (miniappBuildState.submitting) return;
+  syncMiniappBuildDraftFromForm();
+  const shouldOpen = !miniappBuildState.referenceExpanded || !miniappBuildState.referencePickerOpen;
+  miniappBuildState.referenceExpanded = true;
+  miniappBuildState.referencePickerOpen = shouldOpen;
+  renderMiniappBuildReferencePanel();
+  if (!miniappBuildState.referencePickerOpen) {
+    renderMiniappBuildReferencePicker();
+    return;
+  }
+  const agentId = String(miniappBuildState.anchorAgentId || '').trim();
+  if (!agentId) {
+    miniappBuildState.referencePickerError = '当前没有可用的 Agent';
+    renderMiniappBuildReferencePicker();
+    return;
+  }
+  if (!miniappBuildState.referencePickerRoot || miniappBuildState.referencePickerAgentId !== agentId) {
+    miniappBuildState.referencePickerLoading = true;
+    miniappBuildState.referencePickerError = '';
+    miniappBuildState.referencePickerEntries = [];
+    miniappBuildState.referencePickerAgentId = agentId;
+    renderMiniappBuildReferencePicker();
+    const workspace = await getWorkspaceForAgent(agentId);
+    if (!miniappBuildState.referencePickerOpen || miniappBuildState.referencePickerAgentId !== agentId) return;
+    if (!workspace) {
+      miniappBuildState.referencePickerLoading = false;
+      miniappBuildState.referencePickerError = '无法读取当前 Agent 工作区';
+      renderMiniappBuildReferencePicker();
+      return;
+    }
+    miniappBuildState.referencePickerRoot = normalizeFsPath(workspace);
+    miniappBuildState.referencePickerPath = miniappBuildState.referencePickerRoot;
+  }
+  await loadMiniappBuildReferencePicker();
+}
+
+function miniappBuildReferencePickerEnter(name) {
+  if (miniappBuildState.referencePickerLoading) return;
+  const target = joinFsPath(miniappBuildState.referencePickerPath, name);
+  if (!miniappBuildReferencePickerContains(target)) return;
+  miniappBuildState.referencePickerPath = target;
+  void loadMiniappBuildReferencePicker();
+}
+
+function miniappBuildReferencePickerGoUp() {
+  if (miniappBuildState.referencePickerLoading) return;
+  const parent = getFsDirname(miniappBuildState.referencePickerPath);
+  if (!miniappBuildReferencePickerContains(parent) || parent === normalizeFsPath(miniappBuildState.referencePickerPath)) return;
+  miniappBuildState.referencePickerPath = parent;
+  void loadMiniappBuildReferencePicker();
+}
+
+function selectMiniappBuildReference(path) {
+  const reference = String(path || '').trim();
+  if (!isAbsoluteMiniappBuildReferencePath(reference) || !isMiniappBuildReferenceMarkdown(reference)) return;
+  miniappBuildState.reference = reference;
+  miniappBuildState.referenceExpanded = true;
+  miniappBuildState.referencePickerOpen = false;
+  const input = document.getElementById('miniappBuildReferenceInput');
+  if (input) {
+    input.value = reference;
+    input.focus();
+  }
+  renderMiniappBuildReferencePanel();
+  renderMiniappBuildReferencePicker();
+}
+
+function clearMiniappBuildReference() {
+  if (miniappBuildState.submitting) return;
+  miniappBuildState.reference = '';
+  const input = document.getElementById('miniappBuildReferenceInput');
+  if (input) {
+    input.value = '';
+    input.focus();
+  }
+}
+
 function getMiniappBuildTemplate(runtimeConfig) {
   const miniapp = runtimeConfig && typeof runtimeConfig === 'object' && !Array.isArray(runtimeConfig)
     ? runtimeConfig.miniapp
@@ -24896,32 +25409,75 @@ function getMiniappBuildTemplate(runtimeConfig) {
   }
   const build = typeof miniapp.build === 'string' ? miniapp.build.trim() : '';
   const fallbackFunction = typeof miniapp.function === 'string' ? miniapp.function.trim() : '';
+  const reference = typeof miniapp.reference === 'string' ? miniapp.reference.trim() : '';
   if (!build) throw new Error('miniapp.build 不能为空');
   if (!build.includes('$name')) throw new Error('miniapp.build 未包含 $name 变量');
   if (!build.includes('$function')) throw new Error('miniapp.build 未包含 $function 变量');
   if (!fallbackFunction) throw new Error('miniapp.function 不能为空');
-  return { build, fallbackFunction };
+  return { build, fallbackFunction, reference };
 }
 
-async function buildMiniappBuildPrompt(name, functions) {
+async function buildMiniappBuildPrompt(name, functions, reference) {
   const runtimeConfig = await readRuntimeConfig(true);
   const template = getMiniappBuildTemplate(runtimeConfig);
   const functionText = functions.length ? functions.join('、') : template.fallbackFunction;
-  return template.build.split('$name').join(name).split('$function').join(functionText);
+  const referencePath = String(reference || '').trim();
+  if (referencePath && !isAbsoluteMiniappBuildReferencePath(referencePath)) throw new Error('参考文档必须是文件系统绝对路径');
+  if (referencePath && !isMiniappBuildReferenceMarkdown(referencePath)) throw new Error('参考文档必须是 .md 文件');
+  if (referencePath && !template.build.includes('$reference')) throw new Error('miniapp.build 未包含 $reference 变量');
+  if (referencePath && !template.reference) throw new Error('miniapp.reference 不能为空');
+  const referenceText = referencePath ? template.reference.split('$reference').join(referencePath) : '';
+  return template.build.split('$name').join(name).split('$function').join(functionText).split('$reference').join(referenceText).trim();
+}
+
+function startMiniappBuildReferenceTourOnboarding() {
+  return withOnboardingStartLock(() => {
+    if (!miniappBuildReferenceTourState.pendingStart || hasMiniappBuildReferenceTourOpenRecord()) {
+      miniappBuildReferenceTourState.pendingStart = false;
+      return false;
+    }
+    const overlay = document.getElementById('miniappBuildOverlay');
+    const popover = document.getElementById('miniappBuildPopover');
+    const target = document.getElementById('miniappBuildReference');
+    if (!miniappBuildState.open || !overlay || !overlay.classList.contains('show') || !popover || !target) {
+      miniappBuildReferenceTourState.pendingStart = false;
+      return false;
+    }
+    miniappBuildReferenceTourState.pendingStart = false;
+    markMiniappBuildReferenceTourOpenRecord();
+    setMiniappBuildReferenceTourContentInert(true);
+    onboardingState.active = true;
+    setOnboardingStep('miniapp-build-reference-tour');
+    scheduleOnboardingStepResync('miniapp-build-reference-tour', [60, 180, 320]);
+    return true;
+  });
+}
+
+function queueMiniappBuildReferenceTourOnboarding() {
+  if (!isOnboardingEnabled() || hasMiniappBuildReferenceTourOpenRecord() || !miniappBuildState.open) return false;
+  miniappBuildReferenceTourState.pendingStart = true;
+  if (isOnboardingStartLocked()) return false;
+  return startMiniappBuildReferenceTourOnboarding();
 }
 
 function closeMiniappBuildPopover(options = {}) {
   const overlay = document.getElementById('miniappBuildOverlay');
   if (!overlay) return;
+  const tourActive = isOnboardingActive() && isMiniappBuildReferenceTourOnboardingStep(onboardingState.step);
+  if (tourActive && !options.force) return false;
+  miniappBuildReferenceTourState.pendingStart = false;
+  if (tourActive) stopOnboarding(false);
   if (miniappBuildState.open && !options.discardDraft) syncMiniappBuildDraftFromForm();
   setOverlayVisible(overlay, false);
   miniappBuildState.open = false;
   miniappBuildState.submitting = false;
   setMiniappBuildError('');
+  return true;
 }
 
 function handleMiniappBuildOverlayClick(event) {
   if (!event || event.target !== event.currentTarget) return;
+  if (isOnboardingActive() && isMiniappBuildReferenceTourOnboardingStep(onboardingState.step)) return;
   closeMiniappBuildPopover();
 }
 
@@ -24936,17 +25492,38 @@ function openMiniappBuildPopover(event) {
     vfsShowUploadToast('当前没有可用的 Agent 或会话', true);
     return;
   }
+  if (isOnboardingActive() && !isMiniappBuildReferenceTourOnboardingStep(onboardingState.step)) {
+    stopOnboarding(false);
+  }
   miniappBuildState.anchorChatId = binding.chatId;
   miniappBuildState.anchorAgentId = binding.agentId;
+  miniappBuildState.referenceExpanded = false;
+  miniappBuildState.referencePickerOpen = false;
   const overlay = document.getElementById('miniappBuildOverlay');
   const input = document.getElementById('miniappBuildNameInput');
+  const referenceInput = document.getElementById('miniappBuildReferenceInput');
   if (!overlay || !input) return;
+  if (miniappBuildState.referencePickerAgentId && miniappBuildState.referencePickerAgentId !== binding.agentId) {
+    miniappBuildState.referencePickerOpen = false;
+    miniappBuildState.referencePickerRoot = '';
+    miniappBuildState.referencePickerPath = '';
+    miniappBuildState.referencePickerEntries = [];
+    miniappBuildState.referencePickerLoading = false;
+    miniappBuildState.referencePickerError = '';
+    miniappBuildState.referencePickerAgentId = '';
+    miniappBuildState.referencePickerRequestSeq += 1;
+  }
   input.value = miniappBuildState.name || '';
+  if (referenceInput) referenceInput.value = miniappBuildState.reference || '';
   renderMiniappBuildFunctionRows();
+  renderMiniappBuildReferencePanel();
+  renderMiniappBuildReferencePicker();
   setMiniappBuildError('');
   showExclusiveOverlay(overlay);
   miniappBuildState.open = true;
+  queueMiniappBuildReferenceTourOnboarding();
   window.setTimeout(() => {
+    if (isOnboardingActive() && isMiniappBuildReferenceTourOnboardingStep(onboardingState.step)) return;
     input.focus();
     if (typeof input.select === 'function') input.select();
   }, 20);
@@ -24991,9 +25568,10 @@ async function submitMiniappBuildPrompt() {
   const functions = miniappBuildState.functions
     .map(value => String(value || '').trim())
     .filter(Boolean);
+  const reference = String(miniappBuildState.reference || '').trim();
   let prompt = '';
   try {
-    prompt = await buildMiniappBuildPrompt(name, functions);
+    prompt = await buildMiniappBuildPrompt(name, functions, reference);
   } catch (err) {
     const message = String(err && err.message || err || '读取构建配置失败');
     setMiniappBuildError('无法发起构建请求：' + message);
@@ -32412,7 +32990,7 @@ function scheduleQueuedCenterRequestDrain(chatId, agentId) {
   const resolvedAgentId = String(agentId != null ? agentId : getChatAgentId(chatId)).trim();
   const queue = getQueuedCenterQueue(chatId, resolvedAgentId);
   syncQueuedCenterRecoveredInsertHold(chatId, resolvedAgentId);
-  if (!queue || queue.draining || queue.holdRecoveredInsertUntilNextBusy || isChatBusy(chatId) || isChatSendDispatching(chatId) || !queue.items.length || isQueuedCenterTourDrainLocked(chatId, resolvedAgentId)) {
+  if (!queue || queue.draining || queue.holdRecoveredInsertUntilNextBusy || isChatBusy(chatId) || isChatSendDispatching(chatId) || !queue.items.length || isQueuedCenterTourDrainLocked(chatId, resolvedAgentId) || isAssistantShortcutTourQueueDrainLocked(chatId)) {
     syncQueuedCenterInputUI(chatId, resolvedAgentId);
     return;
   }
@@ -33528,12 +34106,21 @@ function shouldRenderMessageInCenter(message) {
   return shouldRenderAssistantCenterMessage(message);
 }
 
+function getAssistantMessageBindingKey(message) {
+  if (!message || message.role !== 'assistant' || message.error) return '';
+  const logicalId = normalizeStreamLogicalId(message.streamLogicalId);
+  const timestamp = toChatTimestamp(message.createdAt || message.receivedAt || '');
+  return logicalId ? ('logical:' + logicalId) : (timestamp ? ('time:' + timestamp) : '');
+}
+
 function assistantStreamBindingAttrs(message) {
   if (!message || message.role !== 'assistant' || message.error) return '';
   const sessionToken = String(message.streamSessionToken || '').trim();
-  if (!sessionToken) return '';
+  const messageKey = getAssistantMessageBindingKey(message);
+  if (!sessionToken && !messageKey) return '';
   const attrs = [];
   if (sessionToken) attrs.push(` data-stream-session-token="${esc(sessionToken).replace(/"/g, '&quot;')}"`);
+  if (messageKey) attrs.push(` data-assistant-message-key="${esc(messageKey).replace(/"/g, '&quot;')}"`);
   return attrs.join('');
 }
 
@@ -34736,6 +35323,98 @@ function isAssistantShortcutInteractionDisabled(chatId) {
   return !resolvedChatId || isChatBusy(resolvedChatId) || isChatSendDispatching(resolvedChatId);
 }
 
+function clearAssistantShortcutTourState(options = {}) {
+  const resumeQueuedRequests = options.resumeQueuedRequests !== false;
+  const chatId = String(assistantShortcutTourState.chatId || '').trim();
+  assistantShortcutTourState.pendingStart = false;
+  assistantShortcutTourState.chatId = '';
+  assistantShortcutTourState.messageKey = '';
+  if (resumeQueuedRequests && chatId) {
+    scheduleQueuedCenterRequestDrain(chatId, getChatAgentId(chatId));
+  }
+}
+
+function isAssistantShortcutTourQueueDrainLocked(chatId) {
+  return !!(
+    String(assistantShortcutTourState.chatId || '').trim() === String(chatId || '').trim() &&
+    (assistantShortcutTourState.pendingStart || isAssistantShortcutTourOnboardingStep(onboardingState.step))
+  );
+}
+
+function getAssistantShortcutTourTargetSelector() {
+  const chatId = String(assistantShortcutTourState.chatId || '').trim();
+  const messageKey = String(assistantShortcutTourState.messageKey || '').trim();
+  if (!chatId || chatId !== String(state.activeChat || '').trim() || !messageKey) return '';
+  return '#chatContainer .message-wrap.assistant[data-assistant-message-key="' + CSS.escape(messageKey) + '"] .message-shortcut-btn';
+}
+
+function resolveAssistantShortcutTourTarget() {
+  const selector = getAssistantShortcutTourTargetSelector();
+  if (!selector) return null;
+  const target = document.querySelector(selector);
+  return target instanceof HTMLButtonElement && !target.disabled ? target : null;
+}
+
+function syncAssistantShortcutTourStep(step) {
+  if (!isAssistantShortcutTourOnboardingStep(step)) return true;
+  closeAssistantShortcutModal({ restoreFocus: false });
+  const target = resolveAssistantShortcutTourTarget();
+  if (!target) return false;
+  scheduleOnboardingStepResync(step, [60, 180, 320, 520]);
+  return true;
+}
+
+async function startAssistantShortcutTourOnboarding() {
+  return withOnboardingStartLockAsync(async () => {
+    if (!assistantShortcutTourState.pendingStart || hasAssistantShortcutTourClickRecord()) {
+      clearAssistantShortcutTourState();
+      return false;
+    }
+    const chatId = String(assistantShortcutTourState.chatId || '').trim();
+    const messageKey = String(assistantShortcutTourState.messageKey || '').trim();
+    if (!chatId || chatId !== String(state.activeChat || '').trim() || !messageKey) {
+      clearAssistantShortcutTourState();
+      return false;
+    }
+    let target = resolveAssistantShortcutTourTarget();
+    if (!target) {
+      try {
+        await readRuntimeConfig(true);
+      } catch {}
+      if (chatId !== String(state.activeChat || '').trim()) {
+        clearAssistantShortcutTourState();
+        return false;
+      }
+      renderMessages();
+      target = resolveAssistantShortcutTourTarget();
+    }
+    if (!target || isOnboardingActive()) {
+      clearAssistantShortcutTourState();
+      return false;
+    }
+    assistantShortcutTourState.pendingStart = false;
+    onboardingState.active = true;
+    if (!syncAssistantShortcutTourStep('assistant-shortcut-tour')) {
+      clearAssistantShortcutTourState();
+      stopOnboarding(false);
+      return false;
+    }
+    markAssistantShortcutTourClickRecord();
+    setOnboardingStep('assistant-shortcut-tour');
+    return true;
+  });
+}
+
+function queueAssistantShortcutTourOnboarding(chatId, messageKey) {
+  if (!isOnboardingEnabled() || hasAssistantShortcutTourClickRecord()) return false;
+  assistantShortcutTourState.chatId = String(chatId || '').trim();
+  assistantShortcutTourState.messageKey = String(messageKey || '').trim();
+  assistantShortcutTourState.pendingStart = !!(assistantShortcutTourState.chatId && assistantShortcutTourState.messageKey);
+  if (!assistantShortcutTourState.pendingStart || isOnboardingStartLocked()) return false;
+  void startAssistantShortcutTourOnboarding();
+  return true;
+}
+
 function syncVisibleAssistantShortcutButtons(chatId) {
   const disabled = isAssistantShortcutInteractionDisabled(chatId);
   document.querySelectorAll('.message-shortcut-btn').forEach(button => {
@@ -34942,6 +35621,7 @@ async function openLatestAssistantShortcutModal(event) {
     event.stopPropagation();
   }
   const chat = state.chats[state.activeChat];
+  if (isAssistantShortcutTourOnboardingStep(onboardingState.step)) return false;
   if (!getLatestSuccessfulCenterAssistantResponseMessage(chat)) return false;
   if (isAssistantShortcutInteractionDisabled(state.activeChat)) return false;
   let replies = [];
@@ -40402,6 +41082,7 @@ function finishStreamingFor(chatId, options) {
   stopLiveCliEventPolling(chatId);
   const streamState = chatStreaming[chatId];
   const streamSessionToken = String(streamState && streamState.sessionToken || '').trim();
+  const isFirstSuccessfulAssistantResponse = completedNormally && !hasSuccessfulCompletedAssistantResponseOutsideSession(streamSessionToken);
   getStreamingRenderQueueEntriesForChat(chatId).forEach(item => {
     const queued = item.stateItem;
     if (queued && queued.frame) {
@@ -40417,6 +41098,7 @@ function finishStreamingFor(chatId, options) {
   const chat = state.chats[chatId];
   let completedAssistantTs = '';
   let latestSessionAssistantContent = '';
+  const completedSessionAssistantMessages = [];
   const completedStreamLogicalIds = new Set();
   if (chat && chat.messages.length > 0) {
     let finalized = false;
@@ -40449,6 +41131,7 @@ function finishStreamingFor(chatId, options) {
       msg.streamStatus = '完成';
       delete msg.streamPacketType;
       finalizeAssistantTransientFields(msg);
+      completedSessionAssistantMessages.push(msg);
       if (!latestSessionAssistantContent && shouldRenderAssistantCenterMessage(msg)) {
         latestSessionAssistantContent = String(msg.content || '');
       }
@@ -40494,6 +41177,14 @@ function finishStreamingFor(chatId, options) {
   if (state.activeChat === chatId) {
     document.querySelectorAll('.message.assistant.streaming').forEach(el => el.classList.remove('streaming'));
     renderMessages();
+  }
+  if (isFirstSuccessfulAssistantResponse) {
+    const firstResponseMessage = completedSessionAssistantMessages.find(message => (
+      isAssistantSuccessfulCompletedMessage(message) && shouldRenderAssistantCenterMessage(message)
+    ));
+    if (firstResponseMessage) {
+      queueAssistantShortcutTourOnboarding(chatId, getAssistantMessageBindingKey(firstResponseMessage));
+    }
   }
   if (chat && chat.messages.length > 0) {
     const lastUser = [...chat.messages].reverse().find(m => m.role === 'user');
@@ -54895,7 +55586,8 @@ function getVisibleOnboardingActionButton() {
     getOnboardingOverlay('right'),
     document.getElementById('memoMetaPreviewOnboardingLayer'),
     document.getElementById('settingsOnboardingLayer'),
-    getSkillExtractOnboardingLayer()
+    getSkillExtractOnboardingLayer(),
+    document.getElementById('miniappBuildReferenceOnboardingLayer')
   ];
   for (const layer of layers) {
     if (!isOnboardingLayerVisible(layer)) continue;
@@ -54913,7 +55605,8 @@ function getVisibleOnboardingSecondaryButton() {
     getOnboardingOverlay('right'),
     document.getElementById('memoMetaPreviewOnboardingLayer'),
     document.getElementById('settingsOnboardingLayer'),
-    getSkillExtractOnboardingLayer()
+    getSkillExtractOnboardingLayer(),
+    document.getElementById('miniappBuildReferenceOnboardingLayer')
   ];
   for (const layer of layers) {
     if (!isOnboardingLayerVisible(layer)) continue;

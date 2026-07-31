@@ -3498,3 +3498,13 @@ Integration 启动后会立即检查每个合法 Agent，之后每隔 `recover` 
 定时备忘录出现请求创建或转发失败、SSE 空闲超时、读取错误、非 2xx、业务异常，或者流结束时缺少 `data: [DONE]`，会记录异常聊天日志并将任务状态设为 `4`（失败）。失败是终态，不会被定时扫描自动重试；需要再次执行时可由用户显式创建新的运行任务。备忘录时间线、详情和查询结果都会显示“失败”，且可查看该任务已保存的会话记录。
 
 完整说明见 [iteration/20260730-4/USER_GUIDE.md](iteration/20260730-4/USER_GUIDE.md)。
+
+---
+
+## 迭代 20260731-2：构建迷你应用参考文档
+
+“构建迷你应用”支持一个默认收起的可选参考 Markdown 文档。用户可点击小型虚拟文件系统图标，在当前会话 Agent 的工作区内使用相同的目录浏览方式选择单个 `.md` 文件；也可展开字段后直接填写 `.md` 文件系统绝对路径。选择器不会读取文件内容或修改文件。取消、点击遮罩或按 `Esc` 会保留草稿，成功发送后清空。
+
+静态 `config/config.json.miniapp` 新增 `reference` 模板，且 `build` 可使用 `$reference`。填写参考路径时，Site 先将 `reference` 内的全部 `$reference` 换成该绝对路径，再替换 `build` 内全部 `$reference`；不填写时，`build` 内的全部 `$reference` 置为空字符串。`GET /api/runtime_config` 继续只读透传完整 `miniapp` 对象。
+
+完整说明见 [iteration/20260731-2/USER_GUIDE.md](iteration/20260731-2/USER_GUIDE.md)。
