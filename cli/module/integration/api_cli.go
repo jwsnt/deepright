@@ -119,6 +119,7 @@ func printIntegrationAPIHelp() {
 	fmt.Println("  knowledge-last-update Call GET /knowledge_lastUpdate")
 	fmt.Println("  knowledge-path        Call GET /knowledge_path")
 	fmt.Println("  whisper               Whisper audio transcription queue endpoints")
+	fmt.Println("  voxcpm                VoxCPM text-to-speech queue endpoints")
 	fmt.Println("")
 	fmt.Println("Examples:")
 	fmt.Println("  integration api heartbeat")
@@ -129,6 +130,7 @@ func printIntegrationAPIHelp() {
 	fmt.Println("  integration api token set --body-file ./token.json")
 	fmt.Println("  integration api cron create --help")
 	fmt.Println("  integration api whisper --help")
+	fmt.Println("  integration api voxcpm --help")
 	fmt.Println("  integration service cancel --chat chat-001")
 }
 
@@ -582,6 +584,111 @@ func runIntegrationAPIWhisperCLI(args []string, stdout, stderr io.Writer) int {
 	default:
 		fmt.Fprintf(stderr, "unknown whisper api command: %s\n", args[0])
 		printIntegrationAPIWhisperHelp(stderr)
+		return 1
+	}
+}
+
+func printIntegrationAPIVoxCPMHelp(stdout io.Writer) {
+	fmt.Fprintln(stdout, "Usage:")
+	fmt.Fprintln(stdout, "  integration api voxcpm <check|list|create|cancel|restart|delete|log> [options]")
+	fmt.Fprintln(stdout, "")
+	fmt.Fprintln(stdout, "Create requires one text file; reference audio and expression style are optional. Use the HTTP API directly to submit a batch.")
+}
+
+func runIntegrationAPIVoxCPMCreateCLI(args []string, stdout, stderr io.Writer) int {
+	fs, addr, port, output, pretty := newIntegrationAPICommonFlagSet("integration api voxcpm create", "integration api voxcpm create --agentId ID --textPath PATH --outputName NAME.wav [--referenceAudioPath PATH] [--scenario balanced] [--control '温和、平稳'] [--addr URL] [--port 8080]", "Call POST /api/voxcpm/tasks with one voice-design or cloning task.", stderr)
+	agentID := fs.String("agentId", "", "agent id")
+	fs.StringVar(agentID, "agent", "", "agent id")
+	textPath := fs.String("textPath", "", "workspace-relative UTF-8 text file")
+	referencePath := fs.String("referenceAudioPath", "", "workspace-relative reference audio file")
+	outputName := fs.String("outputName", "", "requested WAV output name")
+	scenario := fs.String("scenario", voxcpmScenarioBalanced, "generation scenario: balanced, quality, fast, clean, warm_narration, or lively")
+	control := fs.String("control", "", "optional VoxCPM expression style instruction")
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		return 1
+	}
+	if fs.NArg() != 0 {
+		fmt.Fprintf(stderr, "unexpected arguments: %s\n", strings.Join(fs.Args(), " "))
+		return 1
+	}
+	request := voxcpmTaskCreateRequest{AgentID: strings.TrimSpace(*agentID), OutputName: strings.TrimSpace(*outputName), Tasks: []voxcpmTaskCreateItem{{TextPath: strings.TrimSpace(*textPath), ReferenceAudioPath: strings.TrimSpace(*referencePath), Scenario: strings.TrimSpace(*scenario), Control: strings.TrimSpace(*control)}}}
+	if request.AgentID == "" || request.OutputName == "" || request.Tasks[0].TextPath == "" {
+		fmt.Fprintln(stderr, "--agentId, --textPath, and --outputName are required; --referenceAudioPath is optional")
+		return 1
+	}
+	body, err := json.Marshal(request)
+	if err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1
+	}
+	base, err := resolveIntegrationAPIBase(*addr, *port)
+	if err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	resp, reqErr := integrationAPIRequest(ctx, newIntegrationAPIClient(60*time.Second), http.MethodPost, base, "/api/voxcpm/tasks", nil, bytes.NewReader(body), "application/json", nil)
+	return integrationAPIHandleHTTPResult(stdout, stderr, resp, reqErr, *output, *pretty, false)
+}
+
+func runIntegrationAPIVoxCPMTaskActionCLI(command string, args []string, stdout, stderr io.Writer) int {
+	fs, addr, port, output, pretty := newIntegrationAPICommonFlagSet("integration api voxcpm "+command, "integration api voxcpm "+command+" --agentId ID --id TASK_ID [--addr URL] [--port 8080]", "Call a VoxCPM task action.", stderr)
+	agentID := fs.String("agentId", "", "agent id")
+	fs.StringVar(agentID, "agent", "", "agent id")
+	taskID := fs.Int64("id", 0, "VoxCPM task id")
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		return 1
+	}
+	if fs.NArg() != 0 {
+		fmt.Fprintf(stderr, "unexpected arguments: %s\n", strings.Join(fs.Args(), " "))
+		return 1
+	}
+	if strings.TrimSpace(*agentID) == "" || *taskID <= 0 {
+		fmt.Fprintln(stderr, "--agentId and a positive --id are required")
+		return 1
+	}
+	body, err := json.Marshal(map[string]interface{}{"agentId": strings.TrimSpace(*agentID), "id": *taskID})
+	if err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1
+	}
+	base, err := resolveIntegrationAPIBase(*addr, *port)
+	if err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	resp, reqErr := integrationAPIRequest(ctx, newIntegrationAPIClient(60*time.Second), http.MethodPost, base, "/api/voxcpm/tasks/"+command, nil, bytes.NewReader(body), "application/json", nil)
+	return integrationAPIHandleHTTPResult(stdout, stderr, resp, reqErr, *output, *pretty, false)
+}
+
+func runIntegrationAPIVoxCPMCLI(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 || strings.TrimSpace(args[0]) == "--help" || strings.TrimSpace(args[0]) == "-h" || strings.TrimSpace(args[0]) == "help" {
+		printIntegrationAPIVoxCPMHelp(stdout)
+		return 0
+	}
+	switch strings.TrimSpace(args[0]) {
+	case "check":
+		return runIntegrationAPIGenericRequestCLI(integrationAPIGenericRequestSpec{Command: "voxcpm check", Usage: "integration api voxcpm check [--addr URL] [--port 8080]", Description: "Call GET /api/voxcpm/check.", Method: http.MethodGet, Path: "/api/voxcpm/check"}, args[1:], stdout, stderr)
+	case "list":
+		return runIntegrationAPIGenericRequestCLI(integrationAPIGenericRequestSpec{Command: "voxcpm list", Usage: "integration api voxcpm list --agentId ID [--status all|queued|running|completed|cancelled|failed] [--page N] [--addr URL] [--port 8080]", Description: "Call GET /api/voxcpm/tasks.", Method: http.MethodGet, Path: "/api/voxcpm/tasks", QueryFlags: []integrationAPIQueryFlag{{QueryKey: "agentId", Names: []string{"agentId", "agent"}, Usage: "agent id"}, {QueryKey: "status", Names: []string{"status"}, Usage: "task status"}, {QueryKey: "page", Names: []string{"page"}, Usage: "one-based page number"}}}, args[1:], stdout, stderr)
+	case "create":
+		return runIntegrationAPIVoxCPMCreateCLI(args[1:], stdout, stderr)
+	case "cancel", "restart", "delete":
+		return runIntegrationAPIVoxCPMTaskActionCLI(strings.TrimSpace(args[0]), args[1:], stdout, stderr)
+	case "log":
+		return runIntegrationAPIGenericRequestCLI(integrationAPIGenericRequestSpec{Command: "voxcpm log", Usage: "integration api voxcpm log --agentId ID --id TASK_ID [--addr URL] [--port 8080]", Description: "Call GET /api/voxcpm/tasks/log.", Method: http.MethodGet, Path: "/api/voxcpm/tasks/log", QueryFlags: []integrationAPIQueryFlag{{QueryKey: "agentId", Names: []string{"agentId", "agent"}, Usage: "agent id"}, {QueryKey: "id", Names: []string{"id"}, Usage: "task id"}}}, args[1:], stdout, stderr)
+	default:
+		fmt.Fprintf(stderr, "unknown voxcpm api command: %s\n", args[0])
+		printIntegrationAPIVoxCPMHelp(stderr)
 		return 1
 	}
 }
@@ -1511,6 +1618,8 @@ func runIntegrationAPICLI(args []string, stdout, stderr io.Writer) int {
 		return runIntegrationAPIKnowledgeCLI(args[1:], stdout, stderr)
 	case "whisper":
 		return runIntegrationAPIWhisperCLI(args[1:], stdout, stderr)
+	case "voxcpm":
+		return runIntegrationAPIVoxCPMCLI(args[1:], stdout, stderr)
 	case "log-round":
 		cfg := &Config{AgentDir: integrationDefaultAgentDir(), AgentCacheMs: 120000}
 		if value, ok := readIntegrationStartupConfigValue("agent-dir"); ok {

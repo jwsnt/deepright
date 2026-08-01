@@ -371,22 +371,26 @@ func handleWhisperCheck() http.HandlerFunc {
 			writeWhisperCheckResp(w, http.StatusMethodNotAllowed, WhisperCheckResponse{Content: "仅支持 GET 请求", Status: 1})
 			return
 		}
-		raw, _, err := readIntegrationStartupConfigRaw()
-		if err != nil {
-			writeWhisperCheckResp(w, http.StatusInternalServerError, WhisperCheckResponse{Content: "读取 config/config.json 失败: " + err.Error(), Status: 1})
-			return
-		}
-		config, err := parseWhisperCheckConfig(raw)
-		if err != nil {
-			writeWhisperCheckResp(w, http.StatusBadRequest, WhisperCheckResponse{Content: err.Error(), Status: 1})
-			return
-		}
-		if !whisperDependencyAvailable(config.CacheFor) {
-			writeWhisperCheckResp(w, http.StatusOK, WhisperCheckResponse{Install: config.Install, Content: "未检测到可用的 Whisper", Status: 0})
-			return
-		}
-		writeWhisperCheckResp(w, http.StatusOK, WhisperCheckResponse{Available: true, Status: 0})
+		status, response := checkWhisperDependency()
+		writeWhisperCheckResp(w, status, response)
 	}
+}
+
+// checkWhisperDependency contains the complete availability rule shared by
+// the HTTP endpoint and the asynchronous startup preflight.
+func checkWhisperDependency() (int, WhisperCheckResponse) {
+	raw, _, err := readIntegrationStartupConfigRaw()
+	if err != nil {
+		return http.StatusInternalServerError, WhisperCheckResponse{Content: "读取 config/config.json 失败: " + err.Error(), Status: 1}
+	}
+	config, err := parseWhisperCheckConfig(raw)
+	if err != nil {
+		return http.StatusBadRequest, WhisperCheckResponse{Content: err.Error(), Status: 1}
+	}
+	if !whisperDependencyAvailable(config.CacheFor) {
+		return http.StatusOK, WhisperCheckResponse{Install: config.Install, Content: "未检测到可用的 Whisper", Status: 0}
+	}
+	return http.StatusOK, WhisperCheckResponse{Available: true, Status: 0}
 }
 
 func newWhisperTaskManager(cfg *Config, db *sql.DB) *whisperTaskManager {

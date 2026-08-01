@@ -1,5 +1,5 @@
 ### 第一性原则
-+ 仅可以新增/更新/删除 integration（../..）同目录及其子目录，以及本需求直接涉及的 `../../../connect/skillstate/`、`../../../site/index.html`、`../../../build.sh`、`../../../build/install.ps1`、`../../../build/USER_GUIDE.md`、`../../../build/USER_GUIDE.txt`、`../../../config/config.json` 与 `../../../config/app/API.md`、`../../../config/app/CANVAS.md`、`../../../config/app/DESIGN.md`。
++ 仅可以新增/更新/删除 integration（../..）同目录及其子目录，以及本需求直接涉及的 `../../../connect/skillstate/`、`../../../site/index.html`、`../../../build.sh`、`../../../build/install.ps1`、`../../../build/USER_GUIDE.md`、`../../../build/USER_GUIDE.txt` 与 `../../../config/app/API.md`、`../../../config/app/CANVAS.md`、`../../../config/app/DESIGN.md`。
 
 ### 技术规范
 + 严格遵守整体设计文档：../../../DESIGN.md
@@ -8,28 +8,34 @@
 
 ### 需求介绍
 
-Integration 新增基于 `rembg` 的图片主体提取队列。该队列与 Whisper 转写队列相互独立，但采用相同的持久化、状态管理、列表、取消、重试、失败删除与日志语义。
+Integration 新增持久化、串行执行的 VoxCPM 配音任务队列，为当前 Agent 工作区内的文字文件生成 WAV；可选参考音色时克隆音色，未选择时自由设计声音。
 
-- 活动 `config/config.json` 必须提供 `rembg` 对象：`check` 为正整数小时，`install` 为非空安装请求文本。`GET /api/rembg/check` 必须读取并校验这两项配置；配置缺失或无效时返回可展示错误，不使用隐式默认值。
-- 检查接口只可验证受控运行环境中 `rembg --help` 能否启动。服务须继承用户已配置及已发现的 Python 运行时脚本目录：macOS 包括用户安装目录、Python Framework、pyenv、conda、venv、Poetry、asdf 与 mise；Linux/WSL 还须向隔离执行环境只读挂入相应 Python 运行时。检查成功可按 `rembg.check` 缓存；命令不存在、失效或不能启动时，返回 `rembg.install`，不得执行安装、创建任务或写入 Agent 工作区。
-- 服务启动时必须幂等创建共享 SQLite 的 `rembg_task` 表，并持久化任务 ID、Agent ID、源图片相对路径、输出相对路径与绝对路径、模型、`alpha matting` 开关、状态、进度、开始时间、创建/更新时间、取消标记与受限大小的执行日志。既有数据库启动时须无损补充模型与开关列；刷新页面或重启服务后，完成、失败与取消任务仍须可查询。
-- 任务创建仅接受当前 Agent 工作区内的图片相对路径，拒绝绝对路径、`~`、`..` 逃逸、目录、跨 Agent 路径、符号链接逃逸、未知字段及非图片内容。图片类型须同时经过服务端允许的图片扩展名与文件内容检测；源图片不得被覆盖、删除或改名。
-- 允许的图片类型应纳入受控媒体 MIME 白名单，以便路径解析、任务校验与图片预览使用同一安全范围；PNG、JPEG、GIF、WebP、BMP 与 TIFF 的检测不得仅信任文件名后缀。
-- 每个任务必须独立保存所选模型；空模型默认 `u2net`（通用）。仅允许受控模型白名单：`u2net_human_seg`、`isnet-general-use`、`u2net`、`u2netp`、`u2net_cloth_seg`、`silueta`、`isnet-anime`，未知模型不得传入子进程。每个任务还可独立保存并启用 `--alpha-matting`。
-- 每个任务只能以服务端决定的 `rembg i -m <模型> [--alpha-matting] <source> <output>` 参数执行。模型尚未缓存时，必须由 rembg 在该任务执行过程中自动下载，下载输出与失败原因须写入任务日志。输出必须固定为当前 Agent 工作目录 `images/` 下的透明背景 PNG，默认文件名为 `<源文件名>_subject.png`；已有文件或当前 Agent 已分配的任务输出冲突时，自动追加时间戳与必要序号，绝不覆盖已有文件。
-- 队列在全部 Agent 间一次只执行一个图片任务，并按创建顺序调度。创建后为 `queued`；当前任务完成、失败或取消后立即继续下一条。取消接口必须同时取消排队任务和终止正在执行的 `rembg` 子进程。
-- 执行状态、进度与标准输出/错误输出须持续写入数据库。任务开始进度为 `0`，仅在成功生成非空 PNG 后置为 `100`；不允许伪造处理中百分比。命令失败、取消或输出无效时不得留下半成品输出文件。
-- 服务重启时，未请求取消的 `running` 任务必须恢复为 `queued` 并追加恢复日志；带取消标记的运行中任务转为 `cancelled`。`completed`、`failed` 与 `cancelled` 历史任务不得自动重复执行。
-- 已取消任务可重新开始，并必须重新分配安全且不冲突的输出路径；失败任务仅可删除当前 Agent 的失败任务记录，删除不得影响源图片、已生成图片或其它任务。
-- 提供受控 HTTP 接口：`GET /api/rembg/check`、`GET/POST /api/rembg/tasks`、`POST /api/rembg/tasks/cancel`、`POST /api/rembg/tasks/restart`、`POST /api/rembg/tasks/delete`、`GET /api/rembg/tasks/log`。列表支持 `queued`、`running`、`completed`、`cancelled`、`failed` 筛选，固定每页 5 条并返回总数和实际页码；任务接口沿用 `status` / `content` JSON 响应约定，且不得泄漏其它 Agent 的文件信息。
+- 运行配置 `config/config.json` 必须包含 `voxcpm` 对象：`check` 为正整数小时，`install` 为非空安装请求文本。`GET /api/voxcpm/check` 只检查受控环境内的 `voxcpm` 可执行命令，并可按 `check` 缓存成功结果；配置无效时返回错误，命令缺失、无法启动或缓存失效时返回可展示的未安装状态及原始 `install` 文本。检查接口、创建接口和工作线程均不得执行安装命令；依赖缺失时不创建任务。
+- 使用独立 SQLite 表持久化任务 ID、Agent ID、文字文件相对/绝对路径、参考音频相对/绝对路径、请求输出名称、最终输出相对/绝对路径、受控生成场景、可选表达风格、状态、进度、开始/创建/更新时间、日志和取消标记。表升级必须幂等；已有记录缺少场景时必须迁移为“均衡克隆”，缺少表达风格时迁移为空；服务重启后将中断的执行中任务恢复为排队中，并保留其余历史任务。
+- 创建接口仅接受当前 Agent 工作区内的相对文字路径、可选参考音色路径、白名单场景及可选 `control` 文本。文字文件必须为常规、非符号链接逃逸、可读取的 UTF-8 文本且非空；参考音色提供时必须为可预览的音频，缺省时不得拒绝任务。表达风格会合并空白、限制为 240 个字符，并且只能作为一个 `--control` 参数值传递，不能形成命令行选项。场景固定为：均衡克隆（CFG 2、10 步）、质量优先（CFG 2.5、20 步、规范化和增强）、快速预览（CFG 1.5、4 步、规范化）、清晰增强（CFG 2、12 步、规范化和增强）、温暖叙述（CFG 2.5、15 步、增强及温和叙述控制）和轻快表达（CFG 2.5、15 步、规范化及轻快控制）。用户填写表达风格时优先于场景内置表达风格；为空时继续使用场景内置值。文本预览入口可以直接提交当前预览文件的相对路径，服务端仍须按同一校验读取实际落盘内容，不能信任浏览器的展示绝对路径或未保存编辑内容。拒绝绝对路径、`~`、`..` 逃逸、目录、跨 Agent 文件、未知字段和除 `control` 外的任意命令/模型参数。
+- 服务端须探测 VoxCPM 所用 Python 环境中的设备：有参考音色时只可执行固定 `voxcpm clone --text <文字内容> --reference-audio <参考音频绝对路径> --output <目标 WAV 绝对路径> --cfg-value <白名单值> --inference-timesteps <白名单值> [--normalize] [--denoise] [--control <受限表达风格>] --device <cuda|mps|cpu>`；未提供参考音色时只可执行 `voxcpm design --text <文字内容> --output <目标 WAV 绝对路径> --cfg-value <白名单值> --inference-timesteps <白名单值> [--normalize] [--control <受限表达风格>] --device <cuda|mps|cpu>`。除受限表达风格外其余参数完全由任务场景映射，不得接受客户端传入的命令行、输出目录或可执行路径。检测到 CUDA 或 Apple MPS 时优先使用 GPU；该次 GPU 执行发生任何错误，必须仅追加受控参数 `--device cpu` 自动重试一次，CPU 重试不得再次重试。未检测到或无法验证 GPU 时直接使用 CPU，并记录参考音色选择、实际 `design`/`clone` 模式、实际 `--control`、设备选择、回退原因与结果。输出仅能写入当前 Agent `audios/`，必须验证生成的非空 WAV 并在取消或失败后删除半成品。
+- 输出命名规则：仅一条创建任务时使用请求名称（无后缀补 `.wav`）；已有文件、既有任务输出或并发竞争则在扩展名前追加时间戳及必要序号。批量创建多条任务时每条从“请求名称 + 时间戳后缀”开始分配，保证同批与跨任务唯一，且绝不覆盖既有文件。
+- 队列全局串行执行，任务按创建顺序从排队中进入执行中。提供 `GET/POST /api/voxcpm/tasks`、`POST /api/voxcpm/tasks/cancel`、`POST /api/voxcpm/tasks/restart`、`POST /api/voxcpm/tasks/delete` 和 `GET /api/voxcpm/tasks/log`；列表支持状态筛选、固定每页 5 条及当前 Agent 隔离。取消可停止正在执行的子进程，已取消任务重新开始时重新分配安全输出路径，失败删除仅删除任务记录。
+- 子进程的标准输出与错误输出、状态和进度写入有上限的任务日志；任务日志必须说明参考音色是否选择、采用的 VoxCPM `design` 或 `clone` 命令语义及实际表达风格，但不得泄漏任意其它 Agent 路径。接口响应采用现有 `status`/`content` JSON 约定。
 
 ### 编写代码
 + 最小范围更新，不新增外部依赖。
-+ 不新增外部 Go 依赖；复用既有 SQLite 生命周期、Agent 工作区路径校验、媒体预览路径校验、依赖检查与受控子进程模式。
-+ 数据库升级、任务创建、输出路径分配、状态转换、取消、重试和日志查询必须可测试；不得改变既有 Whisper、FFmpeg 或普通媒体接口的请求语义。
++ 复用既有 SQLite 生命周期、Agent 工作区路径校验、媒体预览白名单、受控子进程和任务队列模式；数据库、命名分配、依赖检查、取消、重试、命令参数与失败清理均须有自动化测试。
 
 ### 撰写手册
 + 更新 `../../USER_GUIDE.md` 及本迭代目录 `USER_GUIDE.md`
+
+### 其他要求
++ `REQUIREMENT.md` 仅描述需求，不记录实现过程。
+
+### 需求介绍
++
+
+### 编写代码
++ 不新增外部 Go 依赖；复用既有 SQLite 生命周期、Agent 工作区路径校验、媒体预览路径校验、依赖检查与受控子进程模式。
+
+### 撰写手册
++ 更新 `../../USER_GUIDE.md` 及本迭代目录 `USER_GUIDE.md`。
 
 ### 其他要求
 + `REQUIREMENT.md` 仅描述需求，不记录实现过程。

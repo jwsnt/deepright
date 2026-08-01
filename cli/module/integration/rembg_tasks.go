@@ -284,22 +284,26 @@ func handleRembgCheck() http.HandlerFunc {
 			writeRembgCheckResponse(w, http.StatusMethodNotAllowed, rembgCheckResponse{Content: "仅支持 GET 请求", Status: 1})
 			return
 		}
-		raw, _, err := readIntegrationStartupConfigRaw()
-		if err != nil {
-			writeRembgCheckResponse(w, 500, rembgCheckResponse{Content: "读取 config/config.json 失败: " + err.Error(), Status: 1})
-			return
-		}
-		cfg, err := parseRembgCheckConfig(raw)
-		if err != nil {
-			writeRembgCheckResponse(w, 400, rembgCheckResponse{Content: err.Error(), Status: 1})
-			return
-		}
-		if _, ok := rembgExecutable(cfg.CacheFor); !ok {
-			writeRembgCheckResponse(w, 200, rembgCheckResponse{Install: cfg.Install, Content: "未检测到可用的 rembg", Status: 0})
-			return
-		}
-		writeRembgCheckResponse(w, 200, rembgCheckResponse{Available: true, Status: 0})
+		status, response := checkRembgDependency()
+		writeRembgCheckResponse(w, status, response)
 	}
+}
+
+// checkRembgDependency contains the complete availability rule shared by the
+// HTTP endpoint and the asynchronous startup preflight.
+func checkRembgDependency() (int, rembgCheckResponse) {
+	raw, _, err := readIntegrationStartupConfigRaw()
+	if err != nil {
+		return http.StatusInternalServerError, rembgCheckResponse{Content: "读取 config/config.json 失败: " + err.Error(), Status: 1}
+	}
+	cfg, err := parseRembgCheckConfig(raw)
+	if err != nil {
+		return http.StatusBadRequest, rembgCheckResponse{Content: err.Error(), Status: 1}
+	}
+	if _, ok := rembgExecutable(cfg.CacheFor); !ok {
+		return http.StatusOK, rembgCheckResponse{Install: cfg.Install, Content: "未检测到可用的 rembg", Status: 0}
+	}
+	return http.StatusOK, rembgCheckResponse{Available: true, Status: 0}
 }
 
 func startRembgTaskManager(ctx context.Context, cfg *Config) {

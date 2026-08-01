@@ -6729,22 +6729,26 @@ func handleFFmpegCheck() http.HandlerFunc {
 			writeFFmpegCheckResp(w, http.StatusMethodNotAllowed, FFmpegCheckResponse{Content: "仅支持 GET 请求", Status: 1})
 			return
 		}
-		raw, _, err := readIntegrationStartupConfigRaw()
-		if err != nil {
-			writeFFmpegCheckResp(w, http.StatusInternalServerError, FFmpegCheckResponse{Content: "读取 config/config.json 失败: " + err.Error(), Status: 1})
-			return
-		}
-		config, err := parseFFmpegCheckConfig(raw)
-		if err != nil {
-			writeFFmpegCheckResp(w, http.StatusBadRequest, FFmpegCheckResponse{Content: err.Error(), Status: 1})
-			return
-		}
-		if !ffmpegDependenciesAvailable(config.CacheFor) {
-			writeFFmpegCheckResp(w, http.StatusOK, FFmpegCheckResponse{Available: false, Install: config.Install, Content: "未检测到 FFmpeg 或 FFprobe", Status: 0})
-			return
-		}
-		writeFFmpegCheckResp(w, http.StatusOK, FFmpegCheckResponse{Available: true, Status: 0})
+		status, response := checkFFmpegDependency()
+		writeFFmpegCheckResp(w, status, response)
 	}
+}
+
+// checkFFmpegDependency contains the complete availability rule shared by the
+// HTTP endpoint and the asynchronous startup preflight.
+func checkFFmpegDependency() (int, FFmpegCheckResponse) {
+	raw, _, err := readIntegrationStartupConfigRaw()
+	if err != nil {
+		return http.StatusInternalServerError, FFmpegCheckResponse{Content: "读取 config/config.json 失败: " + err.Error(), Status: 1}
+	}
+	config, err := parseFFmpegCheckConfig(raw)
+	if err != nil {
+		return http.StatusBadRequest, FFmpegCheckResponse{Content: err.Error(), Status: 1}
+	}
+	if !ffmpegDependenciesAvailable(config.CacheFor) {
+		return http.StatusOK, FFmpegCheckResponse{Available: false, Install: config.Install, Content: "未检测到 FFmpeg 或 FFprobe", Status: 0}
+	}
+	return http.StatusOK, FFmpegCheckResponse{Available: true, Status: 0}
 }
 
 func writeVideoTrimResp(w http.ResponseWriter, httpStatus int, resp VideoTrimResponse) {
@@ -18873,6 +18877,7 @@ func printCLIHelp() {
 	fmt.Println("  integration file-last-update [options]")
 	fmt.Println("  integration backup-clean [options]")
 	fmt.Println("  integration api whisper <check|list|create|cancel|restart|delete|log> [options]")
+	fmt.Println("  integration api voxcpm <check|list|create|cancel|restart|delete|log> [options]")
 	fmt.Println("  integration connect <subcommand> [options]")
 	fmt.Println("  integration help")
 	fmt.Println("")
@@ -18920,6 +18925,7 @@ func printCLIHelp() {
 	fmt.Println("  integration connect --help")
 	fmt.Println("  integration api --help")
 	fmt.Println("  integration api whisper --help")
+	fmt.Println("  integration api voxcpm --help")
 	fmt.Println("  integration service --help")
 	fmt.Println("  integration notify --help")
 	fmt.Println("  integration skills-warning --refresh")
@@ -20326,6 +20332,12 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/rembg/tasks/restart", handleRembgTaskRestart())
 	mux.HandleFunc("/api/rembg/tasks/delete", handleRembgTaskDelete())
 	mux.HandleFunc("/api/rembg/tasks/log", handleRembgTaskLog())
+	mux.HandleFunc("/api/voxcpm/check", handleVoxCPMCheck())
+	mux.HandleFunc("/api/voxcpm/tasks", handleVoxCPMTasks())
+	mux.HandleFunc("/api/voxcpm/tasks/cancel", handleVoxCPMTaskCancel())
+	mux.HandleFunc("/api/voxcpm/tasks/restart", handleVoxCPMTaskRestart())
+	mux.HandleFunc("/api/voxcpm/tasks/delete", handleVoxCPMTaskDelete())
+	mux.HandleFunc("/api/voxcpm/tasks/log", handleVoxCPMTaskLog())
 	mux.HandleFunc("/api/video_trim", handleVideoTrim(&cfg))
 	mux.HandleFunc("/api/video_audio_extract_to_audio", handleVideoAudioExtractToAudio(&cfg))
 	mux.HandleFunc("/api/video_audio_edit", handleVideoAudioEdit(&cfg))
@@ -20438,6 +20450,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	shutdownController.stopPlugins = stopManagedPlugins
 	mux.HandleFunc("/api/shutdown", handleShutdown(shutdownController))
 	server := &http.Server{Handler: withStandaloneAPIProtection(mux, &cfg)}
+	startIntegrationDependencyChecks(ctx)
 	sleepAssertion, sleepAssertionErr := startIntegrationSleepAssertion()
 	if sleepAssertionErr != nil {
 		log.Printf("integration: start macOS sleep assertion failed: %v", sleepAssertionErr)
@@ -20463,6 +20476,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	initCronDB()
 	startWhisperTaskManager(ctx, &cfg)
 	startRembgTaskManager(ctx, &cfg)
+	startVoxCPMTaskManager(ctx, &cfg)
 	startIntegrationLogRetentionCleanup(ctx)
 	startIntegrationTempCleanup(ctx, cfg.AgentDir)
 	startIntegrationAgentBackups(ctx, cfg.AgentDir)

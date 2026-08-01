@@ -3538,3 +3538,13 @@ Integration 新增 `rembg` 图片主体提取队列。活动 `config/config.json
 图片任务持久化到共享 SQLite，支持查询、创建、取消、重新开始、失败删除和日志读取；状态为 `queued`、`running`、`completed`、`cancelled`、`failed`，列表支持状态筛选且固定每页 5 条。每条任务保存模型与 `alpha matting` 选择，默认模型为通用 `u2net`；未缓存的所选模型由 rembg 在任务执行时自动下载，实时下载过程写入日志。任务只接受当前 Agent 工作区内经内容验证的图片，使用受控的 `rembg i -m <模型> [--alpha-matting]` 串行执行，输出透明 PNG 到该 Agent 的 `images/`，默认命名为 `<源文件名>_subject.png`；冲突时自动追加时间戳，既有文件和源图片均不会被覆盖。
 
 完整说明见 [iteration/20260801-3/USER_GUIDE.md](iteration/20260801-3/USER_GUIDE.md)。
+
+---
+
+## 迭代 20260801-4：VoxCPM 文字转语音队列
+
+Integration 新增 `GET /api/voxcpm/check` 与文字转语音任务接口：`GET/POST /api/voxcpm/tasks`、`POST /api/voxcpm/tasks/cancel`、`POST /api/voxcpm/tasks/restart`、`POST /api/voxcpm/tasks/delete`、`GET /api/voxcpm/tasks/log`。活动配置 `config/config.json.voxcpm` 的 `check` 控制成功检查缓存，`install` 为缺失依赖时返回给页面的安装请求；服务不会执行安装，缺少命令时也不会创建任务。
+
+每条任务仅接受当前 Agent 工作区中非空 UTF-8 文字文件；参考音色和表达风格 `control` 均可不填。文本预览入口提交的也只能是当前预览文件的工作区相对路径，服务端始终重新读取已保存文件而不信任浏览器展示内容。任务还持久化一个受控场景：均衡克隆（CFG 2、10 步）、质量优先（CFG 2.5、20 步、文字规范化与参考音频增强）、快速预览（CFG 1.5、4 步、文字规范化）、清晰增强（CFG 2、12 步、文字规范化与参考音频增强）、温暖叙述（CFG 2.5、15 步、增强及温和叙述控制）和轻快表达（CFG 2.5、15 步、文字规范化及轻快控制），以及可选表达风格 `control`。提供参考音色时执行受控 `voxcpm clone --text … --reference-audio …`；不提供时执行受控 `voxcpm design --text …`。表达风格会折叠空白并限制为 240 个字符，作为一个 `--control` 参数值；填写后覆盖场景内置风格，未填写时再使用场景的内置风格。服务会探测 VoxCPM 所用 Python 环境：检测到 CUDA 或 Apple MPS 时优先指定该 GPU；该次 GPU 执行发生任何错误，都会以受控的 `--device cpu` 自动且仅重试一次，并保留两次输出及回退结果到日志。未检测到或无法验证 GPU 时直接使用 CPU。任务日志会显示参考音色是否选择、实际 `design`/`clone` 模式、场景参数及实际使用的表达风格。任务全局串行、持久化到 SQLite，支持筛选、分页、日志、取消、重新开始和失败记录删除。输出固定在当前 Agent `audios/`；单条任务使用请求名称，批量任务或任何冲突自动追加时间戳，既有文件和源文件均不会被覆盖。
+
+完整说明见 [iteration/20260801-4/USER_GUIDE.md](iteration/20260801-4/USER_GUIDE.md)。
