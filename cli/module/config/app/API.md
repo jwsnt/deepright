@@ -123,6 +123,30 @@ integration service cancel --chat chat-001
 | GET | `/api/standalone=false` | 快捷关闭 standalone | `integration api standalone set --value false` |
 | GET | `/api/site/access` | 查询站点访问地址 | `integration api site-access` |
 
+### Whisper 音频文字提取接口
+
+| 方法 | 路径 | 功能 | CLI |
+|---|---|---|---|
+| GET | `/api/whisper/check` | 检查受控环境能否运行 Whisper | `integration api whisper check` |
+| GET | `/api/whisper/tasks` | 查询当前 Agent 的转写任务（固定每页 5 条） | `integration api whisper list` |
+| POST | `/api/whisper/tasks` | 将一个或多个工作区音频加入转写队列 | `integration api whisper create` |
+| POST | `/api/whisper/tasks/cancel` | 取消排队中或执行中的任务 | `integration api whisper cancel` |
+| POST | `/api/whisper/tasks/restart` | 将已取消任务重新加入队列 | `integration api whisper restart` |
+| POST | `/api/whisper/tasks/delete` | 删除失败任务的记录，不删除文件 | `integration api whisper delete` |
+| GET | `/api/whisper/tasks/log` | 查询任务详情及持久化执行日志 | `integration api whisper log` |
+
+### rembg 图片主体提取接口
+
+| 方法 | 路径 | 功能 |
+|---|---|---|
+| GET | `/api/rembg/check` | 检查受控环境能否运行 rembg |
+| GET | `/api/rembg/tasks` | 查询当前 Agent 的图片主体任务（固定每页 5 条） |
+| POST | `/api/rembg/tasks` | 将一个或多个工作区图片加入提取队列 |
+| POST | `/api/rembg/tasks/cancel` | 取消排队中或执行中的任务 |
+| POST | `/api/rembg/tasks/restart` | 将已取消任务重新加入队列 |
+| POST | `/api/rembg/tasks/delete` | 删除失败任务的记录，不删除源图片或输出图片 |
+| GET | `/api/rembg/tasks/log` | 查询任务详情及持久化执行日志 |
+
 ### 插件 / Connect / Cron 接口
 
 | 方法 | 路径 | 功能 | CLI |
@@ -738,6 +762,117 @@ integration api cron detail-status --agentId demo-agent --detailId detail_1 --st
 - `knowledge_lastUpdate`：`curl 'http://localhost:#port/knowledge_lastUpdate?agentId=demo-agent'` ｜ `integration api knowledge-last-update --agentId demo-agent`
 - `knowledge_path`：`curl 'http://localhost:#port/knowledge_path?agentId=demo-agent'` ｜ `integration api knowledge-path --agentId demo-agent`
 - `/launch`：浏览器启动跳转页，常用于本机拉起后等待 `/site/` 准备完成；示例：直接访问 `http://localhost:#port/launch`
+
+### Whisper 音频文字提取
+
+适用范围：所有请求都由 Integration 的受控运行环境执行。每个任务使用服务端白名单中的转写场景，默认 `chinese_meeting`（中文会议）；任务在全部 Agent 间串行调度，输出写入对应 Agent 工作目录的 `whisper/`。任务状态为 `queued`、`running`、`completed`、`cancelled` 或 `failed`。
+
+| 场景 | 标识 | 适用情况 |
+|---|---|---|
+| 中文会议 | `chinese_meeting` | 默认；中文会议、访谈，准确率与速度均衡 |
+| 专业转写 | `chinese_accurate` | 专业术语或正式字幕，优先准确率 |
+| 低延迟 | `realtime` | 实时预览，优先响应速度 |
+| 批量处理 | `batch` | 长音频和批量任务 |
+| CPU 轻量 | `cpu` | 无独显或资源受限环境 |
+| 中英技术 | `mixed_technical` | 中英混说、产品名、代码和缩写 |
+
+CLI 入口：
+
+```bash
+integration api whisper --help
+```
+
+通用 CLI 参数为 `--addr URL`、`--port PORT`、`--output PATH` 和 `--pretty=true|false`。`create` 的 `--path` 可重复传入多个工作区相对路径。
+
+#### `GET /api/whisper/check`
+
+检查当前受控环境中的 `whisper` 命令是否可启动。成功时返回 `available: true`；缺失或不可用时返回 `available: false`、用于向当前会话发起安装请求的 `install`，以及说明文本 `content`。该接口不执行安装。
+
+```bash
+curl 'http://localhost:#port/api/whisper/check'
+integration api whisper check
+```
+
+成功响应：
+
+```json
+{"available":true,"status":0}
+```
+
+#### `GET /api/whisper/tasks`
+
+查询一个 Agent 的转写任务。`agentId` 必填；`status` 可选，支持 `all`（或省略）、`queued`、`running`、`completed`、`cancelled`、`failed`；`page` 从 1 开始。服务端固定每页返回 5 条，列表不含完整日志。
+
+```bash
+curl 'http://localhost:#port/api/whisper/tasks?agentId=demo-agent&status=running&page=1'
+integration api whisper list --agentId demo-agent --status running --page 1
+```
+
+响应字段包括 `tasks`、`total`、`page`、`pageSize`（固定 `5`）和 `taskStatus`。每项任务包含 `id`、`sourcePath`、`outputPath`、`savedAs`（文字文件绝对路径）、`scenario`、`status`、`progress`、`startedAt`、`createdAt`、`updatedAt` 和 `cancelRequested`。
+
+#### `POST /api/whisper/tasks`
+
+向队列添加 1 至 64 个音频。每个路径必须是当前 Agent 工作目录内的音频文件；输出路径由服务端生成，已存在同名文字文件或任务输出时自动追加时间戳，绝不覆盖。推荐使用 `tasks`，让每个音频单独指定 `scenario`；未传场景时默认为 `chinese_meeting`。旧的 `paths` 请求仍可用，并可通过顶层 `scenario` 将同一场景应用到全部路径。
+
+```bash
+curl -X POST 'http://localhost:#port/api/whisper/tasks' \
+  -H 'Content-Type: application/json' \
+  -d '{"agentId":"demo-agent","tasks":[{"path":"audios/meeting.mp3","scenario":"chinese_meeting"},{"path":"audios/intro.m4a","scenario":"mixed_technical"}]}'
+
+integration api whisper create \
+  --agentId demo-agent \
+  --path audios/meeting.mp3 \
+  --scenario chinese_meeting
+```
+
+成功响应为 `{"status":0,"tasks":[...]}`。创建即进入串行队列；该接口不会等待转写完成。
+
+#### 取消、重新开始与删除
+
+这三个接口的 JSON 请求体相同：
+
+```json
+{"agentId":"demo-agent","id":12}
+```
+
+| 操作 | HTTP | 前置条件 | CLI |
+|---|---|---|---|
+| 取消 | `POST /api/whisper/tasks/cancel` | 任务为 `queued` 或 `running` | `integration api whisper cancel --agentId demo-agent --id 12` |
+| 重新开始 | `POST /api/whisper/tasks/restart` | 任务为 `cancelled` | `integration api whisper restart --agentId demo-agent --id 12` |
+| 删除记录 | `POST /api/whisper/tasks/delete` | 任务为 `failed`；不会删除音频或文字文件 | `integration api whisper delete --agentId demo-agent --id 12` |
+
+取消正在执行的任务会终止对应 Whisper 子进程，并立即让队列调度下一条任务。重新开始会重新分配输出文件路径，并保留该任务原有的场景。执行日志会记录场景及本次实际使用的模型、语言、温度、搜索宽度、上下文和 `fp16` 参数。
+
+HTTP 示例：
+
+```bash
+curl -X POST 'http://localhost:#port/api/whisper/tasks/cancel' \
+  -H 'Content-Type: application/json' \
+  -d '{"agentId":"demo-agent","id":12}'
+```
+
+成功时均返回：
+
+```json
+{"status":0}
+```
+
+#### `GET /api/whisper/tasks/log`
+
+读取单个任务及其持久化执行日志。`agentId` 和正整数 `id` 均必填。正在执行的任务可轮询此接口获取最新日志。
+
+```bash
+curl 'http://localhost:#port/api/whisper/tasks/log?agentId=demo-agent&id=12'
+integration api whisper log --agentId demo-agent --id 12
+```
+
+成功响应为 `{"status":0,"task":{...}}`；其中 `task.logs` 为按时间追加、且有大小上限的执行日志。
+
+### rembg 图片主体提取
+
+受控环境通过 `rembg i <source> <output>` 串行处理图片。任务、状态和日志保存在 Integration 数据库中；每个输出都使用透明背景 PNG，并写入相应 Agent 工作目录的 `images/`。图片须位于该 Agent 工作目录且经服务端图片检测通过，输出名称为 `<原文件名>_subject.png`，冲突时追加时间戳，绝不覆盖既有文件。
+
+`GET /api/rembg/check` 从 `config/config.json.rembg` 读取检查缓存时长与安装请求文案；未找到可执行的 `rembg` 时返回该安装请求。任务接口与 Whisper 队列使用相同的 `status` / `content` 响应约定、状态值、分页规则及取消、重试、失败删除和日志查询语义。
 
 ### `/api/shutdown`
 

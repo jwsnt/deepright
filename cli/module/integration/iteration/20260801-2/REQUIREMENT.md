@@ -1,23 +1,4 @@
 ### 第一性原则
-+ 仅可以新增/更新/删除 integration（../..）同目录及其子目录，以及本需求直接涉及的 `../../../connect/skillstate/`、`../../../site/index.html`、`../../../build.sh`、`../../../build/install.ps1`、`../../../build/USER_GUIDE.md`、`../../../build/USER_GUIDE.txt` 与 `../../../config/app/API.md`、`../../../config/app/CANVAS.md`、`../../../config/app/DESIGN.md`。
-
-### 技术规范
-+ 严格遵守整体设计文档：../../../DESIGN.md
-+ 本模块设计文档：../../DESIGN.md
-+ 不新增外部依赖，不改变既有 `/api/files`、`/api/runtime_config` 或普通消息发送协议。
-
-### 需求介绍
-+
-
-### 编写代码
-+ 最小范围更新，不新增外部依赖。
-
-### 撰写手册
-+ 更新 `../../USER_GUIDE.md` 及本迭代目录 `USER_GUIDE.md`
-
-### 其他要求
-+ `REQUIREMENT.md` 仅描述需求，不记录实现过程。
-### 第一性原则
 + 仅可以新增/更新/删除 integration（../..）同目录及其子目录，以及本需求直接涉及的 `../../../site/index.html`、`../../../config/config.json`。
 
 ### 技术规范

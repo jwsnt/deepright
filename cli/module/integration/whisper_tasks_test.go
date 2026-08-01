@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -26,6 +27,62 @@ func TestParseWhisperCheckConfig(t *testing.T) {
 	}
 	if _, err := parseWhisperCheckConfig(map[string]interface{}{"whisper": map[string]interface{}{"check": 1}}); err == nil {
 		t.Fatal("missing install request must be rejected")
+	}
+}
+
+func TestWhisperScenarioDefaultsAndRejectsUnknownValues(t *testing.T) {
+	defaultScenario, valid := whisperScenarioFor("")
+	if !valid || defaultScenario.ID != whisperScenarioChineseMeeting || defaultScenario.Model != "small" || defaultScenario.BeamSize != 5 {
+		t.Fatalf("default scenario = %#v, valid=%v", defaultScenario, valid)
+	}
+	realtime, valid := whisperScenarioFor(whisperScenarioRealtime)
+	if !valid || realtime.Model != "base" || realtime.BeamSize != 1 || realtime.ConditionOnPreviousText {
+		t.Fatalf("realtime scenario = %#v, valid=%v", realtime, valid)
+	}
+	cpu, valid := whisperScenarioFor(whisperScenarioCPU)
+	if !valid || !cpu.ForceCPU {
+		t.Fatalf("CPU scenario = %#v, valid=%v", cpu, valid)
+	}
+	if _, valid := whisperScenarioFor("--model injected"); valid {
+		t.Fatal("unknown scenario must be rejected")
+	}
+}
+
+func TestWhisperCLIBoolean(t *testing.T) {
+	if got := whisperCLIBoolean(true); got != "True" {
+		t.Fatalf("true CLI literal = %q", got)
+	}
+	if got := whisperCLIBoolean(false); got != "False" {
+		t.Fatalf("false CLI literal = %q", got)
+	}
+}
+
+func TestEnsureWhisperTaskSchemaMigratesScenario(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`CREATE TABLE whisper_task (
+		id INTEGER PRIMARY KEY AUTOINCREMENT, agent_id TEXT NOT NULL, source_path TEXT NOT NULL,
+		output_path TEXT NOT NULL DEFAULT '', saved_as TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'queued',
+		progress INTEGER NOT NULL DEFAULT 0, started_at TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL, logs TEXT NOT NULL DEFAULT '', cancel_requested INTEGER NOT NULL DEFAULT 0
+	)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO whisper_task(agent_id,source_path,created_at,updated_at) VALUES('agent-a','tmp/source.wav','now','now')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureWhisperTaskSchema(db); err != nil {
+		t.Fatalf("migrate whisper schema: %v", err)
+	}
+	var scenario string
+	if err := db.QueryRow(`SELECT scenario FROM whisper_task`).Scan(&scenario); err != nil {
+		t.Fatal(err)
+	}
+	if scenario != whisperScenarioChineseMeeting {
+		t.Fatalf("migrated scenario = %q", scenario)
 	}
 }
 
@@ -218,6 +275,46 @@ func TestWhisperTaskListPageFiltersAndPaginates(t *testing.T) {
 	}
 }
 
+func TestWhisperTaskCreatePersistsPerFileScenarioAndDefaults(t *testing.T) {
+	root := t.TempDir()
+	workspace := filepath.Join(root, "agent-a")
+	if err := os.MkdirAll(filepath.Join(workspace, "audios"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"technical.wav", "meeting.wav"} {
+		if err := os.WriteFile(filepath.Join(workspace, "audios", name), []byte("audio"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := ensureWhisperTaskSchema(db); err != nil {
+		t.Fatal(err)
+	}
+	manager := newWhisperTaskManager(&Config{AgentDir: root}, db)
+	created, err := manager.createTasks(whisperTaskCreateRequest{
+		AgentID: "agent-a",
+		Tasks:   []whisperTaskCreateItem{{Path: "audios/technical.wav", Scenario: whisperScenarioMixedTechnical}},
+	})
+	if err != nil || len(created) != 1 || created[0].Scenario != whisperScenarioMixedTechnical {
+		t.Fatalf("create scenario task = %#v, err=%v", created, err)
+	}
+	defaults, err := manager.createTasks(whisperTaskCreateRequest{AgentID: "agent-a", Paths: []string{"audios/meeting.wav"}})
+	if err != nil || len(defaults) != 1 || defaults[0].Scenario != whisperScenarioChineseMeeting {
+		t.Fatalf("create default task = %#v, err=%v", defaults, err)
+	}
+	var scenario, logs string
+	if err := db.QueryRow(`SELECT scenario,logs FROM whisper_task WHERE id=?`, created[0].ID).Scan(&scenario, &logs); err != nil {
+		t.Fatal(err)
+	}
+	if scenario != whisperScenarioMixedTechnical || !strings.Contains(logs, "场景：中英技术") {
+		t.Fatalf("persisted scenario = %q, logs=%q", scenario, logs)
+	}
+}
+
 func TestWhisperTaskAllocateOutputPathAppendsTimestamp(t *testing.T) {
 	root := t.TempDir()
 	workspace := filepath.Join(root, "agent-a")
@@ -404,6 +501,63 @@ func TestWhisperTaskTranscribeWritesTextFileToWhisperDirectory(t *testing.T) {
 	}
 	if string(content) != "test transcription\n" {
 		t.Fatalf("unexpected output: %q", content)
+	}
+}
+
+func TestWhisperTaskTranscribeUsesSelectedScenario(t *testing.T) {
+	root := t.TempDir()
+	workspace := filepath.Join(root, "agent-a")
+	if err := os.MkdirAll(filepath.Join(workspace, "audios"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workspace, "audios", "demo.wav"), []byte("audio"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	argsPath := filepath.Join(root, "whisper-args.txt")
+	whisper := filepath.Join(root, "whisper-test")
+	script := fmt.Sprintf("#!/bin/sh\nif [ \"$1\" = \"--help\" ]; then exit 0; fi\nprintf '%%s\\n' \"$@\" > %q\nsource=\"$1\"\nshift\nout=\"\"\nwhile [ \"$#\" -gt 0 ]; do\n  if [ \"$1\" = \"--output_dir\" ]; then out=\"$2\"; shift 2; else shift; fi\ndone\nbase=$(basename \"$source\")\nbase=${base%%.*}\nprintf 'scenario transcription\\n' > \"$out/$base.txt\"\n", argsPath)
+	if err := os.WriteFile(whisper, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := ensureWhisperTaskSchema(db); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO whisper_task(id,agent_id,source_path,output_path,saved_as,scenario,status,created_at,updated_at) VALUES(1,'agent-a','audios/demo.wav','whisper/demo.txt',? ,?,'running','now','now')`, filepath.Join(workspace, "whisper", "demo.txt"), whisperScenarioRealtime); err != nil {
+		t.Fatal(err)
+	}
+	originalLookPath := whisperTaskLookPath
+	whisperTaskLookPath = func(name string) (string, error) {
+		if name == "whisper" {
+			return whisper, nil
+		}
+		return originalLookPath(name)
+	}
+	defer func() { whisperTaskLookPath = originalLookPath }()
+	manager := newWhisperTaskManager(&Config{AgentDir: root}, db)
+	task := whisperTask{ID: 1, AgentID: "agent-a", SourcePath: "audios/demo.wav", OutputPath: "whisper/demo.txt", SavedAs: filepath.Join(workspace, "whisper", "demo.txt"), Scenario: whisperScenarioRealtime}
+	if err := manager.transcribe(context.Background(), task); err != nil {
+		t.Fatalf("transcribe selected scenario: %v", err)
+	}
+	args, err := os.ReadFile(argsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"--model\nbase", "--language\nzh", "--beam_size\n1", "--condition_on_previous_text\nFalse", "--fp16\nFalse"} {
+		if !strings.Contains(string(args), expected) {
+			t.Fatalf("Whisper arguments missing %q: %s", expected, args)
+		}
+	}
+	var logs string
+	if err := db.QueryRow(`SELECT logs FROM whisper_task WHERE id=1`).Scan(&logs); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(logs, "本次转写参数") || !strings.Contains(logs, "model=base") || !strings.Contains(logs, "beam_size=1") {
+		t.Fatalf("scenario parameters missing from logs: %q", logs)
 	}
 }
 

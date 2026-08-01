@@ -185,11 +185,6 @@ func platformCommonPathValue(goos string) string {
 				filepath.Join(homeDir, ".n", "bin"),
 				filepath.Join(homeDir, "bin"),
 			)
-			// Python's user-level installer on macOS places console scripts such
-			// as whisper in ~/Library/Python/<version>/bin.  GUI applications do
-			// not normally inherit this directory from an interactive shell, so
-			// discover every installed Python version instead of assuming one.
-			paths = append(paths, darwinUserPythonBinPaths(homeDir)...)
 		}
 	case "linux":
 		paths = append(paths,
@@ -244,18 +239,88 @@ func platformCommonPathValue(goos string) string {
 			)
 		}
 	}
+	// A GUI-launched Integration process (and commands delegated to a sandbox)
+	// does not inherit interactive-shell activation of pyenv, conda or a venv.
+	// Include known user Python runtime bins for both macOS and Linux/WSL so
+	// console scripts such as rembg can resolve their own interpreter.
+	paths = append(paths, pythonRuntimeBinPaths(goos, homeDir)...)
 
 	return strings.Join(uniquePathEntries(paths, strings.TrimSpace(goos) == "windows"), pathListSeparator(goos))
 }
 
-func darwinUserPythonBinPaths(homeDir string) []string {
+func pythonRuntimeBinPaths(goos, homeDir string) []string {
+	goos = strings.TrimSpace(goos)
 	homeDir = strings.TrimSpace(homeDir)
-	if homeDir == "" {
+	if homeDir == "" || (goos != "darwin" && goos != "linux") {
 		return nil
 	}
-	paths, err := systemPathGlobFn(filepath.Join(homeDir, "Library", "Python", "*", "bin"))
-	if err != nil {
-		return nil
+
+	paths := make([]string, 0, 24)
+	add := func(path string) {
+		path = strings.TrimSpace(path)
+		if path != "" {
+			paths = append(paths, path)
+		}
+	}
+	addGlob := func(pattern string) {
+		matches, err := systemPathGlobFn(pattern)
+		if err == nil {
+			paths = append(paths, matches...)
+		}
+	}
+
+	// Explicitly activated environments take precedence over globally
+	// discovered runtimes, matching a terminal in which the environment is
+	// active at launch time.
+	if virtualEnv := firstNonEmptyLookup("VIRTUAL_ENV"); virtualEnv != "" {
+		add(filepath.Join(virtualEnv, "bin"))
+	}
+	if condaPrefix := firstNonEmptyLookup("CONDA_PREFIX"); condaPrefix != "" {
+		add(filepath.Join(condaPrefix, "bin"))
+	}
+
+	pyenvRoot := firstNonEmptyLookup("PYENV_ROOT")
+	if pyenvRoot == "" {
+		pyenvRoot = filepath.Join(homeDir, ".pyenv")
+	}
+	for _, root := range []string{
+		filepath.Join(pyenvRoot, "versions"),
+		filepath.Join(homeDir, ".asdf", "installs", "python"),
+		filepath.Join(homeDir, ".local", "share", "mise", "installs", "python"),
+		filepath.Join(homeDir, ".mise", "installs", "python"),
+		filepath.Join(homeDir, ".virtualenvs"),
+		filepath.Join(homeDir, ".cache", "pypoetry", "virtualenvs"),
+		filepath.Join(homeDir, ".conda", "envs"),
+		filepath.Join(homeDir, "anaconda3", "envs"),
+		filepath.Join(homeDir, "miniconda3", "envs"),
+		filepath.Join(homeDir, "miniforge3", "envs"),
+		filepath.Join(homeDir, "mambaforge", "envs"),
+		filepath.Join(homeDir, "micromamba", "envs"),
+	} {
+		addGlob(filepath.Join(root, "*", "bin"))
+	}
+	for _, root := range []string{
+		filepath.Join(homeDir, "anaconda3"),
+		filepath.Join(homeDir, "miniconda3"),
+		filepath.Join(homeDir, "miniforge3"),
+		filepath.Join(homeDir, "mambaforge"),
+		filepath.Join(homeDir, "micromamba"),
+	} {
+		add(filepath.Join(root, "bin"))
+	}
+
+	if workonHome := firstNonEmptyLookup("WORKON_HOME"); workonHome != "" {
+		addGlob(filepath.Join(workonHome, "*", "bin"))
+	}
+	if goos == "darwin" {
+		for _, root := range []string{
+			filepath.Join(homeDir, "Library", "Python"),
+			filepath.Join(homeDir, "Library", "Frameworks", "Python.framework", "Versions"),
+			filepath.Join(homeDir, "Library", "Caches", "pypoetry", "virtualenvs"),
+			filepath.Join(string(filepath.Separator), "Library", "Frameworks", "Python.framework", "Versions"),
+		} {
+			addGlob(filepath.Join(root, "*", "bin"))
+		}
 	}
 	return uniquePathEntries(paths, false)
 }

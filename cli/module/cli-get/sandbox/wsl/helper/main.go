@@ -745,15 +745,18 @@ func buildBubblewrapArgs(shellPath, cmdText, mode, pickedDir string) ([]string, 
 	for _, path := range sandboxSystemReadOnlyPaths {
 		addBind("--ro-bind", path, path)
 	}
-	// WSL sandbox tasks use --clearenv, so a user-level pip installation is
-	// otherwise invisible even though Integration can find ~/.local/bin. Expose
-	// only executable wrappers and Python site-packages, read-only; never bind
-	// the complete user home or ~/.local data directory into the sandbox.
-	userPythonBin, userPythonSites := sandboxUserPythonRuntimePaths()
-	if userPythonBin != "" {
-		addBind("--ro-bind", userPythonBin, userPythonBin)
+	// WSL sandbox tasks use --clearenv, so user-installed Python environments
+	// are otherwise invisible. Bind each discovered runtime read-only rather
+	// than the complete user home: this covers pyenv, conda and virtualenvs
+	// without granting access to unrelated user data.
+	pythonRuntime := sandboxUserPythonRuntimePaths()
+	for _, root := range pythonRuntime.roots {
+		addBind("--ro-bind", root, root)
 	}
-	for _, site := range userPythonSites {
+	for _, bin := range pythonRuntime.bins {
+		addBind("--ro-bind", bin, bin)
+	}
+	for _, site := range pythonRuntime.sites {
 		addBind("--ro-bind", site, site)
 	}
 
@@ -777,8 +780,8 @@ func buildBubblewrapArgs(shellPath, cmdText, mode, pickedDir string) ([]string, 
 	}
 
 	commandPath := sandboxCommandPath
-	if userPythonBin != "" {
-		commandPath = userPythonBin + ":" + commandPath
+	if len(pythonRuntime.bins) > 0 {
+		commandPath = strings.Join(pythonRuntime.bins, ":") + ":" + commandPath
 	}
 	args = append(args,
 		"--chdir", chdir,
@@ -789,8 +792,10 @@ func buildBubblewrapArgs(shellPath, cmdText, mode, pickedDir string) ([]string, 
 		"--setenv", "ZDOTDIR", scratchHome,
 		"--setenv", "TMPDIR", "/tmp",
 	)
-	if len(userPythonSites) > 0 {
-		args = append(args, "--setenv", "PYTHONPATH", strings.Join(userPythonSites, ":"))
+	if len(pythonRuntime.sites) > 0 && pythonRuntime.userBase != "" {
+		// Keep user-installed packages available to the system interpreter
+		// without injecting them ahead of packages from another virtualenv.
+		args = append(args, "--setenv", "PYTHONUSERBASE", pythonRuntime.userBase)
 	}
 	args = append(args,
 		"--setenv", "PATH", commandPath,
@@ -800,34 +805,159 @@ func buildBubblewrapArgs(shellPath, cmdText, mode, pickedDir string) ([]string, 
 	return args, nil
 }
 
-func sandboxUserPythonRuntimePaths() (string, []string) {
+type sandboxPythonRuntime struct {
+	bins     []string
+	sites    []string
+	roots    []string
+	userBase string
+}
+
+func sandboxUserPythonRuntimePaths() sandboxPythonRuntime {
 	home, err := helperUserHomeDirFn()
 	if err != nil {
-		return "", nil
+		return sandboxPythonRuntime{}
 	}
 	home = strings.TrimSpace(home)
 	if home == "" {
-		return "", nil
+		return sandboxPythonRuntime{}
 	}
 
-	bin := filepath.Join(home, ".local", "bin")
-	if info, err := helperStatFn(bin); err != nil || !info.IsDir() {
-		bin = ""
+	result := sandboxPythonRuntime{userBase: filepath.Join(home, ".local")}
+	seenBins, seenSites, seenRoots := map[string]bool{}, map[string]bool{}, map[string]bool{}
+	addBin := func(bin string, bindRoot bool) {
+		bin = filepath.Clean(strings.TrimSpace(bin))
+		if bin == "." || seenBins[bin] {
+			return
+		}
+		info, err := helperStatFn(bin)
+		if err != nil || !info.IsDir() {
+			return
+		}
+		seenBins[bin] = true
+		result.bins = append(result.bins, bin)
+		if !bindRoot {
+			return
+		}
+		root := filepath.Dir(bin)
+		if seenRoots[root] {
+			return
+		}
+		info, err = helperStatFn(root)
+		if err != nil || !info.IsDir() {
+			return
+		}
+		seenRoots[root] = true
+		result.roots = append(result.roots, root)
 	}
-
-	sites, err := filepath.Glob(filepath.Join(home, ".local", "lib", "python*", "site-packages"))
-	if err != nil {
-		return bin, nil
+	addGlobBins := func(pattern string, bindRoot bool) {
+		bins, err := filepath.Glob(pattern)
+		if err != nil {
+			return
+		}
+		for _, bin := range bins {
+			addBin(bin, bindRoot)
+		}
 	}
-	validSites := make([]string, 0, len(sites))
-	for _, site := range sites {
+	addSite := func(site string) {
+		site = filepath.Clean(strings.TrimSpace(site))
+		if site == "." || seenSites[site] {
+			return
+		}
 		info, err := helperStatFn(site)
 		if err != nil || !info.IsDir() {
+			return
+		}
+		seenSites[site] = true
+		result.sites = append(result.sites, site)
+	}
+	addGlobSites := func(pattern string) {
+		sites, err := filepath.Glob(pattern)
+		if err != nil {
+			return
+		}
+		for _, site := range sites {
+			addSite(site)
+		}
+	}
+	// Preserve any user-managed interpreter that Integration already exposed in
+	// its normalized PATH. This covers custom installation locations without
+	// broadly mounting every directory under the user's home.
+	for _, bin := range strings.Split(os.Getenv("PATH"), string(os.PathListSeparator)) {
+		bin = filepath.Clean(strings.TrimSpace(bin))
+		if bin == "." || sandboxPathIsWithinSystemRuntime(bin) {
 			continue
 		}
-		validSites = append(validSites, site)
+		pythonBinaries, err := filepath.Glob(filepath.Join(bin, "python*"))
+		if err != nil {
+			continue
+		}
+		for _, python := range pythonBinaries {
+			info, err := helperStatFn(python)
+			if err == nil && !info.IsDir() && info.Mode().Perm()&0o111 != 0 {
+				addBin(bin, true)
+				break
+			}
+		}
 	}
-	return bin, validSites
+
+	// Python packages installed with --user use the host's system interpreter;
+	// only their console scripts and site-packages need an individual mount.
+	addBin(filepath.Join(home, ".local", "bin"), false)
+	for _, pattern := range []string{
+		filepath.Join(home, ".local", "lib", "python*", "site-packages"),
+		filepath.Join(home, ".local", "lib", "python*", "dist-packages"),
+	} {
+		addGlobSites(pattern)
+	}
+
+	if virtualEnv := strings.TrimSpace(os.Getenv("VIRTUAL_ENV")); virtualEnv != "" {
+		addBin(filepath.Join(virtualEnv, "bin"), true)
+	}
+	if condaPrefix := strings.TrimSpace(os.Getenv("CONDA_PREFIX")); condaPrefix != "" {
+		addBin(filepath.Join(condaPrefix, "bin"), true)
+	}
+	pyenvRoot := strings.TrimSpace(os.Getenv("PYENV_ROOT"))
+	if pyenvRoot == "" {
+		pyenvRoot = filepath.Join(home, ".pyenv")
+	}
+	for _, root := range []string{
+		filepath.Join(pyenvRoot, "versions"),
+		filepath.Join(home, ".asdf", "installs", "python"),
+		filepath.Join(home, ".local", "share", "mise", "installs", "python"),
+		filepath.Join(home, ".mise", "installs", "python"),
+		filepath.Join(home, ".virtualenvs"),
+		filepath.Join(home, ".cache", "pypoetry", "virtualenvs"),
+		filepath.Join(home, ".conda", "envs"),
+		filepath.Join(home, "anaconda3", "envs"),
+		filepath.Join(home, "miniconda3", "envs"),
+		filepath.Join(home, "miniforge3", "envs"),
+		filepath.Join(home, "mambaforge", "envs"),
+		filepath.Join(home, "micromamba", "envs"),
+	} {
+		addGlobBins(filepath.Join(root, "*", "bin"), true)
+	}
+	for _, root := range []string{
+		filepath.Join(home, "anaconda3"),
+		filepath.Join(home, "miniconda3"),
+		filepath.Join(home, "miniforge3"),
+		filepath.Join(home, "mambaforge"),
+		filepath.Join(home, "micromamba"),
+	} {
+		addBin(filepath.Join(root, "bin"), true)
+	}
+	if workonHome := strings.TrimSpace(os.Getenv("WORKON_HOME")); workonHome != "" {
+		addGlobBins(filepath.Join(workonHome, "*", "bin"), true)
+	}
+	return result
+}
+
+func sandboxPathIsWithinSystemRuntime(path string) bool {
+	for _, root := range sandboxSystemReadOnlyPaths {
+		if sandboxPathContains(root, path) {
+			return true
+		}
+	}
+	return false
 }
 
 func helperDeepRightRuntimeDir() string {

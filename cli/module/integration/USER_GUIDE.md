@@ -3525,6 +3525,16 @@ Integration 启动后会立即检查每个合法 Agent，之后每隔 `recover` 
 
 Integration 新增 `GET /api/whisper/check` 与任务接口：`GET/POST /api/whisper/tasks`、`POST /api/whisper/tasks/cancel`、`POST /api/whisper/tasks/restart`、`POST /api/whisper/tasks/delete`、`GET /api/whisper/tasks/log`。任务列表支持按排队中、执行中、已完成、已取消、失败筛选，固定每页 5 条；已取消任务可重新加入队列，失败任务可删除其任务记录（不删除文件）。活动 `config/config.json` 的 `whisper.check`（正整数小时）和 `whisper.install`（非空安装请求）控制依赖检查与用户确认后的安装消息；接口会验证 `whisper` 命令可启动，并在 macOS 识别用户级 `~/Library/Python/*/bin/whisper` 安装位置，失效时返回安装请求，不会执行安装。Integration、`cmd`、`CLI_SANDBOX` 与 `cli/get` 的普通/沙箱任务均继承同一份规范化命令环境；该环境动态合并当前用户存在的 Python 用户级 `bin` 目录，不依赖硬编码的用户路径或 Python 版本，因此检查和实际执行解析的是同一份 `PATH`。
 
-任务持久化到共享 SQLite，固定使用 Whisper `base` 模型并全局串行执行。源音频和输出必须位于同一 Agent 工作区；输出固定保存到工作目录下的 `whisper/`，优先使用与源音频同名的 `.txt`，已有同名文本或任务输出时自动追加时间戳，绝不覆盖。任务支持进度和日志持久化、取消、服务重启恢复排队，以及 CUDA、Apple MPS、CPU 的受控优先级回退；GPU 已探测可用但实际运行不兼容时，会自动用 CPU 再尝试一次。
+任务持久化到共享 SQLite，并按创建顺序在全部 Agent 间串行执行。每条任务保存一个受服务端白名单约束的转写场景：默认“中文会议”（`chinese_meeting`），另可选“专业转写”“低延迟”“批量处理”“CPU 轻量”和“中英技术”。场景会决定模型及安全的语言、温度、搜索宽度、上下文和提示词参数；场景与实际参数均写入任务日志。源音频和输出必须位于同一 Agent 工作区；创建接口只接受服务端可预览的音频相对路径，输出固定保存到工作目录下的 `whisper/`，优先使用与源音频同名的 `.txt`，已有同名文本或任务输出时自动追加时间戳，绝不覆盖。任务支持进度和日志持久化、取消、服务重启恢复排队，以及 CUDA、Apple MPS、CPU 的受控优先级回退；GPU 已探测可用但实际运行不兼容时，会自动用 CPU 再尝试一次。
 
 完整说明见 [iteration/20260801-2/USER_GUIDE.md](iteration/20260801-2/USER_GUIDE.md)。
+
+---
+
+## 迭代 20260801-3：rembg 图片主体提取队列
+
+Integration 新增 `rembg` 图片主体提取队列。活动 `config/config.json.rembg` 的 `check`（正整数小时）控制依赖检查缓存，`install`（非空文本）为缺少 `rembg` 时返回给页面的安装请求。`GET /api/rembg/check` 仅验证受控环境的 `rembg` 命令可启动，不执行安装。
+
+图片任务持久化到共享 SQLite，支持查询、创建、取消、重新开始、失败删除和日志读取；状态为 `queued`、`running`、`completed`、`cancelled`、`failed`，列表支持状态筛选且固定每页 5 条。每条任务保存模型与 `alpha matting` 选择，默认模型为通用 `u2net`；未缓存的所选模型由 rembg 在任务执行时自动下载，实时下载过程写入日志。任务只接受当前 Agent 工作区内经内容验证的图片，使用受控的 `rembg i -m <模型> [--alpha-matting]` 串行执行，输出透明 PNG 到该 Agent 的 `images/`，默认命名为 `<源文件名>_subject.png`；冲突时自动追加时间戳，既有文件和源图片均不会被覆盖。
+
+完整说明见 [iteration/20260801-3/USER_GUIDE.md](iteration/20260801-3/USER_GUIDE.md)。

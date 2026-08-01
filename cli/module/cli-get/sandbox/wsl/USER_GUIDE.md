@@ -85,11 +85,13 @@ WSL 版使用 Bubblewrap 的空根文件系统。未被显式挂入的宿主路�
 - `/lib`、`/lib64`、`/etc`
 - `/run/current-system/sw`、`/nix/store`
 
-`/usr` 已覆盖大多数发行版的 `/usr/bin`、`/usr/sbin`、`/usr/lib` 和 `/usr/local`。沙箱内 `PATH` 固定为：
+`/usr` 已覆盖大多数发行版的 `/usr/bin`、`/usr/sbin`、`/usr/lib` 和 `/usr/local`。沙箱内 `PATH` 以系统路径为基础，并在其前加入经验证的用户 Python 环境 `bin` 目录：
 
 ```text
 /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ```
+
+为兼容图片主体提取等 Python 工具，WSL 沙盒会只读继承用户已安装的 Python 运行时：`~/.local` 的脚本与用户 site-packages、pyenv、conda/miniforge、virtualenv、Poetry、asdf、mise，以及 Integration 启动时已在宿主 `PATH` 中发现的自定义 Python。每个环境仅挂入对应运行时根目录和 `bin`，不会挂入整个用户 Home；激活的 `VIRTUAL_ENV` 和 `CONDA_PREFIX` 优先。
 
 ### 工作区、临时目录与禁止路径
 
@@ -101,4 +103,4 @@ WSL 版使用 Bubblewrap 的空根文件系统。未被显式挂入的宿主路�
 - 不会默认挂入 `/home`、`/mnt`、`/mnt/c`、`/opt`、`/mnt/c/Program Files` 或 Windows 系统目录。
 - 若用户选择的是 `/mnt/c/...`，仅精确挂入被选择的子目录及其 realpath，不会暴露整块 Windows 磁盘。
 
-位于用户 Home 的 Linuxbrew、pyenv、nvm、Cargo、Conda 等目录不会默认豁免。需要这类工具时，应通过受信任的后续配置挂入精确工具根；不要通过环境变量放大路径权限。
+位于用户 Home 的 Linuxbrew、nvm、Cargo 等目录不会默认豁免。Python 运行时是例外：仅当目录属于受支持的 Python 环境，或已由宿主 `PATH` 发现为可执行 Python 时，才以只读方式精确挂入。其它工具仍应通过受信任的后续配置挂入精确工具根；不要通过环境变量放大路径权限。

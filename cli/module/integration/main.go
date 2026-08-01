@@ -6406,6 +6406,14 @@ var mediaPreviewMIMETypes = map[string]string{
 	".flac": "audio/flac",
 	".ogg":  "audio/ogg",
 	".opus": "audio/ogg",
+	".png":  "image/png",
+	".jpg":  "image/jpeg",
+	".jpeg": "image/jpeg",
+	".gif":  "image/gif",
+	".webp": "image/webp",
+	".bmp":  "image/bmp",
+	".tif":  "image/tiff",
+	".tiff": "image/tiff",
 }
 
 func mediaPreviewMIMEType(filePath string) (string, bool) {
@@ -20312,6 +20320,12 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/whisper/tasks/restart", handleWhisperTaskRestart())
 	mux.HandleFunc("/api/whisper/tasks/delete", handleWhisperTaskDelete())
 	mux.HandleFunc("/api/whisper/tasks/log", handleWhisperTaskLog())
+	mux.HandleFunc("/api/rembg/check", handleRembgCheck())
+	mux.HandleFunc("/api/rembg/tasks", handleRembgTasks())
+	mux.HandleFunc("/api/rembg/tasks/cancel", handleRembgTaskCancel())
+	mux.HandleFunc("/api/rembg/tasks/restart", handleRembgTaskRestart())
+	mux.HandleFunc("/api/rembg/tasks/delete", handleRembgTaskDelete())
+	mux.HandleFunc("/api/rembg/tasks/log", handleRembgTaskLog())
 	mux.HandleFunc("/api/video_trim", handleVideoTrim(&cfg))
 	mux.HandleFunc("/api/video_audio_extract_to_audio", handleVideoAudioExtractToAudio(&cfg))
 	mux.HandleFunc("/api/video_audio_edit", handleVideoAudioEdit(&cfg))
@@ -20448,6 +20462,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	startIntegrationAtMenuRefresh(ctx, &cfg)
 	initCronDB()
 	startWhisperTaskManager(ctx, &cfg)
+	startRembgTaskManager(ctx, &cfg)
 	startIntegrationLogRetentionCleanup(ctx)
 	startIntegrationTempCleanup(ctx, cfg.AgentDir)
 	startIntegrationAgentBackups(ctx, cfg.AgentDir)

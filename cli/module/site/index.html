@@ -4418,7 +4418,7 @@ body.quick-fan-transition-active{cursor:progress}
 .file-editor-color-picker-btn{width:28px;height:28px;border:0;border-radius:8px;padding:0;background:transparent;color:#48638f;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition)}
 .file-editor-color-picker-btn[hidden]{display:none!important}
 .file-editor-color-picker-btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
-#feAudioTrimBtn svg,#feWhisperTaskBtn svg{width:16px;height:16px}
+#feAudioTrimBtn svg,#feWhisperTaskBtn svg,#feRembgTaskBtn svg{width:16px;height:16px}
 #feVideoFrameBtn svg{width:20px;height:20px}#feVideoAudioExtractBtn svg{width:14px;height:14px}
 .file-editor-color-picker-btn .video-frame-unavailable-mark{display:none;stroke:var(--error);stroke-width:2.8}.file-editor-color-picker-btn.video-frame-playing{opacity:.78}.file-editor-color-picker-btn.video-frame-playing .video-frame-unavailable-mark{display:inline}
 .file-editor-color-picker-btn:hover,.file-editor-color-picker-btn[aria-pressed="true"]{background:rgba(var(--accent-rgb),.12);color:var(--accent);transform:translateY(-1px)}
@@ -4467,7 +4467,7 @@ body.quick-fan-transition-active{cursor:progress}
 .fe-media-status{display:none;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--error)}
 .fe-media-status:not(:empty){display:inline}
 .file-editor-overlay.audio-trim-active #feAudioTrimBtn,.file-editor-overlay.video-trim-active #feVideoTrimBtn,.file-editor-overlay.video-audio-edit-active #feVideoAudioExtractBtn{background:rgba(var(--accent-rgb),.16);color:var(--accent)}
-.whisper-task-panel{width:min(860px,calc(100vw - 36px));max-height:min(720px,calc(100vh - 36px));display:flex;flex-direction:column;overflow:hidden}.whisper-task-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border)}.whisper-task-head h3{margin:0;color:var(--text-primary);font-size:16px}.whisper-task-close{margin-left:auto;width:28px;height:28px;border:0;border-radius:8px;background:transparent;color:var(--text-muted);font-size:21px;line-height:1;cursor:pointer}.whisper-task-close:hover{background:rgba(var(--accent-rgb),.1);color:var(--accent)}.whisper-task-body{min-height:0;overflow:auto;padding:14px 16px}.whisper-task-add{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px;border:1px dashed color-mix(in srgb,var(--accent) 55%,var(--border));border-radius:11px;background:color-mix(in srgb,var(--accent) 6%,var(--bg-card))}.whisper-task-add-copy{display:flex;flex-direction:column;gap:3px;color:var(--text-secondary);font-size:12px}.whisper-task-add button,.whisper-task-foot button,.whisper-task-row button,.whisper-task-confirm-actions button,.whisper-task-pagination button,.whisper-task-pending button{height:31px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg-input);color:var(--text-secondary);font-size:12px;font-weight:650;cursor:pointer}.whisper-task-add button,.whisper-task-foot .primary,.whisper-task-confirm-actions .primary{border-color:transparent;background:linear-gradient(135deg,var(--accent-hover),var(--accent));color:#fff}.whisper-task-add button:disabled,.whisper-task-foot button:disabled,.whisper-task-row button:disabled,.whisper-task-pagination button:disabled,.whisper-task-pending button:disabled{opacity:.55;cursor:not-allowed}.whisper-task-pending{margin-top:10px;padding:10px 12px;border:1px solid color-mix(in srgb,var(--border) 72%,transparent);border-radius:10px;background:color-mix(in srgb,var(--bg-main) 70%,var(--bg-card));color:var(--text-secondary);font-size:12px}.whisper-task-pending-head{margin-bottom:7px;font-weight:700}.whisper-task-pending-list{display:flex;flex-direction:column;gap:5px}.whisper-task-pending-item{display:flex;align-items:center;gap:8px;min-width:0;padding:5px 0;border-top:1px solid color-mix(in srgb,var(--border) 54%,transparent)}.whisper-task-pending-item:first-child{border-top:0}.whisper-task-pending-item .whisper-task-path{flex:1;min-width:0}.whisper-task-pending-item button{height:26px;padding:0 8px;color:var(--error);font-size:11px}.whisper-task-path{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text-muted)}.whisper-task-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;color:var(--text-secondary);font-size:12px}.whisper-task-filter{display:flex;align-items:center;gap:7px}.whisper-task-filter select{height:30px;padding:0 26px 0 8px;border:1px solid var(--border);border-radius:8px;background:var(--bg-input);color:var(--text-secondary);font-size:12px;cursor:pointer}.whisper-task-count{color:var(--text-muted);font-size:11px}.whisper-task-list{display:flex;flex-direction:column;gap:9px;margin-top:10px}.whisper-task-empty{padding:26px 12px;color:var(--text-muted);text-align:center;font-size:12px}.whisper-task-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:11px 12px;border:1px solid var(--border);border-radius:11px;background:var(--bg-card)}.whisper-task-row-main{min-width:0}.whisper-task-row-title{display:flex;align-items:center;gap:8px;min-width:0;color:var(--text-primary);font-size:12px;font-weight:700}.whisper-task-row-title strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.whisper-task-status{flex:0 0 auto;padding:2px 6px;border-radius:999px;background:color-mix(in srgb,var(--accent) 13%,var(--bg-input));color:var(--accent);font-size:10px}.whisper-task-status.failed,.whisper-task-status.cancelled{background:color-mix(in srgb,var(--error) 12%,var(--bg-input));color:var(--error)}.whisper-task-status.completed{background:rgba(57,140,90,.13);color:#27804d}.whisper-task-row-inline-actions{display:flex;align-items:center;gap:5px;min-width:0}.whisper-task-row-inline-actions button{height:25px;padding:0 8px;font-size:11px}.whisper-task-row-inline-actions .danger{color:var(--error)}.whisper-task-progress{height:5px;margin:8px 0 6px;overflow:hidden;border-radius:999px;background:color-mix(in srgb,var(--border) 58%,transparent)}.whisper-task-progress i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--accent-hover),var(--accent));transition:width .2s ease}.whisper-task-meta{display:flex;flex-wrap:nowrap;align-items:center;gap:12px;min-width:0;color:var(--text-muted);font-size:10px}.whisper-task-meta span{min-width:0}.whisper-task-output{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text-muted)}.whisper-task-row-actions{display:flex;align-self:stretch;align-items:flex-end;justify-content:flex-end}.whisper-task-pagination{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:12px}.whisper-task-pagination span{min-width:72px;color:var(--text-muted);text-align:center;font-size:11px}.whisper-task-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 16px;border-top:1px solid var(--border)}.whisper-task-foot-actions{display:inline-flex;align-items:center;gap:10px}.whisper-task-foot-status{min-height:16px;color:var(--text-muted);font-size:11px}.whisper-task-foot-status.notice{color:var(--accent)}.whisper-task-foot-status.error{color:var(--error)}.whisper-task-log{margin-top:12px;overflow:hidden;border:1px solid var(--border);border-radius:10px;background:var(--bg-main)}.whisper-task-log-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text-secondary);font-size:11px;font-weight:700}.whisper-task-log pre{max-height:190px;overflow:auto;margin:0;padding:10px;color:var(--text-secondary);font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-word}.whisper-task-confirm{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(18,18,18,.18);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}.whisper-task-confirm[hidden]{display:none!important}.whisper-task-confirm-card{width:min(390px,100%);padding:18px;border:1px solid color-mix(in srgb,var(--border) 65%,var(--accent) 35%);border-radius:15px;background:var(--bg-card);box-shadow:0 22px 54px rgba(0,0,0,.22)}.whisper-task-confirm-card h4{margin:0;color:var(--text-primary);font-size:15px}.whisper-task-confirm-card p{margin:8px 0 0;color:var(--text-secondary);font-size:12px;line-height:1.55}.whisper-task-confirm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:15px}@media(max-width:620px){.whisper-task-row{grid-template-columns:1fr}.whisper-task-row-actions{min-height:31px}.whisper-task-add{align-items:flex-start;flex-direction:column}.whisper-task-add button{width:100%}.whisper-task-toolbar{align-items:flex-start;flex-direction:column}}
+.whisper-task-panel{width:min(860px,calc(100vw - 36px));max-height:min(720px,calc(100vh - 36px));display:flex;flex-direction:column;overflow:hidden}.whisper-task-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border)}.whisper-task-head h3{margin:0;color:var(--text-primary);font-size:16px}.whisper-task-close{margin-left:auto;width:28px;height:28px;border:0;border-radius:8px;background:transparent;color:var(--text-muted);font-size:21px;line-height:1;cursor:pointer}.whisper-task-close:hover{background:rgba(var(--accent-rgb),.1);color:var(--accent)}.whisper-task-body{min-height:0;overflow:auto;padding:14px 16px}.whisper-task-add{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px;border:1px dashed color-mix(in srgb,var(--accent) 55%,var(--border));border-radius:11px;background:color-mix(in srgb,var(--accent) 6%,var(--bg-card))}.whisper-task-add-copy{display:flex;flex-direction:column;gap:3px;color:var(--text-secondary);font-size:12px}.whisper-task-add button,.whisper-task-foot button,.whisper-task-row button,.whisper-task-confirm-actions button,.whisper-task-pagination button,.whisper-task-pending button{height:31px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg-input);color:var(--text-secondary);font-size:12px;font-weight:650;cursor:pointer}.whisper-task-add button,.whisper-task-foot .primary,.whisper-task-confirm-actions .primary{border-color:transparent;background:linear-gradient(135deg,var(--accent-hover),var(--accent));color:#fff}.whisper-task-add button:disabled,.whisper-task-foot button:disabled,.whisper-task-row button:disabled,.whisper-task-pagination button:disabled,.whisper-task-pending button:disabled{opacity:.55;cursor:not-allowed}.whisper-task-pending{margin-top:10px;padding:10px 12px;border:1px solid color-mix(in srgb,var(--border) 72%,transparent);border-radius:10px;background:color-mix(in srgb,var(--bg-main) 70%,var(--bg-card));color:var(--text-secondary);font-size:12px}.whisper-task-pending-head{margin-bottom:7px;font-weight:700}.whisper-task-pending-list{display:flex;flex-direction:column;gap:5px}.whisper-task-pending-item{display:flex;align-items:center;gap:8px;min-width:0;padding:5px 0;border-top:1px solid color-mix(in srgb,var(--border) 54%,transparent)}.whisper-task-pending-item:first-child{border-top:0}.whisper-task-pending-item .whisper-task-path{flex:1;min-width:0}.whisper-task-pending-item button{height:26px;padding:0 8px;color:var(--error);font-size:11px}.whisper-task-path{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text-muted)}.whisper-task-scenario-select,.rembg-task-model-select{height:26px;max-width:230px;padding:0 23px 0 7px;border:1px solid var(--border);border-radius:7px;background:var(--bg-input);color:var(--text-secondary);font-size:11px;cursor:pointer}.rembg-task-pending-options{display:flex;flex:0 0 230px;flex-direction:column;align-items:stretch;gap:5px}.rembg-task-model-select{width:100%;max-width:none}.rembg-task-alpha-toggle{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;color:var(--text-secondary);font-size:11px;cursor:pointer}.rembg-task-alpha-toggle input{margin:0;accent-color:var(--accent);cursor:pointer}.whisper-task-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;color:var(--text-secondary);font-size:12px}.whisper-task-filter{display:flex;align-items:center;gap:7px}.whisper-task-filter select{height:30px;padding:0 26px 0 8px;border:1px solid var(--border);border-radius:8px;background:var(--bg-input);color:var(--text-secondary);font-size:12px;cursor:pointer}.whisper-task-count{color:var(--text-muted);font-size:11px}.whisper-task-list{display:flex;flex-direction:column;gap:9px;margin-top:10px}.whisper-task-empty{padding:26px 12px;color:var(--text-muted);text-align:center;font-size:12px}.whisper-task-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:11px 12px;border:1px solid var(--border);border-radius:11px;background:var(--bg-card)}.whisper-task-row-main{min-width:0}.whisper-task-row-title{display:flex;align-items:center;gap:8px;min-width:0;color:var(--text-primary);font-size:12px;font-weight:700}.whisper-task-row-title strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.whisper-task-status{flex:0 0 auto;padding:2px 6px;border-radius:999px;background:color-mix(in srgb,var(--accent) 13%,var(--bg-input));color:var(--accent);font-size:10px}.whisper-task-status.failed,.whisper-task-status.cancelled{background:color-mix(in srgb,var(--error) 12%,var(--bg-input));color:var(--error)}.whisper-task-status.completed{background:rgba(57,140,90,.13);color:#27804d}.whisper-task-row-inline-actions{display:flex;align-items:center;gap:5px;min-width:0}.whisper-task-row-inline-actions button{height:25px;padding:0 8px;font-size:11px}.whisper-task-row-inline-actions .danger{color:var(--error)}.whisper-task-progress{height:5px;margin:8px 0 6px;overflow:hidden;border-radius:999px;background:color-mix(in srgb,var(--border) 58%,transparent)}.whisper-task-progress i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--accent-hover),var(--accent));transition:width .2s ease}.whisper-task-meta{display:flex;flex-wrap:nowrap;align-items:center;gap:12px;min-width:0;overflow:hidden;color:var(--text-muted);font-size:10px}.whisper-task-meta span{min-width:0}.whisper-task-output{display:block;flex:1 1 0;width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text-muted)}.whisper-task-row-actions{display:flex;align-self:stretch;align-items:flex-end;justify-content:flex-end}.whisper-task-pagination{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:12px}.whisper-task-pagination span{min-width:72px;color:var(--text-muted);text-align:center;font-size:11px}.whisper-task-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 16px;border-top:1px solid var(--border)}.whisper-task-foot-actions{display:inline-flex;align-items:center;gap:10px}.whisper-task-foot-status{min-height:16px;color:var(--text-muted);font-size:11px}.whisper-task-foot-status.notice{color:var(--accent)}.whisper-task-foot-status.error{color:var(--error)}.whisper-task-log{margin-top:12px;overflow:hidden;border:1px solid var(--border);border-radius:10px;background:var(--bg-main)}.whisper-task-log-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text-secondary);font-size:11px;font-weight:700}.whisper-task-log pre{max-height:190px;overflow:auto;margin:0;padding:10px;color:var(--text-secondary);font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-word}.whisper-task-confirm{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(18,18,18,.18);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}.whisper-task-confirm[hidden]{display:none!important}.whisper-task-confirm-card{width:min(390px,100%);padding:18px;border:1px solid color-mix(in srgb,var(--border) 65%,var(--accent) 35%);border-radius:15px;background:var(--bg-card);box-shadow:0 22px 54px rgba(0,0,0,.22)}.whisper-task-confirm-card h4{margin:0;color:var(--text-primary);font-size:15px}.whisper-task-confirm-card p{margin:8px 0 0;color:var(--text-secondary);font-size:12px;line-height:1.55}.whisper-task-confirm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:15px}@media(max-width:620px){.whisper-task-row{grid-template-columns:1fr}.whisper-task-row-actions{min-height:31px}.whisper-task-add{align-items:flex-start;flex-direction:column}.whisper-task-add button{width:100%}.whisper-task-toolbar{align-items:flex-start;flex-direction:column}.whisper-task-pending-item{align-items:flex-start;flex-wrap:wrap}.whisper-task-scenario-select,.rembg-task-model-select,.rembg-task-pending-options{max-width:100%;flex-basis:100%}}
 .whisper-task-row-actions{flex-direction:column;justify-content:flex-end;align-items:flex-end}.whisper-task-row-actions>button{margin-top:auto}.whisper-task-log-head .whisper-task-log-toggle{width:26px;height:26px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:7px;background:transparent;color:var(--text-muted);cursor:pointer}.whisper-task-log-head .whisper-task-log-toggle:hover{background:rgba(var(--accent-rgb),.12);color:var(--accent)}.whisper-task-log-toggle svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .whisper-task-toolbar{justify-content:flex-start}.whisper-task-count{margin-left:auto}.whisper-task-batch-actions{display:flex;align-items:center;gap:6px;max-width:0;overflow:hidden;opacity:0;pointer-events:none;transform:translateX(-6px);transition:max-width .18s ease,opacity .16s ease,transform .18s ease}.whisper-task-batch-actions.active{max-width:180px;opacity:1;pointer-events:auto;transform:translateX(0)}.whisper-task-batch-actions button{height:28px;padding:0 9px;border:1px solid var(--border);border-radius:8px;background:var(--bg-input);color:var(--text-secondary);font-size:11px;font-weight:650;white-space:nowrap;cursor:pointer}.whisper-task-batch-actions button:hover{border-color:rgba(var(--accent-rgb),.48);color:var(--accent)}.whisper-task-complete-select{width:16px;height:16px;flex:0 0 auto;margin:0;accent-color:var(--accent);cursor:pointer}
 .file-editor-overlay.audio-trim-active .fe-media-progress,.file-editor-overlay.audio-trim-active .fe-media-volume,.file-editor-overlay.video-trim-active .fe-media-progress,.file-editor-overlay.video-trim-active .fe-media-volume{accent-color:var(--accent)}
@@ -6296,6 +6296,9 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
 <footer class="vfs-mix-foot"><div class="vfs-mix-export"><label>常用导出 <select id="vfsMixExportPreset" onchange="vfsMixApplyExportPreset(this.value)"><option value="">请选择</option><option value="music_release">音乐发布</option><option value="video_voice">视频配音</option><option value="post_production">后期编辑</option><option value="music_master">高质量音乐</option></select></label><label>采样率 <select id="vfsMixSampleRate" onchange="vfsMixSetExport('sampleRate',this.value)"><option value="44100">44.1 kHz</option><option value="48000">48 kHz</option></select></label><label>位深 <select id="vfsMixBitDepth" onchange="vfsMixSetExport('bitDepth',this.value)"><option value="16">16-bit</option><option value="24">24-bit</option></select></label></div><span class="vfs-mix-status" id="vfsMixStatus" role="status" aria-live="polite"></span><button class="btn btn-secondary" id="vfsMixPreviewBtn" type="button" onclick="vfsMixPreview()">试听</button><button class="btn btn-secondary" type="button" onclick="vfsMixClose()">关闭</button><button class="btn btn-primary" id="vfsMixSaveBtn" type="button" onclick="vfsMixSave()">保存 WAV</button></footer>
   </section>
 </div>
+<style>
+.whisper-task-foot-copy{display:flex;flex:1;flex-direction:column;gap:2px;min-width:0}.whisper-task-foot-copy.audio-task-foot-copy{align-self:flex-end}.whisper-task-foot-copy.rembg-task-foot-copy{transform:translateY(5px)}.audio-task-foot-copy .whisper-task-foot-status:empty{display:none}.whisper-task-scenario-hint{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary);font-size:11px}.rembg-task-pending-options{display:flex;flex:0 1 auto;flex-direction:row;align-items:center;gap:8px}.rembg-task-model-select{width:120px;max-width:120px}.whisper-task-output{flex:0 1 380px;width:380px;max-width:380px}
+</style>
 <div class="overlay" id="whisperTaskOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="30" onclick="if(event.target===this)feWhisperTaskClose()" aria-hidden="true">
   <section class="settings-panel whisper-task-panel" id="whisperTaskPanel" role="dialog" aria-modal="true" aria-labelledby="whisperTaskTitle" onclick="event.stopPropagation()">
     <header class="whisper-task-head"><h3 id="whisperTaskTitle">提取音频文字</h3><button class="whisper-task-close" type="button" onclick="feWhisperTaskClose()" aria-label="关闭音频文字任务">×</button></header>
@@ -6307,7 +6310,21 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
       <nav class="whisper-task-pagination" aria-label="音频文字任务分页"><button id="whisperTaskPreviousPage" type="button" onclick="feWhisperTaskChangePage(-1)">上一页</button><span id="whisperTaskPageLabel"></span><button id="whisperTaskNextPage" type="button" onclick="feWhisperTaskChangePage(1)">下一页</button></nav>
       <div class="whisper-task-log" id="whisperTaskLog" hidden><div class="whisper-task-log-head"><span id="whisperTaskLogTitle">执行日志</span><button class="whisper-task-log-toggle" type="button" onclick="feWhisperTaskCloseLog()" title="收起日志" aria-label="收起日志"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 14 5-5 5 5"/></svg></button></div><pre id="whisperTaskLogText"></pre></div>
     </div>
-    <footer class="whisper-task-foot"><span class="whisper-task-foot-status" id="whisperTaskStatus" role="status" aria-live="polite"></span><span class="whisper-task-foot-actions"><button id="whisperTaskCloseBtn" type="button" onclick="feWhisperTaskClose()">关闭</button><button class="primary" id="whisperTaskStartBtn" type="button" onclick="feWhisperTaskStart()">开始</button></span></footer>
+    <footer class="whisper-task-foot"><span class="whisper-task-foot-copy audio-task-foot-copy"><span class="whisper-task-scenario-hint" id="whisperTaskScenarioHint"></span><span class="whisper-task-foot-status" id="whisperTaskStatus" role="status" aria-live="polite"></span></span><span class="whisper-task-foot-actions"><button id="whisperTaskCloseBtn" type="button" onclick="feWhisperTaskClose()">关闭</button><button class="primary" id="whisperTaskStartBtn" type="button" onclick="feWhisperTaskStart()">开始</button></span></footer>
+  </section>
+</div>
+<div class="overlay" id="rembgTaskOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="30" onclick="if(event.target===this)feRembgTaskClose()" aria-hidden="true">
+  <section class="settings-panel whisper-task-panel" id="rembgTaskPanel" role="dialog" aria-modal="true" aria-labelledby="rembgTaskTitle" onclick="event.stopPropagation()">
+    <header class="whisper-task-head"><h3 id="rembgTaskTitle">提取图片主体</h3><button class="whisper-task-close" type="button" onclick="feRembgTaskClose()" aria-label="关闭图片主体任务">×</button></header>
+    <div class="whisper-task-body">
+      <div class="whisper-task-add"><span class="whisper-task-add-copy">添加更多图片任务</span><button id="rembgTaskAddBtn" type="button" onclick="feRembgTaskChooseFiles()">添加</button></div>
+      <div class="whisper-task-pending" id="rembgTaskPending" hidden></div>
+      <div class="whisper-task-toolbar"><label class="whisper-task-filter">状态 <select id="rembgTaskStatusFilter" onchange="feRembgTaskChangeStatus(this.value)"><option value="">全部</option><option value="queued">排队中</option><option value="running">执行中</option><option value="completed">已完成</option><option value="cancelled">已取消</option><option value="failed">失败</option></select></label><span class="whisper-task-count" id="rembgTaskCount"></span></div>
+      <div class="whisper-task-list" id="rembgTaskList" aria-live="polite"></div>
+      <nav class="whisper-task-pagination" aria-label="图片主体任务分页"><button id="rembgTaskPreviousPage" type="button" onclick="feRembgTaskChangePage(-1)">上一页</button><span id="rembgTaskPageLabel"></span><button id="rembgTaskNextPage" type="button" onclick="feRembgTaskChangePage(1)">下一页</button></nav>
+      <div class="whisper-task-log" id="rembgTaskLog" hidden><div class="whisper-task-log-head"><span id="rembgTaskLogTitle">执行日志</span><button class="whisper-task-log-toggle" type="button" onclick="feRembgTaskCloseLog()" title="收起日志" aria-label="收起日志"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 14 5-5 5 5"/></svg></button></div><pre id="rembgTaskLogText"></pre></div>
+    </div>
+    <footer class="whisper-task-foot"><span class="whisper-task-foot-copy audio-task-foot-copy rembg-task-foot-copy"><span class="whisper-task-scenario-hint" id="rembgTaskModelHint"></span><span class="whisper-task-scenario-hint" id="rembgTaskAlphaHint"></span><span class="whisper-task-foot-status" id="rembgTaskStatus" role="status" aria-live="polite"></span></span><span class="whisper-task-foot-actions"><button id="rembgTaskCloseBtn" type="button" onclick="feRembgTaskClose()">关闭</button><button class="primary" id="rembgTaskStartBtn" type="button" onclick="feRembgTaskStart()">开始</button></span></footer>
   </section>
 </div>
 <div class="overlay" id="vfsAudioOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="29" onclick="if(event.target===this)vfsAudioRequestCancel()" aria-hidden="true">
@@ -6588,6 +6605,9 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
         <button class="file-editor-color-picker-btn" type="button" id="feImageCutoutBtn" onclick="feToggleImageCutout()" aria-label="抠图" aria-pressed="false" title="抠图" hidden>
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="m8.2 7.2 11 7.8"/><path d="m8.2 16.8 11-7.8"/></svg>
         </button>
+        <button class="file-editor-color-picker-btn" type="button" id="feRembgTaskBtn" onclick="feOpenRembgTasks()" aria-label="提取图片主体" title="提取图片主体" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="5.3"/><path d="m15 15 4.2 4.2"/></svg>
+        </button>
         <button class="file-editor-color-picker-btn" type="button" id="feCoordinatePickerBtn" onclick="feToggleCoordinatePicker()" aria-label="提取坐标" aria-pressed="false" title="提取坐标" hidden>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v16h16"/><path d="M8 16 17 7"/><circle cx="17" cy="7" r="2.5"/></svg>
         </button>
@@ -6736,6 +6756,9 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     <p id="feWhisperInstallDesc">是否发送安装请求？</p>
     <div class="fe-ffmpeg-install-actions"><button type="button" onclick="feCancelWhisperInstall()">取消</button><button class="confirm" type="button" id="feWhisperInstallConfirmBtn" onclick="feConfirmWhisperInstall()">安装</button></div>
   </div>
+</div>
+<div class="fe-ffmpeg-install-dialog" id="feRembgInstallDialog" role="dialog" aria-modal="true" aria-labelledby="feRembgInstallTitle" hidden onclick="if(event.target===this)feCancelRembgInstall()">
+  <div class="fe-ffmpeg-install-card" tabindex="-1" onclick="event.stopPropagation()"><h3 id="feRembgInstallTitle">需要安装 rembg</h3><p>是否发送安装请求？</p><div class="fe-ffmpeg-install-actions"><button type="button" onclick="feCancelRembgInstall()">取消</button><button class="confirm" type="button" id="feRembgInstallConfirmBtn" onclick="feConfirmRembgInstall()">安装</button></div></div>
 </div>
 <div class="overlay shutdown-overlay" id="shutdownConfirmOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="59" aria-hidden="true">
   <div class="shutdown-confirm-panel" id="shutdownConfirmPanel" onclick="event.stopPropagation()">
@@ -7202,6 +7225,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
 <input type="file" id="vfsMixFileInput" accept="audio/*,.wav,.mp3,.m4a,.aac,.flac,.ogg,.opus,.aif,.aiff,.wma" multiple style="display:none" onchange="vfsMixHandleChosenFiles(this.files)" />
 <input type="file" id="feVideoAudioEditFileInput" accept="audio/*,.wav,.mp3,.m4a,.aac,.flac,.ogg,.opus,.aif,.aiff,.wma" multiple style="display:none" onchange="feVideoAudioEditHandleFiles(this.files)" />
 <input type="file" id="whisperTaskFileInput" accept="audio/*,.wav,.mp3,.m4a,.aac,.flac,.ogg,.opus,.aif,.aiff,.wma" multiple style="display:none" onchange="feWhisperTaskHandleFiles(this.files)" />
+<input type="file" id="rembgTaskFileInput" accept="image/*,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff" multiple style="display:none" onchange="feRembgTaskHandleFiles(this.files)" />
 <input type="file" id="vfsReferenceFileInput" accept=".txt,.text,.md,.markdown,.mdx,.json,.html,.htm,.xml,.yaml,.yml,.toml,.ini,.cfg,.conf,.log,.csv,.sh,.bash,.zsh,.go,.js,.ts,.py,.java,.c,.cpp,.h,.hpp,.css,.scss,.less,.sql,.rb,.rs,.swift,.kt,.lua,.pl,.r,.m,.mm,.pdf,text/plain,text/markdown,application/json,text/html,application/pdf" style="display:none" onchange="vfsReferenceHandleSelection(this.files)" />
 <input type="file" id="agentImportZipInput" accept=".zip,application/zip" style="display:none" onchange="handleAgentImportZipSelection(this.files)" />
 <input type="file" id="agentImportDirInput" webkitdirectory multiple style="display:none" onchange="handleAgentImportDirectorySelection(this.files)" />
@@ -15370,6 +15394,9 @@ function hideExclusiveOverlayById(id) {
       return true;
     case 'whisperTaskOverlay':
       feWhisperTaskClose();
+      return true;
+    case 'rembgTaskOverlay':
+      feRembgTaskClose();
       return true;
     case 'vfsAudioOverlay':
       vfsAudioDiscard(false);
@@ -48917,8 +48944,12 @@ function vfsRender(entries) {
     const dl = '<button class="vfs-dl" onclick="event.stopPropagation();vfsDownload(event,\'' + esc(e.name) + '\')" title="下载"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>';
     const absPath = vfsCurrentPath + '/' + e.name;
     const isRootAudiosDirectory = e.type === 'dir' && e.name === 'audios' && normalizeFsPath(vfsCurrentPath) === normalizeFsPath(vfsWorkspace);
+    const isRootImagesDirectory = e.type === 'dir' && e.name === 'images' && normalizeFsPath(vfsCurrentPath) === normalizeFsPath(vfsWorkspace);
     const whisperTask = isRootAudiosDirectory
       ? '<button class="vfs-whisper-task" onclick="vfsOpenWhisperTasks(event)" title="提取音频文字" aria-label="提取音频文字"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h14v11H9l-4 4V4.5Z"/><path d="M8.5 8h7M8.5 11h5"/><path d="m15.5 19 1.5 1.5 3-3"/></svg></button>'
+      : '';
+    const rembgTask = isRootImagesDirectory
+      ? '<button class="vfs-whisper-task" onclick="vfsOpenRembgTasks(event)" title="提取图片主体" aria-label="提取图片主体"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="5.3"/><path d="m15 15 4.2 4.2"/></svg></button>'
       : '';
     const modifiedAt = vfsModifiedAtValue(e.modifiedAt);
     const recentFileVersionKey = vfsRecentFileVersionKey(absPath, modifiedAt);
@@ -48985,7 +49016,7 @@ function vfsRender(entries) {
     const vfsEditTourCls = vfsEditTourState.sourcePath && absPath === vfsEditTourState.sourcePath ? ' vfs-edit-tour-source' : '';
     const cls = `${sel}${isRecentFile ? ' recent-file' : ''}${isRecentUploadTarget ? ' recent-upload-target' : ''}${inChain ? ' warning-path' : ''}${warning ? ' warning-file' : ''}${skillsStatusIcon ? ' has-vfs-status' : ''}${hasSessionSkillsStatus ? ' has-session-skills-status' : ''}${vfsEditTourCls}`;
     const statusSlot = skillsStatusIcon ? `<span class="vfs-status-slot">${skillsStatusIcon}</span>` : '';
-    return `<div class="vfs-item${cls}"${skillDisableTourItemId || itemId} data-vfs-name="${esc(e.name)}" data-vfs-type="${e.type}" data-vfs-path="${esc(absPath)}" data-vfs-modified-at="${modifiedAt}" draggable="true" onmouseenter="vfsHover(event,'${esc(e.name)}','${e.type}',${modifiedAt})" ondragstart="vfsDragStart(event,'${esc(absPath)}')" onclick="vfsClick(event,'${esc(e.name)}','${e.type}',${modifiedAt})" ondblclick="vfsDoubleClick(event,'${esc(e.name)}','${e.type}')">${skillIcon}<span class="vfs-name">${esc(e.name)}</span><span class="vfs-actions">${whisperTask}${copyPath}${del}${dl}${soulBtn}</span>${statusSlot}</div>`;
+    return `<div class="vfs-item${cls}"${skillDisableTourItemId || itemId} data-vfs-name="${esc(e.name)}" data-vfs-type="${e.type}" data-vfs-path="${esc(absPath)}" data-vfs-modified-at="${modifiedAt}" draggable="true" onmouseenter="vfsHover(event,'${esc(e.name)}','${e.type}',${modifiedAt})" ondragstart="vfsDragStart(event,'${esc(absPath)}')" onclick="vfsClick(event,'${esc(e.name)}','${e.type}',${modifiedAt})" ondblclick="vfsDoubleClick(event,'${esc(e.name)}','${e.type}')">${skillIcon}<span class="vfs-name">${esc(e.name)}</span><span class="vfs-actions">${whisperTask}${rembgTask}${copyPath}${del}${dl}${soulBtn}</span>${statusSlot}</div>`;
   }).join('');
   vfsRecentFileRenderGeneration += 1;
   vfsScheduleRecentFileExpiry(entries);
@@ -52373,6 +52404,21 @@ async function vfsOpenWhisperTasks(event) {
   }
 }
 
+async function vfsOpenRembgTasks(event) {
+  if (event) { event.preventDefault(); event.stopPropagation(); }
+  if (feRembgTaskCheckPending) return;
+  const agentId = String(vfsAgentId || state.settings.agentId || '').trim();
+  if (!agentId) { vfsShowUploadToast('无法确定当前 Agent 工作目录', true); return; }
+  feRembgTaskCheckPending = true;
+  try {
+    const result = await feCheckExternalDependency('/api/rembg/check', '正在检查 rembg，请稍候…');
+    if (!result.available) { feShowRembgInstallDialog(result.install); return; }
+    feRembgTaskOpen(agentId, '');
+  } catch (error) {
+    vfsShowUploadToast('rembg 检查失败：' + ((error && error.message) || '请重试'), true);
+  } finally { feRembgTaskCheckPending = false; }
+}
+
 // ===== VFS Upload =====
 function vfsUploadClick() {
   showExclusiveOverlay(document.getElementById('vfsUploadOverlay'), document.getElementById('vfsUploadPanel'));
@@ -52980,6 +53026,9 @@ let feWhisperTaskCheckPending = false;
 let feWhisperInstallRequest = '';
 let feWhisperTaskState = null;
 let feWhisperTaskPreviewReturnState = null;
+let feRembgTaskCheckPending = false;
+let feRembgInstallRequest = '';
+let feRembgTaskState = null;
 let dependencyCheckLockSequence = 0;
 const dependencyCheckLocks = new Map();
 let dependencyCheckLockFocus = null;
@@ -54414,6 +54463,10 @@ async function feOpen(absPath, options) {
   feImageExt = absPath.includes('.') ? absPath.split('.').pop().toLowerCase() : '';
   feIsNewImage = false;
   feImageState.loaded = false;
+  // Keep image-only actions hidden until the image bytes have decoded into
+  // the editor canvas; this matches the readiness behavior of the other
+  // toolbar tools and prevents a task from being started during loading.
+  feUpdateRembgTaskButton();
   feImageState.tool = 'erase';
   feImageState.brushSize = 24;
   feImageState.strokeColor = '#ff4d4f';
@@ -54475,9 +54528,11 @@ async function feOpen(absPath, options) {
       feUpdateCoordinatePickerButton();
       feUpdateImageGridButton();
       feUpdateImageCutoutButton();
+      feUpdateRembgTaskButton();
       refreshOverlayStates();
     } catch {
       content.innerHTML = '<div style="color:var(--error);padding:12px">图片加载失败</div>';
+      feUpdateRembgTaskButton();
     }
     return;
   }
@@ -54520,6 +54575,7 @@ async function feOpen(absPath, options) {
     renderMediaPreview(sourceURL, feFileType);
     feUpdateColorPickerButton();
     feUpdateCoordinatePickerButton();
+    feUpdateRembgTaskButton();
     return;
   }
 
@@ -54714,6 +54770,7 @@ async function feRenderImageEditor(base64Content) {
 function feInitializeImageCanvas(canvas) {
   if (!canvas) return;
   feImageState.loaded = true;
+  feUpdateRembgTaskButton();
   feImageState.isDrawing = false;
   feImageState.pointerId = null;
   feImageState.dragStart = null;
@@ -54894,6 +54951,7 @@ function feOpenBlankImage(options = {}) {
   feImageExt = 'png';
   feIsNewImage = true;
   feImageState.loaded = false;
+  feUpdateRembgTaskButton();
   feImageState.tool = 'erase';
   feImageState.brushSize = 24;
   feImageState.strokeColor = '#ff4d4f';
@@ -55441,6 +55499,7 @@ function feClose() {
   feAgentRelPath = '';
   fePreviewAgentId = '';
   feFileType = 'text';
+  feUpdateRembgTaskButton();
   feImageMime = '';
   feImageExt = '';
   feIsNewImage = false;
@@ -55463,6 +55522,7 @@ function feClose() {
   feCancelImageTextEdit();
   feSyncOpenActions();
   feWhisperTaskRestoreAfterPreview();
+  feRembgTaskRestoreAfterPreview();
 }
 
 async function feSave() {
@@ -55941,6 +56001,15 @@ function handleOverlayKeyboardShortcuts(event) {
 }
 
 document.addEventListener('keydown', e => {
+  if (!document.getElementById('feRembgInstallDialog')?.hidden) {
+    if (!e.isComposing && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); feCancelRembgInstall(); }
+    else if (!e.isComposing && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.stopImmediatePropagation(); void feConfirmRembgInstall(); }
+    return;
+  }
+  if (feRembgTaskState && !e.isComposing && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); feRembgTaskClose(); return; }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.stopImmediatePropagation(); void feRembgTaskStart(); return; }
+  }
   if (feWhisperInstallDialogOpen()) {
     if (!e.isComposing && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'Escape') {
       e.preventDefault(); e.stopImmediatePropagation(); feCancelWhisperInstall();
@@ -56405,6 +56474,16 @@ function feUpdateWhisperTaskButton() {
   button.setAttribute('aria-label', button.title);
 }
 
+function feUpdateRembgTaskButton() {
+  const button = document.getElementById('feRembgTaskBtn');
+  if (!button) return;
+  const available = feFileType === 'image' && feImageState.loaded && !!feGetPreviewAgentID() && !!feAgentRelPath && !feAgentRelPath.startsWith('/');
+  button.hidden = !available;
+  button.disabled = !available || feRembgTaskCheckPending;
+  button.title = feRembgTaskCheckPending ? '正在检查 rembg' : '提取图片主体';
+  button.setAttribute('aria-label', button.title);
+}
+
 function feWhisperTaskStatusName(status) {
   switch (String(status || '')) {
     case 'queued': return '排队中';
@@ -56419,6 +56498,25 @@ function feWhisperTaskStatusName(status) {
 function feWhisperTaskFormatTime(value) {
   const date = value ? new Date(value) : null;
   return date && Number.isFinite(date.getTime()) ? date.toLocaleString() : '尚未开始';
+}
+
+const feWhisperTaskDefaultScenario = 'chinese_meeting';
+const feWhisperTaskScenarios = {
+  chinese_meeting: { name: '中文会议', description: '中文会议与访谈，准确率和速度均衡。' },
+  chinese_accurate: { name: '专业转写', description: '适合术语和正式字幕，准确率更高，也更耗时。' },
+  realtime: { name: '低延迟', description: '优先响应速度，适合实时预览。' },
+  batch: { name: '批量处理', description: '适合长音频和批量任务，兼顾吞吐量与质量。' },
+  cpu: { name: 'CPU轻量', description: '适合无独显设备，资源占用较低，处理时间较长。' },
+  mixed_technical: { name: '中英技术', description: '适合中英混说，保留产品名、代码和缩写。' },
+};
+
+function feWhisperTaskScenarioInfo(value) {
+  return feWhisperTaskScenarios[String(value || '')] || feWhisperTaskScenarios[feWhisperTaskDefaultScenario];
+}
+
+function feWhisperTaskScenarioOptions(value) {
+  const selected = Object.prototype.hasOwnProperty.call(feWhisperTaskScenarios, String(value || '')) ? String(value) : feWhisperTaskDefaultScenario;
+  return Object.entries(feWhisperTaskScenarios).map(([id, info]) => '<option value="' + esc(id) + '"' + (id === selected ? ' selected' : '') + '>' + esc(info.name) + '</option>').join('');
 }
 
 function feWhisperTaskSetStatus(message, error) {
@@ -56448,6 +56546,7 @@ function feWhisperTaskRender() {
   const previous = document.getElementById('whisperTaskPreviousPage');
   const next = document.getElementById('whisperTaskNextPage');
   const pageLabel = document.getElementById('whisperTaskPageLabel');
+  const scenarioHint = document.getElementById('whisperTaskScenarioHint');
   const totalPages = Math.max(1, Math.ceil(state.total / state.pageSize));
   if (add) { add.disabled = !!state.importing || !!state.creating || state.pendingPaths.length >= 5; add.textContent = state.importing ? '正在添加…' : '添加'; }
   if (close) close.disabled = !!state.creating;
@@ -56458,11 +56557,18 @@ function feWhisperTaskRender() {
   if (previous) previous.disabled = state.refreshing || state.page <= 1;
   if (next) next.disabled = state.refreshing || state.page >= totalPages;
   if (pageLabel) pageLabel.textContent = '第 ' + state.page + ' / ' + totalPages + ' 页';
-  if (pending) {
-    const paths = state.pendingPaths.map((path, index) => '<div class="whisper-task-pending-item"><div class="whisper-task-path" title="' + esc(path) + '">' + esc(path) + '</div><button type="button" onclick="feWhisperTaskRemovePending(' + index + ')" aria-label="从待加入队列移除">删除</button></div>').join('');
+  // Polling refreshes the task list every 1.2 seconds. Do not replace a native
+  // select while its option menu is open, otherwise macOS closes it immediately.
+  if (pending && !state.scenarioMenuOpen) {
+    const paths = state.pendingPaths.map((item, index) => {
+      const path = String(item && item.path || '');
+      const scenario = feWhisperTaskScenarioInfo(item && item.scenario);
+      return '<div class="whisper-task-pending-item"><div class="whisper-task-path" title="' + esc(path) + '">' + esc(path) + '</div><select class="whisper-task-scenario-select" onpointerdown="feWhisperTaskSetScenarioMenuOpen(true)" onfocus="feWhisperTaskSetScenarioMenuOpen(true)" onblur="feWhisperTaskCloseScenarioMenuIfFocusLost()" onkeydown="if(event.key===&#39;Escape&#39;)window.setTimeout(()=>feWhisperTaskSetScenarioMenuOpen(false),0)" onchange="feWhisperTaskSetPendingScenario(' + index + ',this.value)" aria-label="选择转写场景">' + feWhisperTaskScenarioOptions(item && item.scenario) + '</select><button type="button" onclick="feWhisperTaskRemovePending(' + index + ')" aria-label="从待加入队列移除">删除</button></div>';
+    }).join('');
     pending.hidden = !state.pendingPaths.length;
     pending.innerHTML = '<div class="whisper-task-pending-head">待加入队列（' + state.pendingPaths.length + ' / 5）</div><div class="whisper-task-pending-list">' + paths + '</div>';
   }
+  if (scenarioHint) scenarioHint.textContent = state.pendingPaths.length ? '场景说明：' + feWhisperTaskScenarioInfo(state.scenarioHint).description : '';
   if (list) {
     if (!state.tasks.length) {
       list.innerHTML = '<div class="whisper-task-empty">' + (state.statusFilter ? '当前状态下暂无任务。' : '暂时没有转写任务。添加音频后即可开始提取。') + '</div>';
@@ -56477,9 +56583,10 @@ function feWhisperTaskRender() {
         const selected = !!state.selectedOutputs[String(task.id)];
         const output = String(task.outputPath || '');
         const source = String(task.sourcePath || '');
+		const scenario = feWhisperTaskScenarioInfo(task.scenario);
         const inlineActions = (canUseOutput ? '<button type="button" onclick="feWhisperTaskCopyOutput(' + Number(task.id) + ')">复制</button><button type="button" onclick="feWhisperTaskPreviewOutput(' + Number(task.id) + ')">预览</button>' : '') + (canRestart ? '<button type="button" onclick="feWhisperTaskRestart(' + Number(task.id) + ')">重新开始</button>' : '') + (canCancel ? '<button class="danger" type="button" onclick="feWhisperTaskCancel(' + Number(task.id) + ')">取消</button>' : '') + (canDelete ? '<button class="danger" type="button" onclick="feWhisperTaskDelete(' + Number(task.id) + ')">删除</button>' : '');
         const selector = status === 'completed' ? '<input class="whisper-task-complete-select" type="checkbox" ' + (selected ? 'checked ' : '') + 'onchange="feWhisperTaskToggleSelectedOutput(' + Number(task.id) + ',this.checked)" aria-label="勾选文字文件 ' + esc(source) + '">' : '';
-        return '<article class="whisper-task-row"><div class="whisper-task-row-main"><div class="whisper-task-row-title">' + selector + '<strong title="' + esc(source) + '">' + esc(source) + '</strong><span class="whisper-task-status ' + esc(status) + '">' + feWhisperTaskStatusName(status) + '</span>' + (inlineActions ? '<span class="whisper-task-row-inline-actions">' + inlineActions + '</span>' : '') + '</div><div class="whisper-task-progress"><i style="width:' + progress + '%"></i></div><div class="whisper-task-meta"><span>开始：' + esc(feWhisperTaskFormatTime(task.startedAt || task.createdAt)) + '</span><span class="whisper-task-output" title="' + esc(output) + '">文字：' + esc(output || '等待生成') + '</span></div></div><div class="whisper-task-row-actions"><button type="button" onclick="feWhisperTaskShowLog(' + Number(task.id) + ')">日志</button></div></article>';
+        return '<article class="whisper-task-row"><div class="whisper-task-row-main"><div class="whisper-task-row-title">' + selector + '<strong title="' + esc(source) + '">' + esc(source) + '</strong><span class="whisper-task-status ' + esc(status) + '">' + feWhisperTaskStatusName(status) + '</span>' + (inlineActions ? '<span class="whisper-task-row-inline-actions">' + inlineActions + '</span>' : '') + '</div><div class="whisper-task-progress"><i style="width:' + progress + '%"></i></div><div class="whisper-task-meta"><span>开始：' + esc(feWhisperTaskFormatTime(task.startedAt || task.createdAt)) + '</span><span>场景：' + esc(scenario.name) + '</span><span class="whisper-task-output" title="' + esc(output) + '">文字：' + esc(output || '等待生成') + '</span></div></div><div class="whisper-task-row-actions"><button type="button" onclick="feWhisperTaskShowLog(' + Number(task.id) + ')">日志</button></div></article>';
       }).join('');
     }
   }
@@ -56488,8 +56595,8 @@ function feWhisperTaskRender() {
 
 function feWhisperTaskOpen(agentId, initialPath) {
   feWhisperTaskPreviewReturnState = null;
-  const paths = initialPath ? [String(initialPath)] : [];
-  feWhisperTaskState = { agentId: String(agentId || ''), pendingPaths: paths, tasks: [], selectedOutputs: {}, page: 1, pageSize: 5, total: 0, statusFilter: '', importing: false, creating: false, refreshing: false, poller: null, logTaskID: 0, logRequestSequence: 0, status: '', error: false };
+  const paths = initialPath ? [{ path: String(initialPath), scenario: feWhisperTaskDefaultScenario }] : [];
+  feWhisperTaskState = { agentId: String(agentId || ''), pendingPaths: paths, scenarioHint: feWhisperTaskDefaultScenario, scenarioMenuOpen: false, tasks: [], selectedOutputs: {}, page: 1, pageSize: 5, total: 0, statusFilter: '', importing: false, creating: false, refreshing: false, poller: null, logTaskID: 0, logRequestSequence: 0, status: '', error: false };
   feWhisperTaskCloseLog();
   showExclusiveOverlay(document.getElementById('whisperTaskOverlay'), document.getElementById('whisperTaskPanel'));
   feWhisperTaskRender();
@@ -56614,7 +56721,7 @@ async function feWhisperTaskHandleFiles(files) {
     const result = await uploadItemsToAgentTmp(items.slice(0, remaining), { agentId: state.agentId });
     if (feWhisperTaskState !== state) return;
     const paths = result.uploadedRelPaths.map(path => joinFsPath('tmp', path));
-    paths.forEach(path => { if (!state.pendingPaths.includes(path) && state.pendingPaths.length < 5) state.pendingPaths.push(path); });
+    paths.forEach(path => { if (!state.pendingPaths.some(item => item.path === path) && state.pendingPaths.length < 5) state.pendingPaths.push({ path, scenario: feWhisperTaskDefaultScenario }); });
     state.status = '';
     if (items.length > remaining) state.status = '仅添加前 ' + remaining + ' 个音频文件；待加入队列最多 5 个。';
     vfsLastJson = '';
@@ -56635,7 +56742,34 @@ function feWhisperTaskRemovePending(index) {
   const state = feWhisperTaskState;
   if (!state || state.importing || state.creating || !Number.isInteger(Number(index))) return;
   state.pendingPaths.splice(Number(index), 1);
+  state.scenarioHint = String(state.pendingPaths[0] && state.pendingPaths[0].scenario || feWhisperTaskDefaultScenario);
   feWhisperTaskRender();
+}
+
+function feWhisperTaskSetPendingScenario(index, scenario) {
+  const state = feWhisperTaskState;
+  const item = state && state.pendingPaths[Number(index)];
+  if (!state || !item || state.importing || state.creating) return;
+  state.scenarioMenuOpen = false;
+  item.scenario = String(scenario || feWhisperTaskDefaultScenario);
+  state.scenarioHint = item.scenario;
+  feWhisperTaskRender();
+}
+
+function feWhisperTaskSetScenarioMenuOpen(open) {
+  const state = feWhisperTaskState;
+  if (!state) return;
+  state.scenarioMenuOpen = !!open;
+  if (!open) feWhisperTaskRender();
+}
+
+function feWhisperTaskCloseScenarioMenuIfFocusLost() {
+  window.setTimeout(() => {
+    const state = feWhisperTaskState;
+    if (!state || !state.scenarioMenuOpen || document.activeElement?.classList?.contains('whisper-task-scenario-select')) return;
+    state.scenarioMenuOpen = false;
+    feWhisperTaskRender();
+  }, 0);
 }
 
 async function feWhisperTaskStart() {
@@ -56643,7 +56777,7 @@ async function feWhisperTaskStart() {
   if (!state || state.creating || !state.pendingPaths.length) return;
   state.creating = true;
   try {
-    const response = await fetch('/api/whisper/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agentId: state.agentId, paths: state.pendingPaths }) });
+    const response = await fetch('/api/whisper/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agentId: state.agentId, tasks: state.pendingPaths }) });
     let result = null; try { result = await response.json(); } catch {}
     if (!response.ok || !result || result.status !== 0) throw new Error(result && result.content || '创建任务失败');
     if (feWhisperTaskState !== state) return;
@@ -56813,6 +56947,97 @@ function feWhisperTaskCloseLog() {
   const panel = document.getElementById('whisperTaskLog');
   if (panel) panel.hidden = true;
 }
+
+// Images use the same interaction language as Whisper, but have a separate
+// state and endpoints so their persisted queue remains independently scoped.
+let feRembgTaskPreviewReturnState = null;
+const feRembgDefaultModel = 'u2net';
+const feRembgModels = [
+	{ value: 'u2net', label: '通用', description: '通用前景分割，适合常规人物和物品图片。' },
+  { value: 'u2net_human_seg', label: '人物', description: '针对人物主体优化，适合人像、全身照和头像。' },
+  { value: 'isnet-general-use', label: '通用高质量', description: '通用主体分割质量更高，适合多数物品和复杂主体。' },
+  { value: 'u2netp', label: '轻量快速', description: '轻量且速度更快，适合批量任务，边缘细节相对较少。' },
+  { value: 'u2net_cloth_seg', label: '服饰', description: '识别服装区域，适合服饰分割任务。' },
+  { value: 'silueta', label: '轻量通用', description: '轻量通用模型，适合追求更快处理速度的图片。' },
+  { value: 'isnet-anime', label: '动漫', description: '针对动漫与插画主体优化。' }
+];
+function feRembgModelInfo(model) { return feRembgModels.find(item => item.value === String(model || '').trim()) || feRembgModels[0]; }
+function feRembgTaskParameterHints(model, alphaMatting) { const info = feRembgModelInfo(model); return { model: '模型说明：' + info.description, alpha: alphaMatting ? '边缘优化：已启用；改善毛发、半透明和复杂边缘的透明度，处理时间会更长。' : '边缘优化：未启用；开启后可改善毛发、半透明和复杂边缘。' }; }
+function feRembgTaskModelOptions(model) { return feRembgModels.map(item => '<option value="' + item.value + '"' + (item.value === model ? ' selected' : '') + '>' + esc(item.label) + '</option>').join(''); }
+function feRembgTaskStatusName(status) { return feWhisperTaskStatusName(status); }
+function feRembgTaskFormatTime(value) { return feWhisperTaskFormatTime(value); }
+function feRembgTaskSetStatus(message, error) { const state = feRembgTaskState; if (!state) return; state.status = String(message || ''); state.error = !!error; const el = document.getElementById('rembgTaskStatus'); if (el) { el.textContent = state.status; el.classList.toggle('notice', !!state.status && !state.error); el.classList.toggle('error', state.error); } }
+function feRembgTaskByID(id) { const state = feRembgTaskState; return state && state.tasks.find(task => Number(task.id) === Number(id)); }
+function feRembgTaskRender() {
+  const state = feRembgTaskState; if (!state) return;
+  const totalPages = Math.max(1, Math.ceil(state.total / state.pageSize));
+  const add = document.getElementById('rembgTaskAddBtn'), start = document.getElementById('rembgTaskStartBtn'), close = document.getElementById('rembgTaskCloseBtn'), pending = document.getElementById('rembgTaskPending'), list = document.getElementById('rembgTaskList'), modelHint = document.getElementById('rembgTaskModelHint'), alphaHint = document.getElementById('rembgTaskAlphaHint');
+  if (add) { add.disabled = state.importing || state.creating || state.pendingPaths.length >= 5; add.textContent = state.importing ? '正在添加…' : '添加'; }
+  if (start) { start.disabled = !state.pendingPaths.length || state.importing || state.creating; start.textContent = state.creating ? '正在加入队列…' : '开始'; }
+  if (close) close.disabled = state.creating;
+  const filter = document.getElementById('rembgTaskStatusFilter'); if (filter) filter.value = state.statusFilter;
+  const count = document.getElementById('rembgTaskCount'); if (count) count.textContent = '共 ' + state.total + ' 条';
+  const previous = document.getElementById('rembgTaskPreviousPage'), next = document.getElementById('rembgTaskNextPage'), label = document.getElementById('rembgTaskPageLabel'); if (previous) previous.disabled = state.refreshing || state.page <= 1; if (next) next.disabled = state.refreshing || state.page >= totalPages; if (label) label.textContent = '第 ' + state.page + ' / ' + totalPages + ' 页';
+  if (pending && !state.modelMenuOpen) { const paths = state.pendingPaths.map((item, i) => { const path = String(item && item.path || ''); const model = feRembgModelInfo(item && item.model).value; const alpha = !!(item && item.alphaMatting); return '<div class="whisper-task-pending-item"><div class="whisper-task-path" title="' + esc(path) + '">' + esc(path) + '</div><div class="rembg-task-pending-options"><select class="rembg-task-model-select" onpointerdown="feRembgTaskSetModelMenuOpen(true)" onfocus="feRembgTaskSetModelMenuOpen(true)" onblur="feRembgTaskCloseModelMenuIfFocusLost()" onkeydown="if(event.key===&#39;Escape&#39;)window.setTimeout(()=>feRembgTaskSetModelMenuOpen(false),0)" onchange="feRembgTaskSetPendingModel(' + i + ',this.value)" aria-label="选择提取模型">' + feRembgTaskModelOptions(model) + '</select><label class="rembg-task-alpha-toggle" title="改善毛发、半透明和复杂边缘，处理时间会更长"><input type="checkbox"' + (alpha ? ' checked' : '') + ' onchange="feRembgTaskSetAlphaMatting(' + i + ',this.checked)">边缘优化</label></div><button type="button" onclick="feRembgTaskRemovePending(' + i + ')">删除</button></div>'; }).join(''); pending.hidden = !state.pendingPaths.length; pending.innerHTML = '<div class="whisper-task-pending-head">待加入队列（' + state.pendingPaths.length + ' / 5）</div><div class="whisper-task-pending-list">' + paths + '</div>'; }
+  const parameterHints = state.parameterHint; if (modelHint) modelHint.textContent = parameterHints ? parameterHints.model : ''; if (alphaHint) alphaHint.textContent = parameterHints ? parameterHints.alpha : '';
+  if (list) list.innerHTML = !state.tasks.length ? '<div class="whisper-task-empty">' + (state.statusFilter ? '当前状态下暂无任务。' : '暂时没有图片主体任务。添加图片后即可开始提取。') + '</div>' : state.tasks.map(task => { const status = String(task.status || ''), progress = Math.max(0, Math.min(100, Number(task.progress) || 0)), id = Number(task.id), output = String(task.outputPath || ''), source = String(task.sourcePath || ''), model = feRembgModelInfo(task.model), completed = status === 'completed' && task.savedAs, actions = (completed ? '<button type="button" onclick="feRembgTaskCopyOutput(' + id + ')">复制</button><button type="button" onclick="feRembgTaskPreviewOutput(' + id + ')">预览</button>' : '') + ((status === 'queued' || status === 'running') ? '<button class="danger" type="button" onclick="feRembgTaskCancel(' + id + ')">取消</button>' : '') + (status === 'cancelled' ? '<button type="button" onclick="feRembgTaskRestart(' + id + ')">重新开始</button>' : '') + (status === 'failed' ? '<button class="danger" type="button" onclick="feRembgTaskDelete(' + id + ')">删除</button>' : ''); return '<article class="whisper-task-row"><div class="whisper-task-row-main"><div class="whisper-task-row-title"><strong title="' + esc(source) + '">' + esc(source) + '</strong><span class="whisper-task-status ' + esc(status) + '">' + feRembgTaskStatusName(status) + '</span><span class="whisper-task-row-inline-actions">' + actions + '</span></div><div class="whisper-task-progress"><i style="width:' + progress + '%"></i></div><div class="whisper-task-meta"><span>开始：' + esc(feRembgTaskFormatTime(task.startedAt || task.createdAt)) + '</span><span>模型：' + esc(model.label) + (task.alphaMatting ? ' + 边缘优化' : '') + '</span><span class="whisper-task-output" title="' + esc(output) + '">图片：' + esc(output || '等待生成') + '</span></div></div><div class="whisper-task-row-actions"><button type="button" onclick="feRembgTaskShowLog(' + id + ')">日志</button></div></article>'; }).join('');
+  feRembgTaskSetStatus(state.status, state.error);
+}
+function feRembgTaskOpen(agentId, initialPath) { const parameterHint=initialPath ? feRembgTaskParameterHints(feRembgDefaultModel,false) : null; feRembgTaskPreviewReturnState = null; feRembgTaskState = {agentId:String(agentId || ''), pendingPaths:initialPath ? [{path:String(initialPath),model:feRembgDefaultModel,alphaMatting:false}] : [], modelMenuOpen:false, tasks:[], page:1, pageSize:5, total:0, statusFilter:'', importing:false, creating:false, refreshing:false, poller:null, logTaskID:0, logRequestSequence:0, parameterHint, status:'', error:false}; feRembgTaskCloseLog(); showExclusiveOverlay(document.getElementById('rembgTaskOverlay'), document.getElementById('rembgTaskPanel')); feRembgTaskRender(); void feRembgTaskRefresh(); feRembgTaskState.poller = window.setInterval(() => void feRembgTaskRefresh(), 1200); window.setTimeout(() => document.getElementById('rembgTaskAddBtn')?.focus({preventScroll:true}), 0); }
+function feRembgTaskClose(options = {}) { const state = feRembgTaskState; if (!state) return; if (state.poller) window.clearInterval(state.poller); feRembgTaskState = null; if (!options.preservePreviewReturn) feRembgTaskPreviewReturnState = null; setOverlayVisible(document.getElementById('rembgTaskOverlay'), false, document.getElementById('rembgTaskPanel')); }
+function feRembgTaskRestoreAfterPreview() { const state = feRembgTaskPreviewReturnState; if (!state || feRembgTaskState) return; feRembgTaskPreviewReturnState = null; state.refreshing = false; state.poller = null; feRembgTaskState = state; showExclusiveOverlay(document.getElementById('rembgTaskOverlay'), document.getElementById('rembgTaskPanel')); feRembgTaskRender(); void feRembgTaskRefresh(); state.poller = window.setInterval(() => void feRembgTaskRefresh(), 1200); }
+async function feRembgTaskRefresh() { const state = feRembgTaskState; if (!state || state.refreshing || !state.agentId) return; state.refreshing = true; try { const query = new URLSearchParams({agentId:state.agentId,page:String(state.page)}); if (state.statusFilter) query.set('status',state.statusFilter); const response = await fetch('/api/rembg/tasks?' + query, {cache:'no-store'}); const result = await response.json(); if (!response.ok || !result || result.status !== 0) throw new Error(result && result.content || '读取任务失败'); if (feRembgTaskState !== state) return; state.tasks = Array.isArray(result.tasks) ? result.tasks : []; state.total = Math.max(0,Number(result.total)||0); state.pageSize = Math.max(1,Number(result.pageSize)||5); state.page = Math.max(1,Number(result.page)||1); state.statusFilter = String(result.taskStatus || state.statusFilter || ''); if (state.logTaskID) void feRembgTaskRefreshLog(state,state.logTaskID); } catch (error) { if (feRembgTaskState === state) feRembgTaskSetStatus('刷新任务失败：' + ((error && error.message) || '请重试'),true); } finally { if (feRembgTaskState === state) { state.refreshing=false; feRembgTaskRender(); } } }
+function feRembgTaskChangeStatus(status) { const state=feRembgTaskState; if (!state || state.refreshing) return; state.statusFilter=String(status||''); state.page=1; feRembgTaskCloseLog(); void feRembgTaskRefresh(); }
+function feRembgTaskChangePage(offset) { const state=feRembgTaskState; if (!state || state.refreshing) return; const page=Math.max(1,Math.min(Math.max(1,Math.ceil(state.total/state.pageSize)),state.page+Number(offset||0))); if(page!==state.page){state.page=page;feRembgTaskCloseLog();void feRembgTaskRefresh();} }
+function feRembgTaskChooseFiles() { const state=feRembgTaskState; if(state&&!state.importing&&!state.creating) document.getElementById('rembgTaskFileInput')?.click(); }
+function feRembgImageItem(item) { const file=item&&item.file, name=String((item&&item.relativePath)||(file&&file.name)||''); return !!(file&&/^image\//i.test(String(file.type||''))) || /\.(png|jpe?g|webp|gif|bmp|tiff?)$/i.test(name); }
+async function feRembgTaskHandleFiles(files) { const input=document.getElementById('rembgTaskFileInput'), state=feRembgTaskState; try { const items=normalizeUploadFileItems(files).filter(feRembgImageItem); if(!state||!items.length){if(state)feRembgTaskSetStatus('请选择图片文件。',true);return;} const remaining=5-state.pendingPaths.length; if(remaining<=0){feRembgTaskSetStatus('待加入队列最多 5 个图片文件。',true);return;} state.importing=true;feRembgTaskSetStatus('正在添加图片文件…',false);feRembgTaskRender(); const result=await uploadItemsToAgentTmp(items.slice(0,remaining),{agentId:state.agentId}); if(feRembgTaskState!==state)return; result.uploadedRelPaths.map(path=>joinFsPath('tmp',path)).forEach(path=>{if(!state.pendingPaths.some(item=>item.path===path)&&state.pendingPaths.length<5)state.pendingPaths.push({path,model:feRembgDefaultModel,alphaMatting:false})}); state.parameterHint=state.pendingPaths.length?feRembgTaskParameterHints(feRembgDefaultModel,false):null; state.status=items.length>remaining?'仅添加前 '+remaining+' 个图片文件；待加入队列最多 5 个。':''; state.error=false; vfsLastJson='';void vfsRefresh(); } catch(error) { if(feRembgTaskState===state)feRembgTaskSetStatus('添加文件失败：'+((error&&error.message)||'请重试'),true); } finally { if(feRembgTaskState===state){state.importing=false;feRembgTaskRender();}if(input)input.value=''; } }
+function feRembgTaskSetPendingModel(index, model) { const state=feRembgTaskState, item=state&&state.pendingPaths[Number(index)], info=feRembgModelInfo(model); if(!state||!item||state.importing||state.creating)return; state.modelMenuOpen=false; item.model=info.value; state.parameterHint=feRembgTaskParameterHints(item.model,item.alphaMatting); feRembgTaskSetStatus('',false); feRembgTaskRender(); }
+function feRembgTaskSetModelMenuOpen(open) { const state=feRembgTaskState; if(!state)return; state.modelMenuOpen=!!open; if(!open)feRembgTaskRender(); }
+function feRembgTaskCloseModelMenuIfFocusLost() { window.setTimeout(()=>{const state=feRembgTaskState;if(!state||!state.modelMenuOpen||document.activeElement?.classList?.contains('rembg-task-model-select'))return;state.modelMenuOpen=false;feRembgTaskRender();},0); }
+function feRembgTaskSetAlphaMatting(index, alphaMatting) { const state=feRembgTaskState, item=state&&state.pendingPaths[Number(index)]; if(!state||!item||state.importing||state.creating)return; item.alphaMatting=!!alphaMatting; state.parameterHint=feRembgTaskParameterHints(item.model,item.alphaMatting); feRembgTaskSetStatus('',false); feRembgTaskRender(); }
+function feRembgTaskRemovePending(index) { const state=feRembgTaskState;if(state&&!state.importing&&!state.creating) {state.pendingPaths.splice(Number(index),1);const item=state.pendingPaths[0];state.parameterHint=item?feRembgTaskParameterHints(item.model,item.alphaMatting):null;feRembgTaskRender();} }
+async function feRembgTaskRequest(path,id) { const state=feRembgTaskState; const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agentId:state.agentId,id:Number(id)})}); const result=await response.json(); if(!response.ok||!result||result.status!==0)throw new Error(result&&result.content||'请求失败'); }
+async function feRembgTaskStart() { const state=feRembgTaskState;if(!state||state.creating||!state.pendingPaths.length)return;state.creating=true;try{const response=await fetch('/api/rembg/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agentId:state.agentId,tasks:state.pendingPaths})});const result=await response.json();if(!response.ok||!result||result.status!==0)throw new Error(result&&result.content||'创建任务失败');if(feRembgTaskState!==state)return;state.pendingPaths=[];state.parameterHint='';state.status='已加入图片主体提取队列；缺失的模型会在任务执行时自动下载。';state.error=false;await feRembgTaskRefresh();}catch(error){if(feRembgTaskState===state)feRembgTaskSetStatus('创建任务失败：'+((error&&error.message)||'请重试'),true)}finally{if(feRembgTaskState===state){state.creating=false;feRembgTaskRender();}} }
+async function feRembgTaskCancel(id) { try{await feRembgTaskRequest('/api/rembg/tasks/cancel',id);feRembgTaskSetStatus('已请求取消任务。',false);await feRembgTaskRefresh();}catch(error){feRembgTaskSetStatus('取消任务失败：'+((error&&error.message)||'请重试'),true)} }
+async function feRembgTaskRestart(id) { try{await feRembgTaskRequest('/api/rembg/tasks/restart',id);feRembgTaskSetStatus('已重新加入图片主体提取队列。',false);await feRembgTaskRefresh();}catch(error){feRembgTaskSetStatus('重新开始任务失败：'+((error&&error.message)||'请重试'),true)} }
+async function feRembgTaskDelete(id) { try{await feRembgTaskRequest('/api/rembg/tasks/delete',id);feRembgTaskSetStatus('失败任务已删除。',false);await feRembgTaskRefresh();}catch(error){feRembgTaskSetStatus('删除失败任务失败：'+((error&&error.message)||'请重试'),true)} }
+async function feRembgTaskCopyOutput(id) { const task=feRembgTaskByID(id), path=String(task&&task.savedAs||'').trim(); if(!path)return;try{await copyTextToClipboard(path);feRembgTaskSetStatus('图片绝对路径已复制',false)}catch(error){feRembgTaskSetStatus('复制图片路径失败：'+((error&&error.message)||'请重试'),true)} }
+async function feRembgTaskPreviewOutput(id) {
+  const state = feRembgTaskState;
+  const task = feRembgTaskByID(id);
+  const outputPath = String(task && task.outputPath || '').trim();
+  if (!state || !outputPath || outputPath.startsWith('/')) return;
+  try {
+    // PNG is binary data. Verify it through the Agent-scoped media endpoint
+    // instead of /api/data, which is intentionally reserved for text files.
+    const response = await fetch('/api/media_preview?agentId=' + encodeURIComponent(state.agentId) + '&path=' + encodeURIComponent(outputPath), { method: 'HEAD', cache: 'no-store' });
+    if (!response.ok) {
+      const message = (await response.text()).trim();
+      throw new Error(message || '图片文件已删除，无法预览');
+    }
+    const workspaceRoot = await getWorkspaceForAgent(state.agentId);
+    if (!workspaceRoot) throw new Error('无法确定当前 Agent 工作目录');
+    if (feRembgTaskState !== state) return;
+    feRembgTaskPreviewReturnState = state;
+    feRembgTaskClose({ preservePreviewReturn: true });
+    await feOpen(joinFsPath(workspaceRoot, outputPath), { agentId: state.agentId, workspaceRoot });
+  } catch (error) {
+    if (feRembgTaskPreviewReturnState === state && !feRembgTaskState) {
+      feRembgTaskRestoreAfterPreview();
+      feRembgTaskSetStatus('预览图片失败：' + ((error && error.message) || '请重试'), true);
+    } else if (feRembgTaskState === state) {
+      feRembgTaskSetStatus('预览图片失败：' + ((error && error.message) || '请重试'), true);
+    }
+  }
+}
+async function feRembgTaskShowLog(id) { const state=feRembgTaskState;if(!state)return;state.logTaskID=Number(id);const panel=document.getElementById('rembgTaskLog'),title=document.getElementById('rembgTaskLogTitle'),text=document.getElementById('rembgTaskLogText');if(panel){panel.hidden=false;window.requestAnimationFrame(()=>panel.scrollIntoView({behavior:'smooth',block:'start'}));}if(title)title.textContent='任务 #'+id+' 执行日志';if(text)text.textContent='正在读取日志…';void feRembgTaskRefreshLog(state,id); }
+async function feRembgTaskRefreshLog(state,id) { const taskID=Number(id);if(!state||feRembgTaskState!==state||state.logTaskID!==taskID)return;const request=++state.logRequestSequence,text=document.getElementById('rembgTaskLogText');try{const response=await fetch('/api/rembg/tasks/log?agentId='+encodeURIComponent(state.agentId)+'&id='+taskID,{cache:'no-store'}),result=await response.json();if(!response.ok||!result||result.status!==0||!result.task)throw new Error(result&&result.content||'读取日志失败');if(feRembgTaskState===state&&state.logTaskID===taskID&&state.logRequestSequence===request&&text){text.textContent=String(result.task.logs||'暂无执行日志。');text.scrollTop=text.scrollHeight;}}catch(error){if(feRembgTaskState===state&&state.logTaskID===taskID&&state.logRequestSequence===request&&text)text.textContent='读取日志失败：'+((error&&error.message)||'请重试');} }
+function feRembgTaskCloseLog() { const state=feRembgTaskState;if(state){state.logTaskID=0;state.logRequestSequence++;}const panel=document.getElementById('rembgTaskLog');if(panel)panel.hidden=true; }
+async function feOpenRembgTasks() { if(feRembgTaskCheckPending)return;const agentId=String(feGetPreviewAgentID()||'').trim(),source=String(feAgentRelPath||'').trim();if(feFileType!=='image'||!agentId||!source||source.startsWith('/')){feSetMediaStatus('无法确定当前 Agent 工作目录中的图片文件');return;}feRembgTaskCheckPending=true;feUpdateRembgTaskButton();try{const result=await feCheckExternalDependency('/api/rembg/check','正在检查 rembg，请稍候…');if(!result.available){feShowRembgInstallDialog(result.install);return;}feRembgTaskOpen(agentId,source);}catch(error){feSetMediaStatus('rembg 检查失败：'+((error&&error.message)||'请重试'));}finally{feRembgTaskCheckPending=false;feUpdateRembgTaskButton();} }
+function feShowRembgInstallDialog(request) { request=String(request||'').trim();if(!request){feSetMediaStatus('rembg 安装请求配置为空');return;}feRembgInstallRequest=request;const dialog=document.getElementById('feRembgInstallDialog'),button=document.getElementById('feRembgInstallConfirmBtn');if(dialog)dialog.hidden=false;window.setTimeout(()=>button?.focus({preventScroll:true}),0); }
+function feCancelRembgInstall() { const dialog=document.getElementById('feRembgInstallDialog');if(dialog)dialog.hidden=true;feRembgInstallRequest=''; }
+async function feConfirmRembgInstall() { const request=String(feRembgInstallRequest||'').trim();if(!request)return;feCancelRembgInstall();feClose();const sent=await sendCenterMessage(request,{clearInputAfterSend:false,toastOnSuccess:'',requestSource:'rembg_install'});if(!sent)vfsShowUploadToast('未能发送 rembg 安装请求，请检查当前 Chat',true); }
 
 function feUpdateVideoTrimButton() {
   const button = document.getElementById('feVideoTrimBtn');

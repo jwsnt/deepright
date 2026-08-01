@@ -13,6 +13,8 @@
 }
 ```
 
+`check` 必须是正整数小时，`install` 必须是非空的安装请求文本；两项均由活动配置显式提供。配置缺失或格式无效时，检查接口会返回可展示的错误，不会猜测默认配置或代为安装。
+
 `GET /api/whisper/check` 会验证受控运行环境中的 `whisper` 命令存在且可启动；macOS 同时会识别当前用户的 `~/Library/Python/*/bin/whisper` 安装位置，避免桌面应用未继承终端 `PATH` 时误报未安装。成功检测会按 `check` 的小时数缓存；命令缺失、失效、配置无效或检查失败不会缓存，接口会返回安装请求，且不会在服务端执行安装。
 
 Integration 在启动时会构建统一的命令环境，并由 Whisper/FFmpeg 检查、Integration 的 `cmd` 请求、`CLI_SANDBOX` 和 `cli/get` 任务执行共同继承。这个 `PATH` 会动态合并系统、登录 Shell、启动服务、常见用户目录以及 macOS 当前用户已存在的 `~/Library/Python/*/bin`，因此用户通过 `pip --user` 安装的 `whisper` 不需要写死用户目录或 Python 版本；依赖检查成功后，实际任务会在同一环境中查找该命令。
@@ -34,3 +36,5 @@ Integration 在启动时会构建统一的命令环境，并由 Whisper/FFmpeg �
 每项任务的输出固定在当前 Agent 工作目录的 `whisper/` 中，优先使用与源文件同名的 `.txt` 文件，例如 `audios/demo.mp3` 输出到 `whisper/demo.txt`。已有同名文本或任务输出不会被覆盖，系统会自动追加时间戳（必要时追加序号）生成新文件名。Whisper 输出会尽可能解析为百分比进度，无法识别时仍会保持“执行中”。
 
 执行时会使用运行同一 Whisper Python 环境探测 CUDA 与 Apple MPS；验证到 CUDA 时优先 CUDA，验证到 MPS 时优先 MPS，不能验证 GPU 时自动使用 CPU，并在任务日志中记录选择原因。若实际加载模型或转写时 GPU 后端不受当前 Whisper 环境支持，系统会保留该次输出并自动用 CPU 重试一次；仅当 CPU 重试也失败时才将任务标记为失败。
+
+任务日志会与状态和进度一并持久化，并限制单个任务的存储量，避免异常子进程输出无限增长；进度无法从 Whisper 输出可靠解析时，任务仍显示为执行中，不会伪造百分比。

@@ -48,21 +48,28 @@ func TestApplySystemPathMergesUnixShellAndSystemPaths(t *testing.T) {
 	}
 }
 
-func TestApplySystemPathIncludesDarwinUserPythonBins(t *testing.T) {
+func TestApplySystemPathIncludesDarwinPythonRuntimeBins(t *testing.T) {
 	resetSystemPathTestHooks(t)
 
 	t.Setenv("PATH", "/usr/bin")
+	t.Setenv("VIRTUAL_ENV", "/Users/tester/.virtualenvs/active")
+	t.Setenv("PYENV_ROOT", "/Users/tester/.pyenv")
 	systemPathRuntimeGOOS = "darwin"
 	systemPathUserHomeFn = func() (string, error) { return "/Users/tester", nil }
 	systemPathGlobFn = func(pattern string) ([]string, error) {
-		want := "/Users/tester/Library/Python/*/bin"
-		if pattern != want {
-			t.Fatalf("Glob pattern = %q, want %q", pattern, want)
+		switch pattern {
+		case "/Users/tester/Library/Python/*/bin":
+			return []string{
+				"/Users/tester/Library/Python/3.9/bin",
+				"/Users/tester/Library/Python/3.13/bin",
+			}, nil
+		case "/Users/tester/.pyenv/versions/*/bin":
+			return []string{"/Users/tester/.pyenv/versions/3.12/bin"}, nil
+		case "/Library/Frameworks/Python.framework/Versions/*/bin":
+			return []string{"/Library/Frameworks/Python.framework/Versions/3.12/bin"}, nil
+		default:
+			return nil, nil
 		}
-		return []string{
-			"/Users/tester/Library/Python/3.9/bin",
-			"/Users/tester/Library/Python/3.13/bin",
-		}, nil
 	}
 	systemPathCommandFn = func(string, ...string) ([]byte, error) { return nil, nil }
 
@@ -70,8 +77,11 @@ func TestApplySystemPathIncludesDarwinUserPythonBins(t *testing.T) {
 
 	parts := splitPathEntries(os.Getenv("PATH"))
 	for _, want := range []string{
+		"/Users/tester/.virtualenvs/active/bin",
 		"/Users/tester/Library/Python/3.9/bin",
 		"/Users/tester/Library/Python/3.13/bin",
+		"/Users/tester/.pyenv/versions/3.12/bin",
+		"/Library/Frameworks/Python.framework/Versions/3.12/bin",
 	} {
 		if !containsPathEntry(parts, want) {
 			t.Fatalf("PATH = %q, want %q", os.Getenv("PATH"), want)

@@ -438,7 +438,7 @@ func printIntegrationAPIWhisperHelp(stdout io.Writer) {
 	fmt.Fprintln(stdout, "Examples:")
 	fmt.Fprintln(stdout, "  integration api whisper check")
 	fmt.Fprintln(stdout, "  integration api whisper list --agentId demo-agent --status running --page 1")
-	fmt.Fprintln(stdout, "  integration api whisper create --agentId demo-agent --path audios/meeting.mp3 --path audios/intro.m4a")
+	fmt.Fprintln(stdout, "  integration api whisper create --agentId demo-agent --path audios/meeting.mp3 --scenario chinese_meeting")
 	fmt.Fprintln(stdout, "  integration api whisper cancel --agentId demo-agent --id 12")
 	fmt.Fprintln(stdout, "  integration api whisper log --agentId demo-agent --id 12")
 }
@@ -446,7 +446,7 @@ func printIntegrationAPIWhisperHelp(stdout io.Writer) {
 func runIntegrationAPIWhisperCreateCLI(args []string, stdout, stderr io.Writer) int {
 	fs, addr, port, output, pretty := newIntegrationAPICommonFlagSet(
 		"integration api whisper create",
-		"integration api whisper create --agentId ID --path AUDIO_PATH [--path AUDIO_PATH ...] [--addr URL] [--port 8080]",
+		"integration api whisper create --agentId ID --path AUDIO_PATH [--path AUDIO_PATH ...] [--scenario SCENARIO] [--addr URL] [--port 8080]",
 		"Call POST /api/whisper/tasks. Each path must be an audio file under the Agent workspace.",
 		stderr,
 	)
@@ -454,6 +454,7 @@ func runIntegrationAPIWhisperCreateCLI(args []string, stdout, stderr io.Writer) 
 	fs.StringVar(agentID, "agent", "", "agent id")
 	var paths integrationStringSliceFlag
 	fs.Var(&paths, "path", "workspace-relative audio path; may be repeated")
+	scenario := fs.String("scenario", "", "transcription scenario: chinese_meeting, chinese_accurate, realtime, batch, cpu, or mixed_technical")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
@@ -479,7 +480,7 @@ func runIntegrationAPIWhisperCreateCLI(args []string, stdout, stderr io.Writer) 
 		fmt.Fprintln(stderr, "at least one --path is required")
 		return 1
 	}
-	body, err := json.Marshal(whisperTaskCreateRequest{AgentID: *agentID, Paths: cleanedPaths})
+	body, err := json.Marshal(whisperTaskCreateRequest{AgentID: *agentID, Paths: cleanedPaths, Scenario: strings.TrimSpace(*scenario)})
 	if err != nil {
 		fmt.Fprintln(stderr, err.Error())
 		return 1

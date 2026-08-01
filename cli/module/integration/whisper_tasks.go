@@ -21,12 +21,22 @@ import (
 )
 
 const (
+	whisperScenarioChineseMeeting  = "chinese_meeting"
+	whisperScenarioChineseAccurate = "chinese_accurate"
+	whisperScenarioRealtime        = "realtime"
+	whisperScenarioBatch           = "batch"
+	whisperScenarioCPU             = "cpu"
+	whisperScenarioMixedTechnical  = "mixed_technical"
+
 	whisperTaskStatusQueued    = "queued"
 	whisperTaskStatusRunning   = "running"
 	whisperTaskStatusCompleted = "completed"
 	whisperTaskStatusCancelled = "cancelled"
 	whisperTaskStatusFailed    = "failed"
 	whisperTaskLogLimit        = 128 * 1024
+	// Loading Whisper may initialize native Python/ML dependencies on a cold
+	// start, so dependency detection allows one minute before declaring it absent.
+	whisperProbeTimeout = time.Minute
 )
 
 // WhisperCheckResponse intentionally mirrors the narrow FFmpeg check response:
@@ -50,6 +60,7 @@ type whisperTask struct {
 	SourcePath  string `json:"sourcePath"`
 	OutputPath  string `json:"outputPath,omitempty"`
 	SavedAs     string `json:"savedAs,omitempty"`
+	Scenario    string `json:"scenario"`
 	Status      string `json:"status"`
 	Progress    int    `json:"progress"`
 	StartedAt   string `json:"startedAt,omitempty"`
@@ -60,8 +71,73 @@ type whisperTask struct {
 }
 
 type whisperTaskCreateRequest struct {
-	AgentID string   `json:"agentId"`
-	Paths   []string `json:"paths"`
+	AgentID string                  `json:"agentId"`
+	Tasks   []whisperTaskCreateItem `json:"tasks,omitempty"`
+	// Paths and Scenario preserve compatibility with clients from before
+	// per-file scenarios were introduced.
+	Paths    []string `json:"paths,omitempty"`
+	Scenario string   `json:"scenario,omitempty"`
+}
+
+type whisperTaskCreateItem struct {
+	Path     string `json:"path"`
+	Scenario string `json:"scenario,omitempty"`
+}
+
+type whisperScenario struct {
+	ID                      string
+	Name                    string
+	Model                   string
+	Language                string
+	Task                    string
+	Temperature             float64
+	BeamSize                int
+	ConditionOnPreviousText bool
+	InitialPrompt           string
+	ForceCPU                bool
+}
+
+func whisperScenarioFor(raw string) (whisperScenario, bool) {
+	switch strings.TrimSpace(raw) {
+	case "", whisperScenarioChineseMeeting:
+		return whisperScenario{ID: whisperScenarioChineseMeeting, Name: "中文会议", Model: "small", Language: "zh", Task: "transcribe", Temperature: 0, BeamSize: 5, ConditionOnPreviousText: true}, true
+	case whisperScenarioChineseAccurate:
+		return whisperScenario{ID: whisperScenarioChineseAccurate, Name: "专业转写", Model: "large-v3", Language: "zh", Task: "transcribe", Temperature: 0, BeamSize: 5, ConditionOnPreviousText: true, InitialPrompt: "以下内容为中文专业访谈，请准确保留人名、产品名、英文缩写及专业术语。"}, true
+	case whisperScenarioRealtime:
+		return whisperScenario{ID: whisperScenarioRealtime, Name: "低延迟", Model: "base", Language: "zh", Task: "transcribe", Temperature: 0, BeamSize: 1, ConditionOnPreviousText: false}, true
+	case whisperScenarioBatch:
+		return whisperScenario{ID: whisperScenarioBatch, Name: "批量处理", Model: "small", Language: "zh", Task: "transcribe", Temperature: 0, BeamSize: 3, ConditionOnPreviousText: true}, true
+	case whisperScenarioCPU:
+		return whisperScenario{ID: whisperScenarioCPU, Name: "CPU轻量", Model: "base", Language: "zh", Task: "transcribe", Temperature: 0, BeamSize: 1, ConditionOnPreviousText: true, ForceCPU: true}, true
+	case whisperScenarioMixedTechnical:
+		return whisperScenario{ID: whisperScenarioMixedTechnical, Name: "中英技术", Model: "medium", Language: "zh", Task: "transcribe", Temperature: 0, BeamSize: 5, ConditionOnPreviousText: true, InitialPrompt: "以下是中英混合的技术讨论。请保留英文产品名、代码名、API、缩写和数字，例如 GPT、Python、Docker、API。"}, true
+	default:
+		return whisperScenario{}, false
+	}
+}
+
+// Whisper's command-line parser accepts title-cased boolean literals only.
+func whisperCLIBoolean(value bool) string {
+	if value {
+		return "True"
+	}
+	return "False"
+}
+
+func whisperScenarioLogParameters(scenario whisperScenario, device string) string {
+	parameters := []string{
+		"model=" + scenario.Model,
+		"language=" + scenario.Language,
+		"task=" + scenario.Task,
+		"temperature=" + strconv.FormatFloat(scenario.Temperature, 'f', -1, 64),
+		"beam_size=" + strconv.Itoa(scenario.BeamSize),
+		"condition_on_previous_text=" + whisperCLIBoolean(scenario.ConditionOnPreviousText),
+		"fp16=" + whisperCLIBoolean(device != "cpu"),
+	}
+	if scenario.InitialPrompt != "" {
+		parameters = append(parameters, "initial_prompt=已设置")
+	}
+	return strings.Join(parameters, ", ")
 }
 
 type whisperTaskCancelRequest struct {
@@ -128,6 +204,7 @@ func ensureWhisperTaskSchema(db *sql.DB) error {
 			source_path TEXT NOT NULL,
 			output_path TEXT NOT NULL DEFAULT '',
 			saved_as TEXT NOT NULL DEFAULT '',
+			scenario TEXT NOT NULL DEFAULT 'chinese_meeting',
 			status TEXT NOT NULL DEFAULT 'queued',
 			progress INTEGER NOT NULL DEFAULT 0,
 			started_at TEXT NOT NULL DEFAULT '',
@@ -139,6 +216,36 @@ func ensureWhisperTaskSchema(db *sql.DB) error {
 		CREATE INDEX IF NOT EXISTS idx_whisper_task_agent_created ON whisper_task(agent_id, id DESC);
 		CREATE INDEX IF NOT EXISTS idx_whisper_task_queue ON whisper_task(status, cancel_requested, id);
 	`)
+	if err != nil {
+		return err
+	}
+	// The original table did not retain task-specific transcription options.
+	// Add the scenario column for existing databases without discarding queued
+	// tasks; they continue with the default Chinese meeting profile.
+	columns := map[string]bool{}
+	rows, err := db.Query(`PRAGMA table_info(whisper_task)`)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var cid, notNull, pk int
+		var name, typ string
+		var defaultValue interface{}
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &defaultValue, &pk); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		columns[name] = true
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	if !columns["scenario"] {
+		if _, err := db.Exec(`ALTER TABLE whisper_task ADD COLUMN scenario TEXT NOT NULL DEFAULT 'chinese_meeting'`); err != nil {
+			return err
+		}
+	}
+	_, err = db.Exec(`UPDATE whisper_task SET scenario = ? WHERE trim(scenario) = ''`, whisperScenarioChineseMeeting)
 	return err
 }
 
@@ -230,7 +337,7 @@ func whisperExecutablePath(cacheFor time.Duration) (string, bool) {
 	// Verify that the same command which will run a task can start normally,
 	// so the UI can offer installation before it opens the task dialog.
 	for _, whisperPath := range candidates {
-		probeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		probeCtx, cancel := context.WithTimeout(context.Background(), whisperProbeTimeout)
 		err := whisperTaskCommandContext(probeCtx, whisperPath, "--help").Run()
 		timedOut := probeCtx.Err() != nil
 		cancel()
@@ -370,7 +477,7 @@ func (manager *whisperTaskManager) claimNextTask() (*whisperTask, error) {
 		return nil, err
 	}
 	defer tx.Rollback()
-	row := tx.QueryRow(`SELECT id, agent_id, source_path, output_path, saved_as, status, progress, started_at, created_at, updated_at, logs, cancel_requested
+	row := tx.QueryRow(`SELECT id, agent_id, source_path, output_path, saved_as, scenario, status, progress, started_at, created_at, updated_at, logs, cancel_requested
 		FROM whisper_task WHERE status = ? AND cancel_requested = 0 ORDER BY id LIMIT 1`, whisperTaskStatusQueued)
 	task, err := scanWhisperTask(row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -417,7 +524,13 @@ func (manager *whisperTaskManager) executeTask(parent context.Context, task whis
 		manager.mu.Unlock()
 	}()
 
-	manager.appendLog(task.ID, "开始使用 Whisper base 模型提取文字。")
+	scenario, valid := whisperScenarioFor(task.Scenario)
+	if !valid {
+		manager.finishTask(task.ID, whisperTaskStatusFailed, 0, "", "提取失败：任务场景无效。")
+		return
+	}
+	task.Scenario = scenario.ID
+	manager.appendLog(task.ID, "开始使用 Whisper 转写。场景："+scenario.Name+"。")
 	if err := manager.transcribe(ctx, task); err != nil {
 		if manager.isCancelled(task.ID) || errors.Is(ctx.Err(), context.Canceled) {
 			manager.finishTask(task.ID, whisperTaskStatusCancelled, 0, "", "任务已取消。")
@@ -432,6 +545,10 @@ func (manager *whisperTaskManager) executeTask(parent context.Context, task whis
 func (manager *whisperTaskManager) transcribe(ctx context.Context, task whisperTask) error {
 	if manager == nil || manager.cfg == nil {
 		return errors.New("服务配置不可用")
+	}
+	scenario, valid := whisperScenarioFor(task.Scenario)
+	if !valid {
+		return errors.New("任务场景无效")
 	}
 	whisperPath, available := whisperExecutablePath(time.Hour)
 	if !available {
@@ -477,17 +594,22 @@ func (manager *whisperTaskManager) transcribe(ctx context.Context, task whisperT
 	}
 	defer os.RemoveAll(temporaryDirectory)
 
-	device, deviceReason := whisperTaskPreferredDevice(ctx, whisperPath)
+	device, deviceReason := "cpu", ""
+	if scenario.ForceCPU {
+		deviceReason = "场景“CPU轻量”指定使用 CPU。"
+	} else {
+		device, deviceReason = whisperTaskPreferredDevice(ctx, whisperPath)
+	}
 	if deviceReason != "" {
 		manager.appendLog(task.ID, deviceReason)
 	}
-	if err := manager.runWhisperTranscription(ctx, task.ID, whisperPath, sourcePath, temporaryDirectory, device); err != nil {
+	if err := manager.runWhisperTranscription(ctx, task.ID, whisperPath, sourcePath, temporaryDirectory, device, scenario); err != nil {
 		if ctx.Err() != nil {
 			return context.Canceled
 		}
 		if device == "cuda" || device == "mps" {
 			manager.appendLog(task.ID, "Whisper 无法使用 "+strings.ToUpper(device)+" 完成转写，已自动回退到 CPU 重新尝试。")
-			if retryErr := manager.runWhisperTranscription(ctx, task.ID, whisperPath, sourcePath, temporaryDirectory, "cpu"); retryErr == nil {
+			if retryErr := manager.runWhisperTranscription(ctx, task.ID, whisperPath, sourcePath, temporaryDirectory, "cpu", scenario); retryErr == nil {
 				manager.appendLog(task.ID, "Whisper 已使用 CPU 回退完成。")
 			} else {
 				if ctx.Err() != nil {
@@ -513,11 +635,20 @@ func (manager *whisperTaskManager) transcribe(ctx context.Context, task whisperT
 	return nil
 }
 
-func (manager *whisperTaskManager) runWhisperTranscription(ctx context.Context, taskID int64, whisperPath, sourcePath, temporaryDirectory, device string) error {
-	args := []string{sourcePath, "--model", "base", "--output_dir", temporaryDirectory, "--output_format", "txt", "--device", device}
+func (manager *whisperTaskManager) runWhisperTranscription(ctx context.Context, taskID int64, whisperPath, sourcePath, temporaryDirectory, device string, scenario whisperScenario) error {
+	args := []string{sourcePath, "--model", scenario.Model, "--output_dir", temporaryDirectory, "--output_format", "txt", "--device", device,
+		"--language", scenario.Language, "--task", scenario.Task,
+		"--temperature", strconv.FormatFloat(scenario.Temperature, 'f', -1, 64),
+		"--beam_size", strconv.Itoa(scenario.BeamSize),
+		"--condition_on_previous_text", whisperCLIBoolean(scenario.ConditionOnPreviousText),
+	}
+	if scenario.InitialPrompt != "" {
+		args = append(args, "--initial_prompt", scenario.InitialPrompt)
+	}
 	if device == "cpu" {
 		args = append(args, "--fp16", "False")
 	}
+	manager.appendLog(taskID, "本次转写参数："+whisperScenarioLogParameters(scenario, device)+"。")
 	command := whisperTaskCommandContext(ctx, whisperPath, args...)
 	stdout, err := command.StdoutPipe()
 	if err != nil {
@@ -706,7 +837,14 @@ func (manager *whisperTaskManager) createTasks(request whisperTaskCreateRequest)
 		return nil, errors.New("Whisper 任务服务未就绪")
 	}
 	request.AgentID = strings.TrimSpace(request.AgentID)
-	if !isValidMediaPreviewAgentID(request.AgentID) || len(request.Paths) == 0 || len(request.Paths) > 64 {
+	items := request.Tasks
+	if len(items) == 0 {
+		items = make([]whisperTaskCreateItem, 0, len(request.Paths))
+		for _, path := range request.Paths {
+			items = append(items, whisperTaskCreateItem{Path: path, Scenario: request.Scenario})
+		}
+	}
+	if !isValidMediaPreviewAgentID(request.AgentID) || len(items) == 0 || len(items) > 64 {
 		return nil, errors.New("agentId 和 1 至 64 个音频文件不能为空")
 	}
 	manager.createMu.Lock()
@@ -715,16 +853,20 @@ func (manager *whisperTaskManager) createTasks(request whisperTaskCreateRequest)
 	if err != nil {
 		return nil, errors.New("Agent 不存在")
 	}
-	type source struct{ relative, output, absolute string }
-	sources := make([]source, 0, len(request.Paths))
+	type source struct{ relative, output, absolute, scenario string }
+	sources := make([]source, 0, len(items))
 	seen := make(map[string]bool)
 	reservedOutputs := make(map[string]bool)
-	for _, input := range request.Paths {
-		relative := normalizeQuotedPathArg(input)
+	for _, item := range items {
+		relative := normalizeQuotedPathArg(item.Path)
 		if seen[relative] {
 			continue
 		}
 		seen[relative] = true
+		scenario, valid := whisperScenarioFor(item.Scenario)
+		if !valid {
+			return nil, errors.New("不支持的 Whisper 转写场景")
+		}
 		absolute, _, status, message := resolveMediaPreviewFile(manager.cfg, request.AgentID, relative)
 		if status != 0 {
 			return nil, errors.New(message)
@@ -741,7 +883,7 @@ func (manager *whisperTaskManager) createTasks(request whisperTaskCreateRequest)
 		if err != nil {
 			return nil, err
 		}
-		sources = append(sources, source{relative: filepath.ToSlash(relativePath), output: filepath.ToSlash(outputRelative), absolute: outputAbsolute})
+		sources = append(sources, source{relative: filepath.ToSlash(relativePath), output: filepath.ToSlash(outputRelative), absolute: outputAbsolute, scenario: scenario.ID})
 	}
 	if len(sources) == 0 {
 		return nil, errors.New("未找到可添加的音频文件")
@@ -754,7 +896,8 @@ func (manager *whisperTaskManager) createTasks(request whisperTaskCreateRequest)
 	created := make([]whisperTask, 0, len(sources))
 	now := whisperTaskTimestamp()
 	for _, source := range sources {
-		result, err := tx.Exec(`INSERT INTO whisper_task (agent_id, source_path, output_path, saved_as, status, progress, created_at, updated_at, logs, cancel_requested) VALUES (?,?,?,?,?,?,?,?,?,0)`, request.AgentID, source.relative, source.output, source.absolute, whisperTaskStatusQueued, 0, now, now, "["+now+"] 已加入 Whisper 转写队列。\n")
+		scenario, _ := whisperScenarioFor(source.scenario)
+		result, err := tx.Exec(`INSERT INTO whisper_task (agent_id, source_path, output_path, saved_as, scenario, status, progress, created_at, updated_at, logs, cancel_requested) VALUES (?,?,?,?,?,?,?,?,?,?,0)`, request.AgentID, source.relative, source.output, source.absolute, source.scenario, whisperTaskStatusQueued, 0, now, now, "["+now+"] 已加入 Whisper 转写队列。场景："+scenario.Name+"。\n")
 		if err != nil {
 			return nil, err
 		}
@@ -762,7 +905,7 @@ func (manager *whisperTaskManager) createTasks(request whisperTaskCreateRequest)
 		if err != nil {
 			return nil, err
 		}
-		created = append(created, whisperTask{ID: id, AgentID: request.AgentID, SourcePath: source.relative, OutputPath: source.output, SavedAs: source.absolute, Status: whisperTaskStatusQueued, CreatedAt: now, UpdatedAt: now})
+		created = append(created, whisperTask{ID: id, AgentID: request.AgentID, SourcePath: source.relative, OutputPath: source.output, SavedAs: source.absolute, Scenario: source.scenario, Status: whisperTaskStatusQueued, CreatedAt: now, UpdatedAt: now})
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
@@ -865,7 +1008,7 @@ func (manager *whisperTaskManager) listTasksPage(agentID, status string, page in
 		result.Page = lastPage
 	}
 	args = append(args, result.PageSize, (result.Page-1)*result.PageSize)
-	rows, err := manager.db.Query(`SELECT id, agent_id, source_path, output_path, saved_as, status, progress, started_at, created_at, updated_at, `+logs+`, cancel_requested FROM whisper_task WHERE `+where+` ORDER BY id DESC LIMIT ? OFFSET ?`, args...)
+	rows, err := manager.db.Query(`SELECT id, agent_id, source_path, output_path, saved_as, scenario, status, progress, started_at, created_at, updated_at, `+logs+`, cancel_requested FROM whisper_task WHERE `+where+` ORDER BY id DESC LIMIT ? OFFSET ?`, args...)
 	if err != nil {
 		return result, err
 	}
@@ -884,7 +1027,7 @@ func (manager *whisperTaskManager) taskLog(agentID string, taskID int64) (whispe
 	if manager == nil || manager.db == nil || !isValidMediaPreviewAgentID(agentID) || taskID <= 0 {
 		return whisperTask{}, errors.New("任务参数无效")
 	}
-	return scanWhisperTask(manager.db.QueryRow(`SELECT id, agent_id, source_path, output_path, saved_as, status, progress, started_at, created_at, updated_at, logs, cancel_requested FROM whisper_task WHERE id = ? AND agent_id = ?`, taskID, strings.TrimSpace(agentID)))
+	return scanWhisperTask(manager.db.QueryRow(`SELECT id, agent_id, source_path, output_path, saved_as, scenario, status, progress, started_at, created_at, updated_at, logs, cancel_requested FROM whisper_task WHERE id = ? AND agent_id = ?`, taskID, strings.TrimSpace(agentID)))
 }
 
 func (manager *whisperTaskManager) cancelTask(agentID string, taskID int64) error {
@@ -981,7 +1124,7 @@ type whisperTaskScanner interface {
 func scanWhisperTask(scanner whisperTaskScanner) (whisperTask, error) {
 	var task whisperTask
 	var cancelRequested int
-	err := scanner.Scan(&task.ID, &task.AgentID, &task.SourcePath, &task.OutputPath, &task.SavedAs, &task.Status, &task.Progress, &task.StartedAt, &task.CreatedAt, &task.UpdatedAt, &task.Logs, &cancelRequested)
+	err := scanner.Scan(&task.ID, &task.AgentID, &task.SourcePath, &task.OutputPath, &task.SavedAs, &task.Scenario, &task.Status, &task.Progress, &task.StartedAt, &task.CreatedAt, &task.UpdatedAt, &task.Logs, &cancelRequested)
 	task.CancelAsked = cancelRequested != 0
 	return task, err
 }

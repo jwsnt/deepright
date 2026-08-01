@@ -19,6 +19,10 @@
     "check": 24,
     "install": "请在当前 Python 环境安装与系统及 GPU/MPS 兼容的 openai-whisper 和 PyTorch，勿盲目使用最新版。安装后实际用 GPU/MPS 加载 Whisper base 验证，失败则更换兼容版本重试并输出最终版本。"
   },
+  "rembg": {
+    "check": 24,
+    "install": "请安装 rembg"
+  },
   "test": {
     "content": "Hello World",
     "timeout": 60
@@ -176,5 +180,13 @@
     "reference": " 参考READ_ME.md: $reference",
     "function": "全部功能",
     "recover": 30
-  }
+  },
+  "model_source": [
+    "https://modelscope.cn",
+    "https://hf-mirror.com"
+  ],
+  "pypi_source": [
+    "https://pypi.tuna.tsinghua.edu.cn/simple",
+    "https://mirrors.aliyun.com/pypi/simple"
+  ]
 }

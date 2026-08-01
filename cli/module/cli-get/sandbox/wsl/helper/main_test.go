@@ -10,6 +10,16 @@ import (
 	"testing"
 )
 
+func isolatePythonEnvironment(t *testing.T, home string) {
+	t.Helper()
+	t.Setenv("HOME", home)
+	t.Setenv("PYENV_ROOT", filepath.Join(home, ".pyenv"))
+	t.Setenv("VIRTUAL_ENV", "")
+	t.Setenv("CONDA_PREFIX", "")
+	t.Setenv("WORKON_HOME", "")
+	t.Setenv("PATH", sandboxCommandPath)
+}
+
 func TestNormalizeSandboxMode(t *testing.T) {
 	if got := normalizeSandboxMode(" FILEPICK_NET "); got != sandboxModeFilePickNet {
 		t.Fatalf("mode = %q, want %q", got, sandboxModeFilePickNet)
@@ -21,7 +31,7 @@ func TestNormalizeSandboxMode(t *testing.T) {
 
 func TestSetPickedDirectoryReturnsNormalizedDirectory(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	isolatePythonEnvironment(t, home)
 	allowedDir := filepath.Join(home, "picked")
 	if err := os.MkdirAll(allowedDir, 0o755); err != nil {
 		t.Fatalf("mkdir picked: %v", err)
@@ -38,7 +48,7 @@ func TestSetPickedDirectoryReturnsNormalizedDirectory(t *testing.T) {
 
 func TestResolvePickedDirectoryUsesEnvOverride(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	isolatePythonEnvironment(t, home)
 	allowedDir := filepath.Join(home, "picked")
 	if err := os.MkdirAll(allowedDir, 0o755); err != nil {
 		t.Fatalf("mkdir picked: %v", err)
@@ -56,7 +66,7 @@ func TestResolvePickedDirectoryUsesEnvOverride(t *testing.T) {
 
 func TestResolvePickedDirectoryReturnsHelpfulErrorWithoutCache(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	isolatePythonEnvironment(t, home)
 
 	_, err := resolvePickedDirectory(t.Context(), false)
 	if err == nil {
@@ -148,7 +158,7 @@ func TestIsPickerCanceledTreatsCanceledOutputAsCancellation(t *testing.T) {
 
 func TestBuildBubblewrapArgsFilePickNet(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	isolatePythonEnvironment(t, home)
 	picked := filepath.Join(home, "workspace")
 	if err := os.MkdirAll(picked, 0o755); err != nil {
 		t.Fatalf("mkdir picked: %v", err)
@@ -172,7 +182,7 @@ func TestBuildBubblewrapArgsFilePickNet(t *testing.T) {
 
 func TestBuildBubblewrapArgsSpecialPathsAcrossModes(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	isolatePythonEnvironment(t, home)
 	picked := filepath.Join(home, "workspace")
 	if err := os.MkdirAll(picked, 0o755); err != nil {
 		t.Fatalf("mkdir picked: %v", err)
@@ -232,7 +242,7 @@ func TestBuildBubblewrapArgsSpecialPathsAcrossModes(t *testing.T) {
 
 func TestBuildBubblewrapArgsIncludesUserPythonRuntimeReadOnly(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	isolatePythonEnvironment(t, home)
 	bin := filepath.Join(home, ".local", "bin")
 	site := filepath.Join(home, ".local", "lib", "python3.12", "site-packages")
 	if err := os.MkdirAll(bin, 0o755); err != nil {
@@ -258,14 +268,67 @@ func TestBuildBubblewrapArgsIncludesUserPythonRuntimeReadOnly(t *testing.T) {
 	if !strings.Contains(text, "--setenv\nPATH\n"+bin+":"+sandboxCommandPath) {
 		t.Fatalf("PATH should include user Python bin: %v", args)
 	}
-	if !strings.Contains(text, "--setenv\nPYTHONPATH\n"+site) {
-		t.Fatalf("PYTHONPATH should include user site packages: %v", args)
+	if !strings.Contains(text, "--setenv\nPYTHONUSERBASE\n"+filepath.Join(home, ".local")) {
+		t.Fatalf("PYTHONUSERBASE should retain the user package base: %v", args)
+	}
+}
+
+func TestBuildBubblewrapArgsIncludesPyenvAndCondaRuntimesReadOnly(t *testing.T) {
+	home := t.TempDir()
+	isolatePythonEnvironment(t, home)
+	pyenvRoot := filepath.Join(home, ".pyenv", "versions", "3.12.1")
+	condaRoot := filepath.Join(home, "miniforge3", "envs", "images")
+	for _, root := range []string{pyenvRoot, condaRoot} {
+		if err := os.MkdirAll(filepath.Join(root, "bin"), 0o755); err != nil {
+			t.Fatalf("create Python runtime: %v", err)
+		}
+	}
+
+	args, err := buildBubblewrapArgs("/bin/sh", "command -v rembg", sandboxModeNet, "")
+	if err != nil {
+		t.Fatalf("buildBubblewrapArgs: %v", err)
+	}
+	text := strings.Join(args, "\n")
+	for _, root := range []string{pyenvRoot, condaRoot} {
+		bin := filepath.Join(root, "bin")
+		if !strings.Contains(text, "--ro-bind\n"+root+"\n"+root) {
+			t.Fatalf("Python runtime %s should be read-only mounted: %v", root, args)
+		}
+		if !strings.Contains(text, bin) {
+			t.Fatalf("PATH should include Python bin %s: %v", bin, args)
+		}
+	}
+}
+
+func TestBuildBubblewrapArgsIncludesPythonRuntimeFromHostPath(t *testing.T) {
+	home := t.TempDir()
+	isolatePythonEnvironment(t, home)
+	runtimeRoot := filepath.Join(home, "custom-python")
+	bin := filepath.Join(runtimeRoot, "bin")
+	if err := os.MkdirAll(bin, 0o755); err != nil {
+		t.Fatalf("create custom Python bin: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(bin, "python3"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write custom Python executable: %v", err)
+	}
+	t.Setenv("PATH", bin+":"+sandboxCommandPath)
+
+	args, err := buildBubblewrapArgs("/bin/sh", "command -v python3", sandboxModeNet, "")
+	if err != nil {
+		t.Fatalf("buildBubblewrapArgs: %v", err)
+	}
+	text := strings.Join(args, "\n")
+	if !strings.Contains(text, "--ro-bind\n"+runtimeRoot+"\n"+runtimeRoot) {
+		t.Fatalf("custom Python runtime should be read-only mounted: %v", args)
+	}
+	if !strings.Contains(text, "--setenv\nPATH\n"+bin+":"+sandboxCommandPath) {
+		t.Fatalf("PATH should include custom Python bin: %v", args)
 	}
 }
 
 func TestBuildBubblewrapArgsRejectsSelectedSystemToolRoot(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	isolatePythonEnvironment(t, home)
 	_, err := buildBubblewrapArgs("/bin/sh", "pwd", sandboxModeFilePick, "/usr")
 	if err == nil || !strings.Contains(err.Error(), "系统工具路径") {
 		t.Fatalf("selected system tool root error = %v, want a system tool path rejection", err)
