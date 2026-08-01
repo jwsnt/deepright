@@ -10,6 +10,12 @@ CLI-Get 是一个心跳上报与任务执行客户端。它以心跳方式将 Ag
 - 如果 `cli/get` 响应任务中带有 `subOps.exempted=true`，则即使当前会话已开启沙盒，也仍然走原始链路：`cli/get -> 本地 Shell 执行 -> cli/pub`
 - 如果当前工作目录共享 SQLite `data` 的 `message_insert` 表中存在当前 `chat` 的待上传插入消息，则会在 `cli/pub` 前自动附带最多 `5` 条 `insert` 记录；发布成功后自动改为已上传
 
+### 命令环境
+
+`cli-get` 会在启动时规范化命令执行环境；普通 Shell 任务与 `CLI_SANDBOX` 任务均继承同一份 `PATH`。该规则与 Integration 的依赖检查和 `cmd` 任务一致：会合并系统、登录 Shell、启动服务和常见用户级目录；macOS 还会动态加入当前用户实际存在的 `~/Library/Python/*/bin`，WSL/Linux 则会加入 `~/.local/bin`。因此通过用户级 Python 安装的 `whisper` 等命令无需写死用户名或 Python 版本。
+
+WSL 的 `CLI_SANDBOX` 会主动清空宿主环境以维持隔离。为使 `pip --user` 安装的 Whisper 可运行，沙箱仅以只读方式挂载用户的 `.local/bin` 与实际存在的 `.local/lib/python*/site-packages`，并设置相应的 `PATH` 与 `PYTHONPATH`；不会挂载整个用户 Home 或 `.local` 数据目录。
+
 ## 安装
 
 ```bash

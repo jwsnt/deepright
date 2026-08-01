@@ -17,6 +17,7 @@ var (
 	systemPathLookupEnvFn = os.LookupEnv
 	systemPathSetenvFn    = os.Setenv
 	systemPathUserHomeFn  = os.UserHomeDir
+	systemPathGlobFn      = filepath.Glob
 	systemPathCommandFn   = func(name string, args ...string) ([]byte, error) {
 		return exec.Command(name, args...).Output()
 	}
@@ -184,6 +185,11 @@ func platformCommonPathValue(goos string) string {
 				filepath.Join(homeDir, ".n", "bin"),
 				filepath.Join(homeDir, "bin"),
 			)
+			// Python's user-level installer on macOS places console scripts such
+			// as whisper in ~/Library/Python/<version>/bin.  GUI applications do
+			// not normally inherit this directory from an interactive shell, so
+			// discover every installed Python version instead of assuming one.
+			paths = append(paths, darwinUserPythonBinPaths(homeDir)...)
 		}
 	case "linux":
 		paths = append(paths,
@@ -240,6 +246,18 @@ func platformCommonPathValue(goos string) string {
 	}
 
 	return strings.Join(uniquePathEntries(paths, strings.TrimSpace(goos) == "windows"), pathListSeparator(goos))
+}
+
+func darwinUserPythonBinPaths(homeDir string) []string {
+	homeDir = strings.TrimSpace(homeDir)
+	if homeDir == "" {
+		return nil
+	}
+	paths, err := systemPathGlobFn(filepath.Join(homeDir, "Library", "Python", "*", "bin"))
+	if err != nil {
+		return nil
+	}
+	return uniquePathEntries(paths, false)
 }
 
 func currentProcessPath() string {

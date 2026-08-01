@@ -3508,3 +3508,23 @@ Integration 启动后会立即检查每个合法 Agent，之后每隔 `recover` 
 静态 `config/config.json.miniapp` 新增 `reference` 模板，且 `build` 可使用 `$reference`。填写参考路径时，Site 先将 `reference` 内的全部 `$reference` 换成该绝对路径，再替换 `build` 内全部 `$reference`；不填写时，`build` 内的全部 `$reference` 置为空字符串。`GET /api/runtime_config` 继续只读透传完整 `miniapp` 对象。
 
 完整说明见 [iteration/20260731-2/USER_GUIDE.md](iteration/20260731-2/USER_GUIDE.md)。
+
+---
+
+## 迭代 20260801-1：技能默认关闭
+
+携带 `chatId` 的技能读取链路现在默认关闭全部技能。Integration 首次发现当前会话的直属 `SKILL.md` 目录时，会在共享 SQLite 中记录为关闭；因此 `GET /api/files?path=...&chatId=...` 会直接返回关闭状态，`GET /api/skills?agentId=...&chatId=...`、`@ 技能` 缓存、聊天元数据和 CLI 元数据都不会暴露未启用技能。
+
+`POST /api/skill_state` 保持原请求格式：`disabled: false` 显式启用当前目录，`disabled: true` 关闭当前目录。状态表也会记录显式启用，因此刷新、重启或后续技能扫描不会覆盖用户选择；之后新发现的目录仍默认关闭。旧的关闭记录保持有效，旧会话中此前未记录的目录会在下一次读取时补齐为关闭。不带 `chatId` 的兼容技能读取仍返回完整列表。
+
+完整说明见 [iteration/20260801-1/USER_GUIDE.md](iteration/20260801-1/USER_GUIDE.md)。
+
+---
+
+## 迭代 20260801-2：Whisper 音频转文字队列
+
+Integration 新增 `GET /api/whisper/check` 与任务接口：`GET/POST /api/whisper/tasks`、`POST /api/whisper/tasks/cancel`、`POST /api/whisper/tasks/restart`、`POST /api/whisper/tasks/delete`、`GET /api/whisper/tasks/log`。任务列表支持按排队中、执行中、已完成、已取消、失败筛选，固定每页 5 条；已取消任务可重新加入队列，失败任务可删除其任务记录（不删除文件）。活动 `config/config.json` 的 `whisper.check`（正整数小时）和 `whisper.install`（非空安装请求）控制依赖检查与用户确认后的安装消息；接口会验证 `whisper` 命令可启动，并在 macOS 识别用户级 `~/Library/Python/*/bin/whisper` 安装位置，失效时返回安装请求，不会执行安装。Integration、`cmd`、`CLI_SANDBOX` 与 `cli/get` 的普通/沙箱任务均继承同一份规范化命令环境；该环境动态合并当前用户存在的 Python 用户级 `bin` 目录，不依赖硬编码的用户路径或 Python 版本，因此检查和实际执行解析的是同一份 `PATH`。
+
+任务持久化到共享 SQLite，固定使用 Whisper `base` 模型并全局串行执行。源音频和输出必须位于同一 Agent 工作区；输出固定保存到工作目录下的 `whisper/`，优先使用与源音频同名的 `.txt`，已有同名文本或任务输出时自动追加时间戳，绝不覆盖。任务支持进度和日志持久化、取消、服务重启恢复排队，以及 CUDA、Apple MPS、CPU 的受控优先级回退；GPU 已探测可用但实际运行不兼容时，会自动用 CPU 再尝试一次。
+
+完整说明见 [iteration/20260801-2/USER_GUIDE.md](iteration/20260801-2/USER_GUIDE.md)。

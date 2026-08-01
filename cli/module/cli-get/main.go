@@ -5,6 +5,7 @@ import (
 	"bytes"
 	messageinsert "cli-get/messageinsert"
 	"compress/gzip"
+	"connect/sharedutil"
 	"context"
 	"crypto/sha256"
 	"crypto/tls"
@@ -1182,6 +1183,8 @@ func ExecuteTaskViaSandboxApp(task *TaskContent, sandboxExecutable, allowedDir s
 	if task != nil && task.Timeout > 0 {
 		timeout = time.Duration(task.Timeout)*time.Millisecond + 5*time.Second
 	}
+	// Complete one-time PATH discovery before task timing begins.
+	env := sharedutil.CurrentEnvironmentWithSystemPath()
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -1192,7 +1195,10 @@ func ExecuteTaskViaSandboxApp(task *TaskContent, sandboxExecutable, allowedDir s
 	}
 	args = append(args, "--timeout", strconv.Itoa(task.Timeout))
 	cmd := exec.CommandContext(ctx, sandboxExecutable, args...)
-	cmd.Env = os.Environ()
+	// Use the same canonical command environment as Integration. The sandbox
+	// runner inherits this environment, keeping task commands consistent with
+	// dependency checks (for example a user-installed whisper).
+	cmd.Env = env
 
 	var output bytes.Buffer
 	cmd.Stdout = &output
@@ -1388,6 +1394,9 @@ type Config struct {
 const defaultUpstreamHost = "https://www.deepright.cn"
 
 func main() {
+	// Keep direct cli/get launches and their CLI_SANDBOX child tasks on the
+	// same normalized executable search PATH as Integration.
+	sharedutil.ApplySystemPath()
 	var cfg Config
 
 	flag.StringVar(&cfg.Host, "host", defaultUpstreamHost, "server URL")

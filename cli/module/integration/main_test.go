@@ -182,6 +182,180 @@ func TestHandleFilesSortsDirectoriesThenFilesByModifiedAt(t *testing.T) {
 	}
 }
 
+func TestHandleFilesDefaultsSkillsToDisabledPerChat(t *testing.T) {
+	root := t.TempDir()
+	skillDir := filepath.Join(root, "skills", "alpha")
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatalf("make skill directory: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("---\nname: alpha\ndescription: alpha skill\n---\n"), 0o644); err != nil {
+		t.Fatalf("write SKILL.md: %v", err)
+	}
+	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "data"))
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	defer db.Close()
+	oldCronDB := cronDB
+	cronDB = db
+	defer func() { cronDB = oldCronDB }()
+
+	request := httptest.NewRequest(http.MethodGet, "/api/files?path="+url.QueryEscape(filepath.Dir(skillDir))+"&chatId=chat-1", nil)
+	response := httptest.NewRecorder()
+	handleFiles().ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("list status = %d, body = %s", response.Code, response.Body.String())
+	}
+	var entries []FileEntry
+	if err := json.NewDecoder(response.Body).Decode(&entries); err != nil {
+		t.Fatalf("decode entries: %v", err)
+	}
+	if len(entries) != 1 || !entries[0].HasSkill || !entries[0].SkillDisabled || !entries[0].SkillDisabledSelf {
+		t.Fatalf("initial skill entry = %#v, want directly disabled", entries)
+	}
+
+	if _, err := skillstate.SetDisabled(db, "chat-1", skillDir, false); err != nil {
+		t.Fatalf("enable skill: %v", err)
+	}
+	response = httptest.NewRecorder()
+	handleFiles().ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("list after enable status = %d, body = %s", response.Code, response.Body.String())
+	}
+	entries = nil
+	if err := json.NewDecoder(response.Body).Decode(&entries); err != nil {
+		t.Fatalf("decode entries after enable: %v", err)
+	}
+	if len(entries) != 1 || entries[0].SkillDisabled {
+		t.Fatalf("enabled skill entry = %#v, want enabled", entries)
+	}
+}
+
+func TestHandleFilesIgnoresSkillMarkdownOutsideSkillsDirectory(t *testing.T) {
+	root := t.TempDir()
+	outsideDir := filepath.Join(root, "outside")
+	insideDir := filepath.Join(root, "skills", "inside")
+	for directory, name := range map[string]string{
+		outsideDir: "outside",
+		insideDir:  "inside",
+	} {
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatalf("make skill directory: %v", err)
+		}
+		content := fmt.Sprintf("---\nname: %s\ndescription: %s skill\n---\n", name, name)
+		if err := os.WriteFile(filepath.Join(directory, "SKILL.md"), []byte(content), 0o644); err != nil {
+			t.Fatalf("write SKILL.md: %v", err)
+		}
+	}
+
+	list := func(path string) []FileEntry {
+		t.Helper()
+		request := httptest.NewRequest(http.MethodGet, "/api/files?path="+url.QueryEscape(path), nil)
+		response := httptest.NewRecorder()
+		handleFiles().ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			t.Fatalf("list status = %d, body = %s", response.Code, response.Body.String())
+		}
+		var entries []FileEntry
+		if err := json.NewDecoder(response.Body).Decode(&entries); err != nil {
+			t.Fatalf("decode entries: %v", err)
+		}
+		return entries
+	}
+
+	entries := list(root)
+	for _, entry := range entries {
+		if entry.Name == "outside" && entry.HasSkill {
+			t.Fatalf("directory outside skills was exposed as a skill: %#v", entry)
+		}
+	}
+
+	entries = list(filepath.Join(root, "skills"))
+	if len(entries) != 1 || entries[0].Name != "inside" || !entries[0].HasSkill {
+		t.Fatalf("skill under skills directory = %#v, want inside marked as a skill", entries)
+	}
+}
+
+func TestHandleSkillStateRejectsSkillMarkdownOutsideSkillsDirectory(t *testing.T) {
+	outsideDir := filepath.Join(t.TempDir(), "outside")
+	if err := os.MkdirAll(outsideDir, 0o755); err != nil {
+		t.Fatalf("make directory: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(outsideDir, "SKILL.md"), []byte("---\nname: outside\ndescription: outside skill\n---\n"), 0o644); err != nil {
+		t.Fatalf("write SKILL.md: %v", err)
+	}
+
+	body := strings.NewReader(fmt.Sprintf(`{"chatId":"chat-1","path":%q,"disabled":false}`, outsideDir))
+	request := httptest.NewRequest(http.MethodPost, "/api/skill_state", body)
+	response := httptest.NewRecorder()
+	handleSkillState(&Config{}).ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("skill state status = %d, body = %s; want %d", response.Code, response.Body.String(), http.StatusBadRequest)
+	}
+}
+
+func TestHandleFilesReportsSkillsDirectorySessionSummary(t *testing.T) {
+	workspace := t.TempDir()
+	skillsDir := filepath.Join(workspace, "skills")
+	alphaDir := filepath.Join(skillsDir, "alpha")
+	betaDir := filepath.Join(skillsDir, "beta")
+	for directory, name := range map[string]string{
+		alphaDir: "alpha",
+		betaDir:  "beta",
+	} {
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatalf("make skill directory: %v", err)
+		}
+		content := fmt.Sprintf("---\nname: %s\ndescription: %s skill\n---\n", name, name)
+		if err := os.WriteFile(filepath.Join(directory, "SKILL.md"), []byte(content), 0o644); err != nil {
+			t.Fatalf("write skill: %v", err)
+		}
+	}
+
+	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "data"))
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	defer db.Close()
+	oldCronDB := cronDB
+	cronDB = db
+	defer func() { cronDB = oldCronDB }()
+
+	request := httptest.NewRequest(http.MethodGet, "/api/files?path="+url.QueryEscape(workspace)+"&chatId=chat-1", nil)
+	listSkillsDirectory := func() FileEntry {
+		t.Helper()
+		response := httptest.NewRecorder()
+		handleFiles().ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			t.Fatalf("list status = %d, body = %s", response.Code, response.Body.String())
+		}
+		var entries []FileEntry
+		if err := json.NewDecoder(response.Body).Decode(&entries); err != nil {
+			t.Fatalf("decode entries: %v", err)
+		}
+		for _, entry := range entries {
+			if entry.Name == "skills" && entry.Type == "dir" {
+				return entry
+			}
+		}
+		t.Fatalf("skills directory missing from %#v", entries)
+		return FileEntry{}
+	}
+
+	entry := listSkillsDirectory()
+	if !entry.HasSkills || entry.SkillCount != 0 {
+		t.Fatalf("initial skills summary = %#v, want configured with zero enabled", entry)
+	}
+
+	if _, err := skillstate.SetDisabled(db, "chat-1", alphaDir, false); err != nil {
+		t.Fatalf("enable alpha: %v", err)
+	}
+	entry = listSkillsDirectory()
+	if !entry.HasSkills || entry.SkillCount != 1 {
+		t.Fatalf("enabled skills summary = %#v, want one enabled", entry)
+	}
+}
+
 func integrationTestMacRuntimeBaseDir(home string) string {
 	return runtimepaths.MacAppRuntimeBaseDir(home, integrationBundleID, integrationRuntimeAppDir)
 }
@@ -6597,6 +6771,32 @@ func TestInitCronDBUsesResolvedIntegrationDBPath(t *testing.T) {
 
 	if _, err := os.Stat(filepath.Join(exeDir, "data")); !os.IsNotExist(err) {
 		t.Fatalf("legacy executable db should not be created, stat err = %v", err)
+	}
+}
+
+func TestReadIntegrationSandboxModeDoesNotCreateLegacyWorkingDirectoryDB(t *testing.T) {
+	oldRuntimeGOOS := integrationRuntimeGOOS
+	integrationRuntimeGOOS = "linux"
+	defer func() { integrationRuntimeGOOS = oldRuntimeGOOS }()
+	t.Setenv("WSL_DISTRO_NAME", "")
+
+	runtimeDir := t.TempDir()
+	t.Setenv(integrationRuntimeDirEnv, runtimeDir)
+	workingDir := t.TempDir()
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(workingDir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(originalWD) }()
+
+	if got := readIntegrationSandboxMode("chat-without-sandbox-state"); got != "" {
+		t.Fatalf("readIntegrationSandboxMode() = %q, want empty", got)
+	}
+	if _, err := os.Stat(filepath.Join(workingDir, "data")); !os.IsNotExist(err) {
+		t.Fatalf("legacy working-directory database was created, stat err = %v", err)
 	}
 }
 
@@ -20701,12 +20901,12 @@ func TestHandleSkillStateImmediatelyUpdatesAtMenuCache(t *testing.T) {
 		}
 		return names
 	}
-	if got := getSkills(); !reflect.DeepEqual(got, []string{"__internal_miniapp"}) {
-		t.Fatalf("initial skills = %v, want internal miniapp", got)
+	if got := getSkills(); len(got) != 0 {
+		t.Fatalf("initial skills = %v, want none until explicitly enabled", got)
 	}
 
 	currentTime = currentTime.Add(time.Minute)
-	body := strings.NewReader(fmt.Sprintf(`{"chatId":"chat-1","path":%q,"disabled":true}`, skillDir))
+	body := strings.NewReader(fmt.Sprintf(`{"chatId":"chat-1","path":%q,"disabled":false}`, skillDir))
 	resp, err := http.Post(stateServer.URL+"/api/skill_state", "application/json", body)
 	if err != nil {
 		t.Fatalf("POST skill state: %v", err)
@@ -20716,8 +20916,8 @@ func TestHandleSkillStateImmediatelyUpdatesAtMenuCache(t *testing.T) {
 		responseBody, _ := io.ReadAll(resp.Body)
 		t.Fatalf("POST skill state status = %d body=%s", resp.StatusCode, responseBody)
 	}
-	if got := getSkills(); len(got) != 0 {
-		t.Fatalf("skills after disable = %v, want empty", got)
+	if got := getSkills(); !reflect.DeepEqual(got, []string{"__internal_miniapp"}) {
+		t.Fatalf("skills after explicit enable = %v, want internal miniapp", got)
 	}
 	cfg.AtMenuCache.mu.Lock()
 	expiresAt := cfg.AtMenuCache.expiresAt

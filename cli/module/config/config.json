@@ -15,6 +15,10 @@
     "check": 24,
     "install": "请安装 ffmpeg 和 ffprobe"
   },
+  "whisper": {
+    "check": 24,
+    "install": "请在当前 Python 环境安装与系统及 GPU/MPS 兼容的 openai-whisper 和 PyTorch，勿盲目使用最新版。安装后实际用 GPU/MPS 加载 Whisper base 验证，失败则更换兼容版本重试并输出最终版本。"
+  },
   "test": {
     "content": "Hello World",
     "timeout": 60

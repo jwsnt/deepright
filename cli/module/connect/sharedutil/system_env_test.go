@@ -3,6 +3,7 @@ package sharedutil
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -44,6 +45,37 @@ func TestApplySystemPathMergesUnixShellAndSystemPaths(t *testing.T) {
 	}
 	if countPathEntry(parts, "/usr/bin") != 1 {
 		t.Fatalf("PATH = %q, want /usr/bin deduped", got)
+	}
+}
+
+func TestApplySystemPathIncludesDarwinUserPythonBins(t *testing.T) {
+	resetSystemPathTestHooks(t)
+
+	t.Setenv("PATH", "/usr/bin")
+	systemPathRuntimeGOOS = "darwin"
+	systemPathUserHomeFn = func() (string, error) { return "/Users/tester", nil }
+	systemPathGlobFn = func(pattern string) ([]string, error) {
+		want := "/Users/tester/Library/Python/*/bin"
+		if pattern != want {
+			t.Fatalf("Glob pattern = %q, want %q", pattern, want)
+		}
+		return []string{
+			"/Users/tester/Library/Python/3.9/bin",
+			"/Users/tester/Library/Python/3.13/bin",
+		}, nil
+	}
+	systemPathCommandFn = func(string, ...string) ([]byte, error) { return nil, nil }
+
+	ApplySystemPath()
+
+	parts := splitPathEntries(os.Getenv("PATH"))
+	for _, want := range []string{
+		"/Users/tester/Library/Python/3.9/bin",
+		"/Users/tester/Library/Python/3.13/bin",
+	} {
+		if !containsPathEntry(parts, want) {
+			t.Fatalf("PATH = %q, want %q", os.Getenv("PATH"), want)
+		}
 	}
 }
 
@@ -93,6 +125,7 @@ func resetSystemPathTestHooks(t *testing.T) {
 	oldLookupEnv := systemPathLookupEnvFn
 	oldSetenv := systemPathSetenvFn
 	oldUserHome := systemPathUserHomeFn
+	oldGlob := systemPathGlobFn
 	oldCommandFn := systemPathCommandFn
 
 	systemPathApplyOnce = sync.Once{}
@@ -100,6 +133,7 @@ func resetSystemPathTestHooks(t *testing.T) {
 	systemPathLookupEnvFn = os.LookupEnv
 	systemPathSetenvFn = os.Setenv
 	systemPathUserHomeFn = os.UserHomeDir
+	systemPathGlobFn = filepath.Glob
 	systemPathCommandFn = func(name string, args ...string) ([]byte, error) {
 		return nil, fmt.Errorf("unexpected command %s %v", name, args)
 	}
@@ -110,6 +144,7 @@ func resetSystemPathTestHooks(t *testing.T) {
 		systemPathLookupEnvFn = oldLookupEnv
 		systemPathSetenvFn = oldSetenv
 		systemPathUserHomeFn = oldUserHome
+		systemPathGlobFn = oldGlob
 		systemPathCommandFn = oldCommandFn
 	})
 }

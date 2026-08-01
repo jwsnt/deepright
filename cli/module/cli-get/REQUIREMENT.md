@@ -117,6 +117,7 @@ curl --location 'http://xxx/cli/get' \
 
 ### 执行任务
 + 属性content解析json string后的属性cmd，即本次需要执行的任务，启动与当前进程同环境（Shell）的子进程，执行对应系统命令
++ cli/get 必须与 Integration 服务、Integration `cmd` 和 `CLI_SANDBOX` 使用同一份规范化命令环境。macOS 的 `PATH` 必须动态合并当前用户实际存在的 `~/Library/Python/*/bin`；WSL/Linux 必须合并 `~/.local/bin`；两者均须保留既有系统、Shell、启动服务和用户级目录，禁止硬编码用户名或 Python 版本。普通任务与沙箱任务都必须继承该环境，使依赖检查和实际执行解析到同一可执行文件。WSL `CLI_SANDBOX` 因 `bubblewrap --clearenv` 无法直接继承宿主环境时，必须仅以只读方式挂载用户 `.local/bin` 和实际存在的 `.local/lib/python*/site-packages`，并设置其 `PATH` 与 `PYTHONPATH`；不得为此暴露整个用户 Home 或 `.local` 数据目录。
 + 执行任务的子进程需要指定超时，取值为属性timeout，如果服务端未返回则默认180秒
 + 系统命令需要支持 && ｜等管道符，支持绝对路径、相对路径和~路径
 + 命令被/api/kill终止时需捕捉异常信号，返回status=1且cmd内容为"命令被终止" > 引用自 ./iteration/20260501-1/REQUIREMENT.md

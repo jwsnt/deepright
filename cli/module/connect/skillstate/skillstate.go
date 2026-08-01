@@ -11,10 +11,11 @@ import (
 
 const timeLayout = "2006-01-02T15:04:05.000"
 
-// SkillDirState stores one disabled skill directory bound to a chat session.
+// SkillDirState stores one explicit skill directory state bound to a chat session.
 type SkillDirState struct {
 	ChatID    string `json:"chatId"`
 	Path      string `json:"path"`
+	Disabled  bool   `json:"disabled"`
 	UpdatedAt string `json:"updatedAt"`
 }
 
@@ -26,12 +27,47 @@ func EnsureSchema(db *sql.DB) error {
 		CREATE TABLE IF NOT EXISTS chat_skill_dir_state (
 			chat_id TEXT NOT NULL,
 			path TEXT NOT NULL,
+			disabled INTEGER NOT NULL DEFAULT 1,
 			updated_at TEXT NOT NULL,
 			PRIMARY KEY (chat_id, path)
 		);
 		CREATE INDEX IF NOT EXISTS idx_chat_skill_dir_state_updated_at
 			ON chat_skill_dir_state(updated_at);
 	`)
+	if err != nil {
+		return err
+	}
+	rows, err := db.Query(`PRAGMA table_info(chat_skill_dir_state)`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	hasDisabled := false
+	for rows.Next() {
+		var cid int
+		var name, columnType string
+		var notNull, primaryKey int
+		var defaultValue interface{}
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey); err != nil {
+			return err
+		}
+		if name == "disabled" {
+			hasDisabled = true
+			break
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if hasDisabled {
+		return nil
+	}
+	// Older installations only recorded disabled directories. Preserve those
+	// entries as disabled while adding explicit enabled-state support.
+	_, err = db.Exec(`ALTER TABLE chat_skill_dir_state ADD COLUMN disabled INTEGER NOT NULL DEFAULT 1`)
+	if err != nil && strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
+		return nil
+	}
 	return err
 }
 
@@ -100,6 +136,24 @@ func normalizePathList(paths []string) []string {
 	return pruned
 }
 
+func normalizeUniquePaths(paths []string) []string {
+	normalized := make([]string, 0, len(paths))
+	seen := make(map[string]struct{}, len(paths))
+	for _, path := range paths {
+		path = NormalizePath(path)
+		if path == "" {
+			continue
+		}
+		if _, ok := seen[path]; ok {
+			continue
+		}
+		seen[path] = struct{}{}
+		normalized = append(normalized, path)
+	}
+	sort.Strings(normalized)
+	return normalized
+}
+
 func DisabledStatus(paths []string, path string) (self bool, inherited bool) {
 	path = NormalizePath(path)
 	if path == "" {
@@ -148,7 +202,7 @@ func ListDisabledPaths(db *sql.DB, chatID string) ([]string, error) {
 	if err := EnsureSchema(db); err != nil {
 		return nil, err
 	}
-	rows, err := db.Query(`SELECT path FROM chat_skill_dir_state WHERE chat_id = ? ORDER BY path`, chatID)
+	rows, err := db.Query(`SELECT path FROM chat_skill_dir_state WHERE chat_id = ? AND disabled != 0 ORDER BY path`, chatID)
 	if err != nil {
 		return nil, err
 	}
@@ -168,6 +222,42 @@ func ListDisabledPaths(db *sql.DB, chatID string) ([]string, error) {
 	return normalizePathList(items), nil
 }
 
+// EnsureDefaultDisabled records each newly discovered skill directory as
+// disabled without changing a state the user has already explicitly chosen.
+func EnsureDefaultDisabled(db *sql.DB, chatID string, paths []string) ([]string, error) {
+	chatID = strings.TrimSpace(chatID)
+	if chatID == "" {
+		return nil, nil
+	}
+	paths = normalizeUniquePaths(paths)
+	if err := EnsureSchema(db); err != nil {
+		return nil, err
+	}
+	if len(paths) == 0 {
+		return ListDisabledPaths(db, chatID)
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	updatedAt := time.Now().Format(timeLayout)
+	for _, path := range paths {
+		if _, err := tx.Exec(`
+			INSERT INTO chat_skill_dir_state (chat_id, path, disabled, updated_at)
+			VALUES (?, ?, 1, ?)
+			ON CONFLICT(chat_id, path) DO NOTHING
+		`, chatID, path, updatedAt); err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return ListDisabledPaths(db, chatID)
+}
+
 func SetDisabled(db *sql.DB, chatID, path string, disabled bool) ([]string, error) {
 	chatID = strings.TrimSpace(chatID)
 	if chatID == "" {
@@ -181,48 +271,19 @@ func SetDisabled(db *sql.DB, chatID, path string, disabled bool) ([]string, erro
 		return nil, err
 	}
 
-	tx, err := db.Begin()
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-
-	rows, err := tx.Query(`SELECT path FROM chat_skill_dir_state WHERE chat_id = ? ORDER BY path`, chatID)
-	if err != nil {
-		return nil, err
-	}
-	current := make([]string, 0)
-	for rows.Next() {
-		var existing string
-		if err := rows.Scan(&existing); err != nil {
-			rows.Close()
-			return nil, err
-		}
-		current = append(current, existing)
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return nil, err
-	}
-	rows.Close()
-
-	next := ApplyDisabledPaths(current, path, disabled)
-	if _, err := tx.Exec(`DELETE FROM chat_skill_dir_state WHERE chat_id = ?`, chatID); err != nil {
-		return nil, err
-	}
 	updatedAt := time.Now().Format(timeLayout)
-	for _, item := range next {
-		if _, err := tx.Exec(
-			`INSERT INTO chat_skill_dir_state (chat_id, path, updated_at) VALUES (?,?,?)`,
-			chatID,
-			item,
-			updatedAt,
-		); err != nil {
-			return nil, err
-		}
+	state := 0
+	if disabled {
+		state = 1
 	}
-	if err := tx.Commit(); err != nil {
+	if _, err := db.Exec(`
+		INSERT INTO chat_skill_dir_state (chat_id, path, disabled, updated_at)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(chat_id, path) DO UPDATE SET
+			disabled = excluded.disabled,
+			updated_at = excluded.updated_at
+	`, chatID, path, state, updatedAt); err != nil {
 		return nil, err
 	}
-	return next, nil
+	return ListDisabledPaths(db, chatID)
 }

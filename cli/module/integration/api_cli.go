@@ -118,6 +118,7 @@ func printIntegrationAPIHelp() {
 	fmt.Println("  knowledge             Call GET /knowledge[/path]")
 	fmt.Println("  knowledge-last-update Call GET /knowledge_lastUpdate")
 	fmt.Println("  knowledge-path        Call GET /knowledge_path")
+	fmt.Println("  whisper               Whisper audio transcription queue endpoints")
 	fmt.Println("")
 	fmt.Println("Examples:")
 	fmt.Println("  integration api heartbeat")
@@ -127,6 +128,7 @@ func printIntegrationAPIHelp() {
 	fmt.Println("  integration api token get")
 	fmt.Println("  integration api token set --body-file ./token.json")
 	fmt.Println("  integration api cron create --help")
+	fmt.Println("  integration api whisper --help")
 	fmt.Println("  integration service cancel --chat chat-001")
 }
 
@@ -418,6 +420,169 @@ func runIntegrationAPIRawBodyCLI(command, usage, description, method, path strin
 	defer cancel()
 	resp, reqErr := integrationAPIRequest(ctx, newIntegrationAPIClient(60*time.Second), method, base, path, buildIntegrationAPIQueryValues(queryFlags, valueFlags), bytes.NewReader(body), strings.TrimSpace(*contentType), nil)
 	return integrationAPIHandleHTTPResult(stdout, stderr, resp, reqErr, *output, *pretty, false)
+}
+
+func printIntegrationAPIWhisperHelp(stdout io.Writer) {
+	fmt.Fprintln(stdout, "Usage:")
+	fmt.Fprintln(stdout, "  integration api whisper <check|list|create|cancel|restart|delete|log> [options]")
+	fmt.Fprintln(stdout, "")
+	fmt.Fprintln(stdout, "Commands:")
+	fmt.Fprintln(stdout, "  check       Check whether the controlled environment can run Whisper")
+	fmt.Fprintln(stdout, "  list        List one Agent's transcription tasks, five tasks per page")
+	fmt.Fprintln(stdout, "  create      Queue one or more audio files in one Agent workspace")
+	fmt.Fprintln(stdout, "  cancel      Cancel a queued or running task")
+	fmt.Fprintln(stdout, "  restart     Requeue one cancelled task")
+	fmt.Fprintln(stdout, "  delete      Delete one failed task record; output files are preserved")
+	fmt.Fprintln(stdout, "  log         Read a task and its persisted execution log")
+	fmt.Fprintln(stdout, "")
+	fmt.Fprintln(stdout, "Examples:")
+	fmt.Fprintln(stdout, "  integration api whisper check")
+	fmt.Fprintln(stdout, "  integration api whisper list --agentId demo-agent --status running --page 1")
+	fmt.Fprintln(stdout, "  integration api whisper create --agentId demo-agent --path audios/meeting.mp3 --path audios/intro.m4a")
+	fmt.Fprintln(stdout, "  integration api whisper cancel --agentId demo-agent --id 12")
+	fmt.Fprintln(stdout, "  integration api whisper log --agentId demo-agent --id 12")
+}
+
+func runIntegrationAPIWhisperCreateCLI(args []string, stdout, stderr io.Writer) int {
+	fs, addr, port, output, pretty := newIntegrationAPICommonFlagSet(
+		"integration api whisper create",
+		"integration api whisper create --agentId ID --path AUDIO_PATH [--path AUDIO_PATH ...] [--addr URL] [--port 8080]",
+		"Call POST /api/whisper/tasks. Each path must be an audio file under the Agent workspace.",
+		stderr,
+	)
+	agentID := fs.String("agentId", "", "agent id")
+	fs.StringVar(agentID, "agent", "", "agent id")
+	var paths integrationStringSliceFlag
+	fs.Var(&paths, "path", "workspace-relative audio path; may be repeated")
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		return 1
+	}
+	if fs.NArg() != 0 {
+		fmt.Fprintf(stderr, "unexpected arguments: %s\n", strings.Join(fs.Args(), " "))
+		return 1
+	}
+	*agentID = strings.TrimSpace(*agentID)
+	cleanedPaths := make([]string, 0, len(paths))
+	for _, path := range paths {
+		if path = strings.TrimSpace(path); path != "" {
+			cleanedPaths = append(cleanedPaths, path)
+		}
+	}
+	if *agentID == "" {
+		fmt.Fprintln(stderr, "--agentId is required")
+		return 1
+	}
+	if len(cleanedPaths) == 0 {
+		fmt.Fprintln(stderr, "at least one --path is required")
+		return 1
+	}
+	body, err := json.Marshal(whisperTaskCreateRequest{AgentID: *agentID, Paths: cleanedPaths})
+	if err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1
+	}
+	base, err := resolveIntegrationAPIBase(*addr, *port)
+	if err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	resp, reqErr := integrationAPIRequest(ctx, newIntegrationAPIClient(60*time.Second), http.MethodPost, base, "/api/whisper/tasks", nil, bytes.NewReader(body), "application/json", nil)
+	return integrationAPIHandleHTTPResult(stdout, stderr, resp, reqErr, *output, *pretty, false)
+}
+
+func runIntegrationAPIWhisperTaskActionCLI(command, path, description string, args []string, stdout, stderr io.Writer) int {
+	fs, addr, port, output, pretty := newIntegrationAPICommonFlagSet(
+		"integration api whisper "+command,
+		"integration api whisper "+command+" --agentId ID --id TASK_ID [--addr URL] [--port 8080]",
+		description,
+		stderr,
+	)
+	agentID := fs.String("agentId", "", "agent id")
+	fs.StringVar(agentID, "agent", "", "agent id")
+	taskID := fs.Int64("id", 0, "whisper task id")
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		return 1
+	}
+	if fs.NArg() != 0 {
+		fmt.Fprintf(stderr, "unexpected arguments: %s\n", strings.Join(fs.Args(), " "))
+		return 1
+	}
+	*agentID = strings.TrimSpace(*agentID)
+	if *agentID == "" {
+		fmt.Fprintln(stderr, "--agentId is required")
+		return 1
+	}
+	if *taskID <= 0 {
+		fmt.Fprintln(stderr, "--id must be a positive integer")
+		return 1
+	}
+	body, err := json.Marshal(map[string]interface{}{"agentId": *agentID, "id": *taskID})
+	if err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1
+	}
+	base, err := resolveIntegrationAPIBase(*addr, *port)
+	if err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	resp, reqErr := integrationAPIRequest(ctx, newIntegrationAPIClient(60*time.Second), http.MethodPost, base, path, nil, bytes.NewReader(body), "application/json", nil)
+	return integrationAPIHandleHTTPResult(stdout, stderr, resp, reqErr, *output, *pretty, false)
+}
+
+func runIntegrationAPIWhisperCLI(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 || strings.TrimSpace(args[0]) == "--help" || strings.TrimSpace(args[0]) == "-h" || strings.TrimSpace(args[0]) == "help" {
+		printIntegrationAPIWhisperHelp(stdout)
+		return 0
+	}
+	switch strings.TrimSpace(args[0]) {
+	case "check":
+		return runIntegrationAPIGenericRequestCLI(integrationAPIGenericRequestSpec{
+			Command: "whisper check", Usage: "integration api whisper check [--addr URL] [--port 8080]",
+			Description: "Call GET /api/whisper/check.", Method: http.MethodGet, Path: "/api/whisper/check",
+		}, args[1:], stdout, stderr)
+	case "list":
+		return runIntegrationAPIGenericRequestCLI(integrationAPIGenericRequestSpec{
+			Command: "whisper list", Usage: "integration api whisper list --agentId ID [--status all|queued|running|completed|cancelled|failed] [--page N] [--addr URL] [--port 8080]",
+			Description: "Call GET /api/whisper/tasks. The server returns five tasks per page.", Method: http.MethodGet, Path: "/api/whisper/tasks",
+			QueryFlags: []integrationAPIQueryFlag{
+				{QueryKey: "agentId", Names: []string{"agentId", "agent"}, Usage: "agent id"},
+				{QueryKey: "status", Names: []string{"status"}, Usage: "all, queued, running, completed, cancelled, or failed"},
+				{QueryKey: "page", Names: []string{"page"}, Usage: "one-based page number"},
+			},
+		}, args[1:], stdout, stderr)
+	case "create":
+		return runIntegrationAPIWhisperCreateCLI(args[1:], stdout, stderr)
+	case "cancel":
+		return runIntegrationAPIWhisperTaskActionCLI("cancel", "/api/whisper/tasks/cancel", "Call POST /api/whisper/tasks/cancel.", args[1:], stdout, stderr)
+	case "restart":
+		return runIntegrationAPIWhisperTaskActionCLI("restart", "/api/whisper/tasks/restart", "Call POST /api/whisper/tasks/restart for one cancelled task.", args[1:], stdout, stderr)
+	case "delete":
+		return runIntegrationAPIWhisperTaskActionCLI("delete", "/api/whisper/tasks/delete", "Call POST /api/whisper/tasks/delete for one failed task record.", args[1:], stdout, stderr)
+	case "log":
+		return runIntegrationAPIGenericRequestCLI(integrationAPIGenericRequestSpec{
+			Command: "whisper log", Usage: "integration api whisper log --agentId ID --id TASK_ID [--addr URL] [--port 8080]",
+			Description: "Call GET /api/whisper/tasks/log.", Method: http.MethodGet, Path: "/api/whisper/tasks/log",
+			QueryFlags: []integrationAPIQueryFlag{
+				{QueryKey: "agentId", Names: []string{"agentId", "agent"}, Usage: "agent id"},
+				{QueryKey: "id", Names: []string{"id"}, Usage: "whisper task id"},
+			},
+		}, args[1:], stdout, stderr)
+	default:
+		fmt.Fprintf(stderr, "unknown whisper api command: %s\n", args[0])
+		printIntegrationAPIWhisperHelp(stderr)
+		return 1
+	}
 }
 
 func printIntegrationAPIAgentHelp() {
@@ -1343,6 +1508,8 @@ func runIntegrationAPICLI(args []string, stdout, stderr io.Writer) int {
 		return runIntegrationAPIDownloadCLI(args[1:], stdout, stderr)
 	case "knowledge":
 		return runIntegrationAPIKnowledgeCLI(args[1:], stdout, stderr)
+	case "whisper":
+		return runIntegrationAPIWhisperCLI(args[1:], stdout, stderr)
 	case "log-round":
 		cfg := &Config{AgentDir: integrationDefaultAgentDir(), AgentCacheMs: 120000}
 		if value, ok := readIntegrationStartupConfigValue("agent-dir"); ok {

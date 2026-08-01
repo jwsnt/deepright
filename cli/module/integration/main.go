@@ -1569,6 +1569,9 @@ func getAgentOutputForChat(root string, deviceID string, ttl time.Duration, chat
 	}
 	cloned := *output
 	hydrateAgentOutput(&cloned, chatID)
+	if _, err := ensureDefaultDisabledSkillsForChat(chatID, skillDirectoriesFromOutput(&cloned)); err != nil {
+		return nil, err
+	}
 	if err := applyChatSkillState(&cloned, chatID); err != nil {
 		return nil, err
 	}
@@ -1883,6 +1886,16 @@ func atMenuOutputForRequest(cfg *Config, chatID string) (*AgentOutput, error) {
 	if cfg == nil || cfg.AtMenuCache == nil {
 		return nil, fmt.Errorf("@ cache is not configured")
 	}
+	chatID = strings.TrimSpace(chatID)
+	if chatID != "" {
+		snapshot, err := cfg.AtMenuCache.snapshotForRequest()
+		if err != nil {
+			return nil, err
+		}
+		if _, err := ensureDefaultDisabledSkillsForChat(chatID, skillDirectoriesFromOutput(snapshot.output)); err != nil {
+			return nil, err
+		}
+	}
 	return cfg.AtMenuCache.outputForRequest(chatID, func() ([]string, error) {
 		return disabledSkillPathsForChat(chatID)
 	})
@@ -2050,7 +2063,13 @@ func readIntegrationSandboxMode(chatID string) string {
 	if chatID == "" {
 		return ""
 	}
-	paths := []string{resolveIntegrationDBPath(), "data"}
+	paths := []string{resolveIntegrationDBPath()}
+	// Keep compatibility with a legacy working-directory database only when it
+	// already exists. Opening a missing relative SQLite path creates it, which
+	// would otherwise write an unsigned data file into a macOS app bundle.
+	if _, err := os.Stat("data"); err == nil {
+		paths = append(paths, "data")
+	}
 	seen := map[string]struct{}{}
 	for _, dbPath := range paths {
 		dbPath = strings.TrimSpace(dbPath)
@@ -2104,6 +2123,39 @@ func disabledSkillPathsForChat(chatID string) ([]string, error) {
 	}
 	defer db.Close()
 	return skillstate.ListDisabledPaths(db, chatID)
+}
+
+func skillDirectoriesFromOutput(output *AgentOutput) []string {
+	if output == nil {
+		return nil
+	}
+	directories := make([]string, 0)
+	for _, agent := range output.Agents {
+		for _, skill := range agent.Skills {
+			location := strings.TrimSpace(skill.Location)
+			if location == "" {
+				continue
+			}
+			directories = append(directories, filepath.Dir(location))
+		}
+	}
+	return directories
+}
+
+func ensureDefaultDisabledSkillsForChat(chatID string, directories []string) ([]string, error) {
+	chatID = strings.TrimSpace(chatID)
+	if chatID == "" {
+		return nil, nil
+	}
+	if cronDB != nil {
+		return skillstate.EnsureDefaultDisabled(cronDB, chatID, directories)
+	}
+	db, err := sql.Open("sqlite", resolveIntegrationDBPath())
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+	return skillstate.EnsureDefaultDisabled(db, chatID, directories)
 }
 
 func filterSkillsByDisabledPaths(skills []agentcore.Skill, disabledPaths []string) []agentcore.Skill {
@@ -2232,6 +2284,11 @@ func integrationApplySeedreamSkill(skills []agentcore.Skill, seedream agentcore.
 	filtered := make([]agentcore.Skill, 0, len(skills)+1)
 	for _, skill := range skills {
 		if strings.TrimSpace(skill.Name) == seedreamInternalSkillName {
+			// Prefer the Agent-local copy when present so the VFS folder switch
+			// and chat metadata use the same persisted skill path.
+			if location := strings.TrimSpace(skill.Location); location != "" {
+				seedream.Location = location
+			}
 			continue
 		}
 		filtered = append(filtered, skill)
@@ -3562,10 +3619,16 @@ func executeExternalCommand(binary string, args []string, rawCmd string, timeout
 	if timeoutMs <= 0 {
 		timeout = sharedutil.DefaultAPICmdTimeout
 	}
+	// Complete the one-time environment probe before the requested command
+	// timeout starts, so dependency discovery cannot consume task runtime.
+	env := sharedutil.CurrentEnvironmentWithSystemPath()
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	c := exec.CommandContext(ctx, binary, args...)
-	c.Env = os.Environ()
+	// Every command, including CLI_SANDBOX.app, receives the same normalized
+	// PATH as the Integration service. This includes dynamically discovered
+	// macOS user-level Python console-script directories.
+	c.Env = env
 	if onStart != nil {
 		onStart(&activeCmd{cancel: cancel, cmd: c, rawCmd: rawCmd})
 	}
@@ -4886,6 +4949,17 @@ type FileEntry struct {
 	SkillDisabled          bool   `json:"skillDisabled,omitempty"`
 	SkillDisabledSelf      bool   `json:"skillDisabledSelf,omitempty"`
 	SkillDisabledInherited bool   `json:"skillDisabledInherited,omitempty"`
+	HasSkills              bool   `json:"hasSkills,omitempty"`
+	SkillCount             int    `json:"skillCount,omitempty"`
+}
+
+// skillDirectoryEntry keeps the valid Skill locations that belong to a
+// top-level skills directory in one VFS response. The locations come from
+// the same scanner used by Agent metadata, so the summary never counts an
+// invalid SKILL.md as an available Skill.
+type skillDirectoryEntry struct {
+	resultIndex int
+	locations   []string
 }
 
 func normalizeQuotedPathArg(path string) string {
@@ -4941,12 +5015,9 @@ func handleFiles() http.HandlerFunc {
 			http.Error(w, "Failed to read directory: "+err.Error(), http.StatusNotFound)
 			return
 		}
-		disabledPaths, err := disabledSkillPathsForChat(r.URL.Query().Get("chatId"))
-		if err != nil {
-			http.Error(w, "Failed to read skill state: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
 		result := make([]FileEntry, 0, len(entries))
+		skillDirectories := make([]string, 0)
+		skillsDirectories := make([]skillDirectoryEntry, 0, 1)
 		for _, e := range entries {
 			if prefix != "" && !strings.HasPrefix(strings.ToLower(e.Name()), strings.ToLower(prefix)) {
 				continue
@@ -4963,11 +5034,53 @@ func handleFiles() http.HandlerFunc {
 				entryPath := filepath.Join(searchDir, e.Name())
 				item.HasSkill = hasDirectSkillMarkdown(entryPath)
 				if item.HasSkill {
-					item.SkillDisabledSelf, item.SkillDisabledInherited = skillstate.DisabledStatus(disabledPaths, entryPath)
-					item.SkillDisabled = item.SkillDisabledSelf || item.SkillDisabledInherited
+					skillDirectories = append(skillDirectories, entryPath)
+				}
+				if strings.EqualFold(e.Name(), "skills") {
+					skills, scanErr := skillscore.ScanAgentSkills(entryPath)
+					if scanErr == nil && len(skills) > 0 {
+						locations := make([]string, 0, len(skills))
+						for _, skill := range skills {
+							location := strings.TrimSpace(skill.Location)
+							if location == "" {
+								continue
+							}
+							locations = append(locations, location)
+							skillDirectories = append(skillDirectories, filepath.Dir(location))
+						}
+						if len(locations) > 0 {
+							item.HasSkills = true
+							skillsDirectories = append(skillsDirectories, skillDirectoryEntry{
+								resultIndex: len(result),
+								locations:   locations,
+							})
+						}
+					}
 				}
 			}
 			result = append(result, item)
+		}
+		chatID := strings.TrimSpace(r.URL.Query().Get("chatId"))
+		disabledPaths, err := ensureDefaultDisabledSkillsForChat(chatID, skillDirectories)
+		if err != nil {
+			http.Error(w, "Failed to read skill state: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		for index := range result {
+			if !result[index].HasSkill {
+				continue
+			}
+			entryPath := filepath.Join(searchDir, result[index].Name)
+			result[index].SkillDisabledSelf, result[index].SkillDisabledInherited = skillstate.DisabledStatus(disabledPaths, entryPath)
+			result[index].SkillDisabled = result[index].SkillDisabledSelf || result[index].SkillDisabledInherited
+		}
+		for _, skillsDirectory := range skillsDirectories {
+			for _, location := range skillsDirectory.locations {
+				selfDisabled, inheritedDisabled := skillstate.DisabledStatus(disabledPaths, location)
+				if !selfDisabled && !inheritedDisabled {
+					result[skillsDirectory.resultIndex].SkillCount++
+				}
+			}
 		}
 		// Keep the API order aligned with the virtual file system.  The Site also
 		// applies this ordering defensively, but returning a deterministic order
@@ -4996,11 +5109,31 @@ type skillStateRequest struct {
 
 func hasDirectSkillMarkdown(dir string) bool {
 	dir = strings.TrimSpace(dir)
-	if dir == "" {
+	if dir == "" || !isWithinSkillsDirectory(dir) {
 		return false
 	}
 	info, err := os.Stat(filepath.Join(dir, "SKILL.md"))
 	return err == nil && !info.IsDir()
+}
+
+// isWithinSkillsDirectory reports whether path is the skills root itself or a
+// descendant of one. SKILL.md files elsewhere are ordinary files and must not
+// be exposed as loadable skills.
+func isWithinSkillsDirectory(path string) bool {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return false
+	}
+	for {
+		if filepath.Base(absPath) == "skills" {
+			return true
+		}
+		parent := filepath.Dir(absPath)
+		if parent == absPath {
+			return false
+		}
+		absPath = parent
+	}
 }
 
 func handleSkillState(cfg *Config) http.HandlerFunc {
@@ -18731,6 +18864,7 @@ func printCLIHelp() {
 	fmt.Println("  integration skills-warning [--refresh]")
 	fmt.Println("  integration file-last-update [options]")
 	fmt.Println("  integration backup-clean [options]")
+	fmt.Println("  integration api whisper <check|list|create|cancel|restart|delete|log> [options]")
 	fmt.Println("  integration connect <subcommand> [options]")
 	fmt.Println("  integration help")
 	fmt.Println("")
@@ -18759,6 +18893,7 @@ func printCLIHelp() {
 	fmt.Println("  skills-warning     Read current SKILL parse warnings from shared sqlite")
 	fmt.Println("  file-last-update   Print milliseconds since the target file was last updated")
 	fmt.Println("  backup-clean       Move stale User/Soul backup files into bak and delete stale bak files")
+	fmt.Println("  api                Call integration HTTP APIs; use `integration api --help`")
 	fmt.Println("  help               Show this help")
 	fmt.Println("")
 	fmt.Println("Help shortcuts:")
@@ -18776,6 +18911,7 @@ func printCLIHelp() {
 	fmt.Println("  integration plugins --help")
 	fmt.Println("  integration connect --help")
 	fmt.Println("  integration api --help")
+	fmt.Println("  integration api whisper --help")
 	fmt.Println("  integration service --help")
 	fmt.Println("  integration notify --help")
 	fmt.Println("  integration skills-warning --refresh")
@@ -20170,6 +20306,12 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/raw", handleRaw(&cfg))
 	mux.HandleFunc("/api/media_preview", handleMediaPreview(&cfg))
 	mux.HandleFunc("/api/ffmpeg/check", handleFFmpegCheck())
+	mux.HandleFunc("/api/whisper/check", handleWhisperCheck())
+	mux.HandleFunc("/api/whisper/tasks", handleWhisperTasks())
+	mux.HandleFunc("/api/whisper/tasks/cancel", handleWhisperTaskCancel())
+	mux.HandleFunc("/api/whisper/tasks/restart", handleWhisperTaskRestart())
+	mux.HandleFunc("/api/whisper/tasks/delete", handleWhisperTaskDelete())
+	mux.HandleFunc("/api/whisper/tasks/log", handleWhisperTaskLog())
 	mux.HandleFunc("/api/video_trim", handleVideoTrim(&cfg))
 	mux.HandleFunc("/api/video_audio_extract_to_audio", handleVideoAudioExtractToAudio(&cfg))
 	mux.HandleFunc("/api/video_audio_edit", handleVideoAudioEdit(&cfg))
@@ -20305,6 +20447,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	startIntegrationDeviceConfigRefresh(ctx, cfg.DeviceState)
 	startIntegrationAtMenuRefresh(ctx, &cfg)
 	initCronDB()
+	startWhisperTaskManager(ctx, &cfg)
 	startIntegrationLogRetentionCleanup(ctx)
 	startIntegrationTempCleanup(ctx, cfg.AgentDir)
 	startIntegrationAgentBackups(ctx, cfg.AgentDir)
@@ -23440,6 +23583,9 @@ func cronCheckOnce(cfg *Config) {
 }
 
 func main() {
+	// Normalize PATH before dispatching any command so subprocesses and the
+	// long-running service share one executable search environment.
+	sharedutil.ApplySystemPath()
 	args := normalizeIntegrationLaunchArgs(os.Args[1:])
 	if shouldHandleIntegrationBundleAppLaunch(args) {
 		os.Exit(handleIntegrationBundleAppLaunch(os.Stderr))

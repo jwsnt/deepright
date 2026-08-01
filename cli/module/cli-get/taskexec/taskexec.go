@@ -2,6 +2,7 @@ package taskexec
 
 import (
 	"bytes"
+	"connect/sharedutil"
 	"context"
 	"io"
 	"os"
@@ -100,12 +101,18 @@ func Execute(rawCmd string, opts Options) Result {
 	if shell == "" {
 		shell = DefaultShell()
 	}
+	// Environment discovery can run a one-time shell probe. Complete it before
+	// starting the task timer so the requested timeout measures command work.
+	env := sharedutil.CurrentEnvironmentWithSystemPath()
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, shell, "-c", rawCmd)
-	cmd.Env = os.Environ()
+	// Match Integration and sandbox task execution exactly: commands always
+	// inherit the canonical normalized environment, rather than depending on
+	// the process launcher having supplied an interactive-shell PATH.
+	cmd.Env = env
 
 	if opts.OnStart != nil {
 		opts.OnStart(&ActiveCmd{

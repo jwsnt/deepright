@@ -745,6 +745,17 @@ func buildBubblewrapArgs(shellPath, cmdText, mode, pickedDir string) ([]string, 
 	for _, path := range sandboxSystemReadOnlyPaths {
 		addBind("--ro-bind", path, path)
 	}
+	// WSL sandbox tasks use --clearenv, so a user-level pip installation is
+	// otherwise invisible even though Integration can find ~/.local/bin. Expose
+	// only executable wrappers and Python site-packages, read-only; never bind
+	// the complete user home or ~/.local data directory into the sandbox.
+	userPythonBin, userPythonSites := sandboxUserPythonRuntimePaths()
+	if userPythonBin != "" {
+		addBind("--ro-bind", userPythonBin, userPythonBin)
+	}
+	for _, site := range userPythonSites {
+		addBind("--ro-bind", site, site)
+	}
 
 	createDir(scratchHome)
 	createDir(filepath.Join(scratchHome, ".config"))
@@ -765,6 +776,10 @@ func buildBubblewrapArgs(shellPath, cmdText, mode, pickedDir string) ([]string, 
 		}
 	}
 
+	commandPath := sandboxCommandPath
+	if userPythonBin != "" {
+		commandPath = userPythonBin + ":" + commandPath
+	}
 	args = append(args,
 		"--chdir", chdir,
 		"--setenv", "HOME", scratchHome,
@@ -773,11 +788,46 @@ func buildBubblewrapArgs(shellPath, cmdText, mode, pickedDir string) ([]string, 
 		"--setenv", "XDG_STATE_HOME", filepath.Join(scratchHome, ".local", "state"),
 		"--setenv", "ZDOTDIR", scratchHome,
 		"--setenv", "TMPDIR", "/tmp",
-		"--setenv", "PATH", sandboxCommandPath,
+	)
+	if len(userPythonSites) > 0 {
+		args = append(args, "--setenv", "PYTHONPATH", strings.Join(userPythonSites, ":"))
+	}
+	args = append(args,
+		"--setenv", "PATH", commandPath,
 		"--setenv", "SHELL", shellPath,
 		shellPath, "-c", cmdText,
 	)
 	return args, nil
+}
+
+func sandboxUserPythonRuntimePaths() (string, []string) {
+	home, err := helperUserHomeDirFn()
+	if err != nil {
+		return "", nil
+	}
+	home = strings.TrimSpace(home)
+	if home == "" {
+		return "", nil
+	}
+
+	bin := filepath.Join(home, ".local", "bin")
+	if info, err := helperStatFn(bin); err != nil || !info.IsDir() {
+		bin = ""
+	}
+
+	sites, err := filepath.Glob(filepath.Join(home, ".local", "lib", "python*", "site-packages"))
+	if err != nil {
+		return bin, nil
+	}
+	validSites := make([]string, 0, len(sites))
+	for _, site := range sites {
+		info, err := helperStatFn(site)
+		if err != nil || !info.IsDir() {
+			continue
+		}
+		validSites = append(validSites, site)
+	}
+	return bin, validSites
 }
 
 func helperDeepRightRuntimeDir() string {

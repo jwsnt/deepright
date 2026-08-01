@@ -4296,7 +4296,7 @@ body.quick-fan-transition-active{cursor:progress}
   .soul-tidy-popover{width:min(520px,calc(100vw - 40px))}
 }
 .vfs-list{flex:1;overflow-y:auto;padding:2px 0}
-.vfs-item{padding:5px 12px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:var(--transition)}
+.vfs-item{position:relative;padding:5px 12px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:var(--transition)}
 .vfs-item:hover{background:var(--bg-card)}
 .vfs-item.selected{background:rgba(var(--accent-rgb),.15)}
 .vfs-item.vfs-drop-target{background:linear-gradient(90deg,rgba(var(--accent-rgb),.28),rgba(var(--accent-rgb),.1) 68%,transparent);box-shadow:inset 3px 0 0 var(--accent),0 0 0 1px rgba(var(--accent-rgb),.34),0 0 18px rgba(var(--accent-rgb),.18);color:var(--text-primary)}
@@ -4325,6 +4325,16 @@ body.quick-fan-transition-active{cursor:progress}
 [data-theme="dark"] .vfs-item .vfs-skill-toggle.disabled:focus-visible{box-shadow:0 0 0 2px rgba(255,90,107,.22)}
 [data-theme="dark"] .vfs-item .vfs-skill-toggle:focus-visible{box-shadow:0 0 0 2px rgba(255,190,132,.16)}
 .vfs-item .vfs-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vfs-item .vfs-skills-summary{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;margin-left:2px;color:#b66016;font-size:11px;font-weight:750;line-height:1;letter-spacing:.01em;cursor:default}
+.vfs-item .vfs-skills-summary.inactive{width:15px;height:15px;margin-left:6px;color:#c56a1d}
+.vfs-item .vfs-skills-summary.inactive svg{width:13px;height:13px;color:currentColor}
+.vfs-item:hover .vfs-skills-summary.session-status,.vfs-item:active .vfs-skills-summary.session-status{display:none}
+.vfs-item .vfs-status-slot{position:absolute;right:12px;top:50%;display:flex;align-items:center;justify-content:center;min-width:15px;min-height:18px;line-height:1;transform:translateY(-50%)}
+.vfs-item .vfs-status-slot .vfs-skills-summary{margin:0}
+.vfs-item.has-vfs-status .vfs-actions{margin-right:21px}
+.vfs-item.has-session-skills-status:hover .vfs-actions,.vfs-item.has-session-skills-status:active .vfs-actions{margin-right:0}
+[data-theme="dark"] .vfs-item .vfs-skills-summary{color:#7df3ff}
+[data-theme="dark"] .vfs-item .vfs-skills-summary.inactive{color:#8ef4ff}
 .vfs-item .vfs-actions{display:flex;align-items:center;justify-content:flex-end;gap:4px;flex:0 0 auto;min-width:78px}
 .vfs-item .vfs-repair-btn{width:16px;height:16px;border:none;background:transparent;color:var(--error);display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;cursor:pointer;animation:vfsWarningPulse .32s steps(2,end) infinite}
 .vfs-item .vfs-repair-btn:hover{color:#ff7a18;transform:scale(1.08)}
@@ -4335,11 +4345,15 @@ body.quick-fan-transition-active{cursor:progress}
 .vfs-item .vfs-path-copy,.vfs-item .vfs-del{width:15px;height:15px;border:none;background:transparent;cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity .16s ease,visibility 0s linear .16s}
 .vfs-item:hover .vfs-path-copy,.vfs-item:hover .vfs-del{opacity:.5;visibility:visible;pointer-events:auto;transition:opacity .16s ease}
 .vfs-item .vfs-path-copy:hover,.vfs-item .vfs-del:hover{opacity:1}
-.vfs-item .vfs-path-copy svg,.vfs-item .vfs-del svg{width:15px;height:15px;color:var(--text-muted)}
+.vfs-item .vfs-path-copy svg,.vfs-item .vfs-del svg{width:15px;height:15px;color:var(--accent)}
 .vfs-item .vfs-dl{width:18px;height:18px;border:none;background:transparent;cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity .16s ease,visibility 0s linear .16s}
 .vfs-item:hover .vfs-dl{opacity:.5;visibility:visible;pointer-events:auto;transition:opacity .16s ease}
 .vfs-item .vfs-dl:hover{opacity:1}
 .vfs-item .vfs-dl svg{width:18px;height:18px;color:var(--accent)}
+.vfs-item .vfs-whisper-task{width:18px;height:18px;border:none;background:transparent;cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity .16s ease,visibility 0s linear .16s}
+.vfs-item:hover .vfs-whisper-task{opacity:.5;visibility:visible;pointer-events:auto;transition:opacity .16s ease}
+.vfs-item .vfs-whisper-task:hover{opacity:1}
+.vfs-item .vfs-whisper-task svg{width:17px;height:17px;color:var(--accent);fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .vfs-item .vfs-soul-btn{width:18px;height:18px;border:none;background:transparent;cursor:pointer;padding:0;display:none;align-items:center;justify-content:center;flex-shrink:0;color:#95a0b5;opacity:.92;filter:none;transition:transform .18s ease,color .18s ease,filter .18s ease,opacity .18s ease}
 .vfs-item:hover .vfs-soul-btn,.vfs-item .vfs-soul-btn.show{display:flex}
 .vfs-item .vfs-soul-btn svg{width:18px;height:18px;color:currentColor}
@@ -4404,6 +4418,7 @@ body.quick-fan-transition-active{cursor:progress}
 .file-editor-color-picker-btn{width:28px;height:28px;border:0;border-radius:8px;padding:0;background:transparent;color:#48638f;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition)}
 .file-editor-color-picker-btn[hidden]{display:none!important}
 .file-editor-color-picker-btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+#feAudioTrimBtn svg,#feWhisperTaskBtn svg{width:16px;height:16px}
 #feVideoFrameBtn svg{width:20px;height:20px}#feVideoAudioExtractBtn svg{width:14px;height:14px}
 .file-editor-color-picker-btn .video-frame-unavailable-mark{display:none;stroke:var(--error);stroke-width:2.8}.file-editor-color-picker-btn.video-frame-playing{opacity:.78}.file-editor-color-picker-btn.video-frame-playing .video-frame-unavailable-mark{display:inline}
 .file-editor-color-picker-btn:hover,.file-editor-color-picker-btn[aria-pressed="true"]{background:rgba(var(--accent-rgb),.12);color:var(--accent);transform:translateY(-1px)}
@@ -4452,6 +4467,9 @@ body.quick-fan-transition-active{cursor:progress}
 .fe-media-status{display:none;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--error)}
 .fe-media-status:not(:empty){display:inline}
 .file-editor-overlay.audio-trim-active #feAudioTrimBtn,.file-editor-overlay.video-trim-active #feVideoTrimBtn,.file-editor-overlay.video-audio-edit-active #feVideoAudioExtractBtn{background:rgba(var(--accent-rgb),.16);color:var(--accent)}
+.whisper-task-panel{width:min(860px,calc(100vw - 36px));max-height:min(720px,calc(100vh - 36px));display:flex;flex-direction:column;overflow:hidden}.whisper-task-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border)}.whisper-task-head h3{margin:0;color:var(--text-primary);font-size:16px}.whisper-task-close{margin-left:auto;width:28px;height:28px;border:0;border-radius:8px;background:transparent;color:var(--text-muted);font-size:21px;line-height:1;cursor:pointer}.whisper-task-close:hover{background:rgba(var(--accent-rgb),.1);color:var(--accent)}.whisper-task-body{min-height:0;overflow:auto;padding:14px 16px}.whisper-task-add{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px;border:1px dashed color-mix(in srgb,var(--accent) 55%,var(--border));border-radius:11px;background:color-mix(in srgb,var(--accent) 6%,var(--bg-card))}.whisper-task-add-copy{display:flex;flex-direction:column;gap:3px;color:var(--text-secondary);font-size:12px}.whisper-task-add button,.whisper-task-foot button,.whisper-task-row button,.whisper-task-confirm-actions button,.whisper-task-pagination button,.whisper-task-pending button{height:31px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg-input);color:var(--text-secondary);font-size:12px;font-weight:650;cursor:pointer}.whisper-task-add button,.whisper-task-foot .primary,.whisper-task-confirm-actions .primary{border-color:transparent;background:linear-gradient(135deg,var(--accent-hover),var(--accent));color:#fff}.whisper-task-add button:disabled,.whisper-task-foot button:disabled,.whisper-task-row button:disabled,.whisper-task-pagination button:disabled,.whisper-task-pending button:disabled{opacity:.55;cursor:not-allowed}.whisper-task-pending{margin-top:10px;padding:10px 12px;border:1px solid color-mix(in srgb,var(--border) 72%,transparent);border-radius:10px;background:color-mix(in srgb,var(--bg-main) 70%,var(--bg-card));color:var(--text-secondary);font-size:12px}.whisper-task-pending-head{margin-bottom:7px;font-weight:700}.whisper-task-pending-list{display:flex;flex-direction:column;gap:5px}.whisper-task-pending-item{display:flex;align-items:center;gap:8px;min-width:0;padding:5px 0;border-top:1px solid color-mix(in srgb,var(--border) 54%,transparent)}.whisper-task-pending-item:first-child{border-top:0}.whisper-task-pending-item .whisper-task-path{flex:1;min-width:0}.whisper-task-pending-item button{height:26px;padding:0 8px;color:var(--error);font-size:11px}.whisper-task-path{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text-muted)}.whisper-task-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;color:var(--text-secondary);font-size:12px}.whisper-task-filter{display:flex;align-items:center;gap:7px}.whisper-task-filter select{height:30px;padding:0 26px 0 8px;border:1px solid var(--border);border-radius:8px;background:var(--bg-input);color:var(--text-secondary);font-size:12px;cursor:pointer}.whisper-task-count{color:var(--text-muted);font-size:11px}.whisper-task-list{display:flex;flex-direction:column;gap:9px;margin-top:10px}.whisper-task-empty{padding:26px 12px;color:var(--text-muted);text-align:center;font-size:12px}.whisper-task-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:11px 12px;border:1px solid var(--border);border-radius:11px;background:var(--bg-card)}.whisper-task-row-main{min-width:0}.whisper-task-row-title{display:flex;align-items:center;gap:8px;min-width:0;color:var(--text-primary);font-size:12px;font-weight:700}.whisper-task-row-title strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.whisper-task-status{flex:0 0 auto;padding:2px 6px;border-radius:999px;background:color-mix(in srgb,var(--accent) 13%,var(--bg-input));color:var(--accent);font-size:10px}.whisper-task-status.failed,.whisper-task-status.cancelled{background:color-mix(in srgb,var(--error) 12%,var(--bg-input));color:var(--error)}.whisper-task-status.completed{background:rgba(57,140,90,.13);color:#27804d}.whisper-task-row-inline-actions{display:flex;align-items:center;gap:5px;min-width:0}.whisper-task-row-inline-actions button{height:25px;padding:0 8px;font-size:11px}.whisper-task-row-inline-actions .danger{color:var(--error)}.whisper-task-progress{height:5px;margin:8px 0 6px;overflow:hidden;border-radius:999px;background:color-mix(in srgb,var(--border) 58%,transparent)}.whisper-task-progress i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--accent-hover),var(--accent));transition:width .2s ease}.whisper-task-meta{display:flex;flex-wrap:nowrap;align-items:center;gap:12px;min-width:0;color:var(--text-muted);font-size:10px}.whisper-task-meta span{min-width:0}.whisper-task-output{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text-muted)}.whisper-task-row-actions{display:flex;align-self:stretch;align-items:flex-end;justify-content:flex-end}.whisper-task-pagination{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:12px}.whisper-task-pagination span{min-width:72px;color:var(--text-muted);text-align:center;font-size:11px}.whisper-task-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 16px;border-top:1px solid var(--border)}.whisper-task-foot-actions{display:inline-flex;align-items:center;gap:10px}.whisper-task-foot-status{min-height:16px;color:var(--text-muted);font-size:11px}.whisper-task-foot-status.notice{color:var(--accent)}.whisper-task-foot-status.error{color:var(--error)}.whisper-task-log{margin-top:12px;overflow:hidden;border:1px solid var(--border);border-radius:10px;background:var(--bg-main)}.whisper-task-log-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text-secondary);font-size:11px;font-weight:700}.whisper-task-log pre{max-height:190px;overflow:auto;margin:0;padding:10px;color:var(--text-secondary);font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-word}.whisper-task-confirm{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(18,18,18,.18);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}.whisper-task-confirm[hidden]{display:none!important}.whisper-task-confirm-card{width:min(390px,100%);padding:18px;border:1px solid color-mix(in srgb,var(--border) 65%,var(--accent) 35%);border-radius:15px;background:var(--bg-card);box-shadow:0 22px 54px rgba(0,0,0,.22)}.whisper-task-confirm-card h4{margin:0;color:var(--text-primary);font-size:15px}.whisper-task-confirm-card p{margin:8px 0 0;color:var(--text-secondary);font-size:12px;line-height:1.55}.whisper-task-confirm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:15px}@media(max-width:620px){.whisper-task-row{grid-template-columns:1fr}.whisper-task-row-actions{min-height:31px}.whisper-task-add{align-items:flex-start;flex-direction:column}.whisper-task-add button{width:100%}.whisper-task-toolbar{align-items:flex-start;flex-direction:column}}
+.whisper-task-row-actions{flex-direction:column;justify-content:flex-end;align-items:flex-end}.whisper-task-row-actions>button{margin-top:auto}.whisper-task-log-head .whisper-task-log-toggle{width:26px;height:26px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:7px;background:transparent;color:var(--text-muted);cursor:pointer}.whisper-task-log-head .whisper-task-log-toggle:hover{background:rgba(var(--accent-rgb),.12);color:var(--accent)}.whisper-task-log-toggle svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.whisper-task-toolbar{justify-content:flex-start}.whisper-task-count{margin-left:auto}.whisper-task-batch-actions{display:flex;align-items:center;gap:6px;max-width:0;overflow:hidden;opacity:0;pointer-events:none;transform:translateX(-6px);transition:max-width .18s ease,opacity .16s ease,transform .18s ease}.whisper-task-batch-actions.active{max-width:180px;opacity:1;pointer-events:auto;transform:translateX(0)}.whisper-task-batch-actions button{height:28px;padding:0 9px;border:1px solid var(--border);border-radius:8px;background:var(--bg-input);color:var(--text-secondary);font-size:11px;font-weight:650;white-space:nowrap;cursor:pointer}.whisper-task-batch-actions button:hover{border-color:rgba(var(--accent-rgb),.48);color:var(--accent)}.whisper-task-complete-select{width:16px;height:16px;flex:0 0 auto;margin:0;accent-color:var(--accent);cursor:pointer}
 .file-editor-overlay.audio-trim-active .fe-media-progress,.file-editor-overlay.audio-trim-active .fe-media-volume,.file-editor-overlay.video-trim-active .fe-media-progress,.file-editor-overlay.video-trim-active .fe-media-volume{accent-color:var(--accent)}
 .fe-media-trim-save-lock{position:absolute;inset:0;z-index:12;display:flex;align-items:center;justify-content:center;padding:24px;background:color-mix(in srgb,var(--bg-main) 52%,rgba(255,255,255,.74));backdrop-filter:blur(3px) saturate(120%);-webkit-backdrop-filter:blur(3px) saturate(120%);cursor:wait}
 .fe-media-trim-save-lock[hidden]{display:none!important}
@@ -4466,6 +4484,7 @@ body.quick-fan-transition-active{cursor:progress}
 .fe-ffmpeg-install-dialog[hidden]{display:none!important}
 .fe-ffmpeg-install-card{width:min(390px,100%);padding:20px;border:1px solid color-mix(in srgb,var(--border) 60%,var(--accent) 40%);border-radius:16px;background:color-mix(in srgb,var(--bg-card) 88%,rgba(255,255,255,.92));box-shadow:0 24px 54px rgba(81,43,28,.24)}
 .fe-ffmpeg-install-card h3{margin:0;color:var(--text-primary);font-size:16px}.fe-ffmpeg-install-card p{margin:8px 0 0;color:var(--text-secondary);font-size:13px;line-height:1.55}.fe-ffmpeg-install-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.fe-ffmpeg-install-actions button{min-width:78px;height:32px;border:1px solid var(--border);border-radius:9px;background:var(--bg-input);color:var(--text-secondary);font-size:12px;font-weight:650;cursor:pointer}.fe-ffmpeg-install-actions .confirm{border-color:transparent;background:linear-gradient(135deg,var(--accent-hover),var(--accent));color:#fff}
+.dependency-check-lock{position:fixed;inset:0;z-index:255;display:flex;align-items:center;justify-content:center;padding:24px;background:color-mix(in srgb,var(--bg-main) 48%,rgba(255,255,255,.5));backdrop-filter:blur(4px) saturate(120%);-webkit-backdrop-filter:blur(4px) saturate(120%);cursor:wait}.dependency-check-lock[hidden]{display:none!important}.dependency-check-lock-card{display:flex;align-items:center;gap:10px;max-width:min(360px,100%);padding:14px 17px;border:1px solid color-mix(in srgb,var(--accent) 42%,var(--border));border-radius:13px;background:var(--bg-card);box-shadow:0 18px 42px rgba(0,0,0,.18);color:var(--text-primary);font-size:13px;font-weight:700;line-height:1.4}.dependency-check-lock-spinner{width:18px;height:18px;flex:0 0 auto;border:2px solid rgba(var(--accent-rgb),.2);border-top-color:var(--accent);border-radius:50%;animation:feMediaTrimSaveSpin .72s linear infinite}
 @media (max-width:680px){.file-editor-media-controls{flex-wrap:wrap}.fe-media-progress{order:3;flex-basis:100%}.fe-media-status{max-width:100%}.fe-media-volume-wrap{margin-left:auto}.fe-color-picker-toast.media,.fe-coordinate-picker-progress.media{bottom:98px}}
 .fe-image-editor{display:flex;flex-direction:column;gap:12px;padding:12px}
 .fe-image-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
@@ -4566,7 +4585,7 @@ body.quick-fan-transition-active{cursor:progress}
 [data-theme="dark"] .fe-audio-trim-actions button.confirm,[data-theme="dark"] .fe-video-trim-actions button.confirm{border-color:#43cffa;background:#168dcc;color:#eefaff;box-shadow:0 9px 20px rgba(22,141,204,.26)}
 [data-theme="dark"] .fe-media-trim-save-lock{background:rgba(7,16,31,.68)}
 [data-theme="dark"] .fe-media-trim-save-lock-card{border-color:rgba(var(--accent-soft-rgb),.28);background:rgba(13,29,54,.92);box-shadow:0 18px 38px rgba(0,0,0,.34);color:#e7f8ff}
-[data-theme="dark"] .fe-media-trim-filename-dialog,[data-theme="dark"] .fe-ffmpeg-install-dialog{background:rgba(3,10,22,.52)}[data-theme="dark"] .fe-media-trim-filename-card,[data-theme="dark"] .fe-ffmpeg-install-card{border-color:rgba(var(--accent-soft-rgb),.28);background:rgba(13,29,54,.96);box-shadow:0 24px 52px rgba(0,0,0,.42)}[data-theme="dark"] .fe-media-trim-filename-input{border-color:rgba(169,190,227,.24);background:rgba(255,255,255,.08);color:#e7f8ff}[data-theme="dark"] .fe-media-trim-filename-actions button,[data-theme="dark"] .fe-ffmpeg-install-actions button{border-color:rgba(169,190,227,.22);background:rgba(255,255,255,.08);color:#d5e4ff}[data-theme="dark"] .fe-media-trim-filename-actions .confirm,[data-theme="dark"] .fe-ffmpeg-install-actions .confirm{border-color:transparent;background:linear-gradient(135deg,var(--accent),rgb(var(--accent-soft-rgb)));color:#102033}
+[data-theme="dark"] .fe-media-trim-filename-dialog,[data-theme="dark"] .fe-ffmpeg-install-dialog{background:rgba(3,10,22,.52)}[data-theme="dark"] .fe-media-trim-filename-card,[data-theme="dark"] .fe-ffmpeg-install-card{border-color:rgba(var(--accent-soft-rgb),.28);background:rgba(13,29,54,.96);box-shadow:0 24px 52px rgba(0,0,0,.42)}[data-theme="dark"] .fe-media-trim-filename-input{border-color:rgba(169,190,227,.24);background:rgba(255,255,255,.08);color:#e7f8ff}[data-theme="dark"] .fe-media-trim-filename-actions button,[data-theme="dark"] .fe-ffmpeg-install-actions button{border-color:rgba(169,190,227,.22);background:rgba(255,255,255,.08);color:#d5e4ff}[data-theme="dark"] .fe-media-trim-filename-actions .confirm,[data-theme="dark"] .fe-ffmpeg-install-actions .confirm{border-color:transparent;background:linear-gradient(135deg,var(--accent),rgb(var(--accent-soft-rgb)));color:#102033}[data-theme="dark"] .dependency-check-lock{background:rgba(3,10,22,.62)}[data-theme="dark"] .dependency-check-lock-card{border-color:rgba(var(--accent-soft-rgb),.3);background:rgba(13,29,54,.96);box-shadow:0 20px 44px rgba(0,0,0,.38);color:#e7f8ff}
 [data-theme="dark"] .fe-media-control-btn{background:rgba(255,255,255,.08);border-color:rgba(169,190,227,.22);color:#d5e4ff}
 [data-theme="dark"] .fe-media-control-btn:hover:not(:disabled){background:rgba(255,255,255,.14);border-color:rgba(169,190,227,.4);color:#fff}
 [data-theme="dark"] .file-editor-tab{color:#c8daf8}
@@ -6277,6 +6296,20 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
 <footer class="vfs-mix-foot"><div class="vfs-mix-export"><label>常用导出 <select id="vfsMixExportPreset" onchange="vfsMixApplyExportPreset(this.value)"><option value="">请选择</option><option value="music_release">音乐发布</option><option value="video_voice">视频配音</option><option value="post_production">后期编辑</option><option value="music_master">高质量音乐</option></select></label><label>采样率 <select id="vfsMixSampleRate" onchange="vfsMixSetExport('sampleRate',this.value)"><option value="44100">44.1 kHz</option><option value="48000">48 kHz</option></select></label><label>位深 <select id="vfsMixBitDepth" onchange="vfsMixSetExport('bitDepth',this.value)"><option value="16">16-bit</option><option value="24">24-bit</option></select></label></div><span class="vfs-mix-status" id="vfsMixStatus" role="status" aria-live="polite"></span><button class="btn btn-secondary" id="vfsMixPreviewBtn" type="button" onclick="vfsMixPreview()">试听</button><button class="btn btn-secondary" type="button" onclick="vfsMixClose()">关闭</button><button class="btn btn-primary" id="vfsMixSaveBtn" type="button" onclick="vfsMixSave()">保存 WAV</button></footer>
   </section>
 </div>
+<div class="overlay" id="whisperTaskOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="30" onclick="if(event.target===this)feWhisperTaskClose()" aria-hidden="true">
+  <section class="settings-panel whisper-task-panel" id="whisperTaskPanel" role="dialog" aria-modal="true" aria-labelledby="whisperTaskTitle" onclick="event.stopPropagation()">
+    <header class="whisper-task-head"><h3 id="whisperTaskTitle">提取音频文字</h3><button class="whisper-task-close" type="button" onclick="feWhisperTaskClose()" aria-label="关闭音频文字任务">×</button></header>
+    <div class="whisper-task-body">
+      <div class="whisper-task-add"><span class="whisper-task-add-copy">添加更多音频任务</span><button id="whisperTaskAddBtn" type="button" onclick="feWhisperTaskChooseFiles()">添加</button></div>
+      <div class="whisper-task-pending" id="whisperTaskPending" hidden></div>
+      <div class="whisper-task-toolbar"><label class="whisper-task-filter">状态 <select id="whisperTaskStatusFilter" onchange="feWhisperTaskChangeStatus(this.value)"><option value="">全部</option><option value="queued">排队中</option><option value="running">执行中</option><option value="completed">已完成</option><option value="cancelled">已取消</option><option value="failed">失败</option></select></label><span class="whisper-task-batch-actions" id="whisperTaskBatchActions" aria-label="已勾选文字文件操作"><button type="button" onclick="feWhisperTaskCopySelectedOutputs()">复制</button><button type="button" onclick="feWhisperTaskClearSelectedOutputs()">清空</button></span><span class="whisper-task-count" id="whisperTaskCount"></span></div>
+      <div class="whisper-task-list" id="whisperTaskList" aria-live="polite"></div>
+      <nav class="whisper-task-pagination" aria-label="音频文字任务分页"><button id="whisperTaskPreviousPage" type="button" onclick="feWhisperTaskChangePage(-1)">上一页</button><span id="whisperTaskPageLabel"></span><button id="whisperTaskNextPage" type="button" onclick="feWhisperTaskChangePage(1)">下一页</button></nav>
+      <div class="whisper-task-log" id="whisperTaskLog" hidden><div class="whisper-task-log-head"><span id="whisperTaskLogTitle">执行日志</span><button class="whisper-task-log-toggle" type="button" onclick="feWhisperTaskCloseLog()" title="收起日志" aria-label="收起日志"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 14 5-5 5 5"/></svg></button></div><pre id="whisperTaskLogText"></pre></div>
+    </div>
+    <footer class="whisper-task-foot"><span class="whisper-task-foot-status" id="whisperTaskStatus" role="status" aria-live="polite"></span><span class="whisper-task-foot-actions"><button id="whisperTaskCloseBtn" type="button" onclick="feWhisperTaskClose()">关闭</button><button class="primary" id="whisperTaskStartBtn" type="button" onclick="feWhisperTaskStart()">开始</button></span></footer>
+  </section>
+</div>
 <div class="overlay" id="vfsAudioOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="29" onclick="if(event.target===this)vfsAudioRequestCancel()" aria-hidden="true">
   <section class="settings-panel vfs-audio-panel" id="vfsAudioPanel" role="dialog" aria-modal="true" aria-labelledby="vfsAudioTitle" onclick="event.stopPropagation()">
     <div class="vfs-audio-shell">
@@ -6561,6 +6594,9 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
         <button class="file-editor-color-picker-btn" type="button" id="feAudioTrimBtn" onclick="feEnterAudioTrim()" aria-label="裁剪音频" aria-pressed="false" title="裁剪音频" hidden>
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="m8.2 7.2 11 7.8"/><path d="m8.2 16.8 11-7.8"/></svg>
         </button>
+        <button class="file-editor-color-picker-btn" type="button" id="feWhisperTaskBtn" onclick="feOpenWhisperTasks()" aria-label="提取音频文字" title="提取音频文字" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h14v11H9l-4 4V4.5Z"/><path d="M8.5 8h7M8.5 11h5"/><path d="m15.5 19 1.5 1.5 3-3"/></svg>
+        </button>
         <button class="file-editor-color-picker-btn" type="button" id="feVideoAudioExtractBtn" onclick="feExtractVideoAudio()" aria-label="剪辑音频" title="剪辑音频" hidden>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/><path d="M12 20h8"/><path d="m18 17 2 3-2 3" transform="translate(0 -2)"/></svg>
         </button>
@@ -6689,6 +6725,16 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     <h3 id="feFFmpegInstallTitle">需要安装 FFmpeg</h3>
     <p id="feFFmpegInstallDesc">是否发送安装请求？</p>
     <div class="fe-ffmpeg-install-actions"><button type="button" onclick="feCancelFFmpegInstall()">取消</button><button class="confirm" type="button" id="feFFmpegInstallConfirmBtn" onclick="feConfirmFFmpegInstall()">安装</button></div>
+  </div>
+</div>
+<div class="dependency-check-lock" id="dependencyCheckLock" role="status" aria-live="assertive" aria-atomic="true" aria-label="正在检查依赖，界面已锁定" tabindex="-1" hidden>
+  <div class="dependency-check-lock-card"><span class="dependency-check-lock-spinner" aria-hidden="true"></span><span id="dependencyCheckLockText">正在检查依赖，请稍候…</span></div>
+</div>
+<div class="fe-ffmpeg-install-dialog" id="feWhisperInstallDialog" role="dialog" aria-modal="true" aria-labelledby="feWhisperInstallTitle" aria-describedby="feWhisperInstallDesc" hidden onclick="feHandleWhisperInstallDialogClick(event)">
+  <div class="fe-ffmpeg-install-card" tabindex="-1" onclick="event.stopPropagation()">
+    <h3 id="feWhisperInstallTitle">需要安装 Whisper</h3>
+    <p id="feWhisperInstallDesc">是否发送安装请求？</p>
+    <div class="fe-ffmpeg-install-actions"><button type="button" onclick="feCancelWhisperInstall()">取消</button><button class="confirm" type="button" id="feWhisperInstallConfirmBtn" onclick="feConfirmWhisperInstall()">安装</button></div>
   </div>
 </div>
 <div class="overlay shutdown-overlay" id="shutdownConfirmOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="59" aria-hidden="true">
@@ -7155,6 +7201,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
 <input type="file" id="vfsUploadDirInput" webkitdirectory multiple style="display:none" onchange="vfsUploadFiles(this.files)" />
 <input type="file" id="vfsMixFileInput" accept="audio/*,.wav,.mp3,.m4a,.aac,.flac,.ogg,.opus,.aif,.aiff,.wma" multiple style="display:none" onchange="vfsMixHandleChosenFiles(this.files)" />
 <input type="file" id="feVideoAudioEditFileInput" accept="audio/*,.wav,.mp3,.m4a,.aac,.flac,.ogg,.opus,.aif,.aiff,.wma" multiple style="display:none" onchange="feVideoAudioEditHandleFiles(this.files)" />
+<input type="file" id="whisperTaskFileInput" accept="audio/*,.wav,.mp3,.m4a,.aac,.flac,.ogg,.opus,.aif,.aiff,.wma" multiple style="display:none" onchange="feWhisperTaskHandleFiles(this.files)" />
 <input type="file" id="vfsReferenceFileInput" accept=".txt,.text,.md,.markdown,.mdx,.json,.html,.htm,.xml,.yaml,.yml,.toml,.ini,.cfg,.conf,.log,.csv,.sh,.bash,.zsh,.go,.js,.ts,.py,.java,.c,.cpp,.h,.hpp,.css,.scss,.less,.sql,.rb,.rs,.swift,.kt,.lua,.pl,.r,.m,.mm,.pdf,text/plain,text/markdown,application/json,text/html,application/pdf" style="display:none" onchange="vfsReferenceHandleSelection(this.files)" />
 <input type="file" id="agentImportZipInput" accept=".zip,application/zip" style="display:none" onchange="handleAgentImportZipSelection(this.files)" />
 <input type="file" id="agentImportDirInput" webkitdirectory multiple style="display:none" onchange="handleAgentImportDirectorySelection(this.files)" />
@@ -7374,7 +7421,7 @@ const MESSAGE_IMAGE_CACHE = 'deepright-message-images-v1';
 const MESSAGE_IMAGE_DB = 'deepright-message-images-db';
 const MESSAGE_IMAGE_STORE = 'images';
 const REMOTE_MASKED_TOKEN_VALUE = '**********';
-const MAX_STORE = 2000, MAX_SHOW = 500, LAZY_PAGE = 20, MAX_CLI_SUB_SHOW = 100, MAX_CLI_COMMAND_HISTORY = 100, MAX_CLI_COMMAND_HISTORY_BYTES = 5 * 1024 * 1024, COLD_HISTORY_RECORD_PAGE = 120;
+const MAX_STORE = 2000, MAX_SHOW = 500, LAZY_PAGE = 20, MAX_CLI_SUB_SHOW = 100, MAX_CLI_COMMAND_HISTORY = 100, MAX_CLI_SUB_ENTRY_BYTES = 96 * 1024, COLD_HISTORY_RECORD_PAGE = 120;
 const LOCAL_STORAGE_SOFT_LIMIT_BYTES = Math.round(2.5 * 1024 * 1024);
 const LOCAL_STORAGE_COMPACT_TARGET_BYTES = Math.round(2 * 1024 * 1024);
 const LOCAL_STORAGE_MAINTENANCE_INTERVAL_MS = 30000;
@@ -13737,7 +13784,7 @@ function getOnboardingStepConfig(step) {
       return {
         domain: 'left',
         selector: '#vfsSkillDisableTourItem',
-        message: '禁用技能为会话级别，再次点击可开启。',
+        message: '技能默认关闭；需要使用时，点击图标即可在当前会话开启。',
         actionLabel: '完成',
         padding: 8,
         highlightPadding: 12,
@@ -15098,6 +15145,7 @@ const ONBOARDING_CENTER_FLOAT_CONTAINER_SELECTORS = [
   '#vfsDelOverlay',
   '#agentDelOverlay',
   '#vfsCreateOverlay',
+  '#whisperTaskOverlay',
   '#vfsAudioOverlay',
   '#vfsScreenOverlay',
   '#vfsUploadOverlay',
@@ -15319,6 +15367,9 @@ function hideExclusiveOverlayById(id) {
       return true;
     case 'vfsCreateOverlay':
       vfsHideCreate();
+      return true;
+    case 'whisperTaskOverlay':
+      feWhisperTaskClose();
       return true;
     case 'vfsAudioOverlay':
       vfsAudioDiscard(false);
@@ -30074,7 +30125,8 @@ function shouldPersistAssistantRawSse(msg) {
 
 function finalizeAssistantTransientFields(msg) {
   if (!msg || msg.role !== 'assistant') return msg;
-  if (msg._cliSubContent && !msg.cliSubContent) msg.cliSubContent = msg._cliSubContent;
+  if (msg._cliSubContent && !msg.cliSubContent) msg.cliSubContent = sanitizeCliSubContent(msg._cliSubContent);
+  if (msg.cliSubContent) msg.cliSubContent = sanitizeCliSubContent(msg.cliSubContent);
   if (msg._cliSubGroupId && !msg.cliSubGroupId) msg.cliSubGroupId = msg._cliSubGroupId;
   if (msg._cliSubOnly) msg.cliSubOnly = true;
   const explosionSnapshots = normalizeAssistantExplosionSnapshots(
@@ -30897,7 +30949,7 @@ function normalizeCliCommandHistoryEntry(entry) {
     id: String(entry.id || '').trim() || ('manual-cmd:' + uuid()),
     type: 'manual-cmd',
     command,
-    output: String(entry.output || ''),
+    output: sanitizeCliSubContent(entry.output),
     ok: entry.ok === true ? true : (entry.ok === false ? false : null),
     done: entry.done === false ? false : true,
     createdAt,
@@ -37142,13 +37194,75 @@ function bindCliSubBubbleHover(el) {
 }
 
 function normalizeCliCopyContent(content) {
-  const value = String(content || '').trim();
+  const value = sanitizeCliSubContent(content).trim();
   const match = value.match(/^```[^\n`]*\n([\s\S]*?)\n```$/);
   return match ? match[1] : value;
 }
 
-function splitCliSubSegments(content) {
+const CLI_SUB_BINARY_NOTICE_MARKER = '[已隐藏二进制输出';
+const CLI_SUB_BINARY_SCAN_CHARS = 192 * 1024;
+const CLI_SUB_BINARY_PREFIX_MAX_CHARS = 4096;
+const CLI_SUB_RENDER_MAX_CHARS = 96 * 1024;
+
+function findCliSubBinaryContentIndex(value) {
+  const text = String(value || '');
+  const sample = text.slice(0, CLI_SUB_BINARY_SCAN_CHARS);
+  if (!sample) return -1;
+  // Go's JSON encoder replaces invalid UTF-8 bytes with U+FFFD.  PNG output
+  // therefore commonly arrives as "�PNG" instead of its original 0x89 byte.
+  const magicMatch = /(?:\uFFFD|\x89)PNG\r?\n|\xFF\xD8\xFF|GIF8[79]a|PK[\x03\x05\x07]\x04|\x1F\x8B\x08|\x7FELF/.exec(sample);
+  if (magicMatch && Number.isFinite(magicMatch.index)) return magicMatch.index;
+
+  let firstReplacement = -1;
+  let replacementCount = 0;
+  for (let index = 0; index < sample.length; index++) {
+    const code = sample.charCodeAt(index);
+    if (code === 0 || code === 0x7f || (code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d)) return index;
+    if (code === 0xfffd) {
+      if (firstReplacement < 0) firstReplacement = index;
+      replacementCount += 1;
+    }
+  }
+  // A handful of replacement characters in a short output is a strong sign
+  // that raw bytes were decoded as text.  Do not treat an occasional genuine
+  // replacement glyph in normal prose as binary.
+  if (firstReplacement >= 0 && replacementCount >= 3 && (replacementCount >= 8 || replacementCount * 200 >= sample.length)) return firstReplacement;
+  return -1;
+}
+
+function closeCliSubMarkdownFence(value) {
+  const text = String(value || '');
+  const fences = text.match(/^(?:`{3,}|~{3,})[^\n]*$/gm) || [];
+  if (fences.length % 2 === 0) return text;
+  const fence = (fences[fences.length - 1].match(/^(?:`{3,}|~{3,})/) || ['```'])[0];
+  return `${text}\n${fence}`;
+}
+
+function sanitizeCliSubContent(content) {
   const value = String(content || '');
+  if (!value) return '';
+  if (value.includes(CLI_SUB_BINARY_NOTICE_MARKER)) return value;
+  const binaryIndex = findCliSubBinaryContentIndex(value);
+  if (binaryIndex >= 0) {
+    const prefix = value.slice(0, Math.min(binaryIndex, CLI_SUB_BINARY_PREFIX_MAX_CHARS)).trimEnd();
+    const restoredMarkdown = closeCliSubMarkdownFence(prefix);
+    return `${restoredMarkdown}\n\n> ${CLI_SUB_BINARY_NOTICE_MARKER}：检测到不可打印字节，已停止展示原始内容（共 ${value.length} 个字符）。`;
+  }
+  if (value.length <= CLI_SUB_RENDER_MAX_CHARS) return value;
+  const prefix = closeCliSubMarkdownFence(value.slice(0, CLI_SUB_RENDER_MAX_CHARS).trimEnd());
+  return `${prefix}\n\n> [输出已截断：当前仅展示前 ${CLI_SUB_RENDER_MAX_CHARS} 个字符。]`;
+}
+
+function appendCliSubContent(previous, delta) {
+  const existing = String(previous || '');
+  // Once a binary payload has been hidden, discard later chunks from the same
+  // stream instead of allowing its remaining bytes back into the panel.
+  if (existing.includes(CLI_SUB_BINARY_NOTICE_MARKER)) return existing;
+  return sanitizeCliSubContent(existing + String(delta || ''));
+}
+
+function splitCliSubSegments(content) {
+  const value = sanitizeCliSubContent(content);
   if (!value.trim()) return [];
   // A single cli/sub payload represents one command entry in the right sidebar.
   // Keep the full markdown/code fence payload in one bubble instead of splitting
@@ -37168,7 +37282,7 @@ function createMarkdownFence(language, text) {
 }
 
 function renderManualCmdEntryMarkdown(entry) {
-  const outputText = String(entry && entry.output || '').trim()
+  const outputText = sanitizeCliSubContent(entry && entry.output).trim()
     || (entry && entry.done
       ? (entry.ok === false ? '执行失败' : '执行成功')
       : '执行中');
@@ -37213,9 +37327,13 @@ function estimateCliSubEntryBytes(entry) {
 
 function compactCliSubEntryToBytes(entry, maxBytes) {
   const limit = Math.max(0, Number(maxBytes) || 0);
-  if (!entry || !limit || estimateCliSubEntryBytes(entry) <= limit) return entry;
+  if (!entry) return entry;
+  const safeEntry = entry.type === 'manual-cmd'
+    ? { ...entry, output: sanitizeCliSubContent(entry.output) }
+    : { ...entry, content: sanitizeCliSubContent(entry.content) };
+  if (!limit || estimateCliSubEntryBytes(safeEntry) <= limit) return safeEntry;
   if (entry.type === 'manual-cmd') {
-    const compacted = { ...entry };
+    const compacted = safeEntry;
     ['output', 'command'].forEach(field => {
       if (estimateCliSubEntryBytes(compacted) <= limit) return;
       const text = String(compacted[field] || '');
@@ -37225,31 +37343,25 @@ function compactCliSubEntryToBytes(entry, maxBytes) {
     });
     return compacted;
   }
-  return { ...entry, content: truncateStoredTextToBytes(entry.content, limit) };
+  return { ...safeEntry, content: truncateStoredTextToBytes(safeEntry.content, limit) };
 }
 
 function retainCliSubPanelEntries(entries) {
   const source = Array.isArray(entries) ? entries : [];
-  const retained = [];
-  let totalBytes = 0;
-  for (let index = source.length - 1; index >= 0 && retained.length < MAX_CLI_SUB_SHOW; index--) {
-    const available = MAX_CLI_COMMAND_HISTORY_BYTES - totalBytes;
-    if (available <= 0) break;
-    const entry = compactCliSubEntryToBytes(source[index], available);
-    const entryBytes = estimateCliSubEntryBytes(entry);
-    if (entryBytes > available) break;
-    retained.push(entry);
-    totalBytes += entryBytes;
-  }
-  return retained.reverse();
+  // The right-side CMD panel is a recent-history view: always retain the
+  // newest 100 entries.  Each entry has its own bounded display payload, so a
+  // single long output cannot evict otherwise valid recent commands.
+  return source.slice(-MAX_CLI_SUB_SHOW)
+    .map(entry => compactCliSubEntryToBytes(entry, MAX_CLI_SUB_ENTRY_BYTES));
 }
 
 function setCliSubBubbleContent(el, content) {
   const md = ensureCliSubBubble(el);
   if (!md) return;
   bindCliSubBubbleHover(el);
-  el.dataset.cliCopy = normalizeCliCopyContent(content);
-  md.innerHTML = renderMd(content);
+  const safeContent = sanitizeCliSubContent(content);
+  el.dataset.cliCopy = normalizeCliCopyContent(safeContent);
+  md.innerHTML = renderMd(safeContent);
 }
 
 function renderManualCliSubGroup(group, entry) {
@@ -37266,7 +37378,7 @@ function renderCliSubGroup(group, content) {
   if (!group) return;
   const segments = splitCliSubSegments(content);
   group.innerHTML = '';
-  if (!segments.length && String(content || '').trim()) segments.push(String(content || '').trim());
+  if (!segments.length && String(content || '').trim()) segments.push(sanitizeCliSubContent(content).trim());
   segments.forEach(segment => {
     const el = document.createElement('div');
     el.className = 'runtime-log-entry cli-sub-bubble';
@@ -37286,7 +37398,7 @@ function buildCliSubPanelEntries(chat) {
       entries.push({
         id: String(msg && (msg.cliSubGroupId || msg._cliSubGroupId) || `msg-cli-${idx}`),
         type: 'message',
-        content,
+        content: sanitizeCliSubContent(content),
         createdAt: msg && (msg.receivedAt || msg.createdAt || ''),
         done: !pending,
         order: order++
@@ -40821,7 +40933,7 @@ async function sendCenterMessage(rawText, options) {
               cliAssistantMsg._cliSubOnly = true;
               if (!cliAssistantMsg._cliSubGroupId) cliAssistantMsg._cliSubGroupId = cliAssistantMsg.cliSubGroupId || ('stream-cli:' + uuid());
               if (!cliAssistantMsg._cliSubContent) cliAssistantMsg._cliSubContent = '';
-              cliAssistantMsg._cliSubContent += cliChoice.delta.content;
+              cliAssistantMsg._cliSubContent = appendCliSubContent(cliAssistantMsg._cliSubContent, cliChoice.delta.content);
               // Render to right sidebar (only if this is the active chat)
               if (state.activeChat === chatId) renderCliSubPanel(cliAssistantMsg._cliSubContent, {
                 groupId: cliAssistantMsg._cliSubGroupId,
@@ -42421,7 +42533,7 @@ function parseRestoreAssistantRecord(raw) {
           assistantState._explosionGroupKey = packetSnapshotGroupKey;
         }
         if (isCliSub && !shouldSkipCenterAssistantDelta(parsed)) {
-          cliSubContent += choice.delta.content;
+          cliSubContent = appendCliSubContent(cliSubContent, choice.delta.content);
         } else if (!shouldSkipCenterAssistantDelta(parsed)) {
           appendCenterStreamDelta(assistantState, parsed, choice.delta.content);
           if (shouldTrackLiveExplosionSnapshot) {
@@ -42440,7 +42552,7 @@ function parseRestoreAssistantRecord(raw) {
   });
   return {
     content: collapseTrailingAssistantTimingMarkers(assistantState.content),
-    cliSubContent,
+    cliSubContent: sanitizeCliSubContent(cliSubContent),
     agentId,
     streamLogicalId: normalizeStreamLogicalId(assistantState.streamLogicalId),
     explodedLogicalIds: getAssistantExplodedLogicalIds(assistantState).slice(),
@@ -48804,6 +48916,10 @@ function vfsRender(entries) {
     const del = '<button class="vfs-del" onclick="event.stopPropagation();vfsRequestDel(event,\'' + esc(e.name) + '\',\'' + e.type + '\')" title="删除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>';
     const dl = '<button class="vfs-dl" onclick="event.stopPropagation();vfsDownload(event,\'' + esc(e.name) + '\')" title="下载"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>';
     const absPath = vfsCurrentPath + '/' + e.name;
+    const isRootAudiosDirectory = e.type === 'dir' && e.name === 'audios' && normalizeFsPath(vfsCurrentPath) === normalizeFsPath(vfsWorkspace);
+    const whisperTask = isRootAudiosDirectory
+      ? '<button class="vfs-whisper-task" onclick="vfsOpenWhisperTasks(event)" title="提取音频文字" aria-label="提取音频文字"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h14v11H9l-4 4V4.5Z"/><path d="M8.5 8h7M8.5 11h5"/><path d="m15.5 19 1.5 1.5 3-3"/></svg></button>'
+      : '';
     const modifiedAt = vfsModifiedAtValue(e.modifiedAt);
     const recentFileVersionKey = vfsRecentFileVersionKey(absPath, modifiedAt);
     const isRecentFile = vfsIsRecentFile(e, now) && !!recentFileVersionKey && !recentDismissals[recentFileVersionKey];
@@ -48846,15 +48962,30 @@ function vfsRender(entries) {
     const skillToggleTitle = hasSkillToggle
       ? (skillDisabledInherited && !skillDisabledSelf
         ? '当前目录因父级技能目录被禁用，需先恢复父级'
-        : (skillDisabled ? '启用当前技能目录及其子孙技能' : '禁用当前技能目录及其子孙技能'))
+        : (skillDisabled ? '启用当前技能目录' : '关闭当前技能目录及其子孙技能'))
       : '';
     const skillIcon = hasSkillToggle
       ? `<button class="vfs-skill-toggle${skillDisabled ? ' disabled' : ''}${skillDisabledInherited && !skillDisabledSelf ? ' inherited' : ''}" onclick="vfsToggleSkillDir(event,'${esc(absPath)}',${skillDisabled ? 'true' : 'false'},${skillDisabledSelf ? 'true' : 'false'},${skillDisabledInherited ? 'true' : 'false'})" title="${skillToggleTitle}">${skillDisabled ? disabledFolderIcon : defaultFolderIcon}</button>`
       : icon;
-    const skillDisableTourItemId = skillDisabled && isSkillDisableTourTargetPath(absPath) ? ' id="vfsSkillDisableTourItem"' : '';
+    const isSkillsDirectory = e.type === 'dir' && String(e.name || '').toLowerCase() === 'skills';
+    const hasConfiguredSkills = isSkillsDirectory && !!e.hasSkills && !!String(state.activeChat || '').trim();
+    const activeSkillCount = Math.max(0, Number(e.skillCount) || 0);
+    const skillsSummary = hasConfiguredSkills && activeSkillCount > 0
+      ? `<span class="vfs-skills-summary session-status" title="当前会话已启用 ${activeSkillCount} 个 Skill" aria-label="当前会话已启用 ${activeSkillCount} 个 Skill">${activeSkillCount}</span>`
+      : '';
+    const inactiveSkillsIcon = hasConfiguredSkills && activeSkillCount === 0
+      ? '<span class="vfs-skills-summary inactive session-status" title="当前会话没有启用的 Skill" aria-label="当前会话没有启用的 Skill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="m6.35 6.35 11.3 11.3"></path></svg></span>'
+      : '';
+    // A Skill parse warning is the most urgent directory state. Keep it in
+    // the same right-aligned status slot as the inactive marker, so the two
+    // never compete for space or appear together.
+    const skillsStatusIcon = repairBtn || warningBtn || skillsSummary || inactiveSkillsIcon;
+    const hasSessionSkillsStatus = !repairBtn && !warningBtn && !!skillsStatusIcon;
+    const skillDisableTourItemId = isSkillDisableTourTargetPath(absPath) ? ' id="vfsSkillDisableTourItem"' : '';
     const vfsEditTourCls = vfsEditTourState.sourcePath && absPath === vfsEditTourState.sourcePath ? ' vfs-edit-tour-source' : '';
-    const cls = `${sel}${isRecentFile ? ' recent-file' : ''}${isRecentUploadTarget ? ' recent-upload-target' : ''}${inChain ? ' warning-path' : ''}${warning ? ' warning-file' : ''}${vfsEditTourCls}`;
-    return `<div class="vfs-item${cls}"${skillDisableTourItemId || itemId} data-vfs-name="${esc(e.name)}" data-vfs-type="${e.type}" data-vfs-path="${esc(absPath)}" data-vfs-modified-at="${modifiedAt}" draggable="true" onmouseenter="vfsHover(event,'${esc(e.name)}','${e.type}',${modifiedAt})" ondragstart="vfsDragStart(event,'${esc(absPath)}')" onclick="vfsClick(event,'${esc(e.name)}','${e.type}',${modifiedAt})" ondblclick="vfsDoubleClick(event,'${esc(e.name)}','${e.type}')">${skillIcon}<span class="vfs-name">${esc(e.name)}</span><span class="vfs-actions">${repairBtn}${warningBtn}${copyPath}${del}${dl}${soulBtn}</span></div>`;
+    const cls = `${sel}${isRecentFile ? ' recent-file' : ''}${isRecentUploadTarget ? ' recent-upload-target' : ''}${inChain ? ' warning-path' : ''}${warning ? ' warning-file' : ''}${skillsStatusIcon ? ' has-vfs-status' : ''}${hasSessionSkillsStatus ? ' has-session-skills-status' : ''}${vfsEditTourCls}`;
+    const statusSlot = skillsStatusIcon ? `<span class="vfs-status-slot">${skillsStatusIcon}</span>` : '';
+    return `<div class="vfs-item${cls}"${skillDisableTourItemId || itemId} data-vfs-name="${esc(e.name)}" data-vfs-type="${e.type}" data-vfs-path="${esc(absPath)}" data-vfs-modified-at="${modifiedAt}" draggable="true" onmouseenter="vfsHover(event,'${esc(e.name)}','${e.type}',${modifiedAt})" ondragstart="vfsDragStart(event,'${esc(absPath)}')" onclick="vfsClick(event,'${esc(e.name)}','${e.type}',${modifiedAt})" ondblclick="vfsDoubleClick(event,'${esc(e.name)}','${e.type}')">${skillIcon}<span class="vfs-name">${esc(e.name)}</span><span class="vfs-actions">${whisperTask}${copyPath}${del}${dl}${soulBtn}</span>${statusSlot}</div>`;
   }).join('');
   vfsRecentFileRenderGeneration += 1;
   vfsScheduleRecentFileExpiry(entries);
@@ -48891,13 +49022,13 @@ async function vfsToggleSkillDir(event, absPath, currentlyDisabled, disabledSelf
       vfsShowUploadToast('技能目录切换失败: ' + String(payload.content || resp.statusText || '未知错误'), true);
       return false;
     }
-    const shouldQueueSkillDisableTour = !currentlyDisabled && !hasSkillDisableTourClickRecord();
+    const shouldQueueSkillDisableTour = currentlyDisabled && !hasSkillDisableTourClickRecord();
     if (shouldQueueSkillDisableTour) setSkillDisableTourTargetPath(absPath);
     await vfsRefresh();
     if (currentlyDisabled) {
-      vfsShowUploadToast('技能目录已恢复', false);
+      vfsShowUploadToast('技能目录已启用', false);
     } else if (!shouldQueueSkillDisableTour) {
-      vfsShowUploadToast('技能目录已禁用', false);
+      vfsShowUploadToast('技能目录已关闭', false);
     }
     if (shouldQueueSkillDisableTour) queueSkillDisableTourOnboarding(absPath);
     return true;
@@ -50363,9 +50494,7 @@ async function vfsScreenWaitForVideo(video) {
   });
 }
 async function vfsScreenCheckFFmpeg() {
-  const response = await fetch('/api/ffmpeg/check?_=' + Date.now(), { cache: 'no-store' });
-  const result = await response.json().catch(() => null);
-  if (!response.ok || !result || result.status !== 0) throw new Error(result && result.content || '无法检查 FFmpeg 配置');
+  const result = await feCheckExternalDependency('/api/ffmpeg/check', '正在检查 FFmpeg，请稍候…');
   if (result.available) return true;
   const installRequest = String(result.install || '').trim();
   if (!installRequest) throw new Error(result.content || 'FFmpeg 安装请求配置为空');
@@ -52218,6 +52347,32 @@ function vfsOpenCurrent() {
   }).catch(() => {});
 }
 
+async function vfsOpenWhisperTasks(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  if (feWhisperTaskCheckPending) return;
+  const agentId = String(vfsAgentId || state.settings.agentId || '').trim();
+  if (!agentId) {
+    vfsShowUploadToast('无法确定当前 Agent 工作目录', true);
+    return;
+  }
+  feWhisperTaskCheckPending = true;
+  try {
+    const result = await feCheckExternalDependency('/api/whisper/check', '正在检查 Whisper，请稍候…');
+    if (!result.available) {
+      feShowWhisperInstallDialog(result.install);
+      return;
+    }
+    feWhisperTaskOpen(agentId, '');
+  } catch (error) {
+    vfsShowUploadToast('Whisper 检查失败：' + ((error && error.message) || '请重试'), true);
+  } finally {
+    feWhisperTaskCheckPending = false;
+  }
+}
+
 // ===== VFS Upload =====
 function vfsUploadClick() {
   showExclusiveOverlay(document.getElementById('vfsUploadOverlay'), document.getElementById('vfsUploadPanel'));
@@ -52821,6 +52976,13 @@ let feVideoTrimCheckPending = false;
 let feVideoTrimCheckRequest = 0;
 let feFFmpegInstallRequest = '';
 let feFFmpegInstallOrigin = '';
+let feWhisperTaskCheckPending = false;
+let feWhisperInstallRequest = '';
+let feWhisperTaskState = null;
+let feWhisperTaskPreviewReturnState = null;
+let dependencyCheckLockSequence = 0;
+const dependencyCheckLocks = new Map();
+let dependencyCheckLockFocus = null;
 let feMediaTrimFilenameRequest = null;
 let feVideoFrameSavePending = false;
 let feVideoAudioExtractPending = false;
@@ -55300,6 +55462,7 @@ function feClose() {
   feImageState.pointerId = null;
   feCancelImageTextEdit();
   feSyncOpenActions();
+  feWhisperTaskRestoreAfterPreview();
 }
 
 async function feSave() {
@@ -55778,6 +55941,22 @@ function handleOverlayKeyboardShortcuts(event) {
 }
 
 document.addEventListener('keydown', e => {
+  if (feWhisperInstallDialogOpen()) {
+    if (!e.isComposing && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'Escape') {
+      e.preventDefault(); e.stopImmediatePropagation(); feCancelWhisperInstall();
+    } else if (!e.isComposing && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault(); e.stopImmediatePropagation(); void feConfirmWhisperInstall();
+    }
+    return;
+  }
+  if (feWhisperTaskState && !e.isComposing && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (e.key === 'Escape') {
+      e.preventDefault(); e.stopImmediatePropagation(); feWhisperTaskClose(); return;
+    }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault(); e.stopImmediatePropagation(); void feWhisperTaskStart(); return;
+    }
+  }
   if (feFFmpegInstallDialogOpen()) {
     if (!e.isComposing && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'Escape') {
       e.preventDefault();
@@ -56216,6 +56395,425 @@ function feUpdateAudioTrimButton() {
   button.setAttribute('aria-label', button.title);
 }
 
+function feUpdateWhisperTaskButton() {
+  const button = document.getElementById('feWhisperTaskBtn');
+  if (!button) return;
+  const available = feFileType === 'audio' && feMediaElement() instanceof HTMLAudioElement && !!feGetPreviewAgentID() && !!feAgentRelPath && !feAgentRelPath.startsWith('/');
+  button.hidden = !available;
+  button.disabled = !available || feWhisperTaskCheckPending;
+  button.title = feWhisperTaskCheckPending ? '正在检查 Whisper' : '提取音频文字';
+  button.setAttribute('aria-label', button.title);
+}
+
+function feWhisperTaskStatusName(status) {
+  switch (String(status || '')) {
+    case 'queued': return '排队中';
+    case 'running': return '执行中';
+    case 'completed': return '已完成';
+    case 'cancelled': return '已取消';
+    case 'failed': return '失败';
+    default: return '未知';
+  }
+}
+
+function feWhisperTaskFormatTime(value) {
+  const date = value ? new Date(value) : null;
+  return date && Number.isFinite(date.getTime()) ? date.toLocaleString() : '尚未开始';
+}
+
+function feWhisperTaskSetStatus(message, error) {
+  const state = feWhisperTaskState;
+  if (!state) return;
+  state.status = String(message || '');
+  state.error = !!error;
+  const element = document.getElementById('whisperTaskStatus');
+  if (element) {
+    element.textContent = state.status;
+    element.classList.toggle('notice', !!state.status && !state.error);
+    element.classList.toggle('error', state.error);
+  }
+}
+
+function feWhisperTaskRender() {
+  const state = feWhisperTaskState;
+  if (!state) return;
+  const pending = document.getElementById('whisperTaskPending');
+  const list = document.getElementById('whisperTaskList');
+  const add = document.getElementById('whisperTaskAddBtn');
+  const close = document.getElementById('whisperTaskCloseBtn');
+  const start = document.getElementById('whisperTaskStartBtn');
+  const filter = document.getElementById('whisperTaskStatusFilter');
+  const batchActions = document.getElementById('whisperTaskBatchActions');
+  const count = document.getElementById('whisperTaskCount');
+  const previous = document.getElementById('whisperTaskPreviousPage');
+  const next = document.getElementById('whisperTaskNextPage');
+  const pageLabel = document.getElementById('whisperTaskPageLabel');
+  const totalPages = Math.max(1, Math.ceil(state.total / state.pageSize));
+  if (add) { add.disabled = !!state.importing || !!state.creating || state.pendingPaths.length >= 5; add.textContent = state.importing ? '正在添加…' : '添加'; }
+  if (close) close.disabled = !!state.creating;
+  if (start) { start.disabled = !state.pendingPaths.length || !!state.importing || !!state.creating; start.textContent = state.creating ? '正在加入队列…' : '开始'; }
+  if (filter) filter.value = state.statusFilter;
+  if (batchActions) batchActions.classList.toggle('active', Object.keys(state.selectedOutputs).length > 0);
+  if (count) count.textContent = '共 ' + state.total + ' 条';
+  if (previous) previous.disabled = state.refreshing || state.page <= 1;
+  if (next) next.disabled = state.refreshing || state.page >= totalPages;
+  if (pageLabel) pageLabel.textContent = '第 ' + state.page + ' / ' + totalPages + ' 页';
+  if (pending) {
+    const paths = state.pendingPaths.map((path, index) => '<div class="whisper-task-pending-item"><div class="whisper-task-path" title="' + esc(path) + '">' + esc(path) + '</div><button type="button" onclick="feWhisperTaskRemovePending(' + index + ')" aria-label="从待加入队列移除">删除</button></div>').join('');
+    pending.hidden = !state.pendingPaths.length;
+    pending.innerHTML = '<div class="whisper-task-pending-head">待加入队列（' + state.pendingPaths.length + ' / 5）</div><div class="whisper-task-pending-list">' + paths + '</div>';
+  }
+  if (list) {
+    if (!state.tasks.length) {
+      list.innerHTML = '<div class="whisper-task-empty">' + (state.statusFilter ? '当前状态下暂无任务。' : '暂时没有转写任务。添加音频后即可开始提取。') + '</div>';
+    } else {
+      list.innerHTML = state.tasks.map(task => {
+        const status = String(task.status || '');
+        const progress = Math.max(0, Math.min(100, Number(task.progress) || 0));
+        const canCancel = status === 'queued' || status === 'running';
+        const canRestart = status === 'cancelled';
+		const canDelete = status === 'failed';
+        const canUseOutput = status === 'completed' && !!String(task.savedAs || '').trim() && !!String(task.outputPath || '').trim();
+        const selected = !!state.selectedOutputs[String(task.id)];
+        const output = String(task.outputPath || '');
+        const source = String(task.sourcePath || '');
+        const inlineActions = (canUseOutput ? '<button type="button" onclick="feWhisperTaskCopyOutput(' + Number(task.id) + ')">复制</button><button type="button" onclick="feWhisperTaskPreviewOutput(' + Number(task.id) + ')">预览</button>' : '') + (canRestart ? '<button type="button" onclick="feWhisperTaskRestart(' + Number(task.id) + ')">重新开始</button>' : '') + (canCancel ? '<button class="danger" type="button" onclick="feWhisperTaskCancel(' + Number(task.id) + ')">取消</button>' : '') + (canDelete ? '<button class="danger" type="button" onclick="feWhisperTaskDelete(' + Number(task.id) + ')">删除</button>' : '');
+        const selector = status === 'completed' ? '<input class="whisper-task-complete-select" type="checkbox" ' + (selected ? 'checked ' : '') + 'onchange="feWhisperTaskToggleSelectedOutput(' + Number(task.id) + ',this.checked)" aria-label="勾选文字文件 ' + esc(source) + '">' : '';
+        return '<article class="whisper-task-row"><div class="whisper-task-row-main"><div class="whisper-task-row-title">' + selector + '<strong title="' + esc(source) + '">' + esc(source) + '</strong><span class="whisper-task-status ' + esc(status) + '">' + feWhisperTaskStatusName(status) + '</span>' + (inlineActions ? '<span class="whisper-task-row-inline-actions">' + inlineActions + '</span>' : '') + '</div><div class="whisper-task-progress"><i style="width:' + progress + '%"></i></div><div class="whisper-task-meta"><span>开始：' + esc(feWhisperTaskFormatTime(task.startedAt || task.createdAt)) + '</span><span class="whisper-task-output" title="' + esc(output) + '">文字：' + esc(output || '等待生成') + '</span></div></div><div class="whisper-task-row-actions"><button type="button" onclick="feWhisperTaskShowLog(' + Number(task.id) + ')">日志</button></div></article>';
+      }).join('');
+    }
+  }
+  feWhisperTaskSetStatus(state.status, state.error);
+}
+
+function feWhisperTaskOpen(agentId, initialPath) {
+  feWhisperTaskPreviewReturnState = null;
+  const paths = initialPath ? [String(initialPath)] : [];
+  feWhisperTaskState = { agentId: String(agentId || ''), pendingPaths: paths, tasks: [], selectedOutputs: {}, page: 1, pageSize: 5, total: 0, statusFilter: '', importing: false, creating: false, refreshing: false, poller: null, logTaskID: 0, logRequestSequence: 0, status: '', error: false };
+  feWhisperTaskCloseLog();
+  showExclusiveOverlay(document.getElementById('whisperTaskOverlay'), document.getElementById('whisperTaskPanel'));
+  feWhisperTaskRender();
+  void feWhisperTaskRefresh();
+  feWhisperTaskState.poller = window.setInterval(() => void feWhisperTaskRefresh(), 1200);
+  window.setTimeout(() => document.getElementById('whisperTaskAddBtn')?.focus({ preventScroll: true }), 0);
+}
+
+function feWhisperTaskClose(options = {}) {
+  const state = feWhisperTaskState;
+  if (!state) return;
+  if (state.poller) window.clearInterval(state.poller);
+  feWhisperTaskState = null;
+  if (!options.preservePreviewReturn) feWhisperTaskPreviewReturnState = null;
+  setOverlayVisible(document.getElementById('whisperTaskOverlay'), false, document.getElementById('whisperTaskPanel'));
+}
+
+function feWhisperTaskRestoreAfterPreview() {
+  const state = feWhisperTaskPreviewReturnState;
+  if (!state || feWhisperTaskState) return;
+  feWhisperTaskPreviewReturnState = null;
+  state.refreshing = false;
+  state.poller = null;
+  feWhisperTaskState = state;
+  showExclusiveOverlay(document.getElementById('whisperTaskOverlay'), document.getElementById('whisperTaskPanel'));
+  feWhisperTaskRender();
+  void feWhisperTaskRefresh();
+  state.poller = window.setInterval(() => void feWhisperTaskRefresh(), 1200);
+  window.setTimeout(() => document.getElementById('whisperTaskCloseBtn')?.focus({ preventScroll: true }), 0);
+}
+
+async function feOpenWhisperTasks() {
+  if (feWhisperTaskCheckPending) return;
+  const agentId = String(feGetPreviewAgentID() || '').trim();
+  const sourcePath = String(feAgentRelPath || '').trim();
+  if (feFileType !== 'audio' || !agentId || !sourcePath || sourcePath.startsWith('/')) {
+    feSetMediaStatus('无法确定当前 Agent 工作目录中的音频文件');
+    return;
+  }
+  feWhisperTaskCheckPending = true;
+  feUpdateWhisperTaskButton();
+  try {
+    const result = await feCheckExternalDependency('/api/whisper/check', '正在检查 Whisper，请稍候…');
+    if (!result.available) {
+      feShowWhisperInstallDialog(result.install);
+      return;
+    }
+    feSetMediaStatus('');
+    feWhisperTaskOpen(agentId, sourcePath);
+  } catch (error) {
+    feSetMediaStatus('Whisper 检查失败：' + ((error && error.message) || '请重试'));
+  } finally {
+    feWhisperTaskCheckPending = false;
+    feUpdateWhisperTaskButton();
+  }
+}
+
+async function feWhisperTaskRefresh() {
+  const state = feWhisperTaskState;
+  if (!state || state.refreshing || !state.agentId) return;
+  state.refreshing = true;
+  feWhisperTaskRender();
+  try {
+    const query = new URLSearchParams({ agentId: state.agentId, page: String(state.page) });
+    if (state.statusFilter) query.set('status', state.statusFilter);
+    const response = await fetch('/api/whisper/tasks?' + query.toString(), { cache: 'no-store' });
+    let result = null; try { result = await response.json(); } catch {}
+    if (!response.ok || !result || result.status !== 0) throw new Error(result && result.content || '读取任务失败');
+    if (feWhisperTaskState !== state) return;
+    state.tasks = Array.isArray(result.tasks) ? result.tasks : [];
+    state.total = Math.max(0, Number(result.total) || 0);
+    state.pageSize = Math.max(1, Number(result.pageSize) || 5);
+    state.page = Math.max(1, Number(result.page) || 1);
+    state.statusFilter = String(result.taskStatus || state.statusFilter || '');
+    if (!state.error) state.status = '';
+    feWhisperTaskRender();
+    if (Number(state.logTaskID) > 0) void feWhisperTaskRefreshLog(state, Number(state.logTaskID));
+  } catch (error) {
+    if (feWhisperTaskState === state) { feWhisperTaskSetStatus('刷新任务失败：' + ((error && error.message) || '请重试'), true); }
+  } finally {
+    if (feWhisperTaskState === state) { state.refreshing = false; feWhisperTaskRender(); }
+  }
+}
+
+function feWhisperTaskChangeStatus(status) {
+  const state = feWhisperTaskState;
+  if (!state || state.refreshing) return;
+  state.statusFilter = String(status || '');
+  state.page = 1;
+  feWhisperTaskCloseLog();
+  void feWhisperTaskRefresh();
+}
+
+function feWhisperTaskChangePage(offset) {
+  const state = feWhisperTaskState;
+  if (!state || state.refreshing || !Number.isFinite(Number(offset))) return;
+  const totalPages = Math.max(1, Math.ceil(state.total / state.pageSize));
+  const page = Math.max(1, Math.min(totalPages, state.page + Number(offset)));
+  if (page === state.page) return;
+  state.page = page;
+  feWhisperTaskCloseLog();
+  void feWhisperTaskRefresh();
+}
+
+function feWhisperTaskChooseFiles() {
+  const state = feWhisperTaskState;
+  if (!state || state.importing || state.creating) return;
+  document.getElementById('whisperTaskFileInput')?.click();
+}
+
+async function feWhisperTaskHandleFiles(files) {
+  const input = document.getElementById('whisperTaskFileInput');
+  const state = feWhisperTaskState;
+  try {
+    const items = normalizeUploadFileItems(files).filter(item => vfsMixIsSupportedAudioItem(item));
+    if (!state || !items.length) { if (state) feWhisperTaskSetStatus('请选择音频文件。', true); return; }
+    const remaining = 5 - state.pendingPaths.length;
+    if (remaining <= 0) { feWhisperTaskSetStatus('待加入队列最多 5 个音频文件。', true); return; }
+    state.importing = true;
+    feWhisperTaskSetStatus('正在添加音频文件…', false);
+    feWhisperTaskRender();
+    const result = await uploadItemsToAgentTmp(items.slice(0, remaining), { agentId: state.agentId });
+    if (feWhisperTaskState !== state) return;
+    const paths = result.uploadedRelPaths.map(path => joinFsPath('tmp', path));
+    paths.forEach(path => { if (!state.pendingPaths.includes(path) && state.pendingPaths.length < 5) state.pendingPaths.push(path); });
+    state.status = '';
+    if (items.length > remaining) state.status = '仅添加前 ' + remaining + ' 个音频文件；待加入队列最多 5 个。';
+    vfsLastJson = '';
+    void vfsRefresh();
+    feWhisperTaskRender();
+  } catch (error) {
+    if (feWhisperTaskState === state) feWhisperTaskSetStatus('添加文件失败：' + ((error && error.message) || '请重试'), true);
+  } finally {
+    if (feWhisperTaskState === state) {
+      state.importing = false;
+      feWhisperTaskRender();
+    }
+    if (input) input.value = '';
+  }
+}
+
+function feWhisperTaskRemovePending(index) {
+  const state = feWhisperTaskState;
+  if (!state || state.importing || state.creating || !Number.isInteger(Number(index))) return;
+  state.pendingPaths.splice(Number(index), 1);
+  feWhisperTaskRender();
+}
+
+async function feWhisperTaskStart() {
+  const state = feWhisperTaskState;
+  if (!state || state.creating || !state.pendingPaths.length) return;
+  state.creating = true;
+  try {
+    const response = await fetch('/api/whisper/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agentId: state.agentId, paths: state.pendingPaths }) });
+    let result = null; try { result = await response.json(); } catch {}
+    if (!response.ok || !result || result.status !== 0) throw new Error(result && result.content || '创建任务失败');
+    if (feWhisperTaskState !== state) return;
+    state.pendingPaths = [];
+    state.status = '已加入转写队列。';
+    state.error = false;
+    await feWhisperTaskRefresh();
+  } catch (error) {
+    if (feWhisperTaskState === state) feWhisperTaskSetStatus('创建任务失败：' + ((error && error.message) || '请重试'), true);
+  } finally {
+    if (feWhisperTaskState === state) { state.creating = false; feWhisperTaskRender(); }
+  }
+}
+
+async function feWhisperTaskCancel(id) {
+  const state = feWhisperTaskState;
+  if (!state || !Number.isFinite(Number(id))) return;
+  try {
+    const response = await fetch('/api/whisper/tasks/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agentId: state.agentId, id: Number(id) }) });
+    let result = null; try { result = await response.json(); } catch {}
+    if (!response.ok || !result || result.status !== 0) throw new Error(result && result.content || '取消任务失败');
+    feWhisperTaskSetStatus('已请求取消任务。', false);
+    await feWhisperTaskRefresh();
+  } catch (error) { if (feWhisperTaskState === state) feWhisperTaskSetStatus('取消任务失败：' + ((error && error.message) || '请重试'), true); }
+}
+
+function feWhisperTaskByID(id) {
+  const state = feWhisperTaskState;
+  if (!state || !Number.isFinite(Number(id))) return null;
+  return state.tasks.find(task => Number(task.id) === Number(id)) || null;
+}
+
+async function feWhisperTaskRestart(id) {
+  const state = feWhisperTaskState;
+  const task = feWhisperTaskByID(id);
+  if (!state || !task || String(task.status || '') !== 'cancelled') return;
+  try {
+    const response = await fetch('/api/whisper/tasks/restart', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agentId: state.agentId, id: Number(id) }) });
+    let result = null; try { result = await response.json(); } catch {}
+    if (!response.ok || !result || result.status !== 0) {
+      const detail = result && result.content || (response.status === 404 ? '当前服务未更新，请重启服务后再试' : '请求失败（HTTP ' + response.status + '）');
+      throw new Error(detail);
+    }
+    feWhisperTaskSetStatus('已重新加入转写队列。', false);
+    await feWhisperTaskRefresh();
+  } catch (error) { if (feWhisperTaskState === state) feWhisperTaskSetStatus('重新开始任务失败：' + ((error && error.message) || '请重试'), true); }
+}
+
+async function feWhisperTaskDelete(id) {
+  const state = feWhisperTaskState;
+  const task = feWhisperTaskByID(id);
+  if (!state || !task || String(task.status || '') !== 'failed') return;
+  try {
+    const response = await fetch('/api/whisper/tasks/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agentId: state.agentId, id: Number(id) }) });
+    let result = null; try { result = await response.json(); } catch {}
+    if (!response.ok || !result || result.status !== 0) throw new Error(result && result.content || '删除失败');
+    feWhisperTaskSetStatus('失败任务已删除。', false);
+    await feWhisperTaskRefresh();
+  } catch (error) { if (feWhisperTaskState === state) feWhisperTaskSetStatus('删除失败任务失败：' + ((error && error.message) || '请重试'), true); }
+}
+
+async function feWhisperTaskCopyOutput(id) {
+  const task = feWhisperTaskByID(id);
+  const absolutePath = String(task && task.savedAs || '').trim();
+  if (!absolutePath) return;
+  try {
+    await copyTextToClipboard(absolutePath);
+    feWhisperTaskSetStatus('文件绝对路径已复制', false);
+  } catch (error) { feWhisperTaskSetStatus('复制文字文件路径失败：' + ((error && error.message) || '请重试'), true); }
+}
+
+function feWhisperTaskToggleSelectedOutput(id, selected) {
+  const state = feWhisperTaskState;
+  const task = feWhisperTaskByID(id);
+  if (!state || !task || String(task.status || '') !== 'completed') return;
+  const absolutePath = String(task.savedAs || '').trim();
+  if (!absolutePath) return;
+  const key = String(task.id);
+  if (selected) state.selectedOutputs[key] = absolutePath;
+  else delete state.selectedOutputs[key];
+  feWhisperTaskRender();
+}
+
+async function feWhisperTaskCopySelectedOutputs() {
+  const state = feWhisperTaskState;
+  if (!state) return;
+  const paths = [...new Set(Object.values(state.selectedOutputs).map(path => String(path || '').trim()).filter(Boolean))];
+  if (!paths.length) return;
+  try {
+    await copyTextToClipboard(paths.join('\n'));
+    feWhisperTaskSetStatus('已复制 ' + paths.length + ' 条文字文件绝对路径', false);
+  } catch (error) { feWhisperTaskSetStatus('复制文字文件路径失败：' + ((error && error.message) || '请重试'), true); }
+}
+
+function feWhisperTaskClearSelectedOutputs() {
+  const state = feWhisperTaskState;
+  if (!state) return;
+  state.selectedOutputs = {};
+  feWhisperTaskRender();
+}
+
+async function feWhisperTaskPreviewOutput(id) {
+  const state = feWhisperTaskState;
+  const task = feWhisperTaskByID(id);
+  const absolutePath = String(task && task.savedAs || '').trim();
+  if (!state || !absolutePath) return;
+  try {
+    const response = await fetch('/api/data?path=' + encodeURIComponent(absolutePath), { cache: 'no-store' });
+    let result = null; try { result = await response.json(); } catch {}
+    if (!response.ok || !result || result.status !== 0) {
+      const content = String(result && result.content || '');
+      if (content.includes('文件不存在')) {
+        feWhisperTaskSetStatus('文字文件已删除，无法预览', true);
+        return;
+      }
+      throw new Error(content || '无法读取文字文件');
+    }
+    const workspaceRoot = await getWorkspaceForAgent(state.agentId);
+    if (feWhisperTaskState !== state) return;
+    feWhisperTaskPreviewReturnState = state;
+    feWhisperTaskClose({ preservePreviewReturn: true });
+    await feOpen(absolutePath, { agentId: state.agentId, workspaceRoot });
+  } catch (error) {
+    if (feWhisperTaskPreviewReturnState === state && !feWhisperTaskState) {
+      feWhisperTaskRestoreAfterPreview();
+      feWhisperTaskSetStatus('预览文字文件失败：' + ((error && error.message) || '请重试'), true);
+    } else if (feWhisperTaskState === state) feWhisperTaskSetStatus('预览文字文件失败：' + ((error && error.message) || '请重试'), true);
+  }
+}
+
+async function feWhisperTaskShowLog(id) {
+  const state = feWhisperTaskState;
+  if (!state || !Number.isFinite(Number(id))) return;
+  const taskID = Number(id);
+  const showingSameTask = Number(state.logTaskID) === taskID;
+  state.logTaskID = taskID;
+  const panel = document.getElementById('whisperTaskLog');
+  const title = document.getElementById('whisperTaskLogTitle');
+  const text = document.getElementById('whisperTaskLogText');
+  if (panel) {
+    panel.hidden = false;
+    window.requestAnimationFrame(() => panel.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' }));
+  }
+  if (title) title.textContent = '任务 #' + taskID + ' 执行日志';
+  if (text && !showingSameTask) text.textContent = '正在读取日志…';
+  void feWhisperTaskRefreshLog(state, taskID);
+}
+
+async function feWhisperTaskRefreshLog(state, id) {
+  const taskID = Number(id);
+  if (!state || feWhisperTaskState !== state || !Number.isFinite(taskID) || taskID <= 0 || Number(state.logTaskID) !== taskID) return;
+  const requestSequence = (Number(state.logRequestSequence) || 0) + 1;
+  state.logRequestSequence = requestSequence;
+  const text = document.getElementById('whisperTaskLogText');
+  try {
+    const response = await fetch('/api/whisper/tasks/log?agentId=' + encodeURIComponent(state.agentId) + '&id=' + encodeURIComponent(taskID), { cache: 'no-store' });
+    let result = null; try { result = await response.json(); } catch {}
+    if (!response.ok || !result || result.status !== 0 || !result.task) throw new Error(result && result.content || '读取日志失败');
+    if (feWhisperTaskState !== state || Number(state.logTaskID) !== taskID || Number(state.logRequestSequence) !== requestSequence) return;
+    if (text) { text.textContent = String(result.task.logs || '暂无执行日志。'); text.scrollTop = text.scrollHeight; }
+  } catch (error) { if (feWhisperTaskState === state && Number(state.logTaskID) === taskID && Number(state.logRequestSequence) === requestSequence && text) text.textContent = '读取日志失败：' + ((error && error.message) || '请重试'); }
+}
+
+function feWhisperTaskCloseLog() {
+  const state = feWhisperTaskState;
+  if (state) { state.logTaskID = 0; state.logRequestSequence = (Number(state.logRequestSequence) || 0) + 1; }
+  const panel = document.getElementById('whisperTaskLog');
+  if (panel) panel.hidden = true;
+}
+
 function feUpdateVideoTrimButton() {
   const button = document.getElementById('feVideoTrimBtn');
   if (!button) return;
@@ -56308,6 +56906,8 @@ function feResetAudioTrim() {
     button.title = '裁剪音频';
     button.setAttribute('aria-label', '裁剪音频');
   }
+  const whisperButton = document.getElementById('feWhisperTaskBtn');
+  if (whisperButton) { whisperButton.hidden = true; whisperButton.disabled = true; whisperButton.title = '提取音频文字'; whisperButton.setAttribute('aria-label', '提取音频文字'); }
 }
 
 function feEnterAudioTrim() {
@@ -56726,6 +57326,96 @@ function feFFmpegInstallDialogOpen() {
   return !!(dialog && !dialog.hidden);
 }
 
+function feDependencyCheckLockActive() { return dependencyCheckLocks.size > 0; }
+
+function feAcquireDependencyCheckLock(message) {
+  const token = ++dependencyCheckLockSequence;
+  dependencyCheckLocks.set(token, String(message || '正在检查依赖，请稍候…'));
+  const lock = document.getElementById('dependencyCheckLock');
+  const text = document.getElementById('dependencyCheckLockText');
+  if (text) text.textContent = dependencyCheckLocks.get(token);
+  if (lock) {
+    if (lock.hidden) dependencyCheckLockFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    lock.hidden = false;
+    window.setTimeout(() => lock.focus({ preventScroll: true }), 0);
+  }
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    dependencyCheckLocks.delete(token);
+    if (dependencyCheckLocks.size) {
+      const messages = Array.from(dependencyCheckLocks.values());
+      const latest = messages[messages.length - 1];
+      if (text) text.textContent = latest || '正在检查依赖，请稍候…';
+      return;
+    }
+    if (lock) lock.hidden = true;
+    const previousFocus = dependencyCheckLockFocus;
+    dependencyCheckLockFocus = null;
+    if (previousFocus && previousFocus.isConnected) window.setTimeout(() => previousFocus.focus({ preventScroll: true }), 0);
+  };
+}
+
+async function feCheckExternalDependency(endpoint, message) {
+  const release = feAcquireDependencyCheckLock(message);
+  try {
+    const response = await fetch(endpoint + '?_=' + Date.now(), { cache: 'no-store' });
+    let result = null;
+    try { result = await response.json(); } catch {}
+    if (!response.ok || !result || result.status !== 0) throw new Error(result && result.content || '依赖检查失败');
+    return result;
+  } finally {
+    release();
+  }
+}
+
+document.addEventListener('keydown', event => {
+  if (!feDependencyCheckLockActive()) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+}, true);
+
+function feWhisperInstallDialogOpen() {
+  const dialog = document.getElementById('feWhisperInstallDialog');
+  return !!(dialog && !dialog.hidden);
+}
+
+function feShowWhisperInstallDialog(installRequest) {
+  const request = String(installRequest || '').trim();
+  if (!request) { feSetMediaStatus('Whisper 安装请求配置为空'); return; }
+  const dialog = document.getElementById('feWhisperInstallDialog');
+  const confirm = document.getElementById('feWhisperInstallConfirmBtn');
+  if (!dialog || !confirm) { feSetMediaStatus('无法显示 Whisper 安装确认'); return; }
+  feWhisperInstallRequest = request;
+  dialog.hidden = false;
+  window.setTimeout(() => confirm.focus({ preventScroll: true }), 0);
+}
+
+function feCancelWhisperInstall() {
+  const dialog = document.getElementById('feWhisperInstallDialog');
+  if (dialog) dialog.hidden = true;
+  feWhisperInstallRequest = '';
+  const button = document.getElementById('feWhisperTaskBtn');
+  if (button && !button.disabled) button.focus({ preventScroll: true });
+}
+
+function feHandleWhisperInstallDialogClick(event) { if (event && event.target === event.currentTarget) feCancelWhisperInstall(); }
+
+async function feConfirmWhisperInstall() {
+  const request = String(feWhisperInstallRequest || '').trim();
+  if (!request) return;
+  const dialog = document.getElementById('feWhisperInstallDialog');
+  const confirm = document.getElementById('feWhisperInstallConfirmBtn');
+  if (confirm) confirm.disabled = true;
+  if (dialog) dialog.hidden = true;
+  feWhisperInstallRequest = '';
+  feClose();
+  const sent = await sendCenterMessage(request, { clearInputAfterSend: false, toastOnSuccess: '', requestSource: 'whisper_install' });
+  if (!sent) vfsShowUploadToast('未能发送 Whisper 安装请求，请检查当前 Chat', true);
+  if (confirm) confirm.disabled = false;
+}
+
 function feShowFFmpegInstallDialog(installRequest, origin = 'video-trim') {
   const request = String(installRequest || '').trim();
   if (!request) {
@@ -56803,11 +57493,8 @@ async function feEnterVideoTrim() {
   feUpdateVideoAudioExtractButton();
   feUpdateVideoFrameButton();
   try {
-    const response = await fetch('/api/ffmpeg/check?_=' + Date.now(), { cache: 'no-store' });
-    let result = null;
-    try { result = await response.json(); } catch {}
+    const result = await feCheckExternalDependency('/api/ffmpeg/check', '正在检查 FFmpeg，请稍候…');
     if (request !== feVideoTrimCheckRequest || media !== feMediaElement()) return;
-    if (!response.ok || !result || result.status !== 0) throw new Error(result && result.content || '无法检查 FFmpeg 配置');
     if (!result.available) {
       feShowFFmpegInstallDialog(result.install);
       return;
@@ -57442,11 +58129,8 @@ async function feExtractVideoAudio() {
   feUpdateVideoFrameButton();
   feUpdateVideoTrimButton();
   try {
-    const response = await fetch('/api/ffmpeg/check?_=' + Date.now(), { cache: 'no-store' });
-    let result = null;
-    try { result = await response.json(); } catch {}
+    const result = await feCheckExternalDependency('/api/ffmpeg/check', '正在检查 FFmpeg，请稍候…');
     if (checkRequest !== feVideoTrimCheckRequest || media !== feMediaElement()) return;
-    if (!response.ok || !result || result.status !== 0) throw new Error(result && result.content || '无法检查 FFmpeg 配置');
     if (!result.available) {
       feShowFFmpegInstallDialog(result.install, 'video-audio-extract');
       return;
@@ -57546,6 +58230,7 @@ function renderMediaPreview(sourceURL, mediaType) {
   }
   feAudioTrimState.sourceURL = mediaType === 'audio' ? sourceURL : '';
   feUpdateAudioTrimButton();
+  feUpdateWhisperTaskButton();
   feUpdateVideoTrimButton();
   feUpdateVideoAudioExtractButton();
   feUpdateVideoFrameButton();

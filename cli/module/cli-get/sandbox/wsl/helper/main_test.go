@@ -230,6 +230,39 @@ func TestBuildBubblewrapArgsSpecialPathsAcrossModes(t *testing.T) {
 	}
 }
 
+func TestBuildBubblewrapArgsIncludesUserPythonRuntimeReadOnly(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	bin := filepath.Join(home, ".local", "bin")
+	site := filepath.Join(home, ".local", "lib", "python3.12", "site-packages")
+	if err := os.MkdirAll(bin, 0o755); err != nil {
+		t.Fatalf("create user bin: %v", err)
+	}
+	if err := os.MkdirAll(site, 0o755); err != nil {
+		t.Fatalf("create user site packages: %v", err)
+	}
+
+	args, err := buildBubblewrapArgs("/bin/sh", "command -v whisper", sandboxModeNet, "")
+	if err != nil {
+		t.Fatalf("buildBubblewrapArgs: %v", err)
+	}
+	text := strings.Join(args, "\n")
+	for _, path := range []string{bin, site} {
+		if !strings.Contains(text, "--ro-bind\n"+path+"\n"+path) {
+			t.Fatalf("user Python runtime %s should be read-only mounted: %v", path, args)
+		}
+		if strings.Contains(text, "--bind\n"+path+"\n"+path) {
+			t.Fatalf("user Python runtime %s must not be writable mounted: %v", path, args)
+		}
+	}
+	if !strings.Contains(text, "--setenv\nPATH\n"+bin+":"+sandboxCommandPath) {
+		t.Fatalf("PATH should include user Python bin: %v", args)
+	}
+	if !strings.Contains(text, "--setenv\nPYTHONPATH\n"+site) {
+		t.Fatalf("PYTHONPATH should include user site packages: %v", args)
+	}
+}
+
 func TestBuildBubblewrapArgsRejectsSelectedSystemToolRoot(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

@@ -96,7 +96,66 @@ func TestSetDisabledPersistsNormalizedPaths(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SetDisabled enable alpha: %v", err)
 	}
-	if len(next) != 0 {
-		t.Fatalf("enabled alpha next = %#v, want empty", next)
+	if want := []string{NormalizePath(beta)}; !reflect.DeepEqual(next, want) {
+		t.Fatalf("enabled alpha next = %#v, want %#v", next, want)
+	}
+}
+
+func TestEnsureDefaultDisabledPreservesExplicitEnable(t *testing.T) {
+	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "data"))
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	defer db.Close()
+
+	root := t.TempDir()
+	alpha := filepath.Join(root, "skills", "alpha")
+	beta := filepath.Join(root, "skills", "beta")
+	paths, err := EnsureDefaultDisabled(db, "chat-1", []string{alpha, beta})
+	if err != nil {
+		t.Fatalf("EnsureDefaultDisabled: %v", err)
+	}
+	if want := []string{NormalizePath(alpha), NormalizePath(beta)}; !reflect.DeepEqual(paths, want) {
+		t.Fatalf("default disabled paths = %#v, want %#v", paths, want)
+	}
+
+	if _, err := SetDisabled(db, "chat-1", alpha, false); err != nil {
+		t.Fatalf("enable alpha: %v", err)
+	}
+	paths, err = EnsureDefaultDisabled(db, "chat-1", []string{alpha, beta})
+	if err != nil {
+		t.Fatalf("EnsureDefaultDisabled after enable: %v", err)
+	}
+	if want := []string{NormalizePath(beta)}; !reflect.DeepEqual(paths, want) {
+		t.Fatalf("default sync overwrote explicit enable: %#v, want %#v", paths, want)
+	}
+}
+
+func TestEnsureSchemaMigratesLegacyDisabledState(t *testing.T) {
+	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "data"))
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`
+		CREATE TABLE chat_skill_dir_state (
+			chat_id TEXT NOT NULL,
+			path TEXT NOT NULL,
+			updated_at TEXT NOT NULL,
+			PRIMARY KEY (chat_id, path)
+		);
+		INSERT INTO chat_skill_dir_state (chat_id, path, updated_at) VALUES ('chat-1', '/tmp/alpha', '2026-08-01T00:00:00.000');
+	`); err != nil {
+		t.Fatalf("create legacy state: %v", err)
+	}
+	if err := EnsureSchema(db); err != nil {
+		t.Fatalf("migrate legacy schema: %v", err)
+	}
+	var disabled int
+	if err := db.QueryRow(`SELECT disabled FROM chat_skill_dir_state WHERE chat_id = 'chat-1'`).Scan(&disabled); err != nil {
+		t.Fatalf("read migrated state: %v", err)
+	}
+	if disabled != 1 {
+		t.Fatalf("migrated disabled = %d, want 1", disabled)
 	}
 }
