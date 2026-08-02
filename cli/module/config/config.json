@@ -23,13 +23,17 @@
     "check": 24,
     "install": "请安装 voxcpm"
   },
+  "wav2lip": {
+    "check": 24,
+    "install": "请安装 wav2lip，模型与代码存放至`$workspace/wav2lip`目录下，检查安装是否成功的标准为`$workspace/wav2lip/inference.py`与`$workspace/wav2lip/checkpoints/wav2lip_gan.pth`均存在"
+  },
   "rembg": {
     "check": 24,
     "install": "请安装 rembg"
   },
   "rvm": {
     "check": 24,
-    "install": "请安装 robust video matting，模型与代码存放至 `$workspace/rvm` 目录下，检查安装是否成功的标准为`$workspace/rvm/weights/rvm_mobilenetv3.pth`是否存在"
+    "install": "请安装 robust video matting，模型与代码存放至`$workspace/rvm`目录下，检查安装是否成功的标准为`$workspace/rvm/inference.py`与`$workspace/rvm/weights/rvm_mobilenetv3.pth`均存在"
   },
   "test": {
     "content": "Hello World",

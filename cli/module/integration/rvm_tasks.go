@@ -434,6 +434,7 @@ func (m *rvmTaskManager) signal() {
 	case m.wake <- struct{}{}:
 	default:
 	}
+	notifyIntegrationSleepConditionChanged(m.cfg)
 }
 func (m *rvmTaskManager) run(ctx context.Context) {
 	for {
@@ -718,6 +719,7 @@ func (m *rvmTaskManager) appendLog(id int64, message string) {
 func (m *rvmTaskManager) finish(id int64, status string, p int, message string) {
 	m.appendLog(id, message)
 	_, _ = m.db.Exec(`UPDATE rvm_task SET status=?,progress=?,updated_at=? WHERE id=?`, status, p, rvmTimestamp(), id)
+	notifyIntegrationSleepConditionChanged(m.cfg)
 }
 func (m *rvmTaskManager) cancelled(id int64) bool {
 	var value int
@@ -972,6 +974,7 @@ func (m *rvmTaskManager) cancelTask(agentID string, id int64) error {
 	if running && cancel != nil {
 		cancel()
 	}
+	notifyIntegrationSleepConditionChanged(m.cfg)
 	return nil
 }
 func (m *rvmTaskManager) restart(agentID string, id int64) error {

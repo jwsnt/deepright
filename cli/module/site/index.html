@@ -6443,6 +6443,20 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     <footer class="whisper-task-foot"><span class="whisper-task-foot-copy audio-task-foot-copy"><span class="whisper-task-scenario-hint" id="rvmTaskScenarioHint"></span><span class="whisper-task-foot-status" id="rvmTaskStatus" role="status" aria-live="polite"></span></span><span class="whisper-task-foot-actions"><button id="rvmTaskCloseBtn" type="button" onclick="feRVMTaskClose()">关闭</button><button class="primary" id="rvmTaskStartBtn" type="button" onclick="feRVMTaskStart()">开始</button></span></footer>
   </section>
 </div>
+<div class="overlay" id="wav2lipTaskOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="30" onclick="if(event.target===this)feWav2LipTaskClose()" aria-hidden="true">
+  <section class="settings-panel whisper-task-panel" id="wav2lipTaskPanel" role="dialog" aria-modal="true" aria-labelledby="wav2lipTaskTitle" onclick="event.stopPropagation()">
+    <header class="whisper-task-head"><h3 id="wav2lipTaskTitle">人物视频对口型</h3><button class="whisper-task-close" type="button" onclick="feWav2LipTaskClose()" aria-label="关闭人物视频对口型任务">×</button></header>
+    <div class="whisper-task-body">
+      <div class="whisper-task-add"><span class="whisper-task-add-copy">添加更多视频任务</span><button id="wav2lipTaskAddBtn" type="button" onclick="feWav2LipTaskChooseVideos()">添加</button></div>
+      <div class="whisper-task-pending" id="wav2lipTaskPending" hidden></div>
+      <div class="whisper-task-toolbar"><label class="whisper-task-filter">状态 <select id="wav2lipTaskStatusFilter" onchange="feWav2LipTaskChangeStatus(this.value)"><option value="">全部</option><option value="queued">排队中</option><option value="running">执行中</option><option value="completed">已完成</option><option value="cancelled">已取消</option><option value="failed">失败</option></select></label><span class="whisper-task-batch-actions" id="wav2lipTaskBatchActions" aria-label="已勾选视频文件操作"><button type="button" onclick="feWav2LipTaskCopySelectedOutputs()">复制</button><button type="button" onclick="feWav2LipTaskClearSelectedOutputs()">清空</button></span><span class="whisper-task-count" id="wav2lipTaskCount"></span></div>
+      <div class="whisper-task-list" id="wav2lipTaskList" aria-live="polite"></div>
+      <nav class="whisper-task-pagination" aria-label="人物视频对口型任务分页"><button id="wav2lipTaskPreviousPage" type="button" onclick="feWav2LipTaskChangePage(-1)">上一页</button><span id="wav2lipTaskPageLabel"></span><button id="wav2lipTaskNextPage" type="button" onclick="feWav2LipTaskChangePage(1)">下一页</button></nav>
+      <div class="whisper-task-log" id="wav2lipTaskLog" hidden><div class="whisper-task-log-head"><span id="wav2lipTaskLogTitle">执行日志</span><button class="whisper-task-log-toggle" type="button" onclick="feWav2LipTaskCloseLog()" title="收起日志" aria-label="收起日志"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 14 5-5 5 5"/></svg></button></div><pre id="wav2lipTaskLogText"></pre></div>
+    </div>
+    <footer class="whisper-task-foot"><span class="whisper-task-foot-copy"><span class="whisper-task-foot-status" id="wav2lipTaskStatus" role="status" aria-live="polite"></span></span><span class="whisper-task-foot-actions"><button id="wav2lipTaskCloseBtn" type="button" onclick="feWav2LipTaskClose()">关闭</button><button class="primary" id="wav2lipTaskStartBtn" type="button" onclick="feWav2LipTaskStart()">开始</button></span></footer>
+  </section>
+</div>
 <div class="overlay" id="voxcpmTaskOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="30" onclick="if(event.target===this)feVoxCPMTaskClose()" aria-hidden="true">
   <section class="settings-panel whisper-task-panel" id="voxcpmTaskPanel" role="dialog" aria-modal="true" aria-labelledby="voxcpmTaskTitle" onclick="event.stopPropagation()">
     <header class="whisper-task-head"><h3 id="voxcpmTaskTitle">文字转语音</h3><button class="whisper-task-close" type="button" onclick="feVoxCPMTaskClose()" aria-label="关闭文字转语音任务">×</button></header>
@@ -6757,6 +6771,9 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
         <button class="file-editor-color-picker-btn" type="button" id="feRVMTaskBtn" onclick="feOpenRVMTask()" aria-label="视频提取主体" title="视频提取主体" hidden>
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="5.3"/><path d="m15 15 4.2 4.2"/></svg>
         </button>
+        <button class="file-editor-color-picker-btn" type="button" id="feWav2LipTaskBtn" onclick="feOpenWav2LipTask()" aria-label="人物视频对口型" title="人物视频对口型" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.2 12.3c2.5-.25 4.7-3.9 7.8-3.9s5.3 3.65 7.8 3.9"/><path d="M4.2 12.3c2.5.25 4.7 3.9 7.8 3.9s5.3-3.65 7.8-3.9"/><path d="M4.2 12.3H19.8"/></svg>
+        </button>
         <button class="file-editor-color-picker-btn" type="button" id="feVideoFrameBtn" onclick="feExtractVideoFrame()" aria-label="提取帧" title="提取帧" hidden>
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="6.5" width="17" height="12" rx="2"/><path d="M8 6.5 9.4 4h5.2L16 6.5"/><circle cx="12" cy="12.5" r="3.1"/><path class="video-frame-unavailable-mark" d="m14.5 14.5 5 5m0-5-5 5"/></svg>
         </button>
@@ -6906,6 +6923,9 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
 </div>
 <div class="fe-ffmpeg-install-dialog" id="feRVMInstallDialog" role="dialog" aria-modal="true" aria-labelledby="feRVMInstallTitle" hidden onclick="if(event.target===this)feCancelRVMInstall()">
   <div class="fe-ffmpeg-install-card" tabindex="-1" onclick="event.stopPropagation()"><h3 id="feRVMInstallTitle">需要安装 Robust Video Matting</h3><p>是否发送安装请求？</p><div class="fe-ffmpeg-install-actions"><button type="button" onclick="feCancelRVMInstall()">取消</button><button class="confirm" type="button" id="feRVMInstallConfirmBtn" onclick="feConfirmRVMInstall()">安装</button></div></div>
+</div>
+<div class="fe-ffmpeg-install-dialog" id="feWav2LipInstallDialog" role="dialog" aria-modal="true" aria-labelledby="feWav2LipInstallTitle" hidden onclick="if(event.target===this)feCancelWav2LipInstall()">
+  <div class="fe-ffmpeg-install-card" tabindex="-1" onclick="event.stopPropagation()"><h3 id="feWav2LipInstallTitle">需要安装 Wav2Lip</h3><p>是否发送安装请求？</p><div class="fe-ffmpeg-install-actions"><button type="button" onclick="feCancelWav2LipInstall()">取消</button><button class="confirm" type="button" id="feWav2LipInstallConfirmBtn" onclick="feConfirmWav2LipInstall()">安装</button></div></div>
 </div>
 <div class="overlay shutdown-overlay" id="shutdownConfirmOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="59" aria-hidden="true">
   <div class="shutdown-confirm-panel" id="shutdownConfirmPanel" onclick="event.stopPropagation()">
@@ -7390,6 +7410,8 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
 <input type="file" id="whisperTaskFileInput" accept="audio/*,.wav,.mp3,.m4a,.aac,.flac,.ogg,.opus,.aif,.aiff,.wma" multiple style="display:none" onchange="feWhisperTaskHandleFiles(this.files)" />
 <input type="file" id="rembgTaskFileInput" accept="image/*,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff" multiple style="display:none" onchange="feRembgTaskHandleFiles(this.files)" />
 <input type="file" id="rvmTaskFileInput" accept="video/*,.mp4,.m4v,.webm,.ogv,.mov,.mkv,.avi,.mpg,.mpeg" multiple style="display:none" onchange="feRVMTaskHandleFiles(this.files)" />
+<input type="file" id="wav2lipTaskVideoInput" accept="video/*,.mp4,.m4v,.webm,.ogv,.mov,.mkv,.avi,.mpg,.mpeg" multiple style="display:none" onchange="feWav2LipTaskHandleVideos(this.files)" />
+<input type="file" id="wav2lipTaskAudioInput" accept="audio/*,.wav,.mp3,.m4a,.aac,.flac,.ogg" style="display:none" onchange="feWav2LipTaskHandleAudio(this.files)" />
 <input type="file" id="voxcpmTaskTextInput" accept="text/plain,.txt,.text,.md,.markdown,.mdx,.json,.csv,.log" style="display:none" onchange="feVoxCPMTaskHandleText(this.files)" />
 <input type="file" id="voxcpmTaskReferenceInput" accept="audio/*,.wav,.mp3,.m4a,.aac,.flac,.ogg,.opus,.aif,.aiff,.wma" style="display:none" onchange="feVoxCPMTaskHandleReference(this.files)" />
 <input type="file" id="vfsReferenceFileInput" accept=".txt,.text,.md,.markdown,.mdx,.json,.html,.htm,.xml,.yaml,.yml,.toml,.ini,.cfg,.conf,.log,.csv,.sh,.bash,.zsh,.go,.js,.ts,.py,.java,.c,.cpp,.h,.hpp,.css,.scss,.less,.sql,.rb,.rs,.swift,.kt,.lua,.pl,.r,.m,.mm,.pdf,text/plain,text/markdown,application/json,text/html,application/pdf" style="display:none" onchange="vfsReferenceHandleSelection(this.files)" />
@@ -15630,6 +15652,9 @@ function hideExclusiveOverlayById(id) {
       return true;
 	case 'rvmTaskOverlay':
 	  feRVMTaskClose();
+	  return true;
+	case 'wav2lipTaskOverlay':
+	  feWav2LipTaskClose();
 	  return true;
     case 'vfsAudioOverlay':
       vfsAudioDiscard(false);
@@ -49630,10 +49655,16 @@ function vfsRender(entries) {
     const rvmTask = isRootVideosDirectory
       ? '<button class="vfs-whisper-task" onclick="vfsOpenRVMTasks(event)" title="视频提取主体" aria-label="视频提取主体"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="5.3"/><path d="m15 15 4.2 4.2"/></svg></button>'
       : '';
+	const wav2lipTask = isRootVideosDirectory
+	  ? '<button class="vfs-whisper-task" onclick="vfsOpenWav2LipTasks(event)" title="人物视频对口型" aria-label="人物视频对口型"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.2 12.3c2.5-.25 4.7-3.9 7.8-3.9s5.3 3.65 7.8 3.9"/><path d="M4.2 12.3c2.5.25 4.7 3.9 7.8 3.9s5.3-3.65 7.8-3.9"/><path d="M4.2 12.3H19.8"/></svg></button>'
+	  : '';
     const isRVMVideoFile = e.type === 'file' && detectFileType(e.name) === 'video';
     const rvmVideoTask = isRVMVideoFile
       ? '<button class="vfs-whisper-task" onclick="vfsOpenRVMVideoTask(event,\'' + esc(absPath) + '\')" title="视频提取主体" aria-label="视频提取主体"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="5.3"/><path d="m15 15 4.2 4.2"/></svg></button>'
       : '';
+	const wav2lipVideoTask = isRVMVideoFile
+	  ? '<button class="vfs-whisper-task" onclick="vfsOpenWav2LipVideoTask(event,\'' + esc(absPath) + '\')" title="人物视频对口型" aria-label="人物视频对口型"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.2 12.3c2.5-.25 4.7-3.9 7.8-3.9s5.3 3.65 7.8 3.9"/><path d="M4.2 12.3c2.5.25 4.7 3.9 7.8 3.9s5.3-3.65 7.8-3.9"/><path d="M4.2 12.3H19.8"/></svg></button>'
+	  : '';
     const modifiedAt = vfsModifiedAtValue(e.modifiedAt);
     const recentFileVersionKey = vfsRecentFileVersionKey(absPath, modifiedAt);
     const isRecentFile = vfsIsRecentFile(e, now) && !!recentFileVersionKey && !recentDismissals[recentFileVersionKey];
@@ -49702,7 +49733,7 @@ function vfsRender(entries) {
     const vfsEditTourCls = vfsEditTourState.sourcePath && absPath === vfsEditTourState.sourcePath ? ' vfs-edit-tour-source' : '';
     const cls = `${sel}${isRecentFile ? ' recent-file' : ''}${isRecentUploadTarget ? ' recent-upload-target' : ''}${inChain ? ' warning-path' : ''}${warning ? ' warning-file' : ''}${systemKind ? ` vfs-system-${systemKind}` : ''}${skillsStatusIcon ? ' has-vfs-status' : ''}${hasSessionSkillsStatus ? ' has-session-skills-status' : ''}${vfsEditTourCls}`;
     const statusSlot = skillsStatusIcon ? `<span class="vfs-status-slot">${skillsStatusIcon}</span>` : '';
-    return `<div class="vfs-item${cls}"${skillDisableTourItemId || itemId} data-vfs-name="${esc(e.name)}" data-vfs-type="${e.type}" data-vfs-system="${systemKind}" data-vfs-path="${esc(absPath)}" data-vfs-modified-at="${modifiedAt}" draggable="true" onmouseenter="vfsHover(event,'${esc(e.name)}','${e.type}',${modifiedAt})" ondragstart="vfsDragStart(event,'${esc(absPath)}')" onclick="vfsClick(event,'${esc(e.name)}','${e.type}',${modifiedAt})" ondblclick="vfsDoubleClick(event,'${esc(e.name)}','${e.type}')">${skillIcon}<span class="vfs-name">${esc(e.name)}</span><span class="vfs-actions">${voxcpmTextTask}${whisperAudioTask}${voxcpmTask}${whisperTask}${rembgImageTask}${rembgTask}${rvmVideoTask}${rvmTask}${copyPath}${del}${dl}${soulBtn}</span>${statusSlot}</div>`;
+    return `<div class="vfs-item${cls}"${skillDisableTourItemId || itemId} data-vfs-name="${esc(e.name)}" data-vfs-type="${e.type}" data-vfs-system="${systemKind}" data-vfs-path="${esc(absPath)}" data-vfs-modified-at="${modifiedAt}" draggable="true" onmouseenter="vfsHover(event,'${esc(e.name)}','${e.type}',${modifiedAt})" ondragstart="vfsDragStart(event,'${esc(absPath)}')" onclick="vfsClick(event,'${esc(e.name)}','${e.type}',${modifiedAt})" ondblclick="vfsDoubleClick(event,'${esc(e.name)}','${e.type}')">${skillIcon}<span class="vfs-name">${esc(e.name)}</span><span class="vfs-actions">${voxcpmTextTask}${whisperAudioTask}${voxcpmTask}${whisperTask}${rembgImageTask}${rembgTask}${wav2lipVideoTask}${rvmVideoTask}${wav2lipTask}${rvmTask}${copyPath}${del}${dl}${soulBtn}</span>${statusSlot}</div>`;
   }).join('');
   vfsRecentFileRenderGeneration += 1;
   vfsScheduleRecentFileExpiry(entries);
@@ -53334,6 +53365,39 @@ async function vfsOpenRVMVideoTask(event, absPath) {
   }
 }
 
+async function vfsOpenWav2LipTasks(event) {
+  if (event) { event.preventDefault(); event.stopPropagation(); }
+  if (feWav2LipTaskCheckPending) return;
+  const agentId=String(vfsAgentId||'').trim();
+  if (!agentId) { vfsShowUploadToast('无法确定当前页面 Agent',true); return; }
+  feWav2LipTaskCheckPending=true;
+  try {
+    const ffmpeg=await feCheckExternalDependency('/api/ffmpeg/check','正在检查 FFmpeg，请稍候…');
+    if (!ffmpeg.available) { feShowFFmpegInstallDialog(ffmpeg.install,'wav2lip'); return; }
+    const wav2lip=await feCheckExternalDependency('/api/wav2lip/check?agentId='+encodeURIComponent(agentId),'正在检查 Wav2Lip，请稍候…');
+    if (!wav2lip.available) { feShowWav2LipInstallDialog(wav2lip.install); return; }
+    feWav2LipTaskOpen(agentId);
+  } catch(error) { vfsShowUploadToast('依赖检查失败：'+((error&&error.message)||'请重试'),true); }
+  finally { feWav2LipTaskCheckPending=false; }
+}
+
+async function vfsOpenWav2LipVideoTask(event, absPath) {
+  if (event) { event.preventDefault(); event.stopPropagation(); }
+  if (feWav2LipTaskCheckPending) return;
+  const agentId=String(vfsAgentId||'').trim(), workspace=normalizeFsPath(vfsWorkspace), selected=normalizeFsPath(absPath);
+  const videoPath=workspace&&selected&&isPathWithinWorkspace(selected,workspace)?relativeFsPath(workspace,selected):'';
+  if (!agentId || !videoPath || detectFileType(videoPath)!=='video') { vfsShowUploadToast('无法确定当前 Agent 工作目录中的视频文件',true); return; }
+  feWav2LipTaskCheckPending=true;
+  try {
+    const ffmpeg=await feCheckExternalDependency('/api/ffmpeg/check','正在检查 FFmpeg，请稍候…');
+    if (!ffmpeg.available) { feShowFFmpegInstallDialog(ffmpeg.install,'wav2lip'); return; }
+    const wav2lip=await feCheckExternalDependency('/api/wav2lip/check?agentId='+encodeURIComponent(agentId),'正在检查 Wav2Lip，请稍候…');
+    if (!wav2lip.available) { feShowWav2LipInstallDialog(wav2lip.install); return; }
+    feWav2LipTaskOpen(agentId,videoPath);
+  } catch(error) { vfsShowUploadToast('依赖检查失败：'+((error&&error.message)||'请重试'),true); }
+  finally { feWav2LipTaskCheckPending=false; }
+}
+
 function isRembgImagePath(path) {
   return /\.(png|jpe?g|webp|gif|bmp|tiff?)$/i.test(String(path || '').trim());
 }
@@ -53990,6 +54054,11 @@ let feRVMTaskCheckPending = false;
 let feRVMInstallRequest = '';
 let feRVMTaskState = null;
 let feRVMTaskPreviewReturnState = null;
+let feWav2LipTaskCheckPending = false;
+let feWav2LipInstallRequest = '';
+let feWav2LipTaskState = null;
+let feWav2LipTaskPreviewReturnState = null;
+let feWav2LipTaskAudioPickIndex = -1;
 let dependencyCheckLockSequence = 0;
 const dependencyCheckLocks = new Map();
 let dependencyCheckLockFocus = null;
@@ -55429,6 +55498,7 @@ async function feOpen(absPath, options) {
   // toolbar tools and prevents a task from being started during loading.
   feUpdateRembgTaskButton();
   feUpdateRVMTaskButton();
+  feUpdateWav2LipTaskButton();
   feUpdateVoxCPMTextTaskButton();
   feImageState.tool = 'erase';
   feImageState.brushSize = 24;
@@ -56464,6 +56534,7 @@ function feClose() {
   feFileType = 'text';
   feUpdateRembgTaskButton();
   feUpdateRVMTaskButton();
+  feUpdateWav2LipTaskButton();
   feUpdateVoxCPMTextTaskButton();
   feImageMime = '';
   feImageExt = '';
@@ -56489,6 +56560,7 @@ function feClose() {
   feWhisperTaskRestoreAfterPreview();
   feRembgTaskRestoreAfterPreview();
   feRVMTaskRestoreAfterPreview();
+  feWav2LipTaskRestoreAfterPreview();
   feVoxCPMTaskRestoreAfterPreview();
 }
 
@@ -57011,6 +57083,15 @@ document.addEventListener('keydown', e => {
     if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); feRVMTaskClose(); return; }
     if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && document.activeElement?.tagName !== 'BUTTON') { e.preventDefault(); e.stopImmediatePropagation(); void feRVMTaskStart(); return; }
   }
+  if (!document.getElementById('feWav2LipInstallDialog')?.hidden) {
+    if (!e.isComposing && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); feCancelWav2LipInstall(); }
+    if (!e.isComposing && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'Enter') { e.preventDefault(); e.stopImmediatePropagation(); void feConfirmWav2LipInstall(); }
+    return;
+  }
+  if (feWav2LipTaskState) {
+    if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); feWav2LipTaskClose(); return; }
+    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && document.activeElement?.tagName !== 'BUTTON') { e.preventDefault(); e.stopImmediatePropagation(); void feWav2LipTaskStart(); return; }
+  }
   if (feFFmpegInstallDialogOpen()) {
     if (!e.isComposing && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'Escape') {
       e.preventDefault();
@@ -57487,6 +57568,13 @@ function feUpdateRVMTaskButton() {
   button.disabled = !available || feRVMTaskCheckPending;
   button.title = feRVMTaskCheckPending ? '正在检查 Robust Video Matting' : '视频提取主体';
   button.setAttribute('aria-label', button.title);
+}
+
+function feUpdateWav2LipTaskButton() {
+  const button=document.getElementById('feWav2LipTaskBtn'); if(!button)return;
+  const available=feFileType==='video'&&feMediaElement() instanceof HTMLVideoElement&&!!feGetPreviewAgentID()&&!!feAgentRelPath&&!feAgentRelPath.startsWith('/');
+  button.hidden=!available; button.disabled=!available||feWav2LipTaskCheckPending;
+  button.title=feWav2LipTaskCheckPending?'正在检查 Wav2Lip':'人物视频对口型'; button.setAttribute('aria-label',button.title);
 }
 
 function feWhisperTaskStatusName(status) {
@@ -58114,6 +58202,38 @@ function feShowRVMInstallDialog(request){request=String(request||'').trim();if(!
 function feCancelRVMInstall(){const dialog=document.getElementById('feRVMInstallDialog');if(dialog)dialog.hidden=true;feRVMInstallRequest='';}
 async function feConfirmRVMInstall(){const request=String(feRVMInstallRequest||'').trim();if(!request)return;feCancelRVMInstall();const sent=await sendCenterMessage(request,{clearInputAfterSend:false,toastOnSuccess:'',requestSource:'rvm_install'});if(!sent)vfsShowUploadToast('未能发送 Robust Video Matting 安装请求，请检查当前 Chat',true);}
 
+function feShowWav2LipInstallDialog(request){request=String(request||'').trim();if(!request){vfsShowUploadToast('Wav2Lip 安装请求配置为空',true);return;}feWav2LipInstallRequest=request;const dialog=document.getElementById('feWav2LipInstallDialog'),button=document.getElementById('feWav2LipInstallConfirmBtn');if(dialog)dialog.hidden=false;window.setTimeout(()=>button?.focus({preventScroll:true}),0);}
+function feCancelWav2LipInstall(){const dialog=document.getElementById('feWav2LipInstallDialog');if(dialog)dialog.hidden=true;feWav2LipInstallRequest='';}
+async function feConfirmWav2LipInstall(){const request=String(feWav2LipInstallRequest||'').trim();if(!request)return;feCancelWav2LipInstall();const sent=await sendCenterMessage(request,{clearInputAfterSend:false,toastOnSuccess:'',requestSource:'wav2lip_install'});if(!sent)vfsShowUploadToast('未能发送 Wav2Lip 安装请求，请检查当前 Chat',true);}
+async function feOpenWav2LipTask(){if(feWav2LipTaskCheckPending)return;const agentId=String(feGetPreviewAgentID()||'').trim(),source=String(feAgentRelPath||'').trim();if(feFileType!=='video'||!agentId||!source||source.startsWith('/')){feSetMediaStatus('无法确定当前 Agent 工作目录中的视频文件');return;}feWav2LipTaskCheckPending=true;feUpdateWav2LipTaskButton();try{const ffmpeg=await feCheckExternalDependency('/api/ffmpeg/check','正在检查 FFmpeg，请稍候…');if(!ffmpeg.available){feShowFFmpegInstallDialog(ffmpeg.install,'wav2lip-preview');return;}const result=await feCheckExternalDependency('/api/wav2lip/check?agentId='+encodeURIComponent(agentId),'正在检查 Wav2Lip，请稍候…');if(!result.available){feShowWav2LipInstallDialog(result.install);return;}feSetMediaStatus('');feWav2LipTaskOpen(agentId,source);}catch(error){feSetMediaStatus('依赖检查失败：'+((error&&error.message)||'请重试'));}finally{feWav2LipTaskCheckPending=false;feUpdateWav2LipTaskButton();}}
+function feWav2LipTaskSetStatus(message,error){const s=feWav2LipTaskState;if(!s)return;s.status=String(message||'');s.error=!!error;const el=document.getElementById('wav2lipTaskStatus');if(el){el.textContent=s.status;el.classList.toggle('notice',!!s.status&&!s.error);el.classList.toggle('error',s.error);}}
+function feWav2LipTaskByID(id){return feWav2LipTaskState&&feWav2LipTaskState.tasks.find(x=>Number(x.id)===Number(id));}
+function feWav2LipTaskRender(){const s=feWav2LipTaskState;if(!s)return;feTaskHidePathTooltip();const pending=document.getElementById('wav2lipTaskPending'),list=document.getElementById('wav2lipTaskList'),pages=Math.max(1,Math.ceil(s.total/s.pageSize));const add=document.getElementById('wav2lipTaskAddBtn'),start=document.getElementById('wav2lipTaskStartBtn');if(add){add.disabled=s.importing||s.creating||s.pending.length>=5;add.textContent=s.importing?'正在添加…':'添加';}if(start){start.disabled=!s.pending.length||s.pending.some(x=>!x.audioPath)||s.importing||s.creating;start.textContent=s.creating?'正在加入队列…':'开始';}const close=document.getElementById('wav2lipTaskCloseBtn');if(close)close.disabled=s.creating;const filter=document.getElementById('wav2lipTaskStatusFilter');if(filter)filter.value=s.statusFilter;const batch=document.getElementById('wav2lipTaskBatchActions');if(batch)batch.classList.toggle('active',Object.keys(s.selected).length>0);const count=document.getElementById('wav2lipTaskCount');if(count)count.textContent='共 '+s.total+' 条';const prev=document.getElementById('wav2lipTaskPreviousPage'),next=document.getElementById('wav2lipTaskNextPage'),label=document.getElementById('wav2lipTaskPageLabel');if(prev)prev.disabled=s.refreshing||s.page<=1;if(next)next.disabled=s.refreshing||s.page>=pages;if(label)label.textContent='第 '+s.page+' / '+pages+' 页';if(pending){pending.hidden=!s.pending.length;pending.innerHTML='<div class="whisper-task-pending-head">待加入队列（'+s.pending.length+' / 5）</div><div class="whisper-task-pending-list">'+s.pending.map((x,i)=>'<div class="whisper-task-pending-item"><div class="whisper-task-path" title="'+esc(x.videoPath)+'">视频：'+esc(x.videoPath)+'</div><button type="button" class="'+(x.audioPath?'ready':'')+'" onclick="feWav2LipTaskChooseAudio('+i+')">'+esc(x.audioPath?'音频：'+x.audioPath:'选择音频')+'</button><button type="button" onclick="feWav2LipTaskRemovePending('+i+')">删除</button></div>').join('')+'</div>';}if(list){list.innerHTML=!s.tasks.length?'<div class="whisper-task-empty">'+(s.statusFilter?'当前状态下暂无任务。':'暂时没有人物视频对口型任务。添加视频并配对音频后即可开始。')+'</div>':s.tasks.map(t=>{const id=Number(t.id),status=String(t.status||''),video=String(t.videoPath||''),audio=String(t.audioPath||''),out=String(t.outputPath||''),done=status==='completed'&&!!String(t.savedAs||'').trim(),check=done?'<input class="whisper-task-complete-select" type="checkbox" '+(s.selected[String(id)]?'checked ':'')+'onchange="feWav2LipTaskToggleSelectedOutput('+id+',this.checked)" aria-label="勾选视频文件">':'';const acts=(done?'<button type="button" onclick="feWav2LipTaskCopyOutput('+id+')">复制</button><button type="button" onclick="feWav2LipTaskPreviewOutput('+id+')">预览</button>':'')+((status==='queued'||status==='running')?'<button class="danger" type="button" onclick="feWav2LipTaskCancel('+id+')">取消</button>':'')+(status==='cancelled'?'<button type="button" onclick="feWav2LipTaskRestart('+id+')">重新开始</button>':'')+((status==='failed'||status==='cancelled')?'<button class="danger" type="button" onclick="feWav2LipTaskDelete('+id+')">删除</button>':'');const tip=' onmouseenter="feTaskShowPathTooltip(event,this)" onmouseleave="feTaskHidePathTooltip()"';return '<article class="whisper-task-row"><div class="whisper-task-row-main"><div class="whisper-task-row-title">'+check+'<strong class="task-full-path" data-full-path="'+esc(video)+'"'+tip+'>'+esc(video)+'</strong><span class="whisper-task-status '+esc(status)+'">'+esc(feWhisperTaskStatusName(status))+'</span><span class="whisper-task-row-inline-actions">'+acts+'</span></div><div class="whisper-task-progress"><i style="width:'+Math.max(0,Math.min(100,Number(t.progress)||0))+'%"></i></div><div class="whisper-task-meta"><span>开始：'+esc(feWhisperTaskFormatTime(t.startedAt||t.createdAt))+'</span><span class="whisper-task-output task-full-path" data-full-path="'+esc(audio)+'"'+tip+'>音频：'+esc(audio)+'</span><span class="whisper-task-output task-full-path" data-full-path="'+esc(out)+'"'+tip+'>视频：'+esc(out||'等待生成')+'</span></div></div><div class="whisper-task-row-actions"><button type="button" onclick="feWav2LipTaskShowLog('+id+')">日志</button></div></article>';}).join('');feTaskSyncTruncatedPaths(list);}feWav2LipTaskSetStatus(s.status,s.error);}
+function feWav2LipTaskOpen(agentId,videoPath=''){feWav2LipTaskPreviewReturnState=null;const video=String(videoPath||'').trim(),pending=video&&!video.startsWith('/')&&feRVMVideoItem({relativePath:video})?[{videoPath:video,audioPath:''}]:[];feWav2LipTaskState={agentId:String(agentId||''),pending,tasks:[],selected:{},failureNotices:{},page:1,pageSize:5,total:0,statusFilter:'',importing:false,creating:false,refreshing:false,poller:null,logTaskID:0,logRequestSequence:0,status:'',error:false};feWav2LipTaskCloseLog();showExclusiveOverlay(document.getElementById('wav2lipTaskOverlay'),document.getElementById('wav2lipTaskPanel'));feWav2LipTaskRender();void feWav2LipTaskRefresh();startFileTaskPolling(feWav2LipTaskState,feWav2LipTaskRefresh);}
+function feWav2LipTaskClose(options={}){const s=feWav2LipTaskState;if(!s)return;if(s.poller)window.clearInterval(s.poller);feWav2LipTaskState=null;feTaskHidePathTooltip();if(!options.preservePreviewReturn)feWav2LipTaskPreviewReturnState=null;setOverlayVisible(document.getElementById('wav2lipTaskOverlay'),false,document.getElementById('wav2lipTaskPanel'));}
+function feWav2LipTaskRestoreAfterPreview(){const s=feWav2LipTaskPreviewReturnState;if(!s||feWav2LipTaskState)return;feWav2LipTaskPreviewReturnState=null;s.refreshing=false;s.poller=null;feWav2LipTaskState=s;showExclusiveOverlay(document.getElementById('wav2lipTaskOverlay'),document.getElementById('wav2lipTaskPanel'));feWav2LipTaskRender();void feWav2LipTaskRefresh();startFileTaskPolling(s,feWav2LipTaskRefresh);}
+async function feWav2LipTaskRefresh(){const s=feWav2LipTaskState;if(!s||s.refreshing||!s.agentId)return;s.refreshing=true;try{const q=new URLSearchParams({agentId:s.agentId,page:String(s.page)});if(s.statusFilter)q.set('status',s.statusFilter);const res=await fetch('/api/wav2lip/tasks?'+q,{cache:'no-store'}),r=await res.json();if(!res.ok||!r||r.status!==0)throw new Error(r&&r.content||'读取任务失败');if(feWav2LipTaskState!==s)return;s.tasks=Array.isArray(r.tasks)?r.tasks:[];s.total=Math.max(0,Number(r.total)||0);s.pageSize=Math.max(1,Number(r.pageSize)||5);s.page=Math.max(1,Number(r.page)||1);s.statusFilter=String(r.taskStatus||s.statusFilter||'');for(const task of s.tasks){const reason=String(task&&task.failureReason||'').trim(),key=String(task&&task.id||'')+':'+String(task&&task.updatedAt||'');if(String(task&&task.status||'')==='failed'&&reason&&!s.failureNotices[key]){s.failureNotices[key]=true;feWav2LipTaskSetStatus('任务 #'+String(task.id)+' 失败：'+reason,true);}}if(s.logTaskID)void feWav2LipTaskRefreshLog(s,s.logTaskID);}catch(e){if(feWav2LipTaskState===s)feWav2LipTaskSetStatus('刷新任务失败：'+((e&&e.message)||'请重试'),true);}finally{if(feWav2LipTaskState===s){s.refreshing=false;feWav2LipTaskRender();}}}
+function feWav2LipTaskChangeStatus(v){const s=feWav2LipTaskState;if(!s||s.refreshing)return;s.statusFilter=String(v||'');s.page=1;feWav2LipTaskCloseLog();void feWav2LipTaskRefresh();}
+function feWav2LipTaskChangePage(o){const s=feWav2LipTaskState;if(!s||s.refreshing)return;const p=Math.max(1,Math.min(Math.max(1,Math.ceil(s.total/s.pageSize)),s.page+Number(o||0)));if(p!==s.page){s.page=p;feWav2LipTaskCloseLog();void feWav2LipTaskRefresh();}}
+function feWav2LipTaskChooseVideos(){const s=feWav2LipTaskState;if(s&&!s.importing&&!s.creating)document.getElementById('wav2lipTaskVideoInput')?.click();}
+async function feWav2LipTaskHandleVideos(files){const input=document.getElementById('wav2lipTaskVideoInput'),s=feWav2LipTaskState;try{const items=normalizeUploadFileItems(files).filter(feRVMVideoItem);if(!s||!items.length){if(s)feWav2LipTaskSetStatus('请选择视频文件。',true);return;}const remain=5-s.pending.length;if(remain<=0){feWav2LipTaskSetStatus('待加入队列最多 5 个视频文件。',true);return;}s.importing=true;feWav2LipTaskSetStatus('正在添加视频文件…',false);feWav2LipTaskRender();const result=await uploadItemsToAgentTmp(items.slice(0,remain),{agentId:s.agentId});if(feWav2LipTaskState!==s)return;result.uploadedRelPaths.map(x=>joinFsPath('tmp',x)).forEach(x=>{if(!s.pending.some(p=>p.videoPath===x)&&s.pending.length<5)s.pending.push({videoPath:x,audioPath:''});});s.status=items.length>remain?'仅添加前 '+remain+' 个视频文件；待加入队列最多 5 个。':'';s.error=false;vfsLastJson='';void vfsRefresh();}catch(e){if(feWav2LipTaskState===s)feWav2LipTaskSetStatus('添加文件失败：'+((e&&e.message)||'请重试'),true);}finally{if(feWav2LipTaskState===s){s.importing=false;feWav2LipTaskRender();}if(input)input.value='';}}
+function feWav2LipTaskChooseAudio(i){const s=feWav2LipTaskState;if(!s||!s.pending[Number(i)]||s.importing||s.creating)return;feWav2LipTaskAudioPickIndex=Number(i);document.getElementById('wav2lipTaskAudioInput')?.click();}
+async function feWav2LipTaskHandleAudio(files){const input=document.getElementById('wav2lipTaskAudioInput'),s=feWav2LipTaskState,index=feWav2LipTaskAudioPickIndex;feWav2LipTaskAudioPickIndex=-1;try{const item=normalizeUploadFileItems(files).find(x=>/\.(wav|mp3|m4a|aac|flac|ogg)$/i.test(String((x&&x.relativePath)||(x&&x.file&&x.file.name)||'')));if(!s||index<0||!s.pending[index]||!item){if(s)feWav2LipTaskSetStatus('请选择 WAV、MP3、M4A、AAC、FLAC 或 OGG 音频文件。',true);return;}s.importing=true;feWav2LipTaskSetStatus('正在添加音频文件…',false);feWav2LipTaskRender();const result=await uploadItemsToAgentTmp([item],{agentId:s.agentId});if(feWav2LipTaskState!==s)return;s.pending[index].audioPath=joinFsPath('tmp',result.uploadedRelPaths[0]);s.status='';s.error=false;vfsLastJson='';void vfsRefresh();}catch(e){if(feWav2LipTaskState===s)feWav2LipTaskSetStatus('添加音频失败：'+((e&&e.message)||'请重试'),true);}finally{if(feWav2LipTaskState===s){s.importing=false;feWav2LipTaskRender();}if(input)input.value='';}}
+function feWav2LipTaskRemovePending(i){const s=feWav2LipTaskState;if(s&&!s.importing&&!s.creating){s.pending.splice(Number(i),1);feWav2LipTaskRender();}}
+async function feWav2LipTaskStart(){const s=feWav2LipTaskState;if(!s||s.creating||!s.pending.length||s.pending.some(x=>!x.audioPath))return;s.creating=true;feWav2LipTaskRender();try{const res=await fetch('/api/wav2lip/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agentId:s.agentId,tasks:s.pending})}),r=await res.json();if(!res.ok||!r||r.status!==0)throw new Error(r&&r.content||'创建任务失败');if(feWav2LipTaskState!==s)return;s.pending=[];s.status='';s.error=false;await feWav2LipTaskRefresh();}catch(e){if(feWav2LipTaskState===s)feWav2LipTaskSetStatus('创建任务失败：'+((e&&e.message)||'请重试'),true);}finally{if(feWav2LipTaskState===s){s.creating=false;feWav2LipTaskRender();}}}
+async function feWav2LipTaskRequest(path,id){const s=feWav2LipTaskState,res=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agentId:s.agentId,id:Number(id)})}),r=await res.json();if(!res.ok||!r||r.status!==0)throw new Error(r&&r.content||'请求失败');}
+async function feWav2LipTaskCancel(id){try{await feWav2LipTaskRequest('/api/wav2lip/tasks/cancel',id);feWav2LipTaskSetStatus('已请求取消任务。',false);await feWav2LipTaskRefresh();}catch(e){feWav2LipTaskSetStatus('取消任务失败：'+((e&&e.message)||'请重试'),true);}}
+async function feWav2LipTaskRestart(id){try{await feWav2LipTaskRequest('/api/wav2lip/tasks/restart',id);feWav2LipTaskSetStatus('已重新加入人物视频对口型队列。',false);await feWav2LipTaskRefresh();}catch(e){feWav2LipTaskSetStatus('重新开始任务失败：'+((e&&e.message)||'请重试'),true);}}
+async function feWav2LipTaskDelete(id){try{await feWav2LipTaskRequest('/api/wav2lip/tasks/delete',id);await feWav2LipTaskRefresh();}catch(e){feWav2LipTaskSetStatus('删除任务失败：'+((e&&e.message)||'请重试'),true);}}
+async function feWav2LipTaskCopyOutput(id){const t=feWav2LipTaskByID(id),p=String(t&&t.savedAs||'').trim();if(!p)return;try{await copyTextToClipboard(p);feWav2LipTaskSetStatus('视频绝对路径已复制',false);}catch(e){feWav2LipTaskSetStatus('复制视频路径失败：'+((e&&e.message)||'请重试'),true);}}
+function feWav2LipTaskToggleSelectedOutput(id,on){const s=feWav2LipTaskState,t=feWav2LipTaskByID(id),p=String(t&&t.savedAs||'').trim();if(!s||!p||String(t.status)!=='completed')return;if(on)s.selected[String(t.id)]=p;else delete s.selected[String(t.id)];feWav2LipTaskRender();}
+async function feWav2LipTaskCopySelectedOutputs(){const s=feWav2LipTaskState,paths=s?[...new Set(Object.values(s.selected).map(x=>String(x||'').trim()).filter(Boolean))]:[];if(!paths.length)return;try{await copyTextToClipboard(paths.join('\n'));feWav2LipTaskSetStatus('已复制 '+paths.length+' 条视频绝对路径',false);}catch(e){feWav2LipTaskSetStatus('复制视频路径失败：'+((e&&e.message)||'请重试'),true);}}
+function feWav2LipTaskClearSelectedOutputs(){if(feWav2LipTaskState){feWav2LipTaskState.selected={};feWav2LipTaskRender();}}
+async function feWav2LipTaskPreviewOutput(id){const s=feWav2LipTaskState,t=feWav2LipTaskByID(id),p=String(t&&t.outputPath||'').trim();if(!s||!p||p.startsWith('/'))return;try{const res=await fetch('/api/media_preview?agentId='+encodeURIComponent(s.agentId)+'&path='+encodeURIComponent(p),{method:'HEAD',cache:'no-store'});if(!res.ok)throw new Error((await res.text()).trim()||'视频文件不存在，无法预览');const workspace=await getWorkspaceForAgent(s.agentId);if(!workspace)throw new Error('无法确定当前 Agent 工作目录');if(feWav2LipTaskState!==s)return;feWav2LipTaskPreviewReturnState=s;feWav2LipTaskClose({preservePreviewReturn:true});await feOpen(joinFsPath(workspace,p),{agentId:s.agentId,workspaceRoot:workspace});}catch(e){if(feWav2LipTaskPreviewReturnState===s&&!feWav2LipTaskState){feWav2LipTaskRestoreAfterPreview();feWav2LipTaskSetStatus('预览视频失败：'+((e&&e.message)||'请重试'),true);}else if(feWav2LipTaskState===s)feWav2LipTaskSetStatus('预览视频失败：'+((e&&e.message)||'请重试'),true);}}
+async function feWav2LipTaskShowLog(id){const s=feWav2LipTaskState;if(!s)return;s.logTaskID=Number(id);const panel=document.getElementById('wav2lipTaskLog'),title=document.getElementById('wav2lipTaskLogTitle'),text=document.getElementById('wav2lipTaskLogText');if(panel){panel.hidden=false;window.requestAnimationFrame(()=>panel.scrollIntoView({behavior:'smooth',block:'start'}));}if(title)title.textContent='任务 #'+id+' 执行日志';if(text)text.textContent='正在读取日志…';void feWav2LipTaskRefreshLog(s,id);}
+async function feWav2LipTaskRefreshLog(s,id){const taskID=Number(id);if(!s||feWav2LipTaskState!==s||s.logTaskID!==taskID)return;const seq=++s.logRequestSequence,text=document.getElementById('wav2lipTaskLogText');try{const res=await fetch('/api/wav2lip/tasks/log?agentId='+encodeURIComponent(s.agentId)+'&id='+taskID,{cache:'no-store'}),r=await res.json();if(!res.ok||!r||r.status!==0||!r.task)throw new Error(r&&r.content||'读取日志失败');if(feWav2LipTaskState===s&&s.logTaskID===taskID&&s.logRequestSequence===seq&&text){text.textContent=String(r.task.logs||'暂无执行日志。');text.scrollTop=text.scrollHeight;}}catch(e){if(feWav2LipTaskState===s&&s.logTaskID===taskID&&s.logRequestSequence===seq&&text)text.textContent='读取日志失败：'+((e&&e.message)||'请重试');}}
+function feWav2LipTaskCloseLog(){const s=feWav2LipTaskState;if(s){s.logTaskID=0;s.logRequestSequence++;}const panel=document.getElementById('wav2lipTaskLog');if(panel)panel.hidden=true;}
+
 let feVoxCPMTaskState = null;
 let feVoxCPMTaskPreviewReturnState = null;
 
@@ -58137,6 +58257,7 @@ function syncEnergySaverPollingIntervals() {
   startFileTaskPolling(feWhisperTaskState, feWhisperTaskRefresh);
   startFileTaskPolling(feRembgTaskState, feRembgTaskRefresh);
   startFileTaskPolling(feRVMTaskState, feRVMTaskRefresh);
+  startFileTaskPolling(feWav2LipTaskState, feWav2LipTaskRefresh);
   startFileTaskPolling(feVoxCPMTaskState, feVoxCPMTaskRefresh);
 }
 
@@ -59740,6 +59861,7 @@ function renderMediaPreview(sourceURL, mediaType) {
   feUpdateAudioTrimButton();
   feUpdateWhisperTaskButton();
   feUpdateRVMTaskButton();
+  feUpdateWav2LipTaskButton();
   feUpdateVideoTrimButton();
   feUpdateVideoAudioExtractButton();
   feUpdateVideoFrameButton();

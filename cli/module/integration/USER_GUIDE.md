@@ -187,8 +187,12 @@ Integration 仅在 macOS 上按需启动 `caffeinate -d -i -m -s`，避免必要
 - 飞书（`feishu`）或邮件（`email`）插件已成功启动；
 - 有尚未处理且计划执行时间在未来 24 小时内的备忘录任务；
 - 有仍在传输中的 SSE 响应。
+- 有已持久化、状态为 `queued`（待执行）或 `running`（执行中）的人物视频对口型任务；
+- 有已持久化、状态为 `queued`（待执行）或 `running`（执行中）的提取图片主体任务；
+- 有已持久化、状态为 `queued`（待执行）或 `running`（执行中）的文字转语音任务；
+- 有已持久化、状态为 `queued`（待执行）或 `running`（执行中）的视频提取主体任务。
 
-SSE 在开始、正常完成及异常结束时都会立即重算；上游错误、EOF、解析或写入失败、客户端断开以及请求/服务取消均会结束该 SSE 的防休眠状态。三个条件都不满足时会终止 `caffeinate`，允许系统正常休眠。
+SSE 在开始、正常完成及异常结束时都会立即重算；上游错误、EOF、解析或写入失败、客户端断开以及请求/服务取消均会结束该 SSE 的防休眠状态。上述四类任务在入队、取消、重新开始或结束时也会立即重算；仅前端临时添加、尚未入队的条目不计入。全部条件都不满足时会终止 `caffeinate`，允许系统正常休眠。
 
 `caffeinate` 配置缺失、格式错误或小于等于零时，Integration 会记录日志并拒绝启动；修改配置后需要重启生效。若 macOS 无法创建 `caffeinate` 子进程，服务会记录日志但继续运行。
 
@@ -3586,3 +3590,17 @@ Integration 提供基于 Robust Video Matting 的持久化视频主体队列。`
 在 macOS 上任务优先使用 Apple MPS，其他系统优先 CUDA；GPU/MPS 推理失败时会清理临时输出并自动从头以 CPU 重试一次。任务场景、状态、日志、取消、重新开始和失败或已取消记录删除均保存在共享 SQLite，刷新页面或重启服务不会丢失历史记录。
 
 完整配置与接口说明见 [iteration/20260802-3/USER_GUIDE.md](iteration/20260802-3/USER_GUIDE.md)。
+
+---
+
+## 迭代 20260802-4：Wav2Lip 人物视频对口型
+
+Integration 新增 Wav2Lip 队列。`config/config.json.wav2lip.check` 控制成功检查缓存，`wav2lip.install` 是依赖缺失时发给当前 Chat 的请求；服务端会用页面提供的 Agent ID 解析工作目录并展开 `$workspace`。上游入口固定为 `$workspace/wav2lip/inference.py`，固定默认模型为 `$workspace/wav2lip/checkpoints/wav2lip_gan.pth`。只有两者非空并且实际执行 `inference.py --help` 成功才可用；不回退搜索环境变量、其它目录、模型或 Agent。下载的 Wav2Lip、模型和第三方包一律只读，兼容逻辑仅在 Integration 自身的子进程包装器中运行。
+
+接口包括 `GET /api/wav2lip/check`、`GET/POST /api/wav2lip/tasks`、取消、重新开始、删除和日志接口。每条任务保存一个当前 Agent 工作区内的视频与音频配对，音频限定 WAV、MP3、M4A、AAC、FLAC 或 OGG，创建和执行都会用 FFprobe 再次验证媒体流，并确认 FFmpeg/FFprobe 已安装。输出固定为 `videos/<视频名>_lip_sync.mp4`，任何冲突均自动追加时间戳，绝不覆盖。任务使用固定 GAN 模型及受控的官方 Wav2Lip 参数；macOS 优先 MPS，其他系统优先 CUDA，失败时清理临时产物并仅用 CPU 从头重试一次，实际设备与回退原因写入日志。任务全局串行、可恢复、可取消；失败和已取消记录可删除而不会删除文件。
+
+原始 Wav2Lip 在最终 FFmpeg 合成时没有引用音频和输出路径。Integration 会先在自身无空格的临时目录中映射这些文件，并固定以 `$workspace/wav2lip` 作为子进程工作目录，成功后才把 MP4 写入 Agent 的 `videos/`，从而避免 macOS `Application Support` 路径被截断及临时目录清理后的 `getcwd` 警告；下载的 Wav2Lip、模型和第三方依赖仍保持只读。
+
+完整说明见 [iteration/20260802-4/USER_GUIDE.md](iteration/20260802-4/USER_GUIDE.md)。
+
+Wav2Lip 执行中如识别到 PyTorch `unexpected EOF`，会将原始堆栈转换为“人脸检测模型缓存不完整或损坏”的持久化失败原因，并指引清理 `~/.cache/torch/hub/checkpoints/s3fd-619a316812.pth` 后重新执行；原始输出仍保留在任务日志中。

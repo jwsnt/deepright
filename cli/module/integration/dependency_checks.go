@@ -51,6 +51,13 @@ func startIntegrationDependencyChecks(ctx context.Context, cfg *Config) {
 				return status, response.Available, response.Content
 			},
 		},
+		{
+			name: "wav2lip",
+			check: func() (int, bool, string) {
+				status, response := checkWav2LipDependency(cfg, "")
+				return status, response.Available, response.Content
+			},
+		},
 	}
 	go runIntegrationDependencyChecks(ctx, checks)
 }

@@ -351,6 +351,7 @@ func (m *voxcpmTaskManager) signal() {
 	case m.wake <- struct{}{}:
 	default:
 	}
+	notifyIntegrationSleepConditionChanged(m.cfg)
 }
 func (m *voxcpmTaskManager) run(ctx context.Context) {
 	for {
@@ -772,6 +773,7 @@ func (m *voxcpmTaskManager) appendLog(id int64, message string) {
 func (m *voxcpmTaskManager) finish(id int64, status string, progress int, message string) {
 	m.appendLog(id, message)
 	_, _ = m.db.Exec(`UPDATE voxcpm_task SET status=?,progress=?,updated_at=? WHERE id=?`, status, progress, voxcpmTimestamp(), id)
+	notifyIntegrationSleepConditionChanged(m.cfg)
 }
 func (m *voxcpmTaskManager) cancelled(id int64) bool {
 	var requested int
@@ -1013,6 +1015,7 @@ func (m *voxcpmTaskManager) cancelTask(agentID string, id int64) error {
 	if should && cancel != nil {
 		cancel()
 	}
+	notifyIntegrationSleepConditionChanged(m.cfg)
 	return nil
 }
 func (m *voxcpmTaskManager) restart(agentID string, id int64) error {

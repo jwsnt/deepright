@@ -131,6 +131,68 @@ func TestIntegrationCaffeinatePendingMemoUsesFuture24HourWindow(t *testing.T) {
 	}
 }
 
+func TestIntegrationCaffeinatePendingTaskUsesQueuedAndRunningMediaTasks(t *testing.T) {
+	cases := []struct {
+		name   string
+		table  string
+		status string
+		active bool
+	}{
+		{name: "wav2lip queued", table: "wav2lip", status: wav2lipTaskQueued, active: true},
+		{name: "wav2lip running", table: "wav2lip", status: wav2lipTaskRunning, active: true},
+		{name: "rembg queued", table: "rembg", status: rembgTaskQueued, active: true},
+		{name: "rembg running", table: "rembg", status: rembgTaskRunning, active: true},
+		{name: "voxcpm queued", table: "voxcpm", status: voxcpmTaskQueued, active: true},
+		{name: "voxcpm running", table: "voxcpm", status: voxcpmTaskRunning, active: true},
+		{name: "rvm queued", table: "rvm", status: rvmTaskQueued, active: true},
+		{name: "rvm running", table: "rvm", status: rvmTaskRunning, active: true},
+		{name: "terminal task", table: "wav2lip", status: wav2lipTaskCompleted, active: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			db, err := sql.Open("sqlite", ":memory:")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer db.Close()
+			for _, ensure := range []func(*sql.DB) error{ensureWav2LipTaskSchema, ensureRembgTaskSchema, ensureVoxCPMTaskSchema, ensureRVMTaskSchema} {
+				if err := ensure(db); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			oldCronDB := cronDB
+			cronDB = db
+			t.Cleanup(func() { cronDB = oldCronDB })
+			now := "2026-08-02T10:00:00Z"
+			switch tc.table {
+			case "wav2lip":
+				_, err = db.Exec(`INSERT INTO wav2lip_task(agent_id,video_path,audio_path,status,created_at,updated_at) VALUES ('agent-a','video.mp4','audio.wav',?,?,?)`, tc.status, now, now)
+			case "rembg":
+				_, err = db.Exec(`INSERT INTO rembg_task(agent_id,source_path,status,created_at,updated_at) VALUES ('agent-a','photo.png',?,?,?)`, tc.status, now, now)
+			case "voxcpm":
+				_, err = db.Exec(`INSERT INTO voxcpm_task(agent_id,text_path,text_saved_as,reference_audio_path,reference_audio_saved_as,requested_name,output_path,saved_as,status,created_at,updated_at) VALUES ('agent-a','text.txt','/text.txt','','','voice','voice.wav','/voice.wav',?,?,?)`, tc.status, now, now)
+			case "rvm":
+				_, err = db.Exec(`INSERT INTO rvm_task(agent_id,source_path,status,created_at,updated_at) VALUES ('agent-a','video.mp4',?,?,?)`, tc.status, now, now)
+			default:
+				t.Fatalf("unsupported task table %q", tc.table)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			active, err := integrationCaffeinatePendingTask()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if active != tc.active {
+				t.Fatalf("active = %t, want %t", active, tc.active)
+			}
+		})
+	}
+}
+
 func TestIntegrationSleepManagerStartsAndStopsForConditionChanges(t *testing.T) {
 	conditions := integrationSleepConditions{Memo: true}
 	assertion := &integrationSleepAssertionStub{}

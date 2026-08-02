@@ -336,6 +336,7 @@ func (m *rembgTaskManager) signal() {
 	case m.wake <- struct{}{}:
 	default:
 	}
+	notifyIntegrationSleepConditionChanged(m.cfg)
 }
 func (m *rembgTaskManager) run(ctx context.Context) {
 	for {
@@ -576,6 +577,7 @@ func (m *rembgTaskManager) appendLog(id int64, message string) {
 func (m *rembgTaskManager) finish(id int64, status string, progress int, message string) {
 	m.appendLog(id, message)
 	_, _ = m.db.Exec(`UPDATE rembg_task SET status=?,progress=?,updated_at=? WHERE id=?`, status, progress, rembgTimestamp(), id)
+	notifyIntegrationSleepConditionChanged(m.cfg)
 }
 func (m *rembgTaskManager) cancelled(id int64) bool {
 	var cancelled int
@@ -796,6 +798,7 @@ func (m *rembgTaskManager) cancelTask(agentID string, id int64) error {
 	if shouldCancel && cancel != nil {
 		cancel()
 	}
+	notifyIntegrationSleepConditionChanged(m.cfg)
 	return nil
 }
 func (m *rembgTaskManager) restart(agentID string, id int64) error {

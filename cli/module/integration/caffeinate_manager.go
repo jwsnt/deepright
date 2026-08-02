@@ -18,21 +18,23 @@ type integrationSleepConditions struct {
 	Plugin bool
 	Memo   bool
 	SSE    bool
+	Task   bool
 }
 
 func (conditions integrationSleepConditions) Active() bool {
-	return conditions.Plugin || conditions.Memo || conditions.SSE
+	return conditions.Plugin || conditions.Memo || conditions.SSE || conditions.Task
 }
 
 type integrationSleepManager struct {
 	interval time.Duration
 
-	mu        sync.Mutex
-	closed    bool
-	started   bool
-	assertion integrationSleepAssertion
-	activeSSE int
-	cancel    context.CancelFunc
+	mu         sync.Mutex
+	closed     bool
+	started    bool
+	assertion  integrationSleepAssertion
+	stopFailed bool
+	activeSSE  int
+	cancel     context.CancelFunc
 
 	evaluateConditions func(activeSSE int) (integrationSleepConditions, error)
 	startAssertion     func() (integrationSleepAssertion, error)
@@ -121,6 +123,13 @@ func trackIntegrationSSE(cfg *Config) func() {
 	return cfg.sleepManager.TrackSSE()
 }
 
+func notifyIntegrationSleepConditionChanged(cfg *Config) {
+	if cfg == nil || cfg.sleepManager == nil {
+		return
+	}
+	cfg.sleepManager.requestEvaluation()
+}
+
 func (m *integrationSleepManager) Close() {
 	if m == nil {
 		return
@@ -186,7 +195,7 @@ func (m *integrationSleepManager) ensureAssertion() {
 		m.mu.Unlock()
 		return
 	}
-	if integrationSleepAssertionRunning(m.assertion) {
+	if m.stopFailed || integrationSleepAssertionRunning(m.assertion) {
 		m.mu.Unlock()
 		return
 	}
@@ -211,6 +220,7 @@ func (m *integrationSleepManager) ensureAssertion() {
 		return
 	}
 	m.assertion = assertion
+	m.stopFailed = false
 	m.mu.Unlock()
 	m.logf("integration: macOS sleep assertion started")
 }
@@ -219,6 +229,7 @@ func (m *integrationSleepManager) releaseAssertion() {
 	m.mu.Lock()
 	assertion := m.assertion
 	m.assertion = nil
+	m.stopFailed = false
 	m.mu.Unlock()
 	if assertion == nil {
 		return
@@ -231,6 +242,7 @@ func (m *integrationSleepManager) releaseAssertion() {
 		m.mu.Lock()
 		if !m.closed && m.assertion == nil {
 			m.assertion = assertion
+			m.stopFailed = true
 		}
 		m.mu.Unlock()
 		return
@@ -268,6 +280,15 @@ func integrationCurrentSleepConditions(activeSSE int) (integrationSleepCondition
 		return conditions, err
 	}
 	conditions.Memo = pendingMemo
+	if conditions.Memo {
+		return conditions, nil
+	}
+
+	pendingTask, err := integrationCaffeinatePendingTask()
+	if err != nil {
+		return conditions, err
+	}
+	conditions.Task = pendingTask
 	return conditions, nil
 }
 
@@ -308,6 +329,28 @@ func integrationCaffeinatePendingMemo(now time.Time) (bool, error) {
 	)`, windowStart, windowEnd).Scan(&exists)
 	if err != nil {
 		return false, fmt.Errorf("query pending memo in next 24 hours: %w", err)
+	}
+	return exists != 0, nil
+}
+
+func integrationCaffeinatePendingTask() (bool, error) {
+	if cronDB == nil {
+		return false, nil
+	}
+	var exists int
+	err := cronDB.QueryRow(`SELECT EXISTS(
+		SELECT 1 FROM wav2lip_task WHERE status IN (?, ?)
+		UNION ALL SELECT 1 FROM rembg_task WHERE status IN (?, ?)
+		UNION ALL SELECT 1 FROM voxcpm_task WHERE status IN (?, ?)
+		UNION ALL SELECT 1 FROM rvm_task WHERE status IN (?, ?)
+	)`,
+		wav2lipTaskQueued, wav2lipTaskRunning,
+		rembgTaskQueued, rembgTaskRunning,
+		voxcpmTaskQueued, voxcpmTaskRunning,
+		rvmTaskQueued, rvmTaskRunning,
+	).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("query queued or running media tasks: %w", err)
 	}
 	return exists != 0, nil
 }
