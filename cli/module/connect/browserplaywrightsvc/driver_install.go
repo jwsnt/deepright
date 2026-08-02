@@ -21,6 +21,7 @@ import (
 
 const playwrightDriverFallbackDownloadTimeout = 90 * time.Second
 const playwrightDriverFallbackDownloadAttempts = 3
+const playwrightInstallRequiredMessage = "Playwright is unavailable. Please install Playwright first."
 
 var (
 	playwrightDriverLookupEnvFn   = os.LookupEnv
@@ -97,7 +98,8 @@ func InstallPlaywrightDriver(driverDir string) error {
 		if fallbackErr == nil {
 			return nil
 		}
-		return errors.Join(err, fmt.Errorf("playwright npm fallback install failed: %w", fallbackErr))
+		return fmt.Errorf("%s: %w", playwrightInstallRequiredMessage,
+			errors.Join(err, fmt.Errorf("playwright npm fallback install failed: %w", fallbackErr)))
 	}
 }
 

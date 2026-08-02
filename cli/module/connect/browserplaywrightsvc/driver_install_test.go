@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"io"
 	"log"
 	"net/http"
@@ -131,6 +132,40 @@ func TestInstallPlaywrightDriverFallsBackToNPMTarball(t *testing.T) {
 		if _, err := os.Stat(path); err != nil {
 			t.Fatalf("expected extracted file %s: %v", path, err)
 		}
+	}
+}
+
+func TestInstallPlaywrightDriverPromptsForManualInstallWhenAllDownloadsFail(t *testing.T) {
+	originalInstallFn := playwrightInstallFn
+	originalLookupEnvFn := playwrightDriverLookupEnvFn
+	originalLookPathFn := playwrightDriverLookPathFn
+	originalDriverUsableFn := playwrightDriverExecutableUsableFn
+	originalSetenvFn := playwrightDriverSetenvFn
+	originalDownloadFn := playwrightDriverDownloadFn
+	defer func() {
+		playwrightInstallFn = originalInstallFn
+		playwrightDriverLookupEnvFn = originalLookupEnvFn
+		playwrightDriverLookPathFn = originalLookPathFn
+		playwrightDriverExecutableUsableFn = originalDriverUsableFn
+		playwrightDriverSetenvFn = originalSetenvFn
+		playwrightDriverDownloadFn = originalDownloadFn
+	}()
+
+	playwrightInstallFn = func(*playwright.RunOptions) error { return io.EOF }
+	playwrightDriverLookupEnvFn = func(string) (string, bool) { return "", false }
+	playwrightDriverLookPathFn = func(string) (string, error) { return "/usr/local/bin/node", nil }
+	playwrightDriverExecutableUsableFn = func(path string) bool { return path == "/usr/local/bin/node" }
+	playwrightDriverSetenvFn = func(string, string) error { return nil }
+	playwrightDriverDownloadFn = func(context.Context, string) (io.ReadCloser, error) {
+		return nil, io.ErrUnexpectedEOF
+	}
+
+	err := InstallPlaywrightDriver(filepath.Join(t.TempDir(), "playwright", "driver"))
+	if err == nil {
+		t.Fatal("expected Playwright installation failure")
+	}
+	if !strings.Contains(err.Error(), playwrightInstallRequiredMessage) {
+		t.Fatalf("error = %q, want manual-install prompt %q", err, playwrightInstallRequiredMessage)
 	}
 }
 

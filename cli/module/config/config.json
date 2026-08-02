@@ -27,6 +27,10 @@
     "check": 24,
     "install": "请安装 rembg"
   },
+  "rvm": {
+    "check": 24,
+    "install": "请安装 robust video matting，模型与代码存放至 `$workspace/rvm` 目录下，检查安装是否成功的标准为`$workspace/rvm/weights/rvm_mobilenetv3.pth`是否存在"
+  },
   "test": {
     "content": "Hello World",
     "timeout": 60

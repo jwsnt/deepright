@@ -3574,3 +3574,15 @@ Integration 新增 `GET /api/voxcpm/check` 与文字转语音任务接口：`GET
 `GET /api/runtime_config` 继续只读受控透传完整 `miniapp` 对象，读取的是当前发布包配置，而非 Agent 工作目录。Integration 不执行修复命令、不创建调试任务、不访问浏览器传入路径，修复请求及附件仍沿用普通当前会话消息协议。发布时必须同步应用内配置和 Site 资源，并在修改后重新签名验证。
 
 完整说明见 [iteration/20260802-1/USER_GUIDE.md](iteration/20260802-1/USER_GUIDE.md)。
+
+---
+
+## 迭代 20260802-3：RVM 视频主体提取
+
+Integration 提供基于 Robust Video Matting 的持久化视频主体队列。`config/config.json.rvm.check` 为成功预检缓存小时数，`rvm.install` 为依赖缺失时发送至当前 Chat 的安装请求；服务端将该文案中的 `$workspace` 替换为当前页面 Agent 的工作目录。代码固定在 `$workspace/rvm/inference.py`，模型固定在 `$workspace/rvm/weights/rvm_mobilenetv3.pth`；检查与实际任务执行均使用这两个路径，不会回退查找其它目录。为兼容新版 PyAV，Integration 以受控包装器在内存中转换帧率后再执行未修改的上游脚本，绝不写入下载的 RVM 代码。页面入口提交已选择的 Agent ID，服务端解析其工作目录后检查安装；流程不使用会话 UUID 或 VFS 路径。预检执行实际可用 Python 的 `inference.py --help`，成功结果只在进程内缓存，重启后自动失效；无需也不得设置 RVM 环境变量。
+
+接口包括 `GET /api/rvm/check`、`GET/POST /api/rvm/tasks`、`POST /api/rvm/tasks/cancel`、`/restart`、`/delete` 及 `GET /api/rvm/tasks/log`。创建接口为每项视频保存场景：标准主体提取（默认，4 Mbps）、精细边缘提取（完整分辨率，8 Mbps）或快速主体提取（0.25 下采样，2 Mbps）；旧任务没有场景时按标准主体提取执行。任务只接受当前 Agent 工作区中的视频，固定输出到 `videos/<源文件名>_subject.mov`，并生成同名 MP4 预览副本；复制路径仍为透明 MOV，预览使用 MP4。任一配对文件重名时自动使用同一时间戳，绝不覆盖源文件或已有输出。每个任务依次用 RVM 生成前景与 alpha 视频，再用 FFmpeg 合成为带透明通道的 ProRes 4444 MOV，随后转码 H.264 MP4 预览副本。因此执行前会再次验证 FFmpeg 与 FFprobe。
+
+在 macOS 上任务优先使用 Apple MPS，其他系统优先 CUDA；GPU/MPS 推理失败时会清理临时输出并自动从头以 CPU 重试一次。任务场景、状态、日志、取消、重新开始和失败删除均保存在共享 SQLite，刷新页面或重启服务不会丢失历史记录。
+
+完整配置与接口说明见 [iteration/20260802-3/USER_GUIDE.md](iteration/20260802-3/USER_GUIDE.md)。

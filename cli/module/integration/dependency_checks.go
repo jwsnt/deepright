@@ -14,7 +14,7 @@ type integrationDependencyCheck struct {
 // startIntegrationDependencyChecks warms the same success caches used by the
 // page-triggered dependency checks. It is deliberately asynchronous so a
 // slow Python probe never delays application startup or browser readiness.
-func startIntegrationDependencyChecks(ctx context.Context) {
+func startIntegrationDependencyChecks(ctx context.Context, cfg *Config) {
 	checks := []integrationDependencyCheck{
 		{
 			name: "ffmpeg",
@@ -41,6 +41,13 @@ func startIntegrationDependencyChecks(ctx context.Context) {
 			name: "rembg",
 			check: func() (int, bool, string) {
 				status, response := checkRembgDependency()
+				return status, response.Available, response.Content
+			},
+		},
+		{
+			name: "rvm",
+			check: func() (int, bool, string) {
+				status, response := checkRVMDependency(cfg, "")
 				return status, response.Available, response.Content
 			},
 		},

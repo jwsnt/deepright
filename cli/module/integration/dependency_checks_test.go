@@ -9,8 +9,8 @@ import (
 func TestRunIntegrationDependencyChecksRunsAllChecks(t *testing.T) {
 	var mu sync.Mutex
 	ran := map[string]bool{}
-	checks := make([]integrationDependencyCheck, 0, 4)
-	for _, name := range []string{"ffmpeg", "whisper", "voxcpm", "rembg"} {
+	checks := make([]integrationDependencyCheck, 0, 5)
+	for _, name := range []string{"ffmpeg", "whisper", "voxcpm", "rembg", "rvm"} {
 		name := name
 		checks = append(checks, integrationDependencyCheck{
 			name: name,
@@ -24,7 +24,7 @@ func TestRunIntegrationDependencyChecksRunsAllChecks(t *testing.T) {
 	}
 
 	runIntegrationDependencyChecks(context.Background(), checks)
-	for _, name := range []string{"ffmpeg", "whisper", "voxcpm", "rembg"} {
+	for _, name := range []string{"ffmpeg", "whisper", "voxcpm", "rembg", "rvm"} {
 		if !ran[name] {
 			t.Fatalf("%s check was not run", name)
 		}

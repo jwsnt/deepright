@@ -20350,6 +20350,12 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/rembg/tasks/restart", handleRembgTaskRestart())
 	mux.HandleFunc("/api/rembg/tasks/delete", handleRembgTaskDelete())
 	mux.HandleFunc("/api/rembg/tasks/log", handleRembgTaskLog())
+	mux.HandleFunc("/api/rvm/check", handleRVMCheck(&cfg))
+	mux.HandleFunc("/api/rvm/tasks", handleRVMTasks())
+	mux.HandleFunc("/api/rvm/tasks/cancel", handleRVMTaskCancel())
+	mux.HandleFunc("/api/rvm/tasks/restart", handleRVMTaskRestart())
+	mux.HandleFunc("/api/rvm/tasks/delete", handleRVMTaskDelete())
+	mux.HandleFunc("/api/rvm/tasks/log", handleRVMTaskLog())
 	mux.HandleFunc("/api/voxcpm/check", handleVoxCPMCheck())
 	mux.HandleFunc("/api/voxcpm/tasks", handleVoxCPMTasks())
 	mux.HandleFunc("/api/voxcpm/tasks/cancel", handleVoxCPMTaskCancel())
@@ -20468,7 +20474,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	shutdownController.stopPlugins = stopManagedPlugins
 	mux.HandleFunc("/api/shutdown", handleShutdown(shutdownController))
 	server := &http.Server{Handler: withStandaloneAPIProtection(mux, &cfg)}
-	startIntegrationDependencyChecks(ctx)
+	startIntegrationDependencyChecks(ctx, &cfg)
 	defer func() {
 		if removed, err := cleanupStartupPIDFiles(pidFile); err != nil {
 			log.Printf("serve cleanup startup pid files failed: %v", err)
@@ -20487,6 +20493,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	defer sleepManager.Close()
 	startWhisperTaskManager(ctx, &cfg)
 	startRembgTaskManager(ctx, &cfg)
+	startRVMTaskManager(ctx, &cfg)
 	startVoxCPMTaskManager(ctx, &cfg)
 	startIntegrationLogRetentionCleanup(ctx)
 	startIntegrationTempCleanup(ctx, cfg.AgentDir)
