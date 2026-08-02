@@ -9838,6 +9838,7 @@ func TestRecoverIntegrationMiniappDocumentsRejectsEscapingAppSymlink(t *testing.
 func TestRunIntegrationForegroundRejectsMissingAtConfig(t *testing.T) {
 	appDir := t.TempDir()
 	useIntegrationExecutableDir(t, appDir)
+	writeIntegrationDeviceConfig(t, appDir, `{"caffeinate":15}`)
 
 	var stderr bytes.Buffer
 	if code := runIntegrationForeground(nil, &stderr); code == 0 {
@@ -9845,6 +9846,20 @@ func TestRunIntegrationForegroundRejectsMissingAtConfig(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "config/config.json.at is required") {
 		t.Fatalf("stderr = %q, want missing at configuration error", stderr.String())
+	}
+}
+
+func TestRunIntegrationForegroundRejectsMissingCaffeinateConfig(t *testing.T) {
+	appDir := t.TempDir()
+	useIntegrationExecutableDir(t, appDir)
+	writeIntegrationDeviceConfig(t, appDir, `{"at":{"refresh":60,"cache":120}}`)
+
+	var stderr bytes.Buffer
+	if code := runIntegrationForeground(nil, &stderr); code == 0 {
+		t.Fatal("runIntegrationForeground succeeded without config.json.caffeinate")
+	}
+	if !strings.Contains(stderr.String(), "config/config.json.caffeinate 配置缺失") {
+		t.Fatalf("stderr = %q, want missing caffeinate configuration error", stderr.String())
 	}
 }
 
@@ -10502,7 +10517,7 @@ func TestRunIntegrationForegroundWritesStartupFailureStatusOnListenError(t *test
 		t.Fatalf("mkdir agent dir: %v", err)
 	}
 	writeDefaultAgentTemplate(t, defaultDir)
-	if err := os.WriteFile(filepath.Join(defaultDir, "config.json"), []byte(`{"at":{"refresh":60,"cache":120}}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(defaultDir, "config.json"), []byte(`{"at":{"refresh":60,"cache":120},"caffeinate":15}`), 0o644); err != nil {
 		t.Fatalf("write config/config.json: %v", err)
 	}
 	if err := os.MkdirAll(siteDir, 0o755); err != nil {
@@ -10648,7 +10663,7 @@ func TestRunIntegrationForegroundInvokesGitIdentityEnsure(t *testing.T) {
 		t.Fatalf("mkdir agent dir: %v", err)
 	}
 	writeDefaultAgentTemplate(t, defaultDir)
-	if err := os.WriteFile(filepath.Join(defaultDir, "config.json"), []byte(`{"at":{"refresh":60,"cache":120}}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(defaultDir, "config.json"), []byte(`{"at":{"refresh":60,"cache":120},"caffeinate":15}`), 0o644); err != nil {
 		t.Fatalf("write config/config.json: %v", err)
 	}
 	if err := os.MkdirAll(siteDir, 0o755); err != nil {

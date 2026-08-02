@@ -38,6 +38,19 @@ func (s *integrationStringSliceFlag) Set(value string) error {
 	return nil
 }
 
+func integrationAPIRepeatedTaskValue(values []string, index, taskCount int, fallback, flagName string) (string, error) {
+	switch len(values) {
+	case 0:
+		return fallback, nil
+	case 1:
+		return strings.TrimSpace(values[0]), nil
+	case taskCount:
+		return strings.TrimSpace(values[index]), nil
+	default:
+		return "", fmt.Errorf("%s must be provided once or once for every --textPath", flagName)
+	}
+}
+
 type integrationAPIQueryFlag struct {
 	QueryKey string
 	Names    []string
@@ -119,6 +132,7 @@ func printIntegrationAPIHelp() {
 	fmt.Println("  knowledge-last-update Call GET /knowledge_lastUpdate")
 	fmt.Println("  knowledge-path        Call GET /knowledge_path")
 	fmt.Println("  whisper               Whisper audio transcription queue endpoints")
+	fmt.Println("  rembg                 Image subject extraction queue endpoints")
 	fmt.Println("  voxcpm                VoxCPM text-to-speech queue endpoints")
 	fmt.Println("")
 	fmt.Println("Examples:")
@@ -129,8 +143,9 @@ func printIntegrationAPIHelp() {
 	fmt.Println("  integration api token get")
 	fmt.Println("  integration api token set --body-file ./token.json")
 	fmt.Println("  integration api cron create --help")
-	fmt.Println("  integration api whisper --help")
-	fmt.Println("  integration api voxcpm --help")
+	fmt.Println("  integration api whisper create --agentId demo-agent --path audios/meeting.mp3 --scenario chinese_meeting")
+	fmt.Println("  integration api rembg create --agentId demo-agent --path images/product.jpg --model u2net --alpha-matting")
+	fmt.Println("  integration api voxcpm create --agentId demo-agent --textPath scripts/intro.txt --outputName intro.wav")
 	fmt.Println("  integration service cancel --chat chat-001")
 }
 
@@ -588,22 +603,49 @@ func runIntegrationAPIWhisperCLI(args []string, stdout, stderr io.Writer) int {
 	}
 }
 
-func printIntegrationAPIVoxCPMHelp(stdout io.Writer) {
+func printIntegrationAPIRembgHelp(stdout io.Writer) {
 	fmt.Fprintln(stdout, "Usage:")
-	fmt.Fprintln(stdout, "  integration api voxcpm <check|list|create|cancel|restart|delete|log> [options]")
+	fmt.Fprintln(stdout, "  integration api rembg <check|list|create|cancel|restart|delete|log> [options]")
 	fmt.Fprintln(stdout, "")
-	fmt.Fprintln(stdout, "Create requires one text file; reference audio and expression style are optional. Use the HTTP API directly to submit a batch.")
+	fmt.Fprintln(stdout, "Commands:")
+	fmt.Fprintln(stdout, "  check       Check whether the controlled environment can run rembg")
+	fmt.Fprintln(stdout, "  list        List one Agent's image subject extraction tasks, five tasks per page")
+	fmt.Fprintln(stdout, "  create      Queue one or more image files in one Agent workspace")
+	fmt.Fprintln(stdout, "  cancel      Cancel a queued or running task")
+	fmt.Fprintln(stdout, "  restart     Requeue one cancelled task")
+	fmt.Fprintln(stdout, "  delete      Delete one failed task record; source and output files are preserved")
+	fmt.Fprintln(stdout, "  log         Read a task and its persisted execution log")
+	fmt.Fprintln(stdout, "")
+	fmt.Fprintln(stdout, "Create options:")
+	fmt.Fprintln(stdout, "  --path PATH          Workspace-relative image path; may be repeated")
+	fmt.Fprintln(stdout, "  --model MODEL        u2net (default), u2net_human_seg, u2netp, u2net_cloth_seg,")
+	fmt.Fprintln(stdout, "                       silueta, isnet-general-use, or isnet-anime")
+	fmt.Fprintln(stdout, "  --alpha-matting      Enable alpha-matting edge refinement for every submitted image")
+	fmt.Fprintln(stdout, "")
+	fmt.Fprintln(stdout, "Examples:")
+	fmt.Fprintln(stdout, "  integration api rembg check")
+	fmt.Fprintln(stdout, "  integration api rembg list --agentId demo-agent --status running --page 1")
+	fmt.Fprintln(stdout, "  integration api rembg create --agentId demo-agent --path images/product.jpg --model u2net --alpha-matting")
+	fmt.Fprintln(stdout, "  integration api rembg create --agentId demo-agent --path images/a.jpg --path images/b.png --model isnet-general-use")
+	fmt.Fprintln(stdout, "  integration api rembg cancel --agentId demo-agent --id 12")
+	fmt.Fprintln(stdout, "  integration api rembg log --agentId demo-agent --id 12")
 }
 
-func runIntegrationAPIVoxCPMCreateCLI(args []string, stdout, stderr io.Writer) int {
-	fs, addr, port, output, pretty := newIntegrationAPICommonFlagSet("integration api voxcpm create", "integration api voxcpm create --agentId ID --textPath PATH --outputName NAME.wav [--referenceAudioPath PATH] [--scenario balanced] [--control '温和、平稳'] [--addr URL] [--port 8080]", "Call POST /api/voxcpm/tasks with one voice-design or cloning task.", stderr)
+func runIntegrationAPIRembgCreateCLI(args []string, stdout, stderr io.Writer) int {
+	fs, addr, port, output, pretty := newIntegrationAPICommonFlagSet(
+		"integration api rembg create",
+		"integration api rembg create --agentId ID --path IMAGE_PATH [--path IMAGE_PATH ...] [--model MODEL] [--alpha-matting] [--addr URL] [--port 8080]",
+		"Call POST /api/rembg/tasks. Each path must be an image file under the Agent workspace. The selected model and alpha-matting option apply to every submitted image.",
+		stderr,
+	)
 	agentID := fs.String("agentId", "", "agent id")
 	fs.StringVar(agentID, "agent", "", "agent id")
-	textPath := fs.String("textPath", "", "workspace-relative UTF-8 text file")
-	referencePath := fs.String("referenceAudioPath", "", "workspace-relative reference audio file")
-	outputName := fs.String("outputName", "", "requested WAV output name")
-	scenario := fs.String("scenario", voxcpmScenarioBalanced, "generation scenario: balanced, quality, fast, clean, warm_narration, or lively")
-	control := fs.String("control", "", "optional VoxCPM expression style instruction")
+	var paths integrationStringSliceFlag
+	fs.Var(&paths, "path", "workspace-relative image path; may be repeated")
+	model := fs.String("model", rembgDefaultModel, "rembg model")
+	var alphaMatting bool
+	fs.BoolVar(&alphaMatting, "alpha-matting", false, "enable alpha-matting edge refinement")
+	fs.BoolVar(&alphaMatting, "alphaMatting", false, "enable alpha-matting edge refinement")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
@@ -614,10 +656,210 @@ func runIntegrationAPIVoxCPMCreateCLI(args []string, stdout, stderr io.Writer) i
 		fmt.Fprintf(stderr, "unexpected arguments: %s\n", strings.Join(fs.Args(), " "))
 		return 1
 	}
-	request := voxcpmTaskCreateRequest{AgentID: strings.TrimSpace(*agentID), OutputName: strings.TrimSpace(*outputName), Tasks: []voxcpmTaskCreateItem{{TextPath: strings.TrimSpace(*textPath), ReferenceAudioPath: strings.TrimSpace(*referencePath), Scenario: strings.TrimSpace(*scenario), Control: strings.TrimSpace(*control)}}}
-	if request.AgentID == "" || request.OutputName == "" || request.Tasks[0].TextPath == "" {
-		fmt.Fprintln(stderr, "--agentId, --textPath, and --outputName are required; --referenceAudioPath is optional")
+	*agentID = strings.TrimSpace(*agentID)
+	cleanedPaths := make([]string, 0, len(paths))
+	for _, path := range paths {
+		if path = strings.TrimSpace(path); path != "" {
+			cleanedPaths = append(cleanedPaths, path)
+		}
+	}
+	if *agentID == "" {
+		fmt.Fprintln(stderr, "--agentId is required")
 		return 1
+	}
+	if len(cleanedPaths) == 0 {
+		fmt.Fprintln(stderr, "at least one --path is required")
+		return 1
+	}
+	request := rembgTaskCreateRequest{AgentID: *agentID, Paths: cleanedPaths, Model: strings.TrimSpace(*model), AlphaMatting: alphaMatting}
+	body, err := json.Marshal(request)
+	if err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1
+	}
+	base, err := resolveIntegrationAPIBase(*addr, *port)
+	if err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	resp, reqErr := integrationAPIRequest(ctx, newIntegrationAPIClient(60*time.Second), http.MethodPost, base, "/api/rembg/tasks", nil, bytes.NewReader(body), "application/json", nil)
+	return integrationAPIHandleHTTPResult(stdout, stderr, resp, reqErr, *output, *pretty, false)
+}
+
+func runIntegrationAPIRembgTaskActionCLI(command, path, description string, args []string, stdout, stderr io.Writer) int {
+	fs, addr, port, output, pretty := newIntegrationAPICommonFlagSet(
+		"integration api rembg "+command,
+		"integration api rembg "+command+" --agentId ID --id TASK_ID [--addr URL] [--port 8080]",
+		description,
+		stderr,
+	)
+	agentID := fs.String("agentId", "", "agent id")
+	fs.StringVar(agentID, "agent", "", "agent id")
+	taskID := fs.Int64("id", 0, "rembg task id")
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		return 1
+	}
+	if fs.NArg() != 0 {
+		fmt.Fprintf(stderr, "unexpected arguments: %s\n", strings.Join(fs.Args(), " "))
+		return 1
+	}
+	*agentID = strings.TrimSpace(*agentID)
+	if *agentID == "" {
+		fmt.Fprintln(stderr, "--agentId is required")
+		return 1
+	}
+	if *taskID <= 0 {
+		fmt.Fprintln(stderr, "--id must be a positive integer")
+		return 1
+	}
+	body, err := json.Marshal(rembgTaskActionRequest{AgentID: *agentID, ID: *taskID})
+	if err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1
+	}
+	base, err := resolveIntegrationAPIBase(*addr, *port)
+	if err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	resp, reqErr := integrationAPIRequest(ctx, newIntegrationAPIClient(60*time.Second), http.MethodPost, base, path, nil, bytes.NewReader(body), "application/json", nil)
+	return integrationAPIHandleHTTPResult(stdout, stderr, resp, reqErr, *output, *pretty, false)
+}
+
+func runIntegrationAPIRembgCLI(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 || strings.TrimSpace(args[0]) == "--help" || strings.TrimSpace(args[0]) == "-h" || strings.TrimSpace(args[0]) == "help" {
+		printIntegrationAPIRembgHelp(stdout)
+		return 0
+	}
+	switch strings.TrimSpace(args[0]) {
+	case "check":
+		return runIntegrationAPIGenericRequestCLI(integrationAPIGenericRequestSpec{
+			Command: "rembg check", Usage: "integration api rembg check [--addr URL] [--port 8080]",
+			Description: "Call GET /api/rembg/check.", Method: http.MethodGet, Path: "/api/rembg/check",
+		}, args[1:], stdout, stderr)
+	case "list":
+		return runIntegrationAPIGenericRequestCLI(integrationAPIGenericRequestSpec{
+			Command: "rembg list", Usage: "integration api rembg list --agentId ID [--status all|queued|running|completed|cancelled|failed] [--page N] [--addr URL] [--port 8080]",
+			Description: "Call GET /api/rembg/tasks. The server returns five tasks per page.", Method: http.MethodGet, Path: "/api/rembg/tasks",
+			QueryFlags: []integrationAPIQueryFlag{
+				{QueryKey: "agentId", Names: []string{"agentId", "agent"}, Usage: "agent id"},
+				{QueryKey: "status", Names: []string{"status"}, Usage: "all, queued, running, completed, cancelled, or failed"},
+				{QueryKey: "page", Names: []string{"page"}, Usage: "one-based page number"},
+			},
+		}, args[1:], stdout, stderr)
+	case "create":
+		return runIntegrationAPIRembgCreateCLI(args[1:], stdout, stderr)
+	case "cancel":
+		return runIntegrationAPIRembgTaskActionCLI("cancel", "/api/rembg/tasks/cancel", "Call POST /api/rembg/tasks/cancel.", args[1:], stdout, stderr)
+	case "restart":
+		return runIntegrationAPIRembgTaskActionCLI("restart", "/api/rembg/tasks/restart", "Call POST /api/rembg/tasks/restart for one cancelled task.", args[1:], stdout, stderr)
+	case "delete":
+		return runIntegrationAPIRembgTaskActionCLI("delete", "/api/rembg/tasks/delete", "Call POST /api/rembg/tasks/delete for one failed task record.", args[1:], stdout, stderr)
+	case "log":
+		return runIntegrationAPIGenericRequestCLI(integrationAPIGenericRequestSpec{
+			Command: "rembg log", Usage: "integration api rembg log --agentId ID --id TASK_ID [--addr URL] [--port 8080]",
+			Description: "Call GET /api/rembg/tasks/log.", Method: http.MethodGet, Path: "/api/rembg/tasks/log",
+			QueryFlags: []integrationAPIQueryFlag{
+				{QueryKey: "agentId", Names: []string{"agentId", "agent"}, Usage: "agent id"},
+				{QueryKey: "id", Names: []string{"id"}, Usage: "rembg task id"},
+			},
+		}, args[1:], stdout, stderr)
+	default:
+		fmt.Fprintf(stderr, "unknown rembg api command: %s\n", args[0])
+		printIntegrationAPIRembgHelp(stderr)
+		return 1
+	}
+}
+
+func printIntegrationAPIVoxCPMHelp(stdout io.Writer) {
+	fmt.Fprintln(stdout, "Usage:")
+	fmt.Fprintln(stdout, "  integration api voxcpm <check|list|create|cancel|restart|delete|log> [options]")
+	fmt.Fprintln(stdout, "")
+	fmt.Fprintln(stdout, "Commands:")
+	fmt.Fprintln(stdout, "  check       Check whether the controlled environment can run VoxCPM")
+	fmt.Fprintln(stdout, "  list        List one Agent's text-to-speech tasks, five tasks per page")
+	fmt.Fprintln(stdout, "  create      Queue one to five text-to-speech tasks")
+	fmt.Fprintln(stdout, "  cancel      Cancel a queued or running task")
+	fmt.Fprintln(stdout, "  restart     Requeue one cancelled task")
+	fmt.Fprintln(stdout, "  delete      Delete one failed task record; source and output files are preserved")
+	fmt.Fprintln(stdout, "  log         Read a task and its persisted execution log")
+	fmt.Fprintln(stdout, "")
+	fmt.Fprintln(stdout, "Create options:")
+	fmt.Fprintln(stdout, "  --textPath PATH              Workspace-relative UTF-8 text path; may be repeated")
+	fmt.Fprintln(stdout, "  --referenceAudioPath PATH    Optional reference audio path; one value applies to all tasks,")
+	fmt.Fprintln(stdout, "                               or provide one value for each text path")
+	fmt.Fprintln(stdout, "  --scenario NAME              balanced (default), quality, fast, clean, warm_narration, or lively")
+	fmt.Fprintln(stdout, "  --control TEXT               Optional expression-style instruction; one value applies to all")
+	fmt.Fprintln(stdout, "                               tasks, or provide one value for each text path")
+	fmt.Fprintln(stdout, "  --outputName NAME.wav        Required output name; batch tasks receive collision-safe names")
+	fmt.Fprintln(stdout, "")
+	fmt.Fprintln(stdout, "Examples:")
+	fmt.Fprintln(stdout, "  integration api voxcpm check")
+	fmt.Fprintln(stdout, "  integration api voxcpm list --agentId demo-agent --status running --page 1")
+	fmt.Fprintln(stdout, "  integration api voxcpm create --agentId demo-agent --textPath scripts/intro.txt --outputName intro.wav --scenario warm_narration")
+	fmt.Fprintln(stdout, "  integration api voxcpm create --agentId demo-agent --textPath scripts/a.txt --textPath scripts/b.txt --outputName narration.wav --referenceAudioPath audios/voice.wav")
+	fmt.Fprintln(stdout, "  integration api voxcpm cancel --agentId demo-agent --id 12")
+	fmt.Fprintln(stdout, "  integration api voxcpm log --agentId demo-agent --id 12")
+}
+
+func runIntegrationAPIVoxCPMCreateCLI(args []string, stdout, stderr io.Writer) int {
+	fs, addr, port, output, pretty := newIntegrationAPICommonFlagSet("integration api voxcpm create", "integration api voxcpm create --agentId ID --textPath PATH [--textPath PATH ...] --outputName NAME.wav [--referenceAudioPath PATH] [--scenario SCENARIO] [--control TEXT] [--addr URL] [--port 8080]", "Call POST /api/voxcpm/tasks with one to five voice-design or cloning tasks. Repeated reference-audio, scenario, and control options must occur once or once per text path.", stderr)
+	agentID := fs.String("agentId", "", "agent id")
+	fs.StringVar(agentID, "agent", "", "agent id")
+	var textPaths integrationStringSliceFlag
+	var referencePaths integrationStringSliceFlag
+	var scenarios integrationStringSliceFlag
+	var controls integrationStringSliceFlag
+	fs.Var(&textPaths, "textPath", "workspace-relative UTF-8 text file; may be repeated")
+	fs.Var(&textPaths, "text-path", "workspace-relative UTF-8 text file; may be repeated")
+	fs.Var(&referencePaths, "referenceAudioPath", "workspace-relative reference audio file; may be repeated")
+	fs.Var(&referencePaths, "reference-audio-path", "workspace-relative reference audio file; may be repeated")
+	outputName := fs.String("outputName", "", "requested WAV output name")
+	fs.Var(&scenarios, "scenario", "generation scenario; may be repeated")
+	fs.Var(&controls, "control", "optional VoxCPM expression style instruction; may be repeated")
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		return 1
+	}
+	if fs.NArg() != 0 {
+		fmt.Fprintf(stderr, "unexpected arguments: %s\n", strings.Join(fs.Args(), " "))
+		return 1
+	}
+	request := voxcpmTaskCreateRequest{AgentID: strings.TrimSpace(*agentID), OutputName: strings.TrimSpace(*outputName)}
+	if request.AgentID == "" || request.OutputName == "" || len(textPaths) == 0 {
+		fmt.Fprintln(stderr, "--agentId, at least one --textPath, and --outputName are required; --referenceAudioPath is optional")
+		return 1
+	}
+	if len(textPaths) > 5 {
+		fmt.Fprintln(stderr, "at most five --textPath values are allowed")
+		return 1
+	}
+	for index, textPath := range textPaths {
+		referencePath, err := integrationAPIRepeatedTaskValue(referencePaths, index, len(textPaths), "", "--referenceAudioPath")
+		if err != nil {
+			fmt.Fprintln(stderr, err.Error())
+			return 1
+		}
+		scenario, err := integrationAPIRepeatedTaskValue(scenarios, index, len(textPaths), voxcpmScenarioBalanced, "--scenario")
+		if err != nil {
+			fmt.Fprintln(stderr, err.Error())
+			return 1
+		}
+		control, err := integrationAPIRepeatedTaskValue(controls, index, len(textPaths), "", "--control")
+		if err != nil {
+			fmt.Fprintln(stderr, err.Error())
+			return 1
+		}
+		request.Tasks = append(request.Tasks, voxcpmTaskCreateItem{TextPath: strings.TrimSpace(textPath), ReferenceAudioPath: referencePath, Scenario: scenario, Control: control})
 	}
 	body, err := json.Marshal(request)
 	if err != nil {
@@ -1618,6 +1860,8 @@ func runIntegrationAPICLI(args []string, stdout, stderr io.Writer) int {
 		return runIntegrationAPIKnowledgeCLI(args[1:], stdout, stderr)
 	case "whisper":
 		return runIntegrationAPIWhisperCLI(args[1:], stdout, stderr)
+	case "rembg":
+		return runIntegrationAPIRembgCLI(args[1:], stdout, stderr)
 	case "voxcpm":
 		return runIntegrationAPIVoxCPMCLI(args[1:], stdout, stderr)
 	case "log-round":

@@ -11050,6 +11050,7 @@ func handleModelTest(cfg *Config, proxyClient *http.Client) http.HandlerFunc {
 			writeModelTestJSONError(w, http.StatusBadGateway, message)
 			return
 		}
+		defer trackIntegrationSSE(cfg)()
 
 		w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-cache")
@@ -16800,7 +16801,7 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 			connMu.Unlock()
 		}
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(r.Context())
 
 		newBody, err := json.Marshal(reqData)
 		if err != nil {
@@ -16870,6 +16871,7 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 			return
 		}
 		defer resp.Body.Close()
+		defer trackIntegrationSSE(cfg)()
 
 		for k, vv := range resp.Header {
 			for _, v := range vv {
@@ -16896,7 +16898,12 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 		if !ok {
 			payload, copyErr := io.ReadAll(resp.Body)
 			if len(payload) > 0 {
-				_, _ = w.Write(payload)
+				if _, writeErr := w.Write(payload); writeErr != nil {
+					abnormalStream = true
+					if !sawDoneMarker && !sawAbnormalPacket {
+						sawAbnormalPacket = queueSSEStreamInterruptedLog(ch, writeErr) || sawAbnormalPacket
+					}
+				}
 				if detectResponseType(string(payload)) == "abnormal" {
 					abnormalStream = true
 				}
@@ -16956,7 +16963,10 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 		for {
 			n, err := resp.Body.Read(buf)
 			if n > 0 {
-				w.Write(buf[:n])
+				if _, writeErr := w.Write(buf[:n]); writeErr != nil {
+					streamErr = writeErr
+					break
+				}
 				flusher.Flush()
 				logBuf = append(logBuf, buf[:n]...)
 				for _, event := range splitCompleteSSEEvents(&logBuf) {
@@ -17482,6 +17492,9 @@ type Config struct {
 	// Cached @ menu Agent/Skill metadata. Initialized only after config.json.at
 	// is validated during Integration service startup.
 	AtMenuCache *integrationAtMenuCache
+
+	// sleepManager owns the optional macOS caffeinate process for this service.
+	sleepManager *integrationSleepManager
 }
 
 type integrationStartupOptions struct {
@@ -20207,6 +20220,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 
 	reportStartupFailure := func(format string, args ...interface{}) int {
 		message := fmt.Sprintf(format, args...)
+		log.Printf("integration startup failed: %s", message)
 		if err := writeIntegrationStartupStatus(startupStatusFile, integrationStartupStatus{
 			Status:  "failed",
 			Message: message,
@@ -20215,6 +20229,10 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 		}
 		fmt.Fprintln(stderr, message)
 		return 1
+	}
+	caffeinateInterval, _, err := readIntegrationCaffeinateInterval()
+	if err != nil {
+		return reportStartupFailure("error: %v", err)
 	}
 	if err := integrationEnsureGitIdentityConfiguredFn(); err != nil {
 		log.Printf("integration: git identity auto-config skipped: %v", err)
@@ -20451,17 +20469,6 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/shutdown", handleShutdown(shutdownController))
 	server := &http.Server{Handler: withStandaloneAPIProtection(mux, &cfg)}
 	startIntegrationDependencyChecks(ctx)
-	sleepAssertion, sleepAssertionErr := startIntegrationSleepAssertion()
-	if sleepAssertionErr != nil {
-		log.Printf("integration: start macOS sleep assertion failed: %v", sleepAssertionErr)
-	} else if sleepAssertion != nil {
-		log.Printf("integration: macOS sleep assertion started")
-		defer func() {
-			if err := sleepAssertion.Stop(); err != nil {
-				log.Printf("integration: stop macOS sleep assertion failed: %v", err)
-			}
-		}()
-	}
 	defer func() {
 		if removed, err := cleanupStartupPIDFiles(pidFile); err != nil {
 			log.Printf("serve cleanup startup pid files failed: %v", err)
@@ -20474,6 +20481,10 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	startIntegrationDeviceConfigRefresh(ctx, cfg.DeviceState)
 	startIntegrationAtMenuRefresh(ctx, &cfg)
 	initCronDB()
+	sleepManager := newIntegrationSleepManager(caffeinateInterval)
+	cfg.sleepManager = sleepManager
+	sleepManager.Start(ctx)
+	defer sleepManager.Close()
 	startWhisperTaskManager(ctx, &cfg)
 	startRembgTaskManager(ctx, &cfg)
 	startVoxCPMTaskManager(ctx, &cfg)
@@ -20489,11 +20500,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 
 	go func() {
 		<-ctx.Done()
-		if sleepAssertion != nil {
-			if err := sleepAssertion.Stop(); err != nil {
-				log.Printf("integration: stop macOS sleep assertion failed: %v", err)
-			}
-		}
+		sleepManager.Close()
 		for _, warning := range stopManagedPlugins(nil) {
 			log.Printf("plugin shutdown warning: %s", warning)
 		}
@@ -20521,6 +20528,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 		return reportStartupFailure("server failed: %v", err)
 	}
 
+	sleepManager.Close()
 	cancelAllActiveCmds()
 	if cronDB != nil {
 		_ = cronDB.Close()
@@ -23402,6 +23410,7 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 				return
 			}
 			defer resp.Body.Close()
+			defer trackIntegrationSSE(cfg)()
 
 			payload, readErr := readScheduledTaskSSEBody(resp.Body, scheduledTaskReadTimeout(cfg))
 			if len(payload) > 0 {

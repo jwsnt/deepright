@@ -1,5 +1,6 @@
 {
   "agent-cache": 120000,
+  "caffeinate": 15,
   "agent-dir": "/var/folders/y7/f37ry3b91nx_g07tfp8qnlt00000gn/T/TestRunIntegrationForegroundInvokesGitIdentityEnsure4117482433/001/agent",
   "app": "/var/folders/y7/f37ry3b91nx_g07tfp8qnlt00000gn/T/go-build3019610413/b001/integration.test",
   "app-dir": "/Users/shenjiawei/Library/Containers/cn.deepright.integration/Data/Library/Application Support/deepright",

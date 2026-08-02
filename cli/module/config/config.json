@@ -179,10 +179,12 @@
     "执行",
     "重试"
   ],
+  "caffeinate": 15,
   "miniapp": {
     "build": "请使用 [SKILL:__internal_cli] 为 $name 的 $function 构建迷你应用 $reference",
     "reference": " 参考READ_ME.md: $reference",
     "function": "全部功能",
+    "debug": "请修复 $path，问题是 $reason",
     "recover": 30
   }
 }

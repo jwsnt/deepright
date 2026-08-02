@@ -1,11 +1,16 @@
 package main
 
 import (
+	"errors"
+	"fmt"
+	"os"
 	"os/exec"
 	"sync"
+	"time"
 )
 
 const integrationCaffeinateBinary = "caffeinate"
+const integrationCaffeinateStopTimeout = 2 * time.Second
 
 var integrationCaffeinateCommandFn = exec.Command
 
@@ -17,6 +22,7 @@ type integrationCaffeinateProcess struct {
 	cmd      *exec.Cmd
 	done     chan struct{}
 	stopOnce sync.Once
+	stopErr  error
 }
 
 func startIntegrationSleepAssertion() (integrationSleepAssertion, error) {
@@ -53,8 +59,29 @@ func (p *integrationCaffeinateProcess) Stop() error {
 			return
 		default:
 		}
-		_ = p.cmd.Process.Kill()
-		<-p.done
+		if err := p.cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
+			p.stopErr = fmt.Errorf("terminate caffeinate: %w", err)
+			return
+		}
+		timer := time.NewTimer(integrationCaffeinateStopTimeout)
+		defer timer.Stop()
+		select {
+		case <-p.done:
+		case <-timer.C:
+			p.stopErr = fmt.Errorf("wait for caffeinate termination timed out after %s", integrationCaffeinateStopTimeout)
+		}
 	})
-	return nil
+	return p.stopErr
+}
+
+func (p *integrationCaffeinateProcess) Running() bool {
+	if p == nil || p.cmd == nil || p.cmd.Process == nil {
+		return false
+	}
+	select {
+	case <-p.done:
+		return false
+	default:
+		return true
+	}
 }

@@ -174,11 +174,27 @@ Integration 在每次启动时读取 `config/config.json.temp`：
 
 ### macOS 防止空闲睡眠
 
-在 macOS 上运行 Integration 服务时，Integration 会自动启动并持有一个 `caffeinate -d -i -m -s` 子进程，以避免显示器因空闲关闭或系统进入空闲睡眠而中断任务。该行为适用于直接启动、`serve`、`start` 和 `restart` 后的服务进程，不需要额外配置或命令行参数。
+Integration 仅在 macOS 上按需启动 `caffeinate -d -i -m -s`，避免必要的服务工作因空闲熄屏或系统睡眠中断。`config/config.json` 必须包含顶层正整数 `caffeinate`，单位为分钟；例如：
 
-服务通过 `integration stop`、`SIGINT`、`SIGTERM` 或本机 `/api/shutdown` 关闭时，会先终止该子进程；若 `caffeinate` 无法启动，只会记录日志，Integration 仍会正常提供服务。
+```json
+{
+  "caffeinate": 15
+}
+```
 
-此功能不会修改屏幕保护程序、自动锁屏等系统偏好，也不支持合上笔记本盖子后继续运行。
+服务启动时会立即检查一次，之后按该周期复核。下列任一条件成立时保留或启动防休眠进程：
+
+- 飞书（`feishu`）或邮件（`email`）插件已成功启动；
+- 有尚未处理且计划执行时间在未来 24 小时内的备忘录任务；
+- 有仍在传输中的 SSE 响应。
+
+SSE 在开始、正常完成及异常结束时都会立即重算；上游错误、EOF、解析或写入失败、客户端断开以及请求/服务取消均会结束该 SSE 的防休眠状态。三个条件都不满足时会终止 `caffeinate`，允许系统正常休眠。
+
+`caffeinate` 配置缺失、格式错误或小于等于零时，Integration 会记录日志并拒绝启动；修改配置后需要重启生效。若 macOS 无法创建 `caffeinate` 子进程，服务会记录日志但继续运行。
+
+通过 `integration stop`、`restart` 的停止阶段、`SIGINT`、`SIGTERM` 或本机 `/api/shutdown` 关闭时，会先停止条件检查并尽力终止 `caffeinate`，再释放插件、任务和 HTTP 服务等资源。终止失败或超时只会记录日志，不会阻断应用退出。
+
+此功能不会修改屏幕保护程序、自动锁屏等系统偏好，也不支持合上笔记本盖子后继续运行；Linux、WSL、Windows 和其他平台不会执行 `caffeinate`。
 
 ### 参数说明
 
@@ -3545,6 +3561,16 @@ Integration 新增 `rembg` 图片主体提取队列。活动 `config/config.json
 
 Integration 新增 `GET /api/voxcpm/check` 与文字转语音任务接口：`GET/POST /api/voxcpm/tasks`、`POST /api/voxcpm/tasks/cancel`、`POST /api/voxcpm/tasks/restart`、`POST /api/voxcpm/tasks/delete`、`GET /api/voxcpm/tasks/log`。活动配置 `config/config.json.voxcpm` 的 `check` 控制成功检查缓存，`install` 为缺失依赖时返回给页面的安装请求；服务不会执行安装，缺少命令时也不会创建任务。
 
-每条任务仅接受当前 Agent 工作区中非空 UTF-8 文字文件；参考音色和表达风格 `control` 均可不填。文本预览入口提交的也只能是当前预览文件的工作区相对路径，服务端始终重新读取已保存文件而不信任浏览器展示内容。任务还持久化一个受控场景：均衡克隆（CFG 2、10 步）、质量优先（CFG 2.5、20 步、文字规范化与参考音频增强）、快速预览（CFG 1.5、4 步、文字规范化）、清晰增强（CFG 2、12 步、文字规范化与参考音频增强）、温暖叙述（CFG 2.5、15 步、增强及温和叙述控制）和轻快表达（CFG 2.5、15 步、文字规范化及轻快控制），以及可选表达风格 `control`。提供参考音色时执行受控 `voxcpm clone --text … --reference-audio …`；不提供时执行受控 `voxcpm design --text …`。表达风格会折叠空白并限制为 240 个字符，作为一个 `--control` 参数值；填写后覆盖场景内置风格，未填写时再使用场景的内置风格。服务会探测 VoxCPM 所用 Python 环境：检测到 CUDA 或 Apple MPS 时优先指定该 GPU；该次 GPU 执行发生任何错误，都会以受控的 `--device cpu` 自动且仅重试一次，并保留两次输出及回退结果到日志。未检测到或无法验证 GPU 时直接使用 CPU。任务日志会显示参考音色是否选择、实际 `design`/`clone` 模式、场景参数及实际使用的表达风格。任务全局串行、持久化到 SQLite，支持筛选、分页、日志、取消、重新开始和失败记录删除。输出固定在当前 Agent `audios/`；单条任务使用请求名称，批量任务或任何冲突自动追加时间戳，既有文件和源文件均不会被覆盖。
+每条任务仅接受当前 Agent 工作区中非空 UTF-8 文字文件；参考音色和表达风格 `control` 均可不填，且表达风格仅在未选择参考音色的自由生成模式下有效。文本预览入口提交的也只能是当前预览文件的工作区相对路径，服务端始终重新读取已保存文件而不信任浏览器展示内容。任务还持久化一个受控场景：均衡克隆（CFG 2、10 步）、质量优先（CFG 2.5、20 步、文字规范化与参考音频增强）、快速预览（CFG 1.5、4 步、文字规范化）、清晰增强（CFG 2、12 步、文字规范化与参考音频增强）、温暖叙述（CFG 2.5、15 步、增强及温和叙述控制）和轻快表达（CFG 2.5、15 步、文字规范化及轻快控制）。提供参考音色时执行受控 `voxcpm clone --text … --reference-audio …`，此时不会传入 `--control`；不提供时执行受控 `voxcpm design --text …`，可使用表达风格。自由生成的表达风格会折叠空白并限制为 240 个字符，作为一个 `--control` 参数值；填写后覆盖场景内置风格，未填写时再使用场景的内置风格。服务会探测 VoxCPM 所用 Python 环境：检测到 CUDA 或 Apple MPS 时优先指定该 GPU；该次 GPU 执行发生任何错误，都会以受控的 `--device cpu` 自动且仅重试一次，并保留两次输出及回退结果到日志。未检测到或无法验证 GPU 时直接使用 CPU。任务日志会显示参考音色是否选择、实际 `design`/`clone` 模式、场景参数及实际使用的表达风格。任务全局串行、持久化到 SQLite，支持筛选、分页、日志、取消、重新开始和失败记录删除。输出固定在当前 Agent `audios/`；单条任务使用请求名称，批量任务或任何冲突自动追加时间戳，既有文件和源文件均不会被覆盖。
 
 完整说明见 [iteration/20260801-4/USER_GUIDE.md](iteration/20260801-4/USER_GUIDE.md)。
+
+---
+
+## 迭代 20260802-1：迷你应用调试运行配置
+
+主应用发布包的 `config/config.json.miniapp.debug` 用于生成迷你应用修复请求，默认值为 `请修复 $path，问题是 $reason`。确认调试时，Site 重新读取运行时配置，将全部 `$path` 替换为所选 `app/` 中 HTML 文件的绝对路径，将全部 `$reason` 替换为修复原因和附件气泡文本；该模板必须是同时包含两个变量的非空字符串，否则页面不发送请求。
+
+`GET /api/runtime_config` 继续只读受控透传完整 `miniapp` 对象，读取的是当前发布包配置，而非 Agent 工作目录。Integration 不执行修复命令、不创建调试任务、不访问浏览器传入路径，修复请求及附件仍沿用普通当前会话消息协议。发布时必须同步应用内配置和 Site 资源，并在修改后重新签名验证。
+
+完整说明见 [iteration/20260802-1/USER_GUIDE.md](iteration/20260802-1/USER_GUIDE.md)。

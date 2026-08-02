@@ -32,6 +32,9 @@
 integration api heartbeat
 integration api agent-id
 integration api edit --agentId demo --path USER.md --content '# hello'
+integration api whisper create --agentId demo --path audios/meeting.mp3 --scenario chinese_meeting
+integration api rembg create --agentId demo --path images/product.jpg --model u2net --alpha-matting
+integration api voxcpm create --agentId demo --textPath scripts/intro.txt --outputName intro.wav
 integration service cancel --chat chat-001
 ```
 
@@ -137,15 +140,27 @@ integration service cancel --chat chat-001
 
 ### rembg 图片主体提取接口
 
-| 方法 | 路径 | 功能 |
-|---|---|---|
-| GET | `/api/rembg/check` | 检查受控环境能否运行 rembg |
-| GET | `/api/rembg/tasks` | 查询当前 Agent 的图片主体任务（固定每页 5 条） |
-| POST | `/api/rembg/tasks` | 将一个或多个工作区图片加入提取队列 |
-| POST | `/api/rembg/tasks/cancel` | 取消排队中或执行中的任务 |
-| POST | `/api/rembg/tasks/restart` | 将已取消任务重新加入队列 |
-| POST | `/api/rembg/tasks/delete` | 删除失败任务的记录，不删除源图片或输出图片 |
-| GET | `/api/rembg/tasks/log` | 查询任务详情及持久化执行日志 |
+| 方法 | 路径 | 功能 | CLI |
+|---|---|---|---|
+| GET | `/api/rembg/check` | 检查受控环境能否运行 rembg | `integration api rembg check` |
+| GET | `/api/rembg/tasks` | 查询当前 Agent 的图片主体任务（固定每页 5 条） | `integration api rembg list` |
+| POST | `/api/rembg/tasks` | 将一个或多个工作区图片加入提取队列 | `integration api rembg create` |
+| POST | `/api/rembg/tasks/cancel` | 取消排队中或执行中的任务 | `integration api rembg cancel` |
+| POST | `/api/rembg/tasks/restart` | 将已取消任务重新加入队列 | `integration api rembg restart` |
+| POST | `/api/rembg/tasks/delete` | 删除失败任务的记录，不删除源图片或输出图片 | `integration api rembg delete` |
+| GET | `/api/rembg/tasks/log` | 查询任务详情及持久化执行日志 | `integration api rembg log` |
+
+### VoxCPM 文字转语音接口
+
+| 方法 | 路径 | 功能 | CLI |
+|---|---|---|---|
+| GET | `/api/voxcpm/check` | 检查受控环境能否运行 VoxCPM | `integration api voxcpm check` |
+| GET | `/api/voxcpm/tasks` | 查询当前 Agent 的文字转语音任务（固定每页 5 条） | `integration api voxcpm list` |
+| POST | `/api/voxcpm/tasks` | 将一至五条工作区文字任务加入队列 | `integration api voxcpm create` |
+| POST | `/api/voxcpm/tasks/cancel` | 取消排队中或执行中的任务 | `integration api voxcpm cancel` |
+| POST | `/api/voxcpm/tasks/restart` | 将已取消任务重新加入队列 | `integration api voxcpm restart` |
+| POST | `/api/voxcpm/tasks/delete` | 删除失败任务的记录，不删除源文件或输出文件 | `integration api voxcpm delete` |
+| GET | `/api/voxcpm/tasks/log` | 查询任务详情及持久化执行日志 | `integration api voxcpm log` |
 
 ### 插件 / Connect / Cron 接口
 
@@ -873,6 +888,96 @@ integration api whisper log --agentId demo-agent --id 12
 受控环境通过 `rembg i <source> <output>` 串行处理图片。任务、状态和日志保存在 Integration 数据库中；每个输出都使用透明背景 PNG，并写入相应 Agent 工作目录的 `images/`。图片须位于该 Agent 工作目录且经服务端图片检测通过，输出名称为 `<原文件名>_subject.png`，冲突时追加时间戳，绝不覆盖既有文件。
 
 `GET /api/rembg/check` 从 `config/config.json.rembg` 读取检查缓存时长与安装请求文案；未找到可执行的 `rembg` 时返回该安装请求。任务接口与 Whisper 队列使用相同的 `status` / `content` 响应约定、状态值、分页规则及取消、重试、失败删除和日志查询语义。
+
+CLI 入口：
+
+```bash
+integration api rembg --help
+```
+
+`create` 需要 `--agentId` 与至少一个可重复的 `--path`，并把同一个 `--model` 和 `--alpha-matting` 选择应用到本次提交的全部图片。支持的模型为 `u2net`（默认）、`u2net_human_seg`、`u2netp`、`u2net_cloth_seg`、`silueta`、`isnet-general-use` 和 `isnet-anime`。
+
+```bash
+# 检查依赖，以及按状态查询任务
+integration api rembg check
+integration api rembg list --agentId demo-agent --status running --page 1
+
+# 提取单个主体并启用边缘优化
+integration api rembg create \
+  --agentId demo-agent \
+  --path images/product.jpg \
+  --model u2net \
+  --alpha-matting
+
+# 同一模型批量提交图片
+integration api rembg create \
+  --agentId demo-agent \
+  --path images/portrait.jpg \
+  --path images/logo.png \
+  --model isnet-general-use
+
+# 管理或查看单条任务
+integration api rembg cancel --agentId demo-agent --id 12
+integration api rembg restart --agentId demo-agent --id 12
+integration api rembg delete --agentId demo-agent --id 12
+integration api rembg log --agentId demo-agent --id 12
+```
+
+`cancel` 仅适用于 `queued` 或 `running`，`restart` 仅适用于 `cancelled`，`delete` 仅删除 `failed` 的任务记录；三者均不会删除源图片或已生成的 PNG。`list` 与 `log` 的筛选、分页和日志语义与 Whisper 对应命令相同。
+
+### VoxCPM 文字转语音
+
+VoxCPM 任务仅接受当前 Agent 工作区中的非空 UTF-8 文字文件；参考音色和表达风格均可不填。未提供参考音色时使用 `design` 自由生成声音，提供后使用 `clone` 克隆音色。输出固定写入当前 Agent 的 `audios/`；单条任务使用请求名称，批量任务和任何命名冲突会自动追加时间戳，不覆盖既有文件。
+
+CLI 入口：
+
+```bash
+integration api voxcpm --help
+```
+
+`create` 需要 `--agentId`、一至五个可重复的 `--textPath` 和 `--outputName`。`--referenceAudioPath`、`--scenario` 与 `--control` 可以省略；提供一次时会应用到全部文字任务，提供与文字任务数相同的次数时则按顺序逐条对应。场景为 `balanced`（默认）、`quality`、`fast`、`clean`、`warm_narration` 或 `lively`。`--control` 优先于场景的内置表达风格。
+
+```bash
+# 检查依赖，以及按状态查询任务
+integration api voxcpm check
+integration api voxcpm list --agentId demo-agent --status running --page 1
+
+# 不使用参考音色的自由生成
+integration api voxcpm create \
+  --agentId demo-agent \
+  --textPath scripts/intro.txt \
+  --outputName intro.wav \
+  --scenario warm_narration
+
+# 同一参考音色批量配音
+integration api voxcpm create \
+  --agentId demo-agent \
+  --textPath scripts/part-1.txt \
+  --textPath scripts/part-2.txt \
+  --referenceAudioPath audios/voice.wav \
+  --outputName narration.wav \
+  --scenario quality \
+  --control '温和、平稳、自然的叙述语气'
+
+# 为两条任务分别指定场景和表达风格
+integration api voxcpm create \
+  --agentId demo-agent \
+  --textPath scripts/ad.txt \
+  --textPath scripts/news.txt \
+  --outputName mixed.wav \
+  --scenario lively \
+  --scenario clean \
+  --control '轻快、有活力' \
+  --control '清晰、平稳'
+
+# 管理或查看单条任务
+integration api voxcpm cancel --agentId demo-agent --id 12
+integration api voxcpm restart --agentId demo-agent --id 12
+integration api voxcpm delete --agentId demo-agent --id 12
+integration api voxcpm log --agentId demo-agent --id 12
+```
+
+`cancel` 仅适用于 `queued` 或 `running`，`restart` 仅适用于 `cancelled`，`delete` 仅删除 `failed` 的任务记录；三者都不会删除文字、参考音色或输出 WAV。`log` 返回包括实际 `design`/`clone` 模式、场景参数、表达风格和受控设备回退信息在内的持久化日志。
 
 ### `/api/shutdown`
 

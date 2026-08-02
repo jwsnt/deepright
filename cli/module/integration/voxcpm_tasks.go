@@ -92,7 +92,10 @@ func voxcpmControlText(raw string) (string, error) {
 	return control, nil
 }
 
-func voxcpmEffectiveControl(scenario voxcpmScenario, custom string) string {
+func voxcpmEffectiveControl(scenario voxcpmScenario, custom string, cloning bool) string {
+	if cloning {
+		return ""
+	}
 	if strings.TrimSpace(custom) != "" {
 		return custom
 	}
@@ -552,19 +555,20 @@ func (m *voxcpmTaskManager) generate(ctx context.Context, task voxcpmTask) error
 		m.appendLog(task.ID, deviceReason)
 	}
 	cloning := reference != ""
-	control := voxcpmEffectiveControl(scenario, task.Control)
+	control := voxcpmEffectiveControl(scenario, task.Control, cloning)
 	m.appendLog(task.ID, voxcpmScenarioLogParameters(scenario, control, cloning))
 	if cloning {
 		m.appendLog(task.ID, "参考音色：已选择，使用 clone 模式。")
+		m.appendLog(task.ID, "表达风格仅适用于自由生成，当前不传 --control。")
 	} else {
 		m.appendLog(task.ID, "参考音色：未选择，使用 design 模式自由生成声音。")
-	}
-	if task.Control != "" {
-		m.appendLog(task.ID, "已使用任务填写的表达风格："+task.Control)
-	} else if control != "" {
-		m.appendLog(task.ID, "未填写表达风格，已使用场景内置表达风格："+control)
-	} else {
-		m.appendLog(task.ID, "未填写表达风格，当前场景不传 --control。")
+		if task.Control != "" {
+			m.appendLog(task.ID, "已使用任务填写的表达风格："+task.Control)
+		} else if control != "" {
+			m.appendLog(task.ID, "未填写表达风格，已使用场景内置表达风格："+control)
+		} else {
+			m.appendLog(task.ID, "未填写表达风格，当前场景不传 --control。")
+		}
 	}
 	m.progress(task.ID, 10)
 	_, err = m.runGenerate(ctx, task.ID, executable, text, reference, temporary, device, scenario, control)
@@ -860,10 +864,6 @@ func (m *voxcpmTaskManager) create(request voxcpmTaskCreateRequest) ([]voxcpmTas
 		if !ok {
 			return nil, errors.New("配音场景无效")
 		}
-		control, err := voxcpmControlText(item.Control)
-		if err != nil {
-			return nil, err
-		}
 		textPath, textSavedAs, _, err := voxcpmResolveText(m.cfg, request.AgentID, item.TextPath)
 		if err != nil {
 			return nil, err
@@ -871,6 +871,13 @@ func (m *voxcpmTaskManager) create(request voxcpmTaskCreateRequest) ([]voxcpmTas
 		referencePath, referenceSavedAs, err := voxcpmResolveReference(m.cfg, request.AgentID, item.ReferenceAudioPath)
 		if err != nil {
 			return nil, err
+		}
+		control := ""
+		if referencePath == "" {
+			control, err = voxcpmControlText(item.Control)
+			if err != nil {
+				return nil, err
+			}
 		}
 		output, saved, err := m.allocate(request.AgentID, workspace, requested, len(request.Tasks) > 1, reserved, 0)
 		if err != nil {

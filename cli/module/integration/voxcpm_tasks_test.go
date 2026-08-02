@@ -51,7 +51,7 @@ func TestVoxCPMAllocateNamesSingleAndBatch(t *testing.T) {
 	}
 }
 
-func TestVoxCPMCreateAndGenerateUsesControlledCloneArguments(t *testing.T) {
+func TestVoxCPMCloneIgnoresExpressionStyle(t *testing.T) {
 	root := t.TempDir()
 	workspace := filepath.Join(root, "agent-a")
 	if err := os.MkdirAll(filepath.Join(workspace, "tmp"), 0o755); err != nil {
@@ -91,7 +91,7 @@ func TestVoxCPMCreateAndGenerateUsesControlledCloneArguments(t *testing.T) {
 	manager := &voxcpmTaskManager{cfg: &Config{AgentDir: root}, db: db, wake: make(chan struct{}, 1)}
 	const control = "温和、平稳、自然的叙述语气"
 	created, err := manager.create(voxcpmTaskCreateRequest{AgentID: "agent-a", OutputName: "clone", Tasks: []voxcpmTaskCreateItem{{TextPath: "tmp/speech.txt", ReferenceAudioPath: "tmp/reference.wav", Scenario: voxcpmScenarioQuality, Control: control}}})
-	if err != nil || len(created) != 1 || created[0].OutputPath != "audios/clone.wav" || created[0].Scenario != voxcpmScenarioQuality || created[0].Control != control {
+	if err != nil || len(created) != 1 || created[0].OutputPath != "audios/clone.wav" || created[0].Scenario != voxcpmScenarioQuality || created[0].Control != "" {
 		t.Fatalf("create task = %#v, %v", created, err)
 	}
 	if err := manager.generate(context.Background(), created[0]); err != nil {
@@ -105,17 +105,36 @@ func TestVoxCPMCreateAndGenerateUsesControlledCloneArguments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"--cfg-value\n2.5", "--inference-timesteps\n20", "--normalize", "--denoise", "--control\n" + control} {
+	for _, want := range []string{"--cfg-value\n2.5", "--inference-timesteps\n20", "--normalize", "--denoise"} {
 		if !strings.Contains(string(arguments), want) {
 			t.Fatalf("quality scenario missing %q in args %q", want, arguments)
 		}
+	}
+	if strings.Contains(string(arguments), "--control") {
+		t.Fatalf("clone arguments must not include expression style: %q", arguments)
 	}
 	var logs string
 	if err := db.QueryRow(`SELECT logs FROM voxcpm_task WHERE id=?`, created[0].ID).Scan(&logs); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(logs, "已使用任务填写的表达风格："+control) || !strings.Contains(logs, "--control="+control) {
-		t.Fatalf("expression style must be logged: %q", logs)
+	if !strings.Contains(logs, "表达风格仅适用于自由生成") || strings.Contains(logs, "已使用任务填写的表达风格：") {
+		t.Fatalf("clone expression style must be ignored: %q", logs)
+	}
+}
+
+func TestVoxCPMExpressionStyleOnlyAppliesToFreeGeneration(t *testing.T) {
+	scenario, ok := voxcpmScenarioFor(voxcpmScenarioWarmNarration)
+	if !ok {
+		t.Fatal("warm narration scenario must exist")
+	}
+	if got := voxcpmEffectiveControl(scenario, "自定义表达", false); got != "自定义表达" {
+		t.Fatalf("free generation custom control = %q", got)
+	}
+	if got := voxcpmEffectiveControl(scenario, "", false); got != scenario.Control {
+		t.Fatalf("free generation scenario control = %q", got)
+	}
+	if got := voxcpmEffectiveControl(scenario, "自定义表达", true); got != "" {
+		t.Fatalf("clone control = %q", got)
 	}
 }
 
