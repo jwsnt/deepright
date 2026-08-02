@@ -51,6 +51,38 @@ func TestVoxCPMAllocateNamesSingleAndBatch(t *testing.T) {
 	}
 }
 
+func TestVoxCPMDeleteFailedOrCancelledTask(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := ensureVoxCPMTaskSchema(db); err != nil {
+		t.Fatal(err)
+	}
+	insert := func(status string) int64 {
+		result, err := db.Exec(`INSERT INTO voxcpm_task(agent_id,text_path,text_saved_as,reference_audio_path,reference_audio_saved_as,requested_name,output_path,saved_as,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?, 'now','now')`, "agent-a", "tmp/input.txt", "tmp/input.txt", "", "", "output.wav", "audios/output.wav", "audios/output.wav", status)
+		if err != nil {
+			t.Fatal(err)
+		}
+		id, err := result.LastInsertId()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	failedID, cancelledID, completedID := insert(voxcpmTaskFailed), insert(voxcpmTaskCancelled), insert(voxcpmTaskCompleted)
+	manager := &voxcpmTaskManager{db: db}
+	for _, id := range []int64{failedID, cancelledID} {
+		if err := manager.deleteFailedOrCancelled("agent-a", id); err != nil {
+			t.Fatalf("delete task %d: %v", id, err)
+		}
+	}
+	if err := manager.deleteFailedOrCancelled("agent-a", completedID); err == nil {
+		t.Fatal("completed task must not be deletable")
+	}
+}
+
 func TestVoxCPMCloneIgnoresExpressionStyle(t *testing.T) {
 	root := t.TempDir()
 	workspace := filepath.Join(root, "agent-a")

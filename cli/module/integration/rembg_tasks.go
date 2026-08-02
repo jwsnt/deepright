@@ -824,14 +824,14 @@ func (m *rembgTaskManager) restart(agentID string, id int64) error {
 	m.signal()
 	return nil
 }
-func (m *rembgTaskManager) deleteFailed(agentID string, id int64) error {
-	result, err := m.db.Exec(`DELETE FROM rembg_task WHERE id=? AND agent_id=? AND status=?`, id, strings.TrimSpace(agentID), rembgTaskFailed)
+func (m *rembgTaskManager) deleteFailedOrCancelled(agentID string, id int64) error {
+	result, err := m.db.Exec(`DELETE FROM rembg_task WHERE id=? AND agent_id=? AND status IN (?, ?)`, id, strings.TrimSpace(agentID), rembgTaskFailed, rembgTaskCancelled)
 	if err != nil {
 		return err
 	}
 	affected, _ := result.RowsAffected()
 	if affected != 1 {
-		return errors.New("仅可删除失败任务")
+		return errors.New("仅可删除失败或已取消任务")
 	}
 	return nil
 }
@@ -918,7 +918,9 @@ func handleRembgTaskRestart() http.HandlerFunc {
 	return rembgActionHandler(func(m *rembgTaskManager, r rembgTaskActionRequest) error { return m.restart(r.AgentID, r.ID) })
 }
 func handleRembgTaskDelete() http.HandlerFunc {
-	return rembgActionHandler(func(m *rembgTaskManager, r rembgTaskActionRequest) error { return m.deleteFailed(r.AgentID, r.ID) })
+	return rembgActionHandler(func(m *rembgTaskManager, r rembgTaskActionRequest) error {
+		return m.deleteFailedOrCancelled(r.AgentID, r.ID)
+	})
 }
 func rembgActionHandler(action func(*rembgTaskManager, rembgTaskActionRequest) error) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

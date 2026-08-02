@@ -149,6 +149,54 @@ func TestRVMPreviewMP4Path(t *testing.T) {
 	}
 }
 
+func TestRVMPreviewFFmpegArgsFlattensAlphaOnBlack(t *testing.T) {
+	args := rvmPreviewFFmpegArgs("/agent/videos/clip_subject.mov", "/agent/videos/clip_subject.mp4")
+	joined := strings.Join(args, " ")
+	if !strings.Contains(joined, "color=c=black") || !strings.Contains(joined, "overlay=shortest=1") {
+		t.Fatalf("preview conversion must composite alpha over black: %q", args)
+	}
+	for index := 0; index+1 < len(args); index++ {
+		if args[index] == "-map" && args[index+1] == "0:v:0" {
+			t.Fatalf("preview conversion must not map the alpha-bearing MOV directly: %q", args)
+		}
+	}
+	if !strings.Contains(joined, "-map [preview]") || !strings.Contains(joined, "-c:v libx264") || !strings.Contains(joined, "-pix_fmt yuv420p") {
+		t.Fatalf("unexpected preview conversion args: %q", args)
+	}
+}
+
+func TestRVMDeleteFailedOrCancelledTask(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := ensureRVMTaskSchema(db); err != nil {
+		t.Fatal(err)
+	}
+	insert := func(status string) int64 {
+		result, err := db.Exec(`INSERT INTO rvm_task(agent_id,source_path,output_path,status,created_at,updated_at) VALUES(?,?,?,?, 'now','now')`, "agent-a", "tmp/input.mp4", "videos/output.mov", status)
+		if err != nil {
+			t.Fatal(err)
+		}
+		id, err := result.LastInsertId()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	failedID, cancelledID, completedID := insert(rvmTaskFailed), insert(rvmTaskCancelled), insert(rvmTaskCompleted)
+	manager := &rvmTaskManager{db: db}
+	for _, id := range []int64{failedID, cancelledID} {
+		if err := manager.deleteFailedOrCancelled("agent-a", id); err != nil {
+			t.Fatalf("delete task %d: %v", id, err)
+		}
+	}
+	if err := manager.deleteFailedOrCancelled("agent-a", completedID); err == nil {
+		t.Fatal("completed task must not be deletable")
+	}
+}
+
 func TestRVMRuntimeForStartupFindsAgentWorkspace(t *testing.T) {
 	root := t.TempDir()
 	workspace := filepath.Join(root, "agent-a")

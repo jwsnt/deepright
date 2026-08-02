@@ -3539,7 +3539,7 @@ Integration 启动后会立即检查每个合法 Agent，之后每隔 `recover` 
 
 ## 迭代 20260801-2：Whisper 音频转文字队列
 
-Integration 新增 `GET /api/whisper/check` 与任务接口：`GET/POST /api/whisper/tasks`、`POST /api/whisper/tasks/cancel`、`POST /api/whisper/tasks/restart`、`POST /api/whisper/tasks/delete`、`GET /api/whisper/tasks/log`。任务列表支持按排队中、执行中、已完成、已取消、失败筛选，固定每页 5 条；已取消任务可重新加入队列，失败任务可删除其任务记录（不删除文件）。活动 `config/config.json` 的 `whisper.check`（正整数小时）和 `whisper.install`（非空安装请求）控制依赖检查与用户确认后的安装消息；接口会验证 `whisper` 命令可启动，并在 macOS 识别用户级 `~/Library/Python/*/bin/whisper` 安装位置，失效时返回安装请求，不会执行安装。Integration、`cmd`、`CLI_SANDBOX` 与 `cli/get` 的普通/沙箱任务均继承同一份规范化命令环境；该环境动态合并当前用户存在的 Python 用户级 `bin` 目录，不依赖硬编码的用户路径或 Python 版本，因此检查和实际执行解析的是同一份 `PATH`。
+Integration 新增 `GET /api/whisper/check` 与任务接口：`GET/POST /api/whisper/tasks`、`POST /api/whisper/tasks/cancel`、`POST /api/whisper/tasks/restart`、`POST /api/whisper/tasks/delete`、`GET /api/whisper/tasks/log`。任务列表支持按排队中、执行中、已完成、已取消、失败筛选，固定每页 5 条；失败或已取消任务均可删除其任务记录（不删除文件）。活动 `config/config.json` 的 `whisper.check`（正整数小时）和 `whisper.install`（非空安装请求）控制依赖检查与用户确认后的安装消息；接口会验证 `whisper` 命令可启动，并在 macOS 识别用户级 `~/Library/Python/*/bin/whisper` 安装位置，失效时返回安装请求，不会执行安装。Integration、`cmd`、`CLI_SANDBOX` 与 `cli/get` 的普通/沙箱任务均继承同一份规范化命令环境；该环境动态合并当前用户存在的 Python 用户级 `bin` 目录，不依赖硬编码的用户路径或 Python 版本，因此检查和实际执行解析的是同一份 `PATH`。
 
 任务持久化到共享 SQLite，并按创建顺序在全部 Agent 间串行执行。每条任务保存一个受服务端白名单约束的转写场景：默认“中文会议”（`chinese_meeting`），另可选“专业转写”“低延迟”“批量处理”“CPU 轻量”和“中英技术”。场景会决定模型及安全的语言、温度、搜索宽度、上下文和提示词参数；场景与实际参数均写入任务日志。源音频和输出必须位于同一 Agent 工作区；创建接口只接受服务端可预览的音频相对路径，输出固定保存到工作目录下的 `whisper/`，优先使用与源音频同名的 `.txt`，已有同名文本或任务输出时自动追加时间戳，绝不覆盖。任务支持进度和日志持久化、取消、服务重启恢复排队，以及 CUDA、Apple MPS、CPU 的受控优先级回退；GPU 已探测可用但实际运行不兼容时，会自动用 CPU 再尝试一次。
 
@@ -3551,7 +3551,7 @@ Integration 新增 `GET /api/whisper/check` 与任务接口：`GET/POST /api/whi
 
 Integration 新增 `rembg` 图片主体提取队列。活动 `config/config.json.rembg` 的 `check`（正整数小时）控制依赖检查缓存，`install`（非空文本）为缺少 `rembg` 时返回给页面的安装请求。`GET /api/rembg/check` 仅验证受控环境的 `rembg` 命令可启动，不执行安装。
 
-图片任务持久化到共享 SQLite，支持查询、创建、取消、重新开始、失败删除和日志读取；状态为 `queued`、`running`、`completed`、`cancelled`、`failed`，列表支持状态筛选且固定每页 5 条。每条任务保存模型与 `alpha matting` 选择，默认模型为通用 `u2net`；未缓存的所选模型由 rembg 在任务执行时自动下载，实时下载过程写入日志。任务只接受当前 Agent 工作区内经内容验证的图片，使用受控的 `rembg i -m <模型> [--alpha-matting]` 串行执行，输出透明 PNG 到该 Agent 的 `images/`，默认命名为 `<源文件名>_subject.png`；冲突时自动追加时间戳，既有文件和源图片均不会被覆盖。
+图片任务持久化到共享 SQLite，支持查询、创建、取消、重新开始、失败或已取消任务删除和日志读取；状态为 `queued`、`running`、`completed`、`cancelled`、`failed`，列表支持状态筛选且固定每页 5 条。每条任务保存模型与 `alpha matting` 选择，默认模型为通用 `u2net`；未缓存的所选模型由 rembg 在任务执行时自动下载，实时下载过程写入日志。任务只接受当前 Agent 工作区内经内容验证的图片，使用受控的 `rembg i -m <模型> [--alpha-matting]` 串行执行，输出透明 PNG 到该 Agent 的 `images/`，默认命名为 `<源文件名>_subject.png`；冲突时自动追加时间戳，既有文件和源图片均不会被覆盖。
 
 完整说明见 [iteration/20260801-3/USER_GUIDE.md](iteration/20260801-3/USER_GUIDE.md)。
 
@@ -3561,7 +3561,7 @@ Integration 新增 `rembg` 图片主体提取队列。活动 `config/config.json
 
 Integration 新增 `GET /api/voxcpm/check` 与文字转语音任务接口：`GET/POST /api/voxcpm/tasks`、`POST /api/voxcpm/tasks/cancel`、`POST /api/voxcpm/tasks/restart`、`POST /api/voxcpm/tasks/delete`、`GET /api/voxcpm/tasks/log`。活动配置 `config/config.json.voxcpm` 的 `check` 控制成功检查缓存，`install` 为缺失依赖时返回给页面的安装请求；服务不会执行安装，缺少命令时也不会创建任务。
 
-每条任务仅接受当前 Agent 工作区中非空 UTF-8 文字文件；参考音色和表达风格 `control` 均可不填，且表达风格仅在未选择参考音色的自由生成模式下有效。文本预览入口提交的也只能是当前预览文件的工作区相对路径，服务端始终重新读取已保存文件而不信任浏览器展示内容。任务还持久化一个受控场景：均衡克隆（CFG 2、10 步）、质量优先（CFG 2.5、20 步、文字规范化与参考音频增强）、快速预览（CFG 1.5、4 步、文字规范化）、清晰增强（CFG 2、12 步、文字规范化与参考音频增强）、温暖叙述（CFG 2.5、15 步、增强及温和叙述控制）和轻快表达（CFG 2.5、15 步、文字规范化及轻快控制）。提供参考音色时执行受控 `voxcpm clone --text … --reference-audio …`，此时不会传入 `--control`；不提供时执行受控 `voxcpm design --text …`，可使用表达风格。自由生成的表达风格会折叠空白并限制为 240 个字符，作为一个 `--control` 参数值；填写后覆盖场景内置风格，未填写时再使用场景的内置风格。服务会探测 VoxCPM 所用 Python 环境：检测到 CUDA 或 Apple MPS 时优先指定该 GPU；该次 GPU 执行发生任何错误，都会以受控的 `--device cpu` 自动且仅重试一次，并保留两次输出及回退结果到日志。未检测到或无法验证 GPU 时直接使用 CPU。任务日志会显示参考音色是否选择、实际 `design`/`clone` 模式、场景参数及实际使用的表达风格。任务全局串行、持久化到 SQLite，支持筛选、分页、日志、取消、重新开始和失败记录删除。输出固定在当前 Agent `audios/`；单条任务使用请求名称，批量任务或任何冲突自动追加时间戳，既有文件和源文件均不会被覆盖。
+每条任务仅接受当前 Agent 工作区中非空 UTF-8 文字文件；参考音色和表达风格 `control` 均可不填，且表达风格仅在未选择参考音色的自由生成模式下有效。文本预览入口提交的也只能是当前预览文件的工作区相对路径，服务端始终重新读取已保存文件而不信任浏览器展示内容。任务还持久化一个受控场景：均衡克隆（CFG 2、10 步）、质量优先（CFG 2.5、20 步、文字规范化与参考音频增强）、快速预览（CFG 1.5、4 步、文字规范化）、清晰增强（CFG 2、12 步、文字规范化与参考音频增强）、温暖叙述（CFG 2.5、15 步、增强及温和叙述控制）和轻快表达（CFG 2.5、15 步、文字规范化及轻快控制）。提供参考音色时执行受控 `voxcpm clone --text … --reference-audio …`，此时不会传入 `--control`；不提供时执行受控 `voxcpm design --text …`，可使用表达风格。自由生成的表达风格会折叠空白并限制为 240 个字符，作为一个 `--control` 参数值；填写后覆盖场景内置风格，未填写时再使用场景的内置风格。服务会探测 VoxCPM 所用 Python 环境：检测到 CUDA 或 Apple MPS 时优先指定该 GPU；该次 GPU 执行发生任何错误，都会以受控的 `--device cpu` 自动且仅重试一次，并保留两次输出及回退结果到日志。未检测到或无法验证 GPU 时直接使用 CPU。任务日志会显示参考音色是否选择、实际 `design`/`clone` 模式、场景参数及实际使用的表达风格。任务全局串行、持久化到 SQLite，支持筛选、分页、日志、取消、重新开始和失败或已取消记录删除。输出固定在当前 Agent `audios/`；单条任务使用请求名称，批量任务或任何冲突自动追加时间戳，既有文件和源文件均不会被覆盖。
 
 完整说明见 [iteration/20260801-4/USER_GUIDE.md](iteration/20260801-4/USER_GUIDE.md)。
 
@@ -3581,8 +3581,8 @@ Integration 新增 `GET /api/voxcpm/check` 与文字转语音任务接口：`GET
 
 Integration 提供基于 Robust Video Matting 的持久化视频主体队列。`config/config.json.rvm.check` 为成功预检缓存小时数，`rvm.install` 为依赖缺失时发送至当前 Chat 的安装请求；服务端将该文案中的 `$workspace` 替换为当前页面 Agent 的工作目录。代码固定在 `$workspace/rvm/inference.py`，模型固定在 `$workspace/rvm/weights/rvm_mobilenetv3.pth`；检查与实际任务执行均使用这两个路径，不会回退查找其它目录。为兼容新版 PyAV，Integration 以受控包装器在内存中转换帧率后再执行未修改的上游脚本，绝不写入下载的 RVM 代码。页面入口提交已选择的 Agent ID，服务端解析其工作目录后检查安装；流程不使用会话 UUID 或 VFS 路径。预检执行实际可用 Python 的 `inference.py --help`，成功结果只在进程内缓存，重启后自动失效；无需也不得设置 RVM 环境变量。
 
-接口包括 `GET /api/rvm/check`、`GET/POST /api/rvm/tasks`、`POST /api/rvm/tasks/cancel`、`/restart`、`/delete` 及 `GET /api/rvm/tasks/log`。创建接口为每项视频保存场景：标准主体提取（默认，4 Mbps）、精细边缘提取（完整分辨率，8 Mbps）或快速主体提取（0.25 下采样，2 Mbps）；旧任务没有场景时按标准主体提取执行。任务只接受当前 Agent 工作区中的视频，固定输出到 `videos/<源文件名>_subject.mov`，并生成同名 MP4 预览副本；复制路径仍为透明 MOV，预览使用 MP4。任一配对文件重名时自动使用同一时间戳，绝不覆盖源文件或已有输出。每个任务依次用 RVM 生成前景与 alpha 视频，再用 FFmpeg 合成为带透明通道的 ProRes 4444 MOV，随后转码 H.264 MP4 预览副本。因此执行前会再次验证 FFmpeg 与 FFprobe。
+接口包括 `GET /api/rvm/check`、`GET/POST /api/rvm/tasks`、`POST /api/rvm/tasks/cancel`、`/restart`、`/delete` 及 `GET /api/rvm/tasks/log`。创建接口为每项视频保存场景：标准主体提取（默认，4 Mbps）、精细边缘提取（完整分辨率，8 Mbps）或快速主体提取（0.25 下采样，2 Mbps）；旧任务没有场景时按标准主体提取执行。任务只接受当前 Agent 工作区中的视频，固定输出到 `videos/<源文件名>_subject.mov`，并生成同名 MP4 预览副本；复制路径仍为透明 MOV，预览使用 MP4，预览中的透明区域填充为纯黑色。任一配对文件重名时自动使用同一时间戳，绝不覆盖源文件或已有输出。每个任务依次用 RVM 生成前景与 alpha 视频，再用 FFmpeg 合成为带透明通道的 ProRes 4444 MOV，随后将透明区域合成为纯黑背景并转码 H.264 MP4 预览副本。因此执行前会再次验证 FFmpeg 与 FFprobe。
 
-在 macOS 上任务优先使用 Apple MPS，其他系统优先 CUDA；GPU/MPS 推理失败时会清理临时输出并自动从头以 CPU 重试一次。任务场景、状态、日志、取消、重新开始和失败删除均保存在共享 SQLite，刷新页面或重启服务不会丢失历史记录。
+在 macOS 上任务优先使用 Apple MPS，其他系统优先 CUDA；GPU/MPS 推理失败时会清理临时输出并自动从头以 CPU 重试一次。任务场景、状态、日志、取消、重新开始和失败或已取消记录删除均保存在共享 SQLite，刷新页面或重启服务不会丢失历史记录。
 
 完整配置与接口说明见 [iteration/20260802-3/USER_GUIDE.md](iteration/20260802-3/USER_GUIDE.md)。

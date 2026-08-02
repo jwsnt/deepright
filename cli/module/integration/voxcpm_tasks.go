@@ -1041,14 +1041,14 @@ func (m *voxcpmTaskManager) restart(agentID string, id int64) error {
 	m.signal()
 	return nil
 }
-func (m *voxcpmTaskManager) deleteFailed(agentID string, id int64) error {
-	result, err := m.db.Exec(`DELETE FROM voxcpm_task WHERE id=? AND agent_id=? AND status=?`, id, strings.TrimSpace(agentID), voxcpmTaskFailed)
+func (m *voxcpmTaskManager) deleteFailedOrCancelled(agentID string, id int64) error {
+	result, err := m.db.Exec(`DELETE FROM voxcpm_task WHERE id=? AND agent_id=? AND status IN (?, ?)`, id, strings.TrimSpace(agentID), voxcpmTaskFailed, voxcpmTaskCancelled)
 	if err != nil {
 		return err
 	}
 	changed, _ := result.RowsAffected()
 	if changed != 1 {
-		return errors.New("仅可删除失败任务")
+		return errors.New("仅可删除失败或已取消任务")
 	}
 	return nil
 }
@@ -1137,7 +1137,9 @@ func handleVoxCPMTaskRestart() http.HandlerFunc {
 	return voxcpmActionHandler(func(m *voxcpmTaskManager, r voxcpmTaskActionRequest) error { return m.restart(r.AgentID, r.ID) })
 }
 func handleVoxCPMTaskDelete() http.HandlerFunc {
-	return voxcpmActionHandler(func(m *voxcpmTaskManager, r voxcpmTaskActionRequest) error { return m.deleteFailed(r.AgentID, r.ID) })
+	return voxcpmActionHandler(func(m *voxcpmTaskManager, r voxcpmTaskActionRequest) error {
+		return m.deleteFailedOrCancelled(r.AgentID, r.ID)
+	})
 }
 func handleVoxCPMTaskLog() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

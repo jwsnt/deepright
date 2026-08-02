@@ -26,7 +26,7 @@ Integration 在启动时会构建统一的命令环境，并由 Whisper/FFmpeg �
 - `GET /api/whisper/tasks?agentId=<AgentId>&status=<状态>&page=<页码>` 返回当前 Agent 的任务。`status` 可为 `queued`、`running`、`completed`、`cancelled`、`failed` 或省略（全部）；每页固定 5 条，并返回总数、当前页和页大小。
 - `POST /api/whisper/tasks` 接受 `{ "agentId": "...", "paths": ["audios/demo.mp3"] }`，仅允许当前 Agent 工作区内的受支持音频相对路径。
 - `POST /api/whisper/tasks/cancel` 接受 `{ "agentId": "...", "id": 1 }`，可取消排队或正在执行的任务；`POST /api/whisper/tasks/restart` 可将已取消任务重新加入队列。
-- `POST /api/whisper/tasks/delete` 接受 `{ "agentId": "...", "id": 1 }`，仅可删除当前 Agent 的失败任务记录；不会删除音频或已生成文字文件。
+- `POST /api/whisper/tasks/delete` 接受 `{ "agentId": "...", "id": 1 }`，仅可删除当前 Agent 的失败或已取消任务记录；不会删除音频或已生成文字文件。
 - `GET /api/whisper/tasks/log?agentId=<AgentId>&id=1` 返回指定任务的持久化执行日志。
 
 任务记录保存在共享 SQLite 的 `whisper_task` 表。任务使用固定 `base` 模型，按创建顺序全局串行执行；当前任务完成、失败或被取消后，队列会立刻开始下一个任务。服务重启时，未取消的执行中任务会恢复为排队中并保留恢复日志。

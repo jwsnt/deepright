@@ -423,7 +423,7 @@ func TestWhisperTaskRestartFailureWritesTaskLog(t *testing.T) {
 	}
 }
 
-func TestWhisperTaskDeleteFailedTaskOnlyDeletesMatchingFailure(t *testing.T) {
+func TestWhisperTaskDeleteFailedOrCancelledTask(t *testing.T) {
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("open db: %v", err)
@@ -440,21 +440,32 @@ func TestWhisperTaskDeleteFailedTaskOnlyDeletesMatchingFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed task id: %v", err)
 	}
+	cancelled, err := db.Exec(`INSERT INTO whisper_task (agent_id, source_path, output_path, status, created_at, updated_at) VALUES ('agent-a', 'audios/c.wav', 'whisper/c.txt', ?, 'now', 'now')`, whisperTaskStatusCancelled)
+	if err != nil {
+		t.Fatalf("insert cancelled task: %v", err)
+	}
+	cancelledID, _ := cancelled.LastInsertId()
 	completed, err := db.Exec(`INSERT INTO whisper_task (agent_id, source_path, output_path, status, created_at, updated_at) VALUES ('agent-a', 'audios/b.wav', 'whisper/b.txt', ?, 'now', 'now')`, whisperTaskStatusCompleted)
 	if err != nil {
 		t.Fatalf("insert completed task: %v", err)
 	}
 	completedID, _ := completed.LastInsertId()
 	manager := newWhisperTaskManager(&Config{}, db)
-	if err := manager.deleteFailedTask("agent-a", failedID); err != nil {
+	if err := manager.deleteFailedOrCancelledTask("agent-a", failedID); err != nil {
 		t.Fatalf("delete failed task: %v", err)
+	}
+	if err := manager.deleteFailedOrCancelledTask("agent-a", cancelledID); err != nil {
+		t.Fatalf("delete cancelled task: %v", err)
 	}
 	var count int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM whisper_task WHERE id = ?`, failedID).Scan(&count); err != nil || count != 0 {
 		t.Fatalf("failed task still exists: count=%d err=%v", count, err)
 	}
-	if err := manager.deleteFailedTask("agent-a", completedID); err == nil {
-		t.Fatal("completed task must not be deletable through failed-task endpoint")
+	if err := db.QueryRow(`SELECT COUNT(*) FROM whisper_task WHERE id = ?`, cancelledID).Scan(&count); err != nil || count != 0 {
+		t.Fatalf("cancelled task still exists: count=%d err=%v", count, err)
+	}
+	if err := manager.deleteFailedOrCancelledTask("agent-a", completedID); err == nil {
+		t.Fatal("completed task must not be deletable")
 	}
 }
 

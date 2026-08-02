@@ -1103,11 +1103,11 @@ func (manager *whisperTaskManager) restartTask(agentID string, taskID int64) err
 	return nil
 }
 
-func (manager *whisperTaskManager) deleteFailedTask(agentID string, taskID int64) error {
+func (manager *whisperTaskManager) deleteFailedOrCancelledTask(agentID string, taskID int64) error {
 	if manager == nil || manager.db == nil || !isValidMediaPreviewAgentID(agentID) || taskID <= 0 {
 		return errors.New("任务参数无效")
 	}
-	result, err := manager.db.Exec(`DELETE FROM whisper_task WHERE id = ? AND agent_id = ? AND status = ?`, taskID, strings.TrimSpace(agentID), whisperTaskStatusFailed)
+	result, err := manager.db.Exec(`DELETE FROM whisper_task WHERE id = ? AND agent_id = ? AND status IN (?, ?)`, taskID, strings.TrimSpace(agentID), whisperTaskStatusFailed, whisperTaskStatusCancelled)
 	if err != nil {
 		return err
 	}
@@ -1116,7 +1116,7 @@ func (manager *whisperTaskManager) deleteFailedTask(agentID string, taskID int64
 		return err
 	}
 	if affected != 1 {
-		return errors.New("未找到可删除的失败任务")
+		return errors.New("仅可删除失败或已取消任务")
 	}
 	return nil
 }
@@ -1255,7 +1255,7 @@ func handleWhisperTaskDelete() http.HandlerFunc {
 			writeWhisperTaskJSON(w, http.StatusBadRequest, map[string]interface{}{"status": 1, "content": "请求体格式错误"})
 			return
 		}
-		if err := whisperTasks.deleteFailedTask(strings.TrimSpace(request.AgentID), request.ID); err != nil {
+		if err := whisperTasks.deleteFailedOrCancelledTask(strings.TrimSpace(request.AgentID), request.ID); err != nil {
 			writeWhisperTaskJSON(w, http.StatusBadRequest, map[string]interface{}{"status": 1, "content": err.Error()})
 			return
 		}

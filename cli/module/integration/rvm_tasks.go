@@ -628,7 +628,7 @@ func (m *rvmTaskManager) extract(ctx context.Context, task rvmTask) error {
 	}
 	preview := rvmPreviewMP4Path(target)
 	m.appendLog(task.ID, "正在生成 MP4 预览副本。")
-	output, outputErr := videoTrimCommandContextFn(ctx, ffmpegPath, "-n", "-i", target, "-map", "0:v:0", "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p", "-movflags", "+faststart", preview).CombinedOutput()
+	output, outputErr := videoTrimCommandContextFn(ctx, ffmpegPath, rvmPreviewFFmpegArgs(target, preview)...).CombinedOutput()
 	if outputErr != nil {
 		return fmt.Errorf("生成 MP4 预览副本失败: %s", strings.TrimSpace(string(output)))
 	}
@@ -779,6 +779,18 @@ func (m *rvmTaskManager) allocate(agentID, workspace, source string, reserved ma
 
 func rvmPreviewMP4Path(movPath string) string {
 	return strings.TrimSuffix(movPath, filepath.Ext(movPath)) + ".mp4"
+}
+
+// rvmPreviewFFmpegArgs flattens the alpha-bearing MOV onto a black canvas.
+// H.264/MP4 has no alpha channel, so mapping the MOV stream directly would
+// discard alpha and leave its hidden RGB values visible in the preview.
+func rvmPreviewFFmpegArgs(movPath, previewPath string) []string {
+	return []string{
+		"-n", "-i", movPath,
+		"-filter_complex", "[0:v:0]format=rgba[foreground];color=c=black:s=16x16,format=rgba[background];[background][foreground]scale2ref[background][foreground];[background][foreground]overlay=shortest=1:format=auto,format=yuv420p[preview]",
+		"-map", "[preview]",
+		"-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p", "-movflags", "+faststart", previewPath,
+	}
 }
 
 // ensureAvailableOutputPath makes the output collision rule hold until the
@@ -988,14 +1000,14 @@ func (m *rvmTaskManager) restart(agentID string, id int64) error {
 	m.signal()
 	return nil
 }
-func (m *rvmTaskManager) deleteFailed(agentID string, id int64) error {
-	result, err := m.db.Exec(`DELETE FROM rvm_task WHERE id=? AND agent_id=? AND status=?`, id, strings.TrimSpace(agentID), rvmTaskFailed)
+func (m *rvmTaskManager) deleteFailedOrCancelled(agentID string, id int64) error {
+	result, err := m.db.Exec(`DELETE FROM rvm_task WHERE id=? AND agent_id=? AND status IN (?, ?)`, id, strings.TrimSpace(agentID), rvmTaskFailed, rvmTaskCancelled)
 	if err != nil {
 		return err
 	}
 	n, _ := result.RowsAffected()
 	if n != 1 {
-		return errors.New("仅可删除失败任务")
+		return errors.New("仅可删除失败或已取消任务")
 	}
 	return nil
 }
@@ -1093,7 +1105,9 @@ func handleRVMTaskRestart() http.HandlerFunc {
 	return rvmActionHandler(func(m *rvmTaskManager, r rvmTaskActionRequest) error { return m.restart(r.AgentID, r.ID) })
 }
 func handleRVMTaskDelete() http.HandlerFunc {
-	return rvmActionHandler(func(m *rvmTaskManager, r rvmTaskActionRequest) error { return m.deleteFailed(r.AgentID, r.ID) })
+	return rvmActionHandler(func(m *rvmTaskManager, r rvmTaskActionRequest) error {
+		return m.deleteFailedOrCancelled(r.AgentID, r.ID)
+	})
 }
 func handleRVMTaskLog() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

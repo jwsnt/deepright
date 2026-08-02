@@ -21,7 +21,7 @@
 
 - `GET /api/rembg/tasks?agentId=<AgentId>&status=<状态>&page=<页码>` 查询当前 Agent 的任务。状态可为 `queued`、`running`、`completed`、`cancelled`、`failed` 或省略；每页固定 5 条。
 - `POST /api/rembg/tasks` 接受 `{ "agentId": "...", "tasks": [{ "path": "images/photo.jpg", "model": "u2net", "alphaMatting": false }] }`。模型为空时默认通用模型 `u2net`；旧版 `paths` 请求继续按默认模型处理。路径必须是当前 Agent 工作区内经服务端验证的图片相对路径。
-- `POST /api/rembg/tasks/cancel`、`/restart` 和 `/delete` 接受 `{ "agentId": "...", "id": 1 }`，分别用于取消排队或运行任务、重启已取消任务、删除失败任务记录。
+- `POST /api/rembg/tasks/cancel`、`/restart` 和 `/delete` 接受 `{ "agentId": "...", "id": 1 }`，分别用于取消排队或运行任务、重启已取消任务、删除失败或已取消任务记录。
 - `GET /api/rembg/tasks/log?agentId=<AgentId>&id=1` 返回指定任务及其持久化执行日志。
 
 任务记录存储在共享 SQLite 的 `rembg_task` 表中，按创建顺序在全部 Agent 间串行执行。服务重启时，未取消的运行任务会恢复为排队中；已完成、失败和取消任务继续保留历史记录。

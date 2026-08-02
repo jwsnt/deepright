@@ -20,7 +20,7 @@ Integration 新增基于 `rembg` 的图片主体提取队列。该队列与 Whis
 - 队列在全部 Agent 间一次只执行一个图片任务，并按创建顺序调度。创建后为 `queued`；当前任务完成、失败或取消后立即继续下一条。取消接口必须同时取消排队任务和终止正在执行的 `rembg` 子进程。
 - 执行状态、进度与标准输出/错误输出须持续写入数据库。任务开始进度为 `0`，仅在成功生成非空 PNG 后置为 `100`；不允许伪造处理中百分比。命令失败、取消或输出无效时不得留下半成品输出文件。
 - 服务重启时，未请求取消的 `running` 任务必须恢复为 `queued` 并追加恢复日志；带取消标记的运行中任务转为 `cancelled`。`completed`、`failed` 与 `cancelled` 历史任务不得自动重复执行。
-- 已取消任务可重新开始，并必须重新分配安全且不冲突的输出路径；失败任务仅可删除当前 Agent 的失败任务记录，删除不得影响源图片、已生成图片或其它任务。
+- 已取消任务可重新开始，并必须重新分配安全且不冲突的输出路径；失败或已取消任务仅可删除当前 Agent 的任务记录，删除不得影响源图片、已生成图片或其它任务。
 - 提供受控 HTTP 接口：`GET /api/rembg/check`、`GET/POST /api/rembg/tasks`、`POST /api/rembg/tasks/cancel`、`POST /api/rembg/tasks/restart`、`POST /api/rembg/tasks/delete`、`GET /api/rembg/tasks/log`。列表支持 `queued`、`running`、`completed`、`cancelled`、`failed` 筛选，固定每页 5 条并返回总数和实际页码；任务接口沿用 `status` / `content` JSON 响应约定，且不得泄漏其它 Agent 的文件信息。
 
 ### 编写代码

@@ -189,11 +189,14 @@ func TestRembgTaskListCancelAndDelete(t *testing.T) {
 	if page.Tasks[0].Model != rembgDefaultModel || page.Tasks[0].AlphaMatting {
 		t.Fatalf("default persisted task options = %#v", page.Tasks[0])
 	}
-	var queuedID, failedID int64
+	var queuedID, failedID, completedID int64
 	if err := db.QueryRow(`SELECT id FROM rembg_task WHERE status=? ORDER BY id LIMIT 1`, rembgTaskQueued).Scan(&queuedID); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.QueryRow(`SELECT id FROM rembg_task WHERE status=?`, rembgTaskFailed).Scan(&failedID); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(`SELECT id FROM rembg_task WHERE status=?`, rembgTaskCompleted).Scan(&completedID); err != nil {
 		t.Fatal(err)
 	}
 	if err := manager.cancelTask("agent-a", queuedID); err != nil {
@@ -208,12 +211,21 @@ func TestRembgTaskListCancelAndDelete(t *testing.T) {
 	if status != rembgTaskCancelled || requested != 1 || !strings.Contains(logs, "已请求取消任务") {
 		t.Fatalf("unexpected cancellation: %q %d %q", status, requested, logs)
 	}
-	if err := manager.deleteFailed("agent-a", failedID); err != nil {
+	if err := manager.deleteFailedOrCancelled("agent-a", failedID); err != nil {
 		t.Fatal(err)
+	}
+	if err := manager.deleteFailedOrCancelled("agent-a", queuedID); err != nil {
+		t.Fatalf("delete cancelled task: %v", err)
 	}
 	var count int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM rembg_task WHERE id=?`, failedID).Scan(&count); err != nil || count != 0 {
 		t.Fatalf("failed task remains: %d %v", count, err)
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM rembg_task WHERE id=?`, queuedID).Scan(&count); err != nil || count != 0 {
+		t.Fatalf("cancelled task remains: %d %v", count, err)
+	}
+	if err := manager.deleteFailedOrCancelled("agent-a", completedID); err == nil {
+		t.Fatal("completed task must not be deletable")
 	}
 }
 
