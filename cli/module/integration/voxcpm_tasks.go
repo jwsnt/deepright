@@ -1013,7 +1013,7 @@ func (m *voxcpmTaskManager) downloadVoxCPM2ModelFile(ctx context.Context, taskID
 		BackupURL:    voxcpmModelBackupFileURL(file.Path),
 		PartPath:     temporaryPath,
 		ExpectedSize: file.Size,
-		IdleTimeout:  voxcpmModelIdleTimeout,
+		IdleTimeout:  modelTaskDownloadReadTimeout(m.cfg),
 		Workers:      modelTaskDownloadWorkers(m.cfg),
 		Retries:      modelTaskDownloadRetries(m.cfg),
 		Progress: func(copied, total int64) {

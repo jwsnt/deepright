@@ -17571,6 +17571,10 @@ type Config struct {
 	// used for one runtime model artifact. It is loaded from
 	// config/config.json.modelTask.download at service startup.
 	ModelTaskDownload int
+	// ModelTaskTimeout controls the no-progress read timeout in seconds for
+	// each runtime-model range part and ordinary download. It is loaded from
+	// config/config.json.modelTask.timeout at service startup.
+	ModelTaskTimeout int
 	// ModelTaskRetry controls retry attempts for each runtime-model download
 	// range part or ordinary download. It is loaded from
 	// config/config.json.modelTask.retry at service startup.
@@ -17860,6 +17864,7 @@ func defaultIntegrationStartupOptions() integrationStartupOptions {
 			SkillExtractRound:         10,
 			ModelTaskConcurrence:      defaultModelTaskConcurrence,
 			ModelTaskDownload:         defaultModelTaskDownload,
+			ModelTaskTimeout:          defaultModelTaskTimeout,
 			ModelTaskRetry:            defaultModelTaskRetry,
 			ScheduledTaskReadTimeout:  defaultScheduledTaskReadTimeout,
 		},

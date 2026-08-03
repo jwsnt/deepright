@@ -914,7 +914,7 @@ func (manager *whisperTaskManager) prepareWhisperRuntimeModel(ctx context.Contex
 		URL:         artifact.OfficialURL,
 		BackupURL:   artifact.BackupURL,
 		PartPath:    temporaryPath,
-		IdleTimeout: whisperModelIdleTimeout,
+		IdleTimeout: modelTaskDownloadReadTimeout(manager.cfg),
 		Workers:     modelTaskDownloadWorkers(manager.cfg),
 		Retries:     modelTaskDownloadRetries(manager.cfg),
 		Progress: func(copied, total int64) {
@@ -974,7 +974,7 @@ func (manager *whisperTaskManager) downloadWhisperLargeV3FromModelScope(ctx cont
 		BackupURL:    whisperOfficialLargeV3URL,
 		PartPath:     temporaryPath,
 		ExpectedSize: whisperLargeV3Size,
-		IdleTimeout:  whisperModelIdleTimeout,
+		IdleTimeout:  modelTaskDownloadReadTimeout(manager.cfg),
 		Workers:      modelTaskDownloadWorkers(manager.cfg),
 		Retries:      modelTaskDownloadRetries(manager.cfg),
 		Progress: func(copied, total int64) {

@@ -722,7 +722,7 @@ func (m *rembgTaskManager) downloadRembgModelFromMirror(ctx context.Context, mod
 		URL:         url,
 		BackupURL:   rembgReleaseAssetBaseURL + artifact.Filename,
 		PartPath:    temporaryPath,
-		IdleTimeout: rembgModelIdleTimeout,
+		IdleTimeout: modelTaskDownloadReadTimeout(m.cfg),
 		Workers:     modelTaskDownloadWorkers(m.cfg),
 		Retries:     modelTaskDownloadRetries(m.cfg),
 		Progress: func(copied, total int64) {

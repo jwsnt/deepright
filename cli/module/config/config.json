@@ -14,7 +14,8 @@
   "modelTask": {
     "concurrence": 1,
     "download": 10,
-    "retry": 3
+    "timeout": 60,
+    "retry": 5
   },
   "ffmpeg": {
     "check": 24,

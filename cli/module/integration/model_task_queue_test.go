@@ -70,6 +70,27 @@ func TestParseModelTaskRetry(t *testing.T) {
 	}
 }
 
+func TestParseModelTaskTimeout(t *testing.T) {
+	timeout, err := parseModelTaskTimeout(map[string]interface{}{
+		"modelTask": map[string]interface{}{"concurrence": 1, "timeout": 60},
+	})
+	if err != nil || timeout != 60 {
+		t.Fatalf("parse timeout = %d, %v", timeout, err)
+	}
+	if timeout, err := parseModelTaskTimeout(map[string]interface{}{"modelTask": map[string]interface{}{"concurrence": 1}}); err != nil || timeout != defaultModelTaskTimeout {
+		t.Fatalf("missing timeout = %d, %v", timeout, err)
+	}
+	for _, raw := range []map[string]interface{}{
+		{"modelTask": map[string]interface{}{"timeout": 0}},
+		{"modelTask": map[string]interface{}{"timeout": "60"}},
+		{"modelTask": 1},
+	} {
+		if _, err := parseModelTaskTimeout(raw); err == nil {
+			t.Fatalf("invalid modelTask.timeout accepted: %#v", raw)
+		}
+	}
+}
+
 func TestSharedModelTaskQueueKeepsOtherTaskQueuedUntilSlotIsAvailable(t *testing.T) {
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {

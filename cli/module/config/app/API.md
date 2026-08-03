@@ -806,7 +806,7 @@ integration api cron detail-status --agentId demo-agent --detailId detail_1 --st
 
 ### Whisper 音频文字提取
 
-适用范围：所有请求都由 Integration 的受控运行环境执行。每个任务使用服务端白名单中的转写场景，默认 `chinese_meeting`（中文会议）；输出写入对应 Agent 工作目录的 `whisper/`。五类媒体任务共用 `config/config.json.modelTask.concurrence` 控制的等待队列，只有取得公共名额才从 `queued` 转为 `running`；默认 `1` 表示同一时刻合计仅执行一个任务。运行时模型或资源下载读取正整数 `config/config.json.modelTask.download` 作为分段数，读取非负整数 `config/config.json.modelTask.retry` 作为每个分段或普通下载失败后的额外重试次数，`0` 表示不重试。下载源支持 HTTP Range 时使用多线程断点续传，不支持时回退普通下载，主源普通下载失败后依次尝试备用源的分段与普通下载。每次下载和重试均有连接响应、无进度和总时限。下载日志记录 Range 检查、回退、源切换、断点恢复、重试、进度与校验结果。任务状态为 `queued`、`running`、`completed`、`cancelled` 或 `failed`。
+适用范围：所有请求都由 Integration 的受控运行环境执行。每个任务使用服务端白名单中的转写场景，默认 `chinese_meeting`（中文会议）；输出写入对应 Agent 工作目录的 `whisper/`。五类媒体任务共用 `config/config.json.modelTask.concurrence` 控制的等待队列，只有取得公共名额才从 `queued` 转为 `running`；默认 `1` 表示同一时刻合计仅执行一个任务。运行时模型或资源下载读取正整数 `config/config.json.modelTask.download` 作为分段数，读取正整数 `config/config.json.modelTask.timeout` 作为每个分段或普通下载的读取无进度超时秒数，读取非负整数 `config/config.json.modelTask.retry` 作为每个分段或普通下载失败后的额外重试次数，`0` 表示不重试。下载源支持 HTTP Range 时使用多线程断点续传，不支持时回退普通下载，主源普通下载失败后依次尝试备用源的分段与普通下载。每次下载和重试均有连接响应、读取无进度和总时限。下载日志记录 Range 检查、回退、源切换、断点恢复、重试、进度与校验结果。任务状态为 `queued`、`running`、`completed`、`cancelled` 或 `failed`。
 
 | 场景 | 标识 | 适用情况 |
 |---|---|---|

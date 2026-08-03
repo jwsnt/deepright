@@ -145,8 +145,11 @@ if not os.path.isfile(_deepright_s3fd):
         _deepright_retries = max(0, int(os.environ.get('DEEPRIGHT_MODEL_DOWNLOAD_RETRY', '3')))
     except ValueError:
         _deepright_retries = 3
-    _deepright_idle_timeout = 90
-    _deepright_socket_timeout = min(30, _deepright_part_timeout)
+    try:
+        _deepright_idle_timeout = max(1, int(os.environ.get('DEEPRIGHT_MODEL_DOWNLOAD_TIMEOUT', '90')))
+    except ValueError:
+        _deepright_idle_timeout = 90
+    _deepright_socket_timeout = min(_deepright_idle_timeout, _deepright_part_timeout)
     _deepright_chunk_size = 4 * 1024 * 1024
     _deepright_sources = (
         ('主下载源', 'https://www.adrianbulat.com/downloads/python-fan/s3fd-619a316812.pth', None),
@@ -1069,7 +1072,7 @@ func (m *wav2lipTaskManager) runWav2Lip(ctx context.Context, id int64, r wav2lip
 	// durable upstream working directory; never inherit a task staging directory
 	// that can be removed after a failed device attempt.
 	cmd.Dir = filepath.Dir(r.Script)
-	cmd.Env = append(os.Environ(), "DEEPRIGHT_WAV2LIP_DEVICE="+device, "DEEPRIGHT_MODEL_TASK_DOWNLOAD="+strconv.Itoa(modelTaskDownloadWorkers(m.cfg)), "DEEPRIGHT_MODEL_DOWNLOAD_RETRY="+strconv.Itoa(modelTaskDownloadRetries(m.cfg)), "DEEPRIGHT_MODEL_DOWNLOAD_PART_TIMEOUT="+strconv.Itoa(int(resumableModelDownloadPartTimeout/time.Second)))
+	cmd.Env = append(os.Environ(), "DEEPRIGHT_WAV2LIP_DEVICE="+device, "DEEPRIGHT_MODEL_TASK_DOWNLOAD="+strconv.Itoa(modelTaskDownloadWorkers(m.cfg)), "DEEPRIGHT_MODEL_DOWNLOAD_TIMEOUT="+strconv.Itoa(int(modelTaskDownloadReadTimeout(m.cfg)/time.Second)), "DEEPRIGHT_MODEL_DOWNLOAD_RETRY="+strconv.Itoa(modelTaskDownloadRetries(m.cfg)), "DEEPRIGHT_MODEL_DOWNLOAD_PART_TIMEOUT="+strconv.Itoa(int(resumableModelDownloadPartTimeout/time.Second)))
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return err

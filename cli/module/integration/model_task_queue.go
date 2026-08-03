@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
 )
 
 const (
 	defaultModelTaskConcurrence = 1
 	defaultModelTaskDownload    = 10
+	defaultModelTaskTimeout     = 90
 	defaultModelTaskRetry       = 3
 )
 
@@ -206,12 +208,51 @@ func parseModelTaskRetry(raw map[string]interface{}) (int, error) {
 	return int(retry), nil
 }
 
+func parseModelTaskTimeout(raw map[string]interface{}) (int, error) {
+	if raw == nil {
+		return defaultModelTaskTimeout, nil
+	}
+	modelTaskRaw, exists := raw["modelTask"]
+	if !exists || modelTaskRaw == nil {
+		return defaultModelTaskTimeout, nil
+	}
+	modelTask, ok := modelTaskRaw.(map[string]interface{})
+	if !ok {
+		return 0, errors.New("config/config.json.modelTask 必须是对象")
+	}
+	timeoutRaw, exists := modelTask["timeout"]
+	if !exists {
+		return defaultModelTaskTimeout, nil
+	}
+	var timeout int64
+	switch value := timeoutRaw.(type) {
+	case json.Number:
+		var err error
+		timeout, err = value.Int64()
+		if err != nil {
+			return 0, errors.New("config/config.json.modelTask.timeout 必须是正整数秒")
+		}
+	case int:
+		timeout = int64(value)
+	case int64:
+		timeout = value
+	default:
+		return 0, errors.New("config/config.json.modelTask.timeout 必须是正整数秒")
+	}
+	maxInt := int64(^uint(0) >> 1)
+	if timeout < 1 || timeout > maxInt {
+		return 0, errors.New("config/config.json.modelTask.timeout 必须是正整数秒")
+	}
+	return int(timeout), nil
+}
+
 func configureModelTaskQueue(cfg *Config) {
 	if cfg == nil {
 		return
 	}
 	concurrence := defaultModelTaskConcurrence
 	download := defaultModelTaskDownload
+	timeout := defaultModelTaskTimeout
 	retry := defaultModelTaskRetry
 	raw, _, err := readIntegrationStartupConfigRaw()
 	if err == nil {
@@ -228,6 +269,12 @@ func configureModelTaskQueue(cfg *Config) {
 		} else {
 			download = configuredDownload
 		}
+		configuredTimeout, timeoutErr := parseModelTaskTimeout(raw)
+		if timeoutErr != nil {
+			log.Printf("[model-task] invalid config/config.json.modelTask.timeout: %v; using %d", timeoutErr, defaultModelTaskTimeout)
+		} else {
+			timeout = configuredTimeout
+		}
 		configuredRetry, retryErr := parseModelTaskRetry(raw)
 		if retryErr != nil {
 			log.Printf("[model-task] invalid config/config.json.modelTask.retry: %v; using %d", retryErr, defaultModelTaskRetry)
@@ -237,9 +284,10 @@ func configureModelTaskQueue(cfg *Config) {
 	}
 	cfg.ModelTaskConcurrence = concurrence
 	cfg.ModelTaskDownload = download
+	cfg.ModelTaskTimeout = timeout
 	cfg.ModelTaskRetry = retry
 	cfg.modelTaskQueue = newModelTaskQueue(concurrence)
-	log.Printf("[model-task] shared queue concurrency: %d; download segments: %d; download retries: %d", concurrence, download, retry)
+	log.Printf("[model-task] shared queue concurrency: %d; download segments: %d; download read timeout: %ds; download retries: %d", concurrence, download, timeout, retry)
 }
 
 func modelTaskDownloadWorkers(cfg *Config) int {
@@ -254,6 +302,13 @@ func modelTaskDownloadRetries(cfg *Config) int {
 		return cfg.ModelTaskRetry
 	}
 	return defaultModelTaskRetry
+}
+
+func modelTaskDownloadReadTimeout(cfg *Config) time.Duration {
+	if cfg != nil && cfg.ModelTaskTimeout > 0 {
+		return time.Duration(cfg.ModelTaskTimeout) * time.Second
+	}
+	return time.Duration(defaultModelTaskTimeout) * time.Second
 }
 
 // reserveModelTaskSlot keeps a queued task in its table until the shared
