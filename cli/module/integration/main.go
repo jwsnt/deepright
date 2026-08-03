@@ -17567,6 +17567,14 @@ type Config struct {
 	// ModelTaskConcurrence limits all local media/model tasks together. It is
 	// loaded from config/config.json.modelTask.concurrence at service startup.
 	ModelTaskConcurrence int
+	// ModelTaskDownload controls the number of HTTP byte-range download parts
+	// used for one runtime model artifact. It is loaded from
+	// config/config.json.modelTask.download at service startup.
+	ModelTaskDownload int
+	// ModelTaskRetry controls retry attempts for each runtime-model download
+	// range part or ordinary download. It is loaded from
+	// config/config.json.modelTask.retry at service startup.
+	ModelTaskRetry int
 	// ScheduledTaskReadTimeout is the SSE body idle timeout used only by
 	// scheduled memo execution. It is intentionally distinct from the cli-get
 	// HTTP timeout fields above, which must not impose a total duration on a
@@ -17851,6 +17859,8 @@ func defaultIntegrationStartupOptions() integrationStartupOptions {
 			PluginExecTimeout:         defaultPluginExecTimeoutMs,
 			SkillExtractRound:         10,
 			ModelTaskConcurrence:      defaultModelTaskConcurrence,
+			ModelTaskDownload:         defaultModelTaskDownload,
+			ModelTaskRetry:            defaultModelTaskRetry,
 			ScheduledTaskReadTimeout:  defaultScheduledTaskReadTimeout,
 		},
 		PIDFile: integrationDefaultPIDFile,

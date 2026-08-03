@@ -605,7 +605,7 @@ func TestWhisperTaskTranscribeUsesSelectedScenario(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{"--model\nbase", "--language\nzh", "--beam_size\n1", "--condition_on_previous_text\nFalse", "--fp16\nFalse"} {
+	for _, expected := range []string{"--model\n", "--language\nzh", "--beam_size\n1", "--condition_on_previous_text\nFalse", "--fp16\nFalse"} {
 		if !strings.Contains(string(args), expected) {
 			t.Fatalf("Whisper arguments missing %q: %s", expected, args)
 		}
@@ -614,7 +614,7 @@ func TestWhisperTaskTranscribeUsesSelectedScenario(t *testing.T) {
 	if err := db.QueryRow(`SELECT logs FROM whisper_task WHERE id=1`).Scan(&logs); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(logs, "本次转写参数") || !strings.Contains(logs, "model=base") || !strings.Contains(logs, "beam_size=1") {
+	if !strings.Contains(logs, "本次转写参数") || !strings.Contains(logs, "model=") || !strings.Contains(logs, "base.pt") || !strings.Contains(logs, "beam_size=1") {
 		t.Fatalf("scenario parameters missing from logs: %q", logs)
 	}
 }

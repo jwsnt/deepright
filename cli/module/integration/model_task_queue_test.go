@@ -28,6 +28,48 @@ func TestParseModelTaskConcurrence(t *testing.T) {
 	}
 }
 
+func TestParseModelTaskDownload(t *testing.T) {
+	download, err := parseModelTaskDownload(map[string]interface{}{
+		"modelTask": map[string]interface{}{"concurrence": 1, "download": 10},
+	})
+	if err != nil || download != 10 {
+		t.Fatalf("parse download = %d, %v", download, err)
+	}
+	if download, err := parseModelTaskDownload(map[string]interface{}{"modelTask": map[string]interface{}{"concurrence": 1}}); err != nil || download != defaultModelTaskDownload {
+		t.Fatalf("missing download = %d, %v", download, err)
+	}
+	for _, raw := range []map[string]interface{}{
+		{"modelTask": map[string]interface{}{"download": 0}},
+		{"modelTask": map[string]interface{}{"download": "10"}},
+		{"modelTask": 1},
+	} {
+		if _, err := parseModelTaskDownload(raw); err == nil {
+			t.Fatalf("invalid modelTask.download accepted: %#v", raw)
+		}
+	}
+}
+
+func TestParseModelTaskRetry(t *testing.T) {
+	retry, err := parseModelTaskRetry(map[string]interface{}{
+		"modelTask": map[string]interface{}{"concurrence": 1, "retry": 3},
+	})
+	if err != nil || retry != 3 {
+		t.Fatalf("parse retry = %d, %v", retry, err)
+	}
+	if retry, err := parseModelTaskRetry(map[string]interface{}{"modelTask": map[string]interface{}{"concurrence": 1}}); err != nil || retry != defaultModelTaskRetry {
+		t.Fatalf("missing retry = %d, %v", retry, err)
+	}
+	for _, raw := range []map[string]interface{}{
+		{"modelTask": map[string]interface{}{"retry": -1}},
+		{"modelTask": map[string]interface{}{"retry": "3"}},
+		{"modelTask": 1},
+	} {
+		if _, err := parseModelTaskRetry(raw); err == nil {
+			t.Fatalf("invalid modelTask.retry accepted: %#v", raw)
+		}
+	}
+}
+
 func TestSharedModelTaskQueueKeepsOtherTaskQueuedUntilSlotIsAvailable(t *testing.T) {
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {

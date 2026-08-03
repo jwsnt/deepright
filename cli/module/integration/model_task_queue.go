@@ -10,7 +10,11 @@ import (
 	"sync"
 )
 
-const defaultModelTaskConcurrence = 1
+const (
+	defaultModelTaskConcurrence = 1
+	defaultModelTaskDownload    = 10
+	defaultModelTaskRetry       = 3
+)
 
 // modelTaskQueue is the single execution gate shared by all local model
 // tasks. A permit is acquired before a task record is moved from queued to
@@ -126,11 +130,89 @@ func parseModelTaskConcurrence(raw map[string]interface{}) (int, error) {
 	return int(concurrence), nil
 }
 
+func parseModelTaskDownload(raw map[string]interface{}) (int, error) {
+	if raw == nil {
+		return defaultModelTaskDownload, nil
+	}
+	modelTaskRaw, exists := raw["modelTask"]
+	if !exists || modelTaskRaw == nil {
+		return defaultModelTaskDownload, nil
+	}
+	modelTask, ok := modelTaskRaw.(map[string]interface{})
+	if !ok {
+		return 0, errors.New("config/config.json.modelTask 必须是对象")
+	}
+	downloadRaw, exists := modelTask["download"]
+	if !exists {
+		return defaultModelTaskDownload, nil
+	}
+	var download int64
+	switch value := downloadRaw.(type) {
+	case json.Number:
+		var err error
+		download, err = value.Int64()
+		if err != nil {
+			return 0, errors.New("config/config.json.modelTask.download 必须是正整数")
+		}
+	case int:
+		download = int64(value)
+	case int64:
+		download = value
+	default:
+		return 0, errors.New("config/config.json.modelTask.download 必须是正整数")
+	}
+	maxInt := int64(^uint(0) >> 1)
+	if download < 1 || download > maxInt {
+		return 0, errors.New("config/config.json.modelTask.download 必须是正整数")
+	}
+	return int(download), nil
+}
+
+func parseModelTaskRetry(raw map[string]interface{}) (int, error) {
+	if raw == nil {
+		return defaultModelTaskRetry, nil
+	}
+	modelTaskRaw, exists := raw["modelTask"]
+	if !exists || modelTaskRaw == nil {
+		return defaultModelTaskRetry, nil
+	}
+	modelTask, ok := modelTaskRaw.(map[string]interface{})
+	if !ok {
+		return 0, errors.New("config/config.json.modelTask 必须是对象")
+	}
+	retryRaw, exists := modelTask["retry"]
+	if !exists {
+		return defaultModelTaskRetry, nil
+	}
+	var retry int64
+	switch value := retryRaw.(type) {
+	case json.Number:
+		var err error
+		retry, err = value.Int64()
+		if err != nil {
+			return 0, errors.New("config/config.json.modelTask.retry 必须是非负整数")
+		}
+	case int:
+		retry = int64(value)
+	case int64:
+		retry = value
+	default:
+		return 0, errors.New("config/config.json.modelTask.retry 必须是非负整数")
+	}
+	maxInt := int64(^uint(0) >> 1)
+	if retry < 0 || retry > maxInt {
+		return 0, errors.New("config/config.json.modelTask.retry 必须是非负整数")
+	}
+	return int(retry), nil
+}
+
 func configureModelTaskQueue(cfg *Config) {
 	if cfg == nil {
 		return
 	}
 	concurrence := defaultModelTaskConcurrence
+	download := defaultModelTaskDownload
+	retry := defaultModelTaskRetry
 	raw, _, err := readIntegrationStartupConfigRaw()
 	if err == nil {
 		concurrence, err = parseModelTaskConcurrence(raw)
@@ -139,9 +221,39 @@ func configureModelTaskQueue(cfg *Config) {
 		log.Printf("[model-task] invalid config/config.json.modelTask.concurrence: %v; using %d", err, defaultModelTaskConcurrence)
 		concurrence = defaultModelTaskConcurrence
 	}
+	if raw != nil {
+		configuredDownload, downloadErr := parseModelTaskDownload(raw)
+		if downloadErr != nil {
+			log.Printf("[model-task] invalid config/config.json.modelTask.download: %v; using %d", downloadErr, defaultModelTaskDownload)
+		} else {
+			download = configuredDownload
+		}
+		configuredRetry, retryErr := parseModelTaskRetry(raw)
+		if retryErr != nil {
+			log.Printf("[model-task] invalid config/config.json.modelTask.retry: %v; using %d", retryErr, defaultModelTaskRetry)
+		} else {
+			retry = configuredRetry
+		}
+	}
 	cfg.ModelTaskConcurrence = concurrence
+	cfg.ModelTaskDownload = download
+	cfg.ModelTaskRetry = retry
 	cfg.modelTaskQueue = newModelTaskQueue(concurrence)
-	log.Printf("[model-task] shared queue concurrency: %d", concurrence)
+	log.Printf("[model-task] shared queue concurrency: %d; download segments: %d; download retries: %d", concurrence, download, retry)
+}
+
+func modelTaskDownloadWorkers(cfg *Config) int {
+	if cfg != nil && cfg.ModelTaskDownload > 0 {
+		return cfg.ModelTaskDownload
+	}
+	return defaultModelTaskDownload
+}
+
+func modelTaskDownloadRetries(cfg *Config) int {
+	if cfg != nil && cfg.ModelTaskRetry >= 0 {
+		return cfg.ModelTaskRetry
+	}
+	return defaultModelTaskRetry
 }
 
 // reserveModelTaskSlot keeps a queued task in its table until the shared

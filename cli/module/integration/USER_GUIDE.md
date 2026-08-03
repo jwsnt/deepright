@@ -3597,11 +3597,11 @@ VoxCPM、Whisper、rembg、Wav2Lip 与 RVM 的重启接口均支持失败和已�
 
 `POST /api/task_help` 接收当前 Agent 的 `agentId`、固定任务类型和任务 ID。服务端验证归属后，将当前日志保存到该 Agent `tmp/` 中的 `<功能名>_YYYYMMDD_HHMMSS.log` 文件；同名时追加安全序号。它每次读取并校验 `config/config.json.seekHelp`，替换 `$function` 和包含日志绝对路径的 `$log` 文件气泡后返回消息文本，前端再将该文本发送至当前会话。
 
-这五类媒体任务还共用 `config/config.json.modelTask.concurrence` 控制的全局等待队列。它是五类任务合计的并发上限，不是每种任务各自的上限；默认 `1` 表示同一时刻只执行一个模型任务。尚未取得名额的任务维持 `queued`，取得名额后才改为 `running`。修改配置后重启 Integration 生效；缺失或非法配置会安全使用 `1`，并在服务日志中记录原因。
+这五类媒体任务还共用 `config/config.json.modelTask.concurrence` 控制的全局等待队列。它是五类任务合计的并发上限，不是每种任务各自的上限；默认 `1` 表示同一时刻只执行一个模型任务。`modelTask.download` 控制单个运行时模型或资源下载的分段数，`modelTask.retry` 控制每个分段或普通下载失败后的额外重试次数，`0` 表示不重试。每次重试都有独立的连接响应、无进度和总时限。尚未取得名额的任务维持 `queued`，取得名额后才改为 `running`。修改配置后重启 Integration 生效；缺失或非法配置会使用安全默认值，并在服务日志中记录原因。
 
 五类任务均已提供 CLI：`integration api whisper|rembg|voxcpm|wav2lip|rvm <check|list|create|cancel|restart|delete|log>`。各功能的 `--help` 列出工作区相对路径参数、模型/场景参数、公共队列语义、状态边界和命令案例；RVM 用 `--path` 与可重复 `--scenario` 创建任务，Wav2Lip 用顺序配对的 `--videoPath` 与 `--audioPath` 创建任务。完整 API 与案例见 `config/app/API.md`。
 
-这五类任务的日志会逐次记录任务目的、实际使用的 Python/CPython 解释器和执行入口/脚本、服务端解析的输入绝对路径、最终输出绝对路径、实际模型/权重和具体参数。下载模型或运行时资源时会记录下载源、准备写入的绝对路径、进度及校验结果；失败结束时会记录具体原因和详细错误输出。
+这五类任务的日志会逐次记录任务目的、实际使用的 Python/CPython 解释器和执行入口/脚本、服务端解析的输入绝对路径、最终输出绝对路径、实际模型/权重和具体参数。下载模型或运行时资源时会先检查 HTTP Range 并使用多线程分段断点续传，不支持时回退普通下载，主源失败后继续尝试备用源；日志会记录检查、回退、源切换、断点恢复、下载源、准备写入的绝对路径、进度及校验结果。失败结束时会记录具体原因和详细错误输出。
 
 完整说明见 [iteration/20260803-1/USER_GUIDE.md](iteration/20260803-1/USER_GUIDE.md)。
 

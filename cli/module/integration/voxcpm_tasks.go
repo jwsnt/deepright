@@ -39,10 +39,11 @@ const (
 	// VoxCPM2 is published by OpenBMB on ModelScope as an official domestic
 	// mirror. The URLs stay overridable in tests, while the production values
 	// intentionally point at the publisher's namespace rather than a proxy.
-	voxcpmDefaultModelScopeFilesURL    = "https://modelscope.cn/api/v1/models/OpenBMB/VoxCPM2/repo/files?Revision=master&Root="
-	voxcpmDefaultModelScopeResolveBase = "https://modelscope.cn/models/OpenBMB/VoxCPM2/resolve/master/"
-	voxcpmModelHeaderTimeout           = 30 * time.Second
-	voxcpmModelIdleTimeout             = 90 * time.Second
+	voxcpmDefaultModelScopeFilesURL     = "https://modelscope.cn/api/v1/models/OpenBMB/VoxCPM2/repo/files?Revision=master&Root="
+	voxcpmDefaultModelScopeResolveBase  = "https://modelscope.cn/models/OpenBMB/VoxCPM2/resolve/master/"
+	voxcpmDefaultHuggingFaceResolveBase = "https://huggingface.co/openbmb/VoxCPM2/resolve/main/"
+	voxcpmModelHeaderTimeout            = 30 * time.Second
+	voxcpmModelIdleTimeout              = 90 * time.Second
 
 	voxcpmScenarioBalanced      = "balanced"
 	voxcpmScenarioQuality       = "quality"
@@ -173,17 +174,18 @@ type voxcpmTaskManager struct {
 }
 
 var (
-	voxcpmTasks                 *voxcpmTaskManager
-	voxcpmLookPath              = exec.LookPath
-	voxcpmCommandContext        = exec.CommandContext
-	voxcpmTaskLookPath          = exec.LookPath
-	voxcpmTaskPreferredDevice   = voxcpmPreferredDevice
-	voxcpmNow                   = time.Now
-	voxcpmHTTPClient            = &http.Client{Transport: &http.Transport{ResponseHeaderTimeout: voxcpmModelHeaderTimeout}}
-	voxcpmUserCacheDir          = os.UserCacheDir
-	voxcpmModelMirrorMu         sync.Mutex
-	voxcpmModelScopeFilesURL    = voxcpmDefaultModelScopeFilesURL
-	voxcpmModelScopeResolveBase = voxcpmDefaultModelScopeResolveBase
+	voxcpmTasks                  *voxcpmTaskManager
+	voxcpmLookPath               = exec.LookPath
+	voxcpmCommandContext         = exec.CommandContext
+	voxcpmTaskLookPath           = exec.LookPath
+	voxcpmTaskPreferredDevice    = voxcpmPreferredDevice
+	voxcpmNow                    = time.Now
+	voxcpmHTTPClient             = &http.Client{Transport: &http.Transport{ResponseHeaderTimeout: voxcpmModelHeaderTimeout}}
+	voxcpmUserCacheDir           = os.UserCacheDir
+	voxcpmModelMirrorMu          sync.Mutex
+	voxcpmModelScopeFilesURL     = voxcpmDefaultModelScopeFilesURL
+	voxcpmModelScopeResolveBase  = voxcpmDefaultModelScopeResolveBase
+	voxcpmHuggingFaceResolveBase = voxcpmDefaultHuggingFaceResolveBase
 	// Kept injectable so task-flow tests can use a tiny local snapshot instead
 	// of downloading the real multi-gigabyte model.
 	voxcpmPrepareLocalModel = func(manager *voxcpmTaskManager, ctx context.Context, taskID int64) (string, error) {
@@ -906,11 +908,19 @@ func voxcpmModelRelativePath(raw string) bool {
 }
 
 func voxcpmModelScopeFileURL(relative string) string {
+	return voxcpmModelFileURL(voxcpmModelScopeResolveBase, relative)
+}
+
+func voxcpmModelBackupFileURL(relative string) string {
+	return voxcpmModelFileURL(voxcpmHuggingFaceResolveBase, relative)
+}
+
+func voxcpmModelFileURL(base, relative string) string {
 	parts := strings.Split(filepath.ToSlash(relative), "/")
 	for index, part := range parts {
 		parts[index] = url.PathEscape(part)
 	}
-	return strings.TrimRight(voxcpmModelScopeResolveBase, "/") + "/" + strings.Join(parts, "/")
+	return strings.TrimRight(base, "/") + "/" + strings.Join(parts, "/")
 }
 
 func voxcpmModelDirectoryAvailable(directory string, files []voxcpmModelScopeFile) bool {
@@ -957,22 +967,32 @@ func (m *voxcpmTaskManager) downloadVoxCPM2FromModelScope(ctx context.Context, t
 		m.appendLog(taskID, "检测到已校验的 ModelScope VoxCPM2 本地缓存，跳过重复下载。")
 		return destination, nil
 	}
+	staging := destination + ".deepright.partial"
 	if _, err := os.Lstat(destination); err == nil {
-		// Preserve an existing user cache rather than deleting it merely because
-		// it is incomplete or belongs to a different revision.
-		destination += "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+		// Preserve an existing incomplete user cache rather than overwriting it.
+		// The deterministic staging path survives a cancelled task and is reused
+		// by a retry, so completed model-file parts are never discarded.
+		if _, stagingErr := os.Stat(staging); errors.Is(stagingErr, os.ErrNotExist) {
+			preserved := destination + ".incomplete-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+			if err := os.Rename(destination, preserved); err != nil {
+				return "", fmt.Errorf("无法保留不完整的 VoxCPM2 模型缓存: %w", err)
+			}
+			m.appendLog(taskID, "已保留未校验的旧 VoxCPM2 缓存："+taskLogAbsolutePath(preserved))
+		}
 	}
 	m.appendLog(taskID, "VoxCPM2 模型下载目标绝对目录："+taskLogAbsolutePath(destination))
-	staging, err := os.MkdirTemp(cacheRoot, ".OpenBMB--VoxCPM2-modelscope-")
-	if err != nil {
+	m.appendLog(taskID, "VoxCPM2 模型将使用多线程分段下载并保留断点；任务取消或网络中断后重新开始会继续未完成分段。")
+	if err := os.MkdirAll(staging, 0o755); err != nil {
 		return "", fmt.Errorf("无法创建 VoxCPM2 模型临时目录: %w", err)
 	}
-	defer os.RemoveAll(staging)
 	for index, file := range files {
 		m.appendLog(taskID, fmt.Sprintf("正在从 ModelScope 下载模型文件（%d/%d）：%s；下载源：%s；最终目标绝对路径：%s", index+1, len(files), file.Path, voxcpmModelScopeFileURL(file.Path), taskLogAbsolutePath(filepath.Join(destination, filepath.FromSlash(file.Path)))))
 		if err := m.downloadVoxCPM2ModelFile(ctx, taskID, staging, file); err != nil {
 			return "", err
 		}
+	}
+	if !voxcpmModelDirectoryAvailable(staging, files) {
+		return "", errors.New("VoxCPM2 模型整体校验失败")
 	}
 	if err := os.Rename(staging, destination); err != nil {
 		return "", fmt.Errorf("无法发布已下载的 VoxCPM2 模型: %w", err)
@@ -985,80 +1005,61 @@ func (m *voxcpmTaskManager) downloadVoxCPM2ModelFile(ctx context.Context, taskID
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return fmt.Errorf("无法创建模型文件目录: %w", err)
 	}
-	downloadCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	idleTimer := time.AfterFunc(voxcpmModelIdleTimeout, cancel)
-	defer idleTimer.Stop()
-	request, err := http.NewRequestWithContext(downloadCtx, http.MethodGet, voxcpmModelScopeFileURL(file.Path), nil)
+	temporaryPath := target + ".deepright.part"
+	lastProgress := int64(-1)
+	_, err := downloadModelWithFallback(ctx, resumableModelDownloadConfig{
+		Client:       voxcpmHTTPClient,
+		URL:          voxcpmModelScopeFileURL(file.Path),
+		BackupURL:    voxcpmModelBackupFileURL(file.Path),
+		PartPath:     temporaryPath,
+		ExpectedSize: file.Size,
+		IdleTimeout:  voxcpmModelIdleTimeout,
+		Workers:      modelTaskDownloadWorkers(m.cfg),
+		Retries:      modelTaskDownloadRetries(m.cfg),
+		Progress: func(copied, total int64) {
+			if total < 10*1024*1024 {
+				return
+			}
+			progress := copied * 100 / total
+			if progress >= 100 || progress/10 > lastProgress/10 {
+				lastProgress = progress
+				m.appendLog(taskID, fmt.Sprintf("ModelScope 文件 %s 已下载 %d%%。", file.Path, progress))
+			}
+		},
+		PartProgress: func(worker, part, parts int, copied, total int64) {
+			if total <= 0 {
+				return
+			}
+			m.appendLog(taskID, fmt.Sprintf("ModelScope 文件 %s 下载线程 %d，分段 %d/%d 已下载 %d%%。", file.Path, worker, part, parts, copied*100/total))
+		},
+		Retry: func(worker, part, parts, retry, retries int, err error) {
+			m.appendLog(taskID, "ModelScope 文件 "+file.Path+" "+modelDownloadRetryMessage(worker, part, parts, retry, retries, err))
+		},
+	}, func(message string) { m.appendLog(taskID, "ModelScope 文件 "+file.Path+"："+message) })
 	if err != nil {
-		return fmt.Errorf("无法创建 ModelScope 文件请求: %w", err)
-	}
-	response, err := voxcpmHTTPClient.Do(request)
-	if err != nil {
-		if ctx.Err() == nil && downloadCtx.Err() != nil {
-			return fmt.Errorf("下载 ModelScope 文件 %s 超过 %s 没有进度", file.Path, voxcpmModelIdleTimeout)
-		}
 		return fmt.Errorf("下载 ModelScope 文件 %s 失败: %w", file.Path, err)
 	}
-	defer response.Body.Close()
-	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return fmt.Errorf("下载 ModelScope 文件 %s 返回 HTTP %d", file.Path, response.StatusCode)
-	}
-	temporary, err := os.CreateTemp(filepath.Dir(target), "."+filepath.Base(target)+".part-")
+	input, err := os.Open(temporaryPath)
 	if err != nil {
-		return fmt.Errorf("无法创建模型文件临时文件: %w", err)
+		return fmt.Errorf("无法读取模型文件 %s: %w", file.Path, err)
 	}
-	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
 	hash := sha256.New()
-	buffer := make([]byte, 1024*1024)
-	var copied int64
-	nextProgress := int64(10)
-	for {
-		count, readErr := response.Body.Read(buffer)
-		if count > 0 {
-			if !idleTimer.Stop() && downloadCtx.Err() != nil && ctx.Err() == nil {
-				_ = temporary.Close()
-				return fmt.Errorf("下载 ModelScope 文件 %s 超过 %s 没有进度", file.Path, voxcpmModelIdleTimeout)
-			}
-			idleTimer.Reset(voxcpmModelIdleTimeout)
-			if _, err := hash.Write(buffer[:count]); err != nil {
-				_ = temporary.Close()
-				return fmt.Errorf("校验模型文件 %s 失败: %w", file.Path, err)
-			}
-			if _, err := temporary.Write(buffer[:count]); err != nil {
-				_ = temporary.Close()
-				return fmt.Errorf("保存模型文件 %s 失败: %w", file.Path, err)
-			}
-			copied += int64(count)
-			if file.Size >= 10*1024*1024 && copied*100 >= file.Size*nextProgress {
-				m.appendLog(taskID, fmt.Sprintf("ModelScope 文件 %s 已下载 %d%%。", file.Path, nextProgress))
-				nextProgress += 10
-			}
-		}
-		if readErr == io.EOF {
-			break
-		}
-		if readErr != nil {
-			_ = temporary.Close()
-			if ctx.Err() == nil && downloadCtx.Err() != nil {
-				return fmt.Errorf("下载 ModelScope 文件 %s 超过 %s 没有进度", file.Path, voxcpmModelIdleTimeout)
-			}
-			return fmt.Errorf("读取 ModelScope 文件 %s 失败: %w", file.Path, readErr)
-		}
+	if _, err := io.Copy(hash, input); err != nil {
+		_ = input.Close()
+		return fmt.Errorf("校验模型文件 %s 失败: %w", file.Path, err)
 	}
-	if err := temporary.Close(); err != nil {
+	if err := input.Close(); err != nil {
 		return fmt.Errorf("关闭模型文件 %s 失败: %w", file.Path, err)
 	}
-	if copied != file.Size {
-		return fmt.Errorf("ModelScope 文件 %s 大小校验失败（得到 %d，预期 %d）", file.Path, copied, file.Size)
-	}
 	if actual := fmt.Sprintf("%x", hash.Sum(nil)); actual != file.SHA256 {
+		_ = os.Remove(temporaryPath)
+		removeModelDownloadState(temporaryPath)
 		return fmt.Errorf("ModelScope 文件 %s SHA-256 校验失败", file.Path)
 	}
 	if err := os.Rename(temporaryPath, target); err != nil {
 		return fmt.Errorf("写入模型文件 %s 失败: %w", file.Path, err)
 	}
+	removeModelDownloadState(temporaryPath)
 	return nil
 }
 

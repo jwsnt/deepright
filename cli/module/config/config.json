@@ -12,31 +12,33 @@
     "cache": 120
   },
   "modelTask": {
-    "concurrence": 1
+    "concurrence": 1,
+    "download": 10,
+    "retry": 3
   },
   "ffmpeg": {
     "check": 24,
-    "install": "请先检测当前操作系统、CPU 架构与可用包管理器。必须安装当前稳定版 `FFmpeg 8.1.2`，不得使用开发版、其他版本或来源不明的二进制。使用该系统的可信包源或官方发行包安装，并确保安装包同时提供 ffmpeg 与 ffprobe。安装后执行 `ffmpeg -version` 和 `ffprobe -version`，确认二者均可由当前服务环境找到并运行，且版本为 8.1.2。若安装或验证失败，请改用可信来源提供的 FFmpeg 8.1.2 发行包后重试。最后输出安装来源、FFmpeg 最终版本、两个可执行文件的绝对路径与验证结果。"
+    "install": "检测系统、CPU架构与包管理器。安装稳定版`FFmpeg 8.1.2`，不得使用开发版、其他版本或来源不明的二进制。官方源`https://ffmpeg.org/download.html`，安装包必须提供ffmpeg与ffprobe。官方安装或验证失败时，回退国内源`https://mirrors.tuna.tsinghua.edu.cn/`中匹配系统和架构的FFmpeg 8.1.2包。执行`ffmpeg -version`和`ffprobe -version`验证。输出实际下载地址、版本、可执行文件绝对路径与结果。"
   },
   "whisper": {
     "check": 24,
-    "install": "请先定位可执行的 `python3`，记录其绝对路径为 `$PYTHON`。不得假设 `python`、`python3.x` 或其他 Python 命令存在。所有 Python 依赖统一使用 CPython 3.11（`>=3.11,<3.12`）；检测当前操作系统、CPU 架构、`$PYTHON` 的版本与实现、pip 以及 CUDA、ROCm、MPS、CPU 的可用性。必须固定安装统一的 `torch==2.5.1` 与 `openai-whisper==20250625`。先验证 `$PYTHON` 为兼容的 CPython 3.11。若不满足，必须自行使用当前操作系统可用的包管理器或官方安装方式安装/升级 CPython 3.11。根据安装结果定位候选解释器，验证其版本、实现与 pip 后，才可将其绝对路径重新记录为 `$PYTHON` 并继续。不得在未验证或不兼容的 Python 中安装或运行，也不得仅报告版本不满足而停止。仅使用 `$PYTHON -m pip` 安装，避免混用系统 Python、虚拟环境和不同加速器的 wheel。安装后使用同一解释器导入 torch 与 whisper，有 CUDA 或 MPS 时在对应设备实际加载 Whisper base，无可用加速器时在 CPU 加载，并完成一次最小推理。若安装或验证失败，请根据报错在当前已验证的 `$PYTHON` 内调整兼容的安装来源或 CPU 后端后重试。不得改用其他 torch 或 openai-whisper 版本。最后输出 Python 可执行文件与版本、`torch==2.5.1`、`openai-whisper==20250625`、加速后端与验证结果。"
+    "install": "定位兼容的CPython 3.11，记录绝对路径为`$PYTHON`。官方Python源`https://www.python.org/downloads/`，官方PyPI源`https://pypi.org/simple`。仅用`$PYTHON -m pip`固定安装`torch==2.5.1`和`openai-whisper==20250625`。官方安装失败时，Python回退`https://mirrors.tuna.tsinghua.edu.cn/python/`，pip回退`https://pypi.tuna.tsinghua.edu.cn/simple`，版本不得改变。用同一解释器导入torch和whisper，在可用加速器或CPU加载Whisper base并完成最小推理。输出实际下载地址、解释器、包版本、后端与结果。"
   },
   "voxcpm": {
     "check": 24,
-    "install": "请先定位可执行的 `python3`，记录其绝对路径为 `$PYTHON`。不得假设 `python`、`python3.x` 或其他 Python 命令存在。所有 Python 依赖统一使用 CPython 3.11（`>=3.11,<3.12`）与 `torch==2.5.1`；检测当前操作系统、CPU 架构、`$PYTHON` 的版本与实现以及 CUDA、ROCm、MPS、CPU 的可用性。本功能依赖 VoxCPM2 的 `design`、`--control` 与 `--device mps` 接口，必须固定安装 `voxcpm==2.0.3`，不得降级至 2.0.2 或更早版本，也不得盲目安装其他版本。该统一版本高于 VoxCPM 所需的 Python >= 3.10 和 PyTorch >= 2.5.0。若 `$PYTHON` 不是兼容的 CPython 3.11，必须自行使用当前操作系统可用的包管理器或官方安装方式安装/升级 CPython 3.11。根据安装结果定位候选解释器，验证其版本、实现与 pip 后，才可将其绝对路径重新记录为 `$PYTHON` 并继续。不得在未验证或不兼容的 Python 中安装或运行，也不得仅报告版本不满足而停止。仅使用 `$PYTHON -m pip` 固定安装 `torch==2.5.1` 与 `voxcpm==2.0.3`，并确保 `voxcpm` 命令由该同一解释器环境提供，而非其他 Python、conda 或全局 PATH 中的同名命令。安装后确认 `$PYTHON` 可导入 VoxCPM，`voxcpm --help` 显示 `design`、`--control` 与 `--device`，且命令脚本的 shebang 或安装位置与目标环境一致。如硬件可用则使用对应设备完成一次最小推理。若安装或验证失败，不得回退到不支持上述接口的 VoxCPM 版本；应在当前已验证的 `$PYTHON` 内重试统一的 PyTorch 或 CPU 后端。最后输出 Python 可执行文件与版本、`voxcpm==2.0.3`、`torch==2.5.1`、`voxcpm` 绝对路径、加速后端与验证结果。"
+    "install": "定位兼容的CPython 3.11，记录绝对路径为`$PYTHON`。官方Python源`https://www.python.org/downloads/`，官方PyPI源`https://pypi.org/simple`，VoxCPM2官方模型源`https://huggingface.co/openbmb/VoxCPM2`。仅用`$PYTHON -m pip`固定安装`torch==2.5.1`和`voxcpm==2.0.3`。官方安装失败时，Python回退`https://mirrors.tuna.tsinghua.edu.cn/python/`，pip回退`https://pypi.tuna.tsinghua.edu.cn/simple`，模型回退`https://modelscope.cn/models/OpenBMB/VoxCPM2`，版本不得改变。确认`$PYTHON`可导入VoxCPM，`voxcpm --help`显示`design`、`--control`和`--device`，并完成最小推理。输出实际下载地址、解释器、包版本、模型源、后端与结果。"
   },
   "wav2lip": {
     "check": 24,
-    "install": "请先定位可执行的 `python3`，记录其绝对路径为 `$PYTHON`。不得假设 `python`、`python3.x` 或其他 Python 命令存在。所有 Python 依赖统一使用 CPython 3.11（`>=3.11,<3.12`）、`torch==2.5.1` 与其匹配的 `torchvision==0.20.1`；检测当前操作系统、CPU 架构、`$PYTHON` 的版本与实现以及 CUDA、ROCm、MPS、CPU 的可用性。官方 Wav2Lip 仓库没有发行标签，必须从可信官方源检出当前提交 `Rudrabha/Wav2Lip@bac9a81e63ecc153202353372e5724b83d9e6322`。若 `$PYTHON` 不是兼容的 CPython 3.11，必须自行使用当前操作系统可用的包管理器或官方安装方式安装/升级 CPython 3.11。根据安装结果定位候选解释器，验证其版本、实现与 pip 后，才可将其绝对路径重新记录为 `$PYTHON` 并继续。不得在未验证或不兼容的 Python 中安装或运行，也不得仅报告版本不满足而停止。仅使用 `$PYTHON -m pip` 固定安装 `torch==2.5.1` 与 `torchvision==0.20.1` 及其他依赖，从官方来源取得 `wav2lip_gan.pth` 权重，并完整存放至`$workspace/wav2lip`，不得替换为不兼容的同名项目或空文件。安装后使用同一解释器执行 `inference.py --help`，确认`$workspace/wav2lip/inference.py`与`$workspace/wav2lip/checkpoints/wav2lip_gan.pth`均存在且为非空常规文件，并在可用设备上完成一次最小推理。若安装或验证失败，请根据报错在当前已验证的 `$PYTHON` 内重试统一的 PyTorch 或 CPU 后端。不得改用其他代码、torch 或 torchvision 版本。最后输出 Python 可执行文件与版本、Wav2Lip 提交号、`torch==2.5.1`、`torchvision==0.20.1`、权重路径、实际设备与验证结果。"
+    "install": "定位兼容的CPython 3.11，记录绝对路径为`$PYTHON`。官方Python源`https://www.python.org/downloads/`，官方PyPI源`https://pypi.org/simple`。固定安装`torch==2.5.1`和`torchvision==0.20.1`。官方代码源`https://github.com/Rudrabha/Wav2Lip.git`，固定提交`bac9a81e63ecc153202353372e5724b83d9e6322`，官方权重说明`https://github.com/Rudrabha/Wav2Lip#pre-trained-models`。官方安装失败时，Python回退`https://mirrors.tuna.tsinghua.edu.cn/python/`，pip回退`https://pypi.tuna.tsinghua.edu.cn/simple`，代码回退`https://ghproxy.net/https://github.com/Rudrabha/Wav2Lip.git`，权重回退`https://hf-mirror.com/camenduru/Wav2Lip/resolve/main/checkpoints/wav2lip_gan.pth`。权重写入`$workspace/wav2lip/checkpoints/wav2lip_gan.pth`。用同一解释器执行`inference.py --help`并完成最小推理。输出实际下载地址、提交号、包版本、权重路径、设备与结果。"
   },
   "rembg": {
     "check": 24,
-    "install": "请先定位可执行的 `python3`，记录其绝对路径为 `$PYTHON`。不得假设 `python`、`python3.x` 或其他 Python 命令存在。所有 Python 依赖统一使用 CPython 3.11（`>=3.11,<3.12`）；立即验证 `$PYTHON` 的版本与实现。`rembg==2.0.77` 要求 Python `>=3.11,<4.0`，统一的 CPython 3.11 满足该要求。若当前 `$PYTHON` 不是兼容的 CPython 3.11，必须自行使用当前操作系统可用的包管理器或官方安装方式安装/升级 CPython 3.11。根据安装结果定位候选解释器，验证其版本、实现与 pip 后，才可将该解释器的绝对路径重新记录为 `$PYTHON`。不得在未验证版本的解释器中安装或运行 rembg，也不得以其他 Python 版本继续尝试。随后检测当前操作系统、CPU 架构、`$PYTHON` 的 pip 以及 CUDA、ROCm、MPS、CPU 的可用性。必须固定安装 `rembg==2.0.77`，并按推理后端固定安装 `onnxruntime==1.28.0` 或 `onnxruntime-gpu==1.28.0`。仅使用 `$PYTHON -m pip` 安装，避免把命令装到其他 Python 环境。安装后确认 `$PYTHON` 可导入 rembg，`$PYTHON -m rembg --help` 可运行。再定位 rembg 二进制的绝对路径，确认它属于目标环境并可执行 `--help`，最后对一张小型本地图片完成一次真实去背景。若安装或验证失败，请根据报错在当前已验证的 `$PYTHON` 内调整匹配该固定版本的安装来源或 CPU 后端后重试。Python 版本不满足时必须先升级至 CPython 3.11。不得改用其他 rembg 或 onnxruntime 版本。最后输出 Python 可执行文件与版本、`rembg==2.0.77`、实际安装的 `onnxruntime==1.28.0` 或 `onnxruntime-gpu==1.28.0`、`rembg` 绝对路径、加速后端与验证结果。"
+    "install": "定位兼容的CPython 3.11，记录绝对路径为`$PYTHON`。官方Python源`https://www.python.org/downloads/`，官方PyPI源`https://pypi.org/simple`。仅用`$PYTHON -m pip`固定安装`rembg==2.0.77`和`onnxruntime==1.28.0`或`onnxruntime-gpu==1.28.0`。官方安装失败时，Python回退`https://mirrors.tuna.tsinghua.edu.cn/python/`，pip回退`https://pypi.tuna.tsinghua.edu.cn/simple`。官方模型源`https://github.com/danielgatis/rembg/releases/download/v0.0.0/`失败后回退`https://ghproxy.net/https://github.com/danielgatis/rembg/releases/download/v0.0.0/`。确认`$PYTHON`可导入rembg，`$PYTHON -m rembg --help`可运行，并完成小图去背景。输出实际下载地址、解释器、包版本、rembg路径、后端与结果。"
   },
   "rvm": {
     "check": 24,
-    "install": "请先定位可执行的 `python3`，记录其绝对路径为 `$PYTHON`。不得假设 `python`、`python3.x` 或其他 Python 命令存在。所有 Python 依赖统一使用 CPython 3.11（`>=3.11,<3.12`）、`torch==2.5.1` 与其匹配的 `torchvision==0.20.1`；检测当前操作系统、CPU 架构、`$PYTHON` 的版本与实现以及 CUDA、ROCm、MPS、CPU 的可用性。必须从可信官方源获取最新正式版 `PeterL1n/RobustVideoMatting v1.0.0`。若 `$PYTHON` 不是兼容的 CPython 3.11，必须自行使用当前操作系统可用的包管理器或官方安装方式安装/升级 CPython 3.11。根据安装结果定位候选解释器，验证其版本、实现与 pip 后，才可将其绝对路径重新记录为 `$PYTHON` 并继续。不得在未验证或不兼容的 Python 中安装或运行，也不得仅报告版本不满足而停止。仅使用 `$PYTHON -m pip` 固定安装 `torch==2.5.1` 与 `torchvision==0.20.1` 及其他依赖，从官方来源取得 `rvm_mobilenetv3.pth` 权重，并完整存放至`$workspace/rvm`，不得替换为不兼容的同名项目或空文件。安装后使用同一解释器执行 `inference.py --help`，确认`$workspace/rvm/inference.py`与`$workspace/rvm/weights/rvm_mobilenetv3.pth`均存在且为非空常规文件，并在可用设备上完成一次最小推理。若安装或验证失败，请根据报错在当前已验证的 `$PYTHON` 内重试统一的 PyTorch 或 CPU 后端。不得改用其他 RVM、torch 或 torchvision 版本。最后输出 Python 可执行文件与版本、`RobustVideoMatting v1.0.0`、`torch==2.5.1`、`torchvision==0.20.1`、权重路径、实际设备与验证结果。"
+    "install": "定位兼容的CPython 3.11，记录绝对路径为`$PYTHON`。官方Python源`https://www.python.org/downloads/`，官方PyPI源`https://pypi.org/simple`。固定安装`torch==2.5.1`和`torchvision==0.20.1`。官方代码源`https://github.com/PeterL1n/RobustVideoMatting.git`，固定版本`v1.0.0`。官方安装失败时，Python回退`https://mirrors.tuna.tsinghua.edu.cn/python/`，pip回退`https://pypi.tuna.tsinghua.edu.cn/simple`，代码回退`https://ghproxy.net/https://github.com/PeterL1n/RobustVideoMatting.git`，权重回退`https://hf-mirror.com/DJ02-a/video_matting_RVM/resolve/main/rvm_mobilenetv3.pth`。权重写入`$workspace/rvm/weights/rvm_mobilenetv3.pth`。用同一解释器执行`inference.py --help`并完成最小推理。输出实际下载地址、版本、包版本、权重路径、设备与结果。"
   },
   "test": {
     "content": "Hello World",
@@ -81,7 +83,7 @@
   },
   "install_app": {
     "interval": 60,
-    "content": "请安装 $namelist",
+    "content": "请安装 $namelist。官方源优先，失败时使用国内源回退",
     "linux": [
       "python3",
       "node",

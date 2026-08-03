@@ -334,7 +334,7 @@ func rvmRuntimeForStartup(cacheFor time.Duration, cfg *Config) (rvmRuntime, bool
 func rvmInstallRequest(template, workspace string) string {
 	request := strings.ReplaceAll(template, "$workspace", workspace)
 	checkpoint := filepath.Join(workspace, "rvm", "weights", "rvm_mobilenetv3.pth")
-	return request + "\n\n模型下载要求：优先从国内镜像 `" + rvmDomesticCheckpointURL + "` 下载 `rvm_mobilenetv3.pth` 到 `" + checkpoint + "`，下载连接超时最多 30 秒、连续 90 秒无字节进度必须终止并报告。完成后校验 SHA-256 必须为 `" + rvmDomesticCheckpointSHA256 + "`；镜像失败时才可改用官方发布源，并继续执行相同的超时与校验。"
+	return request + "\n\n模型下载要求：先按配置中的官方权重地址下载 `rvm_mobilenetv3.pth` 到 `" + checkpoint + "`。官方源失败后回退国内源 `" + rvmDomesticCheckpointURL + "`。下载连接超时最多 30 秒，连续 90 秒无字节进度必须终止并报告。完成后校验 SHA-256 必须为 `" + rvmDomesticCheckpointSHA256 + "`。"
 }
 
 func rvmWorkspaceForRequest(cfg *Config, agentID string) (string, string, error) {

@@ -65,12 +65,17 @@ import os
 import sys
 import socket
 import hashlib
+import json
+import concurrent.futures
+import threading
+import time
 import urllib.request
 
 # The upstream S3FD detector downloads its checkpoint through urllib on first
 # use. Bound a stalled socket so a missing download never leaves a task running
-# indefinitely without producing output.
-socket.setdefaulttimeout(90)
+# indefinitely without producing output. The downloader below additionally
+# applies a per-part total and no-progress deadline.
+socket.setdefaulttimeout(30)
 
 # Wav2Lip's older dependency pins pre-date NumPy 1.24, which removed these
 # aliases. Restore them only for this child process before librosa imports.
@@ -120,52 +125,216 @@ if script_dir not in sys.path:
 os.chdir(script_dir)
 
 # Wav2Lip otherwise lets face_detection download S3FD lazily from a single
-# overseas URL. Populate its documented local file location ourselves: first
-# try the original publisher, then the domestic HF mirror. The latter is
-# pinned to its published SHA-256 before it is made visible to inference.
+# overseas URL. Populate its documented local file location ourselves. Every
+# source first uses HTTP Range parts and falls back to one ordinary transfer
+# only when Range is unavailable or that transfer fails. A failed primary then
+# repeats the same order with the domestic backup source.
 _deepright_s3fd = os.path.join(script_dir, 'face_detection', 'detection', 'sfd', 's3fd.pth')
 if not os.path.isfile(_deepright_s3fd):
     _deepright_tmp = _deepright_s3fd + '.deepright-part'
+    _deepright_state = _deepright_tmp + '.json'
+    try:
+        _deepright_workers = max(1, int(os.environ.get('DEEPRIGHT_MODEL_TASK_DOWNLOAD', '10')))
+    except ValueError:
+        _deepright_workers = 10
+    try:
+        _deepright_part_timeout = max(1, int(os.environ.get('DEEPRIGHT_MODEL_DOWNLOAD_PART_TIMEOUT', '900')))
+    except ValueError:
+        _deepright_part_timeout = 900
+    try:
+        _deepright_retries = max(0, int(os.environ.get('DEEPRIGHT_MODEL_DOWNLOAD_RETRY', '3')))
+    except ValueError:
+        _deepright_retries = 3
+    _deepright_idle_timeout = 90
+    _deepright_socket_timeout = min(30, _deepright_part_timeout)
+    _deepright_chunk_size = 4 * 1024 * 1024
     _deepright_sources = (
-        ('官方源', 'https://www.adrianbulat.com/downloads/python-fan/s3fd-619a316812.pth', None),
-        ('国内镜像', 'https://hf-mirror.com/irishavmishra/s3fd-face-detector/resolve/main/sfd_face.pth', 'd54a87c2b7543b64729c9a25eafd188da15fd3f6e02f0ecec76ae1b30d86c491'),
+        ('主下载源', 'https://www.adrianbulat.com/downloads/python-fan/s3fd-619a316812.pth', None),
+        ('备用下载源', 'https://hf-mirror.com/irishavmishra/s3fd-face-detector/resolve/main/sfd_face.pth', 'd54a87c2b7543b64729c9a25eafd188da15fd3f6e02f0ecec76ae1b30d86c491'),
     )
+
+    def _deepright_range_size(url):
+        request = urllib.request.Request(url, headers={'Range': 'bytes=0-0'})
+        with urllib.request.urlopen(request, timeout=_deepright_socket_timeout) as response:
+            content_range = response.headers.get('Content-Range') or ''
+            if response.getcode() != 206 or '/' not in content_range:
+                return None
+            try:
+                return int(content_range.rsplit('/', 1)[1])
+            except ValueError:
+                return None
+
+    def _deepright_save_state(state):
+        temporary = _deepright_state + '.new'
+        with open(temporary, 'w', encoding='utf-8') as file:
+            json.dump(state, file)
+        os.replace(temporary, _deepright_state)
+
+    def _deepright_range_download(url, total):
+        chunks = (total + _deepright_chunk_size - 1) // _deepright_chunk_size
+        if chunks < 2:
+            return False
+        state = {'url': url, 'size': total, 'chunks': [False] * chunks}
+        try:
+            with open(_deepright_state, 'r', encoding='utf-8') as file:
+                stored = json.load(file)
+            if stored.get('url') == url and stored.get('size') == total and len(stored.get('chunks', [])) == chunks:
+                state = stored
+            else:
+                os.remove(_deepright_tmp)
+        except FileNotFoundError:
+            pass
+        except Exception:
+            try:
+                os.remove(_deepright_tmp)
+            except FileNotFoundError:
+                pass
+        with open(_deepright_tmp, 'a+b') as file:
+            file.truncate(total)
+        _deepright_save_state(state)
+        copied = sum(min(_deepright_chunk_size, total - index * _deepright_chunk_size) for index, complete in enumerate(state['chunks']) if complete)
+        next_percent = (copied * 100 // total // 10 + 1) * 10
+        lock = threading.Lock()
+        thread_ids = {}
+        thread_ids_lock = threading.Lock()
+        def thread_id():
+            ident = threading.get_ident()
+            with thread_ids_lock:
+                if ident not in thread_ids:
+                    thread_ids[ident] = len(thread_ids) + 1
+                return thread_ids[ident]
+        def download_part(index):
+            worker = thread_id()
+            start = index * _deepright_chunk_size
+            end = min(total - 1, start + _deepright_chunk_size - 1)
+            part_total = end - start + 1
+            last_error = None
+            for retry in range(_deepright_retries + 1):
+                if retry > 0:
+                    print('Wav2Lip S3FD 下载线程 %d，分段 %d/%d 第 %d 次重试（最多 %d 次）：%s' % (worker, index + 1, chunks, retry, _deepright_retries, last_error), flush=True)
+                try:
+                    started_at = time.monotonic()
+                    last_progress_at = started_at
+                    part_copied = 0
+                    part_next_percent = 10
+                    request = urllib.request.Request(url, headers={'Range': 'bytes=%d-%d' % (start, end)})
+                    with urllib.request.urlopen(request, timeout=_deepright_socket_timeout) as response:
+                        if response.getcode() != 206:
+                            raise RuntimeError('分段请求返回 HTTP %s' % response.getcode())
+                        with open(_deepright_tmp, 'r+b') as file:
+                            file.seek(start)
+                            while True:
+                                now = time.monotonic()
+                                if now - started_at >= _deepright_part_timeout:
+                                    raise RuntimeError('下载线程 %d 的分段 %d 超过总时限 %d 秒' % (worker, index + 1, _deepright_part_timeout))
+                                if now - last_progress_at >= _deepright_idle_timeout:
+                                    raise RuntimeError('下载线程 %d 的分段 %d 超过 %d 秒没有进度' % (worker, index + 1, _deepright_idle_timeout))
+                                data = response.read(256 * 1024)
+                                if not data:
+                                    break
+                                file.write(data)
+                                part_copied += len(data)
+                                last_progress_at = time.monotonic()
+                                while part_copied * 100 >= part_total * part_next_percent and part_next_percent <= 100:
+                                    print('Wav2Lip S3FD 下载线程 %d，分段 %d/%d 已下载 %d%%。' % (worker, index + 1, chunks, part_next_percent), flush=True)
+                                    part_next_percent += 10
+                    if part_copied != part_total:
+                        raise RuntimeError('分段大小不正确')
+                    return index, part_copied
+                except Exception as error:
+                    last_error = error
+                    if retry == _deepright_retries:
+                        raise
+        pending = [index for index, complete in enumerate(state['chunks']) if not complete]
+        if not pending:
+            return True
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(_deepright_workers, len(pending))) as pool:
+            for index, size in pool.map(download_part, pending):
+                with lock:
+                    state['chunks'][index] = True
+                    copied += size
+                    _deepright_save_state(state)
+                    progress = copied * 100 // total
+                    while progress >= next_percent and next_percent <= 100:
+                        print('Wav2Lip S3FD 人脸检测模型已下载 %d%%。' % next_percent, flush=True)
+                        next_percent += 10
+        return True
+
+    def _deepright_plain_download(url):
+        try:
+            os.remove(_deepright_state)
+        except FileNotFoundError:
+            pass
+        last_error = None
+        for retry in range(_deepright_retries + 1):
+            if retry > 0:
+                print('Wav2Lip S3FD 普通下载第 %d 次重试（最多 %d 次）：%s' % (retry, _deepright_retries, last_error), flush=True)
+            try:
+                started_at = time.monotonic()
+                last_progress_at = started_at
+                with urllib.request.urlopen(url, timeout=_deepright_socket_timeout) as response, open(_deepright_tmp, 'wb') as file:
+                    total = int(response.headers.get('Content-Length') or 0)
+                    copied = 0
+                    next_percent = 10
+                    next_bytes = 10 * 1024 * 1024
+                    while True:
+                        now = time.monotonic()
+                        if now - started_at >= _deepright_part_timeout:
+                            raise RuntimeError('普通下载超过总时限 %d 秒' % _deepright_part_timeout)
+                        if now - last_progress_at >= _deepright_idle_timeout:
+                            raise RuntimeError('普通下载超过 %d 秒没有进度' % _deepright_idle_timeout)
+                        data = response.read(1024 * 1024)
+                        if not data:
+                            break
+                        file.write(data)
+                        copied += len(data)
+                        last_progress_at = time.monotonic()
+                        if total > 0:
+                            while copied * 100 >= total * next_percent and next_percent <= 100:
+                                print('Wav2Lip S3FD 人脸检测模型已下载 %d%%。' % next_percent, flush=True)
+                                next_percent += 10
+                        elif copied >= next_bytes:
+                            print('Wav2Lip S3FD 人脸检测模型已下载 %d MiB（下载源未提供总大小）。' % (copied // (1024 * 1024)), flush=True)
+                            next_bytes = copied + 10 * 1024 * 1024
+                return
+            except Exception as error:
+                last_error = error
+                if retry == _deepright_retries:
+                    raise
+
     _deepright_errors = []
     for _deepright_name, _deepright_url, _deepright_sha256 in _deepright_sources:
         try:
             print('正在从%s下载 Wav2Lip S3FD 人脸检测模型。下载源：%s；下载目标绝对路径：%s' % (_deepright_name, _deepright_url, _deepright_s3fd), flush=True)
-            with urllib.request.urlopen(_deepright_url) as _deepright_response, open(_deepright_tmp, 'wb') as _deepright_file:
-                _deepright_total = int(_deepright_response.headers.get('Content-Length') or 0)
-                _deepright_copied = 0
-                _deepright_next_percent = 10
-                _deepright_next_bytes = 10 * 1024 * 1024
-                while True:
-                    _deepright_chunk = _deepright_response.read(1024 * 1024)
-                    if not _deepright_chunk:
-                        break
-                    _deepright_file.write(_deepright_chunk)
-                    _deepright_copied += len(_deepright_chunk)
-                    if _deepright_total > 0:
-                        while _deepright_copied * 100 >= _deepright_total * _deepright_next_percent and _deepright_next_percent <= 100:
-                            print('Wav2Lip S3FD 人脸检测模型已下载 %d%%。' % _deepright_next_percent, flush=True)
-                            _deepright_next_percent += 10
-                    elif _deepright_copied >= _deepright_next_bytes:
-                        print('Wav2Lip S3FD 人脸检测模型已下载 %d MiB（下载源未提供总大小）。' % (_deepright_copied // (1024 * 1024)), flush=True)
-                        _deepright_next_bytes = _deepright_copied + 10 * 1024 * 1024
+            _deepright_total = _deepright_range_size(_deepright_url)
+            if _deepright_total is None:
+                print('%s 不支持 HTTP Range，回退到普通下载。' % _deepright_name, flush=True)
+                _deepright_plain_download(_deepright_url)
+            else:
+                print('%s 支持 HTTP Range，使用 %d 路分段断点续传。' % (_deepright_name, _deepright_workers), flush=True)
+                try:
+                    if not _deepright_range_download(_deepright_url, _deepright_total):
+                        print('%s 文件较小，回退到普通下载。' % _deepright_name, flush=True)
+                        _deepright_plain_download(_deepright_url)
+                except Exception as _deepright_range_error:
+                    print('%s 多线程断点续传失败：%s；回退到普通下载。' % (_deepright_name, _deepright_range_error), flush=True)
+                    _deepright_plain_download(_deepright_url)
             if _deepright_sha256 is not None:
                 with open(_deepright_tmp, 'rb') as _deepright_file:
                     _deepright_actual = hashlib.sha256(_deepright_file.read()).hexdigest()
                 if _deepright_actual != _deepright_sha256:
                     raise RuntimeError('SHA-256 校验失败')
             os.replace(_deepright_tmp, _deepright_s3fd)
+            try:
+                os.remove(_deepright_state)
+            except FileNotFoundError:
+                pass
             print('Wav2Lip S3FD 人脸检测模型下载完成。', flush=True)
             break
         except Exception as _deepright_error:
             _deepright_errors.append('%s：%s' % (_deepright_name, _deepright_error))
-            try:
-                os.remove(_deepright_tmp)
-            except FileNotFoundError:
-                pass
+            if _deepright_name == '主下载源':
+                print('主下载源普通下载失败，回退到多线程断点备用源。', flush=True)
     else:
         raise RuntimeError('Wav2Lip S3FD 人脸检测模型下载失败；' + '；'.join(_deepright_errors))
 sys.argv = [script] + sys.argv[2:]
@@ -398,7 +567,7 @@ func wav2lipRuntimeForStartup(cacheFor time.Duration, cfg *Config) (wav2lipRunti
 func wav2lipInstallRequest(template, workspace string) string {
 	request := strings.ReplaceAll(template, "$workspace", workspace)
 	checkpoint := filepath.Join(workspace, "wav2lip", "checkpoints", "wav2lip_gan.pth")
-	return request + "\n\n模型下载要求：优先从国内镜像 `" + wav2lipDomesticCheckpointURL + "` 下载 `wav2lip_gan.pth` 到 `" + checkpoint + "`，下载连接超时最多 30 秒、连续 90 秒无字节进度必须终止并报告。完成后校验 SHA-256 必须为 `" + wav2lipDomesticCheckpointSHA256 + "`；镜像失败时才可改用官方发布源，并继续执行相同的超时与校验。"
+	return request + "\n\n模型下载要求：先按配置中的官方权重地址下载 `wav2lip_gan.pth` 到 `" + checkpoint + "`。官方源失败后回退国内源 `" + wav2lipDomesticCheckpointURL + "`。下载连接超时最多 30 秒，连续 90 秒无字节进度必须终止并报告。完成后校验 SHA-256 必须为 `" + wav2lipDomesticCheckpointSHA256 + "`。"
 }
 
 func wav2lipWorkspaceForRequest(cfg *Config, agentID string) (string, string, error) {
@@ -900,7 +1069,7 @@ func (m *wav2lipTaskManager) runWav2Lip(ctx context.Context, id int64, r wav2lip
 	// durable upstream working directory; never inherit a task staging directory
 	// that can be removed after a failed device attempt.
 	cmd.Dir = filepath.Dir(r.Script)
-	cmd.Env = append(os.Environ(), "DEEPRIGHT_WAV2LIP_DEVICE="+device)
+	cmd.Env = append(os.Environ(), "DEEPRIGHT_WAV2LIP_DEVICE="+device, "DEEPRIGHT_MODEL_TASK_DOWNLOAD="+strconv.Itoa(modelTaskDownloadWorkers(m.cfg)), "DEEPRIGHT_MODEL_DOWNLOAD_RETRY="+strconv.Itoa(modelTaskDownloadRetries(m.cfg)), "DEEPRIGHT_MODEL_DOWNLOAD_PART_TIMEOUT="+strconv.Itoa(int(resumableModelDownloadPartTimeout/time.Second)))
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return err

@@ -713,79 +713,68 @@ func (m *rembgTaskManager) downloadRembgModelFromMirror(ctx context.Context, mod
 	}
 	if len(taskID) > 0 {
 		m.appendLog(taskID[0], "rembg 模型下载目标绝对路径："+taskLogAbsolutePath(filepath.Join(cacheDir, artifact.Filename)))
+		m.appendLog(taskID[0], "rembg 模型将使用多线程分段下载并保留断点；任务取消或网络中断后重新开始会继续未完成分段。")
 	}
-	downloadCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	idleTimer := time.AfterFunc(rembgModelIdleTimeout, cancel)
-	defer idleTimer.Stop()
-	req, err := http.NewRequestWithContext(downloadCtx, http.MethodGet, url, nil)
-	if err != nil {
-		return fmt.Errorf("无法创建镜像下载请求: %w", err)
-	}
-	response, err := rembgHTTPClient.Do(req)
-	if err != nil {
-		if ctx.Err() == nil && downloadCtx.Err() != nil {
-			return fmt.Errorf("国内镜像下载超过 %s 没有进度", rembgModelIdleTimeout)
+	temporaryPath := filepath.Join(cacheDir, "."+artifact.Filename+".deepright.part")
+	lastProgress := int64(-1)
+	_, err = downloadModelWithFallback(ctx, resumableModelDownloadConfig{
+		Client:      rembgHTTPClient,
+		URL:         url,
+		BackupURL:   rembgReleaseAssetBaseURL + artifact.Filename,
+		PartPath:    temporaryPath,
+		IdleTimeout: rembgModelIdleTimeout,
+		Workers:     modelTaskDownloadWorkers(m.cfg),
+		Retries:     modelTaskDownloadRetries(m.cfg),
+		Progress: func(copied, total int64) {
+			if len(taskID) == 0 || total <= 0 {
+				return
+			}
+			progress := copied * 100 / total
+			if progress >= 100 || progress/10 > lastProgress/10 {
+				lastProgress = progress
+				m.appendLog(taskID[0], fmt.Sprintf("rembg 国内镜像模型已下载 %d%%。", progress))
+			}
+		},
+		PartProgress: func(worker, part, parts int, copied, total int64) {
+			if len(taskID) == 0 || total <= 0 {
+				return
+			}
+			m.appendLog(taskID[0], fmt.Sprintf("rembg 下载线程 %d，分段 %d/%d 已下载 %d%%。", worker, part, parts, copied*100/total))
+		},
+		Retry: func(worker, part, parts, retry, retries int, err error) {
+			if len(taskID) > 0 {
+				m.appendLog(taskID[0], "rembg "+modelDownloadRetryMessage(worker, part, parts, retry, retries, err))
+			}
+		},
+	}, func(message string) {
+		if len(taskID) > 0 {
+			m.appendLog(taskID[0], message)
 		}
-		return fmt.Errorf("请求镜像失败: %w", err)
-	}
-	defer response.Body.Close()
-	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return fmt.Errorf("镜像返回 HTTP %d", response.StatusCode)
-	}
-
-	temporary, err := os.CreateTemp(cacheDir, "."+artifact.Filename+".mirror-*")
+	})
 	if err != nil {
-		return fmt.Errorf("无法创建模型临时文件: %w", err)
+		return fmt.Errorf("下载镜像模型失败: %w", err)
 	}
-	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
+	file, err := os.Open(temporaryPath)
+	if err != nil {
+		return fmt.Errorf("无法读取已下载模型: %w", err)
+	}
 	hash := md5.New() // #nosec G401 -- rembg upstream publishes an MD5 for each immutable model artifact.
-	buffer := make([]byte, 1024*1024)
-	var copied int64
-	nextProgress := int64(10)
-	for {
-		count, readErr := response.Body.Read(buffer)
-		if count > 0 {
-			if !idleTimer.Stop() && downloadCtx.Err() != nil && ctx.Err() == nil {
-				_ = temporary.Close()
-				return fmt.Errorf("国内镜像下载超过 %s 没有进度", rembgModelIdleTimeout)
-			}
-			idleTimer.Reset(rembgModelIdleTimeout)
-			if _, err := hash.Write(buffer[:count]); err != nil {
-				_ = temporary.Close()
-				return fmt.Errorf("校验镜像模型失败: %w", err)
-			}
-			if _, err := temporary.Write(buffer[:count]); err != nil {
-				_ = temporary.Close()
-				return fmt.Errorf("保存镜像模型失败: %w", err)
-			}
-			copied += int64(count)
-			if len(taskID) > 0 && response.ContentLength > 0 && copied*100 >= response.ContentLength*nextProgress {
-				m.appendLog(taskID[0], fmt.Sprintf("rembg 国内镜像模型已下载 %d%%。", nextProgress))
-				nextProgress += 10
-			}
-		}
-		if readErr == io.EOF {
-			break
-		}
-		if readErr != nil {
-			_ = temporary.Close()
-			if ctx.Err() == nil && downloadCtx.Err() != nil {
-				return fmt.Errorf("国内镜像下载超过 %s 没有进度", rembgModelIdleTimeout)
-			}
-			return fmt.Errorf("读取镜像模型失败: %w", readErr)
-		}
+	if _, err := io.Copy(hash, file); err != nil {
+		_ = file.Close()
+		return fmt.Errorf("校验镜像模型失败: %w", err)
 	}
-	if err := temporary.Close(); err != nil {
-		return fmt.Errorf("保存镜像模型失败: %w", err)
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("关闭已下载模型失败: %w", err)
 	}
 	if actual := fmt.Sprintf("%x", hash.Sum(nil)); actual != artifact.MD5 {
+		_ = os.Remove(temporaryPath)
+		removeModelDownloadState(temporaryPath)
 		return fmt.Errorf("镜像模型校验失败（MD5 %s）", actual)
 	}
 	if err := os.Rename(temporaryPath, filepath.Join(cacheDir, artifact.Filename)); err != nil {
 		return fmt.Errorf("无法写入模型缓存: %w", err)
 	}
+	removeModelDownloadState(temporaryPath)
 	return nil
 }
 
