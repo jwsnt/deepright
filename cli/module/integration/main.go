@@ -6627,7 +6627,7 @@ var ffmpegHardwareEncoderCache struct {
 }
 
 func ffmpegHardwareEncoderAvailable(ffmpegPath, encoder string) bool {
-	if runtime.GOOS != "darwin" || strings.TrimSpace(ffmpegPath) == "" {
+	if strings.TrimSpace(ffmpegPath) == "" {
 		return false
 	}
 	key := ffmpegPath + "\x00" + encoder
@@ -6652,9 +6652,15 @@ func ffmpegHardwareEncoderAvailable(ffmpegPath, encoder string) bool {
 }
 
 func ffmpegH264EncoderCandidates(ffmpegPath string) []ffmpegVideoEncoder {
-	candidates := make([]ffmpegVideoEncoder, 0, 2)
-	if ffmpegHardwareEncoderAvailable(ffmpegPath, "h264_videotoolbox") {
-		candidates = append(candidates, ffmpegVideoEncoder{Name: "h264_videotoolbox", Hardware: true})
+	encoders := []string{"h264_nvenc", "h264_qsv", "h264_amf"}
+	if runtime.GOOS == "darwin" {
+		encoders = append([]string{"h264_videotoolbox"}, encoders...)
+	}
+	candidates := make([]ffmpegVideoEncoder, 0, len(encoders)+1)
+	for _, encoder := range encoders {
+		if ffmpegHardwareEncoderAvailable(ffmpegPath, encoder) {
+			candidates = append(candidates, ffmpegVideoEncoder{Name: encoder, Hardware: true})
+		}
 	}
 	return append(candidates, ffmpegVideoEncoder{Name: "libx264"})
 }
@@ -17558,11 +17564,15 @@ type Config struct {
 	IdleTimeout       int
 	PluginExecTimeout int
 	SkillExtractRound int
+	// ModelTaskConcurrence limits all local media/model tasks together. It is
+	// loaded from config/config.json.modelTask.concurrence at service startup.
+	ModelTaskConcurrence int
 	// ScheduledTaskReadTimeout is the SSE body idle timeout used only by
 	// scheduled memo execution. It is intentionally distinct from the cli-get
 	// HTTP timeout fields above, which must not impose a total duration on a
 	// long-running streamed response.
 	ScheduledTaskReadTimeout time.Duration
+	modelTaskQueue           *modelTaskQueue
 
 	// Per-Agent MCP metadata refresh state.
 	mcpStateMu sync.Mutex
@@ -17840,6 +17850,7 @@ func defaultIntegrationStartupOptions() integrationStartupOptions {
 			IdleTimeout:               90,
 			PluginExecTimeout:         defaultPluginExecTimeoutMs,
 			SkillExtractRound:         10,
+			ModelTaskConcurrence:      defaultModelTaskConcurrence,
 			ScheduledTaskReadTimeout:  defaultScheduledTaskReadTimeout,
 		},
 		PIDFile: integrationDefaultPIDFile,
@@ -18969,7 +18980,10 @@ func printCLIHelp() {
 	fmt.Println("  integration file-last-update [options]")
 	fmt.Println("  integration backup-clean [options]")
 	fmt.Println("  integration api whisper <check|list|create|cancel|restart|delete|log> [options]")
+	fmt.Println("  integration api rembg <check|list|create|cancel|restart|delete|log> [options]")
 	fmt.Println("  integration api voxcpm <check|list|create|cancel|restart|delete|log> [options]")
+	fmt.Println("  integration api wav2lip <check|list|create|cancel|restart|delete|log> [options]")
+	fmt.Println("  integration api rvm <check|list|create|cancel|restart|delete|log> [options]")
 	fmt.Println("  integration connect <subcommand> [options]")
 	fmt.Println("  integration help")
 	fmt.Println("")
@@ -19017,7 +19031,10 @@ func printCLIHelp() {
 	fmt.Println("  integration connect --help")
 	fmt.Println("  integration api --help")
 	fmt.Println("  integration api whisper --help")
+	fmt.Println("  integration api rembg --help")
 	fmt.Println("  integration api voxcpm --help")
+	fmt.Println("  integration api wav2lip --help")
+	fmt.Println("  integration api rvm --help")
 	fmt.Println("  integration service --help")
 	fmt.Println("  integration notify --help")
 	fmt.Println("  integration skills-warning --refresh")
@@ -20447,6 +20464,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/voxcpm/tasks/restart", handleVoxCPMTaskRestart())
 	mux.HandleFunc("/api/voxcpm/tasks/delete", handleVoxCPMTaskDelete())
 	mux.HandleFunc("/api/voxcpm/tasks/log", handleVoxCPMTaskLog())
+	mux.HandleFunc("/api/task_help", handleTaskHelp(&cfg))
 	mux.HandleFunc("/api/video_trim", handleVideoTrim(&cfg))
 	mux.HandleFunc("/api/video_audio_extract_to_audio", handleVideoAudioExtractToAudio(&cfg))
 	mux.HandleFunc("/api/video_audio_edit", handleVideoAudioEdit(&cfg))
@@ -20572,6 +20590,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	startIntegrationDeviceConfigRefresh(ctx, cfg.DeviceState)
 	startIntegrationAtMenuRefresh(ctx, &cfg)
 	initCronDB()
+	configureModelTaskQueue(&cfg)
 	startWhisperTaskManager(ctx, &cfg)
 	startRembgTaskManager(ctx, &cfg)
 	startRVMTaskManager(ctx, &cfg)

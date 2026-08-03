@@ -368,8 +368,33 @@ func (m *rembgTaskManager) run(ctx context.Context) {
 			m.cancelRunning()
 			return
 		}
+		slotHeld, err := reserveModelTaskSlot(ctx, m.cfg, m.db, "rembg_task")
+		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				m.cancelRunning()
+				return
+			}
+			log.Printf("[rembg] reserve shared task slot failed: %v", err)
+			select {
+			case <-ctx.Done():
+				m.cancelRunning()
+				return
+			case <-time.After(time.Second):
+			}
+			continue
+		}
+		if !slotHeld {
+			select {
+			case <-ctx.Done():
+				m.cancelRunning()
+				return
+			case <-m.wake:
+			}
+			continue
+		}
 		task, err := m.claim()
 		if err != nil {
+			releaseModelTaskSlot(m.cfg)
 			log.Printf("[rembg] claim task failed: %v", err)
 			select {
 			case <-ctx.Done():
@@ -380,6 +405,7 @@ func (m *rembgTaskManager) run(ctx context.Context) {
 			continue
 		}
 		if task == nil {
+			releaseModelTaskSlot(m.cfg)
 			select {
 			case <-ctx.Done():
 				m.cancelRunning()
@@ -389,6 +415,7 @@ func (m *rembgTaskManager) run(ctx context.Context) {
 			continue
 		}
 		m.execute(ctx, *task)
+		releaseModelTaskSlot(m.cfg)
 	}
 }
 func (m *rembgTaskManager) claim() (*rembgTask, error) {
@@ -444,12 +471,13 @@ func (m *rembgTaskManager) execute(parent context.Context, task rembgTask) {
 		alphaNote = "已启用 alpha matting，可改善复杂边缘的透明度。"
 	}
 	m.appendLog(task.ID, "开始使用 rembg（模型："+task.Model+"）提取图片主体；若模型尚未缓存，rembg 将在当前任务中自动下载。"+alphaNote)
+	m.appendLog(task.ID, "任务目的：提取图片主体并生成透明 PNG。")
 	err := m.extract(ctx, task)
 	if err != nil {
 		if errors.Is(ctx.Err(), context.Canceled) || m.cancelled(task.ID) {
 			m.finish(task.ID, rembgTaskCancelled, 0, "任务已取消。")
 		} else {
-			m.finish(task.ID, rembgTaskFailed, 0, "提取失败："+err.Error())
+			m.finish(task.ID, rembgTaskFailed, 0, "任务失败，具体原因："+err.Error())
 		}
 		return
 	}
@@ -487,6 +515,7 @@ func (m *rembgTaskManager) extract(ctx context.Context, task rembgTask) error {
 	if !ok {
 		return errors.New("未检测到 rembg")
 	}
+	m.appendLog(task.ID, taskPythonExecutionEnvironment(path))
 	source, _, status, msg := resolveMediaPreviewFile(m.cfg, task.AgentID, task.SourcePath)
 	if status != 0 {
 		return errors.New(msg)
@@ -515,21 +544,28 @@ func (m *rembgTaskManager) extract(ctx context.Context, task rembgTask) error {
 	if !valid {
 		return errors.New("任务模型无效")
 	}
+	args := rembgInvocationArgs(model, task.AlphaMatting, true, source, target)
+	m.appendLog(task.ID, "原始图片绝对路径："+source)
+	m.appendLog(task.ID, "输出 PNG 绝对路径："+target)
+	m.appendLog(task.ID, "rembg 可执行文件："+path)
+	m.appendLog(task.ID, "实际 rembg 参数："+strings.Join(args, " "))
 	cached, err := rembgModelCached(model)
 	if err != nil {
 		return err
 	}
 	if !cached {
-		m.appendLog(task.ID, "未发现已校验的 rembg 模型缓存，正在从国内镜像下载。")
+		mirrorURL, _ := rembgModelMirrorURL(model)
+		m.appendLog(task.ID, "未发现已校验的 rembg 模型缓存，正在从国内镜像下载。下载源："+mirrorURL)
 		if mirrorErr := m.downloadRembgModelFromMirror(ctx, model, task.ID); mirrorErr != nil {
 			return fmt.Errorf("国内镜像下载 rembg 模型失败：%w", mirrorErr)
 		}
 		m.appendLog(task.ID, "rembg 国内镜像模型下载并校验成功，开始执行主体提取。")
 	}
-	args := rembgInvocationArgs(model, task.AlphaMatting, true, source, target)
 	diagnostics, runErr := m.runRembg(ctx, task.ID, path, args)
 	if runErr != nil && rembgModelDownloadFailure(diagnostics) {
-		m.appendLog(task.ID, "官方下载模型失败，正在通过国内镜像重试下载。")
+		artifact := rembgModelArtifacts[model]
+		mirrorURL, _ := rembgModelMirrorURL(model)
+		m.appendLog(task.ID, "官方下载模型失败。官方源："+rembgReleaseAssetBaseURL+artifact.Filename+"；正在通过国内镜像重试下载："+mirrorURL)
 		if mirrorErr := m.downloadRembgModelFromMirror(ctx, model, task.ID); mirrorErr != nil {
 			return fmt.Errorf("%w；国内镜像下载也失败：%v", runErr, mirrorErr)
 		}
@@ -675,6 +711,9 @@ func (m *rembgTaskManager) downloadRembgModelFromMirror(ctx context.Context, mod
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		return fmt.Errorf("无法创建模型缓存目录: %w", err)
 	}
+	if len(taskID) > 0 {
+		m.appendLog(taskID[0], "rembg 模型下载目标绝对路径："+taskLogAbsolutePath(filepath.Join(cacheDir, artifact.Filename)))
+	}
 	downloadCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	idleTimer := time.AfterFunc(rembgModelIdleTimeout, cancel)
@@ -774,7 +813,7 @@ func (m *rembgTaskManager) runRembg(ctx context.Context, taskID int64, executabl
 		if ctx.Err() != nil {
 			return diagnostics.String(), context.Canceled
 		}
-		return diagnostics.String(), fmt.Errorf("rembg 执行失败: %w", err)
+		return diagnostics.String(), taskExecutionError("rembg", err, diagnostics.String())
 	}
 	return diagnostics.String(), nil
 }
@@ -1060,8 +1099,8 @@ func (m *rembgTaskManager) cancelTask(agentID string, id int64) error {
 func (m *rembgTaskManager) restart(agentID string, id int64) error {
 	agentID = strings.TrimSpace(agentID)
 	var source string
-	if err := m.db.QueryRow(`SELECT source_path FROM rembg_task WHERE id=? AND agent_id=? AND status=?`, id, agentID, rembgTaskCancelled).Scan(&source); err != nil {
-		return errors.New("仅可重新开始已取消任务")
+	if err := m.db.QueryRow(`SELECT source_path FROM rembg_task WHERE id=? AND agent_id=? AND status IN (?, ?)`, id, agentID, rembgTaskFailed, rembgTaskCancelled).Scan(&source); err != nil {
+		return errors.New("仅可重新开始失败或已取消任务")
 	}
 	workspace, err := getWorkspaceByAgentID(m.cfg, agentID)
 	if err != nil {
@@ -1072,7 +1111,7 @@ func (m *rembgTaskManager) restart(agentID string, id int64) error {
 		return err
 	}
 	now := rembgTimestamp()
-	result, err := m.db.Exec(`UPDATE rembg_task SET output_path=?,saved_as=?,status=?,progress=0,started_at='',cancel_requested=0,updated_at=?,logs=CASE WHEN length(logs)>? THEN substr(logs,-?) ELSE logs END || ? WHERE id=? AND agent_id=? AND status=?`, filepath.ToSlash(output), saved, rembgTaskQueued, now, rembgTaskLogLimit-4096, rembgTaskLogLimit/2, "["+now+"] 已重新加入图片主体提取队列。\n", id, agentID, rembgTaskCancelled)
+	result, err := m.db.Exec(`UPDATE rembg_task SET output_path=?,saved_as=?,status=?,progress=0,started_at='',cancel_requested=0,updated_at=?,logs='' WHERE id=? AND agent_id=? AND status IN (?, ?)`, filepath.ToSlash(output), saved, rembgTaskQueued, now, id, agentID, rembgTaskFailed, rembgTaskCancelled)
 	if err != nil {
 		return err
 	}

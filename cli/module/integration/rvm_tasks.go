@@ -471,8 +471,33 @@ func (m *rvmTaskManager) run(ctx context.Context) {
 			m.cancelRunning()
 			return
 		}
+		slotHeld, err := reserveModelTaskSlot(ctx, m.cfg, m.db, "rvm_task")
+		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				m.cancelRunning()
+				return
+			}
+			log.Printf("[rvm] reserve shared task slot failed: %v", err)
+			select {
+			case <-ctx.Done():
+				m.cancelRunning()
+				return
+			case <-time.After(time.Second):
+			}
+			continue
+		}
+		if !slotHeld {
+			select {
+			case <-ctx.Done():
+				m.cancelRunning()
+				return
+			case <-m.wake:
+			}
+			continue
+		}
 		task, err := m.claim()
 		if err != nil {
+			releaseModelTaskSlot(m.cfg)
 			log.Printf("[rvm] claim task failed: %v", err)
 			select {
 			case <-ctx.Done():
@@ -483,6 +508,7 @@ func (m *rvmTaskManager) run(ctx context.Context) {
 			continue
 		}
 		if task == nil {
+			releaseModelTaskSlot(m.cfg)
 			select {
 			case <-ctx.Done():
 				m.cancelRunning()
@@ -492,6 +518,7 @@ func (m *rvmTaskManager) run(ctx context.Context) {
 			continue
 		}
 		m.execute(ctx, *task)
+		releaseModelTaskSlot(m.cfg)
 	}
 }
 func (m *rvmTaskManager) claim() (*rvmTask, error) {
@@ -540,11 +567,12 @@ func (m *rvmTaskManager) execute(parent context.Context, task rvmTask) {
 		_, scenario, _ = rvmScenarioFor(rvmScenarioStandard)
 	}
 	m.appendLog(task.ID, "开始使用 RVM 提取视频主体（"+scenario.Name+"）。优先使用 GPU，失败会自动回退 CPU。")
+	m.appendLog(task.ID, "任务目的：提取视频主体，生成透明 MOV 和黑底 MP4 预览。")
 	if err := m.extract(ctx, task); err != nil {
 		if errors.Is(ctx.Err(), context.Canceled) || m.cancelled(task.ID) {
 			m.finish(task.ID, rvmTaskCancelled, 0, "任务已取消。")
 		} else {
-			m.finish(task.ID, rvmTaskFailed, 0, "提取失败："+err.Error())
+			m.finish(task.ID, rvmTaskFailed, 0, "任务失败，具体原因："+err.Error())
 		}
 		return
 	}
@@ -594,6 +622,7 @@ func (m *rvmTaskManager) extract(ctx context.Context, task rvmTask) error {
 	if !ok {
 		return errors.New("未检测到可用的 Robust Video Matting")
 	}
+	m.appendLog(task.ID, taskKnownPythonEnvironment(runtimeValue.Python, runtimeValue.Script))
 	target, err := resolveCaseInsensitiveUnderRoot(workspace, filepath.FromSlash(task.OutputPath))
 	if err != nil || !ensureWritablePathWithinRoot(workspace, target) {
 		return errors.New("无法创建视频输出路径")
@@ -604,6 +633,11 @@ func (m *rvmTaskManager) extract(ctx context.Context, task rvmTask) error {
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return errors.New("无法创建视频输出目录")
 	}
+	m.appendLog(task.ID, "原始视频绝对路径："+source)
+	m.appendLog(task.ID, "输出透明 MOV 绝对路径："+target)
+	m.appendLog(task.ID, "输出 MP4 预览绝对路径："+rvmPreviewMP4Path(target))
+	m.appendLog(task.ID, "RVM 推理脚本："+runtimeValue.Script)
+	m.appendLog(task.ID, "RVM 模型权重："+runtimeValue.Checkpoint)
 	tmp, err := os.MkdirTemp(filepath.Dir(target), ".rvm-")
 	if err != nil {
 		return err
@@ -620,6 +654,7 @@ func (m *rvmTaskManager) extract(ctx context.Context, task rvmTask) error {
 			_ = os.Remove(alpha)
 		}
 		m.appendLog(task.ID, "正在使用 "+device+" 执行 RVM 推理。")
+		m.appendLog(task.ID, "实际 RVM 模型参数："+strings.Join(rvmInvocationArgs(runtimeValue, task.Scenario, device, source, foreground, alpha)[2:], " "))
 		err = m.runRVM(ctx, task.ID, runtimeValue, task.Scenario, device, source, foreground, alpha)
 		if err == nil {
 			lastErr = nil
@@ -653,6 +688,8 @@ func (m *rvmTaskManager) extract(ctx context.Context, task rvmTask) error {
 	if previewErr != nil || previewInfo.Size() == 0 {
 		return errors.New("未生成有效的 MP4 预览副本")
 	}
+	m.appendLog(task.ID, "最终输出透明 MOV 绝对路径："+target)
+	m.appendLog(task.ID, "最终输出 MP4 预览绝对路径："+preview)
 	m.progress(task.ID, 100)
 	return nil
 }
@@ -692,16 +729,21 @@ func (m *rvmTaskManager) runRVM(ctx context.Context, id int64, r rvmRuntime, sce
 	if err = cmd.Start(); err != nil {
 		return err
 	}
+	var captured strings.Builder
+	var capturedMu sync.Mutex
 	var wg sync.WaitGroup
 	wg.Add(2)
-	go func() { defer wg.Done(); m.capture(id, stdout) }()
-	go func() { defer wg.Done(); m.capture(id, stderr) }()
+	go func() { defer wg.Done(); m.capture(id, stdout, &captured, &capturedMu) }()
+	go func() { defer wg.Done(); m.capture(id, stderr, &captured, &capturedMu) }()
 	wg.Wait()
 	if err = cmd.Wait(); err != nil {
 		if ctx.Err() != nil {
 			return context.Canceled
 		}
-		return fmt.Errorf("RVM（%s）执行失败: %w", device, err)
+		capturedMu.Lock()
+		diagnostics := captured.String()
+		capturedMu.Unlock()
+		return taskExecutionError("RVM（"+device+"）", err, diagnostics)
 	}
 	for _, file := range []string{foreground, alpha} {
 		info, statErr := os.Stat(file)
@@ -711,12 +753,20 @@ func (m *rvmTaskManager) runRVM(ctx context.Context, id int64, r rvmRuntime, sce
 	}
 	return nil
 }
-func (m *rvmTaskManager) capture(id int64, r io.Reader) {
+func (m *rvmTaskManager) capture(id int64, r io.Reader, captured *strings.Builder, capturedMu *sync.Mutex) {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 4096), 128*1024)
 	scanner.Split(splitRembgOutput)
 	for scanner.Scan() {
-		m.appendLog(id, scanner.Text())
+		line := scanner.Text()
+		m.appendLog(id, line)
+		if captured != nil && capturedMu != nil {
+			capturedMu.Lock()
+			if captured.Len() < 128*1024 {
+				captured.WriteString(line + "\n")
+			}
+			capturedMu.Unlock()
+		}
 	}
 	if err := scanner.Err(); err != nil {
 		m.appendLog(id, "读取 RVM 输出失败："+err.Error())
@@ -1115,8 +1165,8 @@ func (m *rvmTaskManager) cancelTask(agentID string, id int64) error {
 func (m *rvmTaskManager) restart(agentID string, id int64) error {
 	agentID = strings.TrimSpace(agentID)
 	var source, scenario string
-	if err := m.db.QueryRow(`SELECT source_path,COALESCE(NULLIF(scenario,''),'standard') FROM rvm_task WHERE id=? AND agent_id=? AND status=?`, id, agentID, rvmTaskCancelled).Scan(&source, &scenario); err != nil {
-		return errors.New("仅可重新开始已取消任务")
+	if err := m.db.QueryRow(`SELECT source_path,COALESCE(NULLIF(scenario,''),'standard') FROM rvm_task WHERE id=? AND agent_id=? AND status IN (?, ?)`, id, agentID, rvmTaskFailed, rvmTaskCancelled).Scan(&source, &scenario); err != nil {
+		return errors.New("仅可重新开始失败或已取消任务")
 	}
 	workspace, err := getWorkspaceByAgentID(m.cfg, agentID)
 	if err != nil {
@@ -1127,7 +1177,7 @@ func (m *rvmTaskManager) restart(agentID string, id int64) error {
 		return err
 	}
 	now := rvmTimestamp()
-	result, err := m.db.Exec(`UPDATE rvm_task SET scenario=?,output_path=?,saved_as=?,status=?,progress=0,started_at='',cancel_requested=0,updated_at=?,logs=CASE WHEN length(logs)>? THEN substr(logs,-?) ELSE logs END || ? WHERE id=? AND agent_id=? AND status=?`, scenario, filepath.ToSlash(output), saved, rvmTaskQueued, now, rvmTaskLogLimit-4096, rvmTaskLogLimit/2, "["+now+"] 已重新加入视频主体提取队列。\n", id, agentID, rvmTaskCancelled)
+	result, err := m.db.Exec(`UPDATE rvm_task SET scenario=?,output_path=?,saved_as=?,status=?,progress=0,started_at='',cancel_requested=0,updated_at=?,logs='' WHERE id=? AND agent_id=? AND status IN (?, ?)`, scenario, filepath.ToSlash(output), saved, rvmTaskQueued, now, id, agentID, rvmTaskFailed, rvmTaskCancelled)
 	if err != nil {
 		return err
 	}

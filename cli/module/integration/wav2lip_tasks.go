@@ -133,8 +133,25 @@ if not os.path.isfile(_deepright_s3fd):
     _deepright_errors = []
     for _deepright_name, _deepright_url, _deepright_sha256 in _deepright_sources:
         try:
-            print('正在从%s下载 Wav2Lip S3FD 人脸检测模型。' % _deepright_name, flush=True)
-            urllib.request.urlretrieve(_deepright_url, _deepright_tmp)
+            print('正在从%s下载 Wav2Lip S3FD 人脸检测模型。下载源：%s；下载目标绝对路径：%s' % (_deepright_name, _deepright_url, _deepright_s3fd), flush=True)
+            with urllib.request.urlopen(_deepright_url) as _deepright_response, open(_deepright_tmp, 'wb') as _deepright_file:
+                _deepright_total = int(_deepright_response.headers.get('Content-Length') or 0)
+                _deepright_copied = 0
+                _deepright_next_percent = 10
+                _deepright_next_bytes = 10 * 1024 * 1024
+                while True:
+                    _deepright_chunk = _deepright_response.read(1024 * 1024)
+                    if not _deepright_chunk:
+                        break
+                    _deepright_file.write(_deepright_chunk)
+                    _deepright_copied += len(_deepright_chunk)
+                    if _deepright_total > 0:
+                        while _deepright_copied * 100 >= _deepright_total * _deepright_next_percent and _deepright_next_percent <= 100:
+                            print('Wav2Lip S3FD 人脸检测模型已下载 %d%%。' % _deepright_next_percent, flush=True)
+                            _deepright_next_percent += 10
+                    elif _deepright_copied >= _deepright_next_bytes:
+                        print('Wav2Lip S3FD 人脸检测模型已下载 %d MiB（下载源未提供总大小）。' % (_deepright_copied // (1024 * 1024)), flush=True)
+                        _deepright_next_bytes = _deepright_copied + 10 * 1024 * 1024
             if _deepright_sha256 is not None:
                 with open(_deepright_tmp, 'rb') as _deepright_file:
                     _deepright_actual = hashlib.sha256(_deepright_file.read()).hexdigest()
@@ -517,8 +534,33 @@ func (m *wav2lipTaskManager) run(ctx context.Context) {
 			m.cancelRunning()
 			return
 		}
+		slotHeld, err := reserveModelTaskSlot(ctx, m.cfg, m.db, "wav2lip_task")
+		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				m.cancelRunning()
+				return
+			}
+			log.Printf("[wav2lip] reserve shared task slot failed: %v", err)
+			select {
+			case <-ctx.Done():
+				m.cancelRunning()
+				return
+			case <-time.After(time.Second):
+			}
+			continue
+		}
+		if !slotHeld {
+			select {
+			case <-ctx.Done():
+				m.cancelRunning()
+				return
+			case <-m.wake:
+			}
+			continue
+		}
 		task, err := m.claim()
 		if err != nil {
+			releaseModelTaskSlot(m.cfg)
 			log.Printf("[wav2lip] claim task failed: %v", err)
 			select {
 			case <-ctx.Done():
@@ -529,6 +571,7 @@ func (m *wav2lipTaskManager) run(ctx context.Context) {
 			continue
 		}
 		if task == nil {
+			releaseModelTaskSlot(m.cfg)
 			select {
 			case <-ctx.Done():
 				m.cancelRunning()
@@ -538,6 +581,7 @@ func (m *wav2lipTaskManager) run(ctx context.Context) {
 			continue
 		}
 		m.execute(ctx, *task)
+		releaseModelTaskSlot(m.cfg)
 	}
 }
 func (m *wav2lipTaskManager) claim() (*wav2lipTask, error) {
@@ -582,11 +626,12 @@ func (m *wav2lipTaskManager) execute(parent context.Context, task wav2lipTask) {
 		m.mu.Unlock()
 	}()
 	m.appendLog(task.ID, "开始使用 Wav2Lip 为人物视频对口型。优先使用 GPU，失败会自动回退 CPU。")
+	m.appendLog(task.ID, "任务目的：根据输入音频驱动人物视频口型。")
 	if err := m.extract(ctx, task); err != nil {
 		if errors.Is(ctx.Err(), context.Canceled) || m.cancelled(task.ID) {
 			m.finish(task.ID, wav2lipTaskCancelled, 0, "任务已取消。")
 		} else {
-			m.finish(task.ID, wav2lipTaskFailed, 0, "提取失败："+err.Error())
+			m.finish(task.ID, wav2lipTaskFailed, 0, "任务失败，具体原因："+err.Error())
 		}
 		return
 	}
@@ -668,6 +713,7 @@ func (m *wav2lipTaskManager) extract(ctx context.Context, task wav2lipTask) erro
 	if !ok {
 		return errors.New("未检测到可用的 Wav2Lip")
 	}
+	m.appendLog(task.ID, taskKnownPythonEnvironment(runtimeValue.Python, runtimeValue.Script))
 	target, err := resolveCaseInsensitiveUnderRoot(workspace, filepath.FromSlash(task.OutputPath))
 	if err != nil || !ensureWritablePathWithinRoot(workspace, target) {
 		return errors.New("无法创建视频输出路径")
@@ -678,6 +724,11 @@ func (m *wav2lipTaskManager) extract(ctx context.Context, task wav2lipTask) erro
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return errors.New("无法创建视频输出目录")
 	}
+	m.appendLog(task.ID, "原始视频绝对路径："+video)
+	m.appendLog(task.ID, "原始音频绝对路径："+audio)
+	m.appendLog(task.ID, "输出视频绝对路径："+target)
+	m.appendLog(task.ID, "Wav2Lip 推理脚本："+runtimeValue.Script)
+	m.appendLog(task.ID, "Wav2Lip 模型权重："+runtimeValue.Checkpoint)
 	part, err := os.CreateTemp(filepath.Dir(target), ".wav2lip-*.mp4")
 	if err != nil {
 		return err
@@ -696,6 +747,7 @@ func (m *wav2lipTaskManager) extract(ctx context.Context, task wav2lipTask) erro
 			_ = os.Remove(temporary)
 		}
 		m.appendLog(task.ID, "正在使用 "+device+" 执行 Wav2Lip 推理。")
+		m.appendLog(task.ID, "实际 Wav2Lip 模型参数：--checkpoint_path="+runtimeValue.Checkpoint+" --face="+video+" --audio="+audio+" --outfile="+target+" --device="+device)
 		// Wav2Lip's unmodified inference.py builds its final FFmpeg command as
 		// a string without quoting --audio or --outfile.  The Agent workspace on
 		// macOS commonly contains "Application Support", so pass only paths from
@@ -705,6 +757,7 @@ func (m *wav2lipTaskManager) extract(ctx context.Context, task wav2lipTask) erro
 		if stageErr != nil {
 			return stageErr
 		}
+		m.appendLog(task.ID, "Wav2Lip 执行参数路径映射：--face="+staging.Video+" --audio="+staging.Audio+" --outfile="+staging.Output)
 		err = m.runWav2Lip(ctx, task.ID, runtimeValue, device, staging.Video, staging.Audio, staging.Output)
 		if err == nil {
 			err = copyWav2LipOutput(staging.Output, temporary)
@@ -742,6 +795,7 @@ func (m *wav2lipTaskManager) extract(ctx context.Context, task wav2lipTask) erro
 	if info, err = os.Stat(target); err != nil || info.Size() == 0 {
 		return errors.New("无法保存有效 MP4 输出")
 	}
+	m.appendLog(task.ID, "最终输出视频绝对路径："+target)
 	m.progress(task.ID, 100)
 	return nil
 }
@@ -875,7 +929,7 @@ func (m *wav2lipTaskManager) runWav2Lip(ctx context.Context, id int64, r wav2lip
 		if reason := wav2lipReadableFailureReason(outputText); reason != "" {
 			return errors.New(reason)
 		}
-		return fmt.Errorf("Wav2Lip（%s）执行失败: %w", device, err)
+		return taskExecutionError("Wav2Lip（"+device+"）", err, outputText)
 	}
 	info, statErr := os.Stat(output)
 	if statErr != nil || info.Size() == 0 {
@@ -1173,8 +1227,8 @@ func (m *wav2lipTaskManager) cancelTask(agentID string, id int64) error {
 func (m *wav2lipTaskManager) restart(agentID string, id int64) error {
 	agentID = strings.TrimSpace(agentID)
 	var video, audio string
-	if err := m.db.QueryRow(`SELECT video_path,audio_path FROM wav2lip_task WHERE id=? AND agent_id=? AND status=?`, id, agentID, wav2lipTaskCancelled).Scan(&video, &audio); err != nil {
-		return errors.New("仅可重新开始已取消任务")
+	if err := m.db.QueryRow(`SELECT video_path,audio_path FROM wav2lip_task WHERE id=? AND agent_id=? AND status IN (?, ?)`, id, agentID, wav2lipTaskFailed, wav2lipTaskCancelled).Scan(&video, &audio); err != nil {
+		return errors.New("仅可重新开始失败或已取消任务")
 	}
 	workspace, err := getWorkspaceByAgentID(m.cfg, agentID)
 	if err != nil {
@@ -1185,7 +1239,7 @@ func (m *wav2lipTaskManager) restart(agentID string, id int64) error {
 		return err
 	}
 	now := wav2lipTimestamp()
-	result, err := m.db.Exec(`UPDATE wav2lip_task SET output_path=?,saved_as=?,status=?,progress=0,started_at='',cancel_requested=0,failure_reason='',updated_at=?,logs=CASE WHEN length(logs)>? THEN substr(logs,-?) ELSE logs END || ? WHERE id=? AND agent_id=? AND status=?`, filepath.ToSlash(output), saved, wav2lipTaskQueued, now, wav2lipTaskLogLimit-4096, wav2lipTaskLogLimit/2, "["+now+"] 已重新加入人物视频对口型队列。\n", id, agentID, wav2lipTaskCancelled)
+	result, err := m.db.Exec(`UPDATE wav2lip_task SET output_path=?,saved_as=?,status=?,progress=0,started_at='',cancel_requested=0,failure_reason='',updated_at=?,logs='' WHERE id=? AND agent_id=? AND status IN (?, ?)`, filepath.ToSlash(output), saved, wav2lipTaskQueued, now, id, agentID, wav2lipTaskFailed, wav2lipTaskCancelled)
 	if err != nil {
 		return err
 	}

@@ -134,6 +134,8 @@ func printIntegrationAPIHelp() {
 	fmt.Println("  whisper               Whisper audio transcription queue endpoints")
 	fmt.Println("  rembg                 Image subject extraction queue endpoints")
 	fmt.Println("  voxcpm                VoxCPM text-to-speech queue endpoints")
+	fmt.Println("  wav2lip               Person video lip-sync queue endpoints")
+	fmt.Println("  rvm                   Video subject extraction queue endpoints")
 	fmt.Println("")
 	fmt.Println("Examples:")
 	fmt.Println("  integration api heartbeat")
@@ -146,6 +148,8 @@ func printIntegrationAPIHelp() {
 	fmt.Println("  integration api whisper create --agentId demo-agent --path audios/meeting.mp3 --scenario chinese_meeting")
 	fmt.Println("  integration api rembg create --agentId demo-agent --path images/product.jpg --model u2net --alpha-matting")
 	fmt.Println("  integration api voxcpm create --agentId demo-agent --textPath scripts/intro.txt --outputName intro.wav")
+	fmt.Println("  integration api wav2lip create --agentId demo-agent --videoPath videos/person.mp4 --audioPath audios/line.wav")
+	fmt.Println("  integration api rvm create --agentId demo-agent --path videos/source.mp4 --scenario quality")
 	fmt.Println("  integration service cancel --chat chat-001")
 }
 
@@ -443,13 +447,15 @@ func printIntegrationAPIWhisperHelp(stdout io.Writer) {
 	fmt.Fprintln(stdout, "Usage:")
 	fmt.Fprintln(stdout, "  integration api whisper <check|list|create|cancel|restart|delete|log> [options]")
 	fmt.Fprintln(stdout, "")
+	fmt.Fprintln(stdout, "功能：提取音频文字。任务与其余四类模型任务共用等待队列；等待名额时为 queued，取得名额才变为 running。")
+	fmt.Fprintln(stdout, "")
 	fmt.Fprintln(stdout, "Commands:")
 	fmt.Fprintln(stdout, "  check       Check whether the controlled environment can run Whisper")
 	fmt.Fprintln(stdout, "  list        List one Agent's transcription tasks, five tasks per page")
 	fmt.Fprintln(stdout, "  create      Queue one or more audio files in one Agent workspace")
 	fmt.Fprintln(stdout, "  cancel      Cancel a queued or running task")
-	fmt.Fprintln(stdout, "  restart     Requeue one cancelled task")
-	fmt.Fprintln(stdout, "  delete      Delete one failed task record; output files are preserved")
+	fmt.Fprintln(stdout, "  restart     Requeue one failed or cancelled task; previous logs are cleared")
+	fmt.Fprintln(stdout, "  delete      Delete one failed or cancelled task record; output files are preserved")
 	fmt.Fprintln(stdout, "  log         Read a task and its persisted execution log")
 	fmt.Fprintln(stdout, "")
 	fmt.Fprintln(stdout, "Examples:")
@@ -584,9 +590,9 @@ func runIntegrationAPIWhisperCLI(args []string, stdout, stderr io.Writer) int {
 	case "cancel":
 		return runIntegrationAPIWhisperTaskActionCLI("cancel", "/api/whisper/tasks/cancel", "Call POST /api/whisper/tasks/cancel.", args[1:], stdout, stderr)
 	case "restart":
-		return runIntegrationAPIWhisperTaskActionCLI("restart", "/api/whisper/tasks/restart", "Call POST /api/whisper/tasks/restart for one cancelled task.", args[1:], stdout, stderr)
+		return runIntegrationAPIWhisperTaskActionCLI("restart", "/api/whisper/tasks/restart", "Call POST /api/whisper/tasks/restart for one failed or cancelled task; its previous log is cleared.", args[1:], stdout, stderr)
 	case "delete":
-		return runIntegrationAPIWhisperTaskActionCLI("delete", "/api/whisper/tasks/delete", "Call POST /api/whisper/tasks/delete for one failed task record.", args[1:], stdout, stderr)
+		return runIntegrationAPIWhisperTaskActionCLI("delete", "/api/whisper/tasks/delete", "Call POST /api/whisper/tasks/delete for one failed or cancelled task record; files are preserved.", args[1:], stdout, stderr)
 	case "log":
 		return runIntegrationAPIGenericRequestCLI(integrationAPIGenericRequestSpec{
 			Command: "whisper log", Usage: "integration api whisper log --agentId ID --id TASK_ID [--addr URL] [--port 8080]",
@@ -607,13 +613,15 @@ func printIntegrationAPIRembgHelp(stdout io.Writer) {
 	fmt.Fprintln(stdout, "Usage:")
 	fmt.Fprintln(stdout, "  integration api rembg <check|list|create|cancel|restart|delete|log> [options]")
 	fmt.Fprintln(stdout, "")
+	fmt.Fprintln(stdout, "功能：提取图片主体。任务与其余四类模型任务共用等待队列；等待名额时为 queued，取得名额才变为 running。")
+	fmt.Fprintln(stdout, "")
 	fmt.Fprintln(stdout, "Commands:")
 	fmt.Fprintln(stdout, "  check       Check whether the controlled environment can run rembg")
 	fmt.Fprintln(stdout, "  list        List one Agent's image subject extraction tasks, five tasks per page")
 	fmt.Fprintln(stdout, "  create      Queue one or more image files in one Agent workspace")
 	fmt.Fprintln(stdout, "  cancel      Cancel a queued or running task")
-	fmt.Fprintln(stdout, "  restart     Requeue one cancelled task")
-	fmt.Fprintln(stdout, "  delete      Delete one failed task record; source and output files are preserved")
+	fmt.Fprintln(stdout, "  restart     Requeue one failed or cancelled task; previous logs are cleared")
+	fmt.Fprintln(stdout, "  delete      Delete one failed or cancelled task record; source and output files are preserved")
 	fmt.Fprintln(stdout, "  log         Read a task and its persisted execution log")
 	fmt.Fprintln(stdout, "")
 	fmt.Fprintln(stdout, "Create options:")
@@ -759,9 +767,9 @@ func runIntegrationAPIRembgCLI(args []string, stdout, stderr io.Writer) int {
 	case "cancel":
 		return runIntegrationAPIRembgTaskActionCLI("cancel", "/api/rembg/tasks/cancel", "Call POST /api/rembg/tasks/cancel.", args[1:], stdout, stderr)
 	case "restart":
-		return runIntegrationAPIRembgTaskActionCLI("restart", "/api/rembg/tasks/restart", "Call POST /api/rembg/tasks/restart for one cancelled task.", args[1:], stdout, stderr)
+		return runIntegrationAPIRembgTaskActionCLI("restart", "/api/rembg/tasks/restart", "Call POST /api/rembg/tasks/restart for one failed or cancelled task; its previous log is cleared.", args[1:], stdout, stderr)
 	case "delete":
-		return runIntegrationAPIRembgTaskActionCLI("delete", "/api/rembg/tasks/delete", "Call POST /api/rembg/tasks/delete for one failed task record.", args[1:], stdout, stderr)
+		return runIntegrationAPIRembgTaskActionCLI("delete", "/api/rembg/tasks/delete", "Call POST /api/rembg/tasks/delete for one failed or cancelled task record; files are preserved.", args[1:], stdout, stderr)
 	case "log":
 		return runIntegrationAPIGenericRequestCLI(integrationAPIGenericRequestSpec{
 			Command: "rembg log", Usage: "integration api rembg log --agentId ID --id TASK_ID [--addr URL] [--port 8080]",
@@ -782,13 +790,15 @@ func printIntegrationAPIVoxCPMHelp(stdout io.Writer) {
 	fmt.Fprintln(stdout, "Usage:")
 	fmt.Fprintln(stdout, "  integration api voxcpm <check|list|create|cancel|restart|delete|log> [options]")
 	fmt.Fprintln(stdout, "")
+	fmt.Fprintln(stdout, "功能：文字转语音。任务与其余四类模型任务共用等待队列；等待名额时为 queued，取得名额才变为 running。")
+	fmt.Fprintln(stdout, "")
 	fmt.Fprintln(stdout, "Commands:")
 	fmt.Fprintln(stdout, "  check       Check whether the controlled environment can run VoxCPM")
 	fmt.Fprintln(stdout, "  list        List one Agent's text-to-speech tasks, five tasks per page")
 	fmt.Fprintln(stdout, "  create      Queue one to five text-to-speech tasks")
 	fmt.Fprintln(stdout, "  cancel      Cancel a queued or running task")
-	fmt.Fprintln(stdout, "  restart     Requeue one cancelled task")
-	fmt.Fprintln(stdout, "  delete      Delete one failed task record; source and output files are preserved")
+	fmt.Fprintln(stdout, "  restart     Requeue one failed or cancelled task; previous logs are cleared")
+	fmt.Fprintln(stdout, "  delete      Delete one failed or cancelled task record; source and output files are preserved")
 	fmt.Fprintln(stdout, "  log         Read a task and its persisted execution log")
 	fmt.Fprintln(stdout, "")
 	fmt.Fprintln(stdout, "Create options:")
@@ -878,7 +888,16 @@ func runIntegrationAPIVoxCPMCreateCLI(args []string, stdout, stderr io.Writer) i
 }
 
 func runIntegrationAPIVoxCPMTaskActionCLI(command string, args []string, stdout, stderr io.Writer) int {
-	fs, addr, port, output, pretty := newIntegrationAPICommonFlagSet("integration api voxcpm "+command, "integration api voxcpm "+command+" --agentId ID --id TASK_ID [--addr URL] [--port 8080]", "Call a VoxCPM task action.", stderr)
+	description := "Call a VoxCPM task action."
+	switch command {
+	case "cancel":
+		description = "Cancel one queued or running VoxCPM task."
+	case "restart":
+		description = "Restart one failed or cancelled VoxCPM task; its previous log is cleared."
+	case "delete":
+		description = "Delete one failed or cancelled VoxCPM task record; files are preserved."
+	}
+	fs, addr, port, output, pretty := newIntegrationAPICommonFlagSet("integration api voxcpm "+command, "integration api voxcpm "+command+" --agentId ID --id TASK_ID [--addr URL] [--port 8080]", description, stderr)
 	agentID := fs.String("agentId", "", "agent id")
 	fs.StringVar(agentID, "agent", "", "agent id")
 	taskID := fs.Int64("id", 0, "VoxCPM task id")
@@ -1864,6 +1883,10 @@ func runIntegrationAPICLI(args []string, stdout, stderr io.Writer) int {
 		return runIntegrationAPIRembgCLI(args[1:], stdout, stderr)
 	case "voxcpm":
 		return runIntegrationAPIVoxCPMCLI(args[1:], stdout, stderr)
+	case "wav2lip":
+		return runIntegrationAPIWav2LipCLI(args[1:], stdout, stderr)
+	case "rvm":
+		return runIntegrationAPIRVMCLI(args[1:], stdout, stderr)
 	case "log-round":
 		cfg := &Config{AgentDir: integrationDefaultAgentDir(), AgentCacheMs: 120000}
 		if value, ok := readIntegrationStartupConfigValue("agent-dir"); ok {

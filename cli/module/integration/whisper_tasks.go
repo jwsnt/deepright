@@ -466,8 +466,33 @@ func (manager *whisperTaskManager) run(ctx context.Context) {
 			manager.cancelRunning()
 			return
 		}
+		slotHeld, err := reserveModelTaskSlot(ctx, manager.cfg, manager.db, "whisper_task")
+		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				manager.cancelRunning()
+				return
+			}
+			log.Printf("[whisper] reserve shared task slot failed: %v", err)
+			select {
+			case <-ctx.Done():
+				manager.cancelRunning()
+				return
+			case <-time.After(time.Second):
+			}
+			continue
+		}
+		if !slotHeld {
+			select {
+			case <-ctx.Done():
+				manager.cancelRunning()
+				return
+			case <-manager.wake:
+			}
+			continue
+		}
 		task, err := manager.claimNextTask()
 		if err != nil {
+			releaseModelTaskSlot(manager.cfg)
 			log.Printf("[whisper] claim task failed: %v", err)
 			select {
 			case <-ctx.Done():
@@ -478,6 +503,7 @@ func (manager *whisperTaskManager) run(ctx context.Context) {
 			continue
 		}
 		if task == nil {
+			releaseModelTaskSlot(manager.cfg)
 			select {
 			case <-ctx.Done():
 				manager.cancelRunning()
@@ -487,6 +513,7 @@ func (manager *whisperTaskManager) run(ctx context.Context) {
 			continue
 		}
 		manager.executeTask(ctx, *task)
+		releaseModelTaskSlot(manager.cfg)
 	}
 }
 
@@ -553,11 +580,12 @@ func (manager *whisperTaskManager) executeTask(parent context.Context, task whis
 	}
 	task.Scenario = scenario.ID
 	manager.appendLog(task.ID, "开始使用 Whisper 转写。场景："+scenario.Name+"。")
+	manager.appendLog(task.ID, "任务目的：从音频提取文字。")
 	if err := manager.transcribe(ctx, task); err != nil {
 		if manager.isCancelled(task.ID) || errors.Is(ctx.Err(), context.Canceled) {
 			manager.finishTask(task.ID, whisperTaskStatusCancelled, 0, "", "任务已取消。")
 		} else {
-			manager.finishTask(task.ID, whisperTaskStatusFailed, 0, "", "提取失败："+err.Error())
+			manager.finishTask(task.ID, whisperTaskStatusFailed, 0, "", "任务失败，具体原因："+err.Error())
 		}
 		return
 	}
@@ -576,6 +604,7 @@ func (manager *whisperTaskManager) transcribe(ctx context.Context, task whisperT
 	if !available {
 		return errors.New("未检测到 Whisper")
 	}
+	manager.appendLog(task.ID, taskPythonExecutionEnvironment(whisperPath))
 	sourcePath, _, status, message := resolveMediaPreviewFile(manager.cfg, task.AgentID, task.SourcePath)
 	if status != 0 {
 		return errors.New(message)
@@ -610,6 +639,9 @@ func (manager *whisperTaskManager) transcribe(ctx context.Context, task whisperT
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
 		return errors.New("无法创建文字输出目录")
 	}
+	manager.appendLog(task.ID, "原始音频绝对路径："+sourcePath)
+	manager.appendLog(task.ID, "输出文字绝对路径："+targetPath)
+	manager.appendLog(task.ID, "Whisper 可执行文件："+whisperPath)
 	temporaryDirectory, err := os.MkdirTemp(filepath.Dir(targetPath), ".whisper-")
 	if err != nil {
 		return errors.New("无法创建 Whisper 临时目录")
@@ -664,7 +696,7 @@ func (manager *whisperTaskManager) runWhisperWithModelFallback(ctx context.Conte
 		return scenario, nil
 	}
 	if whisperModelDownloadFailure(diagnostics) {
-		manager.appendLog(taskID, "Whisper 原始模型下载失败，正在从 ModelScope 国内源下载已校验的 large-v3 模型。")
+		manager.appendLog(taskID, "Whisper 原始模型下载失败，正在从 ModelScope 国内源下载已校验的 large-v3 模型。下载源："+whisperModelScopeLargeV3URL)
 		modelPath, mirrorErr := manager.downloadWhisperLargeV3FromModelScope(ctx, taskID)
 		if mirrorErr != nil {
 			return scenario, fmt.Errorf("%w；ModelScope 国内源下载也失败：%v", err, mirrorErr)
@@ -732,6 +764,12 @@ func (manager *whisperTaskManager) runWhisperTranscription(ctx context.Context, 
 	}
 	args = append(args, "--model_dir", modelDirectory)
 	manager.appendLog(taskID, "本次转写参数："+whisperScenarioLogParameters(scenario, device)+"。")
+	manager.appendLog(taskID, "实际 Whisper 参数："+strings.Join(args, " "))
+	modelTarget := scenario.Model
+	if !filepath.IsAbs(modelTarget) {
+		modelTarget = filepath.Join(modelDirectory, modelTarget+".pt")
+	}
+	manager.appendLog(taskID, "Whisper 模型缓存目录："+taskLogAbsolutePath(modelDirectory)+"。若模型尚未缓存，将从 Whisper 官方模型源（openaipublic.azureedge.net）下载至："+taskLogAbsolutePath(modelTarget)+"；下载进度和详细资源输出会实时写入下方日志。")
 	command := whisperTaskCommandContext(ctx, whisperPath, args...)
 	timeoutPath, cleanupTimeoutPath, err := whisperSocketTimeoutSitePackage()
 	if err != nil {
@@ -775,7 +813,7 @@ func (manager *whisperTaskManager) runWhisperTranscription(ctx context.Context, 
 		if ctx.Err() != nil {
 			return diagnostics.String(), context.Canceled
 		}
-		return diagnostics.String(), fmt.Errorf("Whisper 执行失败: %w", err)
+		return diagnostics.String(), taskExecutionError("Whisper", err, diagnostics.String())
 	}
 	return diagnostics.String(), nil
 }
@@ -822,6 +860,7 @@ func (manager *whisperTaskManager) downloadWhisperLargeV3FromModelScope(ctx cont
 		return "", err
 	}
 	target := filepath.Join(directory, "large-v3.pt")
+	manager.appendLog(taskID, "ModelScope Whisper large-v3 下载目标绝对路径："+taskLogAbsolutePath(target))
 	if whisperModelFileMatches(target) {
 		manager.appendLog(taskID, "检测到已校验的 ModelScope Whisper large-v3 本地缓存，跳过重复下载。")
 		return target, nil
@@ -1311,9 +1350,9 @@ func (manager *whisperTaskManager) restartTask(agentID string, taskID int64) err
 	manager.createMu.Lock()
 	defer manager.createMu.Unlock()
 	var sourcePath string
-	if err := manager.db.QueryRow(`SELECT source_path FROM whisper_task WHERE id = ? AND agent_id = ? AND status = ?`, taskID, agentID, whisperTaskStatusCancelled).Scan(&sourcePath); err != nil {
+	if err := manager.db.QueryRow(`SELECT source_path FROM whisper_task WHERE id = ? AND agent_id = ? AND status IN (?, ?)`, taskID, agentID, whisperTaskStatusFailed, whisperTaskStatusCancelled).Scan(&sourcePath); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return errors.New("未找到可重新开始的已取消任务")
+			return errors.New("未找到可重新开始的失败或已取消任务")
 		}
 		return err
 	}
@@ -1330,7 +1369,7 @@ func (manager *whisperTaskManager) restartTask(agentID string, taskID int64) err
 		return fail(err)
 	}
 	now := whisperTaskTimestamp()
-	result, err := manager.db.Exec(`UPDATE whisper_task SET output_path = ?, saved_as = ?, status = ?, progress = 0, started_at = '', cancel_requested = 0, updated_at = ?, logs = CASE WHEN length(logs) > ? THEN substr(logs, -?) ELSE logs END || ? WHERE id = ? AND agent_id = ? AND status = ?`, filepath.ToSlash(outputPath), savedAs, whisperTaskStatusQueued, now, whisperTaskLogLimit-4096, whisperTaskLogLimit/2, "["+now+"] 已重新加入 Whisper 转写队列。\n", taskID, agentID, whisperTaskStatusCancelled)
+	result, err := manager.db.Exec(`UPDATE whisper_task SET output_path = ?, saved_as = ?, status = ?, progress = 0, started_at = '', cancel_requested = 0, updated_at = ?, logs = '' WHERE id = ? AND agent_id = ? AND status IN (?, ?)`, filepath.ToSlash(outputPath), savedAs, whisperTaskStatusQueued, now, taskID, agentID, whisperTaskStatusFailed, whisperTaskStatusCancelled)
 	if err != nil {
 		return fail(err)
 	}
@@ -1339,7 +1378,7 @@ func (manager *whisperTaskManager) restartTask(agentID string, taskID int64) err
 		return fail(err)
 	}
 	if affected != 1 {
-		return fail(errors.New("未找到可重新开始的已取消任务"))
+		return fail(errors.New("未找到可重新开始的失败或已取消任务"))
 	}
 	manager.signal()
 	return nil

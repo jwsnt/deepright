@@ -385,9 +385,9 @@ func TestWhisperTaskRestartCancelledTaskUsesNewOutputPath(t *testing.T) {
 	if err := ensureWhisperTaskSchema(db); err != nil {
 		t.Fatalf("ensure schema: %v", err)
 	}
-	result, err := db.Exec(`INSERT INTO whisper_task (agent_id, source_path, output_path, saved_as, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'now', 'now')`, "agent-a", "tmp/demo.wav", "tmp/demo.txt", filepath.Join(workspace, "tmp", "demo.txt"), whisperTaskStatusCancelled)
+	result, err := db.Exec(`INSERT INTO whisper_task (agent_id, source_path, output_path, saved_as, status, logs, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'now', 'now')`, "agent-a", "tmp/demo.wav", "tmp/demo.txt", filepath.Join(workspace, "tmp", "demo.txt"), whisperTaskStatusFailed, "old execution log")
 	if err != nil {
-		t.Fatalf("insert cancelled task: %v", err)
+		t.Fatalf("insert failed task: %v", err)
 	}
 	id, err := result.LastInsertId()
 	if err != nil {
@@ -398,15 +398,18 @@ func TestWhisperTaskRestartCancelledTaskUsesNewOutputPath(t *testing.T) {
 	defer func() { whisperTaskNow = originalNow }()
 	manager := newWhisperTaskManager(&Config{AgentDir: root}, db)
 	if err := manager.restartTask("agent-a", id); err != nil {
-		t.Fatalf("restart cancelled task: %v", err)
+		t.Fatalf("restart failed task: %v", err)
 	}
-	var status, outputPath string
+	var status, outputPath, logs string
 	var cancelRequested int
-	if err := db.QueryRow(`SELECT status, output_path, cancel_requested FROM whisper_task WHERE id = ?`, id).Scan(&status, &outputPath, &cancelRequested); err != nil {
+	if err := db.QueryRow(`SELECT status, output_path, cancel_requested, logs FROM whisper_task WHERE id = ?`, id).Scan(&status, &outputPath, &cancelRequested, &logs); err != nil {
 		t.Fatalf("read restarted task: %v", err)
 	}
 	if status != whisperTaskStatusQueued || cancelRequested != 0 || outputPath != "whisper/demo_20260801_160203.txt" {
 		t.Fatalf("unexpected restarted task: status=%q output=%q cancelled=%d", status, outputPath, cancelRequested)
+	}
+	if logs != "" {
+		t.Fatalf("restart logs = %q", logs)
 	}
 }
 

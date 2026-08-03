@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -378,8 +379,33 @@ func (m *voxcpmTaskManager) run(ctx context.Context) {
 			m.cancelRunning()
 			return
 		}
+		slotHeld, err := reserveModelTaskSlot(ctx, m.cfg, m.db, "voxcpm_task")
+		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				m.cancelRunning()
+				return
+			}
+			log.Printf("[voxcpm] reserve shared task slot failed: %v", err)
+			select {
+			case <-ctx.Done():
+				m.cancelRunning()
+				return
+			case <-time.After(time.Second):
+			}
+			continue
+		}
+		if !slotHeld {
+			select {
+			case <-ctx.Done():
+				m.cancelRunning()
+				return
+			case <-m.wake:
+			}
+			continue
+		}
 		task, err := m.claim()
 		if err != nil {
+			releaseModelTaskSlot(m.cfg)
 			select {
 			case <-ctx.Done():
 				m.cancelRunning()
@@ -389,6 +415,7 @@ func (m *voxcpmTaskManager) run(ctx context.Context) {
 			continue
 		}
 		if task == nil {
+			releaseModelTaskSlot(m.cfg)
 			select {
 			case <-ctx.Done():
 				m.cancelRunning()
@@ -398,6 +425,7 @@ func (m *voxcpmTaskManager) run(ctx context.Context) {
 			continue
 		}
 		m.execute(ctx, *task)
+		releaseModelTaskSlot(m.cfg)
 	}
 }
 func (m *voxcpmTaskManager) claim() (*voxcpmTask, error) {
@@ -446,11 +474,12 @@ func (m *voxcpmTaskManager) execute(parent context.Context, task voxcpmTask) {
 	} else {
 		m.appendLog(task.ID, "已选择参考音色，开始使用 VoxCPM 克隆参考音色生成语音。")
 	}
+	m.appendLog(task.ID, "任务目的：将 UTF-8 文字合成为 WAV 语音。")
 	if err := m.generate(ctx, task); err != nil {
 		if errors.Is(ctx.Err(), context.Canceled) || m.cancelled(task.ID) {
 			m.finish(task.ID, voxcpmTaskCancelled, 0, "任务已取消。")
 		} else {
-			m.finish(task.ID, voxcpmTaskFailed, 0, "配音失败："+err.Error())
+			m.finish(task.ID, voxcpmTaskFailed, 0, "任务失败，具体原因："+err.Error())
 		}
 		return
 	}
@@ -527,11 +556,12 @@ func (m *voxcpmTaskManager) generate(ctx context.Context, task voxcpmTask) error
 	if !ok {
 		return errors.New("未检测到可用的 voxcpm")
 	}
+	m.appendLog(task.ID, taskPythonExecutionEnvironment(executable))
 	scenario, ok := voxcpmScenarioFor(task.Scenario)
 	if !ok {
 		return errors.New("配音场景无效")
 	}
-	_, _, text, err := voxcpmResolveText(m.cfg, task.AgentID, task.TextPath)
+	_, textPath, text, err := voxcpmResolveText(m.cfg, task.AgentID, task.TextPath)
 	if err != nil {
 		return err
 	}
@@ -555,6 +585,14 @@ func (m *voxcpmTaskManager) generate(ctx context.Context, task voxcpmTask) error
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return errors.New("无法创建 audios 目录")
 	}
+	m.appendLog(task.ID, "原始文字文件绝对路径："+textPath)
+	if reference == "" {
+		m.appendLog(task.ID, "参考音频绝对路径：未使用（design 模式）。")
+	} else {
+		m.appendLog(task.ID, "参考音频绝对路径："+reference)
+	}
+	m.appendLog(task.ID, "输出 WAV 绝对路径："+target)
+	m.appendLog(task.ID, "VoxCPM 可执行文件："+executable)
 	temporary := target + ".voxcpm-" + strconv.FormatInt(task.ID, 10) + ".part.wav"
 	temporaryFile, err := os.OpenFile(temporary, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
@@ -595,7 +633,7 @@ func (m *voxcpmTaskManager) generate(ctx context.Context, task voxcpmTask) error
 	// child process at "Loading VoxCPM model..." without useful progress. The
 	// controlled ModelScope downloader has a header timeout, a no-byte-progress
 	// timeout, task logs, and SHA-256 verification for every file.
-	m.appendLog(task.ID, "正在从 ModelScope 国内源检查并准备 VoxCPM2 模型（下载过程会显示进度）。")
+	m.appendLog(task.ID, "正在从 ModelScope 国内源检查并准备 VoxCPM2 模型（下载过程会显示进度）。模型清单源："+voxcpmModelScopeFilesURL+"；模型文件源："+voxcpmModelScopeResolveBase)
 	modelPath, mirrorErr := voxcpmPrepareLocalModel(m, ctx, task.ID)
 	if mirrorErr != nil {
 		return fmt.Errorf("ModelScope 国内源准备 VoxCPM2 模型失败：%w", mirrorErr)
@@ -726,6 +764,7 @@ func (m *voxcpmTaskManager) runGenerateArgs(ctx context.Context, taskID int64, e
 	if err := os.Truncate(output, 0); err != nil {
 		return "", fmt.Errorf("无法重置配音临时文件: %w", err)
 	}
+	m.appendLog(taskID, "实际 VoxCPM 参数："+strings.Join(voxcpmLoggedArgs(args), " "))
 	cmd := voxcpmCommandContext(ctx, executable, args...)
 	// The command always receives --model-path. Make an unexpected Hub request
 	// fail immediately rather than silently creating an uncontrolled download.
@@ -755,9 +794,22 @@ func (m *voxcpmTaskManager) runGenerateArgs(ctx context.Context, taskID int64, e
 		if ctx.Err() != nil {
 			return diagnostics, context.Canceled
 		}
-		return diagnostics, fmt.Errorf("voxcpm 执行失败: %w", err)
+		return diagnostics, taskExecutionError("VoxCPM", err, diagnostics)
 	}
 	return diagnostics, nil
+}
+
+// The text is already traceable through the controlled input file path. Keep
+// the parameter name in the reproducibility log without duplicating a user's
+// potentially sensitive prose into the task record.
+func voxcpmLoggedArgs(args []string) []string {
+	logged := append([]string(nil), args...)
+	for index := 0; index+1 < len(logged); index++ {
+		if logged[index] == "--text" {
+			logged[index+1] = "<由原始文字文件读取>"
+		}
+	}
+	return logged
 }
 
 func voxcpmCLIArgumentError(diagnostics string) bool {
@@ -910,13 +962,14 @@ func (m *voxcpmTaskManager) downloadVoxCPM2FromModelScope(ctx context.Context, t
 		// it is incomplete or belongs to a different revision.
 		destination += "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	}
+	m.appendLog(taskID, "VoxCPM2 模型下载目标绝对目录："+taskLogAbsolutePath(destination))
 	staging, err := os.MkdirTemp(cacheRoot, ".OpenBMB--VoxCPM2-modelscope-")
 	if err != nil {
 		return "", fmt.Errorf("无法创建 VoxCPM2 模型临时目录: %w", err)
 	}
 	defer os.RemoveAll(staging)
 	for index, file := range files {
-		m.appendLog(taskID, fmt.Sprintf("正在从 ModelScope 下载模型文件（%d/%d）：%s", index+1, len(files), file.Path))
+		m.appendLog(taskID, fmt.Sprintf("正在从 ModelScope 下载模型文件（%d/%d）：%s；下载源：%s；最终目标绝对路径：%s", index+1, len(files), file.Path, voxcpmModelScopeFileURL(file.Path), taskLogAbsolutePath(filepath.Join(destination, filepath.FromSlash(file.Path)))))
 		if err := m.downloadVoxCPM2ModelFile(ctx, taskID, staging, file); err != nil {
 			return "", err
 		}
@@ -1370,8 +1423,8 @@ func (m *voxcpmTaskManager) cancelTask(agentID string, id int64) error {
 func (m *voxcpmTaskManager) restart(agentID string, id int64) error {
 	agentID = strings.TrimSpace(agentID)
 	var textPath, referencePath, requested string
-	if err := m.db.QueryRow(`SELECT text_path,reference_audio_path,requested_name FROM voxcpm_task WHERE id=? AND agent_id=? AND status=?`, id, agentID, voxcpmTaskCancelled).Scan(&textPath, &referencePath, &requested); err != nil {
-		return errors.New("仅可重新开始已取消任务")
+	if err := m.db.QueryRow(`SELECT text_path,reference_audio_path,requested_name FROM voxcpm_task WHERE id=? AND agent_id=? AND status IN (?, ?)`, id, agentID, voxcpmTaskFailed, voxcpmTaskCancelled).Scan(&textPath, &referencePath, &requested); err != nil {
+		return errors.New("仅可重新开始失败或已取消任务")
 	}
 	workspace, err := getWorkspaceByAgentID(m.cfg, agentID)
 	if err != nil {
@@ -1382,7 +1435,7 @@ func (m *voxcpmTaskManager) restart(agentID string, id int64) error {
 		return err
 	}
 	now := voxcpmTimestamp()
-	result, err := m.db.Exec(`UPDATE voxcpm_task SET output_path=?,saved_as=?,status=?,progress=0,started_at='',cancel_requested=0,updated_at=?,logs=CASE WHEN length(logs)>? THEN substr(logs,-?) ELSE logs END || ? WHERE id=? AND agent_id=? AND status=?`, output, saved, voxcpmTaskQueued, now, voxcpmTaskLogLimit-4096, voxcpmTaskLogLimit/2, "["+now+"] 已重新加入文字转语音队列。\n", id, agentID, voxcpmTaskCancelled)
+	result, err := m.db.Exec(`UPDATE voxcpm_task SET output_path=?,saved_as=?,status=?,progress=0,started_at='',cancel_requested=0,updated_at=?,logs='' WHERE id=? AND agent_id=? AND status IN (?, ?)`, output, saved, voxcpmTaskQueued, now, id, agentID, voxcpmTaskFailed, voxcpmTaskCancelled)
 	if err != nil {
 		return err
 	}

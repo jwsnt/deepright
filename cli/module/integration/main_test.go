@@ -4666,9 +4666,9 @@ func TestHandleVideoTrimCreatesNewMP4WithoutChangingSource(t *testing.T) {
 	}
 	if got := findArg("-c:a"); got != "aac" {
 		t.Errorf("ffmpeg -c:a = %q, want aac", got)
-}
+	}
 
-// A full-video selection uses the media element's actual duration, which
+	// A full-video selection uses the media element's actual duration, which
 	// need not lie on the 0.5-second slider grid. It must still be exportable.
 	fullDurationBody, err := json.Marshal(VideoTrimRequest{AgentID: "agent-a", Path: "media/clip.mov", Start: 0, End: 12.4, OutputName: "完整时长.mp4"})
 	if err != nil {
@@ -4801,6 +4801,51 @@ func TestHandleVideoTrimCreatesNewMP4WithoutChangingSource(t *testing.T) {
 			body, _ := io.ReadAll(linkedResponse.Body)
 			t.Errorf("symlink trim status = %d, want 400, body=%s", linkedResponse.StatusCode, body)
 		}
+	}
+}
+
+func TestRunFFmpegVideoEncodeFallsBackFromGPUToCPU(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test command shim uses POSIX sh")
+	}
+	temporaryPath := filepath.Join(t.TempDir(), "output.mp4")
+	previousCommand := videoTrimCommandContextFn
+	previousOutput := log.Writer()
+	previousFlags := log.Flags()
+	var logs bytes.Buffer
+	videoTrimCommandContextFn = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		encoder := ""
+		for index := 0; index+1 < len(args); index++ {
+			if args[index] == "-c:v" {
+				encoder = args[index+1]
+				break
+			}
+		}
+		if encoder == "h264_videotoolbox" {
+			return exec.CommandContext(ctx, "sh", "-c", "printf partial > \"$1\"; exit 1", "ffmpeg-gpu-failure-test", temporaryPath)
+		}
+		return exec.CommandContext(ctx, "sh", "-c", "test ! -e \"$1\" && printf cpu > \"$1\"", "ffmpeg-cpu-fallback-test", temporaryPath)
+	}
+	log.SetOutput(&logs)
+	log.SetFlags(0)
+	t.Cleanup(func() {
+		videoTrimCommandContextFn = previousCommand
+		log.SetOutput(previousOutput)
+		log.SetFlags(previousFlags)
+	})
+
+	_, err := runFFmpegVideoEncode(context.Background(), "fallback test", "ffmpeg", temporaryPath,
+		[]ffmpegVideoEncoder{{Name: "h264_videotoolbox", Hardware: true}, {Name: "libx264"}},
+		func(encoder ffmpegVideoEncoder) []string { return []string{"-c:v", encoder.Name, temporaryPath} })
+	if err != nil {
+		t.Fatalf("runFFmpegVideoEncode returned %v", err)
+	}
+	if data, readErr := os.ReadFile(temporaryPath); readErr != nil || string(data) != "cpu" {
+		t.Fatalf("fallback output = %q, err=%v; want CPU output", data, readErr)
+	}
+	logOutput := logs.String()
+	if !strings.Contains(logOutput, "using GPU encoder h264_videotoolbox") || !strings.Contains(logOutput, "falling back to CPU encoder libx264") || !strings.Contains(logOutput, "using CPU encoder libx264") {
+		t.Fatalf("fallback log did not record GPU selection and CPU fallback: %q", logOutput)
 	}
 }
 

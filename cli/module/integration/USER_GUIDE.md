@@ -3589,6 +3589,22 @@ Integration 提供基于 Robust Video Matting 的持久化视频主体队列。`
 
 在 macOS 上任务优先使用 Apple MPS，其他系统优先 CUDA；GPU/MPS 推理失败时会清理临时输出并自动从头以 CPU 重试一次。任务场景、状态、日志、取消、重新开始和失败或已取消记录删除均保存在共享 SQLite，刷新页面或重启服务不会丢失历史记录。
 
+---
+
+## 迭代 20260803-1：媒体任务重新开始与日志求助
+
+VoxCPM、Whisper、rembg、Wav2Lip 与 RVM 的重启接口均支持失败和已取消任务。任务成功重新入队后会清空旧日志，不显示重新入队提示；原始参数与受控输出分配规则保持不变，新的日志从任务实际执行时开始。
+
+`POST /api/task_help` 接收当前 Agent 的 `agentId`、固定任务类型和任务 ID。服务端验证归属后，将当前日志保存到该 Agent `tmp/` 中的 `<功能名>_YYYYMMDD_HHMMSS.log` 文件；同名时追加安全序号。它每次读取并校验 `config/config.json.seekHelp`，替换 `$function` 和包含日志绝对路径的 `$log` 文件气泡后返回消息文本，前端再将该文本发送至当前会话。
+
+这五类媒体任务还共用 `config/config.json.modelTask.concurrence` 控制的全局等待队列。它是五类任务合计的并发上限，不是每种任务各自的上限；默认 `1` 表示同一时刻只执行一个模型任务。尚未取得名额的任务维持 `queued`，取得名额后才改为 `running`。修改配置后重启 Integration 生效；缺失或非法配置会安全使用 `1`，并在服务日志中记录原因。
+
+五类任务均已提供 CLI：`integration api whisper|rembg|voxcpm|wav2lip|rvm <check|list|create|cancel|restart|delete|log>`。各功能的 `--help` 列出工作区相对路径参数、模型/场景参数、公共队列语义、状态边界和命令案例；RVM 用 `--path` 与可重复 `--scenario` 创建任务，Wav2Lip 用顺序配对的 `--videoPath` 与 `--audioPath` 创建任务。完整 API 与案例见 `config/app/API.md`。
+
+这五类任务的日志会逐次记录任务目的、实际使用的 Python/CPython 解释器和执行入口/脚本、服务端解析的输入绝对路径、最终输出绝对路径、实际模型/权重和具体参数。下载模型或运行时资源时会记录下载源、准备写入的绝对路径、进度及校验结果；失败结束时会记录具体原因和详细错误输出。
+
+完整说明见 [iteration/20260803-1/USER_GUIDE.md](iteration/20260803-1/USER_GUIDE.md)。
+
 完整配置与接口说明见 [iteration/20260802-3/USER_GUIDE.md](iteration/20260802-3/USER_GUIDE.md)。
 
 ---

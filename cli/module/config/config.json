@@ -11,6 +11,9 @@
     "refresh": 60,
     "cache": 120
   },
+  "modelTask": {
+    "concurrence": 1
+  },
   "ffmpeg": {
     "check": 24,
     "install": "请先检测当前操作系统、CPU 架构与可用包管理器。必须安装当前稳定版 `FFmpeg 8.1.2`，不得使用开发版、其他版本或来源不明的二进制。使用该系统的可信包源或官方发行包安装，并确保安装包同时提供 ffmpeg 与 ffprobe。安装后执行 `ffmpeg -version` 和 `ffprobe -version`，确认二者均可由当前服务环境找到并运行，且版本为 8.1.2。若安装或验证失败，请改用可信来源提供的 FFmpeg 8.1.2 发行包后重试。最后输出安装来源、FFmpeg 最终版本、两个可执行文件的绝对路径与验证结果。"
@@ -194,5 +197,6 @@
     "function": "全部功能",
     "debug": "请修复 $path，问题是 $reason",
     "recover": 30
-  }
+  },
+  "seekHelp": "我正在使用 $function，请解释或解决以下问题： $log"
 }

@@ -35,6 +35,8 @@ integration api edit --agentId demo --path USER.md --content '# hello'
 integration api whisper create --agentId demo --path audios/meeting.mp3 --scenario chinese_meeting
 integration api rembg create --agentId demo --path images/product.jpg --model u2net --alpha-matting
 integration api voxcpm create --agentId demo --textPath scripts/intro.txt --outputName intro.wav
+integration api wav2lip create --agentId demo --videoPath videos/person.mp4 --audioPath audios/line.wav
+integration api rvm create --agentId demo --path videos/product.mp4 --scenario quality
 integration service cancel --chat chat-001
 ```
 
@@ -134,8 +136,8 @@ integration service cancel --chat chat-001
 | GET | `/api/whisper/tasks` | 查询当前 Agent 的转写任务（固定每页 5 条） | `integration api whisper list` |
 | POST | `/api/whisper/tasks` | 将一个或多个工作区音频加入转写队列 | `integration api whisper create` |
 | POST | `/api/whisper/tasks/cancel` | 取消排队中或执行中的任务 | `integration api whisper cancel` |
-| POST | `/api/whisper/tasks/restart` | 将已取消任务重新加入队列 | `integration api whisper restart` |
-| POST | `/api/whisper/tasks/delete` | 删除失败任务的记录，不删除文件 | `integration api whisper delete` |
+| POST | `/api/whisper/tasks/restart` | 将失败或已取消任务重新加入队列 | `integration api whisper restart` |
+| POST | `/api/whisper/tasks/delete` | 删除失败或已取消任务的记录，不删除文件 | `integration api whisper delete` |
 | GET | `/api/whisper/tasks/log` | 查询任务详情及持久化执行日志 | `integration api whisper log` |
 
 ### rembg 图片主体提取接口
@@ -146,8 +148,8 @@ integration service cancel --chat chat-001
 | GET | `/api/rembg/tasks` | 查询当前 Agent 的图片主体任务（固定每页 5 条） | `integration api rembg list` |
 | POST | `/api/rembg/tasks` | 将一个或多个工作区图片加入提取队列 | `integration api rembg create` |
 | POST | `/api/rembg/tasks/cancel` | 取消排队中或执行中的任务 | `integration api rembg cancel` |
-| POST | `/api/rembg/tasks/restart` | 将已取消任务重新加入队列 | `integration api rembg restart` |
-| POST | `/api/rembg/tasks/delete` | 删除失败任务的记录，不删除源图片或输出图片 | `integration api rembg delete` |
+| POST | `/api/rembg/tasks/restart` | 将失败或已取消任务重新加入队列 | `integration api rembg restart` |
+| POST | `/api/rembg/tasks/delete` | 删除失败或已取消任务的记录，不删除源图片或输出图片 | `integration api rembg delete` |
 | GET | `/api/rembg/tasks/log` | 查询任务详情及持久化执行日志 | `integration api rembg log` |
 
 ### VoxCPM 文字转语音接口
@@ -158,9 +160,33 @@ integration service cancel --chat chat-001
 | GET | `/api/voxcpm/tasks` | 查询当前 Agent 的文字转语音任务（固定每页 5 条） | `integration api voxcpm list` |
 | POST | `/api/voxcpm/tasks` | 将一至五条工作区文字任务加入队列 | `integration api voxcpm create` |
 | POST | `/api/voxcpm/tasks/cancel` | 取消排队中或执行中的任务 | `integration api voxcpm cancel` |
-| POST | `/api/voxcpm/tasks/restart` | 将已取消任务重新加入队列 | `integration api voxcpm restart` |
-| POST | `/api/voxcpm/tasks/delete` | 删除失败任务的记录，不删除源文件或输出文件 | `integration api voxcpm delete` |
+| POST | `/api/voxcpm/tasks/restart` | 将失败或已取消任务重新加入队列 | `integration api voxcpm restart` |
+| POST | `/api/voxcpm/tasks/delete` | 删除失败或已取消任务的记录，不删除源文件或输出文件 | `integration api voxcpm delete` |
 | GET | `/api/voxcpm/tasks/log` | 查询任务详情及持久化执行日志 | `integration api voxcpm log` |
+
+### Wav2Lip 人物视频对口型接口
+
+| 方法 | 路径 | 功能 | CLI |
+|---|---|---|---|
+| GET | `/api/wav2lip/check` | 检查受控环境、Wav2Lip 脚本和权重 | `integration api wav2lip check` |
+| GET | `/api/wav2lip/tasks` | 查询当前 Agent 的对口型任务（固定每页 5 条） | `integration api wav2lip list` |
+| POST | `/api/wav2lip/tasks` | 将一至 64 组工作区视频、音频配对加入队列 | `integration api wav2lip create` |
+| POST | `/api/wav2lip/tasks/cancel` | 取消排队中或执行中的任务 | `integration api wav2lip cancel` |
+| POST | `/api/wav2lip/tasks/restart` | 将失败或已取消任务重新加入队列 | `integration api wav2lip restart` |
+| POST | `/api/wav2lip/tasks/delete` | 删除失败或已取消任务的记录，不删除文件 | `integration api wav2lip delete` |
+| GET | `/api/wav2lip/tasks/log` | 查询任务详情、失败原因及持久化执行日志 | `integration api wav2lip log` |
+
+### RVM 视频提取主体接口
+
+| 方法 | 路径 | 功能 | CLI |
+|---|---|---|---|
+| GET | `/api/rvm/check` | 检查受控环境、RVM 脚本和权重 | `integration api rvm check` |
+| GET | `/api/rvm/tasks` | 查询当前 Agent 的视频主体任务（固定每页 5 条） | `integration api rvm list` |
+| POST | `/api/rvm/tasks` | 将一个或多个工作区视频加入队列 | `integration api rvm create` |
+| POST | `/api/rvm/tasks/cancel` | 取消排队中或执行中的任务 | `integration api rvm cancel` |
+| POST | `/api/rvm/tasks/restart` | 将失败或已取消任务重新加入队列 | `integration api rvm restart` |
+| POST | `/api/rvm/tasks/delete` | 删除失败或已取消任务的记录，不删除文件 | `integration api rvm delete` |
+| GET | `/api/rvm/tasks/log` | 查询任务详情及持久化执行日志 | `integration api rvm log` |
 
 ### 插件 / Connect / Cron 接口
 
@@ -780,7 +806,7 @@ integration api cron detail-status --agentId demo-agent --detailId detail_1 --st
 
 ### Whisper 音频文字提取
 
-适用范围：所有请求都由 Integration 的受控运行环境执行。每个任务使用服务端白名单中的转写场景，默认 `chinese_meeting`（中文会议）；任务在全部 Agent 间串行调度，输出写入对应 Agent 工作目录的 `whisper/`。任务状态为 `queued`、`running`、`completed`、`cancelled` 或 `failed`。
+适用范围：所有请求都由 Integration 的受控运行环境执行。每个任务使用服务端白名单中的转写场景，默认 `chinese_meeting`（中文会议）；输出写入对应 Agent 工作目录的 `whisper/`。五类媒体任务共用 `config/config.json.modelTask.concurrence` 控制的等待队列，只有取得公共名额才从 `queued` 转为 `running`；默认 `1` 表示同一时刻合计仅执行一个任务。任务状态为 `queued`、`running`、`completed`、`cancelled` 或 `failed`。
 
 | 场景 | 标识 | 适用情况 |
 |---|---|---|
@@ -840,7 +866,7 @@ integration api whisper create \
   --scenario chinese_meeting
 ```
 
-成功响应为 `{"status":0,"tasks":[...]}`。创建即进入串行队列；该接口不会等待转写完成。
+成功响应为 `{"status":0,"tasks":[...]}`。创建即进入公共等待队列；该接口不会等待转写完成。
 
 #### 取消、重新开始与删除
 
@@ -853,8 +879,8 @@ integration api whisper create \
 | 操作 | HTTP | 前置条件 | CLI |
 |---|---|---|---|
 | 取消 | `POST /api/whisper/tasks/cancel` | 任务为 `queued` 或 `running` | `integration api whisper cancel --agentId demo-agent --id 12` |
-| 重新开始 | `POST /api/whisper/tasks/restart` | 任务为 `cancelled` | `integration api whisper restart --agentId demo-agent --id 12` |
-| 删除记录 | `POST /api/whisper/tasks/delete` | 任务为 `failed`；不会删除音频或文字文件 | `integration api whisper delete --agentId demo-agent --id 12` |
+| 重新开始 | `POST /api/whisper/tasks/restart` | 任务为 `failed` 或 `cancelled`；重新开始时清空旧日志 | `integration api whisper restart --agentId demo-agent --id 12` |
+| 删除记录 | `POST /api/whisper/tasks/delete` | 任务为 `failed` 或 `cancelled`；不会删除音频或文字文件 | `integration api whisper delete --agentId demo-agent --id 12` |
 
 取消正在执行的任务会终止对应 Whisper 子进程，并立即让队列调度下一条任务。重新开始会重新分配输出文件路径，并保留该任务原有的场景。执行日志会记录场景及本次实际使用的模型、语言、温度、搜索宽度、上下文和 `fp16` 参数。
 
@@ -885,7 +911,7 @@ integration api whisper log --agentId demo-agent --id 12
 
 ### rembg 图片主体提取
 
-受控环境通过 `rembg i <source> <output>` 串行处理图片。任务、状态和日志保存在 Integration 数据库中；每个输出都使用透明背景 PNG，并写入相应 Agent 工作目录的 `images/`。图片须位于该 Agent 工作目录且经服务端图片检测通过，输出名称为 `<原文件名>_subject.png`，冲突时追加时间戳，绝不覆盖既有文件。
+受控环境通过 `rembg i <source> <output>` 处理图片。任务、状态和日志保存在 Integration 数据库中；每个输出都使用透明背景 PNG，并写入相应 Agent 工作目录的 `images/`。图片须位于该 Agent 工作目录且经服务端图片检测通过，输出名称为 `<原文件名>_subject.png`，冲突时追加时间戳，绝不覆盖既有文件。它与其它四类媒体任务共用 `modelTask.concurrence` 等待队列。
 
 `GET /api/rembg/check` 从 `config/config.json.rembg` 读取检查缓存时长与安装请求文案；未找到可执行的 `rembg` 时返回该安装请求。任务接口与 Whisper 队列使用相同的 `status` / `content` 响应约定、状态值、分页规则及取消、重试、失败删除和日志查询语义。
 
@@ -923,11 +949,11 @@ integration api rembg delete --agentId demo-agent --id 12
 integration api rembg log --agentId demo-agent --id 12
 ```
 
-`cancel` 仅适用于 `queued` 或 `running`，`restart` 仅适用于 `cancelled`，`delete` 仅删除 `failed` 的任务记录；三者均不会删除源图片或已生成的 PNG。`list` 与 `log` 的筛选、分页和日志语义与 Whisper 对应命令相同。
+`cancel` 仅适用于 `queued` 或 `running`，`restart` 适用于 `failed` 或 `cancelled` 且会清空旧日志，`delete` 仅删除 `failed` 或 `cancelled` 的任务记录；三者均不会删除源图片或已生成的 PNG。`list` 与 `log` 的筛选、分页和日志语义与 Whisper 对应命令相同。
 
 ### VoxCPM 文字转语音
 
-VoxCPM 任务仅接受当前 Agent 工作区中的非空 UTF-8 文字文件；参考音色和表达风格均可不填。未提供参考音色时使用 `design` 自由生成声音，提供后使用 `clone` 克隆音色。输出固定写入当前 Agent 的 `audios/`；单条任务使用请求名称，批量任务和任何命名冲突会自动追加时间戳，不覆盖既有文件。
+VoxCPM 任务仅接受当前 Agent 工作区中的非空 UTF-8 文字文件；参考音色和表达风格均可不填。未提供参考音色时使用 `design` 自由生成声音，提供后使用 `clone` 克隆音色。输出固定写入当前 Agent 的 `audios/`；单条任务使用请求名称，批量任务和任何命名冲突会自动追加时间戳，不覆盖既有文件。它与其它四类媒体任务共用 `config/config.json.modelTask.concurrence` 等待队列。
 
 CLI 入口：
 
@@ -977,7 +1003,67 @@ integration api voxcpm delete --agentId demo-agent --id 12
 integration api voxcpm log --agentId demo-agent --id 12
 ```
 
-`cancel` 仅适用于 `queued` 或 `running`，`restart` 仅适用于 `cancelled`，`delete` 仅删除 `failed` 的任务记录；三者都不会删除文字、参考音色或输出 WAV。`log` 返回包括实际 `design`/`clone` 模式、场景参数、表达风格和受控设备回退信息在内的持久化日志。
+`cancel` 仅适用于 `queued` 或 `running`，`restart` 适用于 `failed` 或 `cancelled` 且会清空旧日志，`delete` 仅删除 `failed` 或 `cancelled` 的任务记录；三者都不会删除文字、参考音色或输出 WAV。`log` 返回包括实际 `design`/`clone` 模式、场景参数、表达风格和受控设备回退信息在内的持久化日志。
+
+### Wav2Lip 人物视频对口型
+
+Wav2Lip 将当前 Agent 工作区的一组视频和一组音频配对，生成 `videos/<视频名>_lip_sync.mp4`；输出冲突时由服务端改用安全名称，绝不覆盖已有文件。任务和其它四类媒体任务共享 `config/config.json.modelTask.concurrence` 等待队列。CLI 的视频与音频参数按出现顺序配对，必须数量相同，最多 64 组。
+
+```bash
+# 查看受控 Python、脚本和权重是否可用，以及查询正在执行的任务
+integration api wav2lip check
+integration api wav2lip list --agentId demo-agent --status running --page 1
+
+# 提交单个视频、音频配对
+integration api wav2lip create \
+  --agentId demo-agent \
+  --videoPath videos/person.mp4 \
+  --audioPath audios/line.wav
+
+# 按顺序提交两组配对
+integration api wav2lip create \
+  --agentId demo-agent \
+  --videoPath videos/a.mp4 --audioPath audios/a.wav \
+  --videoPath videos/b.mov --audioPath audios/b.mp3
+
+# 管理或读取单个任务
+integration api wav2lip cancel --agentId demo-agent --id 12
+integration api wav2lip restart --agentId demo-agent --id 12
+integration api wav2lip delete --agentId demo-agent --id 12
+integration api wav2lip log --agentId demo-agent --id 12
+```
+
+`cancel` 仅适用于 `queued` 或 `running`；`restart` 适用于 `failed` 或 `cancelled` 并清空旧日志；`delete` 仅删除 `failed` 或 `cancelled` 的任务记录。三项操作均不删除源视频、源音频或输出视频。`log` 可在任务运行时轮询，返回实际 Python 环境、模型参数、下载过程、失败原因和诊断日志。
+
+### RVM 视频提取主体
+
+RVM 将当前 Agent 工作区的视频处理为透明 MOV 与黑底 MP4 预览，输出位于 `videos/`，同名冲突时由服务端安全改名。任务共享同一 `modelTask.concurrence` 等待队列。`--scenario` 可填写 `standard`（默认）、`quality` 或 `fast`；提供一次会应用到全部 `--path`，也可逐路径指定。
+
+```bash
+# 检查 RVM 运行时并查询排队任务
+integration api rvm check
+integration api rvm list --agentId demo-agent --status queued --page 1
+
+# 精细边缘提取
+integration api rvm create \
+  --agentId demo-agent \
+  --path videos/product.mp4 \
+  --scenario quality
+
+# 批量任务分别选择标准与快速场景
+integration api rvm create \
+  --agentId demo-agent \
+  --path videos/a.mp4 --path videos/b.mov \
+  --scenario standard --scenario fast
+
+# 管理或读取单个任务
+integration api rvm cancel --agentId demo-agent --id 12
+integration api rvm restart --agentId demo-agent --id 12
+integration api rvm delete --agentId demo-agent --id 12
+integration api rvm log --agentId demo-agent --id 12
+```
+
+`cancel` 仅适用于 `queued` 或 `running`；`restart` 适用于 `failed` 或 `cancelled` 并清空旧日志；`delete` 仅删除 `failed` 或 `cancelled` 的任务记录。它们不会删除源视频、透明 MOV 或 MP4 预览；`log` 可用于轮询执行详情。
 
 ### `/api/shutdown`
 
