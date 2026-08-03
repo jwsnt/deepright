@@ -10553,6 +10553,7 @@ function savePageAnnotation() {
   closePageAnnotation(true);
   renderMessages();
   syncPageAnnotationHighlights();
+  syncCenterComposerState(selected.chatId);
   return true;
 }
 
@@ -10569,6 +10570,7 @@ function deletePageAnnotation(annotationId) {
   pageAnnotationState.selection = null;
   renderMessages();
   syncPageAnnotationHighlights();
+  syncCenterComposerState(target.chatId);
   return true;
 }
 
@@ -10624,6 +10626,7 @@ function confirmPageAnnotationClear() {
   pageAnnotationState.selection = null;
   renderMessages();
   syncPageAnnotationHighlights();
+  syncCenterComposerState(pendingTarget.chatId);
   return true;
 }
 
@@ -10633,7 +10636,10 @@ function clearPageAnnotationsForChat(chatId, options) {
   if (!resolvedChatId || !store.chats[resolvedChatId]) return false;
   delete store.chats[resolvedChatId];
   persistPageAnnotationStore();
-  if (!(options && options.skipRender) && resolvedChatId === String(state.activeChat || '')) renderMessages();
+  if (resolvedChatId === String(state.activeChat || '')) {
+    if (!(options && options.skipRender)) renderMessages();
+    syncCenterComposerState(resolvedChatId);
+  }
   return true;
 }
 
@@ -10651,6 +10657,7 @@ function clearAllPageAnnotations(options) {
   } else {
     document.querySelectorAll('.page-annotation-list').forEach(el => el.remove());
   }
+  syncCenterComposerState(state.activeChat);
   refreshChatStorageStatsOverlay();
   if (opts.showNotice) vfsShowUploadToast(opts.noticeText || '已清空所有 chat 的页面备注', false);
   return hadAnnotations;
@@ -10696,11 +10703,22 @@ function pageAnnotationStorageStats() {
   return { bytes: estimateJsonStorageBytes(store), count, chats: chatEntries.length };
 }
 
-function composePageAnnotationsForSend(chatId, userText) {
+function getPageAnnotationsForSend(chatId) {
   const target = getCurrentPageAnnotationTarget(chatId);
+  if (!target) return [];
+  // An annotation only makes a request sendable when its quoted source text
+  // is still available. This is the text copied into the request.
+  return getPageAnnotationsForTarget(target.chatId, target.targetId)
+    .filter(annotation => String(annotation && annotation.quote || '').trim());
+}
+
+function hasPageAnnotationsForSend(chatId) {
+  return getPageAnnotationsForSend(chatId).length > 0;
+}
+
+function composePageAnnotationsForSend(chatId, userText) {
   const text = String(userText || '').trim();
-  if (!target) return text;
-  const annotations = getPageAnnotationsForTarget(target.chatId, target.targetId);
+  const annotations = getPageAnnotationsForSend(chatId);
   if (!annotations.length) return text;
   const toMarkdownTableCell = value => String(value || '')
     .replace(/\\/g, '\\\\')
@@ -33666,10 +33684,11 @@ function scheduleQueuedCenterRequestDrain(chatId, agentId) {
   syncQueuedCenterInputUI(chatId, resolvedAgentId);
 }
 
-function queueCenterMessageAfterBusy(chatId, rawText, agentId, fileOwners) {
+function queueCenterMessageAfterBusy(chatId, rawText, agentId, fileOwners, options) {
   const text = String(rawText || '').trim();
   const resolvedAgentId = String(agentId != null ? agentId : getChatAgentId(chatId)).trim();
   if (!chatId || !text) return false;
+  const opts = options || {};
   const input = document.getElementById('msgInput');
   const queue = ensureQueuedCenterQueue(chatId, resolvedAgentId);
   if (!queue) return false;
@@ -33678,9 +33697,10 @@ function queueCenterMessageAfterBusy(chatId, rawText, agentId, fileOwners) {
     vfsShowUploadToast(`待发送消息最多 ${QUEUED_CENTER_REQUEST_LIMIT} 条`, true);
     return false;
   }
-  const draftHtml = input ? input.innerHTML : text;
+  const draftHtml = getInputText() && input ? input.innerHTML : text;
   const itemId = uuid();
   const sendOptions = captureQueuedCenterSendOptions(chatId);
+  if (opts.includePageAnnotations === false) sendOptions.includePageAnnotations = false;
   const normalizedFileOwners = normalizeMessageFileOwners(fileOwners);
   if (Object.keys(normalizedFileOwners).length) sendOptions.fileOwners = normalizedFileOwners;
   queue.items.push({
@@ -40488,6 +40508,8 @@ async function handleSend(event) {
   const chatId = String(state.activeChat || '').trim();
   if (chatId && isChatSendDispatching(chatId)) return false;
   const text = getInputText();
+  const composedText = composePageAnnotationsForSend(chatId, text);
+  const hasSendableContent = !!composedText;
   const fileOwners = collectFileOwnersFromInput(document.getElementById('msgInput'));
   if (event) {
     const confirmed = await maybePromptChatAgentChangeConfirm(chatId, text);
@@ -40498,7 +40520,13 @@ async function handleSend(event) {
     const isStopMode = !!(btn && btn.classList.contains('stop'));
     const isSendButtonTrigger = !!(event && event.currentTarget === btn);
     const isManualStopTrigger = !!(isSendButtonTrigger && (!event || typeof event.detail !== 'number' || event.detail > 0));
-    if (text) return queueCenterMessageAfterBusy(chatId, text, getChatAgentId(chatId), fileOwners);
+    if (hasSendableContent) {
+      // Queue the composed snapshot so annotations selected for this request
+      // cannot be lost when the current response completes and clears them.
+      return queueCenterMessageAfterBusy(chatId, composedText, getChatAgentId(chatId), fileOwners, {
+        includePageAnnotations: false
+      });
+    }
     if (isStopMode && isManualStopTrigger) {
       if (!isChatCancelling(chatId)) return stopStreaming();
       return false;
@@ -40772,10 +40800,10 @@ async function sendCenterMessage(rawText, options) {
     ? { ...opts.metadata }
     : null;
   const userText = String(rawText || '').trim();
-  if (!userText) return false;
   const text = opts.includePageAnnotations === false
     ? userText
     : composePageAnnotationsForSend(chatId, userText);
+  if (!text) return false;
   if (countEditableInputChars(text) > EDITABLE_INPUT_MAX_CHARS) {
     vfsShowUploadToast('输入内容最多 ' + EDITABLE_INPUT_MAX_CHARS + ' 个字符', true);
     return false;
@@ -41971,6 +41999,7 @@ function syncCenterComposerState(chatId, options) {
   const dispatching = !!(resolvedChatId && isChatSendDispatching(resolvedChatId));
   const busy = !!(resolvedChatId && isChatBusy(resolvedChatId));
   const hasText = !!(input && getInputText());
+  const hasSendableContent = hasText || hasPageAnnotationsForSend(resolvedChatId);
   const inputLocked = queueFull || dispatching;
   if (input) {
     input.classList.toggle('locked', inputLocked);
@@ -41980,9 +42009,9 @@ function syncCenterComposerState(chatId, options) {
   }
   const btn = document.getElementById('sendBtn');
   if (btn) btn.disabled = dispatching;
-  const nextMode = busy && (!hasText || queueFull) ? 'stop' : 'send';
+  const nextMode = busy && (!hasSendableContent || queueFull) ? 'stop' : 'send';
   setSendBtnMode(nextMode, { flash: !!(options && options.flashSend) });
-  return { busy, hasText, queueFull, inputLocked, mode: nextMode, dispatching };
+  return { busy, hasText, hasSendableContent, queueFull, inputLocked, mode: nextMode, dispatching };
 }
 
 // ===== Settings =====
@@ -58095,7 +58124,7 @@ function feRembgTaskCloseModelMenuIfFocusLost() { window.setTimeout(()=>{const s
 function feRembgTaskSetAlphaMatting(index, alphaMatting) { const state=feRembgTaskState, item=state&&state.pendingPaths[Number(index)]; if(!state||!item||state.importing||state.creating)return; item.alphaMatting=!!alphaMatting; state.parameterHint=feRembgTaskParameterHints(item.model,item.alphaMatting); feRembgTaskSetStatus('',false); feRembgTaskRender(); }
 function feRembgTaskRemovePending(index) { const state=feRembgTaskState;if(state&&!state.importing&&!state.creating) {state.pendingPaths.splice(Number(index),1);const item=state.pendingPaths[0];state.parameterHint=item?feRembgTaskParameterHints(item.model,item.alphaMatting):null;feRembgTaskRender();} }
 async function feRembgTaskRequest(path,id) { const state=feRembgTaskState; const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agentId:state.agentId,id:Number(id)})}); const result=await response.json(); if(!response.ok||!result||result.status!==0)throw new Error(result&&result.content||'请求失败'); }
-async function feRembgTaskStart() { const state=feRembgTaskState;if(!state||state.creating||!state.pendingPaths.length)return;state.creating=true;try{const response=await fetch('/api/rembg/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agentId:state.agentId,tasks:state.pendingPaths})});const result=await response.json();if(!response.ok||!result||result.status!==0)throw new Error(result&&result.content||'创建任务失败');if(feRembgTaskState!==state)return;state.pendingPaths=[];state.parameterHint='';state.status='已加入图片主体提取队列；缺失的模型会在任务执行时自动下载。';state.error=false;await feRembgTaskRefresh();}catch(error){if(feRembgTaskState===state)feRembgTaskSetStatus('创建任务失败：'+((error&&error.message)||'请重试'),true)}finally{if(feRembgTaskState===state){state.creating=false;feRembgTaskRender();}} }
+async function feRembgTaskStart() { const state=feRembgTaskState;if(!state||state.creating||!state.pendingPaths.length)return;state.creating=true;try{const response=await fetch('/api/rembg/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agentId:state.agentId,tasks:state.pendingPaths})});const result=await response.json();if(!response.ok||!result||result.status!==0)throw new Error(result&&result.content||'创建任务失败');if(feRembgTaskState!==state)return;state.pendingPaths=[];state.parameterHint='';state.status='';state.error=false;await feRembgTaskRefresh();}catch(error){if(feRembgTaskState===state)feRembgTaskSetStatus('创建任务失败：'+((error&&error.message)||'请重试'),true)}finally{if(feRembgTaskState===state){state.creating=false;feRembgTaskRender();}} }
 async function feRembgTaskCancel(id) { try{await feRembgTaskRequest('/api/rembg/tasks/cancel',id);feRembgTaskSetStatus('已请求取消任务。',false);await feRembgTaskRefresh();}catch(error){feRembgTaskSetStatus('取消任务失败：'+((error&&error.message)||'请重试'),true)} }
 async function feRembgTaskRestart(id) { try{await feRembgTaskRequest('/api/rembg/tasks/restart',id);feRembgTaskSetStatus('已重新加入图片主体提取队列。',false);await feRembgTaskRefresh();}catch(error){feRembgTaskSetStatus('重新开始任务失败：'+((error&&error.message)||'请重试'),true)} }
 async function feRembgTaskDelete(id) { try{await feRembgTaskRequest('/api/rembg/tasks/delete',id);await feRembgTaskRefresh();}catch(error){feRembgTaskSetStatus('删除任务失败：'+((error&&error.message)||'请重试'),true)} }

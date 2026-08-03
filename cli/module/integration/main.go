@@ -6609,7 +6609,82 @@ var screenRecordingTemporaryName = regexp.MustCompile(`^\.screen-recording-[a-z0
 
 var videoTrimLookPathFn = exec.LookPath
 var videoTrimCommandContextFn = exec.CommandContext
+var ffmpegEncoderProbeCommandContextFn = exec.CommandContext
 var videoTrimLastOutputTimestamp int64
+
+// ffmpegVideoEncoder describes one encoder in a small, ordered fallback list.
+// Hardware encoders deliberately precede the software encoder, but their
+// availability is verified against the FFmpeg binary that runs the job rather
+// than inferred solely from the host OS.
+type ffmpegVideoEncoder struct {
+	Name     string
+	Hardware bool
+}
+
+var ffmpegHardwareEncoderCache struct {
+	sync.Mutex
+	entries map[string]bool
+}
+
+func ffmpegHardwareEncoderAvailable(ffmpegPath, encoder string) bool {
+	if runtime.GOOS != "darwin" || strings.TrimSpace(ffmpegPath) == "" {
+		return false
+	}
+	key := ffmpegPath + "\x00" + encoder
+	ffmpegHardwareEncoderCache.Lock()
+	available, found := ffmpegHardwareEncoderCache.entries[key]
+	ffmpegHardwareEncoderCache.Unlock()
+	if found {
+		return available
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	command := ffmpegEncoderProbeCommandContextFn(ctx, ffmpegPath, "-hide_banner", "-loglevel", "error", "-h", "encoder="+encoder)
+	available = command.Run() == nil && ctx.Err() == nil
+	ffmpegHardwareEncoderCache.Lock()
+	if ffmpegHardwareEncoderCache.entries == nil {
+		ffmpegHardwareEncoderCache.entries = make(map[string]bool)
+	}
+	ffmpegHardwareEncoderCache.entries[key] = available
+	ffmpegHardwareEncoderCache.Unlock()
+	return available
+}
+
+func ffmpegH264EncoderCandidates(ffmpegPath string) []ffmpegVideoEncoder {
+	candidates := make([]ffmpegVideoEncoder, 0, 2)
+	if ffmpegHardwareEncoderAvailable(ffmpegPath, "h264_videotoolbox") {
+		candidates = append(candidates, ffmpegVideoEncoder{Name: "h264_videotoolbox", Hardware: true})
+	}
+	return append(candidates, ffmpegVideoEncoder{Name: "libx264"})
+}
+
+// runFFmpegVideoEncode prefers an FFmpeg-supported hardware encoder. It
+// removes the partial temporary file a failed hardware encoder may leave
+// behind before invoking the software fallback, since all of these callers
+// use -n and must not mistake that partial output for a name collision.
+func runFFmpegVideoEncode(ctx context.Context, operation, ffmpegPath, temporaryPath string, candidates []ffmpegVideoEncoder, argsFor func(ffmpegVideoEncoder) []string) ([]byte, error) {
+	var output []byte
+	var err error
+	for index, encoder := range candidates {
+		if encoder.Hardware {
+			log.Printf("[ffmpeg] %s: using GPU encoder %s", operation, encoder.Name)
+		} else {
+			log.Printf("[ffmpeg] %s: using CPU encoder %s", operation, encoder.Name)
+		}
+		output, err = videoTrimCommandContextFn(ctx, ffmpegPath, argsFor(encoder)...).CombinedOutput()
+		if err == nil {
+			return output, nil
+		}
+		if encoder.Hardware && index+1 < len(candidates) {
+			log.Printf("[ffmpeg] %s: GPU encoder %s failed: %s; removed partial output and falling back to CPU encoder %s", operation, encoder.Name, videoTrimCommandError(err, output), candidates[index+1].Name)
+			if removeErr := os.Remove(temporaryPath); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+				log.Printf("[ffmpeg] %s: remove failed GPU output %s: %v", operation, temporaryPath, removeErr)
+			}
+		}
+	}
+	return output, err
+}
 
 // FFmpegCheckResponse is intentionally narrow: the Site only needs to know
 // whether it may enter video editing and, when unavailable, which configured
@@ -6900,23 +6975,25 @@ func handleVideoRecordConvert(cfg *Config) http.HandlerFunc {
 			return
 		}
 		defer os.Remove(temporaryPath)
-		args := []string{
-			"-hide_banner", "-loglevel", "error", "-nostdin",
-			"-i", sourcePath,
-			"-map", "0:v:0", "-map", "0:a?",
-			// H.264 with 4:2:0 chroma requires even dimensions. Browser display
-			// capture may legitimately produce odd widths or heights (for example
-			// 943x1235). Pad only the extra edge pixel instead of cropping source
-			// content so full-frame recording always remains complete.
-			"-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0",
-			"-pix_fmt", "yuv420p",
-			"-c:v", "libx264", "-c:a", "aac",
+		argsForEncoder := func(encoder ffmpegVideoEncoder) []string {
+			args := []string{
+				"-hide_banner", "-loglevel", "error", "-nostdin",
+				"-i", sourcePath,
+				"-map", "0:v:0", "-map", "0:a?",
+				// H.264 with 4:2:0 chroma requires even dimensions. Browser display
+				// capture may legitimately produce odd widths or heights (for example
+				// 943x1235). Pad only the extra edge pixel instead of cropping source
+				// content so full-frame recording always remains complete.
+				"-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0",
+				"-pix_fmt", "yuv420p",
+				"-c:v", encoder.Name, "-c:a", "aac",
+			}
+			if bitrate > 0 {
+				args = append(args, "-b:v", strconv.FormatInt(bitrate, 10))
+			}
+			return append(args, "-movflags", "+faststart", "-f", "mp4", "-n", temporaryPath)
 		}
-		if bitrate > 0 {
-			args = append(args, "-b:v", strconv.FormatInt(bitrate, 10))
-		}
-		args = append(args, "-movflags", "+faststart", "-f", "mp4", "-n", temporaryPath)
-		commandOutput, err := videoTrimCommandContextFn(ctx, ffmpegPath, args...).CombinedOutput()
+		commandOutput, err := runFFmpegVideoEncode(ctx, "screen recording conversion", ffmpegPath, temporaryPath, ffmpegH264EncoderCandidates(ffmpegPath), argsForEncoder)
 		if err != nil {
 			message := "视频转码失败：" + videoTrimCommandError(err, commandOutput)
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
@@ -7352,23 +7429,25 @@ func handleVideoTrim(cfg *Config) http.HandlerFunc {
 			return
 		}
 		defer os.Remove(temporaryPath)
-		args := []string{
-			"-hide_banner", "-loglevel", "error", "-nostdin",
-			"-ss", formatVideoTrimSeconds(request.Start),
-			"-i", sourcePath,
-			"-t", formatVideoTrimSeconds(request.End - request.Start),
+		argsForEncoder := func(encoder ffmpegVideoEncoder) []string {
+			args := []string{
+				"-hide_banner", "-loglevel", "error", "-nostdin",
+				"-ss", formatVideoTrimSeconds(request.Start),
+				"-i", sourcePath,
+				"-t", formatVideoTrimSeconds(request.End - request.Start),
+			}
+			if crop != nil {
+				args = append(args, "-filter_complex", videoTrimCropFilter(crop), "-map", "[trimCropOutput]")
+			} else {
+				args = append(args, "-map", "0:v:0?")
+			}
+			args = append(args, "-map", "0:a?", "-c:v", encoder.Name, "-c:a", "aac")
+			if bitrate > 0 {
+				args = append(args, "-b:v", strconv.FormatInt(bitrate, 10))
+			}
+			return append(args, "-movflags", "+faststart", "-f", "mp4", "-n", temporaryPath)
 		}
-		if crop != nil {
-			args = append(args, "-filter_complex", videoTrimCropFilter(crop), "-map", "[trimCropOutput]")
-		} else {
-			args = append(args, "-map", "0:v:0?")
-		}
-		args = append(args, "-map", "0:a?", "-c:v", "libx264", "-c:a", "aac")
-		if bitrate > 0 {
-			args = append(args, "-b:v", strconv.FormatInt(bitrate, 10))
-		}
-		args = append(args, "-movflags", "+faststart", "-f", "mp4", "-n", temporaryPath)
-		output, err := videoTrimCommandContextFn(ctx, ffmpegPath, args...).CombinedOutput()
+		output, err := runFFmpegVideoEncode(ctx, "video trim", ffmpegPath, temporaryPath, ffmpegH264EncoderCandidates(ffmpegPath), argsForEncoder)
 		if err != nil {
 			message := "视频转码失败：" + videoTrimCommandError(err, output)
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {

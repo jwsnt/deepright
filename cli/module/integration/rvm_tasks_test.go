@@ -73,6 +73,16 @@ func TestRVMInvocationUsesCompatibilityWrapper(t *testing.T) {
 	}
 }
 
+func TestRVMProbeUsesTheSameCompatibilityBootstrap(t *testing.T) {
+	args := rvmProbeArgs("/agent/rvm/inference.py")
+	if len(args) != 4 || args[0] != "-c" || args[1] != rvmCompatibilityBootstrap || args[2] != "/agent/rvm/inference.py" || args[3] != "--help" {
+		t.Fatalf("RVM probe args = %#v", args)
+	}
+	if !strings.Contains(args[1], "weights_only") {
+		t.Fatalf("RVM bootstrap must cover current PyTorch checkpoint loading: %q", args[1])
+	}
+}
+
 func TestRVMScenarioDefaultsAndValidation(t *testing.T) {
 	value, standard, ok := rvmScenarioFor("")
 	if !ok || value != rvmScenarioStandard || standard.Name != "标准主体提取" {
@@ -165,6 +175,17 @@ func TestRVMPreviewFFmpegArgsFlattensAlphaOnBlack(t *testing.T) {
 	}
 }
 
+func TestRVMFFmpegFallbackArgumentsPreserveAlphaAndPreview(t *testing.T) {
+	mov := rvmTransparentMOVFFmpegArgs("foreground.mov", "alpha.mov", "result.mov", "qtrle")
+	if got := strings.Join(mov, " "); !strings.Contains(got, "alphamerge") || !strings.Contains(got, "-c:v qtrle") || !strings.Contains(got, "-pix_fmt argb") {
+		t.Fatalf("qtrle MOV args = %#v", mov)
+	}
+	preview := rvmPreviewFFmpegArgsWithCodec("result.mov", "result.mp4", "mpeg4")
+	if got := strings.Join(preview, " "); !strings.Contains(got, "-c:v mpeg4") || !strings.Contains(got, "-q:v 2") || strings.Contains(got, "-crf") {
+		t.Fatalf("mpeg4 preview args = %#v", preview)
+	}
+}
+
 func TestRVMDeleteFailedOrCancelledTask(t *testing.T) {
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
@@ -230,9 +251,8 @@ func TestRVMRuntimeForStartupFindsAgentWorkspace(t *testing.T) {
 func TestRVMInstallRequestExpandsWorkspace(t *testing.T) {
 	workspace := "/agents/current"
 	got := rvmInstallRequest("请安装 robust video matting，模型与代码存放至 `$workspace/rvm` 目录下", workspace)
-	want := "请安装 robust video matting，模型与代码存放至 `/agents/current/rvm` 目录下"
-	if got != want {
-		t.Fatalf("install request = %q, want %q", got, want)
+	if !strings.Contains(got, "请安装 robust video matting，模型与代码存放至 `/agents/current/rvm` 目录下") || !strings.Contains(got, rvmDomesticCheckpointURL) || !strings.Contains(got, rvmDomesticCheckpointSHA256) {
+		t.Fatalf("install request missing expanded workspace or verified domestic source: %q", got)
 	}
 }
 

@@ -81,6 +81,18 @@ func TestWav2LipInvocationUsesOnlyOfficialFixedArguments(t *testing.T) {
 	}
 }
 
+func TestWav2LipProbeUsesTheSameCompatibilityBootstrap(t *testing.T) {
+	args := wav2lipProbeArgs("/agent/wav2lip/inference.py")
+	if len(args) != 4 || args[0] != "-c" || args[1] != wav2lipRuntimeBootstrap || args[2] != "/agent/wav2lip/inference.py" || args[3] != "--help" {
+		t.Fatalf("Wav2Lip probe args = %#v", args)
+	}
+	for _, required := range []string{"weights_only", "np.__dict__", "DEEPRIGHT_WAV2LIP_DEVICE', 'cpu'"} {
+		if !strings.Contains(args[1], required) {
+			t.Fatalf("Wav2Lip bootstrap missing %q: %q", required, args[1])
+		}
+	}
+}
+
 func TestWav2LipStagingUsesPathsWithoutWhitespace(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "Application Support")
 	if err := os.MkdirAll(root, 0o755); err != nil {
@@ -275,7 +287,7 @@ func TestWav2LipRuntimeForStartupFindsAgentWorkspace(t *testing.T) {
 
 func TestWav2LipInstallRequestExpandsWorkspace(t *testing.T) {
 	got := wav2lipInstallRequest("请安装 wav2lip，放到`$workspace/wav2lip`", "/agents/current")
-	if got != "请安装 wav2lip，放到`/agents/current/wav2lip`" {
-		t.Fatalf("install request = %q", got)
+	if !strings.Contains(got, "请安装 wav2lip，放到`/agents/current/wav2lip`") || !strings.Contains(got, wav2lipDomesticCheckpointURL) || !strings.Contains(got, wav2lipDomesticCheckpointSHA256) {
+		t.Fatalf("install request missing expanded workspace or verified domestic source: %q", got)
 	}
 }

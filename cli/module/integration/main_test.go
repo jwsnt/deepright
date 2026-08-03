@@ -4661,14 +4661,14 @@ func TestHandleVideoTrimCreatesNewMP4WithoutChangingSource(t *testing.T) {
 	if got := findArg("-b:v"); got != "2400000" {
 		t.Errorf("ffmpeg -b:v = %q, want source bitrate; args=%q", got, ffmpegArgs)
 	}
-	if got := findArg("-c:v"); got != "libx264" {
-		t.Errorf("ffmpeg -c:v = %q, want libx264", got)
+	if got := findArg("-c:v"); got != "libx264" && got != "h264_videotoolbox" {
+		t.Errorf("ffmpeg -c:v = %q, want libx264 or h264_videotoolbox", got)
 	}
 	if got := findArg("-c:a"); got != "aac" {
 		t.Errorf("ffmpeg -c:a = %q, want aac", got)
-	}
+}
 
-	// A full-video selection uses the media element's actual duration, which
+// A full-video selection uses the media element's actual duration, which
 	// need not lie on the 0.5-second slider grid. It must still be exportable.
 	fullDurationBody, err := json.Marshal(VideoTrimRequest{AgentID: "agent-a", Path: "media/clip.mov", Start: 0, End: 12.4, OutputName: "完整时长.mp4"})
 	if err != nil {
@@ -5147,7 +5147,7 @@ func TestHandleVideoRecordConvertCreatesMP4AndCleansTemporaryWebM(t *testing.T) 
 			}
 		}
 		return ""
-	}; findArg("-c:v") != "libx264" || findArg("-c:a") != "aac" || findArg("-b:v") != "1800000" || findArg("-vf") != "pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0" || findArg("-pix_fmt") != "yuv420p" {
+	}; (findArg("-c:v") != "libx264" && findArg("-c:v") != "h264_videotoolbox") || findArg("-c:a") != "aac" || findArg("-b:v") != "1800000" || findArg("-vf") != "pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0" || findArg("-pix_fmt") != "yuv420p" {
 		t.Errorf("unexpected FFmpeg arguments: %q", ffmpegArgs)
 	}
 	for _, arg := range ffmpegArgs {

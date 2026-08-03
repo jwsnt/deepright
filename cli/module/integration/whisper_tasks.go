@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -37,6 +38,14 @@ const (
 	// Loading Whisper may initialize native Python/ML dependencies on a cold
 	// start, so dependency detection allows one minute before declaring it absent.
 	whisperProbeTimeout = time.Minute
+	// ModelScope's iic/Whisper-large-v3 checkpoint has the same SHA-256 as
+	// OpenAI's official large-v3.pt. It is the domestic fallback for every
+	// supported Whisper profile when the original checkpoint transfer fails.
+	whisperDefaultModelScopeLargeV3URL = "https://modelscope.cn/models/iic/whisper-large-v3/resolve/master/large-v3.pt"
+	whisperDefaultLargeV3SHA256        = "e5b1a55b89c1367dacf97e3e19bfd829a01529dbfdeefa8caeb59b3f1b81dadb"
+	whisperDefaultLargeV3Size          = int64(3087371615)
+	whisperModelHeaderTimeout          = 30 * time.Second
+	whisperModelIdleTimeout            = 90 * time.Second
 )
 
 // WhisperCheckResponse intentionally mirrors the narrow FFmpeg check response:
@@ -173,6 +182,15 @@ type whisperTaskManager struct {
 	cancel    context.CancelFunc
 	wake      chan struct{}
 }
+
+var (
+	whisperModelHTTPClient      = &http.Client{Transport: &http.Transport{ResponseHeaderTimeout: whisperModelHeaderTimeout}}
+	whisperModelUserCacheDir    = os.UserCacheDir
+	whisperModelMirrorMu        sync.Mutex
+	whisperModelScopeLargeV3URL = whisperDefaultModelScopeLargeV3URL
+	whisperLargeV3SHA256        = whisperDefaultLargeV3SHA256
+	whisperLargeV3Size          = whisperDefaultLargeV3Size
+)
 
 var (
 	whisperTaskLookPath        = exec.LookPath
@@ -607,13 +625,14 @@ func (manager *whisperTaskManager) transcribe(ctx context.Context, task whisperT
 	if deviceReason != "" {
 		manager.appendLog(task.ID, deviceReason)
 	}
-	if err := manager.runWhisperTranscription(ctx, task.ID, whisperPath, sourcePath, temporaryDirectory, device, scenario); err != nil {
+	usedScenario, runErr := manager.runWhisperWithModelFallback(ctx, task.ID, whisperPath, sourcePath, temporaryDirectory, device, scenario)
+	if runErr != nil {
 		if ctx.Err() != nil {
 			return context.Canceled
 		}
 		if device == "cuda" || device == "mps" {
 			manager.appendLog(task.ID, "Whisper 无法使用 "+strings.ToUpper(device)+" 完成转写，已自动回退到 CPU 重新尝试。")
-			if retryErr := manager.runWhisperTranscription(ctx, task.ID, whisperPath, sourcePath, temporaryDirectory, "cpu", scenario); retryErr == nil {
+			if _, retryErr := manager.runWhisperWithModelFallback(ctx, task.ID, whisperPath, sourcePath, temporaryDirectory, "cpu", usedScenario); retryErr == nil {
 				manager.appendLog(task.ID, "Whisper 已使用 CPU 回退完成。")
 			} else {
 				if ctx.Err() != nil {
@@ -622,7 +641,7 @@ func (manager *whisperTaskManager) transcribe(ctx context.Context, task whisperT
 				return retryErr
 			}
 		} else {
-			return err
+			return runErr
 		}
 	}
 	temporaryOutput := filepath.Join(temporaryDirectory, strings.TrimSuffix(filepath.Base(sourcePath), filepath.Ext(sourcePath))+".txt")
@@ -639,7 +658,66 @@ func (manager *whisperTaskManager) transcribe(ctx context.Context, task whisperT
 	return nil
 }
 
-func (manager *whisperTaskManager) runWhisperTranscription(ctx context.Context, taskID int64, whisperPath, sourcePath, temporaryDirectory, device string, scenario whisperScenario) error {
+func (manager *whisperTaskManager) runWhisperWithModelFallback(ctx context.Context, taskID int64, whisperPath, sourcePath, temporaryDirectory, device string, scenario whisperScenario) (whisperScenario, error) {
+	diagnostics, err := manager.runWhisperTranscription(ctx, taskID, whisperPath, sourcePath, temporaryDirectory, device, scenario)
+	if err == nil {
+		return scenario, nil
+	}
+	if whisperModelDownloadFailure(diagnostics) {
+		manager.appendLog(taskID, "Whisper 原始模型下载失败，正在从 ModelScope 国内源下载已校验的 large-v3 模型。")
+		modelPath, mirrorErr := manager.downloadWhisperLargeV3FromModelScope(ctx, taskID)
+		if mirrorErr != nil {
+			return scenario, fmt.Errorf("%w；ModelScope 国内源下载也失败：%v", err, mirrorErr)
+		}
+		mirrored := scenario
+		mirrored.Model = modelPath
+		manager.appendLog(taskID, "ModelScope Whisper large-v3 下载并校验成功，正在使用本地模型重新转写。")
+		_, err = manager.runWhisperTranscription(ctx, taskID, whisperPath, sourcePath, temporaryDirectory, device, mirrored)
+		return mirrored, err
+	}
+	if !whisperModelSelectionError(scenario, diagnostics) {
+		return scenario, err
+	}
+	// large-v3 was introduced after the long-standing `large` checkpoint. A
+	// stable older Whisper CLI can still complete the quality profile with that
+	// model, whereas retrying the same unsupported name just fails again.
+	legacy := scenario
+	legacy.Model = "large"
+	manager.appendLog(taskID, "当前 Whisper 不支持模型 large-v3，已回退到兼容的 large 模型重新尝试。")
+	_, err = manager.runWhisperTranscription(ctx, taskID, whisperPath, sourcePath, temporaryDirectory, device, legacy)
+	return legacy, err
+}
+
+func whisperModelDownloadFailure(diagnostics string) bool {
+	value := strings.ToLower(diagnostics)
+	for _, marker := range []string{
+		"openaipublic.azureedge", "download the model", "downloaded but the sha256",
+		"urllib.error", "urlopen error", "connection timed out", "read timed out",
+		"network is unreachable", "temporary failure in name resolution", "http error",
+	} {
+		if strings.Contains(value, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func whisperModelSelectionError(scenario whisperScenario, diagnostics string) bool {
+	if scenario.Model != "large-v3" {
+		return false
+	}
+	value := strings.ToLower(diagnostics)
+	return strings.Contains(value, "large-v3") && (strings.Contains(value, "not found") ||
+		strings.Contains(value, "unknown model") ||
+		strings.Contains(value, "available models") ||
+		strings.Contains(value, "invalid choice"))
+}
+
+func (manager *whisperTaskManager) runWhisperTranscription(ctx context.Context, taskID int64, whisperPath, sourcePath, temporaryDirectory, device string, scenario whisperScenario) (string, error) {
+	modelDirectory, err := whisperModelCacheDirectory()
+	if err != nil {
+		return "", err
+	}
 	args := []string{sourcePath, "--model", scenario.Model, "--output_dir", temporaryDirectory, "--output_format", "txt", "--device", device,
 		"--language", scenario.Language, "--task", scenario.Task,
 		"--temperature", strconv.FormatFloat(scenario.Temperature, 'f', -1, 64),
@@ -652,23 +730,42 @@ func (manager *whisperTaskManager) runWhisperTranscription(ctx context.Context, 
 	if device == "cpu" {
 		args = append(args, "--fp16", "False")
 	}
+	args = append(args, "--model_dir", modelDirectory)
 	manager.appendLog(taskID, "本次转写参数："+whisperScenarioLogParameters(scenario, device)+"。")
 	command := whisperTaskCommandContext(ctx, whisperPath, args...)
+	timeoutPath, cleanupTimeoutPath, err := whisperSocketTimeoutSitePackage()
+	if err != nil {
+		return "", err
+	}
+	defer cleanupTimeoutPath()
+	pythonPath := timeoutPath
+	if inherited := strings.TrimSpace(os.Getenv("PYTHONPATH")); inherited != "" {
+		pythonPath += string(os.PathListSeparator) + inherited
+	}
+	command.Env = append(os.Environ(), "PYTHONPATH="+pythonPath)
 	stdout, err := command.StdoutPipe()
 	if err != nil {
-		return fmt.Errorf("无法读取 Whisper 输出: %w", err)
+		return "", fmt.Errorf("无法读取 Whisper 输出: %w", err)
 	}
 	stderr, err := command.StderrPipe()
 	if err != nil {
-		return fmt.Errorf("无法读取 Whisper 日志: %w", err)
+		return "", fmt.Errorf("无法读取 Whisper 日志: %w", err)
 	}
 	if err := command.Start(); err != nil {
-		return fmt.Errorf("无法启动 Whisper: %w", err)
+		return "", fmt.Errorf("无法启动 Whisper: %w", err)
 	}
+	var diagnostics strings.Builder
+	var diagnosticsMu sync.Mutex
 	var output sync.WaitGroup
 	output.Add(2)
-	go func() { defer output.Done(); manager.captureWhisperOutput(taskID, stdout) }()
-	go func() { defer output.Done(); manager.captureWhisperOutput(taskID, stderr) }()
+	go func() {
+		defer output.Done()
+		manager.captureWhisperOutput(taskID, stdout, &diagnostics, &diagnosticsMu)
+	}()
+	go func() {
+		defer output.Done()
+		manager.captureWhisperOutput(taskID, stderr, &diagnostics, &diagnosticsMu)
+	}()
 	// StdoutPipe/StderrPipe readers must finish before Wait. Wait closes these
 	// pipes itself, which otherwise races with Scanner and produces a misleading
 	// "file already closed" message after a successful transcription.
@@ -676,11 +773,151 @@ func (manager *whisperTaskManager) runWhisperTranscription(ctx context.Context, 
 	err = command.Wait()
 	if err != nil {
 		if ctx.Err() != nil {
-			return context.Canceled
+			return diagnostics.String(), context.Canceled
 		}
-		return fmt.Errorf("Whisper 执行失败: %w", err)
+		return diagnostics.String(), fmt.Errorf("Whisper 执行失败: %w", err)
 	}
-	return nil
+	return diagnostics.String(), nil
+}
+
+func whisperModelCacheDirectory() (string, error) {
+	if configured := strings.TrimSpace(os.Getenv("DEEPRIGHT_WHISPER_MODEL_CACHE")); configured != "" {
+		if err := os.MkdirAll(configured, 0o755); err != nil {
+			return "", fmt.Errorf("无法创建 Whisper 模型缓存目录: %w", err)
+		}
+		return configured, nil
+	}
+	cache, err := whisperModelUserCacheDir()
+	if err != nil {
+		return "", fmt.Errorf("无法确定 Whisper 模型缓存目录: %w", err)
+	}
+	directory := filepath.Join(cache, "deepright", "whisper")
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		return "", fmt.Errorf("无法创建 Whisper 模型缓存目录: %w", err)
+	}
+	return directory, nil
+}
+
+// openai-whisper downloads through urllib rather than a configurable Hub
+// client. sitecustomize gives every socket in just this child process a
+// bounded idle timeout without altering the user's Python installation.
+func whisperSocketTimeoutSitePackage() (string, func(), error) {
+	directory, err := os.MkdirTemp("", "deepright-whisper-timeout-")
+	if err != nil {
+		return "", nil, fmt.Errorf("无法创建 Whisper 下载超时配置: %w", err)
+	}
+	content := "import socket\nsocket.setdefaulttimeout(90)\n"
+	if err := os.WriteFile(filepath.Join(directory, "sitecustomize.py"), []byte(content), 0o600); err != nil {
+		_ = os.RemoveAll(directory)
+		return "", nil, fmt.Errorf("无法写入 Whisper 下载超时配置: %w", err)
+	}
+	return directory, func() { _ = os.RemoveAll(directory) }, nil
+}
+
+func (manager *whisperTaskManager) downloadWhisperLargeV3FromModelScope(ctx context.Context, taskID int64) (string, error) {
+	whisperModelMirrorMu.Lock()
+	defer whisperModelMirrorMu.Unlock()
+	directory, err := whisperModelCacheDirectory()
+	if err != nil {
+		return "", err
+	}
+	target := filepath.Join(directory, "large-v3.pt")
+	if whisperModelFileMatches(target) {
+		manager.appendLog(taskID, "检测到已校验的 ModelScope Whisper large-v3 本地缓存，跳过重复下载。")
+		return target, nil
+	}
+	downloadCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	idleTimer := time.AfterFunc(whisperModelIdleTimeout, cancel)
+	defer idleTimer.Stop()
+	request, err := http.NewRequestWithContext(downloadCtx, http.MethodGet, whisperModelScopeLargeV3URL, nil)
+	if err != nil {
+		return "", fmt.Errorf("无法创建 ModelScope Whisper 下载请求: %w", err)
+	}
+	response, err := whisperModelHTTPClient.Do(request)
+	if err != nil {
+		if ctx.Err() == nil && downloadCtx.Err() != nil {
+			return "", fmt.Errorf("下载 ModelScope Whisper 模型超过 %s 没有进度", whisperModelIdleTimeout)
+		}
+		return "", fmt.Errorf("下载 ModelScope Whisper 模型失败: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return "", fmt.Errorf("ModelScope Whisper 模型返回 HTTP %d", response.StatusCode)
+	}
+	temporary, err := os.CreateTemp(directory, ".large-v3.pt.part-")
+	if err != nil {
+		return "", fmt.Errorf("无法创建 Whisper 模型临时文件: %w", err)
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	hash := sha256.New()
+	buffer := make([]byte, 1024*1024)
+	var copied int64
+	nextProgress := int64(10)
+	for {
+		count, readErr := response.Body.Read(buffer)
+		if count > 0 {
+			if !idleTimer.Stop() && downloadCtx.Err() != nil && ctx.Err() == nil {
+				_ = temporary.Close()
+				return "", fmt.Errorf("下载 ModelScope Whisper 模型超过 %s 没有进度", whisperModelIdleTimeout)
+			}
+			idleTimer.Reset(whisperModelIdleTimeout)
+			if _, err := hash.Write(buffer[:count]); err != nil {
+				_ = temporary.Close()
+				return "", err
+			}
+			if _, err := temporary.Write(buffer[:count]); err != nil {
+				_ = temporary.Close()
+				return "", fmt.Errorf("保存 Whisper 模型失败: %w", err)
+			}
+			copied += int64(count)
+			if copied*100 >= whisperLargeV3Size*nextProgress {
+				manager.appendLog(taskID, fmt.Sprintf("ModelScope Whisper large-v3 已下载 %d%%。", nextProgress))
+				nextProgress += 10
+			}
+		}
+		if readErr == io.EOF {
+			break
+		}
+		if readErr != nil {
+			_ = temporary.Close()
+			if ctx.Err() == nil && downloadCtx.Err() != nil {
+				return "", fmt.Errorf("下载 ModelScope Whisper 模型超过 %s 没有进度", whisperModelIdleTimeout)
+			}
+			return "", fmt.Errorf("读取 ModelScope Whisper 模型失败: %w", readErr)
+		}
+	}
+	if err := temporary.Close(); err != nil {
+		return "", fmt.Errorf("关闭 Whisper 模型临时文件失败: %w", err)
+	}
+	if copied != whisperLargeV3Size {
+		return "", fmt.Errorf("ModelScope Whisper 模型大小校验失败（得到 %d，预期 %d）", copied, whisperLargeV3Size)
+	}
+	if actual := fmt.Sprintf("%x", hash.Sum(nil)); actual != whisperLargeV3SHA256 {
+		return "", errors.New("ModelScope Whisper 模型 SHA-256 校验失败")
+	}
+	if err := os.Rename(temporaryPath, target); err != nil {
+		return "", fmt.Errorf("写入 Whisper 本地模型失败: %w", err)
+	}
+	return target, nil
+}
+
+func whisperModelFileMatches(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() || info.Size() != whisperLargeV3Size {
+		return false
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return false
+	}
+	return fmt.Sprintf("%x", hash.Sum(nil)) == whisperLargeV3SHA256
 }
 
 func whisperPreferredDevice(ctx context.Context, whisperPath string) (string, string) {
@@ -743,7 +980,7 @@ func whisperPythonInterpreter(whisperPath string) string {
 	return parts[0]
 }
 
-func (manager *whisperTaskManager) captureWhisperOutput(taskID int64, reader io.Reader) {
+func (manager *whisperTaskManager) captureWhisperOutput(taskID int64, reader io.Reader, diagnostics *strings.Builder, diagnosticsMu *sync.Mutex) {
 	scanner := bufio.NewScanner(reader)
 	scanner.Buffer(make([]byte, 4096), 128*1024)
 	scanner.Split(scanWhisperOutput)
@@ -752,6 +989,11 @@ func (manager *whisperTaskManager) captureWhisperOutput(taskID int64, reader io.
 		if line == "" {
 			continue
 		}
+		diagnosticsMu.Lock()
+		if diagnostics.Len() < 128*1024 {
+			diagnostics.WriteString(line + "\n")
+		}
+		diagnosticsMu.Unlock()
 		manager.appendLog(taskID, line)
 		if matches := whisperProgressPattern.FindStringSubmatch(line); len(matches) == 2 {
 			if progress, err := strconv.Atoi(matches[1]); err == nil && progress >= 0 && progress <= 100 {

@@ -2,13 +2,22 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"database/sql"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
+
+type rembgRoundTripper func(*http.Request) (*http.Response, error)
+
+func (fn rembgRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
+	return fn(request)
+}
 
 func TestParseRembgCheckConfig(t *testing.T) {
 	cfg, err := parseRembgCheckConfig(map[string]interface{}{"rembg": map[string]interface{}{"check": float64(24), "install": "请安装 rembg"}})
@@ -29,6 +38,110 @@ func TestNormalizeRembgModel(t *testing.T) {
 	}
 	if _, ok := normalizeRembgModel("--output /tmp/untrusted"); ok {
 		t.Fatal("unsupported model must be rejected")
+	}
+}
+
+func TestRembgCompatibilityInvocationFallbacks(t *testing.T) {
+	primary := rembgInvocationArgs("isnet-general-use", true, true, "/input.png", "/output.png")
+	if got := strings.Join(primary, " "); !strings.Contains(got, "i -m isnet-general-use --alpha-matting /input.png /output.png") {
+		t.Fatalf("primary invocation = %#v", primary)
+	}
+	legacy := rembgInvocationArgs(rembgDefaultModel, false, false, "/input.png", "/output.png")
+	if got, want := strings.Join(legacy, " "), "i /input.png /output.png"; got != want {
+		t.Fatalf("legacy invocation = %q, want %q", got, want)
+	}
+	for _, value := range []string{"No such option: --alpha-matting", "usage: rembg [OPTIONS]", "unrecognized arguments: -m"} {
+		if !rembgCLIArgumentError(value) {
+			t.Fatalf("expected parser error for %q", value)
+		}
+	}
+	if rembgCLIArgumentError("onnxruntime failed to load model") {
+		t.Fatal("inference failure must not trigger a CLI fallback")
+	}
+}
+
+func TestRembgModelDownloadFailure(t *testing.T) {
+	for _, tc := range []struct {
+		diagnostics string
+		want        bool
+	}{
+		{"Downloading data from 'https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx'", true},
+		{"File 'pooch/core.py'\nrequests.exceptions.ReadTimeout: HTTPSConnectionPool(host='github.com')", true},
+		{"pooch: Hash of downloaded file does not match known hash", true},
+		{"onnxruntime failed to load model", false},
+		{"usage: rembg [OPTIONS]", false},
+		{"github.com was mentioned outside the downloader", false},
+	} {
+		if got := rembgModelDownloadFailure(tc.diagnostics); got != tc.want {
+			t.Fatalf("rembgModelDownloadFailure(%q) = %v, want %v", tc.diagnostics, got, tc.want)
+		}
+	}
+}
+
+func TestDownloadRembgModelFromMirrorVerifiesBeforeCaching(t *testing.T) {
+	originalArtifacts := rembgModelArtifacts
+	originalClient := rembgHTTPClient
+	defer func() {
+		rembgModelArtifacts = originalArtifacts
+		rembgHTTPClient = originalClient
+	}()
+	rembgModelArtifacts = map[string]rembgModelArtifact{
+		"fixture": {Filename: "fixture.onnx", MD5: "20f35e630daf44dbfa4c3f68f5399d8c"},
+	}
+	cacheDir := t.TempDir()
+	t.Setenv("U2NET_HOME", cacheDir)
+	rembgHTTPClient = &http.Client{Transport: rembgRoundTripper(func(request *http.Request) (*http.Response, error) {
+		wantURL := rembgModelMirrorBaseURL + rembgReleaseAssetBaseURL + "fixture.onnx"
+		if got := request.URL.String(); got != wantURL {
+			t.Fatalf("mirror URL = %q, want %q", got, wantURL)
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader("model")),
+			Header:     make(http.Header),
+			Request:    request,
+		}, nil
+	})}
+
+	m := &rembgTaskManager{}
+	if err := m.downloadRembgModelFromMirror(context.Background(), "fixture"); err != nil {
+		t.Fatalf("downloadRembgModelFromMirror() error = %v", err)
+	}
+	bytes, err := os.ReadFile(filepath.Join(cacheDir, "fixture.onnx"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(bytes); got != "model" {
+		t.Fatalf("cached model = %q", got)
+	}
+}
+
+func TestDownloadRembgModelFromMirrorRejectsBadChecksum(t *testing.T) {
+	originalArtifacts := rembgModelArtifacts
+	originalClient := rembgHTTPClient
+	defer func() {
+		rembgModelArtifacts = originalArtifacts
+		rembgHTTPClient = originalClient
+	}()
+	rembgModelArtifacts = map[string]rembgModelArtifact{
+		"fixture": {Filename: "fixture.onnx", MD5: "20f35e630daf44dbfa4c3f68f5399d8c"},
+	}
+	cacheDir := t.TempDir()
+	t.Setenv("U2NET_HOME", cacheDir)
+	rembgHTTPClient = &http.Client{Transport: rembgRoundTripper(func(request *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader("not a model")),
+			Header:     make(http.Header),
+			Request:    request,
+		}, nil
+	})}
+
+	if err := (&rembgTaskManager{}).downloadRembgModelFromMirror(context.Background(), "fixture"); err == nil {
+		t.Fatal("downloadRembgModelFromMirror() succeeded with a bad checksum")
+	}
+	if _, err := os.Stat(filepath.Join(cacheDir, "fixture.onnx")); !os.IsNotExist(err) {
+		t.Fatalf("bad mirror response populated cache: %v", err)
 	}
 }
 

@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -45,6 +48,20 @@ func TestWhisperScenarioDefaultsAndRejectsUnknownValues(t *testing.T) {
 	}
 	if _, valid := whisperScenarioFor("--model injected"); valid {
 		t.Fatal("unknown scenario must be rejected")
+	}
+}
+
+func TestWhisperQualityModelFallsBackOnlyForLegacyCLIModelErrors(t *testing.T) {
+	scenario, ok := whisperScenarioFor(whisperScenarioChineseAccurate)
+	if !ok || !whisperModelSelectionError(scenario, "error: model large-v3 not found; available models: tiny, base, large") {
+		t.Fatal("legacy Whisper model rejection must select the compatible large fallback")
+	}
+	if whisperModelSelectionError(scenario, "failed to decode the source audio") {
+		t.Fatal("ordinary inference failures must not change the selected model")
+	}
+	base, _ := whisperScenarioFor(whisperScenarioRealtime)
+	if whisperModelSelectionError(base, "unknown model base") {
+		t.Fatal("only the newer large-v3 profile has a safe legacy fallback")
 	}
 }
 
@@ -512,6 +529,33 @@ func TestWhisperTaskTranscribeWritesTextFileToWhisperDirectory(t *testing.T) {
 	}
 	if string(content) != "test transcription\n" {
 		t.Fatalf("unexpected output: %q", content)
+	}
+}
+
+func TestWhisperDownloadsModelScopeFallbackWithChecksum(t *testing.T) {
+	model := []byte("whisper-model")
+	sum := sha256.Sum256(model)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		_, _ = w.Write(model)
+	}))
+	defer server.Close()
+	originalURL, originalHash, originalSize := whisperModelScopeLargeV3URL, whisperLargeV3SHA256, whisperLargeV3Size
+	originalClient, originalCache := whisperModelHTTPClient, whisperModelUserCacheDir
+	whisperModelScopeLargeV3URL = server.URL + "/large-v3.pt"
+	whisperLargeV3SHA256, whisperLargeV3Size = fmt.Sprintf("%x", sum[:]), int64(len(model))
+	whisperModelHTTPClient = server.Client()
+	whisperModelUserCacheDir = func() (string, error) { return t.TempDir(), nil }
+	defer func() {
+		whisperModelScopeLargeV3URL, whisperLargeV3SHA256, whisperLargeV3Size = originalURL, originalHash, originalSize
+		whisperModelHTTPClient, whisperModelUserCacheDir = originalClient, originalCache
+	}()
+	path, err := (&whisperTaskManager{}).downloadWhisperLargeV3FromModelScope(context.Background(), 0)
+	if err != nil {
+		t.Fatalf("downloadWhisperLargeV3FromModelScope: %v", err)
+	}
+	actual, err := os.ReadFile(path)
+	if err != nil || string(actual) != string(model) {
+		t.Fatalf("cached fallback = %q, %v", actual, err)
 	}
 }
 

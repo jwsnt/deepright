@@ -31,6 +31,10 @@ const (
 	wav2lipTaskFailed    = "failed"
 	wav2lipTaskLogLimit  = 128 * 1024
 	wav2lipProbeTimeout  = time.Minute
+	// The checkpoint is kept separate from the source tree so the existing
+	// runtime probe can verify it before scheduling a lip-sync task.
+	wav2lipDomesticCheckpointURL    = "https://hf-mirror.com/camenduru/Wav2Lip/resolve/main/checkpoints/wav2lip_gan.pth"
+	wav2lipDomesticCheckpointSHA256 = "ca9ab7b7b812c0e80a6e70a5977c545a1e8a365a6c49d5e533023c034d7ac3d8"
 )
 
 type wav2lipCheckConfig struct {
@@ -53,11 +57,45 @@ type wav2lipStagingFiles struct {
 }
 
 // wav2lipRuntimeBootstrap executes the unmodified upstream script in a
-// separate process.  It only adapts the process-local device selection; the
-// downloaded Wav2Lip tree and checkpoint are never written or patched.
+// separate process. It adapts only process-local APIs whose signatures changed
+// between supported Python dependency releases; the downloaded Wav2Lip tree
+// and checkpoint are never written or patched.
 const wav2lipRuntimeBootstrap = `
 import os
 import sys
+import socket
+import hashlib
+import urllib.request
+
+# The upstream S3FD detector downloads its checkpoint through urllib on first
+# use. Bound a stalled socket so a missing download never leaves a task running
+# indefinitely without producing output.
+socket.setdefaulttimeout(90)
+
+# Wav2Lip's older dependency pins pre-date NumPy 1.24, which removed these
+# aliases. Restore them only for this child process before librosa imports.
+import numpy as np
+for _deepright_name, _deepright_value in (
+    ('complex', complex), ('float', float), ('int', int), ('bool', bool),
+):
+    if _deepright_name not in np.__dict__:
+        setattr(np, _deepright_name, _deepright_value)
+
+# PyTorch 2.6 changed torch.load's default to weights_only=True. Official
+# Wav2Lip checkpoints contain the conventional state-dict wrapper and need
+# the earlier loader behavior. Do not pass an unknown keyword to old PyTorch.
+import inspect
+import torch
+try:
+    _deepright_supports_weights_only = 'weights_only' in inspect.signature(torch.load).parameters
+except (TypeError, ValueError):
+    _deepright_supports_weights_only = False
+if _deepright_supports_weights_only:
+    _deepright_torch_load = torch.load
+    def _deepright_compatible_torch_load(*args, **kwargs):
+        kwargs.setdefault('weights_only', False)
+        return _deepright_torch_load(*args, **kwargs)
+    torch.load = _deepright_compatible_torch_load
 
 # Wav2Lip's bundled audio.py uses the pre-0.10 positional signature
 # librosa.filters.mel(sample_rate, n_fft, ...).  Newer librosa releases make
@@ -80,8 +118,41 @@ script_dir = os.path.dirname(script)
 if script_dir not in sys.path:
     sys.path.insert(0, script_dir)
 os.chdir(script_dir)
+
+# Wav2Lip otherwise lets face_detection download S3FD lazily from a single
+# overseas URL. Populate its documented local file location ourselves: first
+# try the original publisher, then the domestic HF mirror. The latter is
+# pinned to its published SHA-256 before it is made visible to inference.
+_deepright_s3fd = os.path.join(script_dir, 'face_detection', 'detection', 'sfd', 's3fd.pth')
+if not os.path.isfile(_deepright_s3fd):
+    _deepright_tmp = _deepright_s3fd + '.deepright-part'
+    _deepright_sources = (
+        ('官方源', 'https://www.adrianbulat.com/downloads/python-fan/s3fd-619a316812.pth', None),
+        ('国内镜像', 'https://hf-mirror.com/irishavmishra/s3fd-face-detector/resolve/main/sfd_face.pth', 'd54a87c2b7543b64729c9a25eafd188da15fd3f6e02f0ecec76ae1b30d86c491'),
+    )
+    _deepright_errors = []
+    for _deepright_name, _deepright_url, _deepright_sha256 in _deepright_sources:
+        try:
+            print('正在从%s下载 Wav2Lip S3FD 人脸检测模型。' % _deepright_name, flush=True)
+            urllib.request.urlretrieve(_deepright_url, _deepright_tmp)
+            if _deepright_sha256 is not None:
+                with open(_deepright_tmp, 'rb') as _deepright_file:
+                    _deepright_actual = hashlib.sha256(_deepright_file.read()).hexdigest()
+                if _deepright_actual != _deepright_sha256:
+                    raise RuntimeError('SHA-256 校验失败')
+            os.replace(_deepright_tmp, _deepright_s3fd)
+            print('Wav2Lip S3FD 人脸检测模型下载完成。', flush=True)
+            break
+        except Exception as _deepright_error:
+            _deepright_errors.append('%s：%s' % (_deepright_name, _deepright_error))
+            try:
+                os.remove(_deepright_tmp)
+            except FileNotFoundError:
+                pass
+    else:
+        raise RuntimeError('Wav2Lip S3FD 人脸检测模型下载失败；' + '；'.join(_deepright_errors))
 sys.argv = [script] + sys.argv[2:]
-device = os.environ['DEEPRIGHT_WAV2LIP_DEVICE']
+device = os.environ.get('DEEPRIGHT_WAV2LIP_DEVICE', 'cpu')
 with open(script, 'rb') as f:
     source = f.read().decode('utf-8')
 old = "device = 'cuda' if torch.cuda.is_available() else 'cpu'"
@@ -184,7 +255,10 @@ func wav2lipRuntimeFor(cacheFor time.Duration, workspace string) (wav2lipRuntime
 		}
 		for _, python := range wav2lipPythonCandidates() {
 			probe, cancel := context.WithTimeout(context.Background(), wav2lipProbeTimeout)
-			err := wav2lipCommandContext(probe, python, candidate.Script, "--help").Run()
+			// Probe with exactly the compatibility bootstrap used for the real
+			// job. A modern Python may reject the upstream script's old librosa or
+			// PyTorch assumptions even though the isolated wrapper can run it.
+			err := wav2lipCommandContext(probe, python, wav2lipProbeArgs(candidate.Script)...).Run()
 			timedOut := probe.Err() != nil
 			cancel()
 			if err != nil || timedOut {
@@ -305,7 +379,9 @@ func wav2lipRuntimeForStartup(cacheFor time.Duration, cfg *Config) (wav2lipRunti
 }
 
 func wav2lipInstallRequest(template, workspace string) string {
-	return strings.ReplaceAll(template, "$workspace", workspace)
+	request := strings.ReplaceAll(template, "$workspace", workspace)
+	checkpoint := filepath.Join(workspace, "wav2lip", "checkpoints", "wav2lip_gan.pth")
+	return request + "\n\n模型下载要求：优先从国内镜像 `" + wav2lipDomesticCheckpointURL + "` 下载 `wav2lip_gan.pth` 到 `" + checkpoint + "`，下载连接超时最多 30 秒、连续 90 秒无字节进度必须终止并报告。完成后校验 SHA-256 必须为 `" + wav2lipDomesticCheckpointSHA256 + "`；镜像失败时才可改用官方发布源，并继续执行相同的超时与校验。"
 }
 
 func wav2lipWorkspaceForRequest(cfg *Config, agentID string) (string, string, error) {
@@ -680,6 +756,10 @@ func wav2lipInvocationArgs(r wav2lipRuntime, video, audio, output string) []stri
 	return []string{"-c", wav2lipRuntimeBootstrap, r.Script, "--checkpoint_path", r.Checkpoint, "--face", video, "--audio", audio, "--outfile", output}
 }
 
+func wav2lipProbeArgs(script string) []string {
+	return []string{"-c", wav2lipRuntimeBootstrap, script, "--help"}
+}
+
 // wav2lipPrepareStaging maps inputs and output to a self-owned temporary
 // directory before invoking the upstream script. Its internal FFmpeg command
 // is a shell string, so these paths must not contain whitespace.
@@ -804,7 +884,11 @@ func (m *wav2lipTaskManager) runWav2Lip(ctx context.Context, id int64, r wav2lip
 	return nil
 }
 func wav2lipReadableFailureReason(output string) string {
-	if strings.Contains(strings.ToLower(output), "unexpected eof") {
+	value := strings.ToLower(output)
+	if strings.Contains(value, "timed out") || strings.Contains(value, "timeout") {
+		return "Wav2Lip 人脸检测模型下载在 90 秒内没有进度，已停止。请检查网络或在安装阶段提供已校验的本地 S3FD 模型后重试。"
+	}
+	if strings.Contains(value, "unexpected eof") {
 		return "Wav2Lip 人脸检测模型缓存不完整或已损坏。请删除 ~/.cache/torch/hub/checkpoints/s3fd-619a316812.pth 后重新执行任务，系统会重新下载完整模型。"
 	}
 	return ""

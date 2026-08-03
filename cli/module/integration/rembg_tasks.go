@@ -7,6 +7,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/md5"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -33,8 +34,30 @@ const (
 	rembgTaskLogLimit  = 128 * 1024
 	// Loading rembg imports its Python image/ML dependencies and can exceed the
 	// generic CLI probe timeout on a cold start.
-	rembgProbeTimeout = time.Minute
+	rembgProbeTimeout        = time.Minute
+	rembgModelMirrorBaseURL  = "https://ghproxy.net/"
+	rembgReleaseAssetBaseURL = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/"
+	rembgModelHeaderTimeout  = 30 * time.Second
+	rembgModelIdleTimeout    = 90 * time.Second
 )
+
+type rembgModelArtifact struct {
+	Filename string
+	MD5      string
+}
+
+// These checksums are the hashes rembg itself uses for the models exposed by
+// this queue. The mirror is only allowed to populate the cache after the
+// downloaded bytes match the upstream artifact exactly.
+var rembgModelArtifacts = map[string]rembgModelArtifact{
+	"u2net":             {Filename: "u2net.onnx", MD5: "60024c5c889badc19c04ad937298a77b"},
+	"u2net_human_seg":   {Filename: "u2net_human_seg.onnx", MD5: "c09ddc2e0104f800e3e1bb4652583d1f"},
+	"u2netp":            {Filename: "u2netp.onnx", MD5: "8e83ca70e441ab06c318d82300c84806"},
+	"u2net_cloth_seg":   {Filename: "u2net_cloth_seg.onnx", MD5: "2434d1f3cb744e0e49386c906e5a08bb"},
+	"silueta":           {Filename: "silueta.onnx", MD5: "55e59e0d8062d2f5d013f4725ee84782"},
+	"isnet-general-use": {Filename: "isnet-general-use.onnx", MD5: "fc16ebd8b0c10d971d3513d564d01e29"},
+	"isnet-anime":       {Filename: "isnet-anime.onnx", MD5: "6f184e756bb3bd901c8849220a83e38e"},
+}
 
 type rembgCheckConfig struct {
 	CacheFor time.Duration
@@ -103,6 +126,7 @@ var (
 	rembgNow            = time.Now
 	rembgUserHomeDir    = os.UserHomeDir
 	rembgGlob           = mustGlob
+	rembgHTTPClient     = &http.Client{Transport: &http.Transport{ResponseHeaderTimeout: rembgModelHeaderTimeout}}
 	rembgCheckCache     struct {
 		sync.Mutex
 		checkedAt  time.Time
@@ -491,33 +515,46 @@ func (m *rembgTaskManager) extract(ctx context.Context, task rembgTask) error {
 	if !valid {
 		return errors.New("任务模型无效")
 	}
-	args := []string{"i", "-m", model}
-	if task.AlphaMatting {
-		args = append(args, "--alpha-matting")
-	}
-	args = append(args, source, target)
-	cmd := rembgCommandContext(ctx, path, args...)
-	stdout, err := cmd.StdoutPipe()
+	cached, err := rembgModelCached(model)
 	if err != nil {
 		return err
 	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return err
-	}
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("无法启动 rembg: %w", err)
-	}
-	var out sync.WaitGroup
-	out.Add(2)
-	go func() { defer out.Done(); m.capture(task.ID, stdout) }()
-	go func() { defer out.Done(); m.capture(task.ID, stderr) }()
-	out.Wait()
-	if err := cmd.Wait(); err != nil {
-		if ctx.Err() != nil {
-			return context.Canceled
+	if !cached {
+		m.appendLog(task.ID, "未发现已校验的 rembg 模型缓存，正在从国内镜像下载。")
+		if mirrorErr := m.downloadRembgModelFromMirror(ctx, model, task.ID); mirrorErr != nil {
+			return fmt.Errorf("国内镜像下载 rembg 模型失败：%w", mirrorErr)
 		}
-		return fmt.Errorf("rembg 执行失败: %w", err)
+		m.appendLog(task.ID, "rembg 国内镜像模型下载并校验成功，开始执行主体提取。")
+	}
+	args := rembgInvocationArgs(model, task.AlphaMatting, true, source, target)
+	diagnostics, runErr := m.runRembg(ctx, task.ID, path, args)
+	if runErr != nil && rembgModelDownloadFailure(diagnostics) {
+		m.appendLog(task.ID, "官方下载模型失败，正在通过国内镜像重试下载。")
+		if mirrorErr := m.downloadRembgModelFromMirror(ctx, model, task.ID); mirrorErr != nil {
+			return fmt.Errorf("%w；国内镜像下载也失败：%v", runErr, mirrorErr)
+		}
+		m.appendLog(task.ID, "国内镜像下载并校验模型成功，正在重新执行 rembg。")
+		_ = os.Remove(target)
+		diagnostics, runErr = m.runRembg(ctx, task.ID, path, args)
+	}
+	if runErr != nil && rembgCLIArgumentError(diagnostics) {
+		// rembg has kept its core `i input output` command stable, but older
+		// versions may not expose newer quality/model flags. Retry only parser
+		// failures, never an inference failure, so the fallback cannot conceal a
+		// corrupt input or a broken runtime.
+		if task.AlphaMatting {
+			m.appendLog(task.ID, "当前 rembg 不支持边缘优化参数，已回退到基础去背景模式。")
+			_ = os.Remove(target)
+			diagnostics, runErr = m.runRembg(ctx, task.ID, path, rembgInvocationArgs(model, false, true, source, target))
+		}
+		if runErr != nil && rembgCLIArgumentError(diagnostics) && model != rembgDefaultModel {
+			m.appendLog(task.ID, "当前 rembg 不支持所选模型参数，已回退到默认 u2net 模型。")
+			_ = os.Remove(target)
+			diagnostics, runErr = m.runRembg(ctx, task.ID, path, rembgInvocationArgs(rembgDefaultModel, false, false, source, target))
+		}
+	}
+	if runErr != nil {
+		return runErr
 	}
 	info, err := os.Stat(target)
 	if err != nil || info.IsDir() || info.Size() == 0 {
@@ -527,7 +564,221 @@ func (m *rembgTaskManager) extract(ctx context.Context, task rembgTask) error {
 	completed = true
 	return nil
 }
-func (m *rembgTaskManager) capture(id int64, r io.Reader) {
+
+func rembgInvocationArgs(model string, alphaMatting, includeModel bool, source, target string) []string {
+	args := []string{"i"}
+	if includeModel {
+		args = append(args, "-m", model)
+	}
+	if alphaMatting {
+		args = append(args, "--alpha-matting")
+	}
+	return append(args, source, target)
+}
+
+func rembgCLIArgumentError(diagnostics string) bool {
+	value := strings.ToLower(diagnostics)
+	return strings.Contains(value, "no such option") ||
+		strings.Contains(value, "unrecognized option") ||
+		strings.Contains(value, "unrecognized arguments") ||
+		strings.Contains(value, "unknown option") ||
+		strings.Contains(value, "no such command") ||
+		strings.Contains(value, "usage: rembg")
+}
+
+// rembgModelDownloadFailure is intentionally narrower than a general rembg
+// failure. We only use a third-party mirror after rembg/pooch reports that its
+// GitHub model download failed; inference, image, and argument errors keep
+// their original failure behavior.
+func rembgModelDownloadFailure(diagnostics string) bool {
+	value := strings.ToLower(diagnostics)
+	if strings.Contains(value, "downloading data from") && strings.Contains(value, "github") {
+		return true
+	}
+	if !strings.Contains(value, "pooch") {
+		return false
+	}
+	return strings.Contains(value, "github.com") ||
+		strings.Contains(value, "httpsconnectionpool") ||
+		strings.Contains(value, "read timed out") ||
+		strings.Contains(value, "connection timed out") ||
+		strings.Contains(value, "hash of downloaded file")
+}
+
+func rembgModelCacheDir() (string, error) {
+	if configured := strings.TrimSpace(os.Getenv("U2NET_HOME")); configured != "" {
+		if configured == "~" || strings.HasPrefix(configured, "~/") {
+			home, err := rembgUserHomeDir()
+			if err != nil {
+				return "", err
+			}
+			if configured == "~" {
+				return home, nil
+			}
+			return filepath.Join(home, configured[2:]), nil
+		}
+		return configured, nil
+	}
+	dataHome := strings.TrimSpace(os.Getenv("XDG_DATA_HOME"))
+	if dataHome == "" || dataHome == "~" {
+		home, err := rembgUserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(home, ".u2net"), nil
+	}
+	return filepath.Join(dataHome, ".u2net"), nil
+}
+
+func rembgModelCached(model string) (bool, error) {
+	artifact, ok := rembgModelArtifacts[model]
+	if !ok {
+		return false, errors.New("所选 rembg 模型不支持国内镜像下载")
+	}
+	directory, err := rembgModelCacheDir()
+	if err != nil {
+		return false, fmt.Errorf("无法确定 rembg 模型缓存目录: %w", err)
+	}
+	file, err := os.Open(filepath.Join(directory, artifact.Filename))
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("无法读取 rembg 模型缓存: %w", err)
+	}
+	defer file.Close()
+	hash := md5.New() // #nosec G401 -- rembg upstream publishes immutable artifact MD5 values.
+	if _, err := io.Copy(hash, file); err != nil {
+		return false, fmt.Errorf("无法校验 rembg 模型缓存: %w", err)
+	}
+	return fmt.Sprintf("%x", hash.Sum(nil)) == artifact.MD5, nil
+}
+
+func rembgModelMirrorURL(model string) (string, bool) {
+	artifact, ok := rembgModelArtifacts[model]
+	if !ok {
+		return "", false
+	}
+	return rembgModelMirrorBaseURL + rembgReleaseAssetBaseURL + artifact.Filename, true
+}
+
+func (m *rembgTaskManager) downloadRembgModelFromMirror(ctx context.Context, model string, taskID ...int64) error {
+	artifact, ok := rembgModelArtifacts[model]
+	if !ok {
+		return errors.New("所选 rembg 模型不支持镜像下载")
+	}
+	url, _ := rembgModelMirrorURL(model)
+	cacheDir, err := rembgModelCacheDir()
+	if err != nil {
+		return fmt.Errorf("无法确定模型缓存目录: %w", err)
+	}
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		return fmt.Errorf("无法创建模型缓存目录: %w", err)
+	}
+	downloadCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	idleTimer := time.AfterFunc(rembgModelIdleTimeout, cancel)
+	defer idleTimer.Stop()
+	req, err := http.NewRequestWithContext(downloadCtx, http.MethodGet, url, nil)
+	if err != nil {
+		return fmt.Errorf("无法创建镜像下载请求: %w", err)
+	}
+	response, err := rembgHTTPClient.Do(req)
+	if err != nil {
+		if ctx.Err() == nil && downloadCtx.Err() != nil {
+			return fmt.Errorf("国内镜像下载超过 %s 没有进度", rembgModelIdleTimeout)
+		}
+		return fmt.Errorf("请求镜像失败: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("镜像返回 HTTP %d", response.StatusCode)
+	}
+
+	temporary, err := os.CreateTemp(cacheDir, "."+artifact.Filename+".mirror-*")
+	if err != nil {
+		return fmt.Errorf("无法创建模型临时文件: %w", err)
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	hash := md5.New() // #nosec G401 -- rembg upstream publishes an MD5 for each immutable model artifact.
+	buffer := make([]byte, 1024*1024)
+	var copied int64
+	nextProgress := int64(10)
+	for {
+		count, readErr := response.Body.Read(buffer)
+		if count > 0 {
+			if !idleTimer.Stop() && downloadCtx.Err() != nil && ctx.Err() == nil {
+				_ = temporary.Close()
+				return fmt.Errorf("国内镜像下载超过 %s 没有进度", rembgModelIdleTimeout)
+			}
+			idleTimer.Reset(rembgModelIdleTimeout)
+			if _, err := hash.Write(buffer[:count]); err != nil {
+				_ = temporary.Close()
+				return fmt.Errorf("校验镜像模型失败: %w", err)
+			}
+			if _, err := temporary.Write(buffer[:count]); err != nil {
+				_ = temporary.Close()
+				return fmt.Errorf("保存镜像模型失败: %w", err)
+			}
+			copied += int64(count)
+			if len(taskID) > 0 && response.ContentLength > 0 && copied*100 >= response.ContentLength*nextProgress {
+				m.appendLog(taskID[0], fmt.Sprintf("rembg 国内镜像模型已下载 %d%%。", nextProgress))
+				nextProgress += 10
+			}
+		}
+		if readErr == io.EOF {
+			break
+		}
+		if readErr != nil {
+			_ = temporary.Close()
+			if ctx.Err() == nil && downloadCtx.Err() != nil {
+				return fmt.Errorf("国内镜像下载超过 %s 没有进度", rembgModelIdleTimeout)
+			}
+			return fmt.Errorf("读取镜像模型失败: %w", readErr)
+		}
+	}
+	if err := temporary.Close(); err != nil {
+		return fmt.Errorf("保存镜像模型失败: %w", err)
+	}
+	if actual := fmt.Sprintf("%x", hash.Sum(nil)); actual != artifact.MD5 {
+		return fmt.Errorf("镜像模型校验失败（MD5 %s）", actual)
+	}
+	if err := os.Rename(temporaryPath, filepath.Join(cacheDir, artifact.Filename)); err != nil {
+		return fmt.Errorf("无法写入模型缓存: %w", err)
+	}
+	return nil
+}
+
+func (m *rembgTaskManager) runRembg(ctx context.Context, taskID int64, executable string, args []string) (string, error) {
+	cmd := rembgCommandContext(ctx, executable, args...)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", err
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return "", err
+	}
+	if err := cmd.Start(); err != nil {
+		return "", fmt.Errorf("无法启动 rembg: %w", err)
+	}
+	var diagnostics strings.Builder
+	var diagnosticsMu sync.Mutex
+	var out sync.WaitGroup
+	out.Add(2)
+	go func() { defer out.Done(); m.capture(taskID, stdout, &diagnostics, &diagnosticsMu) }()
+	go func() { defer out.Done(); m.capture(taskID, stderr, &diagnostics, &diagnosticsMu) }()
+	out.Wait()
+	if err := cmd.Wait(); err != nil {
+		if ctx.Err() != nil {
+			return diagnostics.String(), context.Canceled
+		}
+		return diagnostics.String(), fmt.Errorf("rembg 执行失败: %w", err)
+	}
+	return diagnostics.String(), nil
+}
+func (m *rembgTaskManager) capture(id int64, r io.Reader, diagnostics *strings.Builder, diagnosticsMu *sync.Mutex) {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 4096), 128*1024)
 	// rembg's model downloader uses a terminal-style progress bar: it rewrites
@@ -538,6 +789,11 @@ func (m *rembgTaskManager) capture(id int64, r io.Reader) {
 	previous := ""
 	for scanner.Scan() {
 		if line := strings.TrimSpace(scanner.Text()); line != "" {
+			diagnosticsMu.Lock()
+			if diagnostics.Len() < 128*1024 {
+				diagnostics.WriteString(line + "\n")
+			}
+			diagnosticsMu.Unlock()
 			if line != previous {
 				m.appendLog(id, line)
 				previous = line

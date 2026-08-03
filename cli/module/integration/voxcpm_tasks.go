@@ -7,12 +7,14 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -33,6 +35,13 @@ const (
 	voxcpmTextLimit     = 1024 * 1024
 	voxcpmControlLimit  = 240
 	voxcpmProbeTimeout  = time.Minute
+	// VoxCPM2 is published by OpenBMB on ModelScope as an official domestic
+	// mirror. The URLs stay overridable in tests, while the production values
+	// intentionally point at the publisher's namespace rather than a proxy.
+	voxcpmDefaultModelScopeFilesURL    = "https://modelscope.cn/api/v1/models/OpenBMB/VoxCPM2/repo/files?Revision=master&Root="
+	voxcpmDefaultModelScopeResolveBase = "https://modelscope.cn/models/OpenBMB/VoxCPM2/resolve/master/"
+	voxcpmModelHeaderTimeout           = 30 * time.Second
+	voxcpmModelIdleTimeout             = 90 * time.Second
 
 	voxcpmScenarioBalanced      = "balanced"
 	voxcpmScenarioQuality       = "quality"
@@ -163,13 +172,23 @@ type voxcpmTaskManager struct {
 }
 
 var (
-	voxcpmTasks               *voxcpmTaskManager
-	voxcpmLookPath            = exec.LookPath
-	voxcpmCommandContext      = exec.CommandContext
-	voxcpmTaskLookPath        = exec.LookPath
-	voxcpmTaskPreferredDevice = voxcpmPreferredDevice
-	voxcpmNow                 = time.Now
-	voxcpmCheckCache          struct {
+	voxcpmTasks                 *voxcpmTaskManager
+	voxcpmLookPath              = exec.LookPath
+	voxcpmCommandContext        = exec.CommandContext
+	voxcpmTaskLookPath          = exec.LookPath
+	voxcpmTaskPreferredDevice   = voxcpmPreferredDevice
+	voxcpmNow                   = time.Now
+	voxcpmHTTPClient            = &http.Client{Transport: &http.Transport{ResponseHeaderTimeout: voxcpmModelHeaderTimeout}}
+	voxcpmUserCacheDir          = os.UserCacheDir
+	voxcpmModelMirrorMu         sync.Mutex
+	voxcpmModelScopeFilesURL    = voxcpmDefaultModelScopeFilesURL
+	voxcpmModelScopeResolveBase = voxcpmDefaultModelScopeResolveBase
+	// Kept injectable so task-flow tests can use a tiny local snapshot instead
+	// of downloading the real multi-gigabyte model.
+	voxcpmPrepareLocalModel = func(manager *voxcpmTaskManager, ctx context.Context, taskID int64) (string, error) {
+		return manager.downloadVoxCPM2FromModelScope(ctx, taskID)
+	}
+	voxcpmCheckCache struct {
 		sync.Mutex
 		checkedAt  time.Time
 		executable string
@@ -572,18 +591,57 @@ func (m *voxcpmTaskManager) generate(ctx context.Context, task voxcpmTask) error
 		}
 	}
 	m.progress(task.ID, 10)
-	_, err = m.runGenerate(ctx, task.ID, executable, text, reference, temporary, device, scenario, control)
+	// Do not let VoxCPM invoke snapshot_download itself: that path can keep a
+	// child process at "Loading VoxCPM model..." without useful progress. The
+	// controlled ModelScope downloader has a header timeout, a no-byte-progress
+	// timeout, task logs, and SHA-256 verification for every file.
+	m.appendLog(task.ID, "正在从 ModelScope 国内源检查并准备 VoxCPM2 模型（下载过程会显示进度）。")
+	modelPath, mirrorErr := voxcpmPrepareLocalModel(m, ctx, task.ID)
+	if mirrorErr != nil {
+		return fmt.Errorf("ModelScope 国内源准备 VoxCPM2 模型失败：%w", mirrorErr)
+	}
+	m.appendLog(task.ID, "ModelScope 国内源模型已校验，开始从本地加载 VoxCPM2。")
+	diagnostics, err := m.runGenerate(ctx, task.ID, executable, text, reference, temporary, device, scenario, control, modelPath)
 	if err != nil {
 		if ctx.Err() != nil {
 			return context.Canceled
 		}
-		if voxcpmGPUDevice(device) {
-			m.appendLog(task.ID, "VoxCPM 使用 "+strings.ToUpper(device)+" 配音失败，已自动回退到 CPU 重新尝试一次。")
-			if _, retryErr := m.runGenerate(ctx, task.ID, executable, text, reference, temporary, "cpu", scenario, control); retryErr != nil {
+		if voxcpmCLIArgumentError(diagnostics) {
+			if cloning {
+				m.appendLog(task.ID, "检测到 VoxCPM CLI 参数接口不兼容；旧版克隆接口还需要参考文本，当前任务未提供该文本，无法安全回退。")
+				return errors.New("当前 VoxCPM CLI 不兼容，且参考音色克隆需要参考文本才能回退")
+			}
+			m.appendLog(task.ID, "检测到 VoxCPM CLI 参数接口不兼容，已回退到兼容的直接合成模式（CPU、忽略表达风格）重新尝试。")
+			if _, retryErr := m.runGenerateFlat(ctx, task.ID, executable, text, temporary, scenario, modelPath); retryErr != nil {
 				if ctx.Err() != nil {
 					return context.Canceled
 				}
 				return retryErr
+			}
+			m.appendLog(task.ID, "VoxCPM 已使用兼容直接合成模式完成。")
+		} else if voxcpmGPUDevice(device) {
+			m.appendLog(task.ID, "VoxCPM 使用 "+strings.ToUpper(device)+" 配音失败，已自动回退到 CPU 重新尝试一次。")
+			cpuDiagnostics, retryErr := m.runGenerate(ctx, task.ID, executable, text, reference, temporary, "cpu", scenario, control, modelPath)
+			if retryErr != nil {
+				if ctx.Err() != nil {
+					return context.Canceled
+				}
+				if voxcpmCLIArgumentError(cpuDiagnostics) && !cloning {
+					m.appendLog(task.ID, "CPU 回退检测到 VoxCPM CLI 参数接口不兼容，已继续回退到兼容的直接合成模式（忽略表达风格）重新尝试。")
+					if _, flatErr := m.runGenerateFlat(ctx, task.ID, executable, text, temporary, scenario, modelPath); flatErr == nil {
+						m.appendLog(task.ID, "VoxCPM 已使用兼容直接合成模式完成。")
+					} else {
+						if ctx.Err() != nil {
+							return context.Canceled
+						}
+						return flatErr
+					}
+				} else if voxcpmCLIArgumentError(cpuDiagnostics) && cloning {
+					m.appendLog(task.ID, "CPU 回退检测到 VoxCPM CLI 参数接口不兼容；旧版克隆接口还需要参考文本，当前任务未提供该文本，无法安全回退。")
+					return errors.New("当前 VoxCPM CLI 不兼容，且参考音色克隆需要参考文本才能回退")
+				} else {
+					return retryErr
+				}
 			}
 			m.appendLog(task.ID, "VoxCPM 已使用 CPU 回退完成。")
 		} else {
@@ -608,7 +666,7 @@ func (m *voxcpmTaskManager) generate(ctx context.Context, task voxcpmTask) error
 	return nil
 }
 
-func (m *voxcpmTaskManager) runGenerate(ctx context.Context, taskID int64, executable, text, reference, output, device string, scenario voxcpmScenario, control string) (string, error) {
+func (m *voxcpmTaskManager) runGenerate(ctx context.Context, taskID int64, executable, text, reference, output, device string, scenario voxcpmScenario, control, modelPath string) (string, error) {
 	cloning := strings.TrimSpace(reference) != ""
 	command := "design"
 	if cloning {
@@ -628,11 +686,50 @@ func (m *voxcpmTaskManager) runGenerate(ctx context.Context, taskID int64, execu
 	}
 	if scenario.Denoise && cloning {
 		args = append(args, "--denoise")
+	} else {
+		// The CLI enables ZipEnhancer by default. A task that has not requested
+		// denoising must disable it explicitly, otherwise it starts an unrelated
+		// lazy ModelScope download while reporting only "Loading VoxCPM model...".
+		args = append(args, "--no-denoiser")
 	}
 	if strings.TrimSpace(device) != "" {
 		args = append(args, "--device", strings.TrimSpace(device))
 	}
+	if strings.TrimSpace(modelPath) != "" {
+		args = append(args, "--model-path", modelPath)
+	}
+	return m.runGenerateArgs(ctx, taskID, executable, output, args)
+}
+
+// runGenerateFlat targets the older VoxCPM single-parser CLI. That CLI has no
+// design subcommand, no expression-control flag, and no device selector; it
+// chooses CPU automatically when CUDA is unavailable.
+func (m *voxcpmTaskManager) runGenerateFlat(ctx context.Context, taskID int64, executable, text, output string, scenario voxcpmScenario, modelPath string) (string, error) {
+	args := []string{"--text", text, "--output", output,
+		"--cfg-value", strconv.FormatFloat(scenario.CFGValue, 'f', -1, 64),
+		"--inference-timesteps", strconv.Itoa(scenario.InferenceTimesteps)}
+	if scenario.Normalize {
+		args = append(args, "--normalize")
+	}
+	// Flat-mode generation has no reference input, so denoising cannot be part
+	// of the requested operation either.
+	args = append(args, "--no-denoiser")
+	if strings.TrimSpace(modelPath) != "" {
+		args = append(args, "--model-path", modelPath)
+	}
+	return m.runGenerateArgs(ctx, taskID, executable, output, args)
+}
+
+func (m *voxcpmTaskManager) runGenerateArgs(ctx context.Context, taskID int64, executable, output string, args []string) (string, error) {
+	// A failed backend may leave partial audio in place. Start each fallback
+	// attempt from an empty task-private temporary file.
+	if err := os.Truncate(output, 0); err != nil {
+		return "", fmt.Errorf("无法重置配音临时文件: %w", err)
+	}
 	cmd := voxcpmCommandContext(ctx, executable, args...)
+	// The command always receives --model-path. Make an unexpected Hub request
+	// fail immediately rather than silently creating an uncontrolled download.
+	cmd.Env = append(os.Environ(), "HF_HUB_OFFLINE=1")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return "", err
@@ -661,6 +758,255 @@ func (m *voxcpmTaskManager) runGenerate(ctx context.Context, taskID int64, execu
 		return diagnostics, fmt.Errorf("voxcpm 执行失败: %w", err)
 	}
 	return diagnostics, nil
+}
+
+func voxcpmCLIArgumentError(diagnostics string) bool {
+	value := strings.ToLower(diagnostics)
+	return strings.Contains(value, "unrecognized arguments") ||
+		strings.Contains(value, "unknown option") ||
+		strings.Contains(value, "unknown command") ||
+		strings.Contains(value, "invalid choice") ||
+		strings.Contains(value, "usage: voxcpm")
+}
+
+type voxcpmModelScopeFile struct {
+	Path   string `json:"Path"`
+	SHA256 string `json:"Sha256"`
+	Size   int64  `json:"Size"`
+	Type   string `json:"Type"`
+}
+
+type voxcpmModelScopeFilesResponse struct {
+	Code    int    `json:"Code"`
+	Message string `json:"Message"`
+	Data    struct {
+		Files []voxcpmModelScopeFile `json:"Files"`
+	} `json:"Data"`
+}
+
+func voxcpmModelMirrorCacheRoot() (string, error) {
+	if configured := strings.TrimSpace(os.Getenv("DEEPRIGHT_VOXCPM_MODEL_CACHE")); configured != "" {
+		return configured, nil
+	}
+	cache, err := voxcpmUserCacheDir()
+	if err != nil {
+		return "", fmt.Errorf("无法确定用户模型缓存目录: %w", err)
+	}
+	return filepath.Join(cache, "deepright", "voxcpm"), nil
+}
+
+func voxcpmModelScopeManifest(ctx context.Context) ([]voxcpmModelScopeFile, error) {
+	// The manifest is small, so give it a bounded total lifetime as well as the
+	// transport's response-header timeout. Otherwise a peer that sends headers
+	// and then stops before the JSON body could leave a task waiting forever.
+	manifestCtx, cancel := context.WithTimeout(ctx, voxcpmModelHeaderTimeout)
+	defer cancel()
+	request, err := http.NewRequestWithContext(manifestCtx, http.MethodGet, voxcpmModelScopeFilesURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("无法创建 ModelScope 清单请求: %w", err)
+	}
+	response, err := voxcpmHTTPClient.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("请求 ModelScope 清单失败: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("ModelScope 清单返回 HTTP %d", response.StatusCode)
+	}
+	var payload voxcpmModelScopeFilesResponse
+	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+		return nil, fmt.Errorf("读取 ModelScope 清单失败: %w", err)
+	}
+	if payload.Code != http.StatusOK {
+		return nil, fmt.Errorf("ModelScope 清单错误: %s", strings.TrimSpace(payload.Message))
+	}
+	files := make([]voxcpmModelScopeFile, 0, len(payload.Data.Files))
+	contains := map[string]bool{}
+	for _, file := range payload.Data.Files {
+		if strings.ToLower(strings.TrimSpace(file.Type)) != "blob" {
+			continue
+		}
+		if !voxcpmModelRelativePath(file.Path) || file.Size < 0 || len(strings.TrimSpace(file.SHA256)) != 64 {
+			return nil, errors.New("ModelScope 返回了无效的 VoxCPM2 模型清单")
+		}
+		file.Path = filepath.ToSlash(file.Path)
+		file.SHA256 = strings.ToLower(strings.TrimSpace(file.SHA256))
+		files = append(files, file)
+		contains[file.Path] = true
+	}
+	if len(files) == 0 || !contains["config.json"] || !contains["model.safetensors"] || !contains["audiovae.pth"] {
+		return nil, errors.New("ModelScope VoxCPM2 清单缺少必要模型文件")
+	}
+	return files, nil
+}
+
+func voxcpmModelRelativePath(raw string) bool {
+	path := filepath.ToSlash(strings.TrimSpace(raw))
+	if path == "" || strings.HasPrefix(path, "/") || strings.Contains(path, "\x00") {
+		return false
+	}
+	for _, part := range strings.Split(path, "/") {
+		if part == "" || part == "." || part == ".." {
+			return false
+		}
+	}
+	return true
+}
+
+func voxcpmModelScopeFileURL(relative string) string {
+	parts := strings.Split(filepath.ToSlash(relative), "/")
+	for index, part := range parts {
+		parts[index] = url.PathEscape(part)
+	}
+	return strings.TrimRight(voxcpmModelScopeResolveBase, "/") + "/" + strings.Join(parts, "/")
+}
+
+func voxcpmModelDirectoryAvailable(directory string, files []voxcpmModelScopeFile) bool {
+	for _, file := range files {
+		path := filepath.Join(directory, filepath.FromSlash(file.Path))
+		info, err := os.Stat(path)
+		if err != nil || info.IsDir() || info.Size() != file.Size {
+			return false
+		}
+		input, err := os.Open(path)
+		if err != nil {
+			return false
+		}
+		hash := sha256.New()
+		_, copyErr := io.Copy(hash, input)
+		closeErr := input.Close()
+		if copyErr != nil || closeErr != nil || fmt.Sprintf("%x", hash.Sum(nil)) != file.SHA256 {
+			return false
+		}
+	}
+	return true
+}
+
+// downloadVoxCPM2FromModelScope obtains the exact snapshot listed by the
+// OpenBMB ModelScope repository. Every file is SHA-256 verified before the
+// staging directory is made visible to VoxCPM.
+func (m *voxcpmTaskManager) downloadVoxCPM2FromModelScope(ctx context.Context, taskID int64) (string, error) {
+	voxcpmModelMirrorMu.Lock()
+	defer voxcpmModelMirrorMu.Unlock()
+
+	files, err := voxcpmModelScopeManifest(ctx)
+	if err != nil {
+		return "", err
+	}
+	cacheRoot, err := voxcpmModelMirrorCacheRoot()
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(cacheRoot, 0o755); err != nil {
+		return "", fmt.Errorf("无法创建 VoxCPM2 模型缓存目录: %w", err)
+	}
+	destination := filepath.Join(cacheRoot, "OpenBMB--VoxCPM2")
+	if voxcpmModelDirectoryAvailable(destination, files) {
+		m.appendLog(taskID, "检测到已校验的 ModelScope VoxCPM2 本地缓存，跳过重复下载。")
+		return destination, nil
+	}
+	if _, err := os.Lstat(destination); err == nil {
+		// Preserve an existing user cache rather than deleting it merely because
+		// it is incomplete or belongs to a different revision.
+		destination += "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	}
+	staging, err := os.MkdirTemp(cacheRoot, ".OpenBMB--VoxCPM2-modelscope-")
+	if err != nil {
+		return "", fmt.Errorf("无法创建 VoxCPM2 模型临时目录: %w", err)
+	}
+	defer os.RemoveAll(staging)
+	for index, file := range files {
+		m.appendLog(taskID, fmt.Sprintf("正在从 ModelScope 下载模型文件（%d/%d）：%s", index+1, len(files), file.Path))
+		if err := m.downloadVoxCPM2ModelFile(ctx, taskID, staging, file); err != nil {
+			return "", err
+		}
+	}
+	if err := os.Rename(staging, destination); err != nil {
+		return "", fmt.Errorf("无法发布已下载的 VoxCPM2 模型: %w", err)
+	}
+	return destination, nil
+}
+
+func (m *voxcpmTaskManager) downloadVoxCPM2ModelFile(ctx context.Context, taskID int64, directory string, file voxcpmModelScopeFile) error {
+	target := filepath.Join(directory, filepath.FromSlash(file.Path))
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		return fmt.Errorf("无法创建模型文件目录: %w", err)
+	}
+	downloadCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	idleTimer := time.AfterFunc(voxcpmModelIdleTimeout, cancel)
+	defer idleTimer.Stop()
+	request, err := http.NewRequestWithContext(downloadCtx, http.MethodGet, voxcpmModelScopeFileURL(file.Path), nil)
+	if err != nil {
+		return fmt.Errorf("无法创建 ModelScope 文件请求: %w", err)
+	}
+	response, err := voxcpmHTTPClient.Do(request)
+	if err != nil {
+		if ctx.Err() == nil && downloadCtx.Err() != nil {
+			return fmt.Errorf("下载 ModelScope 文件 %s 超过 %s 没有进度", file.Path, voxcpmModelIdleTimeout)
+		}
+		return fmt.Errorf("下载 ModelScope 文件 %s 失败: %w", file.Path, err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("下载 ModelScope 文件 %s 返回 HTTP %d", file.Path, response.StatusCode)
+	}
+	temporary, err := os.CreateTemp(filepath.Dir(target), "."+filepath.Base(target)+".part-")
+	if err != nil {
+		return fmt.Errorf("无法创建模型文件临时文件: %w", err)
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	hash := sha256.New()
+	buffer := make([]byte, 1024*1024)
+	var copied int64
+	nextProgress := int64(10)
+	for {
+		count, readErr := response.Body.Read(buffer)
+		if count > 0 {
+			if !idleTimer.Stop() && downloadCtx.Err() != nil && ctx.Err() == nil {
+				_ = temporary.Close()
+				return fmt.Errorf("下载 ModelScope 文件 %s 超过 %s 没有进度", file.Path, voxcpmModelIdleTimeout)
+			}
+			idleTimer.Reset(voxcpmModelIdleTimeout)
+			if _, err := hash.Write(buffer[:count]); err != nil {
+				_ = temporary.Close()
+				return fmt.Errorf("校验模型文件 %s 失败: %w", file.Path, err)
+			}
+			if _, err := temporary.Write(buffer[:count]); err != nil {
+				_ = temporary.Close()
+				return fmt.Errorf("保存模型文件 %s 失败: %w", file.Path, err)
+			}
+			copied += int64(count)
+			if file.Size >= 10*1024*1024 && copied*100 >= file.Size*nextProgress {
+				m.appendLog(taskID, fmt.Sprintf("ModelScope 文件 %s 已下载 %d%%。", file.Path, nextProgress))
+				nextProgress += 10
+			}
+		}
+		if readErr == io.EOF {
+			break
+		}
+		if readErr != nil {
+			_ = temporary.Close()
+			if ctx.Err() == nil && downloadCtx.Err() != nil {
+				return fmt.Errorf("下载 ModelScope 文件 %s 超过 %s 没有进度", file.Path, voxcpmModelIdleTimeout)
+			}
+			return fmt.Errorf("读取 ModelScope 文件 %s 失败: %w", file.Path, readErr)
+		}
+	}
+	if err := temporary.Close(); err != nil {
+		return fmt.Errorf("关闭模型文件 %s 失败: %w", file.Path, err)
+	}
+	if copied != file.Size {
+		return fmt.Errorf("ModelScope 文件 %s 大小校验失败（得到 %d，预期 %d）", file.Path, copied, file.Size)
+	}
+	if actual := fmt.Sprintf("%x", hash.Sum(nil)); actual != file.SHA256 {
+		return fmt.Errorf("ModelScope 文件 %s SHA-256 校验失败", file.Path)
+	}
+	if err := os.Rename(temporaryPath, target); err != nil {
+		return fmt.Errorf("写入模型文件 %s 失败: %w", file.Path, err)
+	}
+	return nil
 }
 
 func voxcpmGPUDevice(device string) bool {
@@ -739,6 +1085,9 @@ func voxcpmPythonInterpreter(voxcpmPath string) string {
 func (m *voxcpmTaskManager) capture(id int64, reader io.Reader, copied *strings.Builder) {
 	scanner := bufio.NewScanner(reader)
 	scanner.Buffer(make([]byte, 4096), 128*1024)
+	// huggingface_hub updates tqdm in place with carriage returns. Splitting on
+	// them avoids a task that appears frozen at “0%” while bytes are arriving.
+	scanner.Split(splitRembgOutput)
 	for scanner.Scan() {
 		if line := strings.TrimSpace(scanner.Text()); line != "" {
 			m.appendLog(id, line)

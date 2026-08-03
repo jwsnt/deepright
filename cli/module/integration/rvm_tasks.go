@@ -35,6 +35,11 @@ const (
 	rvmScenarioStandard = "standard"
 	rvmScenarioQuality  = "quality"
 	rvmScenarioFast     = "fast"
+	// A domestic mirror for the checkpoint expected by the unmodified RVM
+	// script. The install request includes the digest so the installer can
+	// reject a changed community copy before placing it in the workspace.
+	rvmDomesticCheckpointURL    = "https://hf-mirror.com/DJ02-a/video_matting_RVM/resolve/main/rvm_mobilenetv3.pth"
+	rvmDomesticCheckpointSHA256 = "3c7c1d92033f7c38d6577c481d13a195d7d80a159b960f4f3119ac7b534cf4f8"
 )
 
 type rvmCheckConfig struct {
@@ -57,13 +62,29 @@ type rvmScenario struct {
 }
 
 // rvmCompatibilityBootstrap runs the unmodified upstream script while fixing
-// the PyAV rate API change in Integration's own process boundary.  In
+// the PyAV and PyTorch API changes in Integration's own process boundary. In
 // particular, it never writes to the Agent's downloaded RVM directory.
 const rvmCompatibilityBootstrap = `
 import os
 import runpy
 import sys
 from fractions import Fraction
+
+# PyTorch 2.6 changed torch.load's default to weights_only=True. RVM's
+# official checkpoints use the conventional state-dict wrapper; retain the
+# old behavior only when the installed torch supports this argument.
+import inspect
+import torch
+try:
+    _deepright_supports_weights_only = 'weights_only' in inspect.signature(torch.load).parameters
+except (TypeError, ValueError):
+    _deepright_supports_weights_only = False
+if _deepright_supports_weights_only:
+    _deepright_torch_load = torch.load
+    def _deepright_compatible_torch_load(*args, **kwargs):
+        kwargs.setdefault('weights_only', False)
+        return _deepright_torch_load(*args, **kwargs)
+    torch.load = _deepright_compatible_torch_load
 
 script = os.path.abspath(sys.argv[1])
 script_dir = os.path.dirname(script)
@@ -74,7 +95,10 @@ import inference_utils
 
 def _deepright_video_writer_init(self, path, frame_rate, bit_rate=1000000):
     self.container = inference_utils.av.open(path, mode='w')
-    self.stream = self.container.add_stream('h264', rate=Fraction(str(frame_rate)).limit_denominator(100000))
+    try:
+        self.stream = self.container.add_stream('h264', rate=Fraction(str(frame_rate)).limit_denominator(100000))
+    except TypeError:
+        self.stream = self.container.add_stream('h264', rate=frame_rate)
     self.stream.pix_fmt = 'yuv420p'
     self.stream.bit_rate = bit_rate
 
@@ -189,7 +213,10 @@ func rvmRuntimeFor(cacheFor time.Duration, workspace string) (rvmRuntime, bool) 
 		}
 		for _, python := range rvmPythonCandidates() {
 			probe, cancel := context.WithTimeout(context.Background(), rvmProbeTimeout)
-			err := rvmCommandContext(probe, python, candidate.Script, "--help").Run()
+			// The probe must exercise the same bootstrap as a real task. Otherwise
+			// a current PyAV/PyTorch runtime can look unavailable even though the
+			// compatibility wrapper can execute the upstream script safely.
+			err := rvmCommandContext(probe, python, rvmProbeArgs(candidate.Script)...).Run()
 			timedOut := probe.Err() != nil
 			cancel()
 			if err != nil || timedOut {
@@ -305,7 +332,9 @@ func rvmRuntimeForStartup(cacheFor time.Duration, cfg *Config) (rvmRuntime, bool
 }
 
 func rvmInstallRequest(template, workspace string) string {
-	return strings.ReplaceAll(template, "$workspace", workspace)
+	request := strings.ReplaceAll(template, "$workspace", workspace)
+	checkpoint := filepath.Join(workspace, "rvm", "weights", "rvm_mobilenetv3.pth")
+	return request + "\n\n模型下载要求：优先从国内镜像 `" + rvmDomesticCheckpointURL + "` 下载 `rvm_mobilenetv3.pth` 到 `" + checkpoint + "`，下载连接超时最多 30 秒、连续 90 秒无字节进度必须终止并报告。完成后校验 SHA-256 必须为 `" + rvmDomesticCheckpointSHA256 + "`；镜像失败时才可改用官方发布源，并继续执行相同的超时与校验。"
 }
 
 func rvmWorkspaceForRequest(cfg *Config, agentID string) (string, string, error) {
@@ -608,30 +637,17 @@ func (m *rvmTaskManager) extract(ctx context.Context, task rvmTask) error {
 	if err != nil {
 		return errors.New("未检测到 FFmpeg")
 	}
-	for attempt := 0; attempt < 4; attempt++ {
-		m.appendLog(task.ID, "正在合成透明 MOV。")
-		output, outputErr := videoTrimCommandContextFn(ctx, ffmpegPath, "-n", "-i", foreground, "-i", alpha, "-filter_complex", "[0:v][1:v]alphamerge[v]", "-map", "[v]", "-c:v", "prores_ks", "-profile:v", "4", target).CombinedOutput()
-		if outputErr == nil {
-			break
-		}
-		if _, statErr := os.Lstat(target); statErr == nil {
-			target, err = m.ensureAvailableOutputPath(&task, workspace, target)
-			if err != nil {
-				return err
-			}
-			continue
-		}
-		return fmt.Errorf("合成透明 MOV 失败: %s", strings.TrimSpace(string(output)))
+	target, err = m.composeTransparentMOV(ctx, task.ID, ffmpegPath, &task, workspace, target, foreground, alpha)
+	if err != nil {
+		return err
 	}
 	info, err := os.Stat(target)
 	if err != nil || info.Size() == 0 {
 		return errors.New("未生成有效的透明 MOV")
 	}
 	preview := rvmPreviewMP4Path(target)
-	m.appendLog(task.ID, "正在生成 MP4 预览副本。")
-	output, outputErr := videoTrimCommandContextFn(ctx, ffmpegPath, rvmPreviewFFmpegArgs(target, preview)...).CombinedOutput()
-	if outputErr != nil {
-		return fmt.Errorf("生成 MP4 预览副本失败: %s", strings.TrimSpace(string(output)))
+	if err := m.composePreviewMP4(ctx, task.ID, ffmpegPath, target, preview); err != nil {
+		return err
 	}
 	previewInfo, previewErr := os.Stat(preview)
 	if previewErr != nil || previewInfo.Size() == 0 {
@@ -657,6 +673,10 @@ func rvmInvocationArgs(r rvmRuntime, scenarioValue, device, source, foreground, 
 		args = append(args, "--downsample-ratio", scenario.DownsampleRatio)
 	}
 	return args
+}
+
+func rvmProbeArgs(script string) []string {
+	return []string{"-c", rvmCompatibilityBootstrap, script, "--help"}
 }
 
 func (m *rvmTaskManager) runRVM(ctx context.Context, id int64, r rvmRuntime, scenario, device, source, foreground, alpha string) error {
@@ -787,12 +807,127 @@ func rvmPreviewMP4Path(movPath string) string {
 // H.264/MP4 has no alpha channel, so mapping the MOV stream directly would
 // discard alpha and leave its hidden RGB values visible in the preview.
 func rvmPreviewFFmpegArgs(movPath, previewPath string) []string {
-	return []string{
+	return rvmPreviewFFmpegArgsWithCodec(movPath, previewPath, "libx264")
+}
+
+// rvmPreviewFFmpegArgsWithCodec keeps the filter graph stable while selecting
+// a video encoder known to the local FFmpeg build. h264_videotoolbox receives
+// an explicit bitrate because libx264's CRF/preset options do not apply to it.
+// libx264 is the CPU fallback and mpeg4 supports minimal FFmpeg builds.
+func rvmPreviewFFmpegArgsWithCodec(movPath, previewPath, codec string) []string {
+	args := []string{
 		"-n", "-i", movPath,
 		"-filter_complex", "[0:v:0]format=rgba[foreground];color=c=black:s=16x16,format=rgba[background];[background][foreground]scale2ref[background][foreground];[background][foreground]overlay=shortest=1:format=auto,format=yuv420p[preview]",
 		"-map", "[preview]",
-		"-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p", "-movflags", "+faststart", previewPath,
 	}
+	if codec == "h264_videotoolbox" {
+		args = append(args, "-c:v", codec, "-b:v", "8M")
+	} else if codec == "mpeg4" {
+		args = append(args, "-c:v", "mpeg4", "-q:v", "2")
+	} else {
+		args = append(args, "-c:v", "libx264", "-crf", "18", "-preset", "medium")
+	}
+	return append(args, "-pix_fmt", "yuv420p", "-movflags", "+faststart", previewPath)
+}
+
+func rvmTransparentMOVFFmpegArgs(foreground, alpha, target, codec string) []string {
+	args := []string{"-n", "-i", foreground, "-i", alpha, "-filter_complex", "[0:v][1:v]alphamerge[v]", "-map", "[v]"}
+	if codec == "qtrle" {
+		return append(args, "-c:v", "qtrle", "-pix_fmt", "argb", target)
+	}
+	if codec == "prores_videotoolbox" {
+		return append(args, "-c:v", codec, "-profile:v", "4", "-pix_fmt", "bgra", target)
+	}
+	return append(args, "-c:v", "prores_ks", "-profile:v", "4", target)
+}
+
+func (m *rvmTaskManager) composeTransparentMOV(ctx context.Context, taskID int64, ffmpegPath string, task *rvmTask, workspace, target, foreground, alpha string) (string, error) {
+	codecs := []string{"prores_ks", "qtrle"}
+	if ffmpegHardwareEncoderAvailable(ffmpegPath, "prores_videotoolbox") {
+		codecs = append([]string{"prores_videotoolbox"}, codecs...)
+	}
+	for attempt := 0; attempt < 4; attempt++ {
+		for index, codec := range codecs {
+			if codec == "prores_videotoolbox" {
+				m.appendLog(taskID, "正在使用 GPU 编码器 prores_videotoolbox 合成透明 MOV。")
+				log.Printf("[ffmpeg] RVM transparent MOV: using GPU encoder %s", codec)
+			} else {
+				m.appendLog(taskID, "正在使用 CPU 编码器 "+codec+" 合成透明 MOV。")
+				log.Printf("[ffmpeg] RVM transparent MOV: using CPU encoder %s", codec)
+			}
+			_, targetStatErr := os.Lstat(target)
+			targetExisted := targetStatErr == nil
+			if targetStatErr != nil && !errors.Is(targetStatErr, os.ErrNotExist) {
+				return "", errors.New("无法检查透明 MOV 输出路径")
+			}
+			output, err := videoTrimCommandContextFn(ctx, ffmpegPath, rvmTransparentMOVFFmpegArgs(foreground, alpha, target, codec)...).CombinedOutput()
+			if err == nil {
+				return target, nil
+			}
+			if targetExisted {
+				var allocateErr error
+				target, allocateErr = m.ensureAvailableOutputPath(task, workspace, target)
+				if allocateErr != nil {
+					return "", allocateErr
+				}
+				break
+			}
+			// Failed encoders sometimes leave an empty or partial destination.
+			// It belongs to this attempt, not to another task, so clear it before
+			// trying the fallback codec with the same collision-safe name.
+			_ = os.Remove(target)
+			if index+1 < len(codecs) {
+				if codec == "prores_videotoolbox" {
+					m.appendLog(taskID, "GPU 编码器 prores_videotoolbox 失败，已回退到 CPU 编码器 "+codecs[index+1]+"。")
+					log.Printf("[ffmpeg] RVM transparent MOV: GPU encoder %s failed: %s; falling back to CPU encoder %s", codec, strings.TrimSpace(string(output)), codecs[index+1])
+				} else {
+					m.appendLog(taskID, "当前 FFmpeg 不支持 "+codec+" 透明编码，已回退到 "+codecs[index+1]+"。")
+					log.Printf("[ffmpeg] RVM transparent MOV: CPU encoder %s failed: %s; falling back to %s", codec, strings.TrimSpace(string(output)), codecs[index+1])
+				}
+				continue
+			}
+			return "", fmt.Errorf("合成透明 MOV 失败: %s", strings.TrimSpace(string(output)))
+		}
+	}
+	return "", errors.New("无法分配透明 MOV 输出路径")
+}
+
+func (m *rvmTaskManager) composePreviewMP4(ctx context.Context, taskID int64, ffmpegPath, source, preview string) error {
+	codecs := []string{"libx264", "mpeg4"}
+	if ffmpegHardwareEncoderAvailable(ffmpegPath, "h264_videotoolbox") {
+		codecs = append([]string{"h264_videotoolbox"}, codecs...)
+	}
+	for index, codec := range codecs {
+		if codec == "h264_videotoolbox" {
+			m.appendLog(taskID, "正在使用 GPU 编码器 h264_videotoolbox 生成 MP4 预览副本。")
+			log.Printf("[ffmpeg] RVM MP4 preview: using GPU encoder %s", codec)
+		} else {
+			m.appendLog(taskID, "正在使用 CPU 编码器 "+codec+" 生成 MP4 预览副本。")
+			log.Printf("[ffmpeg] RVM MP4 preview: using CPU encoder %s", codec)
+		}
+		if _, statErr := os.Lstat(preview); statErr == nil {
+			return errors.New("MP4 预览输出已存在，已避免覆盖")
+		} else if !errors.Is(statErr, os.ErrNotExist) {
+			return errors.New("无法检查 MP4 预览输出路径")
+		}
+		output, err := videoTrimCommandContextFn(ctx, ffmpegPath, rvmPreviewFFmpegArgsWithCodec(source, preview, codec)...).CombinedOutput()
+		if err == nil {
+			return nil
+		}
+		_ = os.Remove(preview)
+		if index+1 < len(codecs) {
+			if codec == "h264_videotoolbox" {
+				m.appendLog(taskID, "GPU 编码器 h264_videotoolbox 失败，已回退到 CPU 编码器 "+codecs[index+1]+"。")
+				log.Printf("[ffmpeg] RVM MP4 preview: GPU encoder %s failed: %s; falling back to CPU encoder %s", codec, strings.TrimSpace(string(output)), codecs[index+1])
+			} else {
+				m.appendLog(taskID, "当前 FFmpeg 不支持 "+codec+"，已回退到 "+codecs[index+1]+" 生成预览。")
+				log.Printf("[ffmpeg] RVM MP4 preview: CPU encoder %s failed: %s; falling back to %s", codec, strings.TrimSpace(string(output)), codecs[index+1])
+			}
+			continue
+		}
+		return fmt.Errorf("生成 MP4 预览副本失败: %s", strings.TrimSpace(string(output)))
+	}
+	return errors.New("无法生成 MP4 预览副本")
 }
 
 // ensureAvailableOutputPath makes the output collision rule hold until the
