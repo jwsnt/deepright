@@ -93,6 +93,8 @@ start.bat
 /usr/bin/env HOME=/home/deepright TERM=xterm-256color DEEPRIGHT_INTEGRATION_SKIP_BROWSER=1 /app/integration start
 ```
 
+启动包装脚本会以非特权的 `deepright` 用户读取 `~/.bashrc` 并将其 `PATH` 传给服务；不会以 root 身份执行用户的 shell 配置。VoxCPM 的依赖检查还会在每次请求时扫描受管 CPython 的安装目录，因此 `pip` 在服务启动后完成安装时，下一次点击“音频”即可重新检查，无需重启服务。
+
 直接从 `deepright` 用户执行包装脚本时，它会使用配置好的免密 `sudo`。因此精简 Ubuntu Rootfs 尚未安装 `sudo` 时，Windows 启动入口仍可正常运行。进程以 root 身份运行，但 HOME 保持为 `/home/deepright`，因此会继续使用原有的 agent 和运行时数据目录。
 
 WSL 包装脚本只负责等待服务在 `config/config.json` 的 `port` 上就绪，不在 WSL/root 会话中打开浏览器。`start.bat` 与首次安装器会在当前 Windows 桌面会话中打开 `http://localhost:<port>/launch`；因此即使服务以 root 身份运行，双击桌面快捷方式也会使用当前用户的默认浏览器。

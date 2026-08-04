@@ -783,7 +783,7 @@ func TestProxyChatCompletions(t *testing.T) {
 		t.Fatalf("getwd: %v", err)
 	}
 	tmp := t.TempDir()
-	configPath := writeIntegrationDeviceConfig(t, tmp, `{}`)
+	configPath := writeIntegrationDeviceConfig(t, tmp, `{"version":"2026.08.04"}`)
 	agentDir := filepath.Join(tmp, "agent")
 	if err := copyTestDir(fixtureAgentDir, agentDir); err != nil {
 		t.Fatalf("copy agent fixture: %v", err)
@@ -827,6 +827,7 @@ func TestProxyChatCompletions(t *testing.T) {
 		Port:              18765,
 		Host:              upstream.URL,
 		StartupConfigPath: configPath,
+		ClientVersion:     "2026.08.04",
 		AgentDir:          agentDir,
 		Device:            "test-dev",
 		AgentCacheMs:      120000,
@@ -836,7 +837,7 @@ func TestProxyChatCompletions(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(handleChatCompletions(cfg, proxyClient)))
 	defer server.Close()
 
-	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"HELLO WORLD"}],"stream":true,"metadata":{"config":"/tmp/forged/config.json","dir":"/tmp/forged","plugins":["browser"],"port":9999}}`
+	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"HELLO WORLD"}],"stream":true,"metadata":{"config":"/tmp/forged/config.json","version":"forged","theme":"cold","dir":"/tmp/forged","plugins":["browser"],"port":9999}}`
 	req, _ := http.NewRequest("POST", server.URL, strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer sk-test")
@@ -878,6 +879,12 @@ func TestProxyChatCompletions(t *testing.T) {
 	}
 	if meta["config"] != configPath {
 		t.Errorf("metadata.config = %#v, want %q", meta["config"], configPath)
+	}
+	if meta["version"] != "2026.08.04" {
+		t.Errorf("metadata.version = %#v, want %q", meta["version"], "2026.08.04")
+	}
+	if meta["theme"] != "cold" {
+		t.Errorf("metadata.theme = %#v, want %q", meta["theme"], "cold")
 	}
 	if meta["deviceId"] != "test-dev" {
 		t.Errorf("deviceId = %v", meta["deviceId"])
@@ -5441,6 +5448,59 @@ func TestHandleFolderSupportsAbsolutePath(t *testing.T) {
 	}
 }
 
+func TestHandleBrowserOpen(t *testing.T) {
+	previousOpenBrowserURLFn := openBrowserURLFn
+	openedURL := ""
+	openBrowserURLFn = func(target string) error {
+		openedURL = target
+		return nil
+	}
+	defer func() {
+		openBrowserURLFn = previousOpenBrowserURLFn
+	}()
+
+	request := httptest.NewRequest(http.MethodPost, "/api/browser/open", strings.NewReader(`{"url":"https://example.com/path?q=1"}`))
+	request.RemoteAddr = "127.0.0.1:34567"
+	request.Host = "127.0.0.1:8080"
+	recorder := httptest.NewRecorder()
+
+	handleBrowserOpen().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d body=%s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+	if openedURL != "https://example.com/path?q=1" {
+		t.Fatalf("opened URL = %q, want %q", openedURL, "https://example.com/path?q=1")
+	}
+}
+
+func TestHandleBrowserOpenRejectsUnsafeOrRemoteRequests(t *testing.T) {
+	testCases := []struct {
+		name       string
+		method     string
+		body       string
+		remoteAddr string
+		host       string
+		wantStatus int
+	}{
+		{name: "method", method: http.MethodGet, wantStatus: http.StatusMethodNotAllowed},
+		{name: "remote", method: http.MethodPost, body: `{"url":"https://example.com"}`, remoteAddr: "203.0.113.10:12345", host: "example.com", wantStatus: http.StatusForbidden},
+		{name: "unsafe protocol", method: http.MethodPost, body: `{"url":"file:///tmp/private"}`, remoteAddr: "127.0.0.1:12345", host: "127.0.0.1", wantStatus: http.StatusBadRequest},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			request := httptest.NewRequest(testCase.method, "/api/browser/open", strings.NewReader(testCase.body))
+			request.RemoteAddr = testCase.remoteAddr
+			request.Host = testCase.host
+			recorder := httptest.NewRecorder()
+			handleBrowserOpen().ServeHTTP(recorder, request)
+			if recorder.Code != testCase.wantStatus {
+				t.Fatalf("status = %d, want %d body=%s", recorder.Code, testCase.wantStatus, recorder.Body.String())
+			}
+		})
+	}
+}
+
 type testOpenSystemTargetFileInfo struct{}
 
 func (testOpenSystemTargetFileInfo) Name() string       { return "explorer.exe" }
@@ -7364,6 +7424,7 @@ func TestIntegrationClientRuntimeConfigExposesVersion(t *testing.T) {
 		"version":   "0.1",
 		"agent-dir": "/tmp/agents",
 		"shortcut":  []interface{}{"好的", "继续"},
+		"page":      map[string]interface{}{"new_tab": 931},
 		"provider":  map[string]interface{}{"private": "must not be exposed"},
 	})
 	if got := config["version"]; got != "0.1" {
@@ -7374,6 +7435,9 @@ func TestIntegrationClientRuntimeConfigExposesVersion(t *testing.T) {
 	}
 	if got, want := config["shortcut"], []interface{}{"好的", "继续"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("shortcut = %#v, want %#v", got, want)
+	}
+	if got, want := config["page"], map[string]interface{}{"new_tab": 931}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("page = %#v, want %#v", got, want)
 	}
 	if _, ok := config["provider"]; ok {
 		t.Fatalf("provider should not be exposed: %#v", config)
@@ -9095,6 +9159,18 @@ func TestApplyIntegrationStartupConfigSupportsSkillExtractRound(t *testing.T) {
 	}
 }
 
+func TestApplyIntegrationStartupConfigCachesClientVersion(t *testing.T) {
+	opts := defaultIntegrationStartupOptions()
+	if err := applyIntegrationStartupConfig(&opts, map[string]interface{}{
+		"version": " 2026.08.04 ",
+	}); err != nil {
+		t.Fatalf("applyIntegrationStartupConfig: %v", err)
+	}
+	if opts.Config.ClientVersion != "2026.08.04" {
+		t.Fatalf("ClientVersion = %q, want 2026.08.04", opts.Config.ClientVersion)
+	}
+}
+
 func TestApplyIntegrationStartupConfigUsesNestedGetIntervals(t *testing.T) {
 	opts := defaultIntegrationStartupOptions()
 	if err := applyIntegrationStartupConfig(&opts, map[string]interface{}{
@@ -9131,24 +9207,45 @@ func TestApplyIntegrationStartupConfigRejectsFractionalGetIntervals(t *testing.T
 	}
 }
 
-func TestIntegrationCliGetCommandCheckStartsIdleThenChecksAfterCommand(t *testing.T) {
+func TestIntegrationCliGetCommandCheckCountsEveryNoCommandResult(t *testing.T) {
 	state := newCliGetCommandCheck()
-	if state.shouldImmediatelyRetryWithoutSSE(false, 10) {
-		t.Fatal("first empty response before any command should enter await")
-	}
-	if !state.shouldImmediatelyRetryWithoutSSE(true, 10) {
-		t.Fatal("command response should immediately retry")
-	}
 	for count := 1; count < 10; count++ {
 		if !state.shouldImmediatelyRetryWithoutSSE(false, 10) {
-			t.Fatalf("empty response %d should immediately retry", count)
+			t.Fatalf("no-command result %d should immediately retry", count)
 		}
 	}
 	if state.shouldImmediatelyRetryWithoutSSE(false, 10) {
-		t.Fatal("tenth consecutive empty response should enter await")
+		t.Fatal("tenth no-command result should enter await")
+	}
+	if state.shouldImmediatelyRetryWithoutSSE(false, 10) {
+		t.Fatal("no-command result after the threshold should remain in await")
+	}
+	if got := state.emptySinceCommand.Load(); got != 11 {
+		t.Fatalf("no-command count = %d, want 11", got)
 	}
 	if !state.shouldImmediatelyRetryWithoutSSE(true, 10) {
-		t.Fatal("a new command should atomically reset the empty-response count")
+		t.Fatal("command response should immediately retry and reset the count")
+	}
+	for count := 1; count < 10; count++ {
+		if !state.shouldImmediatelyRetryWithoutSSE(false, 10) {
+			t.Fatalf("no-command result after command %d should immediately retry", count)
+		}
+	}
+	if state.shouldImmediatelyRetryWithoutSSE(false, 10) {
+		t.Fatal("tenth no-command result after command should enter await")
+	}
+}
+
+func TestIntegrationCliGetFailureAwaitsWhenNoCommandCheckReachesThreshold(t *testing.T) {
+	state := newCliGetCommandCheck()
+	if shouldAwaitAfterCliGetFailure(false, state.shouldImmediatelyRetryWithoutSSE(false, 2)) {
+		t.Fatal("first failed no-command result should use sleep")
+	}
+	if !shouldAwaitAfterCliGetFailure(false, state.shouldImmediatelyRetryWithoutSSE(false, 2)) {
+		t.Fatal("failed no-command result reaching check should use await")
+	}
+	if shouldAwaitAfterCliGetFailure(true, false) {
+		t.Fatal("active SSE must prevent await after a failed heartbeat")
 	}
 }
 
@@ -9640,6 +9737,7 @@ func useBundledIntegrationExecutable(t *testing.T, bundleRoot string) {
 func TestLoadIntegrationStartupOptionsReadsConfigDirectoryConfig(t *testing.T) {
 	tempDir := t.TempDir()
 	useIntegrationExecutableDir(t, tempDir)
+	useIntegrationRuntimeHome(t, tempDir)
 
 	configDir := filepath.Join(tempDir, "config")
 	if err := os.MkdirAll(configDir, 0o755); err != nil {
@@ -9648,6 +9746,7 @@ func TestLoadIntegrationStartupOptionsReadsConfigDirectoryConfig(t *testing.T) {
 	configPath := filepath.Join(configDir, "config.json")
 	if err := os.WriteFile(configPath, []byte(`{
   "host": "http://www.dr.cn",
+  "version": "2026.08.04",
   "agentDir": "agents",
   "default_dir": "templates",
   "site": "web",
@@ -9669,6 +9768,9 @@ func TestLoadIntegrationStartupOptionsReadsConfigDirectoryConfig(t *testing.T) {
 	}
 	if opts.Config.Host != "http://www.dr.cn" {
 		t.Fatalf("host = %q, want http://www.dr.cn", opts.Config.Host)
+	}
+	if opts.Config.ClientVersion != "2026.08.04" {
+		t.Fatalf("ClientVersion = %q, want 2026.08.04", opts.Config.ClientVersion)
 	}
 	if opts.Config.AgentDir != "agents" {
 		t.Fatalf("agent-dir = %q, want agents", opts.Config.AgentDir)
@@ -11168,7 +11270,7 @@ func TestCliGetHeartbeatAndExecute(t *testing.T) {
 		t.Fatalf("getwd: %v", err)
 	}
 	tmp := t.TempDir()
-	configPath := writeIntegrationDeviceConfig(t, tmp, `{}`)
+	configPath := writeIntegrationDeviceConfig(t, tmp, `{"version":"2026.08.04"}`)
 	if err := os.MkdirAll(filepath.Join(tmp, "knowledge"), 0o755); err != nil {
 		t.Fatalf("mkdir knowledge: %v", err)
 	}
@@ -11229,7 +11331,7 @@ func TestCliGetHeartbeatAndExecute(t *testing.T) {
 	}
 
 	// Test heartbeat
-	upstreamCfg := &Config{Port: 18766, StartupConfigPath: configPath, AgentDir: filepath.Join(tmp, "agent")}
+	upstreamCfg := &Config{Port: 18766, StartupConfigPath: configPath, ClientVersion: "2026.08.04", AgentDir: filepath.Join(tmp, "agent")}
 	task, err := heartbeat(client, server.URL, metadata, upstreamCfg)
 	if err != nil {
 		t.Fatalf("heartbeat: %v", err)
@@ -11262,6 +11364,12 @@ func TestCliGetHeartbeatAndExecute(t *testing.T) {
 	}
 	if getMeta["config"] != configPath {
 		t.Errorf("get metadata.config = %#v, want %q", getMeta["config"], configPath)
+	}
+	if getMeta["version"] != "2026.08.04" {
+		t.Errorf("get metadata.version = %#v, want %q", getMeta["version"], "2026.08.04")
+	}
+	if _, exists := getMeta["theme"]; exists {
+		t.Errorf("cli/get metadata.theme must be absent: %#v", getMeta["theme"])
 	}
 	if getMeta["deviceId"] != "d" {
 		t.Errorf("get deviceId = %v", getMeta["deviceId"])
@@ -15029,7 +15137,7 @@ func TestCronExecuteOnceInjectsDefaultCronTypeIntoRequestMetadata(t *testing.T) 
 		t.Fatalf("getwd: %v", err)
 	}
 	tmp := t.TempDir()
-	configPath := writeIntegrationDeviceConfig(t, tmp, `{}`)
+	configPath := writeIntegrationDeviceConfig(t, tmp, `{"version":"2026.08.04"}`)
 	if err := os.Chdir(tmp); err != nil {
 		t.Fatalf("chdir: %v", err)
 	}
@@ -15097,6 +15205,7 @@ func TestCronExecuteOnceInjectsDefaultCronTypeIntoRequestMetadata(t *testing.T) 
 	cfg := &Config{
 		Host:              upstream.URL,
 		StartupConfigPath: configPath,
+		ClientVersion:     "2026.08.04",
 		AgentDir:          agentRoot,
 		Device:            "dev",
 		AgentCacheMs:      120000,
@@ -15141,6 +15250,12 @@ func TestCronExecuteOnceInjectsDefaultCronTypeIntoRequestMetadata(t *testing.T) 
 	}
 	if metadata["config"] != configPath {
 		t.Fatalf("metadata.config = %#v, want %q", metadata["config"], configPath)
+	}
+	if metadata["version"] != "2026.08.04" {
+		t.Fatalf("metadata.version = %#v, want %q", metadata["version"], "2026.08.04")
+	}
+	if _, exists := metadata["theme"]; exists {
+		t.Fatalf("scheduled-task metadata.theme must be absent: %#v", metadata["theme"])
 	}
 	if _, exists := metadata["META_ID"]; exists {
 		t.Fatalf("metadata META_ID should be absent when meta_ref is empty: %+v", metadata)
@@ -22936,7 +23051,7 @@ func newLocalModelTestRequest(body string) *http.Request {
 }
 
 func TestDecodeModelTestRequestValidatesBaseURL(t *testing.T) {
-	const validRequest = `{"model":"deepseek","token":"test-token","__model":"deepseek-chat"`
+	const validRequest = `{"model":"deepseek","token":"test-token","__model":"deepseek-chat","metadata":{"device":"page-device","theme":"cold"}`
 	tests := []struct {
 		name    string
 		baseURL string
@@ -22971,8 +23086,27 @@ func TestDecodeModelTestRequestValidatesBaseURL(t *testing.T) {
 	}
 }
 
+func TestDecodeModelTestRequestRequiresPageMetadata(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want string
+	}{
+		{name: "missing device", body: `{"model":"deepseek","token":"test-token","__model":"deepseek-chat","metadata":{"theme":"cold"}}`, want: "metadata.device"},
+		{name: "invalid theme", body: `{"model":"deepseek","token":"test-token","__model":"deepseek-chat","metadata":{"device":"page-device","theme":"neutral"}}`, want: "metadata.theme"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := decodeModelTestRequest(io.NopCloser(strings.NewReader(test.body)))
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("decode error = %v, want %s validation error", err, test.want)
+			}
+		})
+	}
+}
+
 func TestHandleModelTestUsesTransientConfigurationAndReturnsSuccess(t *testing.T) {
-	configPath := writeModelTestRuntimeConfig(t, `{"test":{"content":"runtime probe","timeout":10}}`)
+	configPath := writeModelTestRuntimeConfig(t, `{"version":"2026.08.04","test":{"content":"runtime probe","timeout":10}}`)
 	workspace := t.TempDir()
 	var captured map[string]interface{}
 	var authorization string
@@ -22984,9 +23118,9 @@ func TestHandleModelTestUsesTransientConfigurationAndReturnsSuccess(t *testing.T
 	}))
 	defer upstream.Close()
 
-	handler := handleModelTest(&Config{Host: upstream.URL, StartupConfigPath: configPath, AgentDir: workspace, Device: "test-device", Port: 17896}, upstream.Client())
+	handler := handleModelTest(&Config{Host: upstream.URL, StartupConfigPath: configPath, ClientVersion: "2026.08.04", AgentDir: workspace, Device: "test-device", Port: 17896}, upstream.Client())
 	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, newLocalModelTestRequest(`{"model":"deepseek","token":"Bearer transient-token","__url":"https://draft.example/v1","__model":"deepseek-draft","__model_fast":"fast-draft"}`))
+	handler.ServeHTTP(recorder, newLocalModelTestRequest(`{"model":"deepseek","token":"Bearer transient-token","__url":"https://draft.example/v1","__model":"deepseek-draft","__model_fast":"fast-draft","metadata":{"device":"page-device","theme":"cold"}}`))
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d, body=%s", recorder.Code, recorder.Body.String())
@@ -23007,6 +23141,9 @@ func TestHandleModelTestUsesTransientConfigurationAndReturnsSuccess(t *testing.T
 	if metadata["config"] != configPath {
 		t.Fatalf("metadata.config = %#v, want %q", metadata["config"], configPath)
 	}
+	if metadata["version"] != "2026.08.04" {
+		t.Fatalf("metadata.version = %#v, want %q", metadata["version"], "2026.08.04")
+	}
 	chatID, _ := metadata["chat"].(string)
 	if !regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`).MatchString(chatID) {
 		t.Fatalf("chat UUID = %q", chatID)
@@ -23025,8 +23162,11 @@ func TestHandleModelTestUsesTransientConfigurationAndReturnsSuccess(t *testing.T
 			t.Fatalf("metadata.%s must be present: %#v", key, metadata)
 		}
 	}
-	if metadata["device"] != "test-device" {
-		t.Fatalf("metadata.device = %v, want %q", metadata["device"], "test-device")
+	if metadata["device"] != "page-device" {
+		t.Fatalf("metadata.device = %v, want %q", metadata["device"], "page-device")
+	}
+	if metadata["theme"] != "cold" {
+		t.Fatalf("metadata.theme = %v, want %q", metadata["theme"], "cold")
 	}
 	for _, forbidden := range []string{"agentId", "agent", "skills", "knowledge", "router_remote", "plugins", "memory"} {
 		if _, found := metadata[forbidden]; found {
@@ -23043,11 +23183,34 @@ func TestHandleModelTestUsesTransientConfigurationAndReturnsSuccess(t *testing.T
 	}
 }
 
+func TestHandleModelTestForwardsConfiguredPagePacket(t *testing.T) {
+	const pageContent = `{"url":"https://example.com/register","message":"请先注册设备"}`
+	configPath := writeModelTestRuntimeConfig(t, `{"test":{"content":"runtime probe","timeout":10},"page":{"new_tab":931,"iframe":932}}`)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "data: {\"code\":931,\"choices\":[{\"delta\":{\"content\":"+strconv.Quote(pageContent)+"}}]}\n\ndata: [DONE]\n\n")
+	}))
+	defer upstream.Close()
+
+	recorder := httptest.NewRecorder()
+	handleModelTest(&Config{Host: upstream.URL, StartupConfigPath: configPath, Device: "test-device"}, upstream.Client()).ServeHTTP(recorder, newLocalModelTestRequest(`{"model":"deepseek","token":"test-token","__model":"deepseek-chat","metadata":{"device":"page-device","theme":"cold"}}`))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", recorder.Code, recorder.Body.String())
+	}
+	body := recorder.Body.String()
+	if !strings.Contains(body, "event: page") || !strings.Contains(body, `"code":931`) || !strings.Contains(body, strconv.Quote(pageContent)) {
+		t.Fatalf("special page packet was not forwarded: %s", body)
+	}
+	if !strings.Contains(body, "event: result") || !strings.Contains(body, `"status":1`) || !strings.Contains(body, "请先注册设备") {
+		t.Fatalf("special page failure result missing: %s", body)
+	}
+}
+
 func TestHandleModelTestRejectsMissingTestConfigAndRedactsProviderErrors(t *testing.T) {
 	t.Run("missing config", func(t *testing.T) {
 		writeModelTestRuntimeConfig(t, `{}`)
 		recorder := httptest.NewRecorder()
-		handleModelTest(&Config{Device: "test-device"}, http.DefaultClient).ServeHTTP(recorder, newLocalModelTestRequest(`{"model":"deepseek","token":"secret-token","__model":"deepseek-chat"}`))
+		handleModelTest(&Config{Device: "test-device"}, http.DefaultClient).ServeHTTP(recorder, newLocalModelTestRequest(`{"model":"deepseek","token":"secret-token","__model":"deepseek-chat","metadata":{"device":"page-device","theme":"cold"}}`))
 		if recorder.Code != http.StatusBadRequest || !strings.Contains(recorder.Body.String(), "config.json.test") {
 			t.Fatalf("response = %d %s", recorder.Code, recorder.Body.String())
 		}
@@ -23061,7 +23224,7 @@ func TestHandleModelTestRejectsMissingTestConfigAndRedactsProviderErrors(t *test
 		}))
 		defer upstream.Close()
 		recorder := httptest.NewRecorder()
-		handleModelTest(&Config{Host: upstream.URL, Device: "test-device"}, upstream.Client()).ServeHTTP(recorder, newLocalModelTestRequest(`{"model":"deepseek","token":"secret-token","__model":"deepseek-chat"}`))
+		handleModelTest(&Config{Host: upstream.URL, Device: "test-device"}, upstream.Client()).ServeHTTP(recorder, newLocalModelTestRequest(`{"model":"deepseek","token":"secret-token","__model":"deepseek-chat","metadata":{"device":"page-device","theme":"cold"}}`))
 		if recorder.Code != http.StatusBadGateway || !strings.Contains(recorder.Body.String(), "服务商身份认证失败（401）") {
 			t.Fatalf("response = %d %s", recorder.Code, recorder.Body.String())
 		}
@@ -23076,6 +23239,7 @@ func TestHandleModelTestRejectsMissingTestConfigAndRedactsProviderErrors(t *test
 
 func TestModelTestProviderStandardStatusMessages(t *testing.T) {
 	tests := map[int]string{
+		http.StatusBadRequest:          "服务商请求无效（400），请检查模型地址、模型名称与请求参数",
 		http.StatusUnauthorized:        "服务商身份认证失败（401），请检查 API Key/Token 是否正确、有效且未过期",
 		http.StatusForbidden:           "服务商拒绝访问（403），请确认密钥已获该模型或接口的访问权限",
 		http.StatusNotFound:            "服务商资源不存在（404），请检查模型 URL 和基础模型",
@@ -23132,7 +23296,7 @@ func TestConsumeModelTestSSERequiresBusinessDataAndDone(t *testing.T) {
 		{name: "empty", stream: "data: [DONE]\n\n", wantErr: "有效业务数据"},
 		{name: "missing done", stream: "data: {\"choices\":[{\"delta\":{\"content\":\"ok\"}}]}\n\n", wantErr: "缺少 [DONE]"},
 		{name: "stream error", stream: "data: {\"error\":{\"message\":\"token=secret-token rejected\"}}\n\n", wantErr: "[REDACTED]"},
-		{name: "stream error content", stream: "data: {\"code\":400,\"choices\":[{\"delta\":{\"content\":\"Permission denied: token=secret-token\"},\"metadata\":{\"Content-Length\":\"492\"}}]}\n\n", wantErr: "Permission denied: token=[REDACTED]"},
+		{name: "stream error content", stream: "data: {\"code\":400,\"choices\":[{\"delta\":{\"content\":\"Permission denied: token=secret-token\"},\"metadata\":{\"Content-Length\":\"492\"}}]}\n\n", wantErr: "服务商请求无效（400），请检查模型地址、模型名称与请求参数"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -23151,6 +23315,56 @@ func TestConsumeModelTestSSERequiresBusinessDataAndDone(t *testing.T) {
 			}
 			if test.name == "stream error content" && strings.Contains(err.Error(), "Content-Length") {
 				t.Fatalf("stream error must show nested content only: %v", err)
+			}
+		})
+	}
+}
+
+func TestConsumeModelTestSSERelaysOnlyConfiguredPagePacket(t *testing.T) {
+	const pageContent = `{"url":"https://example.com/register","message":"请先注册设备"}`
+	stream := "data: {\"code\":931,\"choices\":[{\"delta\":{\"content\":" + strconv.Quote(pageContent) + "}}]}\n\ndata: [DONE]\n\n"
+	var packets []modelTestPagePacket
+	err := consumeModelTestSSE(context.Background(), strings.NewReader(stream), "secret-token", modelTestSSEOptions{
+		PageResponseCodes: configuredPageResponseCodes{NewTab: 931, Iframe: 932},
+		OnPagePacket: func(packet modelTestPagePacket) {
+			packets = append(packets, packet)
+		},
+	})
+	if err != nil {
+		t.Fatalf("consume error: %v", err)
+	}
+	if len(packets) != 1 || packets[0].Code != 931 || packets[0].Content != pageContent || packets[0].Message != "请先注册设备" {
+		t.Fatalf("page packets = %#v", packets)
+	}
+}
+
+func TestHeartbeatExemptsConfiguredPageResponseCodes(t *testing.T) {
+	configPath := writeModelTestRuntimeConfig(t, `{"page":{"new_tab":931,"iframe":932}}`)
+	for _, tc := range []struct {
+		name       string
+		httpStatus int
+		bodyCode   int
+	}{
+		{name: "JSON 932", httpStatus: http.StatusOK, bodyCode: 932},
+		{name: "HTTP 931", httpStatus: 931},
+		{name: "HTTP 932", httpStatus: 932},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tc.httpStatus)
+				if tc.bodyCode != 0 {
+					_ = json.NewEncoder(w).Encode(ResponsePayload{Code: tc.bodyCode})
+				}
+			}))
+			defer server.Close()
+
+			task, err := heartbeat(server.Client(), server.URL, &AgentOutput{}, &Config{StartupConfigPath: configPath})
+			if err != nil {
+				t.Fatalf("heartbeat error = %v", err)
+			}
+			if task != nil {
+				t.Fatalf("task = %#v, want nil", task)
 			}
 		})
 	}

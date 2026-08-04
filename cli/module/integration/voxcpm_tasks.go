@@ -175,9 +175,10 @@ type voxcpmTaskManager struct {
 
 var (
 	voxcpmTasks                  *voxcpmTaskManager
-	voxcpmLookPath               = exec.LookPath
+	voxcpmLookPath               = integrationCommandLookPath
+	voxcpmGlob                   = filepath.Glob
 	voxcpmCommandContext         = exec.CommandContext
-	voxcpmTaskLookPath           = exec.LookPath
+	voxcpmTaskLookPath           = integrationCommandLookPath
 	voxcpmTaskPreferredDevice    = voxcpmPreferredDevice
 	voxcpmNow                    = time.Now
 	voxcpmHTTPClient             = &http.Client{Transport: &http.Transport{ResponseHeaderTimeout: voxcpmModelHeaderTimeout}}
@@ -279,35 +280,71 @@ func parseVoxCPMCheckConfig(raw map[string]interface{}) (voxcpmCheckConfig, erro
 
 func voxcpmExecutable(cacheFor time.Duration) (string, bool) {
 	now := voxcpmNow()
-	path, err := voxcpmLookPath("voxcpm")
-	if err != nil || strings.TrimSpace(path) == "" {
-		return "", false
-	}
-	path, err = filepath.Abs(path)
-	if err != nil {
-		return "", false
-	}
-	info, err := os.Stat(path)
-	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
-		return "", false
-	}
-	voxcpmCheckCache.Lock()
-	cachedAt, cached := voxcpmCheckCache.checkedAt, voxcpmCheckCache.executable
-	voxcpmCheckCache.Unlock()
-	if cached == path && !cachedAt.IsZero() && now.Before(cachedAt.Add(cacheFor)) {
+	for _, candidate := range voxcpmExecutableCandidates() {
+		path, err := filepath.Abs(candidate)
+		if err != nil {
+			continue
+		}
+		info, err := os.Stat(path)
+		if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
+			continue
+		}
+		voxcpmCheckCache.Lock()
+		cachedAt, cached := voxcpmCheckCache.checkedAt, voxcpmCheckCache.executable
+		voxcpmCheckCache.Unlock()
+		if cached == path && !cachedAt.IsZero() && now.Before(cachedAt.Add(cacheFor)) {
+			return path, true
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), voxcpmProbeTimeout)
+		err = voxcpmCommandContext(ctx, path, "--help").Run()
+		timedOut := ctx.Err() != nil
+		cancel()
+		if err != nil || timedOut {
+			continue
+		}
+		voxcpmCheckCache.Lock()
+		voxcpmCheckCache.checkedAt, voxcpmCheckCache.executable = now, path
+		voxcpmCheckCache.Unlock()
 		return path, true
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), voxcpmProbeTimeout)
-	err = voxcpmCommandContext(ctx, path, "--help").Run()
-	timedOut := ctx.Err() != nil
-	cancel()
-	if err != nil || timedOut {
-		return "", false
+	return "", false
+}
+
+// voxcpmExecutableCandidates checks PATH first, then the managed CPython
+// runtime location used by the WSL installer. The latter is deliberately
+// evaluated for every dependency check: pip can finish after Integration has
+// started, and a running process cannot inherit a later PATH update.
+func voxcpmExecutableCandidates() []string {
+	candidates := make([]string, 0, 2)
+	seen := make(map[string]struct{})
+	appendCandidate := func(path string) {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			return
+		}
+		if _, exists := seen[path]; exists {
+			return
+		}
+		seen[path] = struct{}{}
+		candidates = append(candidates, path)
 	}
-	voxcpmCheckCache.Lock()
-	voxcpmCheckCache.checkedAt, voxcpmCheckCache.executable = now, path
-	voxcpmCheckCache.Unlock()
-	return path, true
+	if path, err := voxcpmLookPath("voxcpm"); err == nil {
+		appendCandidate(path)
+	}
+	patterns := []string{"/usr/local/share/python*/cpython-*/bin/voxcpm"}
+	if home := strings.TrimSpace(os.Getenv("HOME")); home != "" {
+		patterns = append(patterns, filepath.Join(home, ".local", "bin", "voxcpm"))
+	}
+	for _, pattern := range patterns {
+		matches, err := voxcpmGlob(pattern)
+		if err != nil {
+			continue
+		}
+		for _, match := range matches {
+			appendCandidate(match)
+		}
+	}
+	return candidates
 }
 
 func writeVoxCPMJSON(w http.ResponseWriter, code int, value interface{}) {

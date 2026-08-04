@@ -551,6 +551,8 @@ Seedream 特殊说明：
 - 响应实时流式渲染，支持标准 Markdown、LaTeX 公式（例如 `$E=mc^2$`、`$$\int_0^1 x^2 dx$$`）、图片、HTML 嵌入
 - 如果整条响应内容以 `<deepright>...</deepright>` 作为最外层包裹，页面会把它识别为 DeepRight 专属输出卡片，去掉外层标签后继续渲染内部的 Markdown、公式、表格和安全 HTML
 - SSE 增量返回过程中，会基于当前累计文本实时做 Markdown 渲染；标题、列表、引用、代码块、表格等结构不再等到响应结束后才一次性成型
+- 当前运行配置的 `page.new_tab` 与 `page.iframe` 指定两类特殊 SSE 业务码。命中任一 `code` 的包都会将 `choices[0].delta.content` 解析为 `{"url":"...","message":"..."}`，assistant 气泡只展示 `message`，服务端保证两个字段必填。`page.new_tab` 由 Integration 请求系统默认浏览器打开 `url`；`page.iframe` 则在页面内打开 `url` 的 iframe 覆盖窗口。该窗口复用右侧 URL iframe 展开态的尺寸和样式（覆盖可视区域、四周留 `15px`、圆角、阴影和背景模糊），可通过关闭按钮、背景点击或 `Esc` 关闭，且不会改变右侧栏预览。两种行为可并存；浏览器打开或 iframe 加载失败均不会中断 SSE、改变气泡内容或完成状态。
+- 设置页的模型配置测试同样识别 `page.new_tab` 与 `page.iframe` 特殊 SSE 包：结果区只显示 JSON 中的 `message`，不会添加“配置错误：”前缀。`new_tab` 会交给系统浏览器打开，`iframe` 会覆盖设置弹窗；关闭该 iframe 后回到原设置页，且不会取消正在进行的测试。
 - 在送入流式 Markdown 渲染前，页面会先清理 SSE 文本中的 ANSI/OSC 控制序列、`\r` 回车、零宽字符等隐藏干扰内容，避免 `#### 正在加载技能 weather`、列表序号、引用符等结构因前缀脏数据而退化为原始符号文本
 - 流式阶段与最终完成态复用同一套 Markdown/HTML 安全渲染链路；中间态若存在未闭合代码块、表格或 HTML 片段，会按当前可解析结果持续展示，而不会长时间停留在原始 `#`、`*`、``` 符号状态
 - 居中 assistant 气泡会按 SSE 报文里的 `biz/workflow` 区分 `过程报文` 和 `结果报文`：`biz=main && workflow=base@close` 与 `biz=base && workflow=close` 会按结果报文处理，`[DONE]` 作为结束标记归到结果侧，其余报文按过程报文处理
@@ -667,6 +669,8 @@ Seedream 特殊说明：
 ### 主题
 
 - 点击左下角主题切换按钮，在深色/浅色模式间切换
+- 每次居中会话请求都会按当前页面主题携带 `metadata.theme`：深色（冷色模式）为 `cold`，浅色（暖色模式）为 `warm`；该值只作用于当前请求，不会写入会话或服务端缓存
+- 设置页模型测试同样会随当前页面提交 `metadata.device` 与 `metadata.theme`，其中主题映射保持一致
 - 主题切换按钮右侧提供 `节能` 开关；开启后会关闭开屏动画、欢迎页持续动画，并把多处毛玻璃效果降为普通半透明背景，以减少日常渲染消耗
 - 页面内所有“节能 / 降级渲染”相关效果都统一只跟随 `节能` 开关状态，不再直接跟随操作系统或架构判断
 - 当页面超过 `5` 分钟没有新的执行任务，并且鼠标已经离开页面、不再悬停任何页面元素时，会自动进入全屏 `CLI` 鲸鱼屏保
@@ -927,6 +931,7 @@ Header 中 `Authorization` 为对应模型的密钥。
 - 技能目录默认关闭与按需启用：`/path/to/deepright/cli/module/site/iteration/20260801-1/REQUIREMENT.md`
 - assistant 响应 URL / 路径行内气泡与点击动作浮层：`/path/to/deepright/cli/module/site/iteration/20260704-4/REQUIREMENT.md`
 - assistant URL / 路径气泡与 restore 恢复 CLI 子任务历史：`/path/to/deepright/cli/module/site/iteration/20260705-1/REQUIREMENT.md`
+- 特殊 SSE 新开浏览器页面：`/path/to/deepright/cli/module/site/iteration/20260804-1/REQUIREMENT.md`
 - 冷历史会话轻量恢复：`/path/to/deepright/cli/module/site/iteration/20260709-1/REQUIREMENT.md`
 - 本地存储预算自动治理：`/path/to/deepright/cli/module/site/iteration/20260711-3/REQUIREMENT.md`
 - 首次点击右侧备忘录区域引导：`/path/to/deepright/cli/module/site/iteration/20260526-3/REQUIREMENT.md`
@@ -1560,7 +1565,7 @@ Header 中 `Authorization` 为对应模型的密钥。
 - 测试进行时，密码区域会完全替换为不透明、闪动的“正在测试配置，请耐心等待。”不可编辑提示；原密钥、小眼睛、复制和 CURL 等框内控件均不可见，结束后恢复。
 - 服务端会校验完整 SSE：只有 HTTP 200、有效业务数据与 `[DONE]` 同时满足才成功；其它情况展示脱敏后的“配置错误”。
 - 服务商错误 JSON 含 `content` 时，页面只展示该字段（包括 `choices[].delta.content`），不回显完整服务商响应。
-- 401、403、404、429、503 和其他 5xx 会只显示统一的中文原因与处理建议，不保留服务商 `content`；404 提示检查模型 URL 和基础模型，`content` 内的 `(code=401)` 等显式状态码也会命中该规则。
+- 400、401、403、404、429、503 和其他 5xx 会只显示统一的中文原因与处理建议，不保留服务商 `content`；400 提示检查模型地址、模型名称与请求参数，404 提示检查模型 URL 和基础模型，`content` 内的 `(code=401)` 等显式状态码也会命中该规则。
 - 测试不会创建聊天、改变当前会话或写入本地聊天存储。
 - 仅 Test 触发的服务端 `/v1/chat/completions` 转发携带 `metadata.test = true` 并传至最终服务；普通会话不会携带此标记。
 

@@ -43,9 +43,39 @@ type modelDownloadResult struct {
 }
 
 type resumableModelDownloadState struct {
-	URL    string `json:"url"`
-	Size   int64  `json:"size"`
-	Chunks []bool `json:"chunks"`
+	URL          string `json:"url"`
+	Size         int64  `json:"size"`
+	ETag         string `json:"etag,omitempty"`
+	LastModified string `json:"last_modified,omitempty"`
+	Chunks       []bool `json:"chunks"`
+}
+
+// modelDownloadSource identifies the exact representation observed during the
+// range probe. A saved partial file is reusable only for that representation.
+type modelDownloadSource struct {
+	URL          string
+	Size         int64
+	Ranges       bool
+	ETag         string
+	LastModified string
+}
+
+func (source modelDownloadSource) ifRange() string {
+	if etag := strings.TrimSpace(source.ETag); etag != "" {
+		return etag
+	}
+	return strings.TrimSpace(source.LastModified)
+}
+
+// modelDownloadRangeNotSatisfiableError is returned only for a valid HTTP 416
+// response. Its Size is the server's current representation length from
+// Content-Range: bytes */<size>.
+type modelDownloadRangeNotSatisfiableError struct {
+	Size int64
+}
+
+func (err *modelDownloadRangeNotSatisfiableError) Error() string {
+	return fmt.Sprintf("下载源拒绝续传范围（HTTP 416，当前大小 %d）", err.Size)
 }
 
 const (
@@ -93,23 +123,47 @@ func prepareModelDownloadConfig(cfg resumableModelDownloadConfig) (resumableMode
 }
 
 func downloadModelFromSource(ctx context.Context, cfg resumableModelDownloadConfig, before func(bool)) (int64, bool, error) {
-	total, ranges, err := modelDownloadProbe(ctx, cfg)
-	if err != nil {
-		return 0, false, err
+	// A 416 for a data range means that the object changed after the probe, or
+	// that the local resume point is stale. Discard only the partial artifact,
+	// re-probe, and make one clean attempt. A bounded correction prevents an
+	// unstable source from causing an endless restart loop.
+	for correction := 0; correction <= 1; correction++ {
+		source, err := modelDownloadProbe(ctx, cfg)
+		if err != nil {
+			return 0, false, err
+		}
+		total := source.Size
+		if cfg.ExpectedSize > 0 && total >= 0 && total != cfg.ExpectedSize {
+			return 0, source.Ranges, fmt.Errorf("模型大小与预期不一致（源站 %d，预期 %d）", total, cfg.ExpectedSize)
+		}
+		if cfg.ExpectedSize > 0 {
+			total = cfg.ExpectedSize
+		}
+		if before != nil && correction == 0 {
+			before(source.Ranges && total > 0)
+		}
+
+		var (
+			bytes      int64
+			usedRanges bool
+		)
+		if source.Ranges && total > 0 {
+			bytes, usedRanges, err = downloadModelRanges(ctx, cfg, source, total)
+		} else {
+			bytes, usedRanges, err = downloadModelSequentially(ctx, cfg, source, total)
+		}
+		if err == nil {
+			return bytes, usedRanges, nil
+		}
+		var unsatisfied *modelDownloadRangeNotSatisfiableError
+		if !errors.As(err, &unsatisfied) || correction == 1 || ctx.Err() != nil {
+			return bytes, usedRanges, err
+		}
+		if err := discardModelDownloadPartial(cfg.PartPath); err != nil {
+			return bytes, usedRanges, err
+		}
 	}
-	if cfg.ExpectedSize > 0 && total > 0 && total != cfg.ExpectedSize {
-		return 0, ranges, fmt.Errorf("模型大小与预期不一致（源站 %d，预期 %d）", total, cfg.ExpectedSize)
-	}
-	if cfg.ExpectedSize > 0 {
-		total = cfg.ExpectedSize
-	}
-	if before != nil {
-		before(ranges && total > 0)
-	}
-	if ranges && total > 0 {
-		return downloadModelRanges(ctx, cfg, total)
-	}
-	return downloadModelSequentially(ctx, cfg, total)
+	return 0, false, errors.New("模型下载状态重置后未完成")
 }
 
 // downloadModelWithFallback implements the runtime-model source order:
@@ -173,7 +227,18 @@ func downloadModelWithFallback(ctx context.Context, cfg resumableModelDownloadCo
 			reportModelDownload(report, "多线程断点续传失败："+err.Error()+"；回退到当前下载源的普通下载。")
 			_ = os.Remove(attempt.PartPath)
 			removeModelDownloadState(attempt.PartPath)
-			bytes, _, err = downloadModelSequentially(ctx, attempt, attempt.ExpectedSize)
+			fallbackSource, probeErr := modelDownloadProbe(ctx, attempt)
+			if probeErr != nil {
+				fallbackSource = modelDownloadSource{}
+			}
+			// This is intentionally an ordinary-transfer fallback. It still saves
+			// validators in the manifest, but starts with no Range request.
+			fallbackSource.Ranges = false
+			fallbackTotal := fallbackSource.Size
+			if attempt.ExpectedSize > 0 {
+				fallbackTotal = attempt.ExpectedSize
+			}
+			bytes, _, err = downloadModelSequentially(ctx, attempt, fallbackSource, fallbackTotal)
 			if err == nil {
 				return modelDownloadResult{URL: source.url, Bytes: bytes, UsedBackup: source.backup, UsedPlainHTTP: true}, nil
 			}
@@ -215,33 +280,48 @@ func modelDownloadRetryMessage(worker, part, parts, retry, retries int, err erro
 	return fmt.Sprintf("普通下载第 %d 次重试（最多 %d 次）：%v", retry, retries, err)
 }
 
-func modelDownloadProbe(ctx context.Context, cfg resumableModelDownloadConfig) (int64, bool, error) {
+func modelDownloadProbe(ctx context.Context, cfg resumableModelDownloadConfig) (modelDownloadSource, error) {
 	probeCtx, cancel := context.WithTimeout(ctx, cfg.PartTimeout)
 	defer cancel()
 	request, err := http.NewRequestWithContext(probeCtx, http.MethodGet, cfg.URL, nil)
 	if err != nil {
-		return 0, false, fmt.Errorf("无法创建模型下载请求: %w", err)
+		return modelDownloadSource{}, fmt.Errorf("无法创建模型下载请求: %w", err)
 	}
 	request.Header.Set("Range", "bytes=0-0")
 	response, err := cfg.Client.Do(request)
 	if err != nil {
 		if ctx.Err() == nil && errors.Is(probeCtx.Err(), context.DeadlineExceeded) {
-			return 0, false, fmt.Errorf("检查下载源是否支持 HTTP Range 超过总时限 %s", cfg.PartTimeout)
+			return modelDownloadSource{}, fmt.Errorf("检查下载源是否支持 HTTP Range 超过总时限 %s", cfg.PartTimeout)
 		}
-		return 0, false, fmt.Errorf("请求模型下载源失败: %w", err)
+		return modelDownloadSource{}, fmt.Errorf("请求模型下载源失败: %w", err)
 	}
 	defer response.Body.Close()
+	source := modelDownloadSource{
+		URL:          strings.TrimSpace(cfg.URL),
+		ETag:         strings.TrimSpace(response.Header.Get("ETag")),
+		LastModified: strings.TrimSpace(response.Header.Get("Last-Modified")),
+	}
 	if response.StatusCode == http.StatusPartialContent {
 		total, ok := modelDownloadContentRangeSize(response.Header.Get("Content-Range"))
 		if !ok || total <= 0 {
-			return 0, false, errors.New("模型下载源返回了无效的 Content-Range")
+			return modelDownloadSource{}, errors.New("模型下载源返回了无效的 Content-Range")
 		}
-		return total, true, nil
+		source.Size, source.Ranges = total, true
+		return source, nil
+	}
+	if response.StatusCode == http.StatusRequestedRangeNotSatisfiable {
+		total, ok := modelDownloadUnsatisfiedRangeSize(response.Header.Get("Content-Range"))
+		if !ok || total != 0 {
+			return modelDownloadSource{}, fmt.Errorf("模型下载源探测 Range 返回 HTTP 416：%s", strings.TrimSpace(response.Header.Get("Content-Range")))
+		}
+		source.Size, source.Ranges = 0, true
+		return source, nil
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return 0, false, fmt.Errorf("模型下载源返回 HTTP %d", response.StatusCode)
+		return modelDownloadSource{}, fmt.Errorf("模型下载源返回 HTTP %d", response.StatusCode)
 	}
-	return response.ContentLength, false, nil
+	source.Size = response.ContentLength
+	return source, nil
 }
 
 func modelDownloadContentRangeSize(value string) (int64, bool) {
@@ -253,13 +333,22 @@ func modelDownloadContentRangeSize(value string) (int64, bool) {
 	return size, err == nil
 }
 
-func downloadModelRanges(ctx context.Context, cfg resumableModelDownloadConfig, total int64) (int64, bool, error) {
+func modelDownloadUnsatisfiedRangeSize(value string) (int64, bool) {
+	parts := strings.Fields(strings.TrimSpace(value))
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "bytes") || !strings.HasPrefix(parts[1], "*/") {
+		return 0, false
+	}
+	size, err := strconv.ParseInt(strings.TrimPrefix(parts[1], "*/"), 10, 64)
+	return size, err == nil && size >= 0
+}
+
+func downloadModelRanges(ctx context.Context, cfg resumableModelDownloadConfig, source modelDownloadSource, total int64) (int64, bool, error) {
 	chunks := int((total + cfg.ChunkSize - 1) / cfg.ChunkSize)
 	if chunks <= 1 {
-		return downloadModelSequentially(ctx, cfg, total)
+		return downloadModelSequentially(ctx, cfg, source, total)
 	}
 	statePath := cfg.PartPath + ".json"
-	state, err := loadModelDownloadState(statePath, cfg.URL, total, chunks)
+	state, err := prepareModelDownloadState(cfg.PartPath, source, total, chunks, true)
 	if err != nil {
 		return 0, true, err
 	}
@@ -311,7 +400,7 @@ func downloadModelRanges(ctx context.Context, cfg resumableModelDownloadConfig, 
 				}
 				start := int64(index) * cfg.ChunkSize
 				end := start + modelDownloadChunkSize(total, cfg.ChunkSize, index) - 1
-				if err := downloadModelRange(workCtx, cfg, part, start, end, func(copied, total int64) {
+				if err := downloadModelRange(workCtx, cfg, source, part, start, end, func(copied, total int64) {
 					if cfg.PartProgress == nil {
 						return
 					}
@@ -374,28 +463,66 @@ func modelDownloadChunkSize(total, size int64, index int) int64 {
 	return size
 }
 
-func loadModelDownloadState(path, url string, size int64, chunks int) (resumableModelDownloadState, error) {
-	state := resumableModelDownloadState{URL: url, Size: size, Chunks: make([]bool, chunks)}
+func prepareModelDownloadState(partPath string, source modelDownloadSource, size int64, chunks int, fixedLength bool) (resumableModelDownloadState, error) {
+	statePath := partPath + ".json"
+	state, reusable, err := loadModelDownloadState(statePath, source, size, chunks)
+	if err != nil {
+		return state, err
+	}
+	info, statErr := os.Stat(partPath)
+	if statErr != nil && !errors.Is(statErr, os.ErrNotExist) {
+		return state, fmt.Errorf("无法读取模型临时文件: %w", statErr)
+	}
+	partExists := statErr == nil && !info.IsDir()
+	invalidPart := !reusable && partExists
+	if reusable && !partExists {
+		invalidPart = true
+	}
+	if reusable && partExists && fixedLength && info.Size() != size {
+		invalidPart = true
+	}
+	if reusable && partExists && !fixedLength && size > 0 && info.Size() > size {
+		invalidPart = true
+	}
+	if !invalidPart {
+		return state, nil
+	}
+	if err := discardModelDownloadPartial(partPath); err != nil {
+		return state, err
+	}
+	state = resumableModelDownloadState{
+		URL:          strings.TrimSpace(source.URL),
+		Size:         size,
+		ETag:         strings.TrimSpace(source.ETag),
+		LastModified: strings.TrimSpace(source.LastModified),
+		Chunks:       make([]bool, chunks),
+	}
+	if err := saveModelDownloadState(statePath, state); err != nil {
+		return state, err
+	}
+	return state, nil
+}
+
+func loadModelDownloadState(path string, source modelDownloadSource, size int64, chunks int) (resumableModelDownloadState, bool, error) {
+	state := resumableModelDownloadState{URL: strings.TrimSpace(source.URL), Size: size, ETag: strings.TrimSpace(source.ETag), LastModified: strings.TrimSpace(source.LastModified), Chunks: make([]bool, chunks)}
 	content, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		if err := saveModelDownloadState(path, state); err != nil {
-			return state, err
+			return state, false, err
 		}
-		return state, nil
+		return state, false, nil
 	}
 	if err != nil {
-		return state, fmt.Errorf("无法读取模型断点续传状态: %w", err)
+		return state, false, fmt.Errorf("无法读取模型断点续传状态: %w", err)
 	}
 	var stored resumableModelDownloadState
-	if err := json.Unmarshal(content, &stored); err != nil || stored.URL != url || stored.Size != size || len(stored.Chunks) != chunks {
-		_ = os.Remove(path)
-		_ = os.Remove(strings.TrimSuffix(path, ".json"))
+	if err := json.Unmarshal(content, &stored); err != nil || stored.URL != strings.TrimSpace(source.URL) || stored.Size != size || stored.ETag != strings.TrimSpace(source.ETag) || stored.LastModified != strings.TrimSpace(source.LastModified) || len(stored.Chunks) != chunks {
 		if err := saveModelDownloadState(path, state); err != nil {
-			return state, err
+			return state, false, err
 		}
-		return state, nil
+		return state, false, nil
 	}
-	return stored, nil
+	return stored, true, nil
 }
 
 func saveModelDownloadState(path string, state resumableModelDownloadState) error {
@@ -419,17 +546,21 @@ func saveModelDownloadState(path string, state resumableModelDownloadState) erro
 	return os.Rename(temporaryPath, path)
 }
 
-func downloadModelRange(ctx context.Context, cfg resumableModelDownloadConfig, output *os.File, start, end int64, progress func(copied, total int64), reportRetry func(retry, retries int, err error)) error {
+func downloadModelRange(ctx context.Context, cfg resumableModelDownloadConfig, source modelDownloadSource, output *os.File, start, end int64, progress func(copied, total int64), reportRetry func(retry, retries int, err error)) error {
 	var lastErr error
 	for retry := 0; retry <= cfg.Retries; retry++ {
 		if retry > 0 && reportRetry != nil {
 			reportRetry(retry, cfg.Retries, lastErr)
 		}
-		err := downloadModelRangeAttempt(ctx, cfg, output, start, end, progress)
+		err := downloadModelRangeAttempt(ctx, cfg, source, output, start, end, progress)
 		if err == nil {
 			return nil
 		}
 		lastErr = err
+		var unsatisfied *modelDownloadRangeNotSatisfiableError
+		if errors.As(err, &unsatisfied) {
+			return err
+		}
 		if ctx.Err() != nil || retry == cfg.Retries {
 			return err
 		}
@@ -437,7 +568,7 @@ func downloadModelRange(ctx context.Context, cfg resumableModelDownloadConfig, o
 	return lastErr
 }
 
-func downloadModelRangeAttempt(ctx context.Context, cfg resumableModelDownloadConfig, output *os.File, start, end int64, progress func(copied, total int64)) error {
+func downloadModelRangeAttempt(ctx context.Context, cfg resumableModelDownloadConfig, source modelDownloadSource, output *os.File, start, end int64, progress func(copied, total int64)) error {
 	downloadCtx, cancel := context.WithTimeout(ctx, cfg.PartTimeout)
 	defer cancel()
 	idle := time.AfterFunc(cfg.IdleTimeout, cancel)
@@ -447,6 +578,9 @@ func downloadModelRangeAttempt(ctx context.Context, cfg resumableModelDownloadCo
 		return err
 	}
 	request.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, end))
+	if validator := source.ifRange(); validator != "" {
+		request.Header.Set("If-Range", validator)
+	}
 	response, err := cfg.Client.Do(request)
 	if err != nil {
 		if ctx.Err() == nil && errors.Is(downloadCtx.Err(), context.DeadlineExceeded) {
@@ -458,6 +592,12 @@ func downloadModelRangeAttempt(ctx context.Context, cfg resumableModelDownloadCo
 		return err
 	}
 	defer response.Body.Close()
+	if response.StatusCode == http.StatusRequestedRangeNotSatisfiable {
+		if total, ok := modelDownloadUnsatisfiedRangeSize(response.Header.Get("Content-Range")); ok {
+			return &modelDownloadRangeNotSatisfiableError{Size: total}
+		}
+		return errors.New("下载源返回 HTTP 416 但未提供有效 Content-Range")
+	}
 	if response.StatusCode != http.StatusPartialContent {
 		return fmt.Errorf("下载源不支持分段请求（HTTP %d）", response.StatusCode)
 	}
@@ -529,16 +669,29 @@ func modelDownloadContentRange(value string) (int64, int64, bool) {
 	return start, end, startErr == nil && endErr == nil && start >= 0 && end >= start
 }
 
-func downloadModelSequentially(ctx context.Context, cfg resumableModelDownloadConfig, total int64) (int64, bool, error) {
+func downloadModelSequentially(ctx context.Context, cfg resumableModelDownloadConfig, source modelDownloadSource, total int64) (int64, bool, error) {
+	if _, err := prepareModelDownloadState(cfg.PartPath, source, total, 0, false); err != nil {
+		return 0, false, err
+	}
 	var copied int64
 	var lastErr error
 	for retry := 0; retry <= cfg.Retries; retry++ {
 		if retry > 0 && cfg.Retry != nil {
 			cfg.Retry(0, 0, 0, retry, cfg.Retries, lastErr)
 		}
-		copied, _, lastErr = downloadModelSequentialAttempt(ctx, cfg, total)
+		copied, _, lastErr = downloadModelSequentialAttempt(ctx, cfg, source, total)
 		if lastErr == nil {
 			return copied, false, nil
+		}
+		var unsatisfied *modelDownloadRangeNotSatisfiableError
+		if errors.As(lastErr, &unsatisfied) {
+			// A request for bytes=N- returning "bytes */N" means the local
+			// partial file already reaches the remote EOF. The caller still
+			// validates the final digest before publication.
+			if copied == unsatisfied.Size && (total <= 0 || copied == total) {
+				return copied, false, nil
+			}
+			return copied, false, lastErr
 		}
 		if ctx.Err() != nil || retry == cfg.Retries {
 			return copied, false, lastErr
@@ -547,7 +700,7 @@ func downloadModelSequentially(ctx context.Context, cfg resumableModelDownloadCo
 	return copied, false, lastErr
 }
 
-func downloadModelSequentialAttempt(ctx context.Context, cfg resumableModelDownloadConfig, total int64) (int64, bool, error) {
+func downloadModelSequentialAttempt(ctx context.Context, cfg resumableModelDownloadConfig, source modelDownloadSource, total int64) (int64, bool, error) {
 	part, err := os.OpenFile(cfg.PartPath, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return 0, false, fmt.Errorf("无法打开模型临时文件: %w", err)
@@ -574,6 +727,9 @@ func downloadModelSequentialAttempt(ctx context.Context, cfg resumableModelDownl
 	}
 	if offset > 0 {
 		request.Header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
+		if validator := source.ifRange(); validator != "" {
+			request.Header.Set("If-Range", validator)
+		}
 	}
 	response, err := cfg.Client.Do(request)
 	if err != nil {
@@ -586,10 +742,21 @@ func downloadModelSequentialAttempt(ctx context.Context, cfg resumableModelDownl
 		return offset, false, err
 	}
 	defer response.Body.Close()
+	if response.StatusCode == http.StatusRequestedRangeNotSatisfiable {
+		if size, ok := modelDownloadUnsatisfiedRangeSize(response.Header.Get("Content-Range")); ok {
+			return offset, false, &modelDownloadRangeNotSatisfiableError{Size: size}
+		}
+		return offset, false, errors.New("下载源返回 HTTP 416 但未提供有效 Content-Range")
+	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		return offset, false, fmt.Errorf("模型下载源返回 HTTP %d", response.StatusCode)
 	}
 	if offset > 0 && response.StatusCode == http.StatusOK {
+		if source.Ranges && source.ifRange() != "" {
+			// A Range-capable source answered 200 to an If-Range request: the
+			// representation changed. Re-probe before accepting any bytes.
+			return offset, false, &modelDownloadRangeNotSatisfiableError{Size: -1}
+		}
 		if err := part.Truncate(0); err != nil {
 			return 0, false, err
 		}
@@ -641,4 +808,12 @@ func downloadModelSequentialAttempt(ctx context.Context, cfg resumableModelDownl
 
 func removeModelDownloadState(partPath string) {
 	_ = os.Remove(partPath + ".json")
+}
+
+func discardModelDownloadPartial(partPath string) error {
+	if err := os.Remove(partPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("无法清理失效的模型临时文件: %w", err)
+	}
+	removeModelDownloadState(partPath)
+	return nil
 }

@@ -155,7 +155,7 @@ type rvmTaskManager struct {
 
 var (
 	rvmTasks          *rvmTaskManager
-	rvmLookPath       = exec.LookPath
+	rvmLookPath       = integrationCommandLookPath
 	rvmCommandContext = exec.CommandContext
 	rvmNow            = time.Now
 	rvmCheckCache     struct {

@@ -29,21 +29,25 @@ public class HttpAuthority implements TokenMapping {
 
     public static final TokenEntry TOKEN = TokenEntry.builder().build();
 
-    public static final String LANG_KEY_URL = "auth.url";
+    public static final String LANG_KEY_MESSAGE = "auth.message";
 
     public static final String NAME = "token.http";
 
-    public static final Integer CODE = 931;
+    public static final Integer NEW_TAB = 931;
+
+    public static final Integer IFRAME = 932;
 
     protected AuthService authService;
 
     protected String response;
 
+    protected Integer code;
+
     protected String url;
 
     @PostConstruct
     public void init() throws Exception {
-        this.response = JsonUtils.write(ImmutableMap.of("url", this.url, "message", XmlResourceLang.get(HttpAuthority.LANG_KEY_URL)));
+        this.response = JsonUtils.write(ImmutableMap.of("url", this.url, "message", XmlResourceLang.get(HttpAuthority.LANG_KEY_MESSAGE)));
     }
 
     @Override
@@ -70,9 +74,14 @@ public class HttpAuthority implements TokenMapping {
         return HttpAuthority.TOKEN;
     }
 
+    // 由子类覆盖
+    protected Boolean allowedDevice(WorkflowTask workTask, String token) throws Exception {
+        return true;
+    }
+
     // 检查Device
     protected void checkDevice(WorkflowTask workTask, String token) throws Exception {
-        WorkflowException.checkCondition(true, this.response, HttpAuthority.CODE);
+        WorkflowException.checkCondition(!this.allowedDevice(workTask, token), true, this.response, this.code);
     }
 
     @Configuration
@@ -82,6 +91,9 @@ public class HttpAuthority implements TokenMapping {
 
         @Autowired
         protected AuthService authService;
+
+        @Value("${auth.code:}")
+        protected Integer code = HttpAuthority.IFRAME;
 
         @Value("${auth.url:}")
         protected String url;

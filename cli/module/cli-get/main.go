@@ -708,6 +708,12 @@ func Heartbeat(client *http.Client, host string, metadata *AgentOutput) (*TaskCo
 	}
 
 	if resp.StatusCode != 200 {
+		// Upstreams may return page.new_tab/page.iframe as the HTTP status
+		// instead of as the JSON business code. Treat both forms as the same
+		// successful, idle page control response.
+		if configuredPageResponseCode(resp.StatusCode) {
+			return nil, nil
+		}
 		if resp.StatusCode >= 300 && resp.StatusCode < 400 {
 			location := strings.TrimSpace(resp.Header.Get("Location"))
 			if location != "" {
@@ -722,6 +728,12 @@ func Heartbeat(client *http.Client, host string, metadata *AgentOutput) (*TaskCo
 		return nil, fmt.Errorf("parse heartbeat response: %w", err)
 	}
 	if rp.Code != 200 {
+		// page.new_tab and page.iframe are control responses shared with the
+		// Site SSE protocol. cli/get has no page to open, so they are a
+		// successful idle poll rather than a heartbeat failure.
+		if configuredPageResponseCode(rp.Code) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("heartbeat code %d", rp.Code)
 	}
 
@@ -871,6 +883,10 @@ func nextHeartbeatBackoff(current, base, max time.Duration) time.Duration {
 
 func shouldSleepAfterHeartbeat(task *TaskContent, err error) bool {
 	return err != nil
+}
+
+func shouldAwaitAfterCliGetFailure(immediatelyRetryByCheck bool) bool {
+	return !immediatelyRetryByCheck
 }
 
 func sandboxStateForTask(metadata *AgentOutput, task *TaskContent) (sandboxStateRecord, error) {
@@ -1060,6 +1076,23 @@ func configuredSandboxApp() string {
 	return configuredSandboxAppFromRaw(readCliGetConfigRaw())
 }
 
+func configuredPageResponseCode(code int) bool {
+	if code <= 0 {
+		return false
+	}
+	page, ok := readCliGetConfigRaw()["page"].(map[string]interface{})
+	if !ok || page == nil {
+		return false
+	}
+	for _, key := range []string{"new_tab", "iframe"} {
+		configured, ok := cliGetConfigPositiveInteger(page[key])
+		if ok && configured == code {
+			return true
+		}
+	}
+	return false
+}
+
 func cliGetConfigBool(raw interface{}) (bool, bool) {
 	switch value := raw.(type) {
 	case bool:
@@ -1152,17 +1185,16 @@ func cliGetConfigPositiveInteger(raw interface{}) (int, bool) {
 	return value, ok && value > 0
 }
 
-// cliGetCommandCheck tracks consecutive successful cli/get responses without
-// a command after at least one command has been received. -1 means no command
-// has been observed since process start; zero means a command was just seen.
-// The single atomic state makes reset and increment visible atomically.
+// cliGetCommandCheck tracks consecutive cli/get results without a command.
+// A failed heartbeat is also a no-command result. The single atomic state
+// makes command reset and no-command increment visible atomically.
 type cliGetCommandCheck struct {
 	emptySinceCommand atomic.Int64
 }
 
 func newCliGetCommandCheck() cliGetCommandCheck {
 	state := cliGetCommandCheck{}
-	state.emptySinceCommand.Store(-1)
+	state.emptySinceCommand.Store(0)
 	return state
 }
 
@@ -1173,9 +1205,6 @@ func (state *cliGetCommandCheck) shouldImmediatelyRetry(hasCommand bool, check i
 	}
 	for {
 		current := state.emptySinceCommand.Load()
-		if current < 0 || current >= int64(check) {
-			return false
-		}
 		if state.emptySinceCommand.CompareAndSwap(current, current+1) {
 			return current+1 < int64(check)
 		}
@@ -1595,6 +1624,11 @@ func main() {
 		task, err := Heartbeat(client, cfg.Host, metadata)
 		if shouldSleepAfterHeartbeat(task, err) {
 			fmt.Fprintf(os.Stderr, "heartbeat error: %v\n", err)
+			if shouldAwaitAfterCliGetFailure(commandCheck.shouldImmediatelyRetry(false, cfg.Check)) {
+				heartbeatBackoff = sleepDur
+				time.Sleep(awaitDur)
+				continue
+			}
 			time.Sleep(heartbeatBackoff)
 			heartbeatBackoff = nextHeartbeatBackoff(heartbeatBackoff, sleepDur, maxHeartbeatBackoff)
 			continue

@@ -151,6 +151,54 @@ func TestHeartbeatRequestFormat(t *testing.T) {
 	}
 }
 
+func TestHeartbeatExemptsConfiguredPageResponseCodes(t *testing.T) {
+	root := t.TempDir()
+	execPath := filepath.Join(root, "integration")
+	configPath := filepath.Join(root, "config", "config.json")
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
+		t.Fatalf("mkdir config: %v", err)
+	}
+	if err := os.WriteFile(execPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatalf("write executable: %v", err)
+	}
+	if err := os.WriteFile(configPath, []byte(`{"page":{"new_tab":931,"iframe":932}}`), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	restoreExec := osExecutable
+	osExecutable = func() (string, error) { return execPath, nil }
+	t.Cleanup(func() { osExecutable = restoreExec })
+
+	for _, tc := range []struct {
+		name       string
+		httpStatus int
+		bodyCode   int
+	}{
+		{name: "JSON 931", httpStatus: http.StatusOK, bodyCode: 931},
+		{name: "JSON 932", httpStatus: http.StatusOK, bodyCode: 932},
+		{name: "HTTP 931", httpStatus: 931},
+		{name: "HTTP 932", httpStatus: 932},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tc.httpStatus)
+				if tc.bodyCode != 0 {
+					_ = json.NewEncoder(w).Encode(ResponsePayload{Code: tc.bodyCode})
+				}
+			}))
+			defer server.Close()
+
+			task, err := Heartbeat(server.Client(), server.URL, &AgentOutput{})
+			if err != nil {
+				t.Fatalf("Heartbeat() error = %v", err)
+			}
+			if task != nil {
+				t.Fatalf("Heartbeat() task = %#v, want nil", task)
+			}
+		})
+	}
+}
+
 func TestApplicationDataDirUsesAgentRootParent(t *testing.T) {
 	root := t.TempDir()
 	agentRoot := filepath.Join(root, "agent")
@@ -1183,24 +1231,42 @@ func TestConfiguredHeartbeatIntervalsRejectFractionalValues(t *testing.T) {
 	}
 }
 
-func TestCliGetCommandCheckStartsIdleThenChecksAfterCommand(t *testing.T) {
+func TestCliGetCommandCheckCountsEveryNoCommandResult(t *testing.T) {
 	state := newCliGetCommandCheck()
-	if state.shouldImmediatelyRetry(false, 10) {
-		t.Fatal("first empty response before any command should enter await")
-	}
-	if !state.shouldImmediatelyRetry(true, 10) {
-		t.Fatal("command response should immediately retry")
-	}
 	for count := 1; count < 10; count++ {
 		if !state.shouldImmediatelyRetry(false, 10) {
-			t.Fatalf("empty response %d should immediately retry", count)
+			t.Fatalf("no-command result %d should immediately retry", count)
 		}
 	}
 	if state.shouldImmediatelyRetry(false, 10) {
-		t.Fatal("tenth consecutive empty response should enter await")
+		t.Fatal("tenth no-command result should enter await")
+	}
+	if state.shouldImmediatelyRetry(false, 10) {
+		t.Fatal("no-command result after the threshold should remain in await")
+	}
+	if got := state.emptySinceCommand.Load(); got != 11 {
+		t.Fatalf("no-command count = %d, want 11", got)
 	}
 	if !state.shouldImmediatelyRetry(true, 10) {
-		t.Fatal("a new command should atomically reset the empty-response count")
+		t.Fatal("command response should immediately retry and reset the count")
+	}
+	for count := 1; count < 10; count++ {
+		if !state.shouldImmediatelyRetry(false, 10) {
+			t.Fatalf("no-command result after command %d should immediately retry", count)
+		}
+	}
+	if state.shouldImmediatelyRetry(false, 10) {
+		t.Fatal("tenth no-command result after command should enter await")
+	}
+}
+
+func TestCliGetFailureAwaitsWhenNoCommandCheckReachesThreshold(t *testing.T) {
+	state := newCliGetCommandCheck()
+	if shouldAwaitAfterCliGetFailure(state.shouldImmediatelyRetry(false, 2)) {
+		t.Fatal("first failed no-command result should use sleep")
+	}
+	if !shouldAwaitAfterCliGetFailure(state.shouldImmediatelyRetry(false, 2)) {
+		t.Fatal("failed no-command result reaching check should use await")
 	}
 }
 

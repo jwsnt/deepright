@@ -1491,6 +1491,10 @@ body.rs-url-preview-expanded .rs-url-preview-expand-btn{opacity:0;visibility:hid
 .rs-url-preview-expanded-backdrop::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 18% 18%,rgba(255,255,255,.32),transparent 28%),radial-gradient(circle at 82% 14%,rgba(var(--accent-rgb),.16),transparent 30%),radial-gradient(circle at 50% 84%,rgba(var(--accent-soft-rgb),.14),transparent 28%)}
 body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .24s ease,visibility 0s linear 0s}
 .rs-url-preview-expanded-backdrop.is-overlay-suspended{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s ease,visibility 0s linear .2s}
+.page-iframe-backdrop.is-active{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .24s ease,visibility 0s linear 0s}
+.page-iframe-close{position:fixed;top:calc(var(--rs-url-preview-expanded-inset) - 10px);right:calc(var(--rs-url-preview-expanded-inset) + 2px);left:auto;z-index:1000;width:32px;height:32px;border-radius:10px;touch-action:manipulation}
+.page-iframe-close svg{width:13px;height:13px}
+.page-iframe-close[hidden]{display:none!important}
 #rsUrlPreviewFloatingSwitch.is-overlay-suspended,#rsUrlPreviewExpandBtn.is-overlay-suspended{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s ease,filter .2s ease,visibility 0s linear .2s}
 [data-theme="dark"] .rs-url-preview-expanded-backdrop{background:linear-gradient(180deg,rgba(6,12,24,.28),rgba(6,12,24,.4))}
 [data-energy-saver="on"] .rs-url-preview,
@@ -5508,6 +5512,15 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"></path><path d="M16 3h3a2 2 0 0 1 2 2v3"></path><path d="M8 21H5a2 2 0 0 1-2-2v-3"></path><path d="M16 21h3a2 2 0 0 0 2-2v-3"></path></svg>
 </button>
 <button type="button" class="rs-url-preview-switch rs-url-preview-floating-switch" id="rsUrlPreviewFloatingSwitch" title="关闭网站浏览" aria-label="关闭网站浏览" onclick="handleRightSidebarUrlPreviewFloatingSwitch(event)">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m6.5 6.5 11 11"></path><path d="m17.5 6.5-11 11"></path></svg>
+</button>
+<div class="rs-url-preview-expanded-backdrop page-iframe-backdrop" id="pageIframeBackdrop" aria-hidden="true" onclick="closePageIframeFromBackdrop(event)"></div>
+<div class="rs-url-preview page-iframe-window" id="pageIframeWindow" role="dialog" aria-label="页面预览" aria-hidden="true">
+  <div class="rs-url-preview-frame-shell">
+    <iframe class="rs-url-preview-frame" id="pageIframeFrame" sandbox="allow-same-origin allow-scripts allow-forms allow-popups" referrerpolicy="no-referrer" loading="eager" scrolling="auto" tabindex="0" title="页面预览"></iframe>
+  </div>
+</div>
+<button type="button" class="rs-url-preview-switch page-iframe-close" id="pageIframeClose" title="关闭页面预览" aria-label="关闭页面预览" onpointerdown="closePageIframe(event)" onclick="closePageIframe(event)" hidden>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m6.5 6.5 11 11"></path><path d="m17.5 6.5-11 11"></path></svg>
 </button>
 
@@ -16095,6 +16108,7 @@ document.addEventListener('focusin', event => {
   else focusLogCleanupLockCard();
 }, true);
 document.addEventListener('keydown', memoDetailPreviewHandleEscape, true);
+document.addEventListener('keydown', syncPageIframeEscape, true);
 document.addEventListener('keydown', syncRightSidebarUrlPreviewExpandedEscape, true);
 
 function releaseSwitchedChatAutoReloadLock() {
@@ -27058,6 +27072,11 @@ function applyTheme() {
     ? '<circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>'
     : '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
 }
+
+function getCurrentRequestTheme() {
+  return state && state.theme === 'dark' ? 'cold' : 'warm';
+}
+
 let _userThemeOverride = false;
 
 function isAutoThemeDisabled(profile) {
@@ -38884,6 +38903,25 @@ async function readRuntimeConfig(force) {
   }
 }
 
+function resolvePageResponseCode(config, key) {
+  const page = config && typeof config === 'object' && !Array.isArray(config) ? config.page : null;
+  if (!page || typeof page !== 'object' || Array.isArray(page)) return 0;
+  const code = Number(page[key]);
+  return Number.isSafeInteger(code) && code > 0 ? code : 0;
+}
+
+async function readPageResponseCodes() {
+  try {
+    const config = await readRuntimeConfig(true);
+    return {
+      newTab: resolvePageResponseCode(config, 'new_tab'),
+      iframe: resolvePageResponseCode(config, 'iframe')
+    };
+  } catch {
+    return { newTab: 0, iframe: 0 };
+  }
+}
+
 function renderSettingsVersion(config) {
   const el = document.getElementById('settingsVersion');
   if (!el) return;
@@ -40071,8 +40109,83 @@ function extractSseChoiceMessage(payload, fallbackMessage) {
   return extractResponseMessage(payload, fallbackMessage);
 }
 
+function extractPageSpecialPacket(payload, expectedCode) {
+  if (!expectedCode || extractResponseCode(payload, 0) !== expectedCode) return null;
+  const choice = payload && payload.choices && payload.choices[0];
+  const delta = choice && choice.delta;
+  if (!delta || typeof delta.content !== 'string') return null;
+  try {
+    const content = JSON.parse(delta.content);
+    if (!content || typeof content !== 'object' || Array.isArray(content)) return null;
+    if (typeof content.message !== 'string' || typeof content.url !== 'string') return null;
+    return { message: content.message, url: content.url };
+  } catch {
+    return null;
+  }
+}
+
+async function openPageNewTabInSystemBrowser(url) {
+  try {
+    await fetch('/api/browser/open', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+  } catch {}
+}
+
+function openPageIframe(url) {
+  const href = normalizeRightSidebarUrlPreviewHref(url);
+  const backdrop = document.getElementById('pageIframeBackdrop');
+  const windowEl = document.getElementById('pageIframeWindow');
+  const frame = document.getElementById('pageIframeFrame');
+  const closeButton = document.getElementById('pageIframeClose');
+  if (!href || !backdrop || !windowEl || !frame || !closeButton) return false;
+  frame.setAttribute('src', href);
+  backdrop.classList.add('is-active');
+  backdrop.setAttribute('aria-hidden', 'false');
+  windowEl.classList.add('is-active', 'is-expanded');
+  windowEl.setAttribute('aria-hidden', 'false');
+  closeButton.hidden = false;
+  return true;
+}
+
+function closePageIframe(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  const backdrop = document.getElementById('pageIframeBackdrop');
+  const windowEl = document.getElementById('pageIframeWindow');
+  const frame = document.getElementById('pageIframeFrame');
+  const closeButton = document.getElementById('pageIframeClose');
+  if (!backdrop || !windowEl || !frame || !closeButton) return false;
+  backdrop.classList.remove('is-active');
+  backdrop.setAttribute('aria-hidden', 'true');
+  windowEl.classList.remove('is-active', 'is-expanded');
+  windowEl.setAttribute('aria-hidden', 'true');
+  frame.removeAttribute('src');
+  closeButton.hidden = true;
+  return true;
+}
+
+function closePageIframeFromBackdrop(event) {
+  if (!event || event.target !== event.currentTarget) return false;
+  return closePageIframe(event);
+}
+
+function syncPageIframeEscape(event) {
+  const windowEl = document.getElementById('pageIframeWindow');
+  if (!windowEl || !windowEl.classList.contains('is-active') || !event || event.key !== 'Escape') return;
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  closePageIframe();
+}
+
 function mapProviderErrorText(code, fallbackMessage) {
   const resolvedCode = Number.parseInt(String(code == null ? '' : code).trim(), 10);
+  if (resolvedCode === 400) return '服务商请求无效（400），请检查模型地址、模型名称与请求参数';
   if (resolvedCode === 401) return '模型服务商拒绝访问，请核对API KEY。';
   if (resolvedCode === 403) return '模型访问受限，请核对服务商的地区限制或余额。';
   if (resolvedCode === 404) return '模型或服务地址不存在，请核对服务商配置。';
@@ -40201,6 +40314,7 @@ function isResponseErrorCode(code) {
 }
 
 function isResponseTerminalErrorPacket(payload) {
+  if (payload && (payload.__deeprightPageNewTab || payload.__deeprightPageIframe)) return false;
   const choice = payload && payload.choices && payload.choices[0];
   if (choice && choice.finish_reason === 'error') return true;
   return isResponseErrorCode(extractResponseCode(payload, 0));
@@ -40908,6 +41022,7 @@ async function sendCenterMessage(rawText, options) {
     // Check agent validity before sending
     const valid = await checkAgentValidity(chatId);
     if (!valid) return false;
+    const pageResponseCodes = await readPageResponseCodes();
     const chatAgentId = String(chatAgents[chatId] || state.settings.agentId || '').trim();
     const routerRemote = await getAgentRouterRemoteConfig(chatAgentId);
     if (routerRemote.length) requestMetadata.router_remote = routerRemote.slice();
@@ -40972,7 +41087,7 @@ async function sendCenterMessage(rawText, options) {
       thinking: !!thinkingRequested,
       html: !!htmlRequested,
       router_disable: !swarmRequested,
-      metadata: { agentId: chatAgentId, chat: chatId, type: 'page_session' }
+      metadata: { agentId: chatAgentId, chat: chatId, type: 'page_session', theme: getCurrentRequestTheme() }
     };
     if (requestSource) body.metadata.requestSource = requestSource;
     if (requestMetadata) {
@@ -41455,6 +41570,18 @@ async function sendCenterMessage(rawText, options) {
           if (confirmedInsertTid) confirmQueuedCenterInsertedMessage(chatId, chatAgentId, confirmedInsertTid);
           const choice = parsed.choices && parsed.choices[0];
           const delta = choice && choice.delta;
+          const pageNewTabPacket = extractPageSpecialPacket(parsed, pageResponseCodes.newTab);
+          if (pageNewTabPacket && delta) {
+            delta.content = pageNewTabPacket.message;
+            parsed.__deeprightPageNewTab = true;
+            void openPageNewTabInSystemBrowser(pageNewTabPacket.url);
+          }
+          const pageIframePacket = extractPageSpecialPacket(parsed, pageResponseCodes.iframe);
+          if (pageIframePacket && delta) {
+            delta.content = pageIframePacket.message;
+            parsed.__deeprightPageIframe = true;
+            openPageIframe(pageIframePacket.url);
+          }
           const hasDeltaContent = !!(delta && delta.content);
           const packetExplosionGroupKey = extractResponseExplosionGroupKey(parsed);
           const isCliSub = isResponseCliSub(parsed);
@@ -47290,19 +47417,37 @@ async function readModelConfigurationTestResponse(response) {
   if (!contentType.includes('text/event-stream')) {
     throw new Error('配置错误：测试服务未返回 SSE 结果');
   }
+  const pageResponseCodes = await readPageResponseCodes();
+  let pageMessage = null;
   const raw = await response.text();
   const events = raw.split(/\r?\n\r?\n/);
   for (const event of events) {
     const lines = event.split(/\r?\n/);
     const eventName = String(lines.find(line => /^event\s*:/.test(line)) || '').replace(/^event\s*:\s*/, '').trim();
-    if (eventName !== 'result') continue;
     const payload = lines
       .filter(line => /^data\s*:/.test(line))
       .map(line => line.replace(/^data\s*:\s*/, ''))
       .join('\n');
+    if (eventName === 'page') {
+      try {
+        const data = JSON.parse(payload);
+        const newTabPacket = extractPageSpecialPacket(data, pageResponseCodes.newTab);
+        if (newTabPacket) {
+          pageMessage = newTabPacket.message;
+          void openPageNewTabInSystemBrowser(newTabPacket.url);
+        }
+        const iframePacket = extractPageSpecialPacket(data, pageResponseCodes.iframe);
+        if (iframePacket) {
+          pageMessage = iframePacket.message;
+          openPageIframe(iframePacket.url);
+        }
+      } catch {}
+      continue;
+    }
+    if (eventName !== 'result') continue;
     try {
       const data = JSON.parse(payload);
-      if (data && data.status === 0) return;
+      if (data && data.status === 0) return { pageMessage };
       throw new Error(limitModelTestMessage(data && data.content, '配置错误：测试失败'));
     } catch (error) {
       if (error instanceof Error) throw error;
@@ -47338,14 +47483,29 @@ async function toggleModelConfigurationTest(button) {
   modelTestRequests.add(state);
   setModelConfigurationTestRunning(state);
   try {
+    const device = await readRuntimeDeviceId(false);
+    if (state.cancelled) return;
+    const payload = {
+      ...request.payload,
+      metadata: {
+        device,
+        theme: getCurrentRequestTheme()
+      }
+    };
     const response = await fetch('/api/model/test', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(request.payload),
+      body: JSON.stringify(payload),
       signal: state.controller.signal
     });
-    await readModelConfigurationTestResponse(response);
-    if (!state.completed && !state.cancelled) setModelConfigurationTestResult(entry, 'success', '配置成功');
+    const testResult = await readModelConfigurationTestResponse(response);
+    if (!state.completed && !state.cancelled) {
+      if (testResult && testResult.pageMessage !== null) {
+        setModelConfigurationTestResult(entry, 'error', testResult.pageMessage);
+      } else {
+        setModelConfigurationTestResult(entry, 'success', '配置成功');
+      }
+    }
   } catch (error) {
     if (!state.completed && !state.cancelled && !(error && error.name === 'AbortError')) {
       setModelConfigurationTestResult(entry, 'error', limitModelTestMessage(error && error.message, '配置错误：网络异常'));

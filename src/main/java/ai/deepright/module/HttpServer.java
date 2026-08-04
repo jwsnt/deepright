@@ -40,7 +40,7 @@ public class HttpServer extends NettyHttpServer {
     @Setter
     @Getter
     @Configuration
-    public static class ChunkInitConfig extends InitConfig {
+    public static class HttpConfig extends InitConfig {
 
         @Bean
         public NettyHttpServer nettyHttpServer() throws Exception {

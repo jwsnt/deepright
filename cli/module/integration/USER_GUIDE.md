@@ -261,6 +261,28 @@ Integration 启动时会验证主 `config/config.json`，并在以下上游请�
 - `/cli/pub` 不携带该字段，独立 `cli-get` 程序也不在此规则内。
 - 配置文件缺失、不是普通文件、不可读或 JSON 非法时，Integration 无法启动。服务运行期间文件变为无效时，以上请求会在本机失败而不会向上游发送。
 
+### 上游请求 `metadata.version`
+
+Integration 在启动时从实际生效的主 `config/config.json` 读取并缓存字符串 `version`。内置 `/cli/get` 心跳，以及普通会话、备忘录任务（包括飞书和邮件 Connect 消息触发的即时任务）和设置页模型测试发出的上游 `/v1/chat/completions` 请求，都会在顶层 metadata 中携带该客户端版本：
+
+```json
+{
+  "metadata": {
+    "version": "0.1"
+  }
+}
+```
+
+- `version` 由 Integration 在转发前强制写入，浏览器请求中同名字段会被覆盖；不会使用 Agent 工作目录中的 `config.json`。
+- 版本在本进程启动后保存在内存中。主配置文件之后发生修改时，需重启 Integration 才会使用新版本。
+- `/cli/pub` 与独立 `cli-get` 程序不携带该字段。
+
+### 上游请求 `metadata.theme`
+
+页面直接发起的普通 `/v1/chat/completions` 请求会在 metadata 中按当前页面主题携带 `theme`：冷色模式为 `cold`，暖色模式为 `warm`。该值由页面逐次提交，Integration 不缓存、推测或改写它。
+
+设置页模型测试同样以 `metadata.device`、`metadata.theme` 提交页面参数；Integration 仅接受 `cold` 或 `warm`，并将它带入最终上游 `/v1/chat/completions` 请求。备忘录、飞书/邮件 Connect 任务、内置 `/cli/get` 与 `/cli/pub` 不携带 `metadata.theme`。
+
 ### `device` 解析与热更新
 
 Integration 服务使用同一个全局 `deviceId` 快照构建 Agent 元数据，优先级如下：
@@ -899,6 +921,26 @@ curl http://127.0.0.1:8080/install_app
 - 本地 HTTP 端口的优先级为：显式 `--port`、静态 `config/config.json` 的 `port`、默认 `8080`；端口必须介于 `1` 与 `65535` 之间。
 - `knowledge` 元数据继续基于 `agent-dir` 和共享 SQLite 解析；知识库目录固定取 `--agent-dir/knowledge`，共享 SQLite 默认取 `<app-dir>/data`。
 
+### `page` 特殊 SSE 页面
+
+`config/config.json` 可声明以下页面协议：
+
+```json
+{
+  "page": {
+    "new_tab": 931,
+    "iframe": 932
+  }
+}
+```
+
+- `new_tab` 与 `iframe` 均为正整数 SSE 业务码。`GET /api/runtime_config` 会在受控的 `config` 对象中原样透传完整 `page` 对象，供 Site 读取；该接口不会返回模型密钥或其他未列入白名单的配置。
+- `POST /api/browser/open` 仅接受本机 `localhost`、`127.0.0.1` 或 `::1` 的请求。请求体为 `{"url":"https://..."}`，且 URL 必须是带 host 的 `http` 或 `https` 地址。
+- 命中 `new_tab` 时，验证通过后 Integration 使用操作系统默认浏览器打开该地址；非 POST、远程访问、非法 JSON 或非 HTTP(S) 地址均会被拒绝；打开失败只返回接口错误，不影响已在 Site 中展示的 SSE 内容。命中 `iframe` 时由 Site 直接在页内展示 URL，不调用该接口。
+
+- 设置页模型配置测试也会识别该协议：Integration 仅把验证通过的匹配特殊包转给 Site，Site 在测试结果区只显示其中的 `message`，不添加“配置错误：”前缀，并按相同规则打开浏览器或覆盖设置页的 iframe。
+- `/cli/get` 的 HTTP 状态码或 JSON 业务 `code` 若等于已配置的 `new_tab` 或 `iframe`，会按成功、无任务的心跳处理；不会累积 heartbeat 失败次数，也不会触发远程服务报警。
+
 ### macOS `.app` 配置与代码签名保护
 
 macOS `.app` 的 `Contents/Resources/config/config.json` 是签名保护的静态配置，每次启动、重启和 `GET /api/runtime_config` 都从这里读取，绝不可在安装后修改。运行目录不再创建或读取 `config/config.json`；旧版本遗留的同名文件会被忽略，因此升级发布包后的新配置字段能立即生效。
@@ -1444,6 +1486,7 @@ curl -X POST 'http://127.0.0.1:8080/api/cron/create?agentId=demo-agent' \
 | POST | `/api/cmd` | 仅本机可调用的命令执行接口 |
 | POST | `/api/kill` | 仅本机可调用的命令终止接口 |
 | GET | `/api/folder` | 打开 Agent 工作目录 |
+| POST | `/api/browser/open` | 仅本机可调用；使用系统默认浏览器打开 HTTP(S) URL |
 | GET | `/api/skills` | 获取 Agent 技能列表 |
 | GET | `/api/files` | 浏览文件列表 |
 | POST | `/api/skill_state` | 按会话切换技能目录禁用状态 |
@@ -1861,7 +1904,7 @@ Integration 与 proxy 保持一致，统一提供模型密钥读写接口。
   - `cli/get -> taskQueue -> execute workers -> publishQueue -> cli/pub`
 - 心跳线程不会因为执行 Worker 正忙而阻塞；只有当本地 `taskQueue` 已满时，才会暂停发新的 `/cli/get`
 - 有任一会话、备忘录、飞书或邮件 SSE 未终态时，成功的 `/cli/get` 会立即进行下一轮；任务只入队，不等待执行或 `/cli/pub`
-- 所有 SSE 终态后，启动后的首个无 cmd 成功响应按 `config.json.get.await`（当前 `30000ms`）等待下一轮；收到 cmd 后会进行最多 `config.json.get.check`（当前 `10`）次连续无 cmd 快速检查，达到该次数才等待 `await`。新的 cmd 会原子重置连续计数
+- 所有 SSE 终态后，`cli/get` 仅按是否收到非空 cmd 调度：每个无 cmd 结果都会计入 `config.json.get.check`（当前 `10`），包括网络错误、超时、HTTP 非 `200` 和解析失败。未达到阈值时，成功无 cmd 立即继续、失败按 `config.json.get.sleep`（当前 `15000ms`）指数退避；恰好达到阈值时直接等待 `config.json.get.await`（当前 `30000ms`），不再先 sleep。新的 cmd 会原子重置连续计数
 - 本地 `taskQueue` 是纯内存队列，不做持久化恢复
 - 执行 Worker 在真正执行前会重新检查任务 `ddl`
 - 如果当前时间已超过 `ddl`：
@@ -3168,8 +3211,9 @@ Integration 新增本机接口 `POST /api/model/test`，供设置页测试尚未
 - 测试固定使用 `__model`，不回退到快速、思考或多模态模型。
 - `__url` 可以为空以使用服务商默认地址；非空时必须是无用户名和密码、带主机名的完整 `http://` 或 `https://` URL；反斜杠、空白、中文标点（如 `、`）和无效百分号编码均会在上游转发前被拒绝。
 - 测试配置、Token 与 UUID 均不写入 token_store、Agent 配置、聊天日志、连接表、记忆、技能、任务或通知。
-- 测试请求转发到 `/v1/chat/completions` 时，`metadata` 会保留本机运行环境字段：`app`、`workspace`、`terminal`、`Origin`、`device`、`chat` 与 `sys`；其中 `chat` 是本次测试专属 UUID。不会附带 Agent、技能、记忆、知识库、路由、任务或媒体上下文。
-- 成功必须同时满足 HTTP 200、有效 SSE 业务数据和 `[DONE]`；HTTP/SSE 错误、超时、空流、流中断或缺少 `[DONE]` 都会返回脱敏后的错误。错误 JSON 的 `content`（包括 `choices[].delta.content`）会优先展示，不会回显完整响应；401、403、404、429、503 与其他 5xx 会只使用统一中文原因和处理建议（404 为“请检查模型 URL 和基础模型”），`content` 内如 `(code=401)` 的显式状态码也会识别。接口只返回最终测试结果，页面在对应设置模型行内展示它，不会发送虚拟文件系统 Toast。
+- 测试页面会按与普通会话相同的层级提交 `metadata.device` 与 `metadata.theme`。`theme` 必须为 `cold` 或 `warm`，分别表示冷色和暖色页面模式；二者仅作用于本次测试请求，不会缓存或持久化。
+- 测试请求转发到 `/v1/chat/completions` 时，`metadata` 会保留本机运行环境字段：`app`、`workspace`、`terminal`、`Origin`、`device`、`theme`、`chat` 与 `sys`；其中 `chat` 是本次测试专属 UUID。不会附带 Agent、技能、记忆、知识库、路由、任务或媒体上下文。
+- 成功必须同时满足 HTTP 200、有效 SSE 业务数据和 `[DONE]`；HTTP/SSE 错误、超时、空流、流中断或缺少 `[DONE]` 都会返回脱敏后的错误。错误 JSON 的 `content`（包括 `choices[].delta.content`）会优先展示，不会回显完整响应；400、401、403、404、429、503 与其他 5xx 会只使用统一中文原因和处理建议，其中 400 提示检查模型地址、模型名称与请求参数，404 提示检查模型 URL 和基础模型；`content` 内如 `(code=401)` 的显式状态码也会识别。接口只返回最终测试结果，页面在对应设置模型行内展示它，不会发送虚拟文件系统 Toast。
 - 只有该测试转发携带 `metadata.test = true`，并会原样传至 `--host` 指定的最终处理服务器；普通 `/v1/chat/completions` 会在转发前移除客户端伪造的同名字段。
 
 完整说明见 [iteration/20260722-2/USER_GUIDE.md](iteration/20260722-2/USER_GUIDE.md)。

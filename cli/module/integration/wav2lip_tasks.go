@@ -400,7 +400,7 @@ type wav2lipTaskManager struct {
 
 var (
 	wav2lipTasks          *wav2lipTaskManager
-	wav2lipLookPath       = exec.LookPath
+	wav2lipLookPath       = integrationCommandLookPath
 	wav2lipCommandContext = exec.CommandContext
 	wav2lipNow            = time.Now
 	wav2lipCheckCache     struct {

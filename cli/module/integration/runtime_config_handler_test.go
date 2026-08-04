@@ -20,6 +20,7 @@ func TestIntegrationClientRuntimeConfigReturnsOnlyClientFields(t *testing.T) {
 			"reference": "（READ_ME.md: $reference）",
 			"function":  "全部功能",
 		},
+		"page":     map[string]interface{}{"new_tab": 931},
 		"provider": map[string]interface{}{"openai": "private"},
 		"secret":   "must not be exposed",
 	}
@@ -33,6 +34,9 @@ func TestIntegrationClientRuntimeConfigReturnsOnlyClientFields(t *testing.T) {
 	}
 	if got, want := got["miniapp"], raw["miniapp"]; !reflect.DeepEqual(got, want) {
 		t.Fatalf("miniapp = %#v, want %#v", got, want)
+	}
+	if got, want := got["page"], raw["page"]; !reflect.DeepEqual(got, want) {
+		t.Fatalf("page = %#v, want %#v", got, want)
 	}
 	if _, ok := got["knowledge"]; !ok {
 		t.Fatal("knowledge is missing")
@@ -99,7 +103,7 @@ func TestHandleRuntimeConfigReadsIntegrationConfigForMacAndWSLLayouts(t *testing
 			if err := os.MkdirAll(configDir, 0o755); err != nil {
 				t.Fatalf("mkdir config: %v", err)
 			}
-			if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(`{"skills_git_install":"install $git_path","miniapp":{"build":"请使用 @__internal_cli 为 $name 的 $function 构建迷你应用 $reference","reference":"（READ_ME.md: $reference）","function":"全部功能"}}`), 0o644); err != nil {
+			if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(`{"skills_git_install":"install $git_path","miniapp":{"build":"请使用 @__internal_cli 为 $name 的 $function 构建迷你应用 $reference","reference":"（READ_ME.md: $reference）","function":"全部功能"},"page":{"new_tab":931}}`), 0o644); err != nil {
 				t.Fatalf("write config: %v", err)
 			}
 
@@ -128,6 +132,10 @@ func TestHandleRuntimeConfigReadsIntegrationConfigForMacAndWSLLayouts(t *testing
 			miniapp, ok := payload.Config["miniapp"].(map[string]interface{})
 			if !ok || miniapp["build"] != "请使用 @__internal_cli 为 $name 的 $function 构建迷你应用 $reference" || miniapp["reference"] != "（READ_ME.md: $reference）" || miniapp["function"] != "全部功能" {
 				t.Fatalf("miniapp = %#v", payload.Config["miniapp"])
+			}
+			page, ok := payload.Config["page"].(map[string]interface{})
+			if !ok || page["new_tab"] != float64(931) {
+				t.Fatalf("page = %#v", payload.Config["page"])
 			}
 		})
 	}

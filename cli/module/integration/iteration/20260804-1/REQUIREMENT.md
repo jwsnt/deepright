@@ -26,8 +26,8 @@
     ```
     + 单位均为毫秒。
     + `get.sleep` 是 cli-get 心跳失败、Agent 扫描失败或本地任务队列满时的等待基数。
-    + `get.await` 是 Integration 没有任何未终态 SSE 时，成功 `/cli/get` 响应后的待机间隔。
-    + `get.check` 是在收到过需执行 `cmd` 后、重新进入待机前允许连续快速检查的“无 cmd 成功响应”次数。
+    + `get.await` 是 Integration 没有任何未终态 SSE 时，连续 `get.check` 次未收到 `cmd` 后的待机间隔。
+    + `get.check` 是连续“无 cmd”结果的阈值；只看是否收到可执行 `cmd`，不区分成功响应、HTTP/网络失败或响应解析失败。
     + `get.sleep` 与 `get.await` 必须是非负整数；`get.check` 必须是正整数。配置缺失时保持现有兼容默认值，其中 `await` 默认 `30000`、`check` 默认 `10`。
     + 命令行显式传入 `--sleep` 时必须优先于 `config.json.get.sleep`；未传入时使用 `config.json.get.sleep`。
     + 不新增 `--await` 命令行参数，`await` 仅由 `config.json.get.await` 配置。
@@ -39,35 +39,37 @@
     + 计数仅保存在进程内存，不写入 SQLite，不新增 HTTP 接口、数据库表、上游字段或报文 schema。
     + 现有 macOS 防休眠计数不等同于本需求计数：本需求计数必须在所有系统生效，并覆盖响应头到达前的连接阶段。
 
-+ Integration 内置 cli-get 的成功心跳调度规则：
++ Integration 内置 cli-get 的心跳调度规则：
     + 若 SSE 原子计数大于零：
         + `/cli/get` 返回任务时，任务必须先进入现有本地 `taskQueue`；成功入队后立即发起下一次 `/cli/get`。
         + `/cli/get` 返回无任务时，立即发起下一次 `/cli/get`。
         + 不等待任务执行、`/cli/pub`、`get.await` 或 SSE 结束。
     + 若 SSE 原子计数等于零：
         + 若本次响应包含非空 `cmd`，必须原子重置连续无 cmd 计数，并立即进行下一次 `/cli/get`；不等待任务执行或 `/cli/pub`。
-        + 若进程启动以来尚未收到过需执行 `cmd`，本次成功响应无 `cmd` 后直接等待 `get.await`。
-        + 若此前已收到过需执行 `cmd`，每次成功响应无 `cmd` 都必须原子递增连续无 cmd 计数；计数小于 `get.check` 时立即进行下一次 `/cli/get`，计数达到 `get.check` 时才等待 `get.await`。
-        + 快速检查期间任一次响应再次包含非空 `cmd` 时，必须原子重置连续无 cmd 计数，并重新开始快速检查周期。
+        + 每次未收到 `cmd` 都必须原子递增连续无 cmd 计数，包括成功无任务响应、网络错误、超时、HTTP 非 200 和响应解析失败。
+        + 连续无 cmd 计数小于 `get.check` 时，成功无任务响应立即进行下一次 `/cli/get`；失败响应仍按 `--sleep` / `get.sleep` 的指数退避等待。
+        + 恰好使连续无 cmd 计数达到或超过 `get.check` 的任一结果，直接等待 `get.await`，不再先执行一次 `sleep`；之后每次继续未收到 `cmd` 的结果仍等待 `get.await`。
+        + 任一次响应再次包含非空 `cmd` 时，必须原子重置连续无 cmd 计数，并重新开始检查周期。
     + SSE 原子计数与连续无 cmd 计数必须独立维护、共同决策：
-        + SSE 原子计数大于零时始终立即请求，连续无 cmd 计数不得使其等待。
+        + SSE 原子计数大于零时，成功响应始终立即请求，连续无 cmd 计数不得使其等待；失败仍保留 `sleep` 指数退避，但同样必须计入连续无 cmd 计数。
         + SSE 原子计数等于零时，才允许连续无 cmd 计数决定立即请求或 `await`。
     + 当 cli-get 正在等待 `get.await` 时，只要 SSE 计数从零变为正数：
         + 必须立即中断本次等待。
         + 必须立即进入下一次 `/cli/get` 上报，不得等待当前 `await` 计时结束。
     + 现有例外语义保持不变：
-        + `/cli/get` 网络错误、超时、HTTP 非 200 或响应解析失败时，按 `--sleep` / `get.sleep` 进行既有指数退避，最大退避上限保持不变。
+        + `/cli/get` 网络错误、超时、HTTP 非 200 或响应解析失败时，未达到 `get.check` 前按 `--sleep` / `get.sleep` 进行既有指数退避，最大退避上限保持不变；达到阈值时改为直接等待 `get.await`。
         + 本地 `taskQueue` 已满时，不发起 `/cli/get`，按 `--sleep` / `get.sleep` 等待后重新检查。
         + `/cli/pub` 的独立队列与重试不影响心跳等待决策。
 
 + 验收要求：
     + 覆盖 `get.sleep`、`get.await` 的配置读取、非负校验以及 `--sleep` 优先级。
     + 覆盖 SSE 计数在开始、正常完成、异常、取消/超时与重复清理时的增减和不为负语义。
-    + 覆盖无 SSE 时成功心跳等待 `get.await`。
+    + 覆盖无 SSE 时连续 `get.check` 次未收到 cmd 后等待 `get.await`。
     + 覆盖等待 `get.await` 期间创建 SSE 会立即唤醒心跳。
     + 覆盖 SSE 活跃时，有任务和无任务两种成功响应都不会等待 `get.await`。
-    + 覆盖启动后的首个无 cmd 响应直接进入 `await`、收到 cmd 后的连续空响应快速检查、达到 `get.check` 后进入 `await`，以及新 cmd 原子重置计数。
-    + 覆盖心跳失败、队列满和 `/cli/pub` 重试仍使用既有策略。
+    + 覆盖启动后的无 cmd 结果、收到 cmd 后的连续无 cmd 结果、达到 `get.check` 后进入 `await`，以及新 cmd 原子重置计数。
+    + 覆盖心跳失败也计入无 cmd 计数；计数未达阈值时继续使用 `sleep` 退避，恰好达到阈值时直接使用 `await`。
+    + 覆盖队列满和 `/cli/pub` 重试仍使用既有策略。
 
 ### 编写代码
 + 以 Golang 完成最小范围更新，复用既有 cli-get 队列、心跳退避、上下文取消与 SSE 生命周期处理；不得新增外部 Go 依赖。

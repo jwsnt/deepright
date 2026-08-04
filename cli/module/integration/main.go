@@ -2422,9 +2422,10 @@ func injectApplicationDataDirMetadata(metaMap map[string]interface{}, agentDir s
 	}
 }
 
-// injectIntegrationConfigPathMetadata makes config a runtime-owned upstream
-// metadata field. The path is checked immediately before sending so a deleted
-// or unreadable main configuration cannot be advertised to the upstream.
+// injectIntegrationConfigPathMetadata makes config and version runtime-owned
+// upstream metadata fields. The path is checked immediately before sending so
+// a deleted or unreadable main configuration cannot be advertised upstream;
+// version is cached from that configuration at process startup.
 func injectIntegrationConfigPathMetadata(metaMap map[string]interface{}, cfg *Config) error {
 	if metaMap == nil || cfg == nil {
 		return nil
@@ -2439,6 +2440,10 @@ func injectIntegrationConfigPathMetadata(metaMap map[string]interface{}, cfg *Co
 	}
 	delete(metaMap, "config")
 	metaMap["config"] = configPath
+	delete(metaMap, "version")
+	if version := strings.TrimSpace(cfg.ClientVersion); version != "" {
+		metaMap["version"] = version
+	}
 	return nil
 }
 
@@ -2974,6 +2979,12 @@ func heartbeat(client *http.Client, host string, metadata *AgentOutput, cfg *Con
 		return nil, fmt.Errorf("read response: %w", err)
 	}
 	if resp.StatusCode != 200 {
+		// Some upstream gateways put the configured page protocol code in the
+		// HTTP status instead of the JSON response body. It has the same
+		// control-packet meaning, and cli/get must not turn it into an alert.
+		if readConfiguredPageResponseCodes().matches(resp.StatusCode) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("heartbeat HTTP %d", resp.StatusCode)
 	}
 	var rp ResponsePayload
@@ -2981,6 +2992,12 @@ func heartbeat(client *http.Client, host string, metadata *AgentOutput, cfg *Con
 		return nil, fmt.Errorf("parse response: %w", err)
 	}
 	if rp.Code != 200 {
+		// Page protocol responses are intentional control packets rather than
+		// failed heartbeats. cli/get does not execute them, so acknowledge them
+		// as an idle, successful poll and do not contribute to the alert count.
+		if readConfiguredPageResponseCodes().matches(rp.Code) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("heartbeat code %d", rp.Code)
 	}
 	if len(rp.Choices) == 0 || rp.Choices[0].Message.Content == nil {
@@ -3124,17 +3141,20 @@ func shouldSleepAfterHeartbeat(task *TaskContent, err error) bool {
 	return err != nil
 }
 
-// cliGetCommandCheck tracks consecutive successful cli/get responses without
-// a command after at least one command has been received. -1 means no command
-// has been observed since process start; zero means a command was just seen.
-// The single atomic state makes reset and increment visible atomically.
+func shouldAwaitAfterCliGetFailure(sseActive, immediatelyRetryByCheck bool) bool {
+	return !sseActive && !immediatelyRetryByCheck
+}
+
+// cliGetCommandCheck tracks consecutive cli/get results without a command.
+// A failed heartbeat is also a no-command result. The single atomic state
+// makes command reset and no-command increment visible atomically.
 type cliGetCommandCheck struct {
 	emptySinceCommand atomic.Int64
 }
 
 func newCliGetCommandCheck() cliGetCommandCheck {
 	state := cliGetCommandCheck{}
-	state.emptySinceCommand.Store(-1)
+	state.emptySinceCommand.Store(0)
 	return state
 }
 
@@ -3149,9 +3169,6 @@ func (state *cliGetCommandCheck) shouldImmediatelyRetryWithoutSSE(hasCommand boo
 	}
 	for {
 		current := state.emptySinceCommand.Load()
-		if current < 0 || current >= int64(check) {
-			return false
-		}
 		if state.emptySinceCommand.CompareAndSwap(current, current+1) {
 			return current+1 < int64(check)
 		}
@@ -3562,6 +3579,14 @@ func startCliGet(ctx context.Context, cfg *Config) {
 				errText := formatCliGetHeartbeatError(host, err)
 				log.Printf("%s", errText)
 				recordHeartbeat(1, errText) // failure
+				immediatelyRetryByCheck := commandCheck.shouldImmediatelyRetryWithoutSSE(false, cfg.Check)
+				if shouldAwaitAfterCliGetFailure(integrationHasActiveSSE(), immediatelyRetryByCheck) {
+					heartbeatBackoff = sleepDur
+					if !waitForCliGetHeartbeat(ctx, awaitDur) {
+						return
+					}
+					continue
+				}
 				if !sleepContext(ctx, heartbeatBackoff) {
 					return
 				}
@@ -3571,16 +3596,9 @@ func startCliGet(ctx context.Context, cfg *Config) {
 			heartbeatBackoff = sleepDur
 			hasCommand := taskHasExecutableCommand(task)
 			sseActive := integrationHasActiveSSE()
-			immediatelyRetryByCheck := false
-			if sseActive {
-				// SSE takes priority over the command check. A command still resets
-				// the atomic check state for when SSE activity later reaches zero.
-				if hasCommand {
-					commandCheck.resetForCommand()
-				}
-			} else {
-				immediatelyRetryByCheck = commandCheck.shouldImmediatelyRetryWithoutSSE(hasCommand, cfg.Check)
-			}
+			// Every result without cmd advances the idle check, including results
+			// observed while an SSE is active. SSE activity only suppresses await.
+			immediatelyRetryByCheck := commandCheck.shouldImmediatelyRetryWithoutSSE(hasCommand, cfg.Check)
 			if task == nil {
 				recordHeartbeat(0, "") // success, no task
 			} else {
@@ -4341,6 +4359,7 @@ func handleDeviceID(cfg *Config) http.HandlerFunc {
 // ═══════════════════════════════════════════════════════════════════════════
 
 var openFolderFn = openSystemTarget
+var openBrowserURLFn = openSystemTarget
 var openSystemTargetGOOS = runtime.GOOS
 var openSystemTargetIsWSLFn = integrationBrowserIsWSL
 var openSystemTargetExecCommandFn = exec.Command
@@ -4359,6 +4378,10 @@ var openSystemTargetOutputFn = func(name string, args ...string) ([]byte, error)
 
 func openFolder(path string) error {
 	return openFolderFn(path)
+}
+
+func openBrowserURL(target string) error {
+	return openBrowserURLFn(target)
 }
 
 func openSystemTarget(target string) error {
@@ -4889,6 +4912,47 @@ func handleFolder(cfg *Config) http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"status": "ok", "path": target})
+	}
+}
+
+// handleBrowserOpen opens an HTTP(S) URL in the system browser. It is kept
+// separate from the page UI because the UI deliberately blocks window.open.
+func handleBrowserOpen() http.HandlerFunc {
+	type browserOpenRequest struct {
+		URL string `json:"url"`
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if !isLocalManagementRequest(r) {
+			http.Error(w, "only localhost requests can open browser URLs", http.StatusForbidden)
+			return
+		}
+		var request browserOpenRequest
+		decoder := json.NewDecoder(io.LimitReader(r.Body, 16*1024))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&request); err != nil {
+			http.Error(w, "invalid JSON body", http.StatusBadRequest)
+			return
+		}
+		if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+			http.Error(w, "invalid JSON body", http.StatusBadRequest)
+			return
+		}
+		target, err := normalizeURLPreviewProbeTarget(request.URL)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := openBrowserURL(target.String()); err != nil {
+			log.Printf("open browser URL error: %v", err)
+			http.Error(w, "Failed to open browser URL: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "url": target.String()})
 	}
 }
 
@@ -6703,7 +6767,7 @@ const screenRecordingTemporaryDirectory = "tmp"
 
 var screenRecordingTemporaryName = regexp.MustCompile(`^\.screen-recording-[a-z0-9-]{12,96}\.webm$`)
 
-var videoTrimLookPathFn = exec.LookPath
+var videoTrimLookPathFn = integrationCommandLookPath
 var videoTrimCommandContextFn = exec.CommandContext
 var ffmpegEncoderProbeCommandContextFn = exec.CommandContext
 var videoTrimLastOutputTimestamp int64
@@ -6804,7 +6868,7 @@ type ffmpegCheckConfig struct {
 	Install  string
 }
 
-var ffmpegCheckLookPathFn = exec.LookPath
+var ffmpegCheckLookPathFn = integrationCommandLookPath
 var ffmpegCheckNowFn = time.Now
 var ffmpegCheckCache struct {
 	sync.Mutex
@@ -11132,22 +11196,82 @@ var (
 	modelTestURLAllowedCharacters    = regexp.MustCompile(`^[A-Za-z0-9\-._~:/?#[\]@!$&'()*+,;=%]+$`)
 )
 
-// modelTestRequest deliberately contains only transient provider material. It
-// is never written to token_store or any of the chat/agent persistence paths.
+// modelTestRequest contains transient provider material plus the page's
+// request-scoped metadata. It is never written to token_store or any of the
+// chat/agent persistence paths.
 type modelTestRequest struct {
-	Model            string `json:"model"`
-	Token            string `json:"token"`
-	BaseURL          string `json:"__url"`
-	ModelBase        string `json:"__model"`
-	ModelFast        string `json:"__model_fast"`
-	ModelThinking    string `json:"__model_thinking"`
-	ModelMultiInput  string `json:"__model_multi_input"`
-	ModelMultiOutput string `json:"__model_multi_output"`
+	Model            string                   `json:"model"`
+	Token            string                   `json:"token"`
+	BaseURL          string                   `json:"__url"`
+	ModelBase        string                   `json:"__model"`
+	ModelFast        string                   `json:"__model_fast"`
+	ModelThinking    string                   `json:"__model_thinking"`
+	ModelMultiInput  string                   `json:"__model_multi_input"`
+	ModelMultiOutput string                   `json:"__model_multi_output"`
+	Metadata         modelTestRequestMetadata `json:"metadata"`
+}
+
+type modelTestRequestMetadata struct {
+	Device string `json:"device"`
+	Theme  string `json:"theme"`
 }
 
 type modelTestConfig struct {
-	Content string
-	Timeout time.Duration
+	Content           string
+	Timeout           time.Duration
+	PageResponseCodes configuredPageResponseCodes
+}
+
+// configuredPageResponseCodes is the small, public part of the static page
+// protocol shared by chat SSE, model tests, and cli/get heartbeats.
+type configuredPageResponseCodes struct {
+	NewTab int
+	Iframe int
+}
+
+func (codes configuredPageResponseCodes) matches(code int) bool {
+	return code > 0 && (code == codes.NewTab || code == codes.Iframe)
+}
+
+func configuredPageResponseCodesFromRaw(raw map[string]interface{}) configuredPageResponseCodes {
+	page, ok := raw["page"].(map[string]interface{})
+	if !ok || page == nil {
+		return configuredPageResponseCodes{}
+	}
+	return configuredPageResponseCodes{
+		NewTab: configuredPageResponseCode(page["new_tab"]),
+		Iframe: configuredPageResponseCode(page["iframe"]),
+	}
+}
+
+func configuredPageResponseCode(raw interface{}) int {
+	var code int64
+	switch value := raw.(type) {
+	case json.Number:
+		parsed, err := value.Int64()
+		if err != nil {
+			return 0
+		}
+		code = parsed
+	default:
+		parsed, ok := parseResponseStatusCode(value)
+		if !ok {
+			return 0
+		}
+		code = int64(parsed)
+	}
+	if code <= 0 || code > int64(^uint(0)>>1) {
+		return 0
+	}
+	return int(code)
+}
+
+func readConfiguredPageResponseCodes() configuredPageResponseCodes {
+	raw, _, err := readIntegrationStartupConfigRaw()
+	if err != nil || raw == nil {
+		return configuredPageResponseCodes{}
+	}
+	return configuredPageResponseCodesFromRaw(raw)
 }
 
 // handleModelTest runs an isolated, non-persistent provider probe. It does
@@ -11246,11 +11370,22 @@ func handleModelTest(cfg *Config, proxyClient *http.Client) http.HandlerFunc {
 		w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("X-Accel-Buffering", "no")
-		if err := consumeModelTestSSE(ctx, resp.Body, request.Token); err != nil {
+		var pagePacket *modelTestPagePacket
+		if err := consumeModelTestSSE(ctx, resp.Body, request.Token, modelTestSSEOptions{
+			PageResponseCodes: testConfig.PageResponseCodes,
+			OnPagePacket: func(packet modelTestPagePacket) {
+				pagePacket = &packet
+				writeModelTestSSEPagePacket(w, packet)
+			},
+		}); err != nil {
 			if errors.Is(ctx.Err(), context.Canceled) && !errors.Is(ctx.Err(), context.DeadlineExceeded) {
 				return
 			}
 			writeModelTestSSEResult(w, false, modelTestErrorMessage(err, request.Token))
+			return
+		}
+		if pagePacket != nil {
+			writeModelTestSSEResult(w, false, pagePacket.Message)
 			return
 		}
 		writeModelTestSSEResult(w, true, "配置成功")
@@ -11279,6 +11414,8 @@ func decodeModelTestRequest(body io.ReadCloser) (modelTestRequest, error) {
 	request.ModelThinking = strings.TrimSpace(request.ModelThinking)
 	request.ModelMultiInput = strings.TrimSpace(request.ModelMultiInput)
 	request.ModelMultiOutput = strings.TrimSpace(request.ModelMultiOutput)
+	request.Metadata.Device = strings.TrimSpace(request.Metadata.Device)
+	request.Metadata.Theme = strings.ToLower(strings.TrimSpace(request.Metadata.Theme))
 	if request.Model == "" {
 		return request, fmt.Errorf("配置错误：未选择模型服务商")
 	}
@@ -11290,6 +11427,12 @@ func decodeModelTestRequest(body io.ReadCloser) (modelTestRequest, error) {
 	}
 	if request.ModelBase == "" {
 		return request, fmt.Errorf("配置错误：基础模型 __model 不能为空")
+	}
+	if request.Metadata.Device == "" {
+		return request, fmt.Errorf("配置错误：metadata.device 不能为空")
+	}
+	if request.Metadata.Theme != "cold" && request.Metadata.Theme != "warm" {
+		return request, fmt.Errorf("配置错误：metadata.theme 必须为 cold 或 warm")
 	}
 	return request, nil
 }
@@ -11347,7 +11490,11 @@ func readModelTestConfig() (modelTestConfig, error) {
 	if !ok || timeoutSeconds <= 0 || timeoutSeconds > int64((1<<63-1)/int64(time.Second)) {
 		return modelTestConfig{}, fmt.Errorf("配置错误：config.json.test.timeout 必须为正整数秒")
 	}
-	return modelTestConfig{Content: content, Timeout: time.Duration(timeoutSeconds) * time.Second}, nil
+	return modelTestConfig{
+		Content:           content,
+		Timeout:           time.Duration(timeoutSeconds) * time.Second,
+		PageResponseCodes: configuredPageResponseCodesFromRaw(raw),
+	}, nil
 }
 
 func modelTestTimeoutSeconds(raw interface{}) (int64, bool) {
@@ -11374,7 +11521,8 @@ func buildModelTestUpstreamRequest(cfg *Config, request modelTestRequest, sessio
 		"test":   true,
 		"type":   "test",
 		"chat":   sessionID,
-		"device": cfg.effectiveDeviceID(),
+		"device": request.Metadata.Device,
+		"theme":  request.Metadata.Theme,
 		"port":   integrationMetadataPort(cfg),
 		// Keep the runtime fields required by the upstream /v1/chat/completions
 		// pipeline. They describe this Integration process only; unlike ordinary
@@ -11440,7 +11588,22 @@ func newModelTestUUID() (string, error) {
 		value[0:4], value[4:6], value[6:8], value[8:10], value[10:16]), nil
 }
 
-func consumeModelTestSSE(ctx context.Context, body io.Reader, token string) error {
+type modelTestSSEOptions struct {
+	PageResponseCodes configuredPageResponseCodes
+	OnPagePacket      func(modelTestPagePacket)
+}
+
+type modelTestPagePacket struct {
+	Code    int
+	Content string
+	Message string
+}
+
+func consumeModelTestSSE(ctx context.Context, body io.Reader, token string, options ...modelTestSSEOptions) error {
+	var option modelTestSSEOptions
+	if len(options) > 0 {
+		option = options[0]
+	}
 	buffer := make([]byte, 0, 4096)
 	chunk := make([]byte, 2048)
 	sawBusinessData := false
@@ -11453,7 +11616,7 @@ func consumeModelTestSSE(ctx context.Context, body io.Reader, token string) erro
 				return fmt.Errorf("配置错误：SSE 事件过大或未正常分帧")
 			}
 			for _, event := range splitCompleteSSEEvents(&buffer) {
-				business, done, err := inspectModelTestSSEEvent(event, token)
+				business, done, err := inspectModelTestSSEEvent(event, token, option)
 				if err != nil {
 					return err
 				}
@@ -11473,7 +11636,7 @@ func consumeModelTestSSE(ctx context.Context, body io.Reader, token string) erro
 		break
 	}
 	for _, event := range flushTrailingSSEBytes(&buffer) {
-		business, done, err := inspectModelTestSSEEvent(event, token)
+		business, done, err := inspectModelTestSSEEvent(event, token, option)
 		if err != nil {
 			return err
 		}
@@ -11492,7 +11655,7 @@ func consumeModelTestSSE(ctx context.Context, body io.Reader, token string) erro
 	return nil
 }
 
-func inspectModelTestSSEEvent(event, token string) (bool, bool, error) {
+func inspectModelTestSSEEvent(event, token string, option modelTestSSEOptions) (bool, bool, error) {
 	if strings.Contains(strings.ToLower(event), "event: error") {
 		return false, false, fmt.Errorf("配置错误：%s", modelTestSSEErrorDetail(event, token))
 	}
@@ -11515,6 +11678,13 @@ func inspectModelTestSSEEvent(event, token string) (bool, bool, error) {
 		if err := json.Unmarshal([]byte(payload), &raw); err != nil {
 			return false, done, fmt.Errorf("配置错误：SSE 响应包含无效数据")
 		}
+		if packet, ok := modelTestPagePacketFromPayload(raw, option.PageResponseCodes); ok {
+			business = true
+			if option.OnPagePacket != nil {
+				option.OnPagePacket(packet)
+			}
+			continue
+		}
 		if modelTestPayloadIsError(raw) {
 			return false, done, fmt.Errorf("配置错误：%s", modelTestPayloadErrorDetail(raw, token))
 		}
@@ -11523,6 +11693,51 @@ func inspectModelTestSSEEvent(event, token string) (bool, bool, error) {
 		}
 	}
 	return business, done, nil
+}
+
+func modelTestPagePacketFromPayload(raw map[string]interface{}, codes configuredPageResponseCodes) (modelTestPagePacket, bool) {
+	if raw == nil || !codes.matches(modelTestPayloadTopLevelCode(raw)) {
+		return modelTestPagePacket{}, false
+	}
+	choices, ok := raw["choices"].([]interface{})
+	if !ok || len(choices) == 0 {
+		return modelTestPagePacket{}, false
+	}
+	choice, ok := choices[0].(map[string]interface{})
+	if !ok {
+		return modelTestPagePacket{}, false
+	}
+	delta, ok := choice["delta"].(map[string]interface{})
+	if !ok {
+		return modelTestPagePacket{}, false
+	}
+	content, ok := delta["content"].(string)
+	if !ok {
+		return modelTestPagePacket{}, false
+	}
+	var page map[string]interface{}
+	if json.Unmarshal([]byte(content), &page) != nil || page == nil {
+		return modelTestPagePacket{}, false
+	}
+	if _, ok := page["url"].(string); !ok {
+		return modelTestPagePacket{}, false
+	}
+	message, ok := page["message"].(string)
+	if !ok {
+		return modelTestPagePacket{}, false
+	}
+	return modelTestPagePacket{Code: modelTestPayloadTopLevelCode(raw), Content: content, Message: message}, true
+}
+
+func modelTestPayloadTopLevelCode(raw map[string]interface{}) int {
+	if raw == nil {
+		return 0
+	}
+	code, ok := parseResponseStatusCode(raw["code"])
+	if !ok {
+		return 0
+	}
+	return code
 }
 
 func modelTestPayloadIsError(raw map[string]interface{}) bool {
@@ -11627,6 +11842,8 @@ func formatModelTestProviderFailure(status int, detail string) string {
 
 func modelTestStandardStatusMessage(status int) string {
 	switch {
+	case status == http.StatusBadRequest:
+		return "服务商请求无效（400），请检查模型地址、模型名称与请求参数"
 	case status == http.StatusUnauthorized:
 		return "服务商身份认证失败（401），请检查 API Key/Token 是否正确、有效且未过期"
 	case status == http.StatusForbidden:
@@ -11754,6 +11971,21 @@ func writeModelTestSSEResult(w http.ResponseWriter, success bool, message string
 	}
 }
 
+// writeModelTestSSEPagePacket deliberately forwards only the fields Site needs
+// for the configured page protocol, never ordinary model-test SSE payloads.
+func writeModelTestSSEPagePacket(w http.ResponseWriter, packet modelTestPagePacket) {
+	payload, _ := json.Marshal(map[string]interface{}{
+		"code": packet.Code,
+		"choices": []map[string]interface{}{{
+			"delta": map[string]string{"content": packet.Content},
+		}},
+	})
+	_, _ = fmt.Fprintf(w, "event: page\ndata: %s\n\n", payload)
+	if flusher, ok := w.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
 var integrationClientRuntimeConfigFields = []string{
 	"agent-dir",
 	"app-dir",
@@ -11766,6 +11998,7 @@ var integrationClientRuntimeConfigFields = []string{
 	"skills_git_install",
 	"shortcut",
 	"miniapp",
+	"page",
 }
 
 func integrationClientRuntimeConfig(raw map[string]interface{}) map[string]interface{} {
@@ -17649,16 +17882,19 @@ type Config struct {
 	// StartupConfigPath is the verified absolute path of the static main
 	// config/config.json used to start this Integration process.
 	StartupConfigPath string
-	RuntimeHost       *runtimehost.State
-	Standalone        *integrationstandalone.State
-	AgentDir          string
-	DefaultDir        string
-	Device            string
-	DeviceState       *integrationDeviceState
-	AgentCacheMs      int
-	ConnectCacheMs    int
-	Site              string
-	Provider          map[string]map[string]string
+	// ClientVersion is read from the main config/config.json during startup and
+	// remains stable for the lifetime of this Integration process.
+	ClientVersion  string
+	RuntimeHost    *runtimehost.State
+	Standalone     *integrationstandalone.State
+	AgentDir       string
+	DefaultDir     string
+	Device         string
+	DeviceState    *integrationDeviceState
+	AgentCacheMs   int
+	ConnectCacheMs int
+	Site           string
+	Provider       map[string]map[string]string
 
 	// Proxy specific
 	ConnectTimeoutMs          int
@@ -17995,6 +18231,7 @@ func defaultIntegrationStartupOptions() integrationStartupOptions {
 var integrationStartupConfigKeys = map[string]string{
 	"port":                    "port",
 	"host":                    "host",
+	"version":                 "version",
 	"app":                     "app",
 	"appdir":                  "app-dir",
 	"agentdir":                "agent-dir",
@@ -18427,6 +18664,10 @@ func applyIntegrationStartupConfig(opts *integrationStartupOptions, values map[s
 	}
 	for key, raw := range values {
 		switch key {
+		case "version":
+			if value, ok := raw.(string); ok {
+				opts.Config.ClientVersion = strings.TrimSpace(value)
+			}
 		case "port":
 			if err := assignIntegrationStartupConfigInt(raw, key, &opts.Config.Port); err != nil {
 				return err
@@ -20664,6 +20905,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/plugins/exec", handlePluginsExec(&cfg))
 	mux.HandleFunc("/api/plugins/log", handlePluginsLog(&cfg))
 	mux.HandleFunc("/api/folder", handleFolder(&cfg))
+	mux.HandleFunc("/api/browser/open", handleBrowserOpen())
 	mux.HandleFunc("/api/skills", handleSkills(&cfg))
 	mux.HandleFunc("/api/skill_state", handleSkillState(&cfg))
 	mux.HandleFunc("/skills_warning", handleSkillsWarning(&cfg))

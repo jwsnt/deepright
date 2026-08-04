@@ -38,6 +38,41 @@ func TestParseVoxCPMCheckConfig(t *testing.T) {
 	}
 }
 
+func TestVoxCPMExecutableFindsManagedPythonInstallAddedAfterStartup(t *testing.T) {
+	command := filepath.Join(t.TempDir(), "voxcpm")
+	if err := os.WriteFile(command, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	previousLookPath, previousGlob := voxcpmLookPath, voxcpmGlob
+	previousCheckedAt, previousExecutable := time.Time{}, ""
+	voxcpmCheckCache.Lock()
+	previousCheckedAt, previousExecutable = voxcpmCheckCache.checkedAt, voxcpmCheckCache.executable
+	voxcpmCheckCache.checkedAt, voxcpmCheckCache.executable = time.Time{}, ""
+	voxcpmCheckCache.Unlock()
+	installed := false
+	voxcpmLookPath = func(string) (string, error) { return "", os.ErrNotExist }
+	voxcpmGlob = func(pattern string) ([]string, error) {
+		if pattern == "/usr/local/share/python*/cpython-*/bin/voxcpm" && installed {
+			return []string{command}, nil
+		}
+		return nil, nil
+	}
+	t.Cleanup(func() {
+		voxcpmLookPath, voxcpmGlob = previousLookPath, previousGlob
+		voxcpmCheckCache.Lock()
+		voxcpmCheckCache.checkedAt, voxcpmCheckCache.executable = previousCheckedAt, previousExecutable
+		voxcpmCheckCache.Unlock()
+	})
+
+	if _, ok := voxcpmExecutable(time.Hour); ok {
+		t.Fatal("VoxCPM must be unavailable before installation")
+	}
+	installed = true
+	if path, ok := voxcpmExecutable(time.Hour); !ok || path != command {
+		t.Fatalf("VoxCPM added after startup = %q, %v; want %q, true", path, ok, command)
+	}
+}
+
 func TestVoxCPMAllocateNamesSingleAndBatch(t *testing.T) {
 	root, workspace := t.TempDir(), ""
 	workspace = filepath.Join(root, "agent-a")

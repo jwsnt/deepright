@@ -121,7 +121,7 @@ type rembgTaskManager struct {
 
 var (
 	rembgTasks          *rembgTaskManager
-	rembgLookPath       = exec.LookPath
+	rembgLookPath       = integrationCommandLookPath
 	rembgCommandContext = exec.CommandContext
 	rembgNow            = time.Now
 	rembgUserHomeDir    = os.UserHomeDir

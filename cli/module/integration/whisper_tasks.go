@@ -224,7 +224,7 @@ var (
 )
 
 var (
-	whisperTaskLookPath        = exec.LookPath
+	whisperTaskLookPath        = integrationCommandLookPath
 	whisperTaskCommandContext  = exec.CommandContext
 	whisperTaskNow             = time.Now
 	whisperTaskUserHomeDir     = os.UserHomeDir

@@ -998,6 +998,25 @@ LOG_PATH="/home/deepright/deepright/integration.log"
 PID_FILE="/home/deepright/deepright/integration.pid"
 WRAPPER_PATH="/home/deepright/start-deepright.sh"
 
+# Integration runs as root, while optional runtimes are commonly added to the
+# deepright user's interactive PATH. Load that PATH as deepright, never by
+# executing the user's shell configuration as root. This affects subsequent
+# service starts; dependency checks also discover managed CPython installs at
+# runtime so a completed install does not require a restart.
+DEEPRIGHT_HOME="/home/deepright"
+DEEPRIGHT_BASHRC="$DEEPRIGHT_HOME/.bashrc"
+if [ -r "$DEEPRIGHT_BASHRC" ]; then
+  DEEPRIGHT_PATH=""
+  if [ "$(id -u)" -eq 0 ] && command -v runuser >/dev/null 2>&1; then
+    DEEPRIGHT_PATH="$(runuser -u deepright -- env HOME="$DEEPRIGHT_HOME" /bin/bash --noprofile --norc -ic 'source "$HOME/.bashrc" >/dev/null 2>&1; printf "%s" "$PATH"' 2>/dev/null || true)"
+  elif [ "$(id -un)" = "deepright" ]; then
+    DEEPRIGHT_PATH="$(/bin/bash --noprofile --norc -ic 'source "$HOME/.bashrc" >/dev/null 2>&1; printf "%s" "$PATH"' 2>/dev/null || true)"
+  fi
+  if [ -n "$DEEPRIGHT_PATH" ]; then
+    export PATH="$DEEPRIGHT_PATH"
+  fi
+fi
+
 # start.bat invokes this wrapper as root. Minimal Ubuntu rootfs images may
 # not include sudo, and root does not need it. Keep the wrapper usable when
 # launched directly by the deepright user as well. The Windows launcher opens
