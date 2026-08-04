@@ -632,7 +632,7 @@ HTTP 关闭接口不是立即退出，而是通过 `integrationShutdownControlle
 - 出错会按 `--sleep` sleep + backoff
 - 队列满时按 `--sleep` 等待
 - 只要任一会话、备忘录、飞书或邮件 SSE 未终态，成功响应后立即继续心跳；无论是否拿到任务，都不等待执行或 `/cli/pub`
-- SSE 计数归零后，成功响应按 `config.json.get.await` 等待，减少待机轮询
+- SSE 计数归零后，启动首个无 cmd 成功响应按 `config.json.get.await` 等待；收到 cmd 后由独立原子 `get.check` 连续无 cmd 计数决定立即检查或等待，减少待机轮询
 
 ### 命令执行
 
@@ -1263,7 +1263,7 @@ bundle 双击启动时：
 - `config/config.json` 同时承担启动配置与运行时记录，旧版单独启动配置文件的描述已不符合当前实现。
 - 高频 cron `cycle = 3 / 4 / 5` 只在创建时铺 5 天窗口，后台不会继续补齐。
 - `delete-meta` 与部分 cleanup 流程可能留下 `started = 3` 的孤立 detail 历史记录。
-- `cli-get` 在 SSE 计数归零后的成功响应按 `config.json.get.await` 等待；有任一未终态 SSE 时保持快速轮询。
+- `cli-get` 使用 SSE 原子计数和独立的 cmd 检查原子计数共同调度：有任一未终态 SSE 时保持快速轮询；SSE 为零时按 `cmd -> get.check -> get.await` 决定下一次请求。
 - `runtime host` 与 `standalone` 覆盖都是纯内存状态，重启后丢失。
 - plugin 远程访问当前允许读取列表、状态、日志，不允许远程执行管理动作。
 - bundle 启动位置限制已经取消，但遗留文案函数仍在代码中保留。

@@ -39,7 +39,7 @@
 
 1. 主线程循环获取 Agent 元数据。
 2. 主线程调用 `/cli/get` 上报心跳。
-3. 若无任务，按 `config.json.get.await` 等待后进入下一次心跳。
+3. 若无任务，按原子 `get.check` 状态决定立即检查或等待 `config.json.get.await` 后进入下一次心跳。
 4. 若有任务，把任务投递到 worker 池。
 5. worker 决定走本地 Shell 还是 `CLI_SANDBOX`。
 6. worker 执行任务，得到结果后调用 `/cli/pub`。
@@ -282,7 +282,7 @@ agentcore.GetOutputWithPlugins(root, deviceID, ttl, pluginDir, pluginRuntimes)
 
 `Heartbeat` 失败时，主循环先按当前 `heartbeatBackoff` 等待，再把下一次等待值翻倍；默认 `--sleep=3000ms` 时，连续失败的等待序列为 `3s → 6s → 12s → 15s → 15s ...`。任意一次成功响应（包括服务端长轮询结束后返回“无任务”）都会将 `heartbeatBackoff` 重置为 `sleepDur`。
 
-成功的心跳会按 `config.json.get.await` 等待后再进入下一次请求；当前默认值是 `30000ms`。`Heartbeat` 返回 error 时仍使用 `sleepDur` 指数退避。
+启动后的首个成功无 cmd 响应会按 `config.json.get.await` 等待后再进入下一次请求。收到 cmd 后，连续无 cmd 成功响应由原子 `get.check` 状态计数，达到 `get.check` 前立即检查，达到后才等待；当前默认 `await=30000ms`、`check=10`。`Heartbeat` 返回 error 时仍使用 `sleepDur` 指数退避。
 
 退避范围必须区分：
 
@@ -616,7 +616,8 @@ CREATE INDEX IF NOT EXISTS idx_agent_message_log_agent_chat_type_time
 
 + 任意一次 `Heartbeat()` 成功：
     + 将心跳退避重置为 `sleepDur`
-    + 按 `config.json.get.await` 等待后发起下一次心跳
+    + 非空 cmd 原子重置连续无 cmd 计数并立即发起下一次心跳
+    + 无 cmd 时按 `get.check` 原子计数决定立即发起或按 `config.json.get.await` 等待
 
 + 任务投递后执行失败：
     + 不影响主线程后续心跳
@@ -675,7 +676,7 @@ CREATE INDEX IF NOT EXISTS idx_agent_message_log_agent_chat_type_time
 
 ## 已知约束
 
-+ 独立 `cli-get` 无法观察 Integration 进程内的 SSE 活跃状态，因此成功心跳始终按 `config.json.get.await` 等待。
++ 独立 `cli-get` 无法观察 Integration 进程内的 SSE 活跃状态，因此使用独立的原子 `cmd -> check -> await` 调度；它不读取或共享 Integration 的 SSE 状态。
 + 主模块核心逻辑仍集中在 `main.go`，尚未拆成独立 `core` 包。
 + `activeCmdMap` 是进程内内存状态，进程重启后不会恢复。
 + 若沙盒模式开启但 `CLI_SANDBOX` 部署缺失，任务会失败而不是自动降级。

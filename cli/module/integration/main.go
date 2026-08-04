@@ -3124,6 +3124,44 @@ func shouldSleepAfterHeartbeat(task *TaskContent, err error) bool {
 	return err != nil
 }
 
+// cliGetCommandCheck tracks consecutive successful cli/get responses without
+// a command after at least one command has been received. -1 means no command
+// has been observed since process start; zero means a command was just seen.
+// The single atomic state makes reset and increment visible atomically.
+type cliGetCommandCheck struct {
+	emptySinceCommand atomic.Int64
+}
+
+func newCliGetCommandCheck() cliGetCommandCheck {
+	state := cliGetCommandCheck{}
+	state.emptySinceCommand.Store(-1)
+	return state
+}
+
+func (state *cliGetCommandCheck) resetForCommand() {
+	state.emptySinceCommand.Store(0)
+}
+
+func (state *cliGetCommandCheck) shouldImmediatelyRetryWithoutSSE(hasCommand bool, check int) bool {
+	if hasCommand {
+		state.resetForCommand()
+		return true
+	}
+	for {
+		current := state.emptySinceCommand.Load()
+		if current < 0 || current >= int64(check) {
+			return false
+		}
+		if state.emptySinceCommand.CompareAndSwap(current, current+1) {
+			return current+1 < int64(check)
+		}
+	}
+}
+
+func taskHasExecutableCommand(task *TaskContent) bool {
+	return task != nil && strings.TrimSpace(task.Cmd) != ""
+}
+
 func integrationTaskUsesInternalRuntimePaths(task *TaskContent) bool {
 	if task == nil {
 		return false
@@ -3460,6 +3498,10 @@ func startCliGet(ctx context.Context, cfg *Config) {
 		log.Printf("cli-get: invalid get.await=%d", cfg.AwaitMs)
 		return
 	}
+	if cfg.Check <= 0 {
+		log.Printf("cli-get: invalid get.check=%d", cfg.Check)
+		return
+	}
 
 	agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
 	sleepDur := time.Duration(cfg.SleepMs) * time.Millisecond
@@ -3477,8 +3519,9 @@ func startCliGet(ctx context.Context, cfg *Config) {
 		go runCliGetPublishWorker(ctx, client, publishQueue, retryInterval, cfg.RetryTimes, cfg)
 	}
 
-	log.Printf("cli-get: started (host=%s, threads=%d, queue=%d, sleep=%dms, await=%dms, retry_interval=%dms, retry_times=%d)",
-		cfg.currentHost(), cfg.Thread, cfg.Queue, cfg.SleepMs, cfg.AwaitMs, cfg.RetryIntervalMs, cfg.RetryTimes)
+	log.Printf("cli-get: started (host=%s, threads=%d, queue=%d, sleep=%dms, await=%dms, check=%d, retry_interval=%dms, retry_times=%d)",
+		cfg.currentHost(), cfg.Thread, cfg.Queue, cfg.SleepMs, cfg.AwaitMs, cfg.Check, cfg.RetryIntervalMs, cfg.RetryTimes)
+	commandCheck := newCliGetCommandCheck()
 
 	go func() {
 		defer closeHTTPClientIdleConnections(client)
@@ -3526,6 +3569,18 @@ func startCliGet(ctx context.Context, cfg *Config) {
 				continue
 			}
 			heartbeatBackoff = sleepDur
+			hasCommand := taskHasExecutableCommand(task)
+			sseActive := integrationHasActiveSSE()
+			immediatelyRetryByCheck := false
+			if sseActive {
+				// SSE takes priority over the command check. A command still resets
+				// the atomic check state for when SSE activity later reaches zero.
+				if hasCommand {
+					commandCheck.resetForCommand()
+				}
+			} else {
+				immediatelyRetryByCheck = commandCheck.shouldImmediatelyRetryWithoutSSE(hasCommand, cfg.Check)
+			}
 			if task == nil {
 				recordHeartbeat(0, "") // success, no task
 			} else {
@@ -3541,9 +3596,12 @@ func startCliGet(ctx context.Context, cfg *Config) {
 					}
 				}
 			}
+			if sseActive || immediatelyRetryByCheck {
+				continue
+			}
 			// While any session, memo, Feishu, or mail SSE is in flight, retain
-			// immediate heartbeats. Idle Integration instances wait between
-			// successful cli/get requests to reduce standby polling.
+			// immediate heartbeats. When SSE is idle, the atomic command check
+			// decides whether this successful heartbeat can enter standby.
 			if !waitForCliGetHeartbeat(ctx, awaitDur) {
 				return
 			}
@@ -17611,6 +17669,7 @@ type Config struct {
 	// cli-get specific
 	SleepMs           int
 	AwaitMs           int
+	Check             int
 	Thread            int
 	Queue             int
 	RetryIntervalMs   int
@@ -17910,6 +17969,7 @@ func defaultIntegrationStartupOptions() integrationStartupOptions {
 			Reply:                     "",
 			SleepMs:                   3000,
 			AwaitMs:                   30000,
+			Check:                     10,
 			Thread:                    20,
 			Queue:                     1000,
 			RetryIntervalMs:           10000,
@@ -18324,6 +18384,11 @@ func applyIntegrationHeartbeatConfig(raw interface{}, cfg *Config) error {
 			return err
 		}
 	}
+	if value, ok := values["check"]; ok {
+		if err := assignIntegrationHeartbeatPositiveInteger(value, "get.check", &cfg.Check); err != nil {
+			return err
+		}
+	}
 	if cfg.SleepMs < 0 {
 		return fmt.Errorf("get.sleep must be >= 0")
 	}
@@ -18343,6 +18408,16 @@ func assignIntegrationHeartbeatMilliseconds(raw interface{}, name string, target
 		return fmt.Errorf("%s must be a non-negative integer", name)
 	}
 	*target = int(milliseconds)
+	return nil
+}
+
+func assignIntegrationHeartbeatPositiveInteger(raw interface{}, name string, target *int) error {
+	if err := assignIntegrationHeartbeatMilliseconds(raw, name, target); err != nil {
+		return err
+	}
+	if *target <= 0 {
+		return fmt.Errorf("%s must be a positive integer", name)
+	}
 	return nil
 }
 

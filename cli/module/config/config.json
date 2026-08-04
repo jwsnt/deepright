@@ -2,9 +2,13 @@
   "host": "https://www.deepright.cn",
   "version": "0.1",
   "port": 57896,
+  "page": {
+    "new_tab": 931
+  },
   "get": {
     "sleep": 15000,
-    "await": 30000
+    "await": 30000,
+    "check": 10
   },
   "skills": [
     "__internal_mcp",

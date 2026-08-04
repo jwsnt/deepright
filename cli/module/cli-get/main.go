@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	taskexec "cli-get/taskexec"
@@ -54,6 +55,7 @@ const (
 	defaultTaskTimeout            = 180 * time.Second
 	defaultCliGetSleepMs          = 3000
 	defaultCliGetAwaitMs          = 30000
+	defaultCliGetCheck            = 10
 	commandTimeoutMessage         = "[Warning: Command execution timed out.]"
 	commandTimeoutWarning         = "[Warning: Command execution timed out, the returned content may be incomplete.]"
 	sandboxModeFilePick           = "filepick"
@@ -1106,19 +1108,20 @@ func configuredHTTPDebug() bool {
 	return configuredHTTPDebugFromRaw(readCliGetConfigRaw())
 }
 
-// configuredHeartbeatIntervalsFromRaw reads the idle heartbeat interval from
-// config.json. Command-line --sleep remains an explicit override for sleep;
-// await is deliberately configuration-only because it controls idle polling.
-func configuredHeartbeatIntervalsFromRaw(raw map[string]interface{}) (sleepMs, awaitMs int) {
+// configuredHeartbeatSettingsFromRaw reads heartbeat timing from config.json.
+// Command-line --sleep remains an explicit override for sleep; await and check
+// are deliberately configuration-only because they control idle polling.
+func configuredHeartbeatSettingsFromRaw(raw map[string]interface{}) (sleepMs, awaitMs, check int) {
 	sleepMs = defaultCliGetSleepMs
 	awaitMs = defaultCliGetAwaitMs
+	check = defaultCliGetCheck
 	getRaw, ok := raw["get"]
 	if !ok || getRaw == nil {
-		return sleepMs, awaitMs
+		return sleepMs, awaitMs, check
 	}
 	getConfig, ok := getRaw.(map[string]interface{})
 	if !ok || getConfig == nil {
-		return sleepMs, awaitMs
+		return sleepMs, awaitMs, check
 	}
 	if value, ok := cliGetConfigMilliseconds(getConfig["sleep"]); ok {
 		sleepMs = value
@@ -1126,7 +1129,10 @@ func configuredHeartbeatIntervalsFromRaw(raw map[string]interface{}) (sleepMs, a
 	if value, ok := cliGetConfigMilliseconds(getConfig["await"]); ok {
 		awaitMs = value
 	}
-	return sleepMs, awaitMs
+	if value, ok := cliGetConfigPositiveInteger(getConfig["check"]); ok {
+		check = value
+	}
+	return sleepMs, awaitMs, check
 }
 
 func cliGetConfigMilliseconds(raw interface{}) (int, bool) {
@@ -1139,6 +1145,45 @@ func cliGetConfigMilliseconds(raw interface{}) (int, bool) {
 		return 0, false
 	}
 	return int(milliseconds), true
+}
+
+func cliGetConfigPositiveInteger(raw interface{}) (int, bool) {
+	value, ok := cliGetConfigMilliseconds(raw)
+	return value, ok && value > 0
+}
+
+// cliGetCommandCheck tracks consecutive successful cli/get responses without
+// a command after at least one command has been received. -1 means no command
+// has been observed since process start; zero means a command was just seen.
+// The single atomic state makes reset and increment visible atomically.
+type cliGetCommandCheck struct {
+	emptySinceCommand atomic.Int64
+}
+
+func newCliGetCommandCheck() cliGetCommandCheck {
+	state := cliGetCommandCheck{}
+	state.emptySinceCommand.Store(-1)
+	return state
+}
+
+func (state *cliGetCommandCheck) shouldImmediatelyRetry(hasCommand bool, check int) bool {
+	if hasCommand {
+		state.emptySinceCommand.Store(0)
+		return true
+	}
+	for {
+		current := state.emptySinceCommand.Load()
+		if current < 0 || current >= int64(check) {
+			return false
+		}
+		if state.emptySinceCommand.CompareAndSwap(current, current+1) {
+			return current+1 < int64(check)
+		}
+	}
+}
+
+func taskHasExecutableCommand(task *TaskContent) bool {
+	return task != nil && strings.TrimSpace(task.Cmd) != ""
 }
 
 func cliGetDebugPrintf(enabled bool, format string, args ...interface{}) {
@@ -1419,6 +1464,7 @@ type Config struct {
 	AgentCacheMs      int
 	SleepMs           int
 	AwaitMs           int
+	Check             int
 	Thread            int
 	Queue             int
 	RetryIntervalMs   int
@@ -1462,11 +1508,12 @@ func main() {
 		os.Exit(1)
 	}
 	startupConfig := readCliGetConfigRaw()
-	configuredSleepMs, configuredAwaitMs := configuredHeartbeatIntervalsFromRaw(startupConfig)
+	configuredSleepMs, configuredAwaitMs, configuredCheck := configuredHeartbeatSettingsFromRaw(startupConfig)
 	if !sleepProvided {
 		cfg.SleepMs = configuredSleepMs
 	}
 	cfg.AwaitMs = configuredAwaitMs
+	cfg.Check = configuredCheck
 	if strings.TrimSpace(cfg.SandboxApp) == "" {
 		cfg.SandboxApp = configuredSandboxAppFromRaw(startupConfig)
 	}
@@ -1508,6 +1555,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, "error: config get.await must be >= 0")
 		os.Exit(1)
 	}
+	if cfg.Check <= 0 {
+		fmt.Fprintln(os.Stderr, "error: config get.check must be greater than 0")
+		os.Exit(1)
+	}
 
 	agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
 	sleepDur := time.Duration(cfg.SleepMs) * time.Millisecond
@@ -1523,8 +1574,9 @@ func main() {
 		go runPublishWorker(client, cfg.Host, publishQueue, retryInterval, cfg.RetryTimes)
 	}
 
-	fmt.Printf("cli-get started: host=%s, agent-dir=%s, threads=%d, queue=%d, sleep=%dms, await=%dms, retry_interval=%dms, retry_times=%d, sandbox_app=%s\n",
-		cfg.Host, cfg.AgentDir, cfg.Thread, cfg.Queue, cfg.SleepMs, cfg.AwaitMs, cfg.RetryIntervalMs, cfg.RetryTimes, cfg.SandboxApp)
+	fmt.Printf("cli-get started: host=%s, agent-dir=%s, threads=%d, queue=%d, sleep=%dms, await=%dms, check=%d, retry_interval=%dms, retry_times=%d, sandbox_app=%s\n",
+		cfg.Host, cfg.AgentDir, cfg.Thread, cfg.Queue, cfg.SleepMs, cfg.AwaitMs, cfg.Check, cfg.RetryIntervalMs, cfg.RetryTimes, cfg.SandboxApp)
+	commandCheck := newCliGetCommandCheck()
 
 	// Master heartbeat loop
 	for {
@@ -1549,18 +1601,18 @@ func main() {
 		}
 		heartbeatBackoff = sleepDur
 
-		if task == nil {
-			// A standalone cli-get has no in-process SSE activity to observe, so
-			// successful idle heartbeats use the configured standby interval.
-			time.Sleep(awaitDur)
+		hasCommand := taskHasExecutableCommand(task)
+		immediatelyRetry := commandCheck.shouldImmediatelyRetry(hasCommand, cfg.Check)
+		if task != nil {
+			// Dispatch tasks to the worker queue without waiting for execution or
+			// publication. Only command presence affects heartbeat scheduling.
+			t := *task
+			taskQueue <- queuedTask{task: t, metadata: metadata}
+			cliGetDebugPrintf(cfg.HTTPDebug, "cli-get: task queued tid=%s pending=%d capacity=%d\n", strings.TrimSpace(t.Tid), len(taskQueue), cap(taskQueue))
+		}
+		if immediatelyRetry {
 			continue
 		}
-
-		// Dispatch task to worker pool. Standalone cli-get has no local SSE
-		// activity, so it uses the configured standby interval before polling again.
-		t := *task
-		taskQueue <- queuedTask{task: t, metadata: metadata}
-		cliGetDebugPrintf(cfg.HTTPDebug, "cli-get: task queued tid=%s pending=%d capacity=%d\n", strings.TrimSpace(t.Tid), len(taskQueue), cap(taskQueue))
 		time.Sleep(awaitDur)
 	}
 }

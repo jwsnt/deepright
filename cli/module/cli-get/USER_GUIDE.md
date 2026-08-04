@@ -113,7 +113,7 @@ go build -o cli-get .
 7. 如果 `/cli/pub` 返回明确错误、超时、HTTP 非 `200`、或响应解析失败，会按 `--retry_interval` 与 `--retry_times` 重试
 8. 如果心跳请求本身失败、HTTP 非 200，或响应解析异常，则按指数退避等待后重试
 
-成功响应后的待机间隔由 `config.json` 的 `get.await` 控制，当前值为 `30000` 毫秒。
+成功响应后的待机调度由 `config.json.get` 控制：`get.await=30000` 毫秒、`get.check=10`。启动后的首个无 cmd 响应直接等待 `await`；收到 cmd 后，连续无 cmd 成功响应在达到 `check` 前会立即继续拉取，达到 `check` 后才等待 `await`。任一新的 cmd 会原子重置该连续计数。
 
 ## 本地队列与重试
 

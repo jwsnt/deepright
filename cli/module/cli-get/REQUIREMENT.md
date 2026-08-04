@@ -51,6 +51,24 @@ curl --location 'http://xxx/cli/get' \
 + 连接超时从命令行参数--http_connect_timeout获取，默认15000毫秒
 + 读取超时从命令行参数--http_socket_timeout获取，默认45000毫秒
 
+###### 心跳调度配置
++ `config/config.json.get` 包含：
+``` JSON
+{
+  "sleep": 15000,
+  "await": 30000,
+  "check": 10
+}
+```
++ `sleep`、`await` 为非负毫秒整数；`check` 为正整数。
++ 显式 `--sleep` 优先于 `config.json.get.sleep`；未传入时使用配置值。`await`、`check` 不新增命令行参数。
++ 进程启动后必须立即发起一次 `/cli/get`。成功响应调度使用一个进程内原子“连续无 cmd”状态：
+    + 初始状态尚未收到过非空 `cmd`；首个成功无 cmd 响应后等待 `await`。
+    + 收到非空 `cmd` 时原子重置连续无 cmd 计数并立即继续下一次 `/cli/get`，不等待执行或 `/cli/pub`。
+    + 收到过 cmd 后，连续成功无 cmd 响应原子计数；小于 `check` 时立即继续，达到 `check` 时等待 `await`。
+    + 快速检查期间再次收到非空 `cmd` 时原子重置计数。
++ `/cli/get` 失败、任务队列满及 `/cli/pub` 重试保持各自既有 `sleep` / 重试语义，不适用 `await` 或 `check`。
+
 ###### 心跳响应
 + 心跳响应可能包含一个需要执行的任务，也可能为空
 ``` 响应报文案例
@@ -264,8 +282,8 @@ curl --location 'http://127.0.0.1:9998/cli/pub' \
 ### 编写代码
 + 以Golang编写以上代码，要求：
     + 启动一根master线程上报cli/get，如果有待执行任务则交由命令行参数--thread指定的work线程池执行（默认为20）
-    + 如果cli/get没有待执行任务或任何异常，则休眠由命令行参数--sleep指定的毫秒时间（默认为3000）
-    + 如果cli/get返回待执行任务，转交对应work线程后立即进入下一次心跳上报
+    + 成功心跳后的调度遵循“心跳调度配置”中的 `await` 与 `check` 规则；异常仍按 `sleep` 指数退避
+    + 如果cli/get返回待执行任务，转交对应work线程后不等待执行或 `/cli/pub`；是否立即进入下一次心跳由 `check` 状态决定
     + 代码简洁，包体积越小越好，能用开源包的就用开源包
 + 作为其他模块可以调用的子模块和可独立运行的CLI命令来编写
 + 命令执行前注册到全局活跃命令列表，执行完成后注销，确保/api/kill可查询到正在执行的命令 > 引用自 ./iteration/20260501-1/REQUIREMENT.md

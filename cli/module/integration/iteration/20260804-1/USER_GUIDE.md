@@ -12,7 +12,8 @@ Integration 内置 `cli-get` 现在会根据整个 Integration 进程的 SSE 活
 {
   "get": {
     "sleep": 15000,
-    "await": 30000
+    "await": 30000,
+    "check": 10
   }
 }
 ```
@@ -21,10 +22,12 @@ Integration 内置 `cli-get` 现在会根据整个 Integration 进程的 SSE 活
 | --- | --- | --- |
 | `get.sleep` | 毫秒 | 心跳失败退避的基数，以及本地任务队列满时的等待时间 |
 | `get.await` | 毫秒 | 没有任何未终态 SSE 时，成功 `/cli/get` 后的待机间隔 |
+| `get.check` | 次数 | 收到 cmd 后重新进入待机前允许的连续无 cmd 快速检查次数 |
 
 - 两个值必须是非负整数。
 - `--sleep` 显式传入时优先于 `get.sleep`；不传时读取 `get.sleep`。
 - `get.await` 没有命令行参数，仅从配置读取。
+- `get.check` 没有命令行参数，仅从配置读取，且必须为正整数。
 
 ## SSE 活跃范围
 
@@ -41,7 +44,9 @@ Integration 在进程内维护一个原子 SSE 计数，覆盖：
 | 条件 | `/cli/get` 成功且有任务 | `/cli/get` 成功但无任务 |
 | --- | --- | --- |
 | 任一 SSE 未终态 | 任务入 `taskQueue` 后立即继续下一轮；不等执行或 `/cli/pub` | 立即继续下一轮 |
-| SSE 计数为零 | 任务入队后等待 `get.await` | 等待 `get.await` |
+| SSE 计数为零，响应有 cmd | 任务入队后原子重置连续无 cmd 计数并立即继续 | 不适用 |
+| SSE 计数为零，启动后从未收到 cmd | 不适用 | 等待 `get.await` |
+| SSE 计数为零，收到过 cmd 后响应无 cmd | 不适用 | 连续无 cmd 计数小于 `get.check` 时立即继续；达到 `get.check` 时等待 `get.await` |
 
 以下原有行为不变：
 
@@ -51,10 +56,12 @@ Integration 在进程内维护一个原子 SSE 计数，覆盖：
 
 ## 立即唤醒
 
-若 cli-get 正在等待 `get.await`，此时任一 SSE 请求开始，SSE 计数从零变为正数：
+SSE 原子计数与连续无 cmd 原子计数独立维护，但共同决定下一次请求；SSE 计数大于零始终优先立即请求。若 cli-get 正在等待 `get.await`，此时任一 SSE 请求开始，SSE 计数从零变为正数：
 
 1. 当前 `await` 等待立即被中断；
 2. cli-get 立即进入下一次 `/cli/get` 上报；
 3. 不等待原先的 `await` 计时结束。
+
+收到非空 cmd 会原子归零连续无 cmd 计数；快速检查期间任一次新的 cmd 也会重新归零该计数。
 
 这确保用户正在接收流式响应时，任务拉取仍与此前一样及时；仅在完全待机时降低访问频次。

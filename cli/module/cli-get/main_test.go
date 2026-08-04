@@ -1147,10 +1147,11 @@ func TestConfiguredHTTPDebugFromNestedConfig(t *testing.T) {
 }
 
 func TestConfiguredHeartbeatIntervalsFromNestedConfig(t *testing.T) {
-	sleepMs, awaitMs := configuredHeartbeatIntervalsFromRaw(map[string]interface{}{
+	sleepMs, awaitMs, check := configuredHeartbeatSettingsFromRaw(map[string]interface{}{
 		"get": map[string]interface{}{
 			"sleep": json.Number("15000"),
 			"await": json.Number("30000"),
+			"check": json.Number("10"),
 		},
 	})
 	if sleepMs != 15000 {
@@ -1159,10 +1160,13 @@ func TestConfiguredHeartbeatIntervalsFromNestedConfig(t *testing.T) {
 	if awaitMs != 30000 {
 		t.Fatalf("await = %d, want 30000", awaitMs)
 	}
+	if check != 10 {
+		t.Fatalf("check = %d, want 10", check)
+	}
 }
 
 func TestConfiguredHeartbeatIntervalsRejectFractionalValues(t *testing.T) {
-	sleepMs, awaitMs := configuredHeartbeatIntervalsFromRaw(map[string]interface{}{
+	sleepMs, awaitMs, check := configuredHeartbeatSettingsFromRaw(map[string]interface{}{
 		"get": map[string]interface{}{
 			"sleep": json.Number("1.5"),
 			"await": json.Number("30000.5"),
@@ -1173,6 +1177,30 @@ func TestConfiguredHeartbeatIntervalsRejectFractionalValues(t *testing.T) {
 	}
 	if awaitMs != defaultCliGetAwaitMs {
 		t.Fatalf("await = %d, want default %d", awaitMs, defaultCliGetAwaitMs)
+	}
+	if check != defaultCliGetCheck {
+		t.Fatalf("check = %d, want default %d", check, defaultCliGetCheck)
+	}
+}
+
+func TestCliGetCommandCheckStartsIdleThenChecksAfterCommand(t *testing.T) {
+	state := newCliGetCommandCheck()
+	if state.shouldImmediatelyRetry(false, 10) {
+		t.Fatal("first empty response before any command should enter await")
+	}
+	if !state.shouldImmediatelyRetry(true, 10) {
+		t.Fatal("command response should immediately retry")
+	}
+	for count := 1; count < 10; count++ {
+		if !state.shouldImmediatelyRetry(false, 10) {
+			t.Fatalf("empty response %d should immediately retry", count)
+		}
+	}
+	if state.shouldImmediatelyRetry(false, 10) {
+		t.Fatal("tenth consecutive empty response should enter await")
+	}
+	if !state.shouldImmediatelyRetry(true, 10) {
+		t.Fatal("a new command should atomically reset the empty-response count")
 	}
 }
 

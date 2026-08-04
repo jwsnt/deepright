@@ -19,14 +19,16 @@
     {
       "get": {
         "sleep": 15000,
-        "await": 30000
+        "await": 30000,
+        "check": 10
       }
     }
     ```
     + 单位均为毫秒。
     + `get.sleep` 是 cli-get 心跳失败、Agent 扫描失败或本地任务队列满时的等待基数。
     + `get.await` 是 Integration 没有任何未终态 SSE 时，成功 `/cli/get` 响应后的待机间隔。
-    + `get.sleep` 与 `get.await` 必须是非负整数；配置缺失时保持现有兼容默认值，其中 `await` 默认 `30000`。
+    + `get.check` 是在收到过需执行 `cmd` 后、重新进入待机前允许连续快速检查的“无 cmd 成功响应”次数。
+    + `get.sleep` 与 `get.await` 必须是非负整数；`get.check` 必须是正整数。配置缺失时保持现有兼容默认值，其中 `await` 默认 `30000`、`check` 默认 `10`。
     + 命令行显式传入 `--sleep` 时必须优先于 `config.json.get.sleep`；未传入时使用 `config.json.get.sleep`。
     + 不新增 `--await` 命令行参数，`await` 仅由 `config.json.get.await` 配置。
 
@@ -43,7 +45,13 @@
         + `/cli/get` 返回无任务时，立即发起下一次 `/cli/get`。
         + 不等待任务执行、`/cli/pub`、`get.await` 或 SSE 结束。
     + 若 SSE 原子计数等于零：
-        + `/cli/get` 成功返回任务或无任务后，都必须等待 `get.await`，再开始下一次 `/cli/get`。
+        + 若本次响应包含非空 `cmd`，必须原子重置连续无 cmd 计数，并立即进行下一次 `/cli/get`；不等待任务执行或 `/cli/pub`。
+        + 若进程启动以来尚未收到过需执行 `cmd`，本次成功响应无 `cmd` 后直接等待 `get.await`。
+        + 若此前已收到过需执行 `cmd`，每次成功响应无 `cmd` 都必须原子递增连续无 cmd 计数；计数小于 `get.check` 时立即进行下一次 `/cli/get`，计数达到 `get.check` 时才等待 `get.await`。
+        + 快速检查期间任一次响应再次包含非空 `cmd` 时，必须原子重置连续无 cmd 计数，并重新开始快速检查周期。
+    + SSE 原子计数与连续无 cmd 计数必须独立维护、共同决策：
+        + SSE 原子计数大于零时始终立即请求，连续无 cmd 计数不得使其等待。
+        + SSE 原子计数等于零时，才允许连续无 cmd 计数决定立即请求或 `await`。
     + 当 cli-get 正在等待 `get.await` 时，只要 SSE 计数从零变为正数：
         + 必须立即中断本次等待。
         + 必须立即进入下一次 `/cli/get` 上报，不得等待当前 `await` 计时结束。
@@ -58,6 +66,7 @@
     + 覆盖无 SSE 时成功心跳等待 `get.await`。
     + 覆盖等待 `get.await` 期间创建 SSE 会立即唤醒心跳。
     + 覆盖 SSE 活跃时，有任务和无任务两种成功响应都不会等待 `get.await`。
+    + 覆盖启动后的首个无 cmd 响应直接进入 `await`、收到 cmd 后的连续空响应快速检查、达到 `get.check` 后进入 `await`，以及新 cmd 原子重置计数。
     + 覆盖心跳失败、队列满和 `/cli/pub` 重试仍使用既有策略。
 
 ### 编写代码

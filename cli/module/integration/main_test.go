@@ -9103,6 +9103,7 @@ func TestApplyIntegrationStartupConfigUsesNestedGetIntervals(t *testing.T) {
 		"get": map[string]interface{}{
 			"sleep": json.Number("15000"),
 			"await": json.Number("30000"),
+			"check": json.Number("10"),
 		},
 	}); err != nil {
 		t.Fatalf("applyIntegrationStartupConfig: %v", err)
@@ -9112,6 +9113,9 @@ func TestApplyIntegrationStartupConfigUsesNestedGetIntervals(t *testing.T) {
 	}
 	if opts.Config.AwaitMs != 30000 {
 		t.Fatalf("AwaitMs = %d, want 30000", opts.Config.AwaitMs)
+	}
+	if opts.Config.Check != 10 {
+		t.Fatalf("Check = %d, want 10", opts.Config.Check)
 	}
 }
 
@@ -9124,6 +9128,27 @@ func TestApplyIntegrationStartupConfigRejectsFractionalGetIntervals(t *testing.T
 	})
 	if err == nil {
 		t.Fatal("expected fractional get.sleep to be rejected")
+	}
+}
+
+func TestIntegrationCliGetCommandCheckStartsIdleThenChecksAfterCommand(t *testing.T) {
+	state := newCliGetCommandCheck()
+	if state.shouldImmediatelyRetryWithoutSSE(false, 10) {
+		t.Fatal("first empty response before any command should enter await")
+	}
+	if !state.shouldImmediatelyRetryWithoutSSE(true, 10) {
+		t.Fatal("command response should immediately retry")
+	}
+	for count := 1; count < 10; count++ {
+		if !state.shouldImmediatelyRetryWithoutSSE(false, 10) {
+			t.Fatalf("empty response %d should immediately retry", count)
+		}
+	}
+	if state.shouldImmediatelyRetryWithoutSSE(false, 10) {
+		t.Fatal("tenth consecutive empty response should enter await")
+	}
+	if !state.shouldImmediatelyRetryWithoutSSE(true, 10) {
+		t.Fatal("a new command should atomically reset the empty-response count")
 	}
 }
 

@@ -1861,7 +1861,7 @@ Integration 与 proxy 保持一致，统一提供模型密钥读写接口。
   - `cli/get -> taskQueue -> execute workers -> publishQueue -> cli/pub`
 - 心跳线程不会因为执行 Worker 正忙而阻塞；只有当本地 `taskQueue` 已满时，才会暂停发新的 `/cli/get`
 - 有任一会话、备忘录、飞书或邮件 SSE 未终态时，成功的 `/cli/get` 会立即进行下一轮；任务只入队，不等待执行或 `/cli/pub`
-- 所有 SSE 终态后，成功的 `/cli/get` 按 `config.json.get.await`（当前 `30000ms`）等待下一轮，以降低待机访问频次
+- 所有 SSE 终态后，启动后的首个无 cmd 成功响应按 `config.json.get.await`（当前 `30000ms`）等待下一轮；收到 cmd 后会进行最多 `config.json.get.check`（当前 `10`）次连续无 cmd 快速检查，达到该次数才等待 `await`。新的 cmd 会原子重置连续计数
 - 本地 `taskQueue` 是纯内存队列，不做持久化恢复
 - 执行 Worker 在真正执行前会重新检查任务 `ddl`
 - 如果当前时间已超过 `ddl`：

@@ -831,6 +831,19 @@
 + 配置写入必须保留无关字段和既有 `http` 配置，并通过原子文件替换落盘。写入失败时当前服务地址不得改变，接口返回可展示的失败信息。
 + `integration host get`、`set`、`reset` 与接口共用持久化语义；CLI 的说明与 JSON 输出不得再声明仅运行时、启动值或覆盖状态。
 
+### CLI-Get SSE 与待机调度
+> 新增自 ./iteration/20260804-1/REQUIREMENT.md
++ `config/config.json.get` 统一提供 `sleep`、`await`、`check`：
+    + `sleep`、`await` 为非负毫秒整数，`check` 为正整数。
+    + 显式 `--sleep` 覆盖 `get.sleep`；`await` 与 `check` 仅从配置读取。
++ Integration 必须维护进程级、跨平台的 SSE 原子活跃计数，覆盖普通会话、备忘录、飞书、邮件及其他实际向上游发起的 SSE；请求发起前加一，完成、异常、取消、超时或连接失败后幂等减一。
++ Integration 内置 cli-get 使用两个独立的原子计数共同决定成功心跳后的下一次请求：
+    + SSE 活跃计数大于零是最高优先级：无论当前响应有无 cmd，均立即继续 `/cli/get`。
+    + SSE 活跃计数为零时，非空 cmd 原子重置连续无 cmd 计数并立即继续；收到过 cmd 后，连续无 cmd 成功响应小于 `get.check` 时立即继续，达到 `get.check` 时等待 `get.await`。
+    + 进程启动且尚未收到 cmd 时，首个成功无 cmd 响应直接等待 `get.await`。
+    + 等待 `get.await` 期间新 SSE 开始时，必须立即中断等待并开始下一次 `/cli/get`。
++ `/cli/get` 失败仍按 `sleep` 指数退避；任务队列满仍按 `sleep` 等待；任务只入队，不等待执行或 `/cli/pub`。
+
 ### 撰写手册
 + 编写USER_GUIDE.md
 
