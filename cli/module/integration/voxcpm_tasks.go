@@ -41,6 +41,7 @@ const (
 	// intentionally point at the publisher's namespace rather than a proxy.
 	voxcpmDefaultModelScopeFilesURL     = "https://modelscope.cn/api/v1/models/OpenBMB/VoxCPM2/repo/files?Revision=master&Root="
 	voxcpmDefaultModelScopeResolveBase  = "https://modelscope.cn/models/OpenBMB/VoxCPM2/resolve/master/"
+	voxcpmDefaultHuggingFaceFilesURL    = "https://huggingface.co/api/models/openbmb/VoxCPM2/tree/main?recursive=true&expand=false"
 	voxcpmDefaultHuggingFaceResolveBase = "https://huggingface.co/openbmb/VoxCPM2/resolve/main/"
 	voxcpmModelHeaderTimeout            = 30 * time.Second
 	voxcpmModelIdleTimeout              = 90 * time.Second
@@ -186,6 +187,7 @@ var (
 	voxcpmModelMirrorMu          sync.Mutex
 	voxcpmModelScopeFilesURL     = voxcpmDefaultModelScopeFilesURL
 	voxcpmModelScopeResolveBase  = voxcpmDefaultModelScopeResolveBase
+	voxcpmHuggingFaceFilesURL    = voxcpmDefaultHuggingFaceFilesURL
 	voxcpmHuggingFaceResolveBase = voxcpmDefaultHuggingFaceResolveBase
 	// Kept injectable so task-flow tests can use a tiny local snapshot instead
 	// of downloading the real multi-gigabyte model.
@@ -875,6 +877,26 @@ type voxcpmModelScopeFilesResponse struct {
 	} `json:"Data"`
 }
 
+type voxcpmHuggingFaceTreeFile struct {
+	Type string `json:"type"`
+	Path string `json:"path"`
+	Size int64  `json:"size"`
+	LFS  struct {
+		OID  string `json:"oid"`
+		Size int64  `json:"size"`
+	} `json:"lfs"`
+}
+
+type voxcpmModelBackupFile struct {
+	Path   string
+	SHA256 string
+	Size   int64
+}
+
+type voxcpmModelBackupManifestResolver struct {
+	files map[string]voxcpmModelBackupFile
+}
+
 func voxcpmModelMirrorCacheRoot() (string, error) {
 	if configured := strings.TrimSpace(os.Getenv("DEEPRIGHT_VOXCPM_MODEL_CACHE")); configured != "" {
 		return configured, nil
@@ -917,6 +939,9 @@ func voxcpmModelScopeManifest(ctx context.Context) ([]voxcpmModelScopeFile, erro
 		if strings.ToLower(strings.TrimSpace(file.Type)) != "blob" {
 			continue
 		}
+		if !voxcpmModelRuntimePath(file.Path) {
+			continue
+		}
 		if !voxcpmModelRelativePath(file.Path) || file.Size < 0 || len(strings.TrimSpace(file.SHA256)) != 64 {
 			return nil, errors.New("ModelScope 返回了无效的 VoxCPM2 模型清单")
 		}
@@ -931,6 +956,70 @@ func voxcpmModelScopeManifest(ctx context.Context) ([]voxcpmModelScopeFile, erro
 	return files, nil
 }
 
+func voxcpmHuggingFaceManifest(ctx context.Context) (map[string]voxcpmModelBackupFile, error) {
+	manifestCtx, cancel := context.WithTimeout(ctx, voxcpmModelHeaderTimeout)
+	defer cancel()
+	request, err := http.NewRequestWithContext(manifestCtx, http.MethodGet, voxcpmHuggingFaceFilesURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("无法创建Hugging Face清单请求: %w", err)
+	}
+	response, err := voxcpmHTTPClient.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("请求Hugging Face清单失败: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("Hugging Face清单返回HTTP %d", response.StatusCode)
+	}
+	var entries []voxcpmHuggingFaceTreeFile
+	if err := json.NewDecoder(response.Body).Decode(&entries); err != nil {
+		return nil, fmt.Errorf("读取Hugging Face清单失败: %w", err)
+	}
+	files := make(map[string]voxcpmModelBackupFile, len(entries))
+	for _, entry := range entries {
+		if strings.ToLower(strings.TrimSpace(entry.Type)) != "file" || !voxcpmModelRuntimePath(entry.Path) {
+			continue
+		}
+		path := filepath.ToSlash(entry.Path)
+		if !voxcpmModelRelativePath(path) || entry.Size < 0 {
+			return nil, errors.New("Hugging Face返回了无效的VoxCPM2模型清单")
+		}
+		size := entry.Size
+		if entry.LFS.Size > 0 {
+			size = entry.LFS.Size
+		}
+		file := voxcpmModelBackupFile{Path: path, Size: size}
+		if hash := strings.ToLower(strings.TrimSpace(entry.LFS.OID)); len(hash) == 64 {
+			file.SHA256 = hash
+		}
+		files[path] = file
+	}
+	if len(files) == 0 || files["config.json"].Path == "" || files["model.safetensors"].Path == "" || files["audiovae.pth"].Path == "" {
+		return nil, errors.New("Hugging Face VoxCPM2清单缺少必要模型文件")
+	}
+	return files, nil
+}
+
+func (resolver *voxcpmModelBackupManifestResolver) metadata(ctx context.Context, path string) (modelDownloadSourceMetadata, error) {
+	if resolver.files == nil {
+		files, err := voxcpmHuggingFaceManifest(ctx)
+		if err != nil {
+			return modelDownloadSourceMetadata{}, err
+		}
+		resolver.files = files
+	}
+	file, ok := resolver.files[filepath.ToSlash(path)]
+	if !ok {
+		return modelDownloadSourceMetadata{}, fmt.Errorf("Hugging Face清单未包含运行时文件%s", path)
+	}
+	return modelDownloadSourceMetadata{
+		SourceID:     "huggingface:openbmb/VoxCPM2",
+		Revision:     "main",
+		ArtifactPath: file.Path,
+		ExpectedSize: file.Size,
+	}, nil
+}
+
 func voxcpmModelRelativePath(raw string) bool {
 	path := filepath.ToSlash(strings.TrimSpace(raw))
 	if path == "" || strings.HasPrefix(path, "/") || strings.Contains(path, "\x00") {
@@ -940,6 +1029,15 @@ func voxcpmModelRelativePath(raw string) bool {
 		if part == "" || part == "." || part == ".." {
 			return false
 		}
+	}
+	return true
+}
+
+func voxcpmModelRuntimePath(raw string) bool {
+	path := filepath.ToSlash(strings.TrimSpace(raw))
+	base := strings.ToLower(filepath.Base(path))
+	if base == ".gitattributes" || base == ".gitignore" || strings.HasPrefix(base, "readme") || strings.HasPrefix(base, "license") || strings.HasPrefix(base, "model_card") {
+		return false
 	}
 	return true
 }
@@ -1022,9 +1120,10 @@ func (m *voxcpmTaskManager) downloadVoxCPM2FromModelScope(ctx context.Context, t
 	if err := os.MkdirAll(staging, 0o755); err != nil {
 		return "", fmt.Errorf("无法创建 VoxCPM2 模型临时目录: %w", err)
 	}
+	backupManifest := &voxcpmModelBackupManifestResolver{}
 	for index, file := range files {
 		m.appendLog(taskID, fmt.Sprintf("正在从 ModelScope 下载模型文件（%d/%d）：%s；下载源：%s；最终目标绝对路径：%s", index+1, len(files), file.Path, voxcpmModelScopeFileURL(file.Path), taskLogAbsolutePath(filepath.Join(destination, filepath.FromSlash(file.Path)))))
-		if err := m.downloadVoxCPM2ModelFile(ctx, taskID, staging, file); err != nil {
+		if err := m.downloadVoxCPM2ModelFile(ctx, taskID, staging, file, backupManifest); err != nil {
 			return "", err
 		}
 	}
@@ -1037,22 +1136,34 @@ func (m *voxcpmTaskManager) downloadVoxCPM2FromModelScope(ctx context.Context, t
 	return destination, nil
 }
 
-func (m *voxcpmTaskManager) downloadVoxCPM2ModelFile(ctx context.Context, taskID int64, directory string, file voxcpmModelScopeFile) error {
+func (m *voxcpmTaskManager) downloadVoxCPM2ModelFile(ctx context.Context, taskID int64, directory string, file voxcpmModelScopeFile, backupManifest *voxcpmModelBackupManifestResolver) error {
 	target := filepath.Join(directory, filepath.FromSlash(file.Path))
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return fmt.Errorf("无法创建模型文件目录: %w", err)
 	}
 	temporaryPath := target + ".deepright.part"
 	lastProgress := int64(-1)
-	_, err := downloadModelWithFallback(ctx, resumableModelDownloadConfig{
-		Client:       voxcpmHTTPClient,
-		URL:          voxcpmModelScopeFileURL(file.Path),
-		BackupURL:    voxcpmModelBackupFileURL(file.Path),
-		PartPath:     temporaryPath,
-		ExpectedSize: file.Size,
-		IdleTimeout:  modelTaskDownloadReadTimeout(m.cfg),
-		Workers:      modelTaskDownloadWorkers(m.cfg),
-		Retries:      modelTaskDownloadRetries(m.cfg),
+	result, err := downloadModelWithFallback(ctx, resumableModelDownloadConfig{
+		Client:             voxcpmHTTPClient,
+		URL:                voxcpmModelScopeFileURL(file.Path),
+		BackupURL:          voxcpmModelBackupFileURL(file.Path),
+		PartPath:           temporaryPath,
+		ExpectedSize:       file.Size,
+		SourceID:           "modelscope:OpenBMB/VoxCPM2",
+		Revision:           "master",
+		ArtifactPath:       file.Path,
+		BackupSourceID:     "huggingface:openbmb/VoxCPM2",
+		BackupRevision:     "main",
+		BackupArtifactPath: file.Path,
+		PrepareBackup: func(ctx context.Context) (modelDownloadSourceMetadata, error) {
+			if backupManifest == nil {
+				return modelDownloadSourceMetadata{}, errors.New("Hugging Face 模型清单解析器不可用")
+			}
+			return backupManifest.metadata(ctx, file.Path)
+		},
+		IdleTimeout: modelTaskDownloadReadTimeout(m.cfg),
+		Workers:     modelTaskDownloadWorkers(m.cfg),
+		Retries:     modelTaskDownloadRetries(m.cfg),
 		Progress: func(copied, total int64) {
 			if total < 10*1024*1024 {
 				return
@@ -1085,13 +1196,35 @@ func (m *voxcpmTaskManager) downloadVoxCPM2ModelFile(ctx context.Context, taskID
 		_ = input.Close()
 		return fmt.Errorf("校验模型文件 %s 失败: %w", file.Path, err)
 	}
+	info, err := input.Stat()
+	if err != nil {
+		_ = input.Close()
+		return fmt.Errorf("读取模型文件 %s 大小失败: %w", file.Path, err)
+	}
 	if err := input.Close(); err != nil {
 		return fmt.Errorf("关闭模型文件 %s 失败: %w", file.Path, err)
 	}
-	if actual := fmt.Sprintf("%x", hash.Sum(nil)); actual != file.SHA256 {
+	expectedSize, expectedHash, sourceName := file.Size, file.SHA256, "ModelScope"
+	if result.UsedBackup {
+		metadata, metadataErr := backupManifest.metadata(ctx, file.Path)
+		if metadataErr != nil {
+			return fmt.Errorf("读取 Hugging Face 文件 %s 元数据失败: %w", file.Path, metadataErr)
+		}
+		expectedSize, expectedHash, sourceName = metadata.ExpectedSize, "", "Hugging Face"
+		if backupFile, ok := backupManifest.files[file.Path]; ok && backupFile.SHA256 != "" {
+			expectedHash = backupFile.SHA256
+		}
+		m.appendLog(taskID, fmt.Sprintf("文件 %s 已按 Hugging Face 自身元数据校验，预期大小 %d 字节。", file.Path, expectedSize))
+	}
+	if info.Size() != expectedSize {
 		_ = os.Remove(temporaryPath)
 		removeModelDownloadState(temporaryPath)
-		return fmt.Errorf("ModelScope 文件 %s SHA-256 校验失败", file.Path)
+		return fmt.Errorf("%s 文件 %s 大小校验失败（得到 %d 字节，预期 %d 字节）", sourceName, file.Path, info.Size(), expectedSize)
+	}
+	if expectedHash != "" && fmt.Sprintf("%x", hash.Sum(nil)) != expectedHash {
+		_ = os.Remove(temporaryPath)
+		removeModelDownloadState(temporaryPath)
+		return fmt.Errorf("%s 文件 %s SHA-256 校验失败", sourceName, file.Path)
 	}
 	if err := os.Rename(temporaryPath, target); err != nil {
 		return fmt.Errorf("写入模型文件 %s 失败: %w", file.Path, err)

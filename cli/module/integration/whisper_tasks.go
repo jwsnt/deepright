@@ -969,14 +969,20 @@ func (manager *whisperTaskManager) downloadWhisperLargeV3FromModelScope(ctx cont
 	manager.appendLog(taskID, "ModelScope Whisper large-v3 将使用多线程分段下载并保留断点；任务取消或网络中断后重新开始会继续未完成分段。")
 	lastProgress := int64(-1)
 	_, err = downloadModelWithFallback(ctx, resumableModelDownloadConfig{
-		Client:       whisperModelHTTPClient,
-		URL:          whisperModelScopeLargeV3URL,
-		BackupURL:    whisperOfficialLargeV3URL,
-		PartPath:     temporaryPath,
-		ExpectedSize: whisperLargeV3Size,
-		IdleTimeout:  modelTaskDownloadReadTimeout(manager.cfg),
-		Workers:      modelTaskDownloadWorkers(manager.cfg),
-		Retries:      modelTaskDownloadRetries(manager.cfg),
+		Client:             whisperModelHTTPClient,
+		URL:                whisperModelScopeLargeV3URL,
+		BackupURL:          whisperOfficialLargeV3URL,
+		PartPath:           temporaryPath,
+		ExpectedSize:       whisperLargeV3Size,
+		BackupExpectedSize: whisperLargeV3Size,
+		SourceID:           "modelscope:iic/whisper-large-v3",
+		BackupSourceID:     "openai:whisper-large-v3",
+		Revision:           "master",
+		BackupArtifactPath: "large-v3.pt",
+		ArtifactPath:       "large-v3.pt",
+		IdleTimeout:        modelTaskDownloadReadTimeout(manager.cfg),
+		Workers:            modelTaskDownloadWorkers(manager.cfg),
+		Retries:            modelTaskDownloadRetries(manager.cfg),
 		Progress: func(copied, total int64) {
 			if total <= 0 {
 				return

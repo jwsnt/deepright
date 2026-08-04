@@ -19,19 +19,27 @@ import (
 // downloader retains its part file and small completion manifest until the
 // caller has checked the artifact digest and atomically publishes it.
 type resumableModelDownloadConfig struct {
-	Client       *http.Client
-	URL          string
-	BackupURL    string
-	PartPath     string
-	ExpectedSize int64
-	IdleTimeout  time.Duration
-	PartTimeout  time.Duration
-	Workers      int
-	Retries      int
-	ChunkSize    int64
-	Progress     func(copied, total int64)
-	PartProgress func(worker, part, parts int, copied, total int64)
-	Retry        func(worker, part, parts, retry, retries int, err error)
+	Client             *http.Client
+	URL                string
+	BackupURL          string
+	PartPath           string
+	ExpectedSize       int64
+	BackupExpectedSize int64
+	SourceID           string
+	BackupSourceID     string
+	Revision           string
+	BackupRevision     string
+	ArtifactPath       string
+	BackupArtifactPath string
+	PrepareBackup      func(context.Context) (modelDownloadSourceMetadata, error)
+	IdleTimeout        time.Duration
+	PartTimeout        time.Duration
+	Workers            int
+	Retries            int
+	ChunkSize          int64
+	Progress           func(copied, total int64)
+	PartProgress       func(worker, part, parts int, copied, total int64)
+	Retry              func(worker, part, parts, retry, retries int, err error)
 }
 
 type modelDownloadResult struct {
@@ -44,16 +52,32 @@ type modelDownloadResult struct {
 
 type resumableModelDownloadState struct {
 	URL          string `json:"url"`
+	SourceID     string `json:"source_id,omitempty"`
+	Revision     string `json:"revision,omitempty"`
+	ArtifactPath string `json:"artifact_path,omitempty"`
 	Size         int64  `json:"size"`
 	ETag         string `json:"etag,omitempty"`
 	LastModified string `json:"last_modified,omitempty"`
 	Chunks       []bool `json:"chunks"`
 }
 
+// modelDownloadSourceMetadata is the source-owned manifest identity for one
+// artifact. It must never be inherited from the primary source after a
+// fallback. ExpectedSize of zero means the source did not publish a size.
+type modelDownloadSourceMetadata struct {
+	SourceID     string
+	Revision     string
+	ArtifactPath string
+	ExpectedSize int64
+}
+
 // modelDownloadSource identifies the exact representation observed during the
 // range probe. A saved partial file is reusable only for that representation.
 type modelDownloadSource struct {
 	URL          string
+	SourceID     string
+	Revision     string
+	ArtifactPath string
 	Size         int64
 	Ranges       bool
 	ETag         string
@@ -122,6 +146,39 @@ func prepareModelDownloadConfig(cfg resumableModelDownloadConfig) (resumableMode
 	return cfg, nil
 }
 
+func modelDownloadPrimaryMetadata(cfg resumableModelDownloadConfig) modelDownloadSourceMetadata {
+	return modelDownloadSourceMetadata{
+		SourceID:     firstModelDownloadSourceID(cfg.SourceID, cfg.URL),
+		Revision:     strings.TrimSpace(cfg.Revision),
+		ArtifactPath: strings.TrimSpace(cfg.ArtifactPath),
+		ExpectedSize: cfg.ExpectedSize,
+	}
+}
+
+func modelDownloadBackupMetadata(cfg resumableModelDownloadConfig) modelDownloadSourceMetadata {
+	return modelDownloadSourceMetadata{
+		SourceID:     firstModelDownloadSourceID(cfg.BackupSourceID, cfg.BackupURL),
+		Revision:     strings.TrimSpace(cfg.BackupRevision),
+		ArtifactPath: strings.TrimSpace(cfg.BackupArtifactPath),
+		ExpectedSize: cfg.BackupExpectedSize,
+	}
+}
+
+func firstModelDownloadSourceID(sourceID, fallback string) string {
+	if sourceID = strings.TrimSpace(sourceID); sourceID != "" {
+		return sourceID
+	}
+	return strings.TrimSpace(fallback)
+}
+
+func applyModelDownloadSourceMetadata(cfg resumableModelDownloadConfig, metadata modelDownloadSourceMetadata) resumableModelDownloadConfig {
+	cfg.SourceID = firstModelDownloadSourceID(metadata.SourceID, cfg.URL)
+	cfg.Revision = strings.TrimSpace(metadata.Revision)
+	cfg.ArtifactPath = strings.TrimSpace(metadata.ArtifactPath)
+	cfg.ExpectedSize = metadata.ExpectedSize
+	return cfg
+}
+
 func downloadModelFromSource(ctx context.Context, cfg resumableModelDownloadConfig, before func(bool)) (int64, bool, error) {
 	// A 416 for a data range means that the object changed after the probe, or
 	// that the local resume point is stale. Discard only the partial artifact,
@@ -183,20 +240,33 @@ func downloadModelWithFallback(ctx context.Context, cfg resumableModelDownloadCo
 		return modelDownloadResult{}, errors.New("模型主下载源为空")
 	}
 	sources := []struct {
-		url    string
-		backup bool
-	}{{url: primary}}
+		url      string
+		backup   bool
+		metadata modelDownloadSourceMetadata
+	}{{url: primary, metadata: modelDownloadPrimaryMetadata(cfg)}}
 	if backup != "" && backup != primary {
 		sources = append(sources, struct {
-			url    string
-			backup bool
-		}{url: backup, backup: true})
+			url      string
+			backup   bool
+			metadata modelDownloadSourceMetadata
+		}{url: backup, backup: true, metadata: modelDownloadBackupMetadata(cfg)})
 	}
 	var lastErr error
 	for index, source := range sources {
 		attempt := cfg
 		attempt.URL = source.url
 		attempt.BackupURL = ""
+		metadata := source.metadata
+		if source.backup && cfg.PrepareBackup != nil {
+			prepared, prepareErr := cfg.PrepareBackup(ctx)
+			if prepareErr != nil {
+				lastErr = fmt.Errorf("无法读取备用下载源元数据: %w", prepareErr)
+				reportModelDownload(report, lastErr.Error())
+				continue
+			}
+			metadata = prepared
+		}
+		attempt = applyModelDownloadSourceMetadata(attempt, metadata)
 		if source.backup {
 			reportModelDownload(report, "主下载源普通下载失败，正在检查备用下载源是否支持断点续传："+source.url)
 		} else {
@@ -298,6 +368,9 @@ func modelDownloadProbe(ctx context.Context, cfg resumableModelDownloadConfig) (
 	defer response.Body.Close()
 	source := modelDownloadSource{
 		URL:          strings.TrimSpace(cfg.URL),
+		SourceID:     firstModelDownloadSourceID(cfg.SourceID, cfg.URL),
+		Revision:     strings.TrimSpace(cfg.Revision),
+		ArtifactPath: strings.TrimSpace(cfg.ArtifactPath),
 		ETag:         strings.TrimSpace(response.Header.Get("ETag")),
 		LastModified: strings.TrimSpace(response.Header.Get("Last-Modified")),
 	}
@@ -492,6 +565,9 @@ func prepareModelDownloadState(partPath string, source modelDownloadSource, size
 	}
 	state = resumableModelDownloadState{
 		URL:          strings.TrimSpace(source.URL),
+		SourceID:     strings.TrimSpace(source.SourceID),
+		Revision:     strings.TrimSpace(source.Revision),
+		ArtifactPath: strings.TrimSpace(source.ArtifactPath),
 		Size:         size,
 		ETag:         strings.TrimSpace(source.ETag),
 		LastModified: strings.TrimSpace(source.LastModified),
@@ -504,7 +580,16 @@ func prepareModelDownloadState(partPath string, source modelDownloadSource, size
 }
 
 func loadModelDownloadState(path string, source modelDownloadSource, size int64, chunks int) (resumableModelDownloadState, bool, error) {
-	state := resumableModelDownloadState{URL: strings.TrimSpace(source.URL), Size: size, ETag: strings.TrimSpace(source.ETag), LastModified: strings.TrimSpace(source.LastModified), Chunks: make([]bool, chunks)}
+	state := resumableModelDownloadState{
+		URL:          strings.TrimSpace(source.URL),
+		SourceID:     strings.TrimSpace(source.SourceID),
+		Revision:     strings.TrimSpace(source.Revision),
+		ArtifactPath: strings.TrimSpace(source.ArtifactPath),
+		Size:         size,
+		ETag:         strings.TrimSpace(source.ETag),
+		LastModified: strings.TrimSpace(source.LastModified),
+		Chunks:       make([]bool, chunks),
+	}
 	content, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		if err := saveModelDownloadState(path, state); err != nil {
@@ -516,7 +601,15 @@ func loadModelDownloadState(path string, source modelDownloadSource, size int64,
 		return state, false, fmt.Errorf("无法读取模型断点续传状态: %w", err)
 	}
 	var stored resumableModelDownloadState
-	if err := json.Unmarshal(content, &stored); err != nil || stored.URL != strings.TrimSpace(source.URL) || stored.Size != size || stored.ETag != strings.TrimSpace(source.ETag) || stored.LastModified != strings.TrimSpace(source.LastModified) || len(stored.Chunks) != chunks {
+	decodeErr := json.Unmarshal(content, &stored)
+	storedSourceID := strings.TrimSpace(stored.SourceID)
+	if storedSourceID == "" {
+		// Manifests written before source_id was added were already bound to
+		// the exact URL. Preserve that safe resume path while requiring all
+		// newer source identities to match explicitly.
+		storedSourceID = strings.TrimSpace(stored.URL)
+	}
+	if decodeErr != nil || stored.URL != strings.TrimSpace(source.URL) || storedSourceID != strings.TrimSpace(source.SourceID) || stored.Revision != strings.TrimSpace(source.Revision) || stored.ArtifactPath != strings.TrimSpace(source.ArtifactPath) || stored.Size != size || stored.ETag != strings.TrimSpace(source.ETag) || stored.LastModified != strings.TrimSpace(source.LastModified) || len(stored.Chunks) != chunks {
 		if err := saveModelDownloadState(path, state); err != nil {
 			return state, false, err
 		}

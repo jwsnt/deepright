@@ -535,6 +535,41 @@ func TestVoxCPMGenerateUsesVerifiedModelScopeSnapshot(t *testing.T) {
 	}
 }
 
+func TestVoxCPMBackupManifestUsesSourceSpecificRuntimeMetadata(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/tree" {
+			http.NotFound(writer, request)
+			return
+		}
+		_ = json.NewEncoder(writer).Encode([]map[string]interface{}{
+			{"type": "file", "path": ".gitattributes", "size": 1519},
+			{"type": "file", "path": "config.json", "size": 81},
+			{"type": "file", "path": "model.safetensors", "size": 4096, "lfs": map[string]interface{}{"size": 4096, "oid": strings.Repeat("a", 64)}},
+			{"type": "file", "path": "audiovae.pth", "size": 2048, "lfs": map[string]interface{}{"size": 2048, "oid": strings.Repeat("b", 64)}},
+		})
+	}))
+	defer server.Close()
+
+	previousURL, previousClient := voxcpmHuggingFaceFilesURL, voxcpmHTTPClient
+	voxcpmHuggingFaceFilesURL, voxcpmHTTPClient = server.URL+"/tree", server.Client()
+	t.Cleanup(func() { voxcpmHuggingFaceFilesURL, voxcpmHTTPClient = previousURL, previousClient })
+
+	resolver := &voxcpmModelBackupManifestResolver{}
+	metadata, err := resolver.metadata(context.Background(), "model.safetensors")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if metadata.SourceID != "huggingface:openbmb/VoxCPM2" || metadata.Revision != "main" || metadata.ExpectedSize != 4096 {
+		t.Fatalf("backup metadata = %#v", metadata)
+	}
+	if _, found := resolver.files[".gitattributes"]; found {
+		t.Fatal("non-runtime .gitattributes must not take part in model verification")
+	}
+	if got := resolver.files["model.safetensors"].SHA256; got != strings.Repeat("a", 64) {
+		t.Fatalf("backup SHA-256 = %q", got)
+	}
+}
+
 func TestVoxCPMGPUDevice(t *testing.T) {
 	for _, device := range []string{"cuda", "CUDA", "mps", " MPS "} {
 		if !voxcpmGPUDevice(device) {

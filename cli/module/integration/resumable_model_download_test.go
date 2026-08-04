@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -212,5 +213,321 @@ func TestModelDownloadProbeStopsAtPartTimeout(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "检查下载源是否支持 HTTP Range 超过总时限") {
 		t.Fatalf("probe timeout error = %v", err)
+	}
+}
+
+func TestModelSequentialResumeTreats416AtEOFAsComplete(t *testing.T) {
+	payload := []byte("already-complete")
+	var eofRanges int
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("ETag", `"v1"`)
+		switch request.Header.Get("Range") {
+		case "bytes=0-0":
+			writer.Header().Set("Content-Length", strconv.Itoa(len(payload)))
+			_, _ = writer.Write(payload)
+		case fmt.Sprintf("bytes=%d-", len(payload)):
+			if got := request.Header.Get("If-Range"); got != `"v1"` {
+				t.Fatalf("If-Range = %q, want ETag", got)
+			}
+			eofRanges++
+			writer.Header().Set("Content-Range", fmt.Sprintf("bytes */%d", len(payload)))
+			writer.WriteHeader(http.StatusRequestedRangeNotSatisfiable)
+		default:
+			t.Fatalf("unexpected Range %q", request.Header.Get("Range"))
+		}
+	}))
+	defer server.Close()
+
+	part := t.TempDir() + "/model.part"
+	if err := os.WriteFile(part, payload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := saveModelDownloadState(part+".json", resumableModelDownloadState{URL: server.URL, Size: int64(len(payload)), ETag: `"v1"`, Chunks: []bool{}}); err != nil {
+		t.Fatal(err)
+	}
+	got, usedRanges, err := downloadModelWithResume(context.Background(), resumableModelDownloadConfig{
+		Client:       server.Client(),
+		URL:          server.URL,
+		PartPath:     part,
+		ExpectedSize: int64(len(payload)),
+	})
+	if err != nil || usedRanges || got != int64(len(payload)) {
+		t.Fatalf("downloadModelWithResume() = (%d, %t, %v)", got, usedRanges, err)
+	}
+	actual, err := os.ReadFile(part)
+	if err != nil || !bytes.Equal(actual, payload) {
+		t.Fatalf("part = %q, %v", actual, err)
+	}
+	if eofRanges != 1 {
+		t.Fatalf("416 EOF requests = %d, want 1", eofRanges)
+	}
+}
+
+func TestModelSequentialResumeResetsAfter416ForChangedObject(t *testing.T) {
+	oldPayload := []byte("0123456789ab")
+	newPayload := []byte("new-data")
+	var probes int
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch request.Header.Get("Range") {
+		case "bytes=0-0":
+			probes++
+			if probes == 1 {
+				writer.Header().Set("ETag", `"old"`)
+				writer.Header().Set("Content-Length", strconv.Itoa(len(oldPayload)))
+				_, _ = writer.Write(oldPayload)
+				return
+			}
+			writer.Header().Set("ETag", `"new"`)
+			writer.Header().Set("Content-Length", strconv.Itoa(len(newPayload)))
+			_, _ = writer.Write(newPayload)
+		case fmt.Sprintf("bytes=%d-", len(oldPayload)):
+			writer.Header().Set("Content-Range", fmt.Sprintf("bytes */%d", len(newPayload)))
+			writer.WriteHeader(http.StatusRequestedRangeNotSatisfiable)
+		case "":
+			if probes != 2 {
+				t.Fatalf("ordinary transfer started before re-probe, probes=%d", probes)
+			}
+			writer.Header().Set("ETag", `"new"`)
+			writer.Header().Set("Content-Length", strconv.Itoa(len(newPayload)))
+			_, _ = writer.Write(newPayload)
+		default:
+			t.Fatalf("unexpected Range %q", request.Header.Get("Range"))
+		}
+	}))
+	defer server.Close()
+
+	part := t.TempDir() + "/model.part"
+	if err := os.WriteFile(part, oldPayload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := saveModelDownloadState(part+".json", resumableModelDownloadState{URL: server.URL, Size: int64(len(oldPayload)), ETag: `"old"`, Chunks: []bool{}}); err != nil {
+		t.Fatal(err)
+	}
+	got, _, err := downloadModelWithResume(context.Background(), resumableModelDownloadConfig{Client: server.Client(), URL: server.URL, PartPath: part})
+	if err != nil || got != int64(len(newPayload)) {
+		t.Fatalf("downloadModelWithResume() = (%d, %v)", got, err)
+	}
+	actual, err := os.ReadFile(part)
+	if err != nil || !bytes.Equal(actual, newPayload) {
+		t.Fatalf("part = %q, %v", actual, err)
+	}
+	if probes != 2 {
+		t.Fatalf("probe count = %d, want 2", probes)
+	}
+}
+
+func TestModelRangeResumeReprobesAfter416(t *testing.T) {
+	oldPayload := []byte("0123456789abcdef")
+	newPayload := []byte("new-data")
+	var mu sync.Mutex
+	probes := 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		raw := request.Header.Get("Range")
+		mu.Lock()
+		defer mu.Unlock()
+		if raw == "bytes=0-0" {
+			probes++
+			if probes == 1 {
+				writer.Header().Set("ETag", `"old"`)
+				writer.Header().Set("Content-Range", fmt.Sprintf("bytes 0-0/%d", len(oldPayload)))
+				writer.WriteHeader(http.StatusPartialContent)
+				_, _ = writer.Write(oldPayload[:1])
+				return
+			}
+			writer.Header().Set("ETag", `"new"`)
+			writer.Header().Set("Content-Range", fmt.Sprintf("bytes 0-0/%d", len(newPayload)))
+			writer.WriteHeader(http.StatusPartialContent)
+			_, _ = writer.Write(newPayload[:1])
+			return
+		}
+		if probes == 1 {
+			if got := request.Header.Get("If-Range"); got != `"old"` {
+				t.Fatalf("If-Range = %q, want old ETag", got)
+			}
+			writer.Header().Set("Content-Range", fmt.Sprintf("bytes */%d", len(newPayload)))
+			writer.WriteHeader(http.StatusRequestedRangeNotSatisfiable)
+			return
+		}
+		start, end := modelDownloadTestRange(t, raw)
+		if got := request.Header.Get("If-Range"); got != `"new"` {
+			t.Fatalf("If-Range = %q, want new ETag", got)
+		}
+		if end >= len(newPayload) {
+			t.Fatalf("range %q exceeds changed payload", raw)
+		}
+		writer.Header().Set("ETag", `"new"`)
+		writer.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, len(newPayload)))
+		writer.WriteHeader(http.StatusPartialContent)
+		_, _ = writer.Write(newPayload[start : end+1])
+	}))
+	defer server.Close()
+
+	part := t.TempDir() + "/model.part"
+	got, usedRanges, err := downloadModelWithResume(context.Background(), resumableModelDownloadConfig{
+		Client:    server.Client(),
+		URL:       server.URL,
+		PartPath:  part,
+		Workers:   1,
+		ChunkSize: 4,
+	})
+	if err != nil || !usedRanges || got != int64(len(newPayload)) {
+		t.Fatalf("downloadModelWithResume() = (%d, %t, %v)", got, usedRanges, err)
+	}
+	actual, err := os.ReadFile(part)
+	if err != nil || !bytes.Equal(actual, newPayload) {
+		t.Fatalf("part = %q, %v", actual, err)
+	}
+	if probes != 2 {
+		t.Fatalf("probe count = %d, want 2", probes)
+	}
+}
+
+func TestModelDownloadFallbackAfter416WithoutContentRange(t *testing.T) {
+	payload := []byte("backup-file")
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/primary":
+			writer.Header().Set("ETag", `"primary"`)
+			switch request.Header.Get("Range") {
+			case "bytes=0-0":
+				writer.Header().Set("Content-Length", strconv.Itoa(len(payload)))
+				_, _ = writer.Write(payload)
+			case "bytes=4-":
+				writer.WriteHeader(http.StatusRequestedRangeNotSatisfiable)
+			default:
+				t.Fatalf("unexpected primary Range %q", request.Header.Get("Range"))
+			}
+		case "/backup":
+			writer.Header().Set("ETag", `"backup"`)
+			writer.Header().Set("Content-Length", strconv.Itoa(len(payload)))
+			_, _ = writer.Write(payload)
+		default:
+			writer.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	part := t.TempDir() + "/model.part"
+	if err := os.WriteFile(part, []byte("part"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := saveModelDownloadState(part+".json", resumableModelDownloadState{URL: server.URL + "/primary", Size: int64(len(payload)), ETag: `"primary"`, Chunks: []bool{}}); err != nil {
+		t.Fatal(err)
+	}
+	result, err := downloadModelWithFallback(context.Background(), resumableModelDownloadConfig{
+		Client:    server.Client(),
+		URL:       server.URL + "/primary",
+		BackupURL: server.URL + "/backup",
+		PartPath:  part,
+	}, nil)
+	if err != nil || !result.UsedBackup || !result.UsedPlainHTTP {
+		t.Fatalf("downloadModelWithFallback() = (%#v, %v)", result, err)
+	}
+	actual, err := os.ReadFile(part)
+	if err != nil || !bytes.Equal(actual, payload) {
+		t.Fatalf("part = %q, %v", actual, err)
+	}
+}
+
+func TestModelResumeRejectsStateWithChangedETag(t *testing.T) {
+	payload := []byte("fresh-content")
+	var resumedRange bool
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("ETag", `"new"`)
+		switch request.Header.Get("Range") {
+		case "bytes=0-0":
+			writer.Header().Set("Content-Length", strconv.Itoa(len(payload)))
+			_, _ = writer.Write(payload)
+		case "":
+			writer.Header().Set("Content-Length", strconv.Itoa(len(payload)))
+			_, _ = writer.Write(payload)
+		default:
+			resumedRange = true
+			writer.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	part := t.TempDir() + "/model.part"
+	if err := os.WriteFile(part, []byte("stale"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := saveModelDownloadState(part+".json", resumableModelDownloadState{URL: server.URL, Size: int64(len(payload)), ETag: `"old"`, Chunks: []bool{}}); err != nil {
+		t.Fatal(err)
+	}
+	got, _, err := downloadModelWithResume(context.Background(), resumableModelDownloadConfig{Client: server.Client(), URL: server.URL, PartPath: part, ExpectedSize: int64(len(payload))})
+	if err != nil || got != int64(len(payload)) {
+		t.Fatalf("downloadModelWithResume() = (%d, %v)", got, err)
+	}
+	actual, err := os.ReadFile(part)
+	if err != nil || !bytes.Equal(actual, payload) {
+		t.Fatalf("part = %q, %v", actual, err)
+	}
+	if resumedRange {
+		t.Fatal("changed ETag must discard stale partial file before the transfer")
+	}
+}
+
+func TestModelDownloadFallbackUsesBackupSourceMetadata(t *testing.T) {
+	primary := []byte("primary-metadata-is-longer")
+	backup := []byte("mirror")
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/primary":
+			if request.Header.Get("Range") == "bytes=0-0" {
+				writer.Header().Set("Content-Length", strconv.Itoa(len(primary)))
+				_, _ = writer.Write(primary)
+				return
+			}
+			writer.WriteHeader(http.StatusBadGateway)
+		case "/backup":
+			if request.Header.Get("Range") == "bytes=0-0" {
+				writer.Header().Set("Content-Length", strconv.Itoa(len(backup)))
+				_, _ = writer.Write(backup)
+				return
+			}
+			if request.Header.Get("Range") != "" {
+				t.Fatalf("backup ordinary transfer must not inherit primary offset: %q", request.Header.Get("Range"))
+			}
+			writer.Header().Set("Content-Length", strconv.Itoa(len(backup)))
+			_, _ = writer.Write(backup)
+		default:
+			writer.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	part := t.TempDir() + "/model.part"
+	result, err := downloadModelWithFallback(context.Background(), resumableModelDownloadConfig{
+		Client:             server.Client(),
+		URL:                server.URL + "/primary",
+		BackupURL:          server.URL + "/backup",
+		PartPath:           part,
+		ExpectedSize:       int64(len(primary)),
+		SourceID:           "official:test",
+		ArtifactPath:       "weights.bin",
+		BackupSourceID:     "mirror:test",
+		BackupArtifactPath: "weights.bin",
+		PrepareBackup: func(context.Context) (modelDownloadSourceMetadata, error) {
+			return modelDownloadSourceMetadata{SourceID: "mirror:test", Revision: "main", ArtifactPath: "weights.bin", ExpectedSize: int64(len(backup))}, nil
+		},
+	}, nil)
+	if err != nil || !result.UsedBackup || result.Bytes != int64(len(backup)) {
+		t.Fatalf("downloadModelWithFallback() = (%#v, %v)", result, err)
+	}
+	actual, readErr := os.ReadFile(part)
+	if readErr != nil || !bytes.Equal(actual, backup) {
+		t.Fatalf("backup part = %q, %v", actual, readErr)
+	}
+	stateContent, readErr := os.ReadFile(part + ".json")
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	var state resumableModelDownloadState
+	if err := json.Unmarshal(stateContent, &state); err != nil {
+		t.Fatal(err)
+	}
+	if state.SourceID != "mirror:test" || state.Revision != "main" || state.ArtifactPath != "weights.bin" || state.Size != int64(len(backup)) {
+		t.Fatalf("backup state = %#v", state)
 	}
 }

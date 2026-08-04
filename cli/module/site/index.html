@@ -53399,6 +53399,11 @@ async function vfsOpenWhisperTasks(event) {
   }
   feWhisperTaskCheckPending = true;
   try {
+    const ffmpeg = await feCheckExternalDependency('/api/ffmpeg/check', '正在检查 FFmpeg，请稍候…');
+    if (!ffmpeg.available) {
+      feShowFFmpegInstallDialog(ffmpeg.install, 'whisper');
+      return;
+    }
     const result = await feCheckExternalDependency('/api/whisper/check', '正在检查 Whisper，请稍候…');
     if (!result.available) {
       feShowWhisperInstallDialog(result.install);
@@ -53434,6 +53439,11 @@ async function vfsOpenWhisperAudioTask(event, absPath) {
   }
   feWhisperTaskCheckPending = true;
   try {
+    const ffmpeg = await feCheckExternalDependency('/api/ffmpeg/check', '正在检查 FFmpeg，请稍候…');
+    if (!ffmpeg.available) {
+      feShowFFmpegInstallDialog(ffmpeg.install, 'whisper');
+      return;
+    }
     const result = await feCheckExternalDependency('/api/whisper/check', '正在检查 Whisper，请稍候…');
     if (!result.available) {
       feShowWhisperInstallDialog(result.install);
@@ -57955,6 +57965,11 @@ async function feOpenWhisperTasks() {
   feWhisperTaskCheckPending = true;
   feUpdateWhisperTaskButton();
   try {
+    const ffmpeg = await feCheckExternalDependency('/api/ffmpeg/check', '正在检查 FFmpeg，请稍候…');
+    if (!ffmpeg.available) {
+      feShowFFmpegInstallDialog(ffmpeg.install, 'whisper-preview');
+      return;
+    }
     const result = await feCheckExternalDependency('/api/whisper/check', '正在检查 Whisper，请稍候…');
     if (!result.available) {
       feShowWhisperInstallDialog(result.install);
@@ -59541,6 +59556,11 @@ function feCancelFFmpegInstall() {
     document.getElementById('feRVMTaskBtn')?.focus({ preventScroll: true });
     return;
   }
+  if (origin === 'whisper') return;
+  if (origin === 'whisper-preview') {
+    document.getElementById('feWhisperTaskBtn')?.focus({ preventScroll: true });
+    return;
+  }
   const button = document.getElementById(origin === 'video-audio-extract' ? 'feVideoAudioExtractBtn' : 'feVideoTrimBtn');
   if (button && !button.disabled) button.focus({ preventScroll: true });
 }
@@ -59560,7 +59580,7 @@ async function feConfirmFFmpegInstall() {
   feFFmpegInstallRequest = '';
   feFFmpegInstallOrigin = '';
   if (origin === 'screen-recording') vfsHideCreate();
-  else if (origin !== 'rvm' && origin !== 'rvm-preview') feClose();
+  else if (origin !== 'rvm' && origin !== 'rvm-preview' && origin !== 'whisper') feClose();
   const sent = await sendCenterMessage(request, {
     clearInputAfterSend: false,
     toastOnSuccess: '',

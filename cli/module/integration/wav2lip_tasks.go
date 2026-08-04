@@ -69,6 +69,7 @@ import json
 import concurrent.futures
 import threading
 import time
+import urllib.error
 import urllib.request
 
 # The upstream S3FD detector downloads its checkpoint through urllib on first
@@ -152,20 +153,35 @@ if not os.path.isfile(_deepright_s3fd):
     _deepright_socket_timeout = min(_deepright_idle_timeout, _deepright_part_timeout)
     _deepright_chunk_size = 4 * 1024 * 1024
     _deepright_sources = (
-        ('主下载源', 'https://www.adrianbulat.com/downloads/python-fan/s3fd-619a316812.pth', None),
-        ('备用下载源', 'https://hf-mirror.com/irishavmishra/s3fd-face-detector/resolve/main/sfd_face.pth', 'd54a87c2b7543b64729c9a25eafd188da15fd3f6e02f0ecec76ae1b30d86c491'),
+        ('主下载源', 'official:adrianbulat/s3fd-619a316812', '619a316812', 'https://www.adrianbulat.com/downloads/python-fan/s3fd-619a316812.pth', None),
+        ('备用下载源', 'mirror:irishavmishra/s3fd-face-detector', 'main', 'https://hf-mirror.com/irishavmishra/s3fd-face-detector/resolve/main/sfd_face.pth', 'd54a87c2b7543b64729c9a25eafd188da15fd3f6e02f0ecec76ae1b30d86c491'),
     )
 
-    def _deepright_range_size(url):
+    def _deepright_range_metadata(url):
         request = urllib.request.Request(url, headers={'Range': 'bytes=0-0'})
         with urllib.request.urlopen(request, timeout=_deepright_socket_timeout) as response:
             content_range = response.headers.get('Content-Range') or ''
             if response.getcode() != 206 or '/' not in content_range:
                 return None
             try:
-                return int(content_range.rsplit('/', 1)[1])
+                size = int(content_range.rsplit('/', 1)[1])
             except ValueError:
                 return None
+            if size <= 0:
+                return None
+            return {
+                'url': url,
+                'size': size,
+                'etag': response.headers.get('ETag') or '',
+                'last_modified': response.headers.get('Last-Modified') or '',
+            }
+
+    def _deepright_discard_partial():
+        for path in (_deepright_tmp, _deepright_state):
+            try:
+                os.remove(path)
+            except FileNotFoundError:
+                pass
 
     def _deepright_save_state(state):
         temporary = _deepright_state + '.new'
@@ -173,25 +189,38 @@ if not os.path.isfile(_deepright_s3fd):
             json.dump(state, file)
         os.replace(temporary, _deepright_state)
 
-    def _deepright_range_download(url, total):
+    def _deepright_range_download(source_id, revision, metadata):
+        url = metadata['url']
+        total = metadata['size']
         chunks = (total + _deepright_chunk_size - 1) // _deepright_chunk_size
         if chunks < 2:
             return False
-        state = {'url': url, 'size': total, 'chunks': [False] * chunks}
+        state = {
+            'source_id': source_id,
+            'revision': revision,
+            'artifact_path': 'face_detection/detection/sfd/s3fd.pth',
+            'url': url,
+            'size': total,
+            'etag': metadata['etag'],
+            'last_modified': metadata['last_modified'],
+            'chunks': [False] * chunks,
+        }
         try:
             with open(_deepright_state, 'r', encoding='utf-8') as file:
                 stored = json.load(file)
-            if stored.get('url') == url and stored.get('size') == total and len(stored.get('chunks', [])) == chunks:
+            if (stored.get('source_id') == source_id and stored.get('revision') == revision and
+                    stored.get('artifact_path') == state['artifact_path'] and stored.get('url') == url and
+                    stored.get('size') == total and stored.get('etag', '') == metadata['etag'] and
+                    stored.get('last_modified', '') == metadata['last_modified'] and
+                    len(stored.get('chunks', [])) == chunks and os.path.isfile(_deepright_tmp) and
+                    os.path.getsize(_deepright_tmp) == total):
                 state = stored
             else:
-                os.remove(_deepright_tmp)
+                _deepright_discard_partial()
         except FileNotFoundError:
             pass
         except Exception:
-            try:
-                os.remove(_deepright_tmp)
-            except FileNotFoundError:
-                pass
+            _deepright_discard_partial()
         with open(_deepright_tmp, 'a+b') as file:
             file.truncate(total)
         _deepright_save_state(state)
@@ -220,7 +249,11 @@ if not os.path.isfile(_deepright_s3fd):
                     last_progress_at = started_at
                     part_copied = 0
                     part_next_percent = 10
-                    request = urllib.request.Request(url, headers={'Range': 'bytes=%d-%d' % (start, end)})
+                    headers = {'Range': 'bytes=%d-%d' % (start, end)}
+                    validator = metadata['etag'] or metadata['last_modified']
+                    if validator:
+                        headers['If-Range'] = validator
+                    request = urllib.request.Request(url, headers=headers)
                     with urllib.request.urlopen(request, timeout=_deepright_socket_timeout) as response:
                         if response.getcode() != 206:
                             raise RuntimeError('分段请求返回 HTTP %s' % response.getcode())
@@ -263,7 +296,7 @@ if not os.path.isfile(_deepright_s3fd):
                         next_percent += 10
         return True
 
-    def _deepright_plain_download(url):
+    def _deepright_plain_download(url, metadata=None):
         try:
             os.remove(_deepright_state)
         except FileNotFoundError:
@@ -299,6 +332,8 @@ if not os.path.isfile(_deepright_s3fd):
                         elif copied >= next_bytes:
                             print('Wav2Lip S3FD 人脸检测模型已下载 %d MiB（下载源未提供总大小）。' % (copied // (1024 * 1024)), flush=True)
                             next_bytes = copied + 10 * 1024 * 1024
+                if metadata is not None and copied != metadata['size']:
+                    raise RuntimeError('普通下载大小不正确（得到%d，预期%d）' % (copied, metadata['size']))
                 return
             except Exception as error:
                 last_error = error
@@ -306,22 +341,22 @@ if not os.path.isfile(_deepright_s3fd):
                     raise
 
     _deepright_errors = []
-    for _deepright_name, _deepright_url, _deepright_sha256 in _deepright_sources:
+    for _deepright_name, _deepright_source_id, _deepright_revision, _deepright_url, _deepright_sha256 in _deepright_sources:
         try:
             print('正在从%s下载 Wav2Lip S3FD 人脸检测模型。下载源：%s；下载目标绝对路径：%s' % (_deepright_name, _deepright_url, _deepright_s3fd), flush=True)
-            _deepright_total = _deepright_range_size(_deepright_url)
-            if _deepright_total is None:
+            _deepright_metadata = _deepright_range_metadata(_deepright_url)
+            if _deepright_metadata is None:
                 print('%s 不支持 HTTP Range，回退到普通下载。' % _deepright_name, flush=True)
                 _deepright_plain_download(_deepright_url)
             else:
                 print('%s 支持 HTTP Range，使用 %d 路分段断点续传。' % (_deepright_name, _deepright_workers), flush=True)
                 try:
-                    if not _deepright_range_download(_deepright_url, _deepright_total):
+                    if not _deepright_range_download(_deepright_source_id, _deepright_revision, _deepright_metadata):
                         print('%s 文件较小，回退到普通下载。' % _deepright_name, flush=True)
-                        _deepright_plain_download(_deepright_url)
+                        _deepright_plain_download(_deepright_url, _deepright_metadata)
                 except Exception as _deepright_range_error:
                     print('%s 多线程断点续传失败：%s；回退到普通下载。' % (_deepright_name, _deepright_range_error), flush=True)
-                    _deepright_plain_download(_deepright_url)
+                    _deepright_plain_download(_deepright_url, _deepright_metadata)
             if _deepright_sha256 is not None:
                 with open(_deepright_tmp, 'rb') as _deepright_file:
                     _deepright_actual = hashlib.sha256(_deepright_file.read()).hexdigest()
