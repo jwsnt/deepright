@@ -52,6 +52,8 @@ const (
 	logTypeCLIGet                 = 2
 	logTypeCLIPub                 = 3
 	defaultTaskTimeout            = 180 * time.Second
+	defaultCliGetSleepMs          = 3000
+	defaultCliGetAwaitMs          = 30000
 	commandTimeoutMessage         = "[Warning: Command execution timed out.]"
 	commandTimeoutWarning         = "[Warning: Command execution timed out, the returned content may be incomplete.]"
 	sandboxModeFilePick           = "filepick"
@@ -1104,6 +1106,41 @@ func configuredHTTPDebug() bool {
 	return configuredHTTPDebugFromRaw(readCliGetConfigRaw())
 }
 
+// configuredHeartbeatIntervalsFromRaw reads the idle heartbeat interval from
+// config.json. Command-line --sleep remains an explicit override for sleep;
+// await is deliberately configuration-only because it controls idle polling.
+func configuredHeartbeatIntervalsFromRaw(raw map[string]interface{}) (sleepMs, awaitMs int) {
+	sleepMs = defaultCliGetSleepMs
+	awaitMs = defaultCliGetAwaitMs
+	getRaw, ok := raw["get"]
+	if !ok || getRaw == nil {
+		return sleepMs, awaitMs
+	}
+	getConfig, ok := getRaw.(map[string]interface{})
+	if !ok || getConfig == nil {
+		return sleepMs, awaitMs
+	}
+	if value, ok := cliGetConfigMilliseconds(getConfig["sleep"]); ok {
+		sleepMs = value
+	}
+	if value, ok := cliGetConfigMilliseconds(getConfig["await"]); ok {
+		awaitMs = value
+	}
+	return sleepMs, awaitMs
+}
+
+func cliGetConfigMilliseconds(raw interface{}) (int, bool) {
+	value, ok := raw.(json.Number)
+	if !ok {
+		return 0, false
+	}
+	milliseconds, err := value.Int64()
+	if err != nil || milliseconds < 0 || milliseconds > int64(^uint(0)>>1) {
+		return 0, false
+	}
+	return int(milliseconds), true
+}
+
 func cliGetDebugPrintf(enabled bool, format string, args ...interface{}) {
 	if !enabled {
 		return
@@ -1381,6 +1418,7 @@ type Config struct {
 	HTTPDebug         bool
 	AgentCacheMs      int
 	SleepMs           int
+	AwaitMs           int
 	Thread            int
 	Queue             int
 	RetryIntervalMs   int
@@ -1404,7 +1442,7 @@ func main() {
 	flag.StringVar(&cfg.Device, "device", "", "device ID (auto-generated if empty)")
 	flag.StringVar(&cfg.SandboxApp, "sandbox_app", "", "relative path to CLI_SANDBOX(.app); defaults to config/config.json sandbox_app")
 	flag.IntVar(&cfg.AgentCacheMs, "agent-cache", 120000, "agent metadata cache TTL in ms")
-	flag.IntVar(&cfg.SleepMs, "sleep", 3000, "sleep after heartbeat errors in ms")
+	flag.IntVar(&cfg.SleepMs, "sleep", defaultCliGetSleepMs, "sleep after heartbeat errors in ms")
 	flag.IntVar(&cfg.Thread, "thread", 20, "worker pool size")
 	flag.IntVar(&cfg.Queue, "queue", 1000, "local task queue size")
 	flag.IntVar(&cfg.RetryIntervalMs, "retry_interval", 10000, "cli/pub retry interval in ms")
@@ -1414,12 +1452,21 @@ func main() {
 	flag.IntVar(&cfg.HTTPSocketTimeout, "http_socket_timeout", 45000, "HTTP read timeout in ms")
 	flag.IntVar(&cfg.IdleTimeout, "idle_timeout", 90, "connection pool idle timeout in seconds")
 	flag.Parse()
+	sleepProvided := false
+	flag.Visit(func(item *flag.Flag) {
+		sleepProvided = sleepProvided || item.Name == "sleep"
+	})
 
 	if cfg.AgentDir == "" {
 		fmt.Fprintln(os.Stderr, "error: --agent-dir is required")
 		os.Exit(1)
 	}
 	startupConfig := readCliGetConfigRaw()
+	configuredSleepMs, configuredAwaitMs := configuredHeartbeatIntervalsFromRaw(startupConfig)
+	if !sleepProvided {
+		cfg.SleepMs = configuredSleepMs
+	}
+	cfg.AwaitMs = configuredAwaitMs
 	if strings.TrimSpace(cfg.SandboxApp) == "" {
 		cfg.SandboxApp = configuredSandboxAppFromRaw(startupConfig)
 	}
@@ -1453,9 +1500,18 @@ func main() {
 		fmt.Fprintln(os.Stderr, "error: --retry_times must be >= 0")
 		os.Exit(1)
 	}
+	if cfg.SleepMs < 0 {
+		fmt.Fprintln(os.Stderr, "error: --sleep must be >= 0")
+		os.Exit(1)
+	}
+	if cfg.AwaitMs < 0 {
+		fmt.Fprintln(os.Stderr, "error: config get.await must be >= 0")
+		os.Exit(1)
+	}
 
 	agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
 	sleepDur := time.Duration(cfg.SleepMs) * time.Millisecond
+	awaitDur := time.Duration(cfg.AwaitMs) * time.Millisecond
 	retryInterval := time.Duration(cfg.RetryIntervalMs) * time.Millisecond
 	heartbeatBackoff := sleepDur
 	maxHeartbeatBackoff := 15 * time.Second
@@ -1467,8 +1523,8 @@ func main() {
 		go runPublishWorker(client, cfg.Host, publishQueue, retryInterval, cfg.RetryTimes)
 	}
 
-	fmt.Printf("cli-get started: host=%s, agent-dir=%s, threads=%d, queue=%d, sleep=%dms, retry_interval=%dms, retry_times=%d, sandbox_app=%s\n",
-		cfg.Host, cfg.AgentDir, cfg.Thread, cfg.Queue, cfg.SleepMs, cfg.RetryIntervalMs, cfg.RetryTimes, cfg.SandboxApp)
+	fmt.Printf("cli-get started: host=%s, agent-dir=%s, threads=%d, queue=%d, sleep=%dms, await=%dms, retry_interval=%dms, retry_times=%d, sandbox_app=%s\n",
+		cfg.Host, cfg.AgentDir, cfg.Thread, cfg.Queue, cfg.SleepMs, cfg.AwaitMs, cfg.RetryIntervalMs, cfg.RetryTimes, cfg.SandboxApp)
 
 	// Master heartbeat loop
 	for {
@@ -1494,13 +1550,17 @@ func main() {
 		heartbeatBackoff = sleepDur
 
 		if task == nil {
-			// No task, immediately retry heartbeat
+			// A standalone cli-get has no in-process SSE activity to observe, so
+			// successful idle heartbeats use the configured standby interval.
+			time.Sleep(awaitDur)
 			continue
 		}
 
-		// Dispatch task to worker pool, then immediately loop for next heartbeat
+		// Dispatch task to worker pool. Standalone cli-get has no local SSE
+		// activity, so it uses the configured standby interval before polling again.
 		t := *task
 		taskQueue <- queuedTask{task: t, metadata: metadata}
 		cliGetDebugPrintf(cfg.HTTPDebug, "cli-get: task queued tid=%s pending=%d capacity=%d\n", strings.TrimSpace(t.Tid), len(taskQueue), cap(taskQueue))
+		time.Sleep(awaitDur)
 	}
 }

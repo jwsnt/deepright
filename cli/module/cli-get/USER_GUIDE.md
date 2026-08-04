@@ -37,7 +37,7 @@ go build -o cli-get .
 | `--device` | 否 | 自动生成 | 设备ID |
 | `--sandbox_app` | 否 | 从 `config/config.json` 读取 | 沙盒根路径或锚点路径；支持 `.app`、目录或二进制路径，相对路径按主程序可执行文件目录解析 |
 | `--agent-cache` | 否 | `120000` | Agent 元数据缓存 TTL（毫秒） |
-| `--sleep` | 否 | `3000` | 心跳请求失败或非 200 时的重试等待时间（毫秒） |
+| `--sleep` | 否 | `config.json.get.sleep`（当前为 `15000`） | 心跳请求失败、队列满时的等待时间；显式传入时覆盖配置值 |
 | `--thread` | 否 | `20` | 执行 Worker 数量 |
 | `--queue` | 否 | `1000` | 本地任务队列容量；队列满时会暂停发 `/cli/get` |
 | `--retry_interval` | 否 | `10000` | `/cli/pub` 失败后的重试等待时间（毫秒） |
@@ -106,12 +106,14 @@ go build -o cli-get .
 
 1. 心跳线程先检查 `taskQueue` 是否还有空位；只有有空位时才会发 `/cli/get`
 2. 如果本地任务队列已满，不会拉新任务，而是按 `--sleep` 等待后再次检查
-3. 如果 `/cli/get` 返回任务，任务会立刻进入本地 `taskQueue`，心跳线程马上继续下一轮，不等待执行完成
+3. 如果 `/cli/get` 返回任务，任务会立刻进入本地 `taskQueue`，不等待执行或 `/cli/pub`；独立 `cli-get` 在没有可观测的本进程 SSE 时，按 `config.json.get.await` 再进入下一轮
 4. 执行 Worker 从 `taskQueue` 取任务时先检查 `ddl`；如果当前时间已超过 `ddl`，会打印日志并直接丢弃
 5. 未过期的任务按现有逻辑执行，本地 Shell 或 `CLI_SANDBOX` 均会复用原有执行链路
 6. 执行结果会进入 `publishQueue`，由独立发布 Worker 提交 `/cli/pub`
 7. 如果 `/cli/pub` 返回明确错误、超时、HTTP 非 `200`、或响应解析失败，会按 `--retry_interval` 与 `--retry_times` 重试
 8. 如果心跳请求本身失败、HTTP 非 200，或响应解析异常，则按指数退避等待后重试
+
+成功响应后的待机间隔由 `config.json` 的 `get.await` 控制，当前值为 `30000` 毫秒。
 
 ## 本地队列与重试
 

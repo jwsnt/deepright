@@ -150,6 +150,14 @@ public class FeatureUtils {
         return MapUtils.getString(metadata, FeatureField.KEY_ORIGIN, FeatureUtils.KEY_LOCALHOST + ":" + MapUtils.getString(metadata, FeatureUtils.KEY_PORT));
     }
 
+    public static String buildConfig(Map<String, Object> metadata) throws Exception {
+        return MapUtils.getString(metadata, FeatureField.KEY_CONFIG);
+    }
+
+    public static String buildConfig(WorkflowTask workTask) throws Exception {
+        return FeatureUtils.buildConfig(workTask.getMetadata());
+    }
+
     public static String buildHost(WorkflowTask workTask) throws Exception {
         return FeatureUtils.buildHost(workTask.getMetadata());
     }

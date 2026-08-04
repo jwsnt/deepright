@@ -82,6 +82,7 @@ public class CliRag extends RagCondition implements RagService {
         this.updateProvider(ragConfig, ragData);
         this.updateSandbox(ragConfig, ragData);
         this.updateExtract(ragConfig, ragData);
+        this.updateConfig(ragConfig, ragData);
         this.updateOrigin(ragConfig, ragData);
         this.updateDevice(ragConfig, ragData);
         this.updateAgent(ragConfig, ragData);
@@ -165,6 +166,13 @@ public class CliRag extends RagCondition implements RagService {
         if (ragData.getQuery().isEntry() && FeatureFlag.isSkillExtract(ragData.getQuery())) {
             // Extract（SOUL/USER/Knowledge提炼）任务关闭上下文
             ragData.getQuery().putMetadata("__containHistories", false);
+        }
+    }
+
+    protected void updateConfig(RagConfig ragConfig, RagData ragData) throws Exception {
+        String replace = MapUtils.getString(ragConfig.getGlobalConfig(), FeatureField.KEY_CONFIG);
+        if (!StringUtils.isEmpty(replace)) {
+            RagService.updatePrompt(ragConfig, ragData, replace, FeatureUtils.buildConfig(ragData.getQuery()));
         }
     }
 

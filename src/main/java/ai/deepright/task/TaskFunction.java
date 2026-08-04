@@ -335,8 +335,10 @@ public class TaskFunction extends BaseFunction implements TaskResult {
     protected Map<String, Object> buildMetadata(WorkflowTask workTask, RouterDevice routerDevice) throws Exception {
         Map<String, Object> metadata = this.buildModelAndToken(workTask, routerDevice, new HashMap<String, Object>(routerDevice.getMetadata()));
         // @See CliRag
+        // KEY_KNOWLEDGE_COMMIT（是否提交知识库） 和 KEY_KNOWLEDGE（当前知识库状态）是请求级别的，需要从WorkflowTask获取
         metadata.put(FeatureField.KEY_KNOWLEDGE_COMMIT, MapUtils.getObject(workTask.getMetadata(), FeatureField.KEY_KNOWLEDGE_COMMIT));
         metadata.put(FeatureField.KEY_KNOWLEDGE, MapUtils.getObject(workTask.getMetadata(), FeatureField.KEY_KNOWLEDGE));
+        metadata.put(FeatureField.KEY_CONFIG, MapUtils.getString(routerDevice.getMetadata(), FeatureField.KEY_CONFIG));
         metadata.put(FeatureField.KEY_MEDIA, MapUtils.getMap(routerDevice.getMetadata(), FeatureField.KEY_MEDIA));
         metadata.put(FeatureField.KEY_PLUGINS_DIR, FeatureUtils.buildPluginsDir(routerDevice.getMetadata()));
         metadata.put(FeatureField.KEY_USER, FeatureUtils.buildUser(routerDevice.getMetadata()));

@@ -56,6 +56,8 @@ public interface FeatureField {
 
     public static final String KEY_SILENT = "silent";
 
+    public static final String KEY_CONFIG = "config";
+
     public static final String KEY_LOGIC = "logic";
 
     public static final String KEY_MEDIA = "media";

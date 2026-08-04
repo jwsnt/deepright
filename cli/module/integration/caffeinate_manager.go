@@ -6,6 +6,7 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -19,6 +20,59 @@ type integrationSleepConditions struct {
 	Memo   bool
 	SSE    bool
 	Task   bool
+}
+
+// integrationSSEActivity tracks every in-flight SSE request in this
+// Integration process. Unlike integrationSleepManager.activeSSE, it is
+// cross-platform and also includes the period before upstream response headers
+// arrive, so cli-get can use it to distinguish active work from standby.
+var integrationSSEActivity = struct {
+	active  atomic.Int64
+	changed chan struct{}
+}{
+	changed: make(chan struct{}, 1),
+}
+
+func signalIntegrationSSEActivityChanged() {
+	select {
+	case integrationSSEActivity.changed <- struct{}{}:
+	default:
+	}
+}
+
+func integrationHasActiveSSE() bool {
+	return integrationSSEActivity.active.Load() > 0
+}
+
+// waitForCliGetHeartbeat waits while Integration is idle. A newly started SSE
+// wakes the wait immediately so the heartbeat loop returns to its active mode.
+func waitForCliGetHeartbeat(ctx context.Context, await time.Duration) bool {
+	if integrationHasActiveSSE() {
+		return true
+	}
+	if await <= 0 {
+		select {
+		case <-ctx.Done():
+			return false
+		default:
+			return true
+		}
+	}
+
+	timer := time.NewTimer(await)
+	defer timer.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return false
+		case <-timer.C:
+			return true
+		case <-integrationSSEActivity.changed:
+			if integrationHasActiveSSE() {
+				return true
+			}
+		}
+	}
 }
 
 func (conditions integrationSleepConditions) Active() bool {
@@ -117,10 +171,22 @@ func (m *integrationSleepManager) TrackSSE() func() {
 }
 
 func trackIntegrationSSE(cfg *Config) func() {
-	if cfg == nil || cfg.sleepManager == nil {
-		return func() {}
+	integrationSSEActivity.active.Add(1)
+	signalIntegrationSSEActivityChanged()
+
+	sleepDone := func() {}
+	if cfg != nil && cfg.sleepManager != nil {
+		sleepDone = cfg.sleepManager.TrackSSE()
 	}
-	return cfg.sleepManager.TrackSSE()
+
+	var done sync.Once
+	return func() {
+		done.Do(func() {
+			integrationSSEActivity.active.Add(-1)
+			signalIntegrationSSEActivityChanged()
+			sleepDone()
+		})
+	}
 }
 
 func notifyIntegrationSleepConditionChanged(cfg *Config) {

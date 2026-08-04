@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -8,6 +9,16 @@ import (
 	"testing"
 	"time"
 )
+
+func drainIntegrationSSEActivitySignals() {
+	for {
+		select {
+		case <-integrationSSEActivity.changed:
+		default:
+			return
+		}
+	}
+}
 
 type integrationSleepAssertionStub struct {
 	mu      sync.Mutex
@@ -233,6 +244,41 @@ func TestIntegrationSleepManagerTracksSSEUntilAbnormalTermination(t *testing.T) 
 	}
 	if got := assertion.stopCount(); got != 1 {
 		t.Fatalf("stop count = %d, want one idempotent stop", got)
+	}
+}
+
+func TestTrackIntegrationSSEWakesIdleHeartbeatAndIsIdempotent(t *testing.T) {
+	previous := integrationSSEActivity.active.Swap(0)
+	drainIntegrationSSEActivitySignals()
+	t.Cleanup(func() {
+		integrationSSEActivity.active.Store(previous)
+		drainIntegrationSSEActivitySignals()
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	waited := make(chan bool, 1)
+	go func() {
+		waited <- waitForCliGetHeartbeat(ctx, time.Minute)
+	}()
+
+	finish := trackIntegrationSSE(nil)
+	select {
+	case ok := <-waited:
+		if !ok {
+			t.Fatal("idle heartbeat wait stopped unexpectedly")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("active SSE did not wake idle heartbeat wait")
+	}
+	if !integrationHasActiveSSE() {
+		t.Fatal("expected active SSE after tracking starts")
+	}
+
+	finish()
+	finish()
+	if integrationHasActiveSSE() {
+		t.Fatal("expected SSE count to return to zero after cleanup")
 	}
 }
 

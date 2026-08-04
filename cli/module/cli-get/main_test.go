@@ -1146,6 +1146,36 @@ func TestConfiguredHTTPDebugFromNestedConfig(t *testing.T) {
 	}
 }
 
+func TestConfiguredHeartbeatIntervalsFromNestedConfig(t *testing.T) {
+	sleepMs, awaitMs := configuredHeartbeatIntervalsFromRaw(map[string]interface{}{
+		"get": map[string]interface{}{
+			"sleep": json.Number("15000"),
+			"await": json.Number("30000"),
+		},
+	})
+	if sleepMs != 15000 {
+		t.Fatalf("sleep = %d, want 15000", sleepMs)
+	}
+	if awaitMs != 30000 {
+		t.Fatalf("await = %d, want 30000", awaitMs)
+	}
+}
+
+func TestConfiguredHeartbeatIntervalsRejectFractionalValues(t *testing.T) {
+	sleepMs, awaitMs := configuredHeartbeatIntervalsFromRaw(map[string]interface{}{
+		"get": map[string]interface{}{
+			"sleep": json.Number("1.5"),
+			"await": json.Number("30000.5"),
+		},
+	})
+	if sleepMs != defaultCliGetSleepMs {
+		t.Fatalf("sleep = %d, want default %d", sleepMs, defaultCliGetSleepMs)
+	}
+	if awaitMs != defaultCliGetAwaitMs {
+		t.Fatalf("await = %d, want default %d", awaitMs, defaultCliGetAwaitMs)
+	}
+}
+
 func TestConfiguredHTTPDebugIgnoresLegacyFlatKey(t *testing.T) {
 	root := t.TempDir()
 	execPath := filepath.Join(root, "integration.app", "Contents", "MacOS", "integration")

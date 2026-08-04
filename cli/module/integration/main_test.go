@@ -783,6 +783,7 @@ func TestProxyChatCompletions(t *testing.T) {
 		t.Fatalf("getwd: %v", err)
 	}
 	tmp := t.TempDir()
+	configPath := writeIntegrationDeviceConfig(t, tmp, `{}`)
 	agentDir := filepath.Join(tmp, "agent")
 	if err := copyTestDir(fixtureAgentDir, agentDir); err != nil {
 		t.Fatalf("copy agent fixture: %v", err)
@@ -823,18 +824,19 @@ func TestProxyChatCompletions(t *testing.T) {
 	defer upstream.Close()
 
 	cfg := &Config{
-		Port:         18765,
-		Host:         upstream.URL,
-		AgentDir:     agentDir,
-		Device:       "test-dev",
-		AgentCacheMs: 120000,
+		Port:              18765,
+		Host:              upstream.URL,
+		StartupConfigPath: configPath,
+		AgentDir:          agentDir,
+		Device:            "test-dev",
+		AgentCacheMs:      120000,
 	}
 	proxyClient := &http.Client{Timeout: 10 * time.Second}
 
 	server := httptest.NewServer(http.HandlerFunc(handleChatCompletions(cfg, proxyClient)))
 	defer server.Close()
 
-	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"HELLO WORLD"}],"stream":true,"metadata":{"dir":"/tmp/forged","plugins":["browser"],"port":9999}}`
+	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"HELLO WORLD"}],"stream":true,"metadata":{"config":"/tmp/forged/config.json","dir":"/tmp/forged","plugins":["browser"],"port":9999}}`
 	req, _ := http.NewRequest("POST", server.URL, strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer sk-test")
@@ -873,6 +875,9 @@ func TestProxyChatCompletions(t *testing.T) {
 	meta := capturedBody["metadata"].(map[string]interface{})
 	if meta["dir"] != tmp {
 		t.Errorf("metadata.dir = %#v, want %q", meta["dir"], tmp)
+	}
+	if meta["config"] != configPath {
+		t.Errorf("metadata.config = %#v, want %q", meta["config"], configPath)
 	}
 	if meta["deviceId"] != "test-dev" {
 		t.Errorf("deviceId = %v", meta["deviceId"])
@@ -6442,6 +6447,115 @@ func TestReadRuntimeConfigReturnsNilWhenBundledConfigMissing(t *testing.T) {
 	}
 }
 
+func TestValidateIntegrationStartupConfigFileRequiresReadableJSONFile(t *testing.T) {
+	root := t.TempDir()
+	configPath := filepath.Join(root, "config", "config.json")
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, []byte(`{"host":"https://example.com"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := validateIntegrationStartupConfigFile(configPath)
+	if err != nil {
+		t.Fatalf("validate config: %v", err)
+	}
+	if got != configPath {
+		t.Fatalf("config path = %q, want %q", got, configPath)
+	}
+
+	missingPath := filepath.Join(root, "missing", "config.json")
+	if _, err := validateIntegrationStartupConfigFile(missingPath); err == nil || !strings.Contains(err.Error(), "does not exist") {
+		t.Fatalf("missing config error = %v", err)
+	}
+
+	directoryPath := filepath.Join(root, "directory-config.json")
+	if err := os.Mkdir(directoryPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := validateIntegrationStartupConfigFile(directoryPath); err == nil || !strings.Contains(err.Error(), "regular file") {
+		t.Fatalf("directory config error = %v", err)
+	}
+
+	invalidPath := filepath.Join(root, "invalid-config.json")
+	if err := os.WriteFile(invalidPath, []byte(`{"host":`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := validateIntegrationStartupConfigFile(invalidPath); err == nil || !strings.Contains(err.Error(), "parse config/config.json") {
+		t.Fatalf("invalid config error = %v", err)
+	}
+}
+
+func TestValidateCurrentIntegrationStartupConfigFileUsesReleaseLayouts(t *testing.T) {
+	t.Run("macOS app bundle", func(t *testing.T) {
+		bundleRoot := filepath.Join(t.TempDir(), "DeepRight.app")
+		useBundledIntegrationExecutable(t, bundleRoot)
+		want := filepath.Join(bundleRoot, "Contents", "Resources", "config", "config.json")
+		if err := os.MkdirAll(filepath.Dir(want), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(want, []byte(`{}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		got, err := validateCurrentIntegrationStartupConfigFile()
+		if err != nil {
+			t.Fatalf("validate bundled config: %v", err)
+		}
+		if got != want {
+			t.Fatalf("config path = %q, want %q", got, want)
+		}
+	})
+
+	for _, name := range []string{"macOS direct binary", "Linux", "WSL"} {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			useIntegrationExecutableDir(t, root)
+			want := writeIntegrationDeviceConfig(t, root, `{}`)
+			got, err := validateCurrentIntegrationStartupConfigFile()
+			if err != nil {
+				t.Fatalf("validate direct config: %v", err)
+			}
+			if got != want {
+				t.Fatalf("config path = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+func TestRunIntegrationForegroundRejectsMissingMainConfig(t *testing.T) {
+	root := t.TempDir()
+	useIntegrationExecutableDir(t, root)
+	var stderr bytes.Buffer
+	if code := runIntegrationForeground(nil, &stderr); code != 1 {
+		t.Fatalf("exit code = %d, want 1", code)
+	}
+	wantPath := filepath.Join(root, "config", "config.json")
+	if !strings.Contains(stderr.String(), wantPath) || !strings.Contains(stderr.String(), "does not exist") {
+		t.Fatalf("stderr = %q, want missing config path %q", stderr.String(), wantPath)
+	}
+}
+
+func TestHeartbeatDoesNotSendWhenMainConfigDisappears(t *testing.T) {
+	root := t.TempDir()
+	configPath := writeIntegrationDeviceConfig(t, root, `{}`)
+	if err := os.Remove(configPath); err != nil {
+		t.Fatal(err)
+	}
+	requests := 0
+	upstream := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		requests++
+	}))
+	defer upstream.Close()
+
+	_, err := heartbeat(upstream.Client(), upstream.URL, &AgentOutput{}, &Config{StartupConfigPath: configPath})
+	if err == nil || !strings.Contains(err.Error(), "does not exist") {
+		t.Fatalf("heartbeat error = %v", err)
+	}
+	if requests != 0 {
+		t.Fatalf("upstream requests = %d, want 0", requests)
+	}
+}
+
 func TestIntegrationBundleRuntimeBaseDirUsesFixedAppSupportDirectory(t *testing.T) {
 	if runtime.GOOS != "darwin" {
 		t.Skip("bundle runtime layout is only used on darwin")
@@ -8981,6 +9095,38 @@ func TestApplyIntegrationStartupConfigSupportsSkillExtractRound(t *testing.T) {
 	}
 }
 
+func TestApplyIntegrationStartupConfigUsesNestedGetIntervals(t *testing.T) {
+	opts := defaultIntegrationStartupOptions()
+	if err := applyIntegrationStartupConfig(&opts, map[string]interface{}{
+		// Nested values take precedence over the legacy flat sleep key.
+		"sleep": json.Number("3000"),
+		"get": map[string]interface{}{
+			"sleep": json.Number("15000"),
+			"await": json.Number("30000"),
+		},
+	}); err != nil {
+		t.Fatalf("applyIntegrationStartupConfig: %v", err)
+	}
+	if opts.Config.SleepMs != 15000 {
+		t.Fatalf("SleepMs = %d, want 15000", opts.Config.SleepMs)
+	}
+	if opts.Config.AwaitMs != 30000 {
+		t.Fatalf("AwaitMs = %d, want 30000", opts.Config.AwaitMs)
+	}
+}
+
+func TestApplyIntegrationStartupConfigRejectsFractionalGetIntervals(t *testing.T) {
+	opts := defaultIntegrationStartupOptions()
+	err := applyIntegrationStartupConfig(&opts, map[string]interface{}{
+		"get": map[string]interface{}{
+			"sleep": json.Number("15000.5"),
+		},
+	})
+	if err == nil {
+		t.Fatal("expected fractional get.sleep to be rejected")
+	}
+}
+
 func TestIntegrationStartupConfigKeyAliasesSkillCreateToSkillExtract(t *testing.T) {
 	got := integrationStartupConfigKeys[normalizeIntegrationStartupConfigKey("skill_create")]
 	if got != "skill_extract" {
@@ -10997,6 +11143,7 @@ func TestCliGetHeartbeatAndExecute(t *testing.T) {
 		t.Fatalf("getwd: %v", err)
 	}
 	tmp := t.TempDir()
+	configPath := writeIntegrationDeviceConfig(t, tmp, `{}`)
 	if err := os.MkdirAll(filepath.Join(tmp, "knowledge"), 0o755); err != nil {
 		t.Fatalf("mkdir knowledge: %v", err)
 	}
@@ -11007,6 +11154,7 @@ func TestCliGetHeartbeatAndExecute(t *testing.T) {
 
 	var capturedGet map[string]interface{}
 	var capturedPub PubRequest
+	var capturedPubRaw map[string]interface{}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/cli/get", func(w http.ResponseWriter, r *http.Request) {
@@ -11031,6 +11179,7 @@ func TestCliGetHeartbeatAndExecute(t *testing.T) {
 	mux.HandleFunc("/cli/pub", func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		json.Unmarshal(body, &capturedPub)
+		json.Unmarshal(body, &capturedPubRaw)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(ResponsePayload{Code: 200})
 	})
@@ -11055,7 +11204,8 @@ func TestCliGetHeartbeatAndExecute(t *testing.T) {
 	}
 
 	// Test heartbeat
-	task, err := heartbeat(client, server.URL, metadata, &Config{Port: 18766, AgentDir: filepath.Join(tmp, "agent")})
+	upstreamCfg := &Config{Port: 18766, StartupConfigPath: configPath, AgentDir: filepath.Join(tmp, "agent")}
+	task, err := heartbeat(client, server.URL, metadata, upstreamCfg)
 	if err != nil {
 		t.Fatalf("heartbeat: %v", err)
 	}
@@ -11084,6 +11234,9 @@ func TestCliGetHeartbeatAndExecute(t *testing.T) {
 	getMeta := capturedGet["metadata"].(map[string]interface{})
 	if getMeta["dir"] != tmp {
 		t.Errorf("get metadata.dir = %#v, want %q", getMeta["dir"], tmp)
+	}
+	if getMeta["config"] != configPath {
+		t.Errorf("get metadata.config = %#v, want %q", getMeta["config"], configPath)
 	}
 	if getMeta["deviceId"] != "d" {
 		t.Errorf("get deviceId = %v", getMeta["deviceId"])
@@ -11141,7 +11294,7 @@ func TestCliGetHeartbeatAndExecute(t *testing.T) {
 	}
 
 	// Test publish
-	if err := publishResult(client, server.URL, result, metadata, nil); err != nil {
+	if err := publishResult(client, server.URL, result, metadata, upstreamCfg); err != nil {
 		t.Fatalf("publish: %v", err)
 	}
 	if capturedPub.Model != "" {
@@ -11155,6 +11308,13 @@ func TestCliGetHeartbeatAndExecute(t *testing.T) {
 	}
 	if capturedPub.Metadata.Knowledge == nil {
 		t.Fatal("pub metadata knowledge should not be nil")
+	}
+	pubMetadata, ok := capturedPubRaw["metadata"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("pub metadata = %#v", capturedPubRaw["metadata"])
+	}
+	if _, found := pubMetadata["config"]; found {
+		t.Fatalf("/cli/pub must not include metadata.config: %#v", pubMetadata)
 	}
 	var pubResult ResultPayload
 	json.Unmarshal([]byte(capturedPub.Messages[0].Content), &pubResult)
@@ -14298,6 +14458,7 @@ func TestCronExecuteOnceInjectsMetaIDAndCronTypeIntoRequestMetadata(t *testing.T
 		t.Fatalf("getwd: %v", err)
 	}
 	tmp := t.TempDir()
+	configPath := writeIntegrationDeviceConfig(t, tmp, `{}`)
 	if err := os.Chdir(tmp); err != nil {
 		t.Fatalf("chdir: %v", err)
 	}
@@ -14372,10 +14533,11 @@ func TestCronExecuteOnceInjectsMetaIDAndCronTypeIntoRequestMetadata(t *testing.T
 	defer upstream.Close()
 
 	cfg := &Config{
-		Host:         upstream.URL,
-		AgentDir:     agentRoot,
-		Device:       "dev",
-		AgentCacheMs: 120000,
+		Host:              upstream.URL,
+		StartupConfigPath: configPath,
+		AgentDir:          agentRoot,
+		Device:            "dev",
+		AgentCacheMs:      120000,
 	}
 	proxyClient := &http.Client{Timeout: 5 * time.Second}
 	connectSvc, err := newIntegrationConnectService(agentRoot)
@@ -14836,11 +14998,13 @@ func TestCronAgentStopHTTPPersistsByAgent(t *testing.T) {
 }
 
 func TestCronExecuteOnceInjectsDefaultCronTypeIntoRequestMetadata(t *testing.T) {
+	disableIntegrationNotificationsForTest(t)
 	oldwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("getwd: %v", err)
 	}
 	tmp := t.TempDir()
+	configPath := writeIntegrationDeviceConfig(t, tmp, `{}`)
 	if err := os.Chdir(tmp); err != nil {
 		t.Fatalf("chdir: %v", err)
 	}
@@ -14906,10 +15070,11 @@ func TestCronExecuteOnceInjectsDefaultCronTypeIntoRequestMetadata(t *testing.T) 
 	defer upstream.Close()
 
 	cfg := &Config{
-		Host:         upstream.URL,
-		AgentDir:     agentRoot,
-		Device:       "dev",
-		AgentCacheMs: 120000,
+		Host:              upstream.URL,
+		StartupConfigPath: configPath,
+		AgentDir:          agentRoot,
+		Device:            "dev",
+		AgentCacheMs:      120000,
 	}
 	proxyClient := &http.Client{Timeout: 5 * time.Second}
 	connectSvc, err := newIntegrationConnectService(agentRoot)
@@ -14948,6 +15113,9 @@ func TestCronExecuteOnceInjectsDefaultCronTypeIntoRequestMetadata(t *testing.T) 
 	}
 	if metadata["cron_type"] != defaultTaskType {
 		t.Fatalf("metadata cron_type = %v, want %s", metadata["cron_type"], defaultTaskType)
+	}
+	if metadata["config"] != configPath {
+		t.Fatalf("metadata.config = %#v, want %q", metadata["config"], configPath)
 	}
 	if _, exists := metadata["META_ID"]; exists {
 		t.Fatalf("metadata META_ID should be absent when meta_ref is empty: %+v", metadata)
@@ -22721,7 +22889,7 @@ func TestIntegrationModelProviderCatalogUsesStartupCache(t *testing.T) {
 	}
 }
 
-func writeModelTestRuntimeConfig(t *testing.T, content string) {
+func writeModelTestRuntimeConfig(t *testing.T, content string) string {
 	t.Helper()
 	root := t.TempDir()
 	useIntegrationExecutableDir(t, root)
@@ -22731,6 +22899,7 @@ func writeModelTestRuntimeConfig(t *testing.T, content string) {
 	if err := os.WriteFile(filepath.Join(root, "config", "config.json"), []byte(content), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
+	return filepath.Join(root, "config", "config.json")
 }
 
 func newLocalModelTestRequest(body string) *http.Request {
@@ -22778,7 +22947,7 @@ func TestDecodeModelTestRequestValidatesBaseURL(t *testing.T) {
 }
 
 func TestHandleModelTestUsesTransientConfigurationAndReturnsSuccess(t *testing.T) {
-	writeModelTestRuntimeConfig(t, `{"test":{"content":"runtime probe","timeout":10}}`)
+	configPath := writeModelTestRuntimeConfig(t, `{"test":{"content":"runtime probe","timeout":10}}`)
 	workspace := t.TempDir()
 	var captured map[string]interface{}
 	var authorization string
@@ -22790,7 +22959,7 @@ func TestHandleModelTestUsesTransientConfigurationAndReturnsSuccess(t *testing.T
 	}))
 	defer upstream.Close()
 
-	handler := handleModelTest(&Config{Host: upstream.URL, AgentDir: workspace, Device: "test-device", Port: 17896}, upstream.Client())
+	handler := handleModelTest(&Config{Host: upstream.URL, StartupConfigPath: configPath, AgentDir: workspace, Device: "test-device", Port: 17896}, upstream.Client())
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, newLocalModelTestRequest(`{"model":"deepseek","token":"Bearer transient-token","__url":"https://draft.example/v1","__model":"deepseek-draft","__model_fast":"fast-draft"}`))
 
@@ -22809,6 +22978,9 @@ func TestHandleModelTestUsesTransientConfigurationAndReturnsSuccess(t *testing.T
 	}
 	if metadata["test"] != true || metadata["type"] != "test" || metadata["provider"] != "deepseek" {
 		t.Fatalf("test metadata = %#v", metadata)
+	}
+	if metadata["config"] != configPath {
+		t.Fatalf("metadata.config = %#v, want %q", metadata["config"], configPath)
 	}
 	chatID, _ := metadata["chat"].(string)
 	if !regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`).MatchString(chatID) {

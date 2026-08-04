@@ -218,7 +218,7 @@ SSE 在开始、正常完成及异常结束时都会立即重算；上游错误�
 | `--knowledge_update_interval` | 否 | `7200000` | knowledge `lastUpdate` 透传阈值（毫秒） | proxy |
 | `--knowledge_update_lock` | 否 | `1800000` | knowledge 更新申请锁窗口（毫秒） | proxy |
 | `--reply` | 否 | `<开始执行>可通过新消息更新任务内容` | 三方插件开始执行时的推送文案 | proxy |
-| `--sleep` | 否 | `3000` | cli-get 心跳请求失败或非 200 时的重试等待时间（毫秒） | cli-get |
+| `--sleep` | 否 | `config.json.get.sleep`（当前为 `15000`） | cli-get 心跳请求失败或队列满时的等待时间；显式传入时覆盖配置值 | cli-get |
 | `--thread` | 否 | `20` | 执行 Worker 数量 | cli-get |
 | `--queue` | 否 | `1000` | cli-get 本地任务队列容量；队列满时暂停发 `/cli/get` | cli-get |
 | `--retry_interval` | 否 | `10000` | cli-get `/cli/pub` 失败后的重试等待时间（毫秒） | cli-get |
@@ -243,6 +243,23 @@ Integration 每次启动会确定一个最终生效的监听端口，并在所�
   }
 }
 ```
+
+### 上游请求 `metadata.config`
+
+Integration 启动时会验证主 `config/config.json`，并在以下上游请求的顶层 metadata 中写入该文件的绝对路径：内置 `/cli/get` 心跳、普通会话、备忘录任务（包括飞书和邮件 Connect 消息触发的即时任务）以及设置页模型测试的 `/v1/chat/completions` 请求。
+
+```json
+{
+  "metadata": {
+    "config": "/home/user/deepright/config/config.json"
+  }
+}
+```
+
+- macOS `.app` 使用 `<App>.app/Contents/Resources/config/config.json`；直接运行的 macOS 二进制、Linux 和 WSL 使用 `<integration 可执行文件所在目录>/config/config.json`，常规 WSL 安装通常为 `~/deepright/config/config.json`。
+- `config` 由 Integration 在转发前强制写入；浏览器请求中同名字段会被覆盖，Agent 工作目录中的 `config.json` 不会被使用。
+- `/cli/pub` 不携带该字段，独立 `cli-get` 程序也不在此规则内。
+- 配置文件缺失、不是普通文件、不可读或 JSON 非法时，Integration 无法启动。服务运行期间文件变为无效时，以上请求会在本机失败而不会向上游发送。
 
 ### `device` 解析与热更新
 
@@ -878,6 +895,7 @@ curl http://127.0.0.1:8080/install_app
 ### 静态 `config/config.json` 与运行状态
 
 - `config/config.json` 是发布包提供的静态默认配置。HTTP 服务启动不会写回 `app`、`app-dir`、`resources-dir`、`db`、PID、日志、端口、超时、缓存、重试或设备等派生值。
+- 该文件也是启动必需资源：必须存在、为可读普通文件且包含合法 JSON；Integration 不会创建、复制或从运行目录、当前目录或 Agent 工作目录回退寻找配置。
 - 本地 HTTP 端口的优先级为：显式 `--port`、静态 `config/config.json` 的 `port`、默认 `8080`；端口必须介于 `1` 与 `65535` 之间。
 - `knowledge` 元数据继续基于 `agent-dir` 和共享 SQLite 解析；知识库目录固定取 `--agent-dir/knowledge`，共享 SQLite 默认取 `<app-dir>/data`。
 
@@ -1842,6 +1860,8 @@ Integration 与 proxy 保持一致，统一提供模型密钥读写接口。
 - `integration` 内置的 `cli-get` 当前实际为两段式流水线：
   - `cli/get -> taskQueue -> execute workers -> publishQueue -> cli/pub`
 - 心跳线程不会因为执行 Worker 正忙而阻塞；只有当本地 `taskQueue` 已满时，才会暂停发新的 `/cli/get`
+- 有任一会话、备忘录、飞书或邮件 SSE 未终态时，成功的 `/cli/get` 会立即进行下一轮；任务只入队，不等待执行或 `/cli/pub`
+- 所有 SSE 终态后，成功的 `/cli/get` 按 `config.json.get.await`（当前 `30000ms`）等待下一轮，以降低待机访问频次
 - 本地 `taskQueue` 是纯内存队列，不做持久化恢复
 - 执行 Worker 在真正执行前会重新检查任务 `ddl`
 - 如果当前时间已超过 `ddl`：

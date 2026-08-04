@@ -2422,6 +2422,26 @@ func injectApplicationDataDirMetadata(metaMap map[string]interface{}, agentDir s
 	}
 }
 
+// injectIntegrationConfigPathMetadata makes config a runtime-owned upstream
+// metadata field. The path is checked immediately before sending so a deleted
+// or unreadable main configuration cannot be advertised to the upstream.
+func injectIntegrationConfigPathMetadata(metaMap map[string]interface{}, cfg *Config) error {
+	if metaMap == nil || cfg == nil {
+		return nil
+	}
+	configPath := strings.TrimSpace(cfg.StartupConfigPath)
+	if configPath == "" {
+		return nil
+	}
+	configPath, err := validateIntegrationStartupConfigFile(configPath)
+	if err != nil {
+		return err
+	}
+	delete(metaMap, "config")
+	metaMap["config"] = configPath
+	return nil
+}
+
 func resolveCurrentPageSessionChatID() string {
 	if cronDB == nil {
 		return ""
@@ -2906,6 +2926,9 @@ func heartbeat(client *http.Client, host string, metadata *AgentOutput, cfg *Con
 	metaMap := buildCLIRequestMetadataMap(metadata)
 	if cfg != nil {
 		injectApplicationDataDirMetadata(metaMap, cfg.AgentDir)
+	}
+	if err := injectIntegrationConfigPathMetadata(metaMap, cfg); err != nil {
+		return nil, fmt.Errorf("validate integration config: %w", err)
 	}
 	currentChatID := resolveCurrentPageSessionChatID()
 	injectMCPMetadataForAgent(cfg, metadata, metaMap, resolveCurrentPageSessionAgentID(currentChatID))
@@ -3429,9 +3452,18 @@ func startCliGet(ctx context.Context, cfg *Config) {
 		log.Printf("cli-get: invalid retry_times=%d", cfg.RetryTimes)
 		return
 	}
+	if cfg.SleepMs < 0 {
+		log.Printf("cli-get: invalid sleep=%d", cfg.SleepMs)
+		return
+	}
+	if cfg.AwaitMs < 0 {
+		log.Printf("cli-get: invalid get.await=%d", cfg.AwaitMs)
+		return
+	}
 
 	agentTTL := time.Duration(cfg.AgentCacheMs) * time.Millisecond
 	sleepDur := time.Duration(cfg.SleepMs) * time.Millisecond
+	awaitDur := time.Duration(cfg.AwaitMs) * time.Millisecond
 	retryInterval := time.Duration(cfg.RetryIntervalMs) * time.Millisecond
 	heartbeatBackoff := sleepDur
 	maxHeartbeatBackoff := 15 * time.Second
@@ -3445,8 +3477,8 @@ func startCliGet(ctx context.Context, cfg *Config) {
 		go runCliGetPublishWorker(ctx, client, publishQueue, retryInterval, cfg.RetryTimes, cfg)
 	}
 
-	log.Printf("cli-get: started (host=%s, threads=%d, queue=%d, sleep=%dms, retry_interval=%dms, retry_times=%d)",
-		cfg.currentHost(), cfg.Thread, cfg.Queue, cfg.SleepMs, cfg.RetryIntervalMs, cfg.RetryTimes)
+	log.Printf("cli-get: started (host=%s, threads=%d, queue=%d, sleep=%dms, await=%dms, retry_interval=%dms, retry_times=%d)",
+		cfg.currentHost(), cfg.Thread, cfg.Queue, cfg.SleepMs, cfg.AwaitMs, cfg.RetryIntervalMs, cfg.RetryTimes)
 
 	go func() {
 		defer closeHTTPClientIdleConnections(client)
@@ -3496,18 +3528,24 @@ func startCliGet(ctx context.Context, cfg *Config) {
 			heartbeatBackoff = sleepDur
 			if task == nil {
 				recordHeartbeat(0, "") // success, no task
-				continue
-			}
-			recordHeartbeat(2, "") // success, has task
-			t := *task
-			select {
-			case <-ctx.Done():
-				return
-			case taskQueue <- queuedCliGetTask{task: t, metadata: metadata}:
-				recordCliGetRuntimeEvent(cliGetRuntimeSnapshot{PendingTasks: 1})
-				if integrationHTTPDebugEnabled(cfg) {
-					log.Printf("cli-get: task queued tid=%s pending=%d capacity=%d", strings.TrimSpace(t.Tid), len(taskQueue), cap(taskQueue))
+			} else {
+				recordHeartbeat(2, "") // success, has task
+				t := *task
+				select {
+				case <-ctx.Done():
+					return
+				case taskQueue <- queuedCliGetTask{task: t, metadata: metadata}:
+					recordCliGetRuntimeEvent(cliGetRuntimeSnapshot{PendingTasks: 1})
+					if integrationHTTPDebugEnabled(cfg) {
+						log.Printf("cli-get: task queued tid=%s pending=%d capacity=%d", strings.TrimSpace(t.Tid), len(taskQueue), cap(taskQueue))
+					}
 				}
+			}
+			// While any session, memo, Feishu, or mail SSE is in flight, retain
+			// immediate heartbeats. Idle Integration instances wait between
+			// successful cli/get requests to reduce standby polling.
+			if !waitForCliGetHeartbeat(ctx, awaitDur) {
+				return
 			}
 		}
 	}()
@@ -11087,7 +11125,17 @@ func handleModelTest(cfg *Config, proxyClient *http.Client) http.HandlerFunc {
 
 		ctx, cancel := context.WithTimeout(r.Context(), testConfig.Timeout)
 		defer cancel()
-		requestBody, err := json.Marshal(buildModelTestUpstreamRequest(cfg, request, sessionID, testConfig.Content))
+		upstreamPayload := buildModelTestUpstreamRequest(cfg, request, sessionID, testConfig.Content)
+		metadata, ok := upstreamPayload["metadata"].(map[string]interface{})
+		if !ok {
+			writeModelTestJSONError(w, http.StatusInternalServerError, "创建测试请求失败")
+			return
+		}
+		if err := injectIntegrationConfigPathMetadata(metadata, cfg); err != nil {
+			writeModelTestJSONError(w, http.StatusInternalServerError, "配置错误：Integration 主配置不可用")
+			return
+		}
+		requestBody, err := json.Marshal(upstreamPayload)
 		if err != nil {
 			writeModelTestJSONError(w, http.StatusInternalServerError, "创建测试请求失败")
 			return
@@ -11106,6 +11154,8 @@ func handleModelTest(cfg *Config, proxyClient *http.Client) http.HandlerFunc {
 		if client == nil {
 			client = http.DefaultClient
 		}
+		finishSSE := trackIntegrationSSE(cfg)
+		defer finishSSE()
 		resp, err := client.Do(upstreamReq)
 		if err != nil {
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
@@ -11135,8 +11185,6 @@ func handleModelTest(cfg *Config, proxyClient *http.Client) http.HandlerFunc {
 			writeModelTestJSONError(w, http.StatusBadGateway, message)
 			return
 		}
-		defer trackIntegrationSSE(cfg)()
-
 		w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("X-Accel-Buffering", "no")
@@ -16868,6 +16916,11 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 			mm["type"] = chatType
 			pruneForwardedChatMetadata(mm)
 			injectApplicationDataDirMetadata(mm, cfg.AgentDir)
+			if err := injectIntegrationConfigPathMetadata(mm, cfg); err != nil {
+				log.Printf("proxy: integration config unavailable: %v", err)
+				http.Error(w, "Integration configuration is unavailable", http.StatusInternalServerError)
+				return
+			}
 		}
 
 		if err := normalizeForwardedChatRequest(reqData); err != nil {
@@ -16939,6 +16992,8 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 		proxyReq.Header.Set("Content-Length", fmt.Sprintf("%d", len(newBody)))
 		proxyReq.Header.Set("Accept", "text/event-stream")
 
+		finishSSE := trackIntegrationSSE(cfg)
+		defer finishSSE()
 		resp, err := proxyClient.Do(proxyReq)
 		if err != nil {
 			releaseActiveConn(key, active)
@@ -16956,7 +17011,6 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 			return
 		}
 		defer resp.Body.Close()
-		defer trackIntegrationSSE(cfg)()
 
 		for k, vv := range resp.Header {
 			for _, v := range vv {
@@ -17532,18 +17586,21 @@ func (cfg *Config) effectiveDeviceID() string {
 
 type Config struct {
 	// Shared
-	Port           int
-	Host           string
-	RuntimeHost    *runtimehost.State
-	Standalone     *integrationstandalone.State
-	AgentDir       string
-	DefaultDir     string
-	Device         string
-	DeviceState    *integrationDeviceState
-	AgentCacheMs   int
-	ConnectCacheMs int
-	Site           string
-	Provider       map[string]map[string]string
+	Port int
+	Host string
+	// StartupConfigPath is the verified absolute path of the static main
+	// config/config.json used to start this Integration process.
+	StartupConfigPath string
+	RuntimeHost       *runtimehost.State
+	Standalone        *integrationstandalone.State
+	AgentDir          string
+	DefaultDir        string
+	Device            string
+	DeviceState       *integrationDeviceState
+	AgentCacheMs      int
+	ConnectCacheMs    int
+	Site              string
+	Provider          map[string]map[string]string
 
 	// Proxy specific
 	ConnectTimeoutMs          int
@@ -17553,6 +17610,7 @@ type Config struct {
 
 	// cli-get specific
 	SleepMs           int
+	AwaitMs           int
 	Thread            int
 	Queue             int
 	RetryIntervalMs   int
@@ -17851,6 +17909,7 @@ func defaultIntegrationStartupOptions() integrationStartupOptions {
 			KnowledgeUpdateLockMs:     1800000,
 			Reply:                     "",
 			SleepMs:                   3000,
+			AwaitMs:                   30000,
 			Thread:                    20,
 			Queue:                     1000,
 			RetryIntervalMs:           10000,
@@ -17891,6 +17950,7 @@ var integrationStartupConfigKeys = map[string]string{
 	"knowledgeupdateinterval": "knowledge_update_interval",
 	"knowledgeupdatelock":     "knowledge_update_lock",
 	"reply":                   "reply",
+	"get":                     "get",
 	"sleep":                   "sleep",
 	"thread":                  "thread",
 	"queue":                   "queue",
@@ -17935,6 +17995,43 @@ func integrationBundledStartupConfigPath() string {
 // a newer application package can supply new configuration fields on upgrade.
 func integrationStartupConfigPath() string {
 	return integrationBundledStartupConfigPath()
+}
+
+func validateIntegrationStartupConfigFile(path string) (string, error) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return "", fmt.Errorf("config/config.json path is unavailable")
+	}
+	absolutePath, err := filepath.Abs(path)
+	if err != nil {
+		return "", fmt.Errorf("resolve absolute config path: %w", err)
+	}
+	absolutePath = filepath.Clean(absolutePath)
+	info, err := os.Stat(absolutePath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return absolutePath, fmt.Errorf("config/config.json does not exist")
+		}
+		return absolutePath, fmt.Errorf("stat config/config.json: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return absolutePath, fmt.Errorf("config/config.json is not a regular file")
+	}
+	data, err := os.ReadFile(absolutePath)
+	if err != nil {
+		return absolutePath, fmt.Errorf("read config/config.json: %w", err)
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	var raw map[string]interface{}
+	if err := decoder.Decode(&raw); err != nil {
+		return absolutePath, fmt.Errorf("parse config/config.json: %w", err)
+	}
+	return absolutePath, nil
+}
+
+func validateCurrentIntegrationStartupConfigFile() (string, error) {
+	return validateIntegrationStartupConfigFile(integrationStartupConfigPath())
 }
 
 func readIntegrationStartupConfigRaw() (map[string]interface{}, string, error) {
@@ -18209,6 +18306,46 @@ func assignIntegrationStartupConfigBool(raw interface{}, name string, target *bo
 	return nil
 }
 
+func applyIntegrationHeartbeatConfig(raw interface{}, cfg *Config) error {
+	if cfg == nil {
+		return nil
+	}
+	values, ok := raw.(map[string]interface{})
+	if !ok || values == nil {
+		return fmt.Errorf("get must be an object")
+	}
+	if value, ok := values["sleep"]; ok {
+		if err := assignIntegrationHeartbeatMilliseconds(value, "get.sleep", &cfg.SleepMs); err != nil {
+			return err
+		}
+	}
+	if value, ok := values["await"]; ok {
+		if err := assignIntegrationHeartbeatMilliseconds(value, "get.await", &cfg.AwaitMs); err != nil {
+			return err
+		}
+	}
+	if cfg.SleepMs < 0 {
+		return fmt.Errorf("get.sleep must be >= 0")
+	}
+	if cfg.AwaitMs < 0 {
+		return fmt.Errorf("get.await must be >= 0")
+	}
+	return nil
+}
+
+func assignIntegrationHeartbeatMilliseconds(raw interface{}, name string, target *int) error {
+	value, ok := raw.(json.Number)
+	if !ok {
+		return fmt.Errorf("%s must be a non-negative integer", name)
+	}
+	milliseconds, err := value.Int64()
+	if err != nil || milliseconds < 0 || milliseconds > int64(^uint(0)>>1) {
+		return fmt.Errorf("%s must be a non-negative integer", name)
+	}
+	*target = int(milliseconds)
+	return nil
+}
+
 func applyIntegrationStartupConfig(opts *integrationStartupOptions, values map[string]interface{}) error {
 	if opts == nil || values == nil {
 		return nil
@@ -18320,6 +18457,13 @@ func applyIntegrationStartupConfig(opts *integrationStartupOptions, values map[s
 			if value := strings.TrimSpace(fmt.Sprint(raw)); value != "" {
 				opts.LogFile = value
 			}
+		}
+	}
+	// The nested get block is the current heartbeat configuration. Apply it
+	// last so its values consistently take precedence over legacy flat keys.
+	if raw, ok := values["get"]; ok {
+		if err := applyIntegrationHeartbeatConfig(raw, &opts.Config); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -20277,6 +20421,15 @@ func handleShutdown(controller *integrationShutdownController) http.HandlerFunc 
 
 func runIntegrationForeground(args []string, stderr io.Writer) int {
 	flags := parseTopLevelFlags(args)
+	configPath, err := validateCurrentIntegrationStartupConfigFile()
+	if err != nil {
+		if strings.TrimSpace(configPath) != "" {
+			fmt.Fprintf(stderr, "%s: %v\n", configPath, err)
+		} else {
+			fmt.Fprintf(stderr, "%v\n", err)
+		}
+		return 1
+	}
 	startupOpts, configPath, err := loadIntegrationStartupOptionsWithPortOverride(strings.TrimSpace(flags["port"]) != "")
 	if err != nil {
 		if strings.TrimSpace(configPath) != "" {
@@ -20299,6 +20452,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return 1
 	}
+	cfg.StartupConfigPath = configPath
 	explicitDevice, _ := integrationFlagValue(fs, "device")
 
 	logFilePath := integrationLogFilePath(map[string]string{"log-file": logFileFlag})
@@ -20669,6 +20823,14 @@ func startIntegrationProcess(flags map[string]string, stdout, stderr io.Writer) 
 	flags = mergeIntegrationRuntimeFlags(flags)
 	if err := validateIntegrationTopLevelPortFlag(flags); err != nil {
 		fmt.Fprintln(stderr, err.Error())
+		return 1
+	}
+	if configPath, err := validateCurrentIntegrationStartupConfigFile(); err != nil {
+		if strings.TrimSpace(configPath) != "" {
+			fmt.Fprintf(stderr, "%s: %v\n", configPath, err)
+		} else {
+			fmt.Fprintln(stderr, err)
+		}
 		return 1
 	}
 	pidFile := integrationPIDFilePath(flags)
@@ -23468,6 +23630,10 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 		metaMap["verify"] = t.Verify
 		metaMap["router_disable"] = t.RouterDisable
 		injectApplicationDataDirMetadata(metaMap, cfg.AgentDir)
+		if err := injectIntegrationConfigPathMetadata(metaMap, cfg); err != nil {
+			failScheduledTaskDetail(t.ID, t.AgentID, chatID, fmt.Errorf("validate integration config: %w", err))
+			continue
+		}
 		injectMCPMetadata(cfg, metadata, metaMap)
 		injectLiveAgentMediaIntoAgentList(metaMap)
 		injectLiveAgentKnowledgeIntoAgentList(metaMap)
@@ -23530,6 +23696,8 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 				req.Header.Set("Authorization", token)
 			}
 
+			finishSSE := trackIntegrationSSE(cfg)
+			defer finishSSE()
 			resp, err := proxyClient.Do(req)
 			if err != nil {
 				failScheduledTaskDetail(dID, agentID, cID, fmt.Errorf("forward upstream request: %w", err))
@@ -23537,7 +23705,6 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 				return
 			}
 			defer resp.Body.Close()
-			defer trackIntegrationSSE(cfg)()
 
 			payload, readErr := readScheduledTaskSSEBody(resp.Body, scheduledTaskReadTimeout(cfg))
 			if len(payload) > 0 {
