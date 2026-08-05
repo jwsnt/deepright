@@ -26,9 +26,9 @@
     "timeout": 60,
     "retry": 5
   },
-  "ffmpeg": {
+  "bubblewrap": {
     "check": 24,
-    "install": "检测系统、CPU架构与包管理器。安装稳定版`FFmpeg 8.1.2`，不得使用开发版、其他版本或来源不明的二进制。官方源`https://ffmpeg.org/download.html`，安装包必须提供ffmpeg与ffprobe。官方安装或验证失败时，回退国内源`https://mirrors.tuna.tsinghua.edu.cn/`中匹配系统和架构的FFmpeg 8.1.2包。执行`ffmpeg -version`和`ffprobe -version`验证。安装完成后将本项所需命令所在目录加入系统PATH，不得仅写入用户`.bashrc`。为使已运行的服务无需重启即可发现命令，cmd子任务必须按平台选择已在服务PATH中的系统目录。WSL/Linux使用`/usr/local/bin`。macOS优先使用`$(brew --prefix)/bin`，无Homebrew时Apple Silicon使用`/opt/homebrew/bin`，Intel使用`/usr/local/bin`。在所选目录为每个受服务调用的已验证可执行文件创建或刷新符号链接，并在新的非交互式shell中使用`command -v`确认服务可以发现命令。断点续传和普通下载必须绑定当前下载源的sourceId、revision、文件路径、ETag或Last-Modified与该源metadata。主源失败切换备用源时，删除未完成的`.part`与状态文件，重新读取备用源自身metadata后从0开始下载，不得复用主源的size、hash、ETag、断点或分片。若`.gitattributes`、README、模型卡等非运行时metadata与主源不一致，按当前源metadata记录，不得判为损坏。运行所需权重、配置、词表与二进制优先校验发布方hash，无hash时只校验当前源metadata的size。不同源分片不得混合。输出实际下载地址、版本、可执行文件绝对路径与结果。安装流程结束后，删除本次产生的下载临时文件、下载脚本以及测试和验证脚本，不得删除已安装的可执行文件、必要配置或用户已有文件。"
+    "install": "检测当前WSL/Linux发行版、CPU架构和包管理器，仅安装发行版官方稳定包`bubblewrap`，其可执行命令必须为`bwrap`。Debian/Ubuntu优先使用`apt`，Fedora/RHEL使用`dnf`，Arch使用`pacman`，不要下载来源不明的预编译二进制，也不要在macOS或Windows宿主机安装。安装完成后执行`bwrap --version`，并在新的非交互式shell中使用`command -v bwrap`验证命令。若服务PATH未包含该命令目录，WSL/Linux仅可在`/usr/local/bin`为已验证的`bwrap`创建或刷新符号链接。不得只写入用户`.bashrc`。输出实际安装源、版本、`bwrap`绝对路径与验证结果。安装流程结束后删除本次产生的下载临时文件、下载脚本以及测试和验证脚本，不得删除系统包、已安装的可执行文件、必要配置或用户已有文件。"
   },
   "whisper": {
     "check": 24,
@@ -41,6 +41,10 @@
   "wav2lip": {
     "check": 24,
     "install": "定位兼容的CPython3.11，记录绝对路径为`$PYTHON`。官方Python源`https://www.python.org/downloads/`，官方PyPI源`https://pypi.org/simple`。固定安装`torch==2.5.1`和`torchvision==0.20.1`。官方代码源`https://github.com/Rudrabha/Wav2Lip.git`，固定提交`bac9a81e63ecc153202353372e5724b83d9e6322`，官方权重说明`https://github.com/Rudrabha/Wav2Lip#pre-trained-models`。官方安装失败时，Python回退`https://mirrors.tuna.tsinghua.edu.cn/python/`，pip回退`https://pypi.tuna.tsinghua.edu.cn/simple`，代码回退`https://ghproxy.net/https://github.com/Rudrabha/Wav2Lip.git`，权重回退`https://hf-mirror.com/camenduru/Wav2Lip/resolve/main/checkpoints/wav2lip_gan.pth`。权重写入`$workspace/wav2lip/checkpoints/wav2lip_gan.pth`。用同一解释器执行`inference.py --help`并完成最小推理。安装完成后将本项所需命令所在目录加入系统PATH，不得仅写入用户`.bashrc`。为使已运行的服务无需重启即可发现命令，cmd子任务必须按平台选择已在服务PATH中的系统目录。WSL/Linux使用`/usr/local/bin`。macOS优先使用`$(brew --prefix)/bin`，无Homebrew时Apple Silicon使用`/opt/homebrew/bin`，Intel使用`/usr/local/bin`。在所选目录为每个受服务调用的已验证可执行文件创建或刷新符号链接，并在新的非交互式shell中使用`command -v`确认服务可以发现命令。断点续传和普通下载必须绑定当前下载源的sourceId、revision、文件路径、ETag或Last-Modified与该源metadata。主源失败切换备用源时，删除未完成的`.part`与状态文件，重新读取备用源自身metadata后从0开始下载，不得复用主源的size、hash、ETag、断点或分片。若`.gitattributes`、README、模型卡等非运行时metadata与主源不一致，按当前源metadata记录，不得判为损坏。运行所需权重、配置、词表与二进制优先校验发布方hash，无hash时只校验当前源metadata的size。不同源分片不得混合。输出实际下载地址、提交号、包版本、权重路径、设备与结果。"
+  },
+  "ffmpeg": {
+    "check": 24,
+    "install": "检测系统、CPU架构与包管理器。安装稳定版`FFmpeg 8.1.2`，不得使用开发版、其他版本或来源不明的二进制。官方源`https://ffmpeg.org/download.html`，安装包必须提供ffmpeg与ffprobe。官方安装或验证失败时，回退国内源`https://mirrors.tuna.tsinghua.edu.cn/`中匹配系统和架构的FFmpeg 8.1.2包。执行`ffmpeg -version`和`ffprobe -version`验证。安装完成后将本项所需命令所在目录加入系统PATH，不得仅写入用户`.bashrc`。为使已运行的服务无需重启即可发现命令，cmd子任务必须按平台选择已在服务PATH中的系统目录。WSL/Linux使用`/usr/local/bin`。macOS优先使用`$(brew --prefix)/bin`，无Homebrew时Apple Silicon使用`/opt/homebrew/bin`，Intel使用`/usr/local/bin`。在所选目录为每个受服务调用的已验证可执行文件创建或刷新符号链接，并在新的非交互式shell中使用`command -v`确认服务可以发现命令。断点续传和普通下载必须绑定当前下载源的sourceId、revision、文件路径、ETag或Last-Modified与该源metadata。主源失败切换备用源时，删除未完成的`.part`与状态文件，重新读取备用源自身metadata后从0开始下载，不得复用主源的size、hash、ETag、断点或分片。若`.gitattributes`、README、模型卡等非运行时metadata与主源不一致，按当前源metadata记录，不得判为损坏。运行所需权重、配置、词表与二进制优先校验发布方hash，无hash时只校验当前源metadata的size。不同源分片不得混合。输出实际下载地址、版本、可执行文件绝对路径与结果。安装流程结束后，删除本次产生的下载临时文件、下载脚本以及测试和验证脚本，不得删除已安装的可执行文件、必要配置或用户已有文件。"
   },
   "rembg": {
     "check": 24,

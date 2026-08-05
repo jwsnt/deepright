@@ -2967,6 +2967,7 @@ integration plugins sync-bundled
   - `filepick_net`
 - macOS 仍然走原有 `CLI_SANDBOX.app` 路径，不改现有 bundle 结构
 - WSL/Linux 新增独立 `bubblewrap` helper，发布后位于 `helpers/<mode>/CLI_SANDBOX`
+- `GET /api/bubblewrap/check` 仅在 WSL/Linux 检查服务环境能否解析 `bwrap`；成功结果按 `config/config.json.bubblewrap.check`（正整数小时）缓存，失败不缓存。缺少依赖时返回同一配置中的 `bubblewrap.install` 原文供页面发送到当前 Chat，接口不会执行安装；非 Linux 运行环境不需要该依赖并直接返回可用。
 - `/api/sandbox=*`、`/api/sandbox_status`、`integration sandbox` CLI 的协议不变
 - `integration /api/cmd` 与内部 `cli/get -> exec -> cli/pub` 链路都会按当前系统自动选择对应沙盒 helper
 

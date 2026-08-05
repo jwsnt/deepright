@@ -17,6 +17,13 @@ type integrationDependencyCheck struct {
 func startIntegrationDependencyChecks(ctx context.Context, cfg *Config) {
 	checks := []integrationDependencyCheck{
 		{
+			name: "bubblewrap",
+			check: func() (int, bool, string) {
+				status, response := checkBubblewrapDependency()
+				return status, response.Available, response.Content
+			},
+		},
+		{
 			name: "ffmpeg",
 			check: func() (int, bool, string) {
 				status, response := checkFFmpegDependency()

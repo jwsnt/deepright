@@ -6992,6 +6992,117 @@ func checkFFmpegDependency() (int, FFmpegCheckResponse) {
 	return http.StatusOK, FFmpegCheckResponse{Available: true, Status: 0}
 }
 
+// BubblewrapCheckResponse tells the Site whether the current runtime needs
+// bubblewrap before it can enable a session sandbox. Bubblewrap is only the
+// Linux/WSL sandbox backend, so non-Linux runtimes deliberately remain
+// available without requiring this optional dependency.
+type BubblewrapCheckResponse struct {
+	Available bool   `json:"available"`
+	Required  bool   `json:"required"`
+	Install   string `json:"install,omitempty"`
+	Content   string `json:"content,omitempty"`
+	Status    int    `json:"status"`
+}
+
+type bubblewrapCheckConfig struct {
+	CacheFor time.Duration
+	Install  string
+}
+
+var bubblewrapCheckLookPathFn = integrationCommandLookPath
+var bubblewrapCheckNowFn = time.Now
+var bubblewrapCheckCache struct {
+	sync.Mutex
+	availableAt time.Time
+}
+
+func writeBubblewrapCheckResp(w http.ResponseWriter, httpStatus int, resp BubblewrapCheckResponse) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(httpStatus)
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+func parseBubblewrapCheckConfig(raw map[string]interface{}) (bubblewrapCheckConfig, error) {
+	if raw == nil {
+		return bubblewrapCheckConfig{}, errors.New("config/config.json.bubblewrap 配置缺失")
+	}
+	value, ok := raw["bubblewrap"]
+	if !ok {
+		return bubblewrapCheckConfig{}, errors.New("config/config.json.bubblewrap 配置缺失")
+	}
+	section, ok := value.(map[string]interface{})
+	if !ok || section == nil {
+		return bubblewrapCheckConfig{}, errors.New("config/config.json.bubblewrap 必须是对象")
+	}
+	hours, ok := ffmpegCheckPositiveHours(section["check"])
+	if !ok {
+		return bubblewrapCheckConfig{}, errors.New("config/config.json.bubblewrap.check 必须是正整数（小时）")
+	}
+	install, ok := section["install"].(string)
+	install = strings.TrimSpace(install)
+	if !ok || install == "" {
+		return bubblewrapCheckConfig{}, errors.New("config/config.json.bubblewrap.install 必须是非空字符串")
+	}
+	return bubblewrapCheckConfig{CacheFor: time.Duration(hours) * time.Hour, Install: install}, nil
+}
+
+func bubblewrapRequired() bool {
+	return integrationRuntimeGOOS == "linux"
+}
+
+func bubblewrapAvailable(cacheFor time.Duration) bool {
+	now := bubblewrapCheckNowFn()
+	bubblewrapCheckCache.Lock()
+	availableAt := bubblewrapCheckCache.availableAt
+	bubblewrapCheckCache.Unlock()
+	if !availableAt.IsZero() && now.Before(availableAt.Add(cacheFor)) {
+		return true
+	}
+
+	if _, err := bubblewrapCheckLookPathFn("bwrap"); err != nil {
+		return false
+	}
+
+	bubblewrapCheckCache.Lock()
+	bubblewrapCheckCache.availableAt = now
+	bubblewrapCheckCache.Unlock()
+	return true
+}
+
+func handleBubblewrapCheck() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.Header().Set("Allow", http.MethodGet)
+			writeBubblewrapCheckResp(w, http.StatusMethodNotAllowed, BubblewrapCheckResponse{Content: "仅支持 GET 请求", Status: 1})
+			return
+		}
+		status, response := checkBubblewrapDependency()
+		writeBubblewrapCheckResp(w, status, response)
+	}
+}
+
+// checkBubblewrapDependency is intentionally limited to availability. It
+// never installs or executes bwrap; the configured installation request is
+// returned to the Site so that the user can choose to send it to the current
+// chat, matching the FFmpeg dependency flow.
+func checkBubblewrapDependency() (int, BubblewrapCheckResponse) {
+	if !bubblewrapRequired() {
+		return http.StatusOK, BubblewrapCheckResponse{Available: true, Required: false, Status: 0}
+	}
+	raw, _, err := readIntegrationStartupConfigRaw()
+	if err != nil {
+		return http.StatusInternalServerError, BubblewrapCheckResponse{Required: true, Content: "读取 config/config.json 失败: " + err.Error(), Status: 1}
+	}
+	config, err := parseBubblewrapCheckConfig(raw)
+	if err != nil {
+		return http.StatusBadRequest, BubblewrapCheckResponse{Required: true, Content: err.Error(), Status: 1}
+	}
+	if !bubblewrapAvailable(config.CacheFor) {
+		return http.StatusOK, BubblewrapCheckResponse{Available: false, Required: true, Install: config.Install, Content: "未检测到 Bubblewrap（bwrap）", Status: 0}
+	}
+	return http.StatusOK, BubblewrapCheckResponse{Available: true, Required: true, Status: 0}
+}
+
 func writeVideoTrimResp(w http.ResponseWriter, httpStatus int, resp VideoTrimResponse) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(httpStatus)
@@ -20920,6 +21031,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/raw", handleRaw(&cfg))
 	mux.HandleFunc("/api/media_preview", handleMediaPreview(&cfg))
 	mux.HandleFunc("/api/ffmpeg/check", handleFFmpegCheck())
+	mux.HandleFunc("/api/bubblewrap/check", handleBubblewrapCheck())
 	mux.HandleFunc("/api/whisper/check", handleWhisperCheck())
 	mux.HandleFunc("/api/whisper/tasks", handleWhisperTasks())
 	mux.HandleFunc("/api/whisper/tasks/cancel", handleWhisperTaskCancel())

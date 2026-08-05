@@ -4623,6 +4623,10 @@ body.quick-fan-transition-active{cursor:progress}
 .fe-image-canvas{display:block;flex:0 0 auto;max-width:100%;height:auto;background-image:linear-gradient(45deg,rgba(0,0,0,.05) 25%,transparent 25%,transparent 75%,rgba(0,0,0,.05) 75%,rgba(0,0,0,.05)),linear-gradient(45deg,rgba(0,0,0,.05) 25%,transparent 25%,transparent 75%,rgba(0,0,0,.05) 75%,rgba(0,0,0,.05));background-position:0 0,8px 8px;background-size:16px 16px;border:1px solid var(--border);border-radius:var(--radius-xs);box-shadow:0 8px 24px rgba(0,0,0,.18);cursor:crosshair}
 .file-editor-panel.image-editor .fe-image-canvas{max-height:calc(90vh - 214px)}
 .file-editor-panel.image-editor .fe-image-canvas.zoomed{max-width:none;max-height:none}
+.fe-image-rotation-handle{position:absolute;z-index:6;display:grid;place-items:center;width:24px;height:24px;padding:0;border:2px solid #fff;border-radius:50%;background:var(--accent);color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.35);cursor:grab;touch-action:none;transform:translate(-50%,-50%)}
+.fe-image-rotation-handle:hover,.fe-image-rotation-handle:focus-visible{filter:brightness(1.08);outline:2px solid rgba(var(--accent-rgb),.32);outline-offset:2px}
+.fe-image-rotation-handle:active{cursor:grabbing}
+.fe-image-rotation-handle svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
 .fe-image-view-controls{position:absolute;top:12px;right:12px;z-index:7;display:flex;align-items:end;gap:6px;padding:5px;border:1px solid color-mix(in srgb,var(--border) 76%,transparent);border-radius:12px;background:color-mix(in srgb,var(--bg-main) 76%,transparent);box-shadow:0 8px 20px rgba(0,0,0,.14);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .fe-image-zoom-controls{display:flex;flex-direction:column;align-items:center;gap:3px}
 .fe-image-zoom,.fe-image-pan{display:grid;place-items:center;width:26px;height:26px;min-height:26px;padding:0;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text-secondary);cursor:pointer;transition:var(--transition)}
@@ -6975,6 +6979,13 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     <div class="fe-ffmpeg-install-actions"><button type="button" onclick="feCancelFFmpegInstall()">取消</button><button class="confirm" type="button" id="feFFmpegInstallConfirmBtn" onclick="feConfirmFFmpegInstall()">安装</button></div>
   </div>
 </div>
+<div class="fe-ffmpeg-install-dialog" id="bubblewrapInstallDialog" role="dialog" aria-modal="true" aria-labelledby="bubblewrapInstallTitle" aria-describedby="bubblewrapInstallDesc" hidden onclick="handleBubblewrapInstallDialogClick(event)">
+  <div class="fe-ffmpeg-install-card" tabindex="-1" onclick="event.stopPropagation()">
+    <h3 id="bubblewrapInstallTitle">需要安装 Bubblewrap</h3>
+    <p id="bubblewrapInstallDesc">会话沙盒需要 Bubblewrap（bwrap）。是否发送安装请求？</p>
+    <div class="fe-ffmpeg-install-actions"><button type="button" onclick="cancelBubblewrapInstall()">取消</button><button class="confirm" type="button" id="bubblewrapInstallConfirmBtn" onclick="confirmBubblewrapInstall()">安装</button></div>
+  </div>
+</div>
 <div class="dependency-check-lock" id="dependencyCheckLock" role="status" aria-live="assertive" aria-atomic="true" aria-label="正在检查依赖，界面已锁定" tabindex="-1" hidden>
   <div class="dependency-check-lock-card"><span class="dependency-check-lock-spinner" aria-hidden="true"></span><span id="dependencyCheckLockText">正在检查依赖，请稍候…</span></div>
 </div>
@@ -8578,8 +8589,10 @@ let chatSwarm = {};
 let chatSandbox = {};
 let sandboxRequestSeq = {};
 let sandboxModalState = {
-  saving: false
+  saving: false,
+  checking: false
 };
+let bubblewrapInstallRequest = '';
 let chatSkillIndicators = {};
 let chatSkillIndicatorTimers = {};
 let chatSkillIndicatorReplayTimers = {};
@@ -31299,11 +31312,12 @@ function updateSandboxUI() {
   if (group) group.classList.toggle('disabled', !hasChat);
   if (button) {
     button.classList.toggle('on', !!snapshot.sandbox);
-    button.classList.toggle('loading', !!snapshot.loading);
-    button.disabled = !hasChat;
+    button.classList.toggle('loading', !!snapshot.loading || sandboxModalState.checking);
+    button.disabled = !hasChat || sandboxModalState.checking;
     button.setAttribute('aria-pressed', snapshot.sandbox ? 'true' : 'false');
     let title = '当前会话沙盒';
     if (!hasChat) title = '请先选择会话';
+    else if (sandboxModalState.checking) title = '正在检查会话沙盒运行环境';
     else if (snapshot.loading) title = '正在同步当前会话沙盒状态';
     else if (snapshot.sandbox) title = '当前会话沙盒模式：' + sandboxModeLabel(snapshot.sandbox, snapshot.recorded);
     else title = snapshot.recorded ? '当前会话沙盒已关闭' : '当前会话沙盒默认关闭';
@@ -31346,7 +31360,7 @@ function updateSandboxUI() {
     errorEl.textContent = displayError;
     errorEl.classList.toggle('show', !!displayError);
   }
-  const actionDisabled = !hasAgent || snapshot.loading || sandboxModalState.saving;
+  const actionDisabled = !hasAgent || snapshot.loading || sandboxModalState.saving || sandboxModalState.checking;
   if (filePickBtn) {
     filePickBtn.disabled = actionDisabled;
     filePickBtn.classList.toggle('active', snapshot.sandbox === 'filepick');
@@ -31397,7 +31411,65 @@ async function refreshChatSandboxStatus(chatId, options) {
   }
 }
 
-function toggleSandboxOverlay(event) {
+function bubblewrapInstallDialogOpen() {
+  const dialog = document.getElementById('bubblewrapInstallDialog');
+  return !!(dialog && !dialog.hidden);
+}
+
+function showBubblewrapInstallDialog(installRequest) {
+  const request = String(installRequest || '').trim();
+  if (!request) {
+    vfsShowUploadToast('Bubblewrap 安装请求配置为空', true);
+    return;
+  }
+  const dialog = document.getElementById('bubblewrapInstallDialog');
+  const confirm = document.getElementById('bubblewrapInstallConfirmBtn');
+  if (!dialog || !confirm) {
+    vfsShowUploadToast('无法显示 Bubblewrap 安装确认', true);
+    return;
+  }
+  bubblewrapInstallRequest = request;
+  confirm.disabled = false;
+  dialog.hidden = false;
+  window.setTimeout(() => confirm.focus({ preventScroll: true }), 0);
+}
+
+function cancelBubblewrapInstall() {
+  const dialog = document.getElementById('bubblewrapInstallDialog');
+  if (dialog) dialog.hidden = true;
+  bubblewrapInstallRequest = '';
+  document.getElementById('inputSandboxToggle')?.focus({ preventScroll: true });
+}
+
+function handleBubblewrapInstallDialogClick(event) {
+  if (event && event.target === event.currentTarget) cancelBubblewrapInstall();
+}
+
+async function confirmBubblewrapInstall() {
+  const request = String(bubblewrapInstallRequest || '').trim();
+  if (!request) return;
+  const dialog = document.getElementById('bubblewrapInstallDialog');
+  const confirm = document.getElementById('bubblewrapInstallConfirmBtn');
+  if (confirm) confirm.disabled = true;
+  if (dialog) dialog.hidden = true;
+  bubblewrapInstallRequest = '';
+  const sent = await sendCenterMessage(request, {
+    clearInputAfterSend: false,
+    toastOnSuccess: '',
+    requestSource: 'bubblewrap_install'
+  });
+  if (!sent) vfsShowUploadToast('未能发送 Bubblewrap 安装请求，请检查当前 Chat', true);
+  if (confirm) confirm.disabled = false;
+}
+
+async function checkSandboxBubblewrap() {
+  const result = await feCheckExternalDependency('/api/bubblewrap/check', '正在检查 Bubblewrap，请稍候…');
+  if (!result.required || result.available) return true;
+  showBubblewrapInstallDialog(result.install);
+  return false;
+}
+
+async function toggleSandboxOverlay(event) {
   if (event) {
     event.preventDefault();
     event.stopPropagation();
@@ -31414,11 +31486,22 @@ function toggleSandboxOverlay(event) {
     hideSandboxOverlay();
     return;
   }
+  if (sandboxModalState.checking) return;
+  sandboxModalState.checking = true;
   updateSandboxUI();
-  showExclusiveOverlay(overlay, card);
-  const binding = getSandboxBinding();
-  if (binding.chatId) {
-    refreshChatSandboxStatus(binding.chatId, { agentId: binding.agentId, toastOnError: false }).catch(() => {});
+  try {
+    if (!await checkSandboxBubblewrap()) return;
+    updateSandboxUI();
+    showExclusiveOverlay(overlay, card);
+    const binding = getSandboxBinding();
+    if (binding.chatId) {
+      refreshChatSandboxStatus(binding.chatId, { agentId: binding.agentId, toastOnError: false }).catch(() => {});
+    }
+  } catch (error) {
+    vfsShowUploadToast('检查 Bubblewrap 失败：' + ((error && error.message) || '请重试'), true);
+  } finally {
+    sandboxModalState.checking = false;
+    updateSandboxUI();
   }
 }
 
@@ -54692,6 +54775,7 @@ let feImageState = {
   strokeColor: '#ff4d4f',
   lineWidth: 4,
   fontSize: 28,
+  shapeRotation: 0,
   dragStart: null,
   lastPoint: null,
   previewImageData: null,
@@ -54705,6 +54789,8 @@ let feImageState = {
   hasTransparentEdits: false,
   isDrawing: false,
   pointerId: null,
+  pendingShape: null,
+  rotationDrag: null,
   viewportResizeObserver: null
 };
 let feColorPickerActive = false;
@@ -56262,6 +56348,7 @@ async function feOpen(absPath, options) {
   feImageState.strokeColor = '#ff4d4f';
   feImageState.lineWidth = 4;
   feImageState.fontSize = 28;
+  feImageState.shapeRotation = 0;
   feImageState.dragStart = null;
   feImageState.lastPoint = null;
   feImageState.previewImageData = null;
@@ -56273,6 +56360,9 @@ async function feOpen(absPath, options) {
   feImageState.hasTransparentEdits = false;
   feImageState.isDrawing = false;
   feImageState.pointerId = null;
+  feImageState.pendingShape = null;
+  feImageState.rotationDrag = null;
+  feRenderImageRotationHandle();
   feCancelImageTextEdit();
   feMode = initialMode;
   feSyncPreviewPathHeader();
@@ -56495,7 +56585,7 @@ function feImageToolbarHtml() {
       '<button type="button" id="feImageCutoutClearBtn" onclick="feClearImageCutoutRegions()" title="清空所有保留区域">清空</button>' +
       '<span class="fe-image-cutout-summary" id="feImageCutoutSummary" aria-live="polite"></span>' +
     '</div>' +
-    '<div class="fe-image-tip">支持橡皮擦、画笔自由线条、圆/椭圆/矩形/三角形拖拽绘制，以及文字在任意位置落点输入；右上角“抠图”可叠加多个矩形、椭圆/圆和闭合钢笔区域，保存时仅保留选区，其余区域为透明像素（Alpha=0）。文字支持换行，点击“确定”或按 Ctrl/Cmd + Enter 生效，Esc 可取消；擦除区域也会直接保存为透明像素，并可最多后退 10 步。</div>' +
+    '<div class="fe-image-tip">支持橡皮擦、画笔自由线条、圆/椭圆/矩形/三角形拖拽绘制，以及文字在任意位置落点输入；点击刚绘制的矩形、椭圆或三角形后，右下角会显示旋转图标，拖动图标可旋转图形。右上角“抠图”可叠加多个矩形、椭圆/圆和闭合钢笔区域，保存时仅保留选区，其余区域为透明像素（Alpha=0）。文字支持换行，点击“确定”或按 Ctrl/Cmd + Enter 生效，Esc 可取消；擦除区域也会直接保存为透明像素，并可最多后退 10 步。</div>' +
     '<div class="fe-image-stage-shell">' +
       '<div class="fe-image-stage" id="feImageStage">' +
         '<canvas id="feImageCanvas" class="fe-image-canvas"></canvas>' +
@@ -56563,6 +56653,7 @@ function feInitializeImageCanvas(canvas) {
   feUpdateRembgTaskButton();
   feImageState.isDrawing = false;
   feImageState.pointerId = null;
+  feImageState.rotationDrag = null;
   feImageState.dragStart = null;
   feImageState.lastPoint = null;
   feImageState.previewImageData = null;
@@ -56627,6 +56718,7 @@ function feUpdateImageZoomControls() {
 
 function feHandleImageStageScroll() {
   feSyncImageTextEditorPosition();
+  feRenderImageRotationHandle();
   if (feImageCutoutState.active) feRenderImageCutoutOverlay();
   feUpdateImageViewportControls();
 }
@@ -56636,6 +56728,7 @@ function feUpdateImageViewportLayout() {
   const canvas = document.getElementById('feImageCanvas');
   if (!stage || !canvas) return;
   stage.classList.toggle('fe-image-stage-wide', canvas.getBoundingClientRect().width > stage.clientWidth + 1);
+  feRenderImageRotationHandle();
   if (feImageCutoutState.active) feRenderImageCutoutOverlay();
 }
 
@@ -56704,6 +56797,7 @@ function feZoomImage(factor) {
   canvas.style.height = 'auto';
   feUpdateImageViewportLayout();
   feSyncImageTextEditorPosition();
+  feRenderImageRotationHandle();
   if (feImageGridState.active) feRenderImageGrid();
   if (feImageCutoutState.active) feRenderImageCutoutOverlay();
   feUpdateImageZoomControls();
@@ -56747,6 +56841,7 @@ function feOpenBlankImage(options = {}) {
   feImageState.strokeColor = '#ff4d4f';
   feImageState.lineWidth = 4;
   feImageState.fontSize = 28;
+  feImageState.shapeRotation = 0;
   feImageState.dragStart = null;
   feImageState.lastPoint = null;
   feImageState.previewImageData = null;
@@ -56760,6 +56855,8 @@ function feOpenBlankImage(options = {}) {
   feImageState.hasTransparentEdits = false;
   feImageState.isDrawing = false;
   feImageState.pointerId = null;
+  feImageState.pendingShape = null;
+  feImageState.rotationDrag = null;
   feCancelImageTextEdit();
   feSyncPreviewPathHeader();
   feMode = 'edit';
@@ -57127,6 +57224,142 @@ function fePushImageHistory(canvas) {
   feUpdateUndoButton();
 }
 
+function feReplaceLatestImageHistory(canvas) {
+  const snapshot = feCaptureCanvasImageData(canvas);
+  if (!snapshot || feImageState.historyIndex < 0) return;
+  feImageState.history[feImageState.historyIndex] = snapshot;
+}
+
+function feGetPendingShapeCenter(shape) {
+  return {
+    x: (shape.start.x + shape.end.x) / 2,
+    y: (shape.start.y + shape.end.y) / 2
+  };
+}
+
+function feGetPendingShapeHandlePoint(shape) {
+  const center = feGetPendingShapeCenter(shape);
+  const halfWidth = Math.max(Math.abs(shape.end.x - shape.start.x) / 2, shape.lineWidth / 2);
+  const halfHeight = Math.max(Math.abs(shape.end.y - shape.start.y) / 2, shape.lineWidth / 2);
+  const radians = (Number(shape.rotation) || 0) * Math.PI / 180;
+  return {
+    x: center.x + halfWidth * Math.cos(radians) - halfHeight * Math.sin(radians),
+    y: center.y + halfWidth * Math.sin(radians) + halfHeight * Math.cos(radians)
+  };
+}
+
+function feIsPointInPendingShape(point, shape) {
+  if (!point || !shape) return false;
+  const center = feGetPendingShapeCenter(shape);
+  const radians = -(Number(shape.rotation) || 0) * Math.PI / 180;
+  const dx = point.x - center.x;
+  const dy = point.y - center.y;
+  const localX = dx * Math.cos(radians) - dy * Math.sin(radians);
+  const localY = dx * Math.sin(radians) + dy * Math.cos(radians);
+  const halfWidth = Math.max(Math.abs(shape.end.x - shape.start.x) / 2, shape.lineWidth / 2);
+  const halfHeight = Math.max(Math.abs(shape.end.y - shape.start.y) / 2, shape.lineWidth / 2);
+  const tolerance = Math.max(10, shape.lineWidth * 2);
+  if (shape.tool === 'ellipse') {
+    const width = halfWidth + tolerance;
+    const height = halfHeight + tolerance;
+    return (localX * localX) / (width * width) + (localY * localY) / (height * height) <= 1;
+  }
+  if (shape.tool === 'triangle') {
+    const height = halfHeight + tolerance;
+    const progress = (localY + height) / (height * 2);
+    return progress >= 0 && progress <= 1 && Math.abs(localX) <= (halfWidth + tolerance) * progress;
+  }
+  return Math.abs(localX) <= halfWidth + tolerance && Math.abs(localY) <= halfHeight + tolerance;
+}
+
+function feRenderImageRotationHandle() {
+  const stage = document.getElementById('feImageStage');
+  const canvas = document.getElementById('feImageCanvas');
+  const shape = feImageState.pendingShape;
+  let handle = document.getElementById('feImageRotationHandle');
+  if (!stage || !canvas || !shape || !shape.selected) {
+    if (handle) handle.remove();
+    return;
+  }
+  if (!handle) {
+    handle = document.createElement('button');
+    handle.type = 'button';
+    handle.id = 'feImageRotationHandle';
+    handle.className = 'fe-image-rotation-handle';
+    handle.title = '拖动旋转图形';
+    handle.setAttribute('aria-label', '拖动旋转图形');
+    handle.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 1-2.34-5.66M20 4v7h-7"></path></svg>';
+    handle.onpointerdown = feHandleImageRotationHandleDown;
+    handle.onmousedown = feHandleImageRotationHandleDown;
+    stage.appendChild(handle);
+  }
+  const stageRect = stage.getBoundingClientRect();
+  const canvasRect = canvas.getBoundingClientRect();
+  const point = feGetPendingShapeHandlePoint(shape);
+  const scaleX = canvas.width && canvasRect.width ? canvasRect.width / canvas.width : 1;
+  const scaleY = canvas.height && canvasRect.height ? canvasRect.height / canvas.height : 1;
+  handle.style.left = (canvasRect.left - stageRect.left + stage.scrollLeft + point.x * scaleX) + 'px';
+  handle.style.top = (canvasRect.top - stageRect.top + stage.scrollTop + point.y * scaleY) + 'px';
+}
+
+function feHandleImageRotationHandleDown(event) {
+  if (feImageState.rotationDrag) return;
+  const shape = feImageState.pendingShape;
+  const canvas = document.getElementById('feImageCanvas');
+  if (!shape || !canvas) return;
+  const point = feGetImagePoint(event, canvas);
+  const center = feGetPendingShapeCenter(shape);
+  feImageState.rotationDrag = {
+    pointerId: event.pointerId == null ? 'mouse' : event.pointerId,
+    startRotation: Number(shape.rotation) || 0,
+    startAngle: Math.atan2(point.y - center.y, point.x - center.x),
+    handle: event.currentTarget
+  };
+  try { event.currentTarget.setPointerCapture(event.pointerId); } catch {}
+  window.addEventListener('pointermove', feHandleImageRotationHandleMove, true);
+  window.addEventListener('pointerup', feHandleImageRotationHandleUp, true);
+  window.addEventListener('pointercancel', feHandleImageRotationHandleUp, true);
+  window.addEventListener('mousemove', feHandleImageRotationHandleMove, true);
+  window.addEventListener('mouseup', feHandleImageRotationHandleUp, true);
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+function feHandleImageRotationHandleMove(event) {
+  const drag = feImageState.rotationDrag;
+  const shape = feImageState.pendingShape;
+  const canvas = document.getElementById('feImageCanvas');
+  const isMouseFallback = String(event.type || '').startsWith('mouse');
+  const pointerId = event.pointerId == null ? 'mouse' : event.pointerId;
+  if (!drag || (!isMouseFallback && drag.pointerId !== pointerId) || !shape || !canvas) return;
+  const point = feGetImagePoint(event, canvas);
+  const center = feGetPendingShapeCenter(shape);
+  const angle = Math.atan2(point.y - center.y, point.x - center.x);
+  shape.rotation = drag.startRotation + (angle - drag.startAngle) * 180 / Math.PI;
+  feImageState.shapeRotation = shape.rotation;
+  if (feRestoreCanvasImageData(canvas, shape.baseImageData)) {
+    feDrawShapePreview(canvas, shape.start, shape.end, shape.tool, shape.rotation, shape);
+    feReplaceLatestImageHistory(canvas);
+    feRenderImageRotationHandle();
+  }
+  event.preventDefault();
+}
+
+function feHandleImageRotationHandleUp(event) {
+  const drag = feImageState.rotationDrag;
+  const isMouseFallback = String(event.type || '').startsWith('mouse');
+  const pointerId = event.pointerId == null ? 'mouse' : event.pointerId;
+  if (!drag || (!isMouseFallback && drag.pointerId !== pointerId)) return;
+  try { drag.handle && drag.handle.releasePointerCapture(event.pointerId); } catch {}
+  window.removeEventListener('pointermove', feHandleImageRotationHandleMove, true);
+  window.removeEventListener('pointerup', feHandleImageRotationHandleUp, true);
+  window.removeEventListener('pointercancel', feHandleImageRotationHandleUp, true);
+  window.removeEventListener('mousemove', feHandleImageRotationHandleMove, true);
+  window.removeEventListener('mouseup', feHandleImageRotationHandleUp, true);
+  feImageState.rotationDrag = null;
+  event.preventDefault();
+}
+
 function feUndoImageEdit() {
   const canvas = document.getElementById('feImageCanvas');
   if (!canvas) return;
@@ -57148,41 +57381,56 @@ function feUndoImageEdit() {
   feImageState.dragStart = null;
   feImageState.lastPoint = null;
   feImageState.previewImageData = null;
+  feImageState.pendingShape = null;
+  feImageState.rotationDrag = null;
+  feRenderImageRotationHandle();
   feSyncImageCutoutUI();
   feUpdateUndoButton();
 }
 
-function feDrawShapePreview(canvas, start, end, tool) {
+function feDrawShapePreview(canvas, start, end, tool, rotation = feImageState.shapeRotation, style = null) {
   const ctx = canvas.getContext('2d');
   if (!ctx || !start || !end) return;
   const dx = end.x - start.x;
   const dy = end.y - start.y;
-  const left = Math.min(start.x, end.x);
-  const top = Math.min(start.y, end.y);
   const width = Math.abs(dx);
   const height = Math.abs(dy);
   if (width < 1 && height < 1) return;
 
   ctx.save();
-  feApplyImageStrokeStyle(ctx);
+  if (style) {
+    ctx.strokeStyle = style.strokeColor;
+    ctx.fillStyle = style.strokeColor;
+    ctx.lineWidth = style.lineWidth;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+  } else {
+    feApplyImageStrokeStyle(ctx);
+  }
+  const centerX = (start.x + end.x) / 2;
+  const centerY = (start.y + end.y) / 2;
+  const canRotate = ['ellipse', 'rect', 'triangle'].includes(tool);
+  if (canRotate) {
+    ctx.translate(centerX, centerY);
+    ctx.rotate((Number(rotation) || 0) * Math.PI / 180);
+  }
   ctx.beginPath();
 
   if (tool === 'circle') {
     const radius = Math.max(width, height) / 2;
-    const centerX = (start.x + end.x) / 2;
-    const centerY = (start.y + end.y) / 2;
     ctx.arc(centerX, centerY, Math.max(radius, feImageState.lineWidth / 2), 0, Math.PI * 2);
   } else if (tool === 'ellipse') {
-    ctx.ellipse((start.x + end.x) / 2, (start.y + end.y) / 2, Math.max(width / 2, feImageState.lineWidth / 2), Math.max(height / 2, feImageState.lineWidth / 2), 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, Math.max(width / 2, ctx.lineWidth / 2), Math.max(height / 2, ctx.lineWidth / 2), 0, 0, Math.PI * 2);
   } else if (tool === 'rect') {
-    ctx.rect(left, top, Math.max(width, feImageState.lineWidth), Math.max(height, feImageState.lineWidth));
+    const drawWidth = Math.max(width, ctx.lineWidth);
+    const drawHeight = Math.max(height, ctx.lineWidth);
+    ctx.rect(-drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
   } else if (tool === 'triangle') {
-    const centerX = (start.x + end.x) / 2;
-    const bottomY = Math.max(start.y, end.y);
-    const apexY = Math.min(start.y, end.y);
-    ctx.moveTo(centerX, apexY);
-    ctx.lineTo(left, bottomY);
-    ctx.lineTo(left + Math.max(width, feImageState.lineWidth), bottomY);
+    const drawWidth = Math.max(width, ctx.lineWidth);
+    const drawHeight = Math.max(height, ctx.lineWidth);
+    ctx.moveTo(0, -drawHeight / 2);
+    ctx.lineTo(-drawWidth / 2, drawHeight / 2);
+    ctx.lineTo(drawWidth / 2, drawHeight / 2);
     ctx.closePath();
   }
 
@@ -57201,6 +57449,16 @@ function feHandleImagePointerDown(event) {
     return;
   }
   feFinalizePendingImageTextEdit(true);
+  const pendingShape = feImageState.pendingShape;
+  if (pendingShape && feIsPointInPendingShape(point, pendingShape)) {
+    pendingShape.selected = true;
+    feRenderImageRotationHandle();
+    event.preventDefault();
+    return;
+  }
+  feImageState.pendingShape = null;
+  feImageState.shapeRotation = 0;
+  feRenderImageRotationHandle();
   feImageState.isDrawing = true;
   feImageState.pointerId = event.pointerId;
   feImageState.dragStart = point;
@@ -57243,6 +57501,18 @@ function feHandleImagePointerUp(event) {
     const point = feGetImagePoint(event, canvas);
     feRestoreCanvasImageData(canvas, feImageState.previewImageData);
     feDrawShapePreview(canvas, feImageState.dragStart, point, feImageState.tool);
+    if (['ellipse', 'rect', 'triangle'].includes(feImageState.tool)) {
+      feImageState.pendingShape = {
+        tool: feImageState.tool,
+        start: { ...feImageState.dragStart },
+        end: { ...point },
+        rotation: feImageState.shapeRotation,
+        selected: false,
+        strokeColor: feImageState.strokeColor,
+        lineWidth: feImageState.lineWidth,
+        baseImageData: feImageState.previewImageData
+      };
+    }
   }
   const shouldCommit = !!(canvas && feImageState.isDrawing && feImageState.pointerId === event.pointerId);
   if (canvas && typeof canvas.releasePointerCapture === 'function' && feImageState.pointerId === event.pointerId) {
@@ -57302,6 +57572,7 @@ function feClose() {
   feImageState.strokeColor = '#ff4d4f';
   feImageState.lineWidth = 4;
   feImageState.fontSize = 28;
+  feImageState.shapeRotation = 0;
   feImageState.dragStart = null;
   feImageState.lastPoint = null;
   feImageState.previewImageData = null;
@@ -57312,6 +57583,8 @@ function feClose() {
   feImageState.hasTransparentEdits = false;
   feImageState.isDrawing = false;
   feImageState.pointerId = null;
+  feImageState.pendingShape = null;
+  feImageState.rotationDrag = null;
   feCancelImageTextEdit();
   feSyncOpenActions();
   feWhisperTaskRestoreAfterPreview();
@@ -57848,6 +58121,18 @@ document.addEventListener('keydown', e => {
   if (feWav2LipTaskState) {
     if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); feWav2LipTaskClose(); return; }
     if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && document.activeElement?.tagName !== 'BUTTON') { e.preventDefault(); e.stopImmediatePropagation(); void feWav2LipTaskStart(); return; }
+  }
+  if (bubblewrapInstallDialogOpen()) {
+    if (!e.isComposing && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'Escape') {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      cancelBubblewrapInstall();
+    } else if (!e.isComposing && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      void confirmBubblewrapInstall();
+    }
+    return;
   }
   if (feFFmpegInstallDialogOpen()) {
     if (!e.isComposing && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'Escape') {
