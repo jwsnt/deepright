@@ -246,9 +246,9 @@ func TestRVMFFmpegFallbackArgumentsPreserveAlphaAndPreview(t *testing.T) {
 	if got := strings.Join(mov, " "); !strings.Contains(got, "alphamerge") || !strings.Contains(got, "-c:v qtrle") || !strings.Contains(got, "-pix_fmt argb") {
 		t.Fatalf("qtrle MOV args = %#v", mov)
 	}
-	preview := rvmPreviewFFmpegArgsWithCodec("result.mov", "result.mp4", "mpeg4")
-	if got := strings.Join(preview, " "); !strings.Contains(got, "-c:v mpeg4") || !strings.Contains(got, "-q:v 2") || strings.Contains(got, "-crf") {
-		t.Fatalf("mpeg4 preview args = %#v", preview)
+	preview := rvmPreviewFFmpegArgsWithCodec("result.mov", "result.mp4", "h264_nvenc")
+	if got := strings.Join(preview, " "); !strings.Contains(got, "-c:v h264_nvenc") || !strings.Contains(got, "-b:v 8M") || strings.Contains(got, "mpeg4") {
+		t.Fatalf("hardware H.264 preview args = %#v", preview)
 	}
 }
 

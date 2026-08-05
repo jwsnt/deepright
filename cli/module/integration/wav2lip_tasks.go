@@ -898,6 +898,10 @@ func (m *wav2lipTaskManager) extract(ctx context.Context, task wav2lipTask) erro
 	if status != http.StatusOK || !ffmpeg.Available {
 		return errors.New("FFmpeg 或 FFprobe 未安装")
 	}
+	ffmpegPath, err := videoTrimLookPathFn("ffmpeg")
+	if err != nil {
+		return errors.New("未检测到 FFmpeg")
+	}
 	video, _, status, msg := resolveMediaPreviewFile(m.cfg, task.AgentID, task.VideoPath)
 	if status != 0 {
 		return errors.New(msg)
@@ -967,7 +971,8 @@ func (m *wav2lipTaskManager) extract(ctx context.Context, task wav2lipTask) erro
 		m.appendLog(task.ID, "Wav2Lip 执行参数路径映射：--face="+staging.Video+" --audio="+staging.Audio+" --outfile="+staging.Output)
 		err = m.runWav2Lip(ctx, task.ID, runtimeValue, device, staging.Video, staging.Audio, staging.Output)
 		if err == nil {
-			err = copyWav2LipOutput(staging.Output, temporary)
+			_ = os.Remove(temporary)
+			err = m.transcodeWav2LipOutputToH264(ctx, task.ID, ffmpegPath, staging.Output, temporary)
 		}
 		_ = os.RemoveAll(staging.Directory)
 		if err == nil {
@@ -1076,28 +1081,39 @@ func wav2lipStagingDirectory() (string, error) {
 	return "", errors.New("无法创建不含空格的 Wav2Lip 临时工作目录")
 }
 
-// copyWav2LipOutput keeps the final write within the Agent workspace. The
-// staging directory may be on another filesystem, so a hard link is not safe
-// here; the caller later atomically links this workspace-local temporary file.
-func copyWav2LipOutput(source, destination string) error {
-	input, err := os.Open(source)
-	if err != nil {
-		return errors.New("Wav2Lip 未生成有效视频输出")
+// wav2lipH264FFmpegArgs converts the upstream output into the browser-safe
+// H.264/AAC MP4 that is atomically linked into the Agent workspace afterwards.
+func wav2lipH264FFmpegArgs(source, destination string, encoder ffmpegVideoEncoder) []string {
+	args := []string{
+		"-hide_banner", "-loglevel", "error", "-nostdin",
+		"-i", source,
+		"-map", "0:v:0?", "-map", "0:a?",
+		"-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0,format=yuv420p",
+		"-c:v", encoder.Name,
+		"-c:a", "aac",
 	}
-	defer input.Close()
-	output, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
-	if err != nil {
-		return fmt.Errorf("无法暂存 Wav2Lip 视频输出: %w", err)
+	if encoder.Name == "libx264" {
+		args = append(args, "-crf", "18", "-preset", "medium")
+	} else {
+		args = append(args, "-b:v", "8M")
 	}
-	_, copyErr := io.Copy(output, input)
-	closeErr := output.Close()
-	if copyErr != nil {
-		return fmt.Errorf("无法暂存 Wav2Lip 视频输出: %w", copyErr)
+	return append(args, "-movflags", "+faststart", "-f", "mp4", "-n", destination)
+}
+
+func (m *wav2lipTaskManager) transcodeWav2LipOutputToH264(ctx context.Context, taskID int64, ffmpegPath, source, destination string) error {
+	output, err := runFFmpegVideoEncode(ctx, "Wav2Lip H.264 MP4 output", ffmpegPath, destination, ffmpegH264EncoderCandidates(ffmpegPath), func(encoder ffmpegVideoEncoder) []string {
+		if encoder.Hardware {
+			m.appendLog(taskID, "正在使用 GPU 编码器 "+encoder.Name+" 转码 Wav2Lip 输出为浏览器兼容的 H.264 MP4。")
+		} else {
+			m.appendLog(taskID, "正在使用 CPU 编码器 "+encoder.Name+" 转码 Wav2Lip 输出为浏览器兼容的 H.264 MP4。")
+		}
+		return wav2lipH264FFmpegArgs(source, destination, encoder)
+	})
+	if err == nil {
+		return nil
 	}
-	if closeErr != nil {
-		return fmt.Errorf("无法暂存 Wav2Lip 视频输出: %w", closeErr)
-	}
-	return nil
+	_ = os.Remove(destination)
+	return fmt.Errorf("Wav2Lip 输出无法转码为浏览器兼容的 H.264 MP4，请安装支持 libx264 或硬件 H.264 编码的 FFmpeg：%s", videoTrimCommandError(err, output))
 }
 
 func (m *wav2lipTaskManager) runWav2Lip(ctx context.Context, id int64, r wav2lipRuntime, device, video, audio, output string) error {

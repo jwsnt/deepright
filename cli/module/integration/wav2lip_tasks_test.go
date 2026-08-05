@@ -165,26 +165,16 @@ func TestRunWav2LipUsesStableUpstreamWorkingDirectory(t *testing.T) {
 	}
 }
 
-func TestCopyWav2LipOutputCopiesAcrossDirectories(t *testing.T) {
-	sourceDirectory := t.TempDir()
-	destinationDirectory := filepath.Join(t.TempDir(), "Application Support")
-	if err := os.MkdirAll(destinationDirectory, 0o755); err != nil {
-		t.Fatal(err)
+func TestWav2LipH264FFmpegArgsUseBrowserCompatibleCodec(t *testing.T) {
+	args := wav2lipH264FFmpegArgs("result.mp4", "output.mp4", ffmpegVideoEncoder{Name: "libx264"})
+	joined := strings.Join(args, " ")
+	for _, required := range []string{"-c:v libx264", "-c:a aac", "format=yuv420p", "-movflags +faststart", "-f mp4"} {
+		if !strings.Contains(joined, required) {
+			t.Fatalf("H.264 output arguments missing %q: %#v", required, args)
+		}
 	}
-	source := filepath.Join(sourceDirectory, "result.mp4")
-	destination := filepath.Join(destinationDirectory, ".wav2lip-result.mp4")
-	if err := os.WriteFile(source, []byte("generated video"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(destination, nil, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := copyWav2LipOutput(source, destination); err != nil {
-		t.Fatal(err)
-	}
-	got, err := os.ReadFile(destination)
-	if err != nil || string(got) != "generated video" {
-		t.Fatalf("copied output = %q, %v", got, err)
+	if strings.Contains(joined, "mpeg4") {
+		t.Fatalf("Wav2Lip browser preview must not fall back to mpeg4: %#v", args)
 	}
 }
 

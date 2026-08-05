@@ -910,21 +910,17 @@ func rvmPreviewFFmpegArgs(movPath, previewPath string) []string {
 }
 
 // rvmPreviewFFmpegArgsWithCodec keeps the filter graph stable while selecting
-// a video encoder known to the local FFmpeg build. h264_videotoolbox receives
-// an explicit bitrate because libx264's CRF/preset options do not apply to it.
-// libx264 is the CPU fallback and mpeg4 supports minimal FFmpeg builds.
+// a browser-compatible H.264 encoder known to the local FFmpeg build.
 func rvmPreviewFFmpegArgsWithCodec(movPath, previewPath, codec string) []string {
 	args := []string{
 		"-n", "-i", movPath,
-		"-filter_complex", "[0:v:0]format=rgba[foreground];color=c=black:s=16x16,format=rgba[background];[background][foreground]scale2ref[background][foreground];[background][foreground]overlay=shortest=1:format=auto,format=yuv420p[preview]",
+		"-filter_complex", "[0:v:0]format=rgba[foreground];color=c=black:s=16x16,format=rgba[background];[background][foreground]scale2ref[background][foreground];[background][foreground]overlay=shortest=1:format=auto,pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0,format=yuv420p[preview]",
 		"-map", "[preview]",
 	}
-	if codec == "h264_videotoolbox" {
-		args = append(args, "-c:v", codec, "-b:v", "8M")
-	} else if codec == "mpeg4" {
-		args = append(args, "-c:v", "mpeg4", "-q:v", "2")
-	} else {
+	if codec == "libx264" {
 		args = append(args, "-c:v", "libx264", "-crf", "18", "-preset", "medium")
+	} else {
+		args = append(args, "-c:v", codec, "-b:v", "8M")
 	}
 	return append(args, "-pix_fmt", "yuv420p", "-movflags", "+faststart", previewPath)
 }
@@ -992,41 +988,25 @@ func (m *rvmTaskManager) composeTransparentMOV(ctx context.Context, taskID int64
 }
 
 func (m *rvmTaskManager) composePreviewMP4(ctx context.Context, taskID int64, ffmpegPath, source, preview string) error {
-	codecs := []string{"libx264", "mpeg4"}
-	if ffmpegHardwareEncoderAvailable(ffmpegPath, "h264_videotoolbox") {
-		codecs = append([]string{"h264_videotoolbox"}, codecs...)
+	if _, statErr := os.Lstat(preview); statErr == nil {
+		return errors.New("MP4 预览输出已存在，已避免覆盖")
+	} else if !errors.Is(statErr, os.ErrNotExist) {
+		return errors.New("无法检查 MP4 预览输出路径")
 	}
-	for index, codec := range codecs {
-		if codec == "h264_videotoolbox" {
-			m.appendLog(taskID, "正在使用 GPU 编码器 h264_videotoolbox 生成 MP4 预览副本。")
-			log.Printf("[ffmpeg] RVM MP4 preview: using GPU encoder %s", codec)
+
+	output, err := runFFmpegVideoEncode(ctx, "RVM H.264 MP4 preview", ffmpegPath, preview, ffmpegH264EncoderCandidates(ffmpegPath), func(encoder ffmpegVideoEncoder) []string {
+		if encoder.Hardware {
+			m.appendLog(taskID, "正在使用 GPU 编码器 "+encoder.Name+" 生成浏览器兼容的 H.264 MP4 预览副本。")
 		} else {
-			m.appendLog(taskID, "正在使用 CPU 编码器 "+codec+" 生成 MP4 预览副本。")
-			log.Printf("[ffmpeg] RVM MP4 preview: using CPU encoder %s", codec)
+			m.appendLog(taskID, "正在使用 CPU 编码器 "+encoder.Name+" 生成浏览器兼容的 H.264 MP4 预览副本。")
 		}
-		if _, statErr := os.Lstat(preview); statErr == nil {
-			return errors.New("MP4 预览输出已存在，已避免覆盖")
-		} else if !errors.Is(statErr, os.ErrNotExist) {
-			return errors.New("无法检查 MP4 预览输出路径")
-		}
-		output, err := videoTrimCommandContextFn(ctx, ffmpegPath, rvmPreviewFFmpegArgsWithCodec(source, preview, codec)...).CombinedOutput()
-		if err == nil {
-			return nil
-		}
-		_ = os.Remove(preview)
-		if index+1 < len(codecs) {
-			if codec == "h264_videotoolbox" {
-				m.appendLog(taskID, "GPU 编码器 h264_videotoolbox 失败，已回退到 CPU 编码器 "+codecs[index+1]+"。")
-				log.Printf("[ffmpeg] RVM MP4 preview: GPU encoder %s failed: %s; falling back to CPU encoder %s", codec, strings.TrimSpace(string(output)), codecs[index+1])
-			} else {
-				m.appendLog(taskID, "当前 FFmpeg 不支持 "+codec+"，已回退到 "+codecs[index+1]+" 生成预览。")
-				log.Printf("[ffmpeg] RVM MP4 preview: CPU encoder %s failed: %s; falling back to %s", codec, strings.TrimSpace(string(output)), codecs[index+1])
-			}
-			continue
-		}
-		return fmt.Errorf("生成 MP4 预览副本失败: %s", strings.TrimSpace(string(output)))
+		return rvmPreviewFFmpegArgsWithCodec(source, preview, encoder.Name)
+	})
+	if err == nil {
+		return nil
 	}
-	return errors.New("无法生成 MP4 预览副本")
+	_ = os.Remove(preview)
+	return fmt.Errorf("生成浏览器兼容的 H.264 MP4 预览副本失败，请安装支持 libx264 或硬件 H.264 编码的 FFmpeg：%s", videoTrimCommandError(err, output))
 }
 
 // ensureAvailableOutputPath makes the output collision rule hold until the
