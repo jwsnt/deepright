@@ -234,7 +234,7 @@ a{color:var(--accent);text-decoration:none}
 .logo-svg.hb-ok{animation:hbSlow 3s ease-in-out infinite}
 .logo-svg.hb-fail{animation:hbFast .6s ease-in-out infinite;filter:grayscale(100%)}
 .logo-svg.logo-mode-default.hb-task{animation:hbRush .52s ease-in-out infinite;filter:drop-shadow(0 0 10px rgba(var(--accent-rgb),.2)) drop-shadow(0 0 22px var(--logo-check-glow-strong))}
-.heartbeat-alert-overlay{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(circle at 50% 50%,rgba(255,244,244,.26) 0,rgba(255,244,244,.08) 18%,rgba(190,0,0,.42) 44%,rgba(68,0,0,.92) 100%);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .22s ease,visibility .22s ease}
+.heartbeat-alert-overlay{position:fixed;inset:0;z-index:2147483645;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(circle at 50% 50%,rgba(255,244,244,.26) 0,rgba(255,244,244,.08) 18%,rgba(190,0,0,.42) 44%,rgba(68,0,0,.92) 100%);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .22s ease,visibility .22s ease}
 .heartbeat-alert-overlay.show{opacity:1;visibility:visible;animation:heartbeatAlertBackdrop .78s ease-in-out infinite alternate}
 .heartbeat-alert-overlay::before{content:"";position:absolute;inset:-18%;background:repeating-linear-gradient(180deg,rgba(255,255,255,.16) 0,rgba(255,255,255,.16) 2px,transparent 2px,transparent 14px);opacity:.18;mix-blend-mode:screen;animation:heartbeatAlertScan 5.2s linear infinite}
 .heartbeat-alert-panel{position:relative;display:flex;flex-direction:column;align-items:center;gap:16px;max-width:min(92vw,900px);padding:42px 48px;border:1px solid rgba(255,224,224,.42);border-radius:28px;background:linear-gradient(180deg,rgba(76,0,0,.86),rgba(30,0,0,.96));box-shadow:0 24px 80px rgba(0,0,0,.4),0 0 0 1px rgba(255,255,255,.05) inset;text-align:center}
@@ -2064,6 +2064,21 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .input-editable .at-bubble .bubble-del svg{width:10px;height:10px;color:currentColor}
 .rs-note-input .at-bubble{max-width:calc(100% - 4px)}
 .rs-note-input .at-bubble .bubble-label{max-width:240px}
+.sticky-note-widget{position:fixed;inset:0;z-index:2147483647;pointer-events:none}
+.sticky-note-trigger{position:absolute;right:14px;bottom:14px;width:30px;height:30px;padding:0;border:2px solid color-mix(in srgb,var(--accent) 76%,#fff 24%);border-radius:50%;background:linear-gradient(145deg,color-mix(in srgb,var(--bg-card) 84%,#fff 16%),color-mix(in srgb,var(--accent) 20%,var(--bg-input) 80%));color:var(--accent);box-shadow:0 10px 24px rgba(var(--accent-rgb),.28),inset 0 1px 0 rgba(255,255,255,.76);cursor:pointer;pointer-events:auto;animation:stickyNotePulse 3.8s ease-in-out infinite;transition:transform .18s ease,box-shadow .18s ease,filter .18s ease}
+.sticky-note-trigger:hover,.sticky-note-trigger:focus-visible{outline:none;transform:translateY(-2px) scale(1.06);filter:brightness(1.05);box-shadow:0 14px 30px rgba(var(--accent-rgb),.34),0 0 0 4px rgba(var(--accent-rgb),.12),inset 0 1px 0 rgba(255,255,255,.82)}
+.sticky-note-trigger svg{width:12px;height:12px;display:block;margin:auto;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.sticky-note-widget.open .sticky-note-trigger{animation:none;box-shadow:0 12px 28px rgba(var(--accent-rgb),.32),0 0 0 4px rgba(var(--accent-rgb),.12),inset 0 1px 0 rgba(255,255,255,.82)}
+@keyframes stickyNotePulse{0%,100%{opacity:.78;transform:scale(.94);filter:brightness(.96)}50%{opacity:1;transform:scale(1);filter:brightness(1.08)}}
+.sticky-note-panel{position:absolute;right:18px;bottom:64px;display:flex;flex-direction:column;width:300px;height:350px;box-sizing:border-box;padding:14px;border:1px solid color-mix(in srgb,var(--accent) 28%,var(--glass-edge-strong) 72%);border-radius:22px;background:linear-gradient(150deg,color-mix(in srgb,var(--bg-card) 94%,#fff 6%),color-mix(in srgb,var(--bg-main) 76%,var(--accent) 24%));box-shadow:0 28px 72px rgba(18,18,18,.24),inset 0 1px 0 rgba(255,255,255,.66);backdrop-filter:blur(24px) saturate(160%);-webkit-backdrop-filter:blur(24px) saturate(160%);opacity:0;visibility:hidden;pointer-events:none;transform:translate3d(16px,16px,0) scale(.94);transform-origin:right bottom;transition:opacity .2s ease,transform .24s cubic-bezier(.22,1,.36,1),visibility 0s linear .24s}
+.sticky-note-widget.open .sticky-note-panel{opacity:1;visibility:visible;pointer-events:auto;transform:translate3d(0,0,0) scale(1);transition:opacity .2s ease,transform .24s cubic-bezier(.22,1,.36,1),visibility 0s linear 0s}
+.sticky-note-head{display:flex;align-items:center;gap:8px;min-height:28px;padding:0 2px 10px;border-bottom:1px dashed color-mix(in srgb,var(--accent) 20%,var(--border) 80%);color:var(--text-primary)}
+.sticky-note-head svg{width:16px;height:16px;color:var(--accent);fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}.sticky-note-head strong{font-size:13px;letter-spacing:.02em}.sticky-note-head span{margin-left:auto;max-width:130px;overflow:hidden;color:var(--text-muted);font-size:10px;text-overflow:ellipsis;white-space:nowrap}
+.sticky-note-compose{position:relative;display:flex;flex:1;min-height:0;margin-top:10px;border-radius:12px;transition:box-shadow .18s ease,background .18s ease}.sticky-note-compose.drag-over{background:rgba(var(--accent-rgb),.08);box-shadow:inset 0 0 0 1px var(--accent)}.sticky-note-input{flex:1;min-height:0;max-height:none;padding:2px 4px;overflow:auto;text-align:left;scrollbar-gutter:stable}.sticky-note-input,.sticky-note-input *{text-align:left}.sticky-note-input:empty::before{content:attr(data-placeholder);color:var(--text-muted)}.sticky-note-input .at-bubble .bubble-label{max-width:188px}.sticky-note-input .at-bubble[data-prefix="[URL:"]{--input-bubble-bg-start:color-mix(in srgb,var(--accent) 16%,var(--bg-card) 84%);--input-bubble-bg-end:color-mix(in srgb,var(--accent) 8%,var(--bg-input) 92%);--input-bubble-border:color-mix(in srgb,var(--accent) 32%,var(--border) 68%);--input-bubble-text:var(--accent)}
+.sticky-note-actions{display:flex;justify-content:flex-end;gap:8px;padding-top:12px;border-top:1px dashed color-mix(in srgb,var(--accent) 20%,var(--border) 80%)}.sticky-note-actions button{height:28px;padding:0 9px;border:1px solid color-mix(in srgb,var(--accent) 24%,var(--border) 76%);border-radius:9px;background:color-mix(in srgb,var(--bg-input) 86%,var(--accent) 14%);color:var(--text-primary);font:600 10px/1 inherit;cursor:pointer;transition:transform .16s ease,filter .16s ease,background .16s ease}.sticky-note-actions button:hover,.sticky-note-actions button:focus-visible{outline:none;transform:translateY(-1px);filter:brightness(1.05);background:color-mix(in srgb,var(--bg-card) 76%,var(--accent) 24%)}.sticky-note-actions .sticky-note-clear{color:var(--error);border-color:color-mix(in srgb,var(--error) 34%,var(--border) 66%)}
+.sticky-note-confirm{position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;padding:22px;border-radius:inherit;background:rgba(20,24,35,.3);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .18s ease,visibility 0s linear .18s}.sticky-note-confirm.show{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .18s ease,visibility 0s linear 0s}.sticky-note-confirm-card{width:100%;padding:17px;border:1px solid color-mix(in srgb,var(--error) 22%,var(--border) 78%);border-radius:16px;background:var(--bg-card);box-shadow:0 20px 46px rgba(18,18,18,.22);text-align:center}.sticky-note-confirm-card strong{display:block;font-size:14px;color:var(--text-primary)}.sticky-note-confirm-card p{margin:8px 0 0;color:var(--text-secondary);font-size:11px;line-height:1.55}.sticky-note-confirm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}.sticky-note-confirm-actions button{height:29px;padding:0 12px;border:1px solid var(--border);border-radius:9px;background:var(--bg-input);color:var(--text-primary);font:600 11px/1 inherit;cursor:pointer}.sticky-note-confirm-actions .danger{border-color:var(--error);background:var(--error);color:#fff}
+[data-theme="dark"] .sticky-note-panel{background:linear-gradient(150deg,rgba(24,34,52,.97),rgba(11,22,39,.97));border-color:rgba(97,209,255,.28);box-shadow:0 30px 76px rgba(0,0,0,.46),inset 0 1px 0 rgba(255,255,255,.07)}[data-theme="dark"] .sticky-note-trigger{background:linear-gradient(145deg,rgba(29,55,86,.98),rgba(15,31,57,.98));border-color:rgba(94,218,255,.64);color:#baf4ff;box-shadow:0 12px 28px rgba(0,0,0,.36),0 0 20px rgba(0,212,255,.15),inset 0 1px 0 rgba(255,255,255,.1)}
+@media (max-height:620px){.sticky-note-panel{top:12px;bottom:auto}}
 .message-edit-overlay{background:rgba(14,22,38,.22);backdrop-filter:blur(12px) saturate(135%);-webkit-backdrop-filter:blur(12px) saturate(135%)}
 .message-edit-overlay.show .message-edit-panel{transform:translateY(0) scale(1)}
 .message-edit-panel{width:min(100%,820px);display:flex;flex-direction:column;gap:14px;padding:0;transform:translateY(10px) scale(.98);transition:transform .24s cubic-bezier(.22,1,.36,1)}
@@ -2652,7 +2667,10 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .vfs-create-actions .btn{min-width:96px}
 .vfs-screen-panel{--vfs-screen-main:#ff6b35;--vfs-screen-main-strong:#ff9a67;--vfs-screen-main-soft:rgba(255,107,53,.15);--vfs-screen-border:rgba(239,123,69,.42);--vfs-screen-panel-start:#fffaf5;--vfs-screen-panel-end:#fff0e4;--vfs-screen-stage-start:#ffe8d5;--vfs-screen-stage-end:#fff5eb;--vfs-screen-text:#6b3826;--vfs-screen-muted:#93614b;--vfs-screen-deep:#4e2b20;--vfs-screen-stop:#e85c47;--vfs-screen-stop-strong:#f58768;width:min(880px,calc(100vw - 40px));max-height:calc(100vh - 40px);padding:0;overflow:auto;border:1px solid var(--vfs-screen-border);background:linear-gradient(145deg,var(--vfs-screen-panel-start),var(--vfs-screen-panel-end));box-shadow:0 30px 76px rgba(133,63,30,.23);color:var(--vfs-screen-text)}
 .vfs-screen-shell{display:flex;flex-direction:column;gap:16px;padding:24px}.vfs-screen-guide{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.vfs-screen-guide-step{min-height:76px;padding:12px;border:1px solid var(--vfs-screen-border);border-radius:16px;background:rgba(255,255,255,.72);font-size:12px;line-height:1.55;color:var(--vfs-screen-muted)}.vfs-screen-guide-step b{display:block;margin-bottom:3px;color:var(--vfs-screen-text);font-size:13px}.vfs-screen-guide-step span{display:inline-grid;place-items:center;width:19px;height:19px;margin-right:6px;border-radius:7px;background:linear-gradient(135deg,var(--vfs-screen-main),var(--vfs-screen-main-strong));color:#fff;font-size:11px}.vfs-screen-stage-wrap{display:none;padding:12px;border:1px solid var(--vfs-screen-border);border-radius:20px;background:linear-gradient(145deg,var(--vfs-screen-stage-start),var(--vfs-screen-stage-end));box-shadow:inset 0 1px 0 rgba(255,255,255,.74)}.vfs-screen-stage-wrap.show{display:block}.vfs-screen-stage{position:relative;width:100%;overflow:hidden;border-radius:13px;background:#0d1930;line-height:0}.vfs-screen-source,.vfs-screen-result{display:block;width:100%;max-height:48vh;background:#0d1930}.vfs-screen-source{pointer-events:none}.vfs-screen-selection-layer{position:absolute;inset:0;overflow:hidden;touch-action:none;cursor:crosshair;opacity:0;pointer-events:none;transition:opacity .16s ease}.vfs-screen-selection-layer.show{opacity:1;pointer-events:auto}.vfs-screen-dim{position:absolute;background:rgba(52,25,17,.55);pointer-events:none}.vfs-screen-selection{position:absolute;box-sizing:border-box;border:2px solid var(--vfs-screen-main);border-radius:8px;box-shadow:0 0 0 1px rgba(255,255,255,.72),0 0 0 9999px transparent;cursor:move}.vfs-screen-selection-label{position:absolute;top:7px;left:7px;padding:3px 7px;border-radius:7px;background:var(--vfs-screen-main);color:#fff;font:700 11px/1.25 ui-monospace,SFMono-Regular,Menlo,monospace;pointer-events:none}.vfs-screen-handle{position:absolute;width:11px;height:11px;border:2px solid #fff;border-radius:50%;background:var(--vfs-screen-main);box-shadow:0 1px 5px rgba(111,52,27,.34)}.vfs-screen-handle.nw{left:-7px;top:-7px}.vfs-screen-handle.ne{right:-7px;top:-7px}.vfs-screen-handle.sw{left:-7px;bottom:-7px}.vfs-screen-handle.se{right:-7px;bottom:-7px}.vfs-screen-meta{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 2px;color:var(--vfs-screen-muted);font-size:12px}.vfs-screen-meta strong{color:var(--vfs-screen-text)}.vfs-screen-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.vfs-screen-action{min-height:44px;border:1px solid var(--vfs-screen-border);border-radius:14px;background:rgba(255,255,255,.82);color:var(--vfs-screen-text);font:700 13px/1 inherit;cursor:pointer;transition:transform .18s ease,filter .18s ease,opacity .18s ease}.vfs-screen-action.primary{border-color:transparent;background:linear-gradient(135deg,var(--vfs-screen-main),var(--vfs-screen-main-strong));color:#fff;box-shadow:0 12px 25px var(--vfs-screen-main-soft)}.vfs-screen-action.stop{background:linear-gradient(135deg,var(--vfs-screen-stop),var(--vfs-screen-stop-strong));border-color:transparent;color:#fff}.vfs-screen-action:hover:not(:disabled),.vfs-screen-action:focus-visible:not(:disabled){outline:none;transform:translateY(-1px);filter:brightness(1.04)}.vfs-screen-action:disabled{cursor:not-allowed;opacity:.44}.vfs-screen-status-row{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:28px}.vfs-screen-status{min-width:0;color:var(--vfs-screen-muted);font-size:12px;line-height:1.5}.vfs-screen-status.error{color:var(--error)}.vfs-screen-range-toggle{display:inline-flex;align-items:center;gap:8px;flex:0 0 auto;color:var(--vfs-screen-text);font-size:12px;font-weight:700;line-height:1;cursor:pointer;user-select:none}.vfs-screen-range-toggle input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}.vfs-screen-range-toggle-track{position:relative;width:34px;height:20px;border-radius:999px;background:rgba(157,96,64,.27);box-shadow:inset 0 1px 2px rgba(89,44,28,.18);transition:background .18s ease,box-shadow .18s ease}.vfs-screen-range-toggle-track::after{content:'';position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(94,44,28,.25);transition:transform .18s ease}.vfs-screen-range-toggle input:checked+.vfs-screen-range-toggle-track{background:var(--vfs-screen-main);box-shadow:0 0 0 3px var(--vfs-screen-main-soft)}.vfs-screen-range-toggle input:checked+.vfs-screen-range-toggle-track::after{transform:translateX(14px)}.vfs-screen-range-toggle input:focus-visible+.vfs-screen-range-toggle-track{outline:2px solid var(--vfs-screen-main);outline-offset:3px}.vfs-screen-range-toggle input:disabled+.vfs-screen-range-toggle-track{opacity:.45}.vfs-screen-range-toggle:has(input:disabled){cursor:not-allowed;opacity:.68}.vfs-screen-result-wrap{display:none;padding:12px;border:1px solid var(--vfs-screen-border);border-radius:18px;background:rgba(255,255,255,.64)}.vfs-screen-result-wrap.show{display:block}.vfs-screen-result{max-height:220px;border-radius:12px}.vfs-screen-actions{display:flex;justify-content:flex-end;gap:10px}.vfs-screen-actions .btn{min-width:112px}.vfs-screen-actions .btn-secondary{border-color:var(--vfs-screen-border);background:rgba(255,255,255,.7);color:var(--vfs-screen-text)}.vfs-screen-actions .btn-primary{border-color:transparent;background:linear-gradient(135deg,var(--vfs-screen-main),var(--vfs-screen-main-strong));box-shadow:0 12px 25px var(--vfs-screen-main-soft)}
-[data-theme="dark"] .vfs-screen-panel{--vfs-screen-main:#00d4ff;--vfs-screen-main-strong:#56a8ff;--vfs-screen-main-soft:rgba(0,212,255,.17);--vfs-screen-border:rgba(120,201,244,.3);--vfs-screen-panel-start:#101d35;--vfs-screen-panel-end:#152642;--vfs-screen-stage-start:#0c1c35;--vfs-screen-stage-end:#102642;--vfs-screen-text:#dceeff;--vfs-screen-muted:#a6c8dc;--vfs-screen-deep:#07182a;--vfs-screen-stop:#108fb6;--vfs-screen-stop-strong:#26bdd8;border-color:var(--vfs-screen-border);box-shadow:0 30px 76px rgba(0,0,0,.42)}[data-theme="dark"] .vfs-screen-guide-step{border-color:var(--vfs-screen-border);background:rgba(255,255,255,.06);color:var(--vfs-screen-muted)}[data-theme="dark"] .vfs-screen-guide-step b,[data-theme="dark"] .vfs-screen-meta strong{color:var(--vfs-screen-text)}[data-theme="dark"] .vfs-screen-stage-wrap{border-color:var(--vfs-screen-border)}[data-theme="dark"] .vfs-screen-action{border-color:var(--vfs-screen-border);background:rgba(255,255,255,.08);color:var(--vfs-screen-text)}[data-theme="dark"] .vfs-screen-meta,[data-theme="dark"] .vfs-screen-status{color:var(--vfs-screen-muted)}[data-theme="dark"] .vfs-screen-range-toggle-track{background:rgba(166,200,220,.24);box-shadow:inset 0 1px 2px rgba(0,0,0,.28)}[data-theme="dark"] .vfs-screen-range-toggle-track::after{box-shadow:0 2px 5px rgba(0,0,0,.3)}[data-theme="dark"] .vfs-screen-result-wrap{border-color:var(--vfs-screen-border);background:rgba(255,255,255,.04)}[data-theme="dark"] .vfs-screen-actions .btn-secondary{background:rgba(255,255,255,.08);color:var(--vfs-screen-text)}
+.vfs-screen-url-parser-trigger{display:grid;place-items:center;width:38px;min-width:38px!important;height:38px;margin-right:auto;padding:0;border:1px solid var(--vfs-screen-border);border-radius:12px;background:rgba(255,255,255,.78);color:var(--vfs-screen-main);cursor:pointer;transition:transform .18s ease,background .18s ease,filter .18s ease}.vfs-screen-url-parser-trigger svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}.vfs-screen-url-parser-trigger:hover,.vfs-screen-url-parser-trigger:focus-visible{outline:none;transform:translateY(-1px);background:#fff;filter:brightness(1.03)}
+.vfs-url-parser-panel{--vfs-screen-main:#ff6b35;--vfs-screen-main-strong:#ff9a67;--vfs-screen-main-soft:rgba(255,107,53,.15);--vfs-screen-border:rgba(239,123,69,.42);--vfs-screen-panel-start:#fffaf5;--vfs-screen-panel-end:#fff0e4;--vfs-screen-text:#6b3826;--vfs-screen-muted:#93614b;--vfs-screen-deep:#4e2b20}
+.vfs-url-parser-panel{width:min(500px,calc(100vw - 40px));max-height:calc(100vh - 40px);padding:0;overflow:auto;border-color:var(--vfs-screen-border);background:linear-gradient(145deg,var(--vfs-screen-panel-start),var(--vfs-screen-panel-end));box-shadow:0 30px 76px rgba(133,63,30,.23);color:var(--vfs-screen-text)}.vfs-url-parser-shell{display:flex;flex-direction:column;gap:16px;padding:24px}.vfs-url-parser-head{display:flex;align-items:flex-start;gap:12px}.vfs-url-parser-icon{display:grid;flex:0 0 auto;place-items:center;width:38px;height:38px;border-radius:12px;background:var(--vfs-screen-main-soft);color:var(--vfs-screen-main)}.vfs-url-parser-icon svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}.vfs-url-parser-heading{min-width:0}.vfs-url-parser-heading h3{margin:0 0 4px;color:var(--vfs-screen-text);font-size:17px}.vfs-url-parser-heading p{margin:0;color:var(--vfs-screen-muted);font-size:12px;line-height:1.55}.vfs-url-parser-close{display:grid;place-items:center;flex:0 0 auto;width:30px;height:30px;margin-left:auto;padding:0;border:0;border-radius:9px;background:transparent;color:var(--vfs-screen-muted);font:24px/1 sans-serif;cursor:pointer}.vfs-url-parser-close:hover,.vfs-url-parser-close:focus-visible{outline:none;background:rgba(255,255,255,.68);color:var(--vfs-screen-text)}.vfs-url-parser-input{box-sizing:border-box;width:100%;min-height:150px;resize:vertical;padding:12px 13px;border:1px solid var(--vfs-screen-border);border-radius:14px;background:rgba(255,255,255,.76);color:var(--vfs-screen-deep);font:13px/1.55 inherit;outline:none}.vfs-url-parser-input:focus{border-color:var(--vfs-screen-main);box-shadow:0 0 0 3px var(--vfs-screen-main-soft)}.vfs-url-parser-input::placeholder{color:var(--vfs-screen-muted)}.vfs-url-parser-error{min-height:18px;margin-top:-8px;color:var(--error);font-size:12px;line-height:1.5}.vfs-url-parser-actions{display:flex;justify-content:flex-end;gap:10px}.vfs-url-parser-actions .btn{min-width:104px}.vfs-url-parser-actions .btn-secondary{border-color:var(--vfs-screen-border);background:rgba(255,255,255,.7);color:var(--vfs-screen-text)}.vfs-url-parser-actions .btn-primary{border-color:transparent;background:linear-gradient(135deg,var(--vfs-screen-main),var(--vfs-screen-main-strong));box-shadow:0 12px 25px var(--vfs-screen-main-soft)}
+[data-theme="dark"] .vfs-screen-panel,[data-theme="dark"] .vfs-url-parser-panel{--vfs-screen-main:#00d4ff;--vfs-screen-main-strong:#56a8ff;--vfs-screen-main-soft:rgba(0,212,255,.17);--vfs-screen-border:rgba(120,201,244,.3);--vfs-screen-panel-start:#101d35;--vfs-screen-panel-end:#152642;--vfs-screen-stage-start:#0c1c35;--vfs-screen-stage-end:#102642;--vfs-screen-text:#dceeff;--vfs-screen-muted:#a6c8dc;--vfs-screen-deep:#07182a;--vfs-screen-stop:#108fb6;--vfs-screen-stop-strong:#26bdd8;border-color:var(--vfs-screen-border);box-shadow:0 30px 76px rgba(0,0,0,.42)}[data-theme="dark"] .vfs-screen-guide-step{border-color:var(--vfs-screen-border);background:rgba(255,255,255,.06);color:var(--vfs-screen-muted)}[data-theme="dark"] .vfs-screen-guide-step b,[data-theme="dark"] .vfs-screen-meta strong{color:var(--vfs-screen-text)}[data-theme="dark"] .vfs-screen-stage-wrap{border-color:var(--vfs-screen-border)}[data-theme="dark"] .vfs-screen-action,[data-theme="dark"] .vfs-screen-url-parser-trigger{border-color:var(--vfs-screen-border);background:rgba(255,255,255,.08);color:var(--vfs-screen-text)}[data-theme="dark"] .vfs-screen-meta,[data-theme="dark"] .vfs-screen-status{color:var(--vfs-screen-muted)}[data-theme="dark"] .vfs-screen-range-toggle-track{background:rgba(166,200,220,.24);box-shadow:inset 0 1px 2px rgba(0,0,0,.28)}[data-theme="dark"] .vfs-screen-range-toggle-track::after{box-shadow:0 2px 5px rgba(0,0,0,.3)}[data-theme="dark"] .vfs-screen-result-wrap{border-color:var(--vfs-screen-border);background:rgba(255,255,255,.04)}[data-theme="dark"] .vfs-screen-actions .btn-secondary,[data-theme="dark"] .vfs-url-parser-actions .btn-secondary{background:rgba(255,255,255,.08);color:var(--vfs-screen-text)}[data-theme="dark"] .vfs-url-parser-input{background:rgba(255,255,255,.06);color:var(--vfs-screen-text)}[data-theme="dark"] .vfs-url-parser-close:hover,[data-theme="dark"] .vfs-url-parser-close:focus-visible{background:rgba(255,255,255,.08)}
 .vfs-screen-source{max-height:none}.vfs-screen-result{display:block;width:100%;background:#0d1930}
 @media (max-width:640px){.vfs-screen-panel{width:calc(100vw - 24px);max-height:calc(100vh - 24px)}.vfs-screen-shell{gap:12px;padding:16px}.vfs-screen-guide,.vfs-screen-controls{grid-template-columns:1fr}.vfs-screen-guide-step{min-height:0}.vfs-screen-meta{align-items:flex-start;flex-direction:column;gap:4px}.vfs-screen-actions .btn{min-width:0;flex:1}}
 .vfs-audio-panel{--vfs-audio-main:#ff7a4d;--vfs-audio-main-strong:#ff9a61;--vfs-audio-main-soft:rgba(255,122,77,.14);--vfs-audio-main-border:rgba(255,132,85,.44);--vfs-audio-deep:#814022;--vfs-audio-panel-bg-1:#fffaf5;--vfs-audio-panel-bg-2:#fff0e3;--vfs-audio-status-bg-1:#fff5ec;--vfs-audio-status-bg-2:#ffe8d7;--vfs-audio-text:#6b3826;--vfs-audio-muted:#93614b;--vfs-audio-shadow:rgba(133,63,30,.22);width:min(520px,calc(100vw - 40px));padding:0;overflow:hidden;border:1px solid var(--vfs-audio-main-border);background:linear-gradient(145deg,var(--vfs-audio-panel-bg-1),var(--vfs-audio-panel-bg-2));box-shadow:0 30px 72px var(--vfs-audio-shadow),0 0 0 1px rgba(255,255,255,.42) inset;color:var(--vfs-audio-text)}
@@ -4459,11 +4477,14 @@ body.quick-fan-transition-active{cursor:progress}
 .file-editor-panel.image-editor .file-editor-content{min-height:0}
 .file-editor-panel.media-preview{width:min(960px,calc(100vw - 32px))}
 .file-editor-panel.media-preview .file-editor-content{display:flex;align-items:center;justify-content:center;min-height:0;overflow:auto}
-.file-editor-panel.media-preview .fe-video-stage{flex:0 1 auto;max-height:100%}
-.file-editor-panel.media-preview .fe-video-stage .fe-video{max-height:100%;object-fit:contain}
+.file-editor-panel.media-preview .fe-video-stage{flex:0 0 auto;max-height:none}
+.file-editor-panel.media-preview .fe-video-stage .fe-video{max-height:70vh;object-fit:contain}
 .file-editor-panel:not(.auto-size){height:700px}
-.file-editor-header{padding:8px 12px;font-size:12px;color:var(--text-muted);border-bottom:1px solid color-mix(in srgb,var(--border) 56%,rgba(255,255,255,.26));display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:linear-gradient(180deg,rgba(255,255,255,.58),rgba(255,255,255,.3))}
+.file-editor-header{padding:8px 12px;font-size:12px;color:var(--text-muted);border-bottom:1px solid color-mix(in srgb,var(--border) 56%,rgba(255,255,255,.26));display:flex;align-items:center;gap:8px;flex-shrink:0;background:linear-gradient(180deg,rgba(255,255,255,.58),rgba(255,255,255,.3))}
+.file-editor-path-wrap{display:flex;align-items:center;gap:7px;min-width:0;flex:1}
 #fileEditorPath{color:#40577f;font-weight:600;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-editor-path-copy{width:28px;height:28px;flex:0 0 28px;padding:0;border:0;border-radius:8px;background:transparent;color:#48638f;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition)}.file-editor-path-copy svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}.file-editor-path-copy:hover:not(:disabled),.file-editor-path-copy:focus-visible{outline:none;background:rgba(var(--accent-rgb),.12);color:var(--accent);transform:translateY(-1px)}.file-editor-path-copy:disabled{opacity:.45;cursor:not-allowed}
+[data-theme="dark"] .file-editor-path-copy{color:#d5e4ff}[data-theme="dark"] .file-editor-path-copy:hover:not(:disabled),[data-theme="dark"] .file-editor-path-copy:focus-visible{background:rgba(255,255,255,.1);color:#fff}
 .file-editor-content{flex:1;overflow-y:auto;padding:12px;background:rgba(255,250,246,.94)}
 [data-theme="dark"] .file-editor-content{background:rgba(8,16,30,.94)}
 .file-editor-content iframe{width:100%;height:100%;border:none;background:#fff;border-radius:10px}
@@ -4723,7 +4744,7 @@ body.quick-fan-transition-active{cursor:progress}
 [data-theme="dark"] .message-wrap .md-content .message-inline-token-bubble.token-skill{background:linear-gradient(180deg,rgba(170,79,27,.48),rgba(104,44,12,.3));border-color:rgba(255,190,132,.28);color:#ffd1a1}
 [data-theme="dark"] .message-wrap .md-content .message-inline-token-bubble.token-team{background:linear-gradient(180deg,rgba(154,52,18,.4),rgba(124,45,18,.24));border-color:rgba(253,186,116,.22);color:#fdba74}
 [data-theme="dark"] .message-wrap .md-content a.message-path-link.onboarding-message-url-target{box-shadow:0 0 0 1px rgba(142,180,255,.24),0 18px 34px rgba(0,0,0,.34)}
-.file-editor-header-actions{display:flex;align-items:center;gap:8px;min-width:0}
+.file-editor-header-actions{display:flex;align-items:center;gap:8px;min-width:0;flex:0 0 auto}
 .file-editor-open-actions{display:none;align-items:center;gap:6px;min-width:0}
 .file-editor-tabs{display:flex;gap:0;flex-shrink:0}
 .file-editor-open-btn{padding:6px 10px;border-radius:999px;border:1px solid color-mix(in srgb,var(--border) 74%,rgba(255,255,255,.24));background:rgba(255,255,255,.72);color:#27406d;font-size:11px;line-height:1;font-weight:600;cursor:pointer;transition:var(--transition);white-space:nowrap;box-shadow:inset 0 1px 0 rgba(255,255,255,.82)}
@@ -5523,6 +5544,22 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
 <button type="button" class="rs-url-preview-switch page-iframe-close" id="pageIframeClose" title="关闭页面预览" aria-label="关闭页面预览" onpointerdown="closePageIframe(event)" onclick="closePageIframe(event)" hidden>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m6.5 6.5 11 11"></path><path d="m17.5 6.5-11 11"></path></svg>
 </button>
+<aside class="sticky-note-widget" id="stickyNoteWidget" hidden aria-label="当前会话便签">
+  <button type="button" class="sticky-note-trigger" id="stickyNoteTrigger" onclick="toggleStickyNote(event)" title="打开便签" aria-label="打开便签" aria-expanded="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.8h8.5l2.7 2.7V20a1.8 1.8 0 0 1-1.8 1.8H7A1.8 1.8 0 0 1 5.2 20V5.6A1.8 1.8 0 0 1 7 3.8Z"></path><path d="M9 10h6M9 14h6M9 18h3.5"></path></svg>
+  </button>
+  <section class="sticky-note-panel" id="stickyNotePanel" aria-hidden="true">
+    <header class="sticky-note-head"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.8h8.5l2.7 2.7V20a1.8 1.8 0 0 1-1.8 1.8H7A1.8 1.8 0 0 1 5.2 20V5.6A1.8 1.8 0 0 1 7 3.8Z"></path><path d="M9 10h6M9 14h6"></path></svg><strong>便签</strong><span id="stickyNoteChatLabel"></span></header>
+    <div class="sticky-note-compose" id="stickyNoteCompose">
+      <div class="at-menu" id="stickyNoteAtMenu"><div class="at-menu-item" data-type="file" onclick="atSelectType('file')">文件</div><div class="at-menu-item" data-type="skill" onclick="atSelectType('skill')">技能</div><div class="at-menu-item" data-type="agent" onclick="atSelectType('agent')" style="display:none">Agent</div></div>
+      <div class="at-file-panel" id="stickyNoteAtFilePanel"><input class="at-file-input" id="stickyNoteAtFileInput" placeholder="输入路径..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" oninput="atFileSearch(this.value)" onkeydown="atFileKey(event)"><div class="at-file-list" id="stickyNoteAtFileList"></div></div>
+      <div class="at-skill-panel" id="stickyNoteAtSkillPanel"></div><div class="at-skill-panel" id="stickyNoteAtAgentPanel"></div>
+      <div class="sticky-note-input input-editable" id="stickyNoteInput" contenteditable="true" data-placeholder="记录转瞬即逝的想法" oninput="handleInput(this)" onkeydown="handleStickyNoteKey(event)"></div>
+    </div>
+    <footer class="sticky-note-actions"><button type="button" onclick="transferStickyNote('chat')">对话框</button><button type="button" onclick="transferStickyNote('memo')">备忘录</button><button type="button" class="sticky-note-clear" onclick="requestStickyNoteClear()">清空</button></footer>
+    <div class="sticky-note-confirm" id="stickyNoteClearConfirm" role="dialog" aria-modal="true" aria-labelledby="stickyNoteClearTitle"><div class="sticky-note-confirm-card"><strong id="stickyNoteClearTitle">清空当前便签？</strong><div class="sticky-note-confirm-actions"><button type="button" onclick="cancelStickyNoteClear()">取消</button><button type="button" class="danger" onclick="confirmStickyNoteClear()">清空</button></div></div></div>
+  </section>
+</aside>
 
 <!-- Settings Overlay -->
 <div class="center-notice-overlay" id="limitToast" data-overlay-base data-overlay-domain="center" data-overlay-order="25" data-overlay-passive="1" aria-hidden="true">
@@ -6380,7 +6417,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     <div class="vfs-create-form">
       <div class="vfs-create-row">
         <input id="vfsCreateName" class="vfs-create-name" placeholder="输入名称" autocomplete="off" />
-        <select id="vfsCreateType" class="form-select vfs-create-type">
+        <select id="vfsCreateType" class="form-select vfs-create-type" onchange="vfsSyncCreateNameHint()">
           <option value="0">目录</option>
           <option value="1">文件</option>
           <option value="2">画布</option>
@@ -6550,7 +6587,17 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
         <button class="vfs-screen-action stop" id="vfsScreenStopBtn" type="button" onclick="vfsScreenStop()" disabled>停止录制</button>
       </div>
       <div class="vfs-screen-status-row"><div class="vfs-screen-status" id="vfsScreenStatus" role="status" aria-live="polite">正在检查视频保存环境…</div><label class="vfs-screen-range-toggle" for="vfsScreenRangeToggle"><input id="vfsScreenRangeToggle" type="checkbox" onchange="vfsScreenToggleRange(this.checked)" disabled><span class="vfs-screen-range-toggle-track" aria-hidden="true"></span><span>选择录制范围</span></label></div>
-      <div class="vfs-screen-actions"><button class="btn btn-secondary" id="vfsScreenCancelBtn" type="button" onclick="vfsScreenRequestClose()">取消</button><button class="btn btn-primary" id="vfsScreenSaveBtn" type="button" onclick="vfsScreenSave()" disabled>保存 MP4</button></div>
+      <div class="vfs-screen-actions"><button class="vfs-screen-url-parser-trigger" type="button" onclick="vfsScreenUrlParserOpen()" title="解析并打开链接" aria-label="解析并打开链接"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 13.5a4 4 0 0 0 5.66.01l2.67-2.67a4 4 0 0 0-5.66-5.66l-1.53 1.52"/><path d="M13.5 10.5a4 4 0 0 0-5.66-.01l-2.67 2.67a4 4 0 1 0 5.66 5.66l1.53-1.52"/></svg></button><button class="btn btn-secondary" id="vfsScreenCancelBtn" type="button" onclick="vfsScreenRequestClose()">取消</button><button class="btn btn-primary" id="vfsScreenSaveBtn" type="button" onclick="vfsScreenSave()" disabled>保存 MP4</button></div>
+    </div>
+  </section>
+</div>
+<div class="overlay" id="vfsScreenUrlParserOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="30" onclick="if(event.target===this)vfsScreenUrlParserClose()" aria-hidden="true">
+  <section class="settings-panel vfs-url-parser-panel" id="vfsScreenUrlParserPanel" role="dialog" aria-modal="true" aria-labelledby="vfsScreenUrlParserTitle" onclick="event.stopPropagation()">
+    <div class="vfs-url-parser-shell">
+      <header class="vfs-url-parser-head"><span class="vfs-url-parser-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10.5 13.5a4 4 0 0 0 5.66.01l2.67-2.67a4 4 0 0 0-5.66-5.66l-1.53 1.52"/><path d="M13.5 10.5a4 4 0 0 0-5.66-.01l-2.67 2.67a4 4 0 1 0 5.66 5.66l1.53-1.52"/></svg></span><div class="vfs-url-parser-heading"><h3 id="vfsScreenUrlParserTitle">解析链接</h3><p>粘贴一段文字，将打开其中第一个 HTTP 或 HTTPS 链接。</p></div><button class="vfs-url-parser-close" type="button" onclick="vfsScreenUrlParserClose()" aria-label="关闭">×</button></header>
+      <textarea class="vfs-url-parser-input" id="vfsScreenUrlParserInput" rows="7" placeholder="例如：请打开 https://example.com 查看详情" oninput="vfsScreenUrlParserClearError()" onkeydown="vfsScreenUrlParserHandleKeydown(event)"></textarea>
+      <div class="vfs-url-parser-error" id="vfsScreenUrlParserError" role="alert" aria-live="polite"></div>
+      <footer class="vfs-url-parser-actions"><button class="btn btn-secondary" type="button" onclick="vfsScreenUrlParserClose()">取消</button><button class="btn btn-primary" id="vfsScreenUrlParserSubmitBtn" type="button" onclick="vfsScreenUrlParserSubmit()">解析并打开</button></footer>
     </div>
   </section>
 </div>
@@ -6752,7 +6799,12 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
 <div class="file-editor-overlay" id="fileEditorOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="50">
   <div class="file-editor-panel">
     <div class="file-editor-header">
-      <span id="fileEditorPath"></span>
+      <div class="file-editor-path-wrap">
+        <button class="file-editor-path-copy" type="button" id="fileEditorPathCopyBtn" onclick="feCopyPreviewAbsolutePath()" aria-label="复制文件绝对路径" title="复制文件绝对路径" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+        </button>
+        <span id="fileEditorPath"></span>
+      </div>
       <div class="file-editor-header-actions">
         <div class="file-editor-open-actions" id="fileEditorOpenActions">
           <button class="file-editor-open-btn" type="button" id="fileEditorOpenOutsideBtn" onclick="feOpenCurrentAppOutside()">应用外打开</button>
@@ -8438,6 +8490,11 @@ let standaloneModeState = {
 };
 // Per-chat input draft: { chatId: innerHTML }
 let chatDrafts = {};
+// Per-chat sticky note draft: { chatId: innerHTML }.  This lives with the
+// chat payload so rich attachment bubbles survive a reload and app restart.
+let chatStickyNotes = {};
+let stickyNotePersistTimer = 0;
+let stickyNoteState = { open: false };
 let centerMessageEditState = {
   visible: false,
   mode: 'message',
@@ -8796,6 +8853,7 @@ function hideScreenSaverImmediate(options = {}) {
     releaseScreenSaverFullscreen();
   }
   syncScreenSaverRootState();
+  syncStickyNoteView();
 }
 
 function showScreenSaver() {
@@ -8812,6 +8870,7 @@ function showScreenSaver() {
   screenSaverState.active = true;
   screenSaverState.waking = false;
   syncScreenSaverRootState();
+  syncStickyNoteView();
   ensureScreenSaverFullscreen();
   return true;
 }
@@ -8844,6 +8903,7 @@ function wakeScreenSaver() {
   screenSaverState.active = false;
   screenSaverState.waking = true;
   syncScreenSaverRootState();
+  syncStickyNoteView();
   if (isRightSidebarCollapsed()) applyRightSidebarState(false);
   syncScreenSaverSceneScale();
   requestAnimationFrame(() => {
@@ -15312,6 +15372,7 @@ function renderRightSidebarUrlPreview() {
   syncRightSidebarUrlPreviewRuntimeWatch();
   scheduleLayoutSync();
   refreshOverlayStates();
+  syncStickyNoteView();
 }
 
 function syncRightSidebarUrlPreviewForActiveChat() {
@@ -27985,6 +28046,7 @@ function openShutdownConfirm() {
   const overlay = document.getElementById('shutdownConfirmOverlay');
   const panel = document.getElementById('shutdownConfirmPanel');
   if (overlay) showExclusiveOverlay(overlay, panel);
+  syncStickyNoteView();
   requestAnimationFrame(() => {
     document.getElementById('shutdownConfirmBtn')?.focus();
   });
@@ -27995,6 +28057,7 @@ function cancelShutdownConfirm(options) {
   const overlay = document.getElementById('shutdownConfirmOverlay');
   const panel = document.getElementById('shutdownConfirmPanel');
   if (overlay) setOverlayVisible(overlay, false, panel);
+  syncStickyNoteView();
   if (restoreFocus) document.getElementById('shutdownTrigger')?.focus();
 }
 
@@ -28013,6 +28076,7 @@ function startShutdownSequence() {
   const overlay = document.getElementById('shutdownOverlay');
   const panel = document.getElementById('shutdownPanel');
   if (overlay) showExclusiveOverlay(overlay, panel);
+  syncStickyNoteView();
   requestIntegrationShutdown().catch(() => {});
   shutdownSequenceState.intervalId = window.setInterval(() => {
     shutdownSequenceState.remainingSeconds = Math.max(shutdownSequenceState.remainingSeconds - 1, 0);
@@ -30301,6 +30365,22 @@ function applyChatsStoragePayload(payload) {
   chatVerify = source.verify && typeof source.verify === 'object' ? source.verify : {};
   chatHtmlOutput = source.htmlOutput && typeof source.htmlOutput === 'object' ? source.htmlOutput : {};
   chatSwarm = source.swarm && typeof source.swarm === 'object' ? source.swarm : {};
+  chatStickyNotes = normalizeChatStickyNotes(source.stickyNotes, state.chats);
+  stickyNoteState.open = false;
+}
+
+function normalizeChatStickyNotes(value, chats) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const normalized = {};
+  Object.keys(value).forEach(chatId => {
+    if (!chats || !chats[chatId] || typeof value[chatId] !== 'string' || !value[chatId]) return;
+    normalized[chatId] = value[chatId];
+  });
+  return normalized;
+}
+
+function serializeChatStickyNotes(chats) {
+  return normalizeChatStickyNotes(chatStickyNotes, chats || state.chats);
 }
 
 function loadChats() {
@@ -30573,6 +30653,7 @@ function syncChatsPayloadToRuntime(payload) {
   } else {
     clearCliSubPanel();
   }
+  syncStickyNoteView({ restore: true });
   renderChatList();
 }
 
@@ -30822,7 +30903,8 @@ function buildChatsStoragePayload(sourceChats, sourceOrder) {
     thinking: { ...chatThinking },
     verify: { ...chatVerify },
     htmlOutput: { ...chatHtmlOutput },
-    swarm: { ...chatSwarm }
+    swarm: { ...chatSwarm },
+    stickyNotes: serializeChatStickyNotes(chatsSource)
   };
 }
 
@@ -34159,6 +34241,7 @@ function confirmDelete() {
   delete restoreReloadQueue[id];
   delete restoreNoDataTipKeys[id];
   delete chatDrafts[id];
+  delete chatStickyNotes[id];
   clearChatTaskBadges(id);
   clearQueuedCenterQueuesForChat(id);
   delete chatModels[id];
@@ -34226,6 +34309,7 @@ function switchChat(id) {
   hideInputReloadConfirm();
   cancelAgentChangeConfirm({ restoreFocus: false });
   cancelThinkingVerifyPrompt();
+  closeStickyNote({ persist: true });
   closeQueuedCenterPanel(true);
   cmdClosePanel(true);
   // Close agent select overlay if open (will re-check for new chat)
@@ -34287,6 +34371,7 @@ function switchChat(id) {
       input.innerHTML = chatDrafts[id] || '';
     }
     syncCenterComposerState(id);
+    syncStickyNoteView({ restore: true });
     // Restore agent and model for this chat
     const previousAgentId = String(state.settings.agentId || '').trim();
     const nextAgentId = String(chatAgents[id] || '').trim();
@@ -39819,13 +39904,14 @@ function truncateEditableInputText(text, limit) {
 
 function getEditableInputCharLimit(el) {
   const id = String(el && el.id || '').trim();
-  if (id === 'msgInput' || id === 'rsNoteInput') return EDITABLE_INPUT_MAX_CHARS;
+  if (id === 'msgInput' || id === 'rsNoteInput' || id === 'stickyNoteInput') return EDITABLE_INPUT_MAX_CHARS;
   return 0;
 }
 
 function getEditableInputLimitToastMessage(el, limit) {
   const id = String(el && el.id || '').trim();
   if (id === 'rsNoteInput') return '备忘录内容最多 ' + limit + ' 个字符';
+  if (id === 'stickyNoteInput') return '便签内容最多 ' + limit + ' 个字符';
   return '输入内容最多 ' + limit + ' 个字符';
 }
 
@@ -39895,6 +39981,241 @@ function enforceEditableInputCharLimit(el) {
   focusEditableInput(el);
   showEditableInputLimitToast(el, limit);
   return true;
+}
+
+function getStickyNoteChatId() {
+  return String(state && state.activeChat || '').trim();
+}
+
+function getStickyNoteInput() {
+  return document.getElementById('stickyNoteInput');
+}
+
+function stickyNoteHasContent() {
+  const input = getStickyNoteInput();
+  return !!(input && extractContent(input, true).trim());
+}
+
+function persistStickyNote() {
+  if (stickyNotePersistTimer) {
+    clearTimeout(stickyNotePersistTimer);
+    stickyNotePersistTimer = 0;
+  }
+  const chatId = getStickyNoteChatId();
+  const input = getStickyNoteInput();
+  if (!chatId || !input || String(input.dataset.chatId || '') !== chatId) return false;
+  const html = String(input.innerHTML || '');
+  if (extractContent(input, true).trim()) chatStickyNotes[chatId] = html;
+  else delete chatStickyNotes[chatId];
+  saveChats();
+  return true;
+}
+
+function scheduleStickyNotePersist() {
+  if (stickyNotePersistTimer) clearTimeout(stickyNotePersistTimer);
+  stickyNotePersistTimer = window.setTimeout(() => {
+    stickyNotePersistTimer = 0;
+    persistStickyNote();
+  }, 180);
+}
+
+function stickyNoteShouldBeHidden() {
+  const screenSaverActive = !!(screenSaverState && (screenSaverState.active || screenSaverState.waking));
+  const shutdownActive = !!(shutdownSequenceState && shutdownSequenceState.active)
+    || !!document.getElementById('shutdownConfirmOverlay')?.classList.contains('show')
+    || !!document.getElementById('shutdownOverlay')?.classList.contains('show');
+  const sidebarIframeVisible = !!(rightSidebarUrlPreviewState && rightSidebarUrlPreviewState.active)
+    && !isRightSidebarUrlPreviewExpanded();
+  return !getStickyNoteChatId() || screenSaverActive || shutdownActive || sidebarIframeVisible;
+}
+
+function syncStickyNoteView(options = {}) {
+  const widget = document.getElementById('stickyNoteWidget');
+  const panel = document.getElementById('stickyNotePanel');
+  const trigger = document.getElementById('stickyNoteTrigger');
+  const input = getStickyNoteInput();
+  const label = document.getElementById('stickyNoteChatLabel');
+  if (!widget || !panel || !trigger || !input) return false;
+  const chatId = getStickyNoteChatId();
+  if (String(input.dataset.chatId || '') !== chatId || options.restore === true) {
+    input.innerHTML = chatId ? String(chatStickyNotes[chatId] || '') : '';
+    input.dataset.chatId = chatId;
+  }
+  const hidden = stickyNoteShouldBeHidden();
+  widget.hidden = hidden;
+  widget.classList.toggle('open', !hidden && !!stickyNoteState.open);
+  panel.setAttribute('aria-hidden', !hidden && stickyNoteState.open ? 'false' : 'true');
+  trigger.setAttribute('aria-expanded', !hidden && stickyNoteState.open ? 'true' : 'false');
+  trigger.title = stickyNoteState.open ? '收起便签' : '打开便签';
+  trigger.setAttribute('aria-label', stickyNoteState.open ? '收起便签' : '打开便签');
+  if (label) {
+    label.textContent = chatId ? ('Chat ' + chatId.slice(0, 14)) : '';
+    label.title = chatId;
+  }
+  return !hidden;
+}
+
+function closeStickyNote(options = {}) {
+  if (options.persist !== false) persistStickyNote();
+  stickyNoteState.open = false;
+  cancelStickyNoteClear();
+  if (atSourceEl && atSourceEl.id === 'stickyNoteInput') hideAllAt();
+  syncStickyNoteView();
+}
+
+function toggleStickyNote(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  if (!syncStickyNoteView()) return false;
+  stickyNoteState.open = !stickyNoteState.open;
+  if (!stickyNoteState.open) {
+    closeStickyNote({ persist: true });
+    return true;
+  }
+  syncStickyNoteView();
+  window.setTimeout(() => focusEditableInput(getStickyNoteInput()), 0);
+  return true;
+}
+
+function insertStickyUrlBubble(url) {
+  const input = getStickyNoteInput();
+  const value = String(url || '').trim();
+  if (!input || !value) return false;
+  insertBubbleAtCursor('[URL:' + value + ']', value, input, {
+    bubbleKind: 'url',
+    valuePrefix: '[URL:',
+    valueSuffix: ']'
+  });
+  return true;
+}
+
+function appendStickyNoteToInput(target) {
+  const input = getStickyNoteInput();
+  if (!input || !target || !stickyNoteHasContent()) return false;
+  const fragment = document.createDocumentFragment();
+  Array.from(input.childNodes).forEach(node => fragment.appendChild(node.cloneNode(true)));
+  if (target.childNodes.length) target.appendChild(document.createElement('br'));
+  target.appendChild(fragment);
+  target.dispatchEvent(new Event('input', { bubbles: true }));
+  enforceEditableInputCharLimit(target);
+  focusEditableInput(target);
+  return true;
+}
+
+function transferStickyNote(destination) {
+  const target = destination === 'memo'
+    ? document.getElementById('rsNoteInput')
+    : document.getElementById('msgInput');
+  if (!stickyNoteHasContent()) {
+    vfsShowUploadToast('便签没有可转发的内容', true);
+    return false;
+  }
+  if (!target || !appendStickyNoteToInput(target)) return false;
+  const input = getStickyNoteInput();
+  input.innerHTML = '';
+  // The transfer is complete only after the source note has been cleared in
+  // persistent chat state.  Save synchronously so a refresh cannot restore
+  // the just-forwarded note during the input debounce window.
+  persistStickyNote();
+  closeStickyNote({ persist: false });
+  vfsShowUploadToast(destination === 'memo' ? '已追加到备忘录' : '已追加到对话框', false);
+  return true;
+}
+
+function requestStickyNoteClear() {
+  if (!stickyNoteHasContent()) return false;
+  document.getElementById('stickyNoteClearConfirm')?.classList.add('show');
+  return true;
+}
+
+function cancelStickyNoteClear() {
+  document.getElementById('stickyNoteClearConfirm')?.classList.remove('show');
+}
+
+function confirmStickyNoteClear() {
+  const input = getStickyNoteInput();
+  if (input) input.innerHTML = '';
+  cancelStickyNoteClear();
+  persistStickyNote();
+  return true;
+}
+
+function handleStickyNoteKey(event) {
+  const confirm = document.getElementById('stickyNoteClearConfirm');
+  if (event.key === 'Escape' && confirm?.classList.contains('show')) {
+    event.preventDefault();
+    cancelStickyNoteClear();
+    return;
+  }
+  const atMenuOpen = ['stickyNoteAtMenu', 'stickyNoteAtFilePanel', 'stickyNoteAtSkillPanel', 'stickyNoteAtAgentPanel']
+    .some(id => document.getElementById(id)?.classList.contains('show'));
+  if (!atMenuOpen && event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    document.execCommand('insertLineBreak', false);
+    scheduleStickyNotePersist();
+    return;
+  }
+  handleKey(event);
+}
+
+function bindStickyNoteInput() {
+  const input = getStickyNoteInput();
+  const compose = document.getElementById('stickyNoteCompose');
+  if (!input || !compose || input.dataset.stickyBound === '1') return;
+  input.dataset.stickyBound = '1';
+  let dragCounter = 0;
+  compose.addEventListener('dragenter', event => {
+    event.preventDefault();
+    dragCounter += 1;
+    compose.classList.add('drag-over');
+  });
+  compose.addEventListener('dragover', event => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  });
+  compose.addEventListener('dragleave', () => {
+    dragCounter -= 1;
+    if (dragCounter <= 0) {
+      dragCounter = 0;
+      compose.classList.remove('drag-over');
+    }
+  });
+  compose.addEventListener('drop', async event => {
+    event.preventDefault();
+    dragCounter = 0;
+    compose.classList.remove('drag-over');
+    focusEditableInput(input);
+    const vfsPath = event.dataTransfer.getData('application/x-vfs-path');
+    if (vfsPath) {
+      const ownerAgentId = getVfsDropOwnerAgentId(event.dataTransfer);
+      vfsPath.split('\n').filter(path => path.trim()).forEach(path => insertFileBubble(input, path, { agentId: ownerAgentId }));
+      return;
+    }
+    const hasSystemFiles = (event.dataTransfer.files && event.dataTransfer.files.length > 0) || (event.dataTransfer.items && event.dataTransfer.items.length > 0);
+    if (hasSystemFiles) {
+      try {
+        await uploadDroppedSystemItemsToBubbles(event.dataTransfer, input, 'center');
+      } catch (error) {
+        vfsShowUploadToast(error.message, true);
+      }
+      return;
+    }
+    const text = String(event.dataTransfer.getData('text/plain') || '').trim();
+    if (/^https?:\/\/\S+$/i.test(text)) insertStickyUrlBubble(text);
+    else if (text) {
+      document.execCommand('insertText', false, text);
+      scheduleStickyNotePersist();
+    }
+  });
+  input.addEventListener('paste', event => {
+    if (getClipboardFiles(event.clipboardData).length) return;
+    const text = String(event.clipboardData?.getData('text/plain') || '').trim();
+    if (!/^https?:\/\/\S+$/i.test(text)) return;
+    event.preventDefault();
+    insertStickyUrlBubble(text);
+  });
 }
 
 function getInputText() {
@@ -48452,7 +48773,7 @@ function normalizeBubbleDisplayText(display) {
 }
 
 function buildBubbleHtml(display) {
-  return '<span class="bubble-label">' + esc(display) + '</span><button class="bubble-del" onmousedown="event.preventDefault();this.parentElement.remove()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>';
+  return '<span class="bubble-label">' + esc(display) + '</span><button class="bubble-del" onmousedown="event.preventDefault();const root=this.closest(\'[contenteditable]\');this.parentElement.remove();if(root)root.dispatchEvent(new Event(\'input\',{bubbles:true}))"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>';
 }
 
 function getImageExtensionFromMime(type) {
@@ -48563,46 +48884,53 @@ function handleInput(el) {
     }
   }
   if (el.id === 'msgInput') syncCenterComposerState(state.activeChat);
+  if (el.id === 'stickyNoteInput') scheduleStickyNotePersist();
 }
 
 function getAtMenuId() {
+  if (atSourceEl && atSourceEl.id === 'stickyNoteInput') return 'stickyNoteAtMenu';
   if (atSourceEl && atSourceEl.id === 'rsNoteInput') return 'rsAtMenu';
   if (atSourceEl && atSourceEl.id === 'messageEditInput') return 'messageEditAtMenu';
   if (atSourceEl && atSourceEl.id === 'pageAnnotationInput') return 'pageAnnotationAtMenu';
   return 'atMenu';
 }
 function getAtFileId() {
+  if (atSourceEl && atSourceEl.id === 'stickyNoteInput') return 'stickyNoteAtFilePanel';
   if (atSourceEl && atSourceEl.id === 'rsNoteInput') return 'rsAtFilePanel';
   if (atSourceEl && atSourceEl.id === 'messageEditInput') return 'messageEditAtFilePanel';
   if (atSourceEl && atSourceEl.id === 'pageAnnotationInput') return 'pageAnnotationAtFilePanel';
   return 'atFilePanel';
 }
 function getAtSkillId() {
+  if (atSourceEl && atSourceEl.id === 'stickyNoteInput') return 'stickyNoteAtSkillPanel';
   if (atSourceEl && atSourceEl.id === 'rsNoteInput') return 'rsAtSkillPanel';
   if (atSourceEl && atSourceEl.id === 'messageEditInput') return 'messageEditAtSkillPanel';
   if (atSourceEl && atSourceEl.id === 'pageAnnotationInput') return 'pageAnnotationAtSkillPanel';
   return 'atSkillPanel';
 }
 function getAtAgentId() {
+  if (atSourceEl && atSourceEl.id === 'stickyNoteInput') return 'stickyNoteAtAgentPanel';
   if (atSourceEl && atSourceEl.id === 'rsNoteInput') return 'rsAtAgentPanel';
   if (atSourceEl && atSourceEl.id === 'messageEditInput') return 'messageEditAtAgentPanel';
   if (atSourceEl && atSourceEl.id === 'pageAnnotationInput') return 'pageAnnotationAtAgentPanel';
   return 'atAgentPanel';
 }
 function getAtFileInputId() {
+  if (atSourceEl && atSourceEl.id === 'stickyNoteInput') return 'stickyNoteAtFileInput';
   if (atSourceEl && atSourceEl.id === 'rsNoteInput') return 'rsAtFileInput';
   if (atSourceEl && atSourceEl.id === 'messageEditInput') return 'messageEditAtFileInput';
   if (atSourceEl && atSourceEl.id === 'pageAnnotationInput') return 'pageAnnotationAtFileInput';
   return 'atFileInput';
 }
 function getAtFileListId() {
+  if (atSourceEl && atSourceEl.id === 'stickyNoteInput') return 'stickyNoteAtFileList';
   if (atSourceEl && atSourceEl.id === 'rsNoteInput') return 'rsAtFileList';
   if (atSourceEl && atSourceEl.id === 'messageEditInput') return 'messageEditAtFileList';
   if (atSourceEl && atSourceEl.id === 'pageAnnotationInput') return 'pageAnnotationAtFileList';
   return 'atFileList';
 }
 function canShowSwarmAgentMenu() {
-  if (!atSourceEl || (atSourceEl.id !== 'msgInput' && atSourceEl.id !== 'pageAnnotationInput')) return false;
+  if (!atSourceEl || !['msgInput', 'pageAnnotationInput', 'stickyNoteInput'].includes(atSourceEl.id)) return false;
   const chatId = String(state.activeChat || '').trim();
   if (!chatId) return false;
   const agentId = String(getChatAgentId(chatId) || state.settings.agentId || '').trim();
@@ -48743,10 +49071,10 @@ function hideAtFile() { document.getElementById(getAtFileId()).classList.remove(
 function hideAtSkill() { document.getElementById(getAtSkillId()).classList.remove('show'); }
 function hideAtAgent() { document.getElementById(getAtAgentId()).classList.remove('show'); }
 function hideAllAt() {
-  ['atMenu','rsAtMenu','messageEditAtMenu','pageAnnotationAtMenu'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('show'); });
-  ['atFilePanel','rsAtFilePanel','messageEditAtFilePanel','pageAnnotationAtFilePanel'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('show'); });
-  ['atSkillPanel','rsAtSkillPanel','messageEditAtSkillPanel','pageAnnotationAtSkillPanel'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('show'); });
-  ['atAgentPanel','rsAtAgentPanel','messageEditAtAgentPanel','pageAnnotationAtAgentPanel'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('show'); });
+  ['atMenu','rsAtMenu','messageEditAtMenu','pageAnnotationAtMenu','stickyNoteAtMenu'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('show'); });
+  ['atFilePanel','rsAtFilePanel','messageEditAtFilePanel','pageAnnotationAtFilePanel','stickyNoteAtFilePanel'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('show'); });
+  ['atSkillPanel','rsAtSkillPanel','messageEditAtSkillPanel','pageAnnotationAtSkillPanel','stickyNoteAtSkillPanel'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('show'); });
+  ['atAgentPanel','rsAtAgentPanel','messageEditAtAgentPanel','pageAnnotationAtAgentPanel','stickyNoteAtAgentPanel'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('show'); });
   atSourceEl = null;
   atSavedRange = null;
 }
@@ -50294,6 +50622,7 @@ function vfsShowCreate(event, options) {
   document.getElementById('vfsCreateName').value = '';
   document.getElementById('vfsCreateType').value = '0';
   document.getElementById('vfsCreateError').textContent = '';
+  vfsSyncCreateNameHint();
   showExclusiveOverlay(document.getElementById('vfsCreateOverlay'), document.getElementById('vfsCreatePanel'));
   setTimeout(() => {
     document.getElementById('vfsCreateName')?.focus();
@@ -50301,6 +50630,12 @@ function vfsShowCreate(event, options) {
 }
 function vfsHideCreate() {
   setOverlayVisible(document.getElementById('vfsCreateOverlay'), false, document.getElementById('vfsCreatePanel'));
+}
+function vfsSyncCreateNameHint() {
+  const input = document.getElementById('vfsCreateName');
+  const type = document.getElementById('vfsCreateType');
+  if (!input || !type) return;
+  input.placeholder = String(type.value) === '5' ? '输入录屏名称（可省略 .mp4）' : '输入名称';
 }
 function getVfsCurrentRelativeDir() {
   const workspacePath = normalizeFsPath(vfsWorkspace);
@@ -50339,7 +50674,8 @@ function validateImageCreateName(name) {
 }
 function validateScreenCreateName(name) {
   const trimmed = String(name || '').trim();
-  if (!trimmed || /\.mp4$/i.test(trimmed)) return '';
+  if (!trimmed) return '请输入录屏文件名';
+  if (/\.mp4$/i.test(trimmed)) return trimmed.length > 4 ? '' : '录屏文件名不能为空';
   const dotIndex = trimmed.lastIndexOf('.');
   if (dotIndex > 0) return '录屏只支持 .mp4 后缀';
   return '';
@@ -50428,7 +50764,7 @@ async function vfsConfirmCreate() {
   const name = document.getElementById('vfsCreateName').value.trim();
   const type = document.getElementById('vfsCreateType').value;
   const errEl = document.getElementById('vfsCreateError');
-  const validationError = type === '5' && !name ? '' : validateVfsCreateName(name);
+  const validationError = validateVfsCreateName(name);
   if (validationError) { errEl.textContent = validationError; return; }
   if (type === '2') {
     const canvasNameError = validateCanvasCreateName(name);
@@ -50554,10 +50890,6 @@ async function vfsConfirmCreate() {
       return;
     }
     if (createButton) createButton.disabled = false;
-    if (nameConflictAtCreate) {
-      errEl.textContent = '同名 MP4 已存在：videos/' + fileName;
-      return;
-    }
     document.getElementById('vfsCreateName').value = '';
     errEl.textContent = '';
     vfsHideCreate();
@@ -51274,6 +51606,7 @@ async function vfsAudioSave() {
   if (state.phase === 'recording') await vfsAudioStop();
   state = vfsAudioState;
   if (!state || state.phase !== 'ready' || !state.blob) return;
+  const workspaceRootPromise = getWorkspaceForAgent(state.agentId);
   state.saving = true; state.error = ''; vfsAudioRender();
   try {
     const content = await vfsAudioBlobToBase64(state.blob);
@@ -51294,8 +51627,21 @@ async function vfsAudioSave() {
     if (!response || !data || !response.ok || data.status !== 0) throw new Error(data && data.content || '保存录音失败');
     const savedPath = String(data.path || targetPath).trim() || targetPath;
     const savedAbsolutePath = String(data.savedAs || '').trim();
+    const workspaceRoot = await workspaceRootPromise;
+    const previewPath = normalizeFsPath(savedAbsolutePath) || (workspaceRoot ? joinFsPath(workspaceRoot, savedPath) : '');
+    const fadeOut = vfsAudioWaitForFadeOut();
     vfsAudioDiscard(false);
-    await vfsNavigateToOutputDirectory(state.agentId, VFS_AUDIO_DIRECTORY);
+    void vfsNavigateToOutputDirectory(state.agentId, VFS_AUDIO_DIRECTORY).catch(() => {});
+    await fadeOut;
+    if (previewPath && workspaceRoot) {
+      try {
+        await feOpen(previewPath, { agentId: state.agentId, workspaceRoot });
+      } catch {
+        vfsShowUploadToast('音频已保存，但无法自动打开音频预览', true);
+      }
+    } else {
+      vfsShowUploadToast('音频已保存，但无法确定音频预览路径', true);
+    }
     if (savedAbsolutePath) {
       try {
         await copyTextToClipboard(savedAbsolutePath);
@@ -51311,6 +51657,25 @@ async function vfsAudioSave() {
     state.saving = false; state.error = '保存失败：' + ((err && err.message) || '请重试');
     vfsAudioRender();
   }
+}
+function vfsAudioWaitForFadeOut() {
+  const overlay = document.getElementById('vfsAudioOverlay');
+  if (!overlay || !overlay.classList.contains('show')) return Promise.resolve();
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      overlay.removeEventListener('transitionend', onTransitionEnd);
+      window.clearTimeout(timeout);
+      resolve();
+    };
+    const onTransitionEnd = event => {
+      if (event.target === overlay && event.propertyName === 'opacity') finish();
+    };
+    const timeout = window.setTimeout(finish, 360);
+    overlay.addEventListener('transitionend', onTransitionEnd);
+  });
 }
 
 // ===== VFS Chrome tab recording =====
@@ -51672,6 +52037,7 @@ async function vfsScreenSave() {
   const state = vfsScreenState;
   if (!state || state.phase !== 'ready' || !state.blob) return;
   const temporaryPath = vfsScreenTemporaryPath();
+  const workspaceRootPromise = getWorkspaceForAgent(state.agentId);
   let completed = false;
   state.phase = 'uploading'; state.error = ''; state.status = '正在上传临时录制文件…'; vfsScreenRender();
   try {
@@ -51684,11 +52050,26 @@ async function vfsScreenSave() {
     data = await response.json().catch(() => null);
     if (!response.ok || !data || data.status !== 0) throw new Error(data && data.content || 'MP4 转换失败');
     completed = true;
-    await vfsNavigateToOutputDirectory(state.agentId, 'videos');
     const savedAs = String(data.savedAs || '').trim();
     const savedName = String(getFsBasename(savedAs) || state.fileName).trim();
     const renamedForConflict = savedName !== state.fileName;
+    const workspaceRoot = await workspaceRootPromise;
+    const savedPath = normalizeFsPath(savedAs) || (workspaceRoot ? joinFsPath(workspaceRoot, 'videos/' + savedName) : '');
+    const fadeOut = vfsScreenWaitForFadeOut();
     vfsScreenDispose(false);
+    void vfsNavigateToOutputDirectory(state.agentId, 'videos').catch(() => {});
+    await fadeOut;
+    let previewOpened = false;
+    if (savedPath && workspaceRoot) {
+      try {
+        await feOpen(savedPath, { agentId: state.agentId, workspaceRoot });
+        previewOpened = true;
+      } catch {}
+    }
+    if (!previewOpened) {
+      vfsShowUploadToast('MP4 已保存，但无法自动打开视频预览', true);
+      return;
+    }
     if (savedAs) {
       try { await copyTextToClipboard(savedAs); vfsShowUploadToast(renamedForConflict ? '同名文件已存在，已保存为 ' + savedName + '，路径已复制到剪贴板' : 'MP4 已保存到 videos，绝对路径已复制到剪贴板', false); }
       catch { vfsShowUploadToast(renamedForConflict ? '同名文件已存在，已保存为 ' + savedName : 'MP4 已保存到 videos', false); }
@@ -51707,6 +52088,25 @@ function vfsScreenRequestClose() {
   if (state.phase === 'recording' && !window.confirm('放弃当前录制？本次内容不会保存。')) return;
   vfsScreenDispose(false);
 }
+function vfsScreenWaitForFadeOut() {
+  const overlay = document.getElementById('vfsScreenOverlay');
+  if (!overlay || !overlay.classList.contains('show')) return Promise.resolve();
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      overlay.removeEventListener('transitionend', onTransitionEnd);
+      window.clearTimeout(timeout);
+      resolve();
+    };
+    const onTransitionEnd = event => {
+      if (event.target === overlay && event.propertyName === 'opacity') finish();
+    };
+    const timeout = window.setTimeout(finish, 360);
+    overlay.addEventListener('transitionend', onTransitionEnd);
+  });
+}
 function vfsScreenDispose(silent) {
   const state = vfsScreenState;
   if (!state) return;
@@ -51714,6 +52114,78 @@ function vfsScreenDispose(silent) {
   vfsScreenReleaseCapture(state);
   vfsScreenClearResult(state);
   if (!silent) setOverlayVisible(document.getElementById('vfsScreenOverlay'), false, document.getElementById('vfsScreenPanel'));
+}
+
+// ===== URL parser for Chrome tab recording =====
+function vfsScreenUrlParserOpen() {
+  const overlay = document.getElementById('vfsScreenUrlParserOverlay');
+  const panel = document.getElementById('vfsScreenUrlParserPanel');
+  const input = document.getElementById('vfsScreenUrlParserInput');
+  if (!overlay || !panel || !input) return;
+  input.value = '';
+  vfsScreenUrlParserClearError();
+  setOverlayVisible(overlay, true, panel);
+  window.setTimeout(() => input.focus(), 0);
+}
+function vfsScreenUrlParserClose() {
+  const overlay = document.getElementById('vfsScreenUrlParserOverlay');
+  const panel = document.getElementById('vfsScreenUrlParserPanel');
+  if (!overlay) return;
+  setOverlayVisible(overlay, false, panel);
+  const trigger = document.querySelector('.vfs-screen-url-parser-trigger');
+  if (trigger instanceof HTMLElement && document.getElementById('vfsScreenOverlay')?.classList.contains('show')) {
+    window.setTimeout(() => trigger.focus(), 0);
+  }
+}
+function vfsScreenUrlParserClearError() {
+  const error = document.getElementById('vfsScreenUrlParserError');
+  if (error) error.textContent = '';
+}
+function vfsScreenUrlParserFirstUrl(value) {
+  const match = String(value || '').match(/https?:\/\/[^\s<>"'`]+/i);
+  if (!match) return '';
+  const candidate = match[0].replace(/[)\]}>.,;:!?，。；：！？、]+$/u, '');
+  if (!candidate) return '';
+  try {
+    const url = new URL(candidate);
+    return /^https?:$/i.test(url.protocol) ? url.href : '';
+  } catch {
+    return '';
+  }
+}
+async function vfsScreenUrlParserSubmit() {
+  const input = document.getElementById('vfsScreenUrlParserInput');
+  const error = document.getElementById('vfsScreenUrlParserError');
+  const submit = document.getElementById('vfsScreenUrlParserSubmitBtn');
+  if (submit?.disabled) return;
+  const url = vfsScreenUrlParserFirstUrl(input && input.value);
+  if (!url) {
+    if (error) error.textContent = '未找到有效的 HTTP 或 HTTPS 链接。';
+    input?.focus();
+    return;
+  }
+  if (submit) { submit.disabled = true; submit.textContent = '正在打开…'; }
+  try {
+    const response = await fetch('/api/browser/open', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      throw new Error(String(payload?.error || payload?.message || '').trim() || '系统浏览器未能打开此链接');
+    }
+    vfsScreenUrlParserClose();
+  } catch (reason) {
+    if (error) error.textContent = '打开失败：' + ((reason && reason.message) || '请重试。');
+  } finally {
+    if (submit) { submit.disabled = false; submit.textContent = '解析并打开'; }
+  }
+}
+function vfsScreenUrlParserHandleKeydown(event) {
+  if (!event || !(event.ctrlKey || event.metaKey) || event.key !== 'Enter') return;
+  event.preventDefault();
+  vfsScreenUrlParserSubmit();
 }
 
 // ===== Reference document preview beside audio recording =====
@@ -54088,7 +54560,8 @@ function vfsShowUploadToast(msg, isError, options) {
   toast.classList.toggle('error', !!isError);
   toast.classList.add('show');
   clearTimeout(vfsUploadToastState.timer);
-  vfsUploadToastState.timer = setTimeout(() => hideVfsUploadToast(), 5000);
+  const duration = Math.max(0, Number(options && options.duration) || 5000);
+  vfsUploadToastState.timer = setTimeout(() => hideVfsUploadToast(), duration);
 }
 
 function showMissingModelToast() {
@@ -54206,6 +54679,7 @@ let feCurrentPath = '';
 let feCurrentContent = '';
 let feMode = 'view'; // 'view' or 'edit'
 let feAgentRelPath = '';
+let fePreviewPathCopiedTimer = 0;
 let fePreviewAgentId = '';
 let feFileType = 'text'; // 'text', 'html', 'image', 'audio', 'video', 'pdf', 'unsupported'
 let feImageMime = '';
@@ -54268,6 +54742,8 @@ let feVideoTrimState = {
 };
 let feVideoTrimCheckPending = false;
 let feVideoTrimCheckRequest = 0;
+let feVideoStageResizeObserver = null;
+let feVideoStageSyncFrame = 0;
 let feFFmpegInstallRequest = '';
 let feFFmpegInstallOrigin = '';
 let feWhisperTaskCheckPending = false;
@@ -55646,6 +56122,57 @@ function feSyncOpenActions() {
   copyBtn.title = actionState.reason || '复制当前应用页面链接';
 }
 
+function feGetPreviewAbsolutePath() {
+  const currentPath = normalizeFsPath(feCurrentPath);
+  if (!currentPath) return '';
+  if (currentPath.startsWith('/')) return currentPath;
+  const workspace = normalizeFsPath(vfsWorkspace);
+  return workspace ? joinFsPath(workspace, currentPath) : '';
+}
+
+function feSyncPreviewPathHeader() {
+  if (fePreviewPathCopiedTimer) {
+    clearTimeout(fePreviewPathCopiedTimer);
+    fePreviewPathCopiedTimer = 0;
+  }
+  const path = document.getElementById('fileEditorPath');
+  const copyButton = document.getElementById('fileEditorPathCopyBtn');
+  const supported = ['text', 'html', 'image', 'pdf', 'audio', 'video'].includes(feFileType);
+  const absolutePath = feGetPreviewAbsolutePath();
+  if (path) {
+    path.textContent = supported ? String(feAgentRelPath || '') : '';
+    path.title = absolutePath || String(feAgentRelPath || '');
+  }
+  if (copyButton) {
+    copyButton.hidden = !supported;
+    copyButton.disabled = !absolutePath;
+  }
+}
+
+async function feCopyPreviewAbsolutePath() {
+  const absolutePath = feGetPreviewAbsolutePath();
+  if (!absolutePath) {
+    vfsShowUploadToast('无法确定文件绝对路径', true, { placement: 'center-top', duration: 3000 });
+    return;
+  }
+  try {
+    await copyTextToClipboard(absolutePath);
+    const path = document.getElementById('fileEditorPath');
+    if (path) {
+      path.textContent = '文件系统路径已复制系统剪贴板';
+      path.title = '文件系统路径已复制系统剪贴板';
+    }
+    if (fePreviewPathCopiedTimer) clearTimeout(fePreviewPathCopiedTimer);
+    fePreviewPathCopiedTimer = setTimeout(() => {
+      fePreviewPathCopiedTimer = 0;
+      feSyncPreviewPathHeader();
+    }, 3000);
+    vfsShowUploadToast('文件绝对路径已复制到系统剪贴板', false, { placement: 'center-top', duration: 3000 });
+  } catch {
+    vfsShowUploadToast('文件绝对路径复制失败', true, { placement: 'center-top', duration: 3000 });
+  }
+}
+
 function feOpenCurrentAppOutside() {
   const actionState = getFileEditorAppOpenState();
   if (!actionState.available || !actionState.href) {
@@ -55747,8 +56274,8 @@ async function feOpen(absPath, options) {
   feImageState.isDrawing = false;
   feImageState.pointerId = null;
   feCancelImageTextEdit();
-  document.getElementById('fileEditorPath').textContent = feAgentRelPath;
   feMode = initialMode;
+  feSyncPreviewPathHeader();
   feSyncOpenActions();
 
   const panel = document.querySelector('.file-editor-panel');
@@ -56234,7 +56761,7 @@ function feOpenBlankImage(options = {}) {
   feImageState.isDrawing = false;
   feImageState.pointerId = null;
   feCancelImageTextEdit();
-  document.getElementById('fileEditorPath').textContent = relPath;
+  feSyncPreviewPathHeader();
   feMode = 'edit';
   feSyncOpenActions();
 
@@ -57529,11 +58056,46 @@ function feHideMediaControls() {
 }
 
 function feStopMediaPreview() {
+  feStopObservingVideoStage();
   const media = feMediaElement();
   if (!media) return;
   try { media.pause(); } catch {}
   media.removeAttribute('src');
   try { media.load(); } catch {}
+}
+
+function feSyncVideoStageToMedia() {
+  const media = feMediaElement();
+  const stage = document.getElementById('feVideoStage');
+  if (!(media instanceof HTMLVideoElement) || !stage || !stage.contains(media)) return;
+  const height = media.getBoundingClientRect().height;
+  if (height > 0) stage.style.height = Math.ceil(height) + 'px';
+}
+
+function feScheduleVideoStageSync() {
+  if (feVideoStageSyncFrame) return;
+  feVideoStageSyncFrame = requestAnimationFrame(() => {
+    feVideoStageSyncFrame = 0;
+    feSyncVideoStageToMedia();
+  });
+}
+
+function feObserveVideoStage(media) {
+  feStopObservingVideoStage();
+  if (!(media instanceof HTMLVideoElement)) return;
+  ['loadedmetadata', 'loadeddata', 'resize'].forEach(eventName => media.addEventListener(eventName, feScheduleVideoStageSync));
+  if (typeof ResizeObserver !== 'undefined') {
+    feVideoStageResizeObserver = new ResizeObserver(feScheduleVideoStageSync);
+    feVideoStageResizeObserver.observe(media);
+  }
+  feScheduleVideoStageSync();
+}
+
+function feStopObservingVideoStage() {
+  if (feVideoStageResizeObserver) feVideoStageResizeObserver.disconnect();
+  feVideoStageResizeObserver = null;
+  if (feVideoStageSyncFrame) cancelAnimationFrame(feVideoStageSyncFrame);
+  feVideoStageSyncFrame = 0;
 }
 
 function fePlayMedia() {
@@ -57596,6 +58158,26 @@ function feGetMediaTrimState(media) {
 
 function feIsMediaTrimSaving() {
   return !!(feAudioTrimState && feAudioTrimState.saving) || !!(feVideoTrimState && feVideoTrimState.saving) || !!(feVideoAudioEditState && (feVideoAudioEditState.saving || feVideoAudioEditState.originalAudioExtracting)) || feVideoFrameSavePending || feVideoAudioExtractPending;
+}
+
+function feWaitForPreviewFadeOut() {
+  const overlay = document.getElementById('fileEditorOverlay');
+  if (!overlay || !overlay.classList.contains('show')) return Promise.resolve();
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      overlay.removeEventListener('transitionend', onTransitionEnd);
+      window.clearTimeout(timeout);
+      resolve();
+    };
+    const onTransitionEnd = event => {
+      if (event.target === overlay && event.propertyName === 'opacity') finish();
+    };
+    const timeout = window.setTimeout(finish, 360);
+    overlay.addEventListener('transitionend', onTransitionEnd);
+  });
 }
 
 function feTrimOutputFilenameStamp(now) {
@@ -59816,6 +60398,7 @@ async function feSaveVideoTrim() {
     feSetVideoTrimSummary('请先选择有效的切分区间', true);
     return;
   }
+  const workspaceRootPromise = getWorkspaceForAgent(agentId);
   let crop = null;
   try {
     crop = feBuildVideoCropPayload();
@@ -59837,8 +60420,15 @@ async function feSaveVideoTrim() {
     let result = null;
     try { result = await response.json(); } catch {}
     if (!response.ok || !result || result.status !== 0) throw new Error(result && result.content || '保存新视频失败');
-    feCancelVideoTrim(true);
-    await vfsNavigateToOutputDirectory(agentId, 'videos');
+    const workspaceRoot = await workspaceRootPromise;
+    const savedPath = normalizeFsPath(result.savedAs || '') || (workspaceRoot ? joinFsPath(workspaceRoot, 'videos/' + outputName) : '');
+    if (!savedPath || !workspaceRoot) throw new Error('新视频已保存，但无法确定输出文件路径');
+    const fadeOut = feWaitForPreviewFadeOut();
+    feVideoTrimState.saving = false;
+    feClose();
+    void vfsNavigateToOutputDirectory(agentId, 'videos').catch(() => {});
+    await fadeOut;
+    await feOpen(savedPath, { agentId, workspaceRoot });
     const savedMessage = '已生成新视频';
     if (result.savedAs) {
       try {
@@ -60328,6 +60918,7 @@ function renderMediaPreview(sourceURL, mediaType) {
   if (mediaType === 'video') {
     const stage = document.createElement('div');
     stage.className = 'fe-video-stage';
+    stage.id = 'feVideoStage';
     const cropLayer = document.createElement('div');
     cropLayer.className = 'fe-video-crop-layer';
     cropLayer.id = 'feVideoCropLayer';
@@ -60344,6 +60935,7 @@ function renderMediaPreview(sourceURL, mediaType) {
     stage.appendChild(cropLayer);
     stage.appendChild(markerLayer);
     container.appendChild(stage);
+    feObserveVideoStage(media);
   } else {
     container.appendChild(media);
   }
@@ -66506,6 +67098,7 @@ document.addEventListener('DOMContentLoaded', updateCliSubEmptyState);
 
 // ===== Paste Plain Text / Supported Files =====
 document.addEventListener('paste', async e => {
+  if (e.defaultPrevented) return;
   const el = e.target.closest('[contenteditable="true"]');
   if (el) {
     const clipboard = e.clipboardData || window.clipboardData;
@@ -66540,6 +67133,11 @@ document.addEventListener('paste', async e => {
     const text = clipboard.getData('text/plain');
     document.execCommand('insertText', false, text);
   }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  bindStickyNoteInput();
+  syncStickyNoteView({ restore: true });
 });
 
 // ===== Boot =====
