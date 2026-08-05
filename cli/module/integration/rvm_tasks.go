@@ -202,6 +202,18 @@ func parseRVMCheckConfig(raw map[string]interface{}) (rvmCheckConfig, error) {
 }
 
 func rvmRuntimeFor(cacheFor time.Duration, workspace string) (rvmRuntime, bool) {
+	values := rvmRuntimesFor(cacheFor, workspace)
+	if len(values) == 0 {
+		return rvmRuntime{}, false
+	}
+	return values[0], true
+}
+
+// rvmRuntimesFor checks every supported installation layout in order.  The
+// returned values are ready for both the dependency check and task execution;
+// callers must not reconstruct a script or checkpoint path from the workspace.
+func rvmRuntimesFor(cacheFor time.Duration, workspace string) []rvmRuntime {
+	values := make([]rvmRuntime, 0, 3)
 	for _, candidate := range rvmRuntimeCandidates(workspace) {
 		key := candidate.Script + "\x00" + candidate.Checkpoint
 		now := rvmNow()
@@ -209,7 +221,8 @@ func rvmRuntimeFor(cacheFor time.Duration, workspace string) (rvmRuntime, bool) 
 		cached, ok := rvmCheckCache.entries[key]
 		rvmCheckCache.Unlock()
 		if ok && cached.runtime.Python != "" && now.Before(cached.checkedAt.Add(cacheFor)) {
-			return cached.runtime, true
+			values = append(values, cached.runtime)
+			continue
 		}
 		for _, python := range rvmPythonCandidates() {
 			probe, cancel := context.WithTimeout(context.Background(), rvmProbeTimeout)
@@ -229,20 +242,22 @@ func rvmRuntimeFor(cacheFor time.Duration, workspace string) (rvmRuntime, bool) 
 			}
 			rvmCheckCache.entries[key] = rvmCachedRuntime{checkedAt: now, runtime: value}
 			rvmCheckCache.Unlock()
-			return value, true
+			values = append(values, value)
+			break
 		}
 	}
-	return rvmRuntime{}, false
+	return values
 }
 
 func rvmRuntimeCandidates(workspace string) []rvmRuntime {
-	values := make([]rvmRuntime, 0, 1)
-	add := func(home, checkpoint string) {
-		home, checkpoint = strings.TrimSpace(home), strings.TrimSpace(checkpoint)
-		if home == "" || checkpoint == "" {
+	values := make([]rvmRuntime, 0, 5)
+	add := func(script, checkpoint string) {
+		script, checkpoint = strings.TrimSpace(script), strings.TrimSpace(checkpoint)
+		if script == "" || checkpoint == "" {
 			return
 		}
-		script, err := filepath.Abs(filepath.Join(home, "inference.py"))
+		var err error
+		script, err = filepath.Abs(script)
 		if err != nil {
 			return
 		}
@@ -262,19 +277,40 @@ func rvmRuntimeCandidates(workspace string) []rvmRuntime {
 		}
 		values = append(values, rvmRuntime{Script: script, Checkpoint: checkpoint})
 	}
-	workspace = strings.TrimSpace(workspace)
-	if workspace == "" {
-		return values
+	for _, candidate := range rvmCandidatePaths(workspace) {
+		add(candidate.Script, candidate.Checkpoint)
 	}
-	home := filepath.Join(workspace, "rvm")
-	// Installation, checking and task execution use this same fixed layout.
-	add(home, filepath.Join(home, "weights", "rvm_mobilenetv3.pth"))
 	return values
 }
 
+func rvmCandidatePaths(workspace string) []rvmRuntime {
+	workspace = strings.TrimSpace(workspace)
+	if workspace == "" {
+		return nil
+	}
+	rvmHome := filepath.Join(workspace, "rvm")
+	nestedHome := filepath.Join(rvmHome, "RobustVideoMatting")
+	workspaceHome := filepath.Join(workspace, "RobustVideoMatting")
+	checkpoint := func(home string) string { return filepath.Join(home, "weights", "rvm_mobilenetv3.pth") }
+	// The first entry is the documented layout. The remaining entries support
+	// the layouts created by a normal `git clone RobustVideoMatting` command.
+	// Keep script and checkpoint paired so the path selected by preflight is
+	// exactly the one supplied to a later task invocation.
+	return []rvmRuntime{
+		{Script: filepath.Join(rvmHome, "inference.py"), Checkpoint: checkpoint(rvmHome)},
+		{Script: filepath.Join(nestedHome, "inference.py"), Checkpoint: checkpoint(rvmHome)},
+		{Script: filepath.Join(nestedHome, "inference.py"), Checkpoint: checkpoint(nestedHome)},
+		{Script: filepath.Join(workspaceHome, "inference.py"), Checkpoint: checkpoint(rvmHome)},
+		{Script: filepath.Join(workspaceHome, "inference.py"), Checkpoint: checkpoint(workspaceHome)},
+	}
+}
+
 func rvmRequiredPaths(workspace string) string {
-	home := filepath.Join(workspace, "rvm")
-	return filepath.Join(home, "inference.py") + " 与 " + filepath.Join(home, "weights", "rvm_mobilenetv3.pth")
+	paths := make([]string, 0, 5)
+	for _, candidate := range rvmCandidatePaths(workspace) {
+		paths = append(paths, candidate.Script+" 与 "+candidate.Checkpoint)
+	}
+	return strings.Join(paths, "；或 ")
 }
 
 func rvmPythonCandidates() []string {
@@ -618,11 +654,10 @@ func (m *rvmTaskManager) extract(ctx context.Context, task rvmTask) error {
 	if err != nil {
 		return errors.New("Agent 工作目录不存在")
 	}
-	runtimeValue, ok := rvmRuntimeFor(time.Hour, workspace)
-	if !ok {
+	runtimes := rvmRuntimesFor(time.Hour, workspace)
+	if len(runtimes) == 0 {
 		return errors.New("未检测到可用的 Robust Video Matting")
 	}
-	m.appendLog(task.ID, taskKnownPythonEnvironment(runtimeValue.Python, runtimeValue.Script))
 	target, err := resolveCaseInsensitiveUnderRoot(workspace, filepath.FromSlash(task.OutputPath))
 	if err != nil || !ensureWritablePathWithinRoot(workspace, target) {
 		return errors.New("无法创建视频输出路径")
@@ -636,8 +671,6 @@ func (m *rvmTaskManager) extract(ctx context.Context, task rvmTask) error {
 	m.appendLog(task.ID, "原始视频绝对路径："+source)
 	m.appendLog(task.ID, "输出透明 MOV 绝对路径："+target)
 	m.appendLog(task.ID, "输出 MP4 预览绝对路径："+rvmPreviewMP4Path(target))
-	m.appendLog(task.ID, "RVM 推理脚本："+runtimeValue.Script)
-	m.appendLog(task.ID, "RVM 模型权重："+runtimeValue.Checkpoint)
 	tmp, err := os.MkdirTemp(filepath.Dir(target), ".rvm-")
 	if err != nil {
 		return err
@@ -647,23 +680,39 @@ func (m *rvmTaskManager) extract(ctx context.Context, task rvmTask) error {
 	alpha := filepath.Join(tmp, "alpha.mov")
 	devices := rvmPreferredDevices()
 	var lastErr error
-	for index, device := range devices {
-		if index > 0 {
-			m.appendLog(task.ID, "GPU/MPS 推理失败，已清理临时输出并回退 CPU："+lastErr.Error())
-			_ = os.Remove(foreground)
-			_ = os.Remove(alpha)
+	for runtimeIndex, runtimeValue := range runtimes {
+		m.appendLog(task.ID, taskKnownPythonEnvironment(runtimeValue.Python, runtimeValue.Script))
+		m.appendLog(task.ID, "RVM 推理脚本："+runtimeValue.Script)
+		m.appendLog(task.ID, "RVM 模型权重："+runtimeValue.Checkpoint)
+		var runtimeErr error
+		for deviceIndex, device := range devices {
+			if deviceIndex > 0 {
+				m.appendLog(task.ID, "GPU/MPS 推理失败，已清理临时输出并回退 CPU："+runtimeErr.Error())
+				_ = os.Remove(foreground)
+				_ = os.Remove(alpha)
+			}
+			m.appendLog(task.ID, "正在使用 "+device+" 执行 RVM 推理。")
+			m.appendLog(task.ID, "实际 RVM 模型参数："+strings.Join(rvmInvocationArgs(runtimeValue, task.Scenario, device, source, foreground, alpha)[2:], " "))
+			err = m.runRVM(ctx, task.ID, runtimeValue, task.Scenario, device, source, foreground, alpha)
+			if err == nil {
+				runtimeErr = nil
+				break
+			}
+			if errors.Is(err, context.Canceled) {
+				return err
+			}
+			runtimeErr = err
 		}
-		m.appendLog(task.ID, "正在使用 "+device+" 执行 RVM 推理。")
-		m.appendLog(task.ID, "实际 RVM 模型参数："+strings.Join(rvmInvocationArgs(runtimeValue, task.Scenario, device, source, foreground, alpha)[2:], " "))
-		err = m.runRVM(ctx, task.ID, runtimeValue, task.Scenario, device, source, foreground, alpha)
-		if err == nil {
+		if runtimeErr == nil {
 			lastErr = nil
 			break
 		}
-		if errors.Is(err, context.Canceled) {
-			return err
+		lastErr = runtimeErr
+		if runtimeIndex+1 < len(runtimes) {
+			m.appendLog(task.ID, "当前 RVM 路径执行失败，已清理临时输出并回退下一组脚本与权重："+runtimeErr.Error())
+			_ = os.Remove(foreground)
+			_ = os.Remove(alpha)
 		}
-		lastErr = err
 	}
 	if lastErr != nil {
 		return lastErr

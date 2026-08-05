@@ -62,6 +62,72 @@ func TestRVMRuntimeCandidatesDiscoverAgentInstallation(t *testing.T) {
 	t.Fatal("agent-local RVM installation using weights/ was not discovered")
 }
 
+func TestRVMRuntimeCandidatesDiscoverNestedCloneInstallation(t *testing.T) {
+	workspace := t.TempDir()
+	rvmHome := filepath.Join(workspace, "rvm")
+	cloneHome := filepath.Join(rvmHome, "RobustVideoMatting")
+	checkpoint := filepath.Join(rvmHome, "weights", "rvm_mobilenetv3.pth")
+	if err := os.MkdirAll(filepath.Dir(checkpoint), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(cloneHome, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cloneHome, "inference.py"), []byte("# test"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(checkpoint, []byte("checkpoint"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, candidate := range rvmRuntimeCandidates(workspace) {
+		if candidate.Script == filepath.Join(cloneHome, "inference.py") && candidate.Checkpoint == checkpoint {
+			return
+		}
+	}
+	t.Fatal("nested git-clone RVM installation was not discovered")
+}
+
+func TestRVMRuntimesForRetainsFallbackLayouts(t *testing.T) {
+	workspace := t.TempDir()
+	rvmHome := filepath.Join(workspace, "rvm")
+	cloneHome := filepath.Join(rvmHome, "RobustVideoMatting")
+	checkpoint := filepath.Join(rvmHome, "weights", "rvm_mobilenetv3.pth")
+	if err := os.MkdirAll(filepath.Dir(checkpoint), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(cloneHome, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, script := range []string{filepath.Join(rvmHome, "inference.py"), filepath.Join(cloneHome, "inference.py")} {
+		if err := os.WriteFile(script, []byte("# test"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(checkpoint, []byte("checkpoint"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	oldLookPath, oldCommand, oldCache := rvmLookPath, rvmCommandContext, rvmCheckCache
+	t.Cleanup(func() { rvmLookPath, rvmCommandContext, rvmCheckCache = oldLookPath, oldCommand, oldCache })
+	rvmLookPath = func(string) (string, error) { return "python3", nil }
+	rvmCommandContext = func(_ context.Context, _ string, _ ...string) *exec.Cmd { return exec.Command("true") }
+	rvmCheckCache = struct {
+		sync.Mutex
+		entries map[string]rvmCachedRuntime
+	}{}
+	runtimes := rvmRuntimesFor(time.Hour, workspace)
+	if len(runtimes) != 2 {
+		t.Fatalf("fallback runtimes = %#v, want direct and nested layouts", runtimes)
+	}
+	if runtimes[0].Script != filepath.Join(rvmHome, "inference.py") || runtimes[1].Script != filepath.Join(cloneHome, "inference.py") {
+		t.Fatalf("fallback order = %#v", runtimes)
+	}
+	for _, runtime := range runtimes {
+		if runtime.Checkpoint != checkpoint {
+			t.Fatalf("runtime checkpoint = %q, want %q", runtime.Checkpoint, checkpoint)
+		}
+	}
+}
+
 func TestRVMInvocationUsesCompatibilityWrapper(t *testing.T) {
 	runtime := rvmRuntime{Python: "python3", Script: "/agent/rvm/inference.py", Checkpoint: "/agent/rvm/weights/rvm_mobilenetv3.pth"}
 	args := rvmInvocationArgs(runtime, rvmScenarioStandard, "mps", "/agent/tmp/input.mp4", "/tmp/foreground.mov", "/tmp/alpha.mov")

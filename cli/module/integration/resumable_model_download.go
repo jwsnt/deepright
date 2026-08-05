@@ -38,8 +38,13 @@ type resumableModelDownloadConfig struct {
 	Retries            int
 	ChunkSize          int64
 	Progress           func(copied, total int64)
-	PartProgress       func(worker, part, parts int, copied, total int64)
-	Retry              func(worker, part, parts, retry, retries int, err error)
+	// RetryProgress reports the actual persisted offset after a sequential
+	// retry has received its response. A server that ignores Range forces the
+	// offset back to zero, so consumers can restart their displayed progress
+	// scale instead of suppressing the next 10% updates as stale.
+	RetryProgress func(copied, total int64)
+	PartProgress  func(worker, part, parts int, copied, total int64)
+	Retry         func(worker, part, parts, retry, retries int, err error)
 }
 
 type modelDownloadResult struct {
@@ -772,7 +777,7 @@ func downloadModelSequentially(ctx context.Context, cfg resumableModelDownloadCo
 		if retry > 0 && cfg.Retry != nil {
 			cfg.Retry(0, 0, 0, retry, cfg.Retries, lastErr)
 		}
-		copied, _, lastErr = downloadModelSequentialAttempt(ctx, cfg, source, total)
+		copied, _, lastErr = downloadModelSequentialAttempt(ctx, cfg, source, total, retry)
 		if lastErr == nil {
 			return copied, false, nil
 		}
@@ -793,7 +798,7 @@ func downloadModelSequentially(ctx context.Context, cfg resumableModelDownloadCo
 	return copied, false, lastErr
 }
 
-func downloadModelSequentialAttempt(ctx context.Context, cfg resumableModelDownloadConfig, source modelDownloadSource, total int64) (int64, bool, error) {
+func downloadModelSequentialAttempt(ctx context.Context, cfg resumableModelDownloadConfig, source modelDownloadSource, total int64, retry int) (int64, bool, error) {
 	part, err := os.OpenFile(cfg.PartPath, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return 0, false, fmt.Errorf("无法打开模型临时文件: %w", err)
@@ -860,6 +865,9 @@ func downloadModelSequentialAttempt(ctx context.Context, cfg resumableModelDownl
 	}
 	if total <= 0 && response.ContentLength >= 0 {
 		total = offset + response.ContentLength
+	}
+	if retry > 0 && cfg.RetryProgress != nil {
+		cfg.RetryProgress(offset, total)
 	}
 	if cfg.Progress != nil {
 		cfg.Progress(offset, total)

@@ -927,6 +927,16 @@ func (manager *whisperTaskManager) prepareWhisperRuntimeModel(ctx context.Contex
 				manager.appendLog(taskID, fmt.Sprintf("Whisper %s 已下载 %d%%。", name, progress))
 			}
 		},
+		RetryProgress: func(copied, total int64) {
+			if total <= 0 {
+				return
+			}
+			progress := copied * 100 / total
+			if progress < lastProgress {
+				lastProgress = -1
+			}
+			manager.appendLog(taskID, fmt.Sprintf("Whisper %s 普通下载重试已从 %d%% 开始。", name, progress))
+		},
 		PartProgress: func(worker, part, parts int, copied, total int64) {
 			if total <= 0 {
 				return
@@ -992,6 +1002,16 @@ func (manager *whisperTaskManager) downloadWhisperLargeV3FromModelScope(ctx cont
 				lastProgress = progress
 				manager.appendLog(taskID, fmt.Sprintf("ModelScope Whisper large-v3 已下载 %d%%。", progress))
 			}
+		},
+		RetryProgress: func(copied, total int64) {
+			if total <= 0 {
+				return
+			}
+			progress := copied * 100 / total
+			if progress < lastProgress {
+				lastProgress = -1
+			}
+			manager.appendLog(taskID, fmt.Sprintf("ModelScope Whisper large-v3 普通下载重试已从 %d%% 开始。", progress))
 		},
 		PartProgress: func(worker, part, parts int, copied, total int64) {
 			if total <= 0 {

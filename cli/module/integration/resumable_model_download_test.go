@@ -195,6 +195,56 @@ func TestModelRangeDownloadRetriesEachPart(t *testing.T) {
 	}
 }
 
+func TestModelSequentialRetryReportsResetProgressWhenRangeIsIgnored(t *testing.T) {
+	payload := []byte("0123456789abcdefghij")
+	var transfers int
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Header.Get("Range") == "bytes=0-0" {
+			writer.Header().Set("Content-Length", strconv.Itoa(len(payload)))
+			_, _ = writer.Write(payload)
+			return
+		}
+		transfers++
+		writer.Header().Set("Content-Length", strconv.Itoa(len(payload)))
+		if transfers == 1 {
+			// Advertise the full object but close early, forcing a retry after
+			// some bytes have reached the local part file.
+			_, _ = writer.Write(payload[:8])
+			return
+		}
+		// Deliberately ignore the retry's Range request. The downloader must
+		// truncate its local partial file and report that it restarted at 0%.
+		_, _ = writer.Write(payload)
+	}))
+	defer server.Close()
+
+	var retryOffsets []int64
+	part := t.TempDir() + "/model.part"
+	got, usedRanges, err := downloadModelWithResume(context.Background(), resumableModelDownloadConfig{
+		Client:       server.Client(),
+		URL:          server.URL,
+		PartPath:     part,
+		ExpectedSize: int64(len(payload)),
+		Retries:      1,
+		RetryProgress: func(copied, total int64) {
+			if total != int64(len(payload)) {
+				t.Errorf("retry total = %d, want %d", total, len(payload))
+			}
+			retryOffsets = append(retryOffsets, copied)
+		},
+	})
+	if err != nil || usedRanges || got != int64(len(payload)) {
+		t.Fatalf("downloadModelWithResume() = (%d, %t, %v)", got, usedRanges, err)
+	}
+	if len(retryOffsets) != 1 || retryOffsets[0] != 0 {
+		t.Fatalf("retry offsets = %v, want [0] after ignored Range", retryOffsets)
+	}
+	actual, readErr := os.ReadFile(part)
+	if readErr != nil || !bytes.Equal(actual, payload) {
+		t.Fatalf("part = %q, %v", actual, readErr)
+	}
+}
+
 func TestModelDownloadProbeStopsAtPartTimeout(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		select {
