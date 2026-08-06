@@ -51,6 +51,13 @@
 + `start`命令启动前需要先清理受管CDP服务并写入`browser.pid`
 + `stop`命令关闭时需要同时清理browser插件拉起的所有obscura和monitor子进程，不留下残留后台进程
 
+### WSL Chat 共享 Profile
++ 在 Windows WSL / WSL2 下，同一 `chatId` 的所有 Agent 共享一个受管 Chrome 实例和 `C:\\ProgramData\\deepright\\profiles\\chats\\<chatId>` Profile；不同 Chat 必须隔离。
++ Chat Profile 首次仅创建空目录，不复制系统 Chrome `User Data` 或 `chrome_def`；`stop` 与 `instance shutdown` 不得立即删除该目录。
++ WSL Profile 锁文件保持原样，不执行锁清理。
++ WSL 过期 Profile 由 `browser.clear` / `browser.scan` 后台任务按目录最后修改时间清理，扫描根目录仅限 `C:\\ProgramData\\deepright\\profiles\\chats`。
++ Browser 忽略 `app-dir`、`app` 和 `agent-dir` 路径覆盖，macOS、WSL 与原生 Linux/Windows 必须按各自固定运行时目录规则定位应用、插件与 Agent 目录。
+
 ### 代理Playwright兼容
 > 新增自 iteration/20260509-2/REQUIREMENT.md
 + 为Browser代理的Playwright所有功能增加执行日志，尤其要单独记录当前域名下实际注入的Cookie

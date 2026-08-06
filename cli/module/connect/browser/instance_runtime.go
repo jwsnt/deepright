@@ -1504,18 +1504,12 @@ func browserResolveAgentRoot(flags map[string]string) (string, error) {
 	if runtimePath, ok, err := browserResolveRuntimeConfigPath(flags); err != nil {
 		return "", err
 	} else if ok {
-		cfg, err := browserReadRuntimeConfig(runtimePath)
+		appDir, err := browserResolveIntegrationAppDir(runtimePath, nil)
 		if err != nil {
 			return "", err
 		}
-		agentRoot := browserResolveRuntimePathValue(runtimePath, cfg["agent-dir"])
-		if agentRoot == "" {
-			if appDir := browserResolveRuntimePathValue(runtimePath, cfg["app-dir"]); appDir != "" {
-				agentRoot = filepath.Join(appDir, "agent")
-			}
-		}
-		if agentRoot != "" {
-			return agentRoot, nil
+		if appDir != "" {
+			return filepath.Join(appDir, "agent"), nil
 		}
 	}
 	root, _, err := browserRuntimeRoot(flags)
@@ -3237,6 +3231,10 @@ func browserInstanceAPIRecord(flags map[string]string, item browserInstanceState
 	record := item.apiRecord()
 	if isWSL, err := browserWSLDetectFn(); err == nil && isWSL {
 		if profileDir, ok := browserWSLInstanceLookupUserDataDir(record.AgentID, record.ChatID); ok {
+			record.ProfileDir = profileDir
+			return record
+		}
+		if profileDir, _, profileErr := browserWSLInstanceChatProfileDir(record.ChatID); profileErr == nil {
 			record.ProfileDir = profileDir
 			return record
 		}

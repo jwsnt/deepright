@@ -21,10 +21,10 @@
 + `browser.clear` 表示 Chrome profile 目录的过期时长；目录最后修改时间距离当前时间严格超过该时长时，视为可清理目录。
 + `browser.scan` 表示后台扫描周期。插件启动成功后必须立即异步执行首次扫描，之后每隔 `browser.scan` 小时异步执行一次；扫描与删除不得阻塞 `browser start`、Playwright daemon 启动或其他 Browser CLI 命令。
 + Browser 的 `start` 前台命令会退出，因此周期任务必须由独立后台进程承载；重复执行 `browser start` 时必须复用或替换已有清理进程，不能并行创建多个扫描循环。`browser stop` 必须停止该后台清理进程。
-+ macOS：扫描主应用配置的 `agent-dir` 下每个 Agent 工作目录的直接子目录；只处理名称满足 `chrome_` 加非空后缀、且不区分大小写的目录。
-+ Windows WSL / WSL2：只扫描 Windows 宿主机 `C:\\ProgramData\\deepright` 下满足同一名称规则的目录。Browser 在 WSL 中运行时，允许转换为对应的 Linux 挂载路径访问，但日志中必须保留 Windows 目标目录语义。
++ macOS：扫描固定 Agent 目录下每个 Agent 工作目录的直接子目录；只处理名称满足 `chrome_` 加非空后缀、且不区分大小写的目录。
++ Windows WSL / WSL2：只扫描 Windows 宿主机 `C:\\ProgramData\\deepright\\profiles\\chats` 下的直接 Chat Profile 目录。Browser 在 WSL 中运行时，允许转换为对应的 Linux 挂载路径访问，但日志中必须保留 Windows 目标目录语义。
 + 原生 Linux 与 Windows 原生环境不执行本次 profile 清理任务。
-+ 清理时只能删除已经判定过期的目录；不得删除文件、符号链接或不匹配 `chrome_` 前缀规则的目录。
++ 清理时只能删除已经判定过期的目录；macOS 必须匹配 `chrome_` 前缀，WSL 的 `profiles/chats` 直接子目录均代表 Chat Profile；不得删除文件或符号链接。
 + 主应用配置不存在、`browser` 配置不存在、`browser.clear` 或 `browser.scan` 缺失、不是正整数或超出可表示时长时，Browser 必须跳过清理任务且不得影响 `browser start` 成功；原因必须记录在插件同目录 `browser.log`。
 
 #### 插件日志
@@ -49,8 +49,8 @@
 + 验证 `browser.clear=72`、`browser.scan=2` 能正确解析为小时级时长；缺失、非正整数、错误类型与超大值均跳过任务并记录原因。
 + 验证首次扫描在清理后台进程启动后立即执行，后续周期使用 `browser.scan`。
 + 验证 macOS 仅扫描 `agent-dir/<agent>/chrome_*` 目录，大小写不敏感，并只删除最后修改时间超过 `browser.clear` 的目录。
-+ 验证 WSL 仅扫描 `C:\\ProgramData\\deepright` 对应目录，且不会扫描原生 Linux 路径。
-+ 验证匹配目录中的未过期目录、普通文件、符号链接和非 `chrome_` 前缀目录均保留。
++ 验证 WSL 仅扫描 `C:\\ProgramData\\deepright\\profiles\\chats` 对应目录，且不会扫描原生 Linux 路径。
++ 验证未过期目录、普通文件和符号链接均保留；macOS 的非 `chrome_` 前缀目录也必须保留。
 + 验证清理扫描与目录删除不阻塞 `browser start`，重复 `start` 不产生多个清理循环，`browser stop` 能终止清理后台进程。
 
 ### 其他要求

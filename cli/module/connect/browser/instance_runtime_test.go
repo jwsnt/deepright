@@ -1376,10 +1376,14 @@ func TestBrowserCleanupStopUserDataRemovesManagedChromeDirsUnderAgentRoot(t *tes
 	defer restore()
 
 	root := t.TempDir()
+	homeDir := filepath.Join(root, "home")
+	t.Setenv("HOME", homeDir)
+	t.Setenv("USERPROFILE", homeDir)
 	appDir := filepath.Join(root, "integration.app", "Contents")
 	macosDir := filepath.Join(appDir, "MacOS")
 	resourcesDir := filepath.Join(appDir, "Resources")
-	agentRoot := filepath.Join(root, "agent")
+	fixedAppDir := runtimepaths.MacAppRuntimeBaseDir(homeDir, runtimepaths.DeepRightMacBundleIdentifier, runtimepaths.DeepRightAppName)
+	agentRoot := filepath.Join(fixedAppDir, "agent")
 	defAgentDir := filepath.Join(agentRoot, "DEF_AGENT")
 	targetProfileDir := filepath.Join(defAgentDir, "chrome_53142")
 	keepDir := filepath.Join(defAgentDir, "data")
@@ -1399,10 +1403,7 @@ func TestBrowserCleanupStopUserDataRemovesManagedChromeDirsUnderAgentRoot(t *tes
 	if err := os.WriteFile(filepath.Join(targetProfileDir, "Preferences"), []byte("{}"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	homeDir := filepath.Join(root, "home")
-	t.Setenv("HOME", homeDir)
-	t.Setenv("USERPROFILE", homeDir)
-	runtimeDir := filepath.Join(runtimepaths.MacAppRuntimeBaseDir(homeDir, runtimepaths.DeepRightMacBundleIdentifier, runtimepaths.DeepRightAppName), "config")
+	runtimeDir := filepath.Join(fixedAppDir, "config")
 	if err := os.MkdirAll(runtimeDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -1410,7 +1411,7 @@ func TestBrowserCleanupStopUserDataRemovesManagedChromeDirsUnderAgentRoot(t *tes
 	if err := os.WriteFile(connectBin, []byte("fake"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	runtimeJSON := fmt.Sprintf("{\"agent-dir\":%q,\"app-dir\":%q}\n", agentRoot, resourcesDir)
+	runtimeJSON := fmt.Sprintf("{\"agent-dir\":%q,\"app-dir\":%q}\n", filepath.Join(root, "ignored-agent"), resourcesDir)
 	if err := os.WriteFile(filepath.Join(runtimeDir, "config.json"), []byte(runtimeJSON), 0o644); err != nil {
 		t.Fatal(err)
 	}

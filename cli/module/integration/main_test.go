@@ -23239,7 +23239,7 @@ func TestHandleModelTestRejectsMissingTestConfigAndRedactsProviderErrors(t *test
 
 func TestModelTestProviderStandardStatusMessages(t *testing.T) {
 	tests := map[int]string{
-		http.StatusBadRequest:          "服务商请求无效（400），请检查模型地址、模型名称与请求参数",
+		http.StatusBadRequest:          "服务商请求无效（400），请稍后重试。",
 		http.StatusUnauthorized:        "服务商身份认证失败（401），请检查 API Key/Token 是否正确、有效且未过期",
 		http.StatusForbidden:           "服务商拒绝访问（403），请确认密钥已获该模型或接口的访问权限",
 		http.StatusNotFound:            "服务商资源不存在（404），请检查模型 URL 和基础模型",
@@ -23296,7 +23296,7 @@ func TestConsumeModelTestSSERequiresBusinessDataAndDone(t *testing.T) {
 		{name: "empty", stream: "data: [DONE]\n\n", wantErr: "有效业务数据"},
 		{name: "missing done", stream: "data: {\"choices\":[{\"delta\":{\"content\":\"ok\"}}]}\n\n", wantErr: "缺少 [DONE]"},
 		{name: "stream error", stream: "data: {\"error\":{\"message\":\"token=secret-token rejected\"}}\n\n", wantErr: "[REDACTED]"},
-		{name: "stream error content", stream: "data: {\"code\":400,\"choices\":[{\"delta\":{\"content\":\"Permission denied: token=secret-token\"},\"metadata\":{\"Content-Length\":\"492\"}}]}\n\n", wantErr: "服务商请求无效（400），请检查模型地址、模型名称与请求参数"},
+		{name: "stream error content", stream: "data: {\"code\":400,\"choices\":[{\"delta\":{\"content\":\"Permission denied: token=secret-token\"},\"metadata\":{\"Content-Length\":\"492\"}}]}\n\n", wantErr: "服务商请求无效（400），请稍后重试。"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

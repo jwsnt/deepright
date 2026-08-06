@@ -2,12 +2,10 @@ package main
 
 import (
 	"context"
-	cryptorand "crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/big"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,12 +19,14 @@ import (
 )
 
 const (
-	browserWSLInstanceDBName       = "browser_data"
-	browserWSLInstanceTableName    = "browser_instance_wsl"
-	browserWSLInstanceProfileRoot  = "/mnt/c/ProgramData/deepright"
-	browserWSLInstanceProfileRootW = `C:\ProgramData\deepright`
-	browserWSLInstancePollInterval = 5 * time.Second
-	browserWSLInstanceTimeout      = 30 * time.Second
+	browserWSLInstanceDBName         = "browser_data"
+	browserWSLInstanceTableName      = "browser_instance_wsl"
+	browserWSLInstanceProfileRoot    = "/mnt/c/ProgramData/deepright"
+	browserWSLInstanceProfileRootW   = `C:\ProgramData\deepright`
+	browserWSLInstanceProfilesSubdir = "profiles"
+	browserWSLInstanceChatsSubdir    = "chats"
+	browserWSLInstancePollInterval   = 5 * time.Second
+	browserWSLInstanceTimeout        = 30 * time.Second
 )
 
 type browserWSLInstanceRecord struct {
@@ -182,14 +182,13 @@ func browserWSLInstanceAcquire(agentID, chatID string, headless, forceRecreate b
 		}
 	}
 
-	profileWin, profileUnix, err := browserWSLInstanceReserveProfileDir()
+	profileWin, profileUnix, err := browserWSLInstanceEnsureChatProfileDir(chatID)
 	if err != nil {
 		return browserWSLInstanceRecord{}, err
 	}
 
 	launchPID, err := browserWSLInstanceStartChrome(chromePath, 0, profileWin, headless)
 	if err != nil {
-		_ = browserWSLInstanceRemoveProfile(profileWin)
 		return browserWSLInstanceRecord{}, err
 	}
 
@@ -337,10 +336,14 @@ func browserWSLInstanceLooksLikeBrowserDir(dir string) bool {
 }
 
 func browserWSLInstanceGetRecord(db *sql.DB, agentID, chatID string) (browserWSLInstanceRecord, bool, error) {
+	_ = browserNormalizeIdentityPart(agentID)
+	chatID = browserNormalizeIdentityPart(chatID)
+	if chatID == "" {
+		return browserWSLInstanceRecord{}, false, nil
+	}
 	var item browserWSLInstanceRecord
 	err := db.QueryRow(
-		`SELECT agent_id, chat_id, pid, port, ws, http, user_data_dir FROM `+browserWSLInstanceTableName+` WHERE agent_id = ? AND chat_id = ?`,
-		agentID,
+		`SELECT agent_id, chat_id, pid, port, ws, http, user_data_dir FROM `+browserWSLInstanceTableName+` WHERE chat_id = ? ORDER BY updated_at DESC LIMIT 1`,
 		chatID,
 	).Scan(&item.AgentID, &item.ChatID, &item.PID, &item.Port, &item.WS, &item.HTTP, &item.UserDataDir)
 	if err != nil {
@@ -353,9 +356,13 @@ func browserWSLInstanceGetRecord(db *sql.DB, agentID, chatID string) (browserWSL
 }
 
 func browserWSLInstanceDeleteRecord(db *sql.DB, agentID, chatID string) error {
+	_ = browserNormalizeIdentityPart(agentID)
+	chatID = browserNormalizeIdentityPart(chatID)
+	if chatID == "" {
+		return nil
+	}
 	if _, err := db.Exec(
-		`DELETE FROM `+browserWSLInstanceTableName+` WHERE agent_id = ? AND chat_id = ?`,
-		agentID,
+		`DELETE FROM `+browserWSLInstanceTableName+` WHERE chat_id = ?`,
 		chatID,
 	); err != nil {
 		return fmt.Errorf("delete stale browser_data record failed: %w", err)
@@ -364,16 +371,30 @@ func browserWSLInstanceDeleteRecord(db *sql.DB, agentID, chatID string) error {
 }
 
 func browserWSLInstanceUpsertRecord(db *sql.DB, item browserWSLInstanceRecord) error {
-	if _, err := db.Exec(
+	item.AgentID = browserNormalizeIdentityPart(item.AgentID)
+	item.ChatID = browserNormalizeIdentityPart(item.ChatID)
+	if item.AgentID == "" {
+		return errors.New("upsert browser_data record failed: agentId is required")
+	}
+	if item.ChatID == "" {
+		return errors.New("upsert browser_data record failed: chatId is required")
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin browser_data transaction failed: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+	if _, err := tx.Exec(
+		`DELETE FROM `+browserWSLInstanceTableName+` WHERE chat_id = ?`,
+		item.ChatID,
+	); err != nil {
+		return fmt.Errorf("clear chat browser_data records failed: %w", err)
+	}
+	if _, err := tx.Exec(
 		`INSERT INTO `+browserWSLInstanceTableName+` (agent_id, chat_id, pid, port, ws, http, user_data_dir, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(agent_id, chat_id) DO UPDATE SET
-			pid = excluded.pid,
-			port = excluded.port,
-			ws = excluded.ws,
-			http = excluded.http,
-			user_data_dir = excluded.user_data_dir,
-			updated_at = excluded.updated_at`,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		item.AgentID,
 		item.ChatID,
 		item.PID,
@@ -383,7 +404,10 @@ func browserWSLInstanceUpsertRecord(db *sql.DB, item browserWSLInstanceRecord) e
 		item.UserDataDir,
 		time.Now().Format(time.RFC3339),
 	); err != nil {
-		return fmt.Errorf("upsert browser_data record failed: %w", err)
+		return fmt.Errorf("insert browser_data record failed: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit browser_data record failed: %w", err)
 	}
 	return nil
 }
@@ -411,36 +435,37 @@ func browserWSLInstanceProbeRecord(item browserWSLInstanceRecord) (browserWSLIns
 	return item, true, nil
 }
 
-func browserWSLInstanceReserveProfileDir() (string, string, error) {
-	return browserWSLInstanceReserveProfileDirAt(browserWSLInstanceProfileRoot, browserWSLInstanceProfileRootW)
+func browserWSLInstanceEnsureChatProfileDir(chatID string) (string, string, error) {
+	return browserWSLInstanceEnsureChatProfileDirAt(chatID, browserWSLInstanceProfileRoot, browserWSLInstanceProfileRootW)
 }
 
-func browserWSLInstanceReserveProfileDirAt(profileRootUnix, profileRootWin string) (string, string, error) {
-	if err := os.MkdirAll(profileRootUnix, 0o755); err != nil {
-		return "", "", fmt.Errorf("create profile root failed: %w", err)
+func browserWSLInstanceEnsureChatProfileDirAt(chatID, profileRootUnix, profileRootWin string) (string, string, error) {
+	profileWin, profileUnix, err := browserWSLInstanceChatProfileDirAt(chatID, profileRootUnix, profileRootWin)
+	if err != nil {
+		return "", "", err
 	}
+	if err := os.MkdirAll(profileUnix, 0o755); err != nil {
+		return "", "", fmt.Errorf("create persistent profile dir failed: %w", err)
+	}
+	browserCreateTrace("instance.wsl.user_data.seed.skip", map[string]any{
+		"profileDir": profileWin,
+		"reason":     "persistent_chat_profile_reuse",
+	})
+	return profileWin, profileUnix, nil
+}
 
-	for attempt := 0; attempt < 256; attempt++ {
-		suffix, err := browserWSLInstanceRandomSuffix(4)
-		if err != nil {
-			return "", "", err
-		}
-		dirName := "chrome_" + suffix
-		profileUnix := filepath.Join(profileRootUnix, dirName)
-		if _, err := os.Stat(profileUnix); err == nil {
-			continue
-		} else if !errors.Is(err, os.ErrNotExist) {
-			return "", "", fmt.Errorf("check profile dir failed: %w", err)
-		}
-		if err := os.Mkdir(profileUnix, 0o755); err != nil {
-			if errors.Is(err, os.ErrExist) {
-				continue
-			}
-			return "", "", fmt.Errorf("reserve profile dir failed: %w", err)
-		}
-		return strings.TrimRight(profileRootWin, `\/`) + `\` + dirName, profileUnix, nil
+func browserWSLInstanceChatProfileDir(chatID string) (string, string, error) {
+	return browserWSLInstanceChatProfileDirAt(chatID, browserWSLInstanceProfileRoot, browserWSLInstanceProfileRootW)
+}
+
+func browserWSLInstanceChatProfileDirAt(chatID, profileRootUnix, profileRootWin string) (string, string, error) {
+	chatID = browserNormalizeIdentityPart(chatID)
+	if chatID == "" {
+		return "", "", errors.New("chatId is required")
 	}
-	return "", "", errors.New("allocate unique chrome user-data-dir failed")
+	profileUnix := filepath.Join(profileRootUnix, browserWSLInstanceProfilesSubdir, browserWSLInstanceChatsSubdir, chatID)
+	profileWin := strings.TrimRight(profileRootWin, `\\/`) + `\` + browserWSLInstanceProfilesSubdir + `\` + browserWSLInstanceChatsSubdir + `\` + chatID
+	return profileWin, profileUnix, nil
 }
 
 func browserWSLInstanceStartChrome(chromePath string, port int, profileWin string, headless bool) (int, error) {
@@ -697,48 +722,6 @@ if (-not [string]::IsNullOrWhiteSpace($match.Groups[2].Value)) {
 	return value, true
 }
 
-func browserWSLInstanceRemoveProfile(profileWin string) error {
-	profileWin = strings.TrimSpace(profileWin)
-	if profileWin == "" {
-		return nil
-	}
-	profileUnix, err := browserWSLInstanceWindowsToUnixPath(profileWin)
-	if err != nil {
-		return err
-	}
-	if err := os.RemoveAll(profileUnix); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	return nil
-}
-
 func browserWSLInstanceWindowsToUnixPath(path string) (string, error) {
 	return browserWSLPathUnixFn(path)
-}
-
-func browserWSLInstanceRandomSuffix(length int) (string, error) {
-	if length <= 0 {
-		return "", errors.New("random suffix length must be positive")
-	}
-	const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
-	data := make([]byte, length)
-	for idx := range data {
-		value, err := browserWSLInstanceRandomInt(len(alphabet))
-		if err != nil {
-			return "", fmt.Errorf("generate random suffix failed: %w", err)
-		}
-		data[idx] = alphabet[value]
-	}
-	return string(data), nil
-}
-
-func browserWSLInstanceRandomInt(max int) (int, error) {
-	if max <= 0 {
-		return 0, fmt.Errorf("invalid random max: %d", max)
-	}
-	value, err := cryptorand.Int(cryptorand.Reader, big.NewInt(int64(max)))
-	if err != nil {
-		return 0, err
-	}
-	return int(value.Int64()), nil
 }

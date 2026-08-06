@@ -16,7 +16,7 @@ import (
 const (
 	browserProfileCleanupCommand     = "__profile-cleaner"
 	browserProfileCleanupPIDFileName = "browser_profile_cleanup.pid"
-	browserWSLProfileCleanupRoot     = `C:\ProgramData\deepright`
+	browserWSLProfileCleanupRoot     = `C:\ProgramData\deepright\profiles\chats`
 )
 
 type browserProfileCleanupConfig struct {
@@ -28,6 +28,7 @@ type browserProfileCleanupTarget struct {
 	Platform string
 	Root     string
 	AgentDir bool
+	ChatDir  bool
 }
 
 type browserProfileCleanupResult struct {
@@ -205,6 +206,8 @@ func browserRunProfileCleanupScan(config browserProfileCleanupConfig) {
 	browserLogProfileCleanupEvent("scan_started", result, 0, nil)
 	if target.AgentDir {
 		browserScanAgentProfileDirectories(target.Root, config.ClearAfter, &result)
+	} else if target.ChatDir {
+		browserScanChatProfileDirectories(target.Root, config.ClearAfter, &result)
 	} else {
 		browserScanProfileDirectories(target.Root, config.ClearAfter, &result)
 	}
@@ -225,7 +228,7 @@ func browserResolveProfileCleanupTarget() (browserProfileCleanupTarget, bool, er
 		if root == "" {
 			return browserProfileCleanupTarget{}, false, fmt.Errorf("resolve WSL cleanup root %s: empty path", browserWSLProfileCleanupRoot)
 		}
-		return browserProfileCleanupTarget{Platform: "wsl", Root: root}, true, nil
+		return browserProfileCleanupTarget{Platform: "wsl", Root: root, ChatDir: true}, true, nil
 	}
 	if browserRuntimeGOOSFn() != "darwin" {
 		return browserProfileCleanupTarget{}, false, nil
@@ -256,6 +259,14 @@ func browserScanAgentProfileDirectories(agentRoot string, clearAfter time.Durati
 }
 
 func browserScanProfileDirectories(root string, clearAfter time.Duration, result *browserProfileCleanupResult) {
+	browserScanProfileDirectoriesMatching(root, clearAfter, result, browserIsChromeProfileDirectory)
+}
+
+func browserScanChatProfileDirectories(root string, clearAfter time.Duration, result *browserProfileCleanupResult) {
+	browserScanProfileDirectoriesMatching(root, clearAfter, result, func(string) bool { return true })
+}
+
+func browserScanProfileDirectoriesMatching(root string, clearAfter time.Duration, result *browserProfileCleanupResult, matches func(string) bool) {
 	entries, err := browserReadDirFn(root)
 	if err != nil {
 		browserRecordProfileCleanupError(result, root, err)
@@ -263,7 +274,7 @@ func browserScanProfileDirectories(root string, clearAfter time.Duration, result
 	}
 	cutoff := browserNowFn().Add(-clearAfter)
 	for _, entry := range entries {
-		if entry == nil || entry.Type()&os.ModeSymlink != 0 || !entry.IsDir() || !browserIsChromeProfileDirectory(entry.Name()) {
+		if entry == nil || entry.Type()&os.ModeSymlink != 0 || !entry.IsDir() || !matches(entry.Name()) {
 			continue
 		}
 		path := filepath.Join(root, entry.Name())

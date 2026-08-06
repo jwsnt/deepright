@@ -42,8 +42,8 @@
 说明：
 
 - `help` 会覆盖插件入口命令和 `instance` 子命令的完整使用手册
-- 手册会明确说明 Windows WSL / WSL2 下，`instance create` / `instance init` 返回的 `profileDir` 固定落在 `C:\ProgramData\deepright\chrome_<随机后缀>`
-- 手册会明确说明 Windows WSL / WSL2 下，`browser start` 与 `browser stop` 都不会操作 `C:\ProgramData\deepright\chrome_def`，且不会删除 `chrome_*` 实例目录
+- 手册会明确说明 Windows WSL / WSL2 下，`instance create` / `instance init` 返回的 `profileDir` 固定落在 `C:\ProgramData\deepright\profiles\chats\<chatId>`，同一 Chat 的 Agent 共享该目录
+- 手册会明确说明 Windows WSL / WSL2 下，`browser start` 与 `browser stop` 都不会操作 `C:\ProgramData\deepright\chrome_def`，也不会删除 Chat Profile；过期 Profile 仅由后台清理任务删除
 
 ## 插件元信息
 
@@ -86,7 +86,7 @@
 - `start` 会先清理当前已托管的 CDP 实例状态，再继续 Playwright daemon 的启动
 - 在 Windows WSL / WSL2 下，`start` 不会枚举、结束或等待 Windows 宿主机的 Chrome 进程，也不会读取系统 Chrome 的 `User Data` 目录
 - `start` 不会创建、删除、刷新或复制 `C:\ProgramData\deepright\chrome_def`，也不会清理任何 Chrome profile 锁或运行态文件
-- Browser 不再要求静态 `config/config.json` 保存 `app-dir`：macOS 自动使用 `~/Library/Containers/cn.deepright.integration/Data/Library/Application Support/deepright`，WSL 自动使用 `~/deepright` 作为 Integration 运行目录
+- Browser 忽略 Integration 运行时 `config/config.json` 的 `app-dir`、`app` 和 `agent-dir` 路径覆盖，统一使用固定目录：macOS 使用容器运行目录，WSL 使用 `~/deepright`，原生 Linux/Windows 使用 `config/config.json` 的上级发布目录；插件和 Agent 分别位于该目录的 `plugins`、`agent` 子目录
 
 ### 过期 profile 后台清理
 
@@ -104,11 +104,11 @@
 
 - `browser start` 成功后会启动独立后台清理任务：立即扫描一次，之后每 `browser.scan` 小时扫描一次；不会阻塞插件启动。
 - 目录最后修改时间严格早于当前时间减去 `browser.clear` 小时，才会被删除。
-- macOS 只检查 `agent-dir` 下各 Agent 工作目录的直接子目录；WSL 只检查 Windows 宿主机 `C:\ProgramData\deepright` 下的目录。
-- 仅名称为 `chrome_` 加非空后缀（不区分大小写）的真实目录可能被删除；普通文件、符号链接和其他目录会保留。
+- macOS 只检查固定 Agent 目录 `~/Library/Containers/cn.deepright.integration/Data/Library/Application Support/deepright/agent` 下各 Agent 工作目录的直接子目录，并只处理名称为 `chrome_` 加非空后缀的真实目录；WSL 只检查 Windows 宿主机 `C:\ProgramData\deepright\profiles\chats` 下的直接 Chat Profile 目录。
+- WSL 中每个直接子目录都代表一个 Chat Profile；普通文件和符号链接均会保留。
 - 原生 Linux 与 Windows 原生环境不执行这项后台清理。
 - `browser.clear` 或 `browser.scan` 缺失、无效，或主应用配置无法读取时，清理任务会跳过并将原因写入同目录 `browser.log`，不会导致 `browser start` 失败。
-- `browser stop` 会停止后台清理任务；`stop` 本身不会额外立即删除 `chrome_xxx` profile。
+- `browser stop` 会停止后台清理任务；`stop` 本身不会额外立即删除 Profile。
 
 ### stop
 
@@ -125,11 +125,11 @@
 - `stop` 会先停止 Playwright daemon
 - 然后通过 `instance list` 枚举所有受管 CDP，并逐个调用 `shutdown`
 - 单个实例关闭失败只会写 `browser.log`，不会阻断其他实例继续关闭
-- 在非 WSL 环境中，`stop` 结束前会清理 `agent-dir` 下所有 `chrome_${port}` 结构的受管实例目录
+- 在非 WSL 环境中，`stop` 结束前会清理固定 Agent 目录下所有 `chrome_${port}` 结构的受管实例目录
 - `stop` 结束时会 best-effort 删除 Browser 同目录的 `browser_runtime.json`；删除失败只写日志，不会导致 `stop` 失败
-- 通过 `integration` 运行且未显式覆盖 `--agent-dir` 时，macOS 默认会清理 `~/Library/Application Support/deepright/agent` 下的这些目录
-- `chrome_xxx` 实例目录不会因 `browser stop` 被立即删除；但 macOS / WSL 的过期 profile 仍可能由 `browser start` 启动的后台清理任务按 `browser.clear` 规则删除
-- 在 Windows WSL / WSL2 下，`stop` 不会删除 `chrome_def`、`chrome_xxx` 或其内部的锁/运行态文件
+- 通过 `integration` 运行时，macOS 会清理 `~/Library/Containers/cn.deepright.integration/Data/Library/Application Support/deepright/agent` 下的这些目录
+- `chrome_xxx` 实例目录（macOS）和 Chat Profile（WSL）不会因 `browser stop` 被立即删除；但过期目录仍可能由 `browser start` 启动的后台清理任务按 `browser.clear` 规则删除
+- 在 Windows WSL / WSL2 下，`stop` 不会删除 `chrome_def`、Chat Profile 或其内部的锁/运行态文件
 
 ## instance create
 
@@ -157,10 +157,10 @@
 - 复制时会过滤 `CacheStorage`、`OptGuideOnDeviceModel` 和其他易失缓存目录，同时保留 `Default/WebStorage`、`Default/IndexedDB`、`Default/Local Storage`
 - 复制时也会跳过纯运行态文件：`RunningChromeVersion`、`SingletonLock`、`SingletonCookie`、`SingletonSocket`、`DevToolsActivePort`
 - 在 Windows WSL / WSL2 下，`profileDir` 仍会出现在原有响应报文里，但它的值以 `browser_instance_wsl` 实际返回的 `user-data-dir` 为准
-- 在 Windows WSL / WSL2 下，新的 `profileDir` 固定落在 `C:\ProgramData\deepright\chrome_<随机后缀>`
-- WSL 下新建的 `profileDir` 是空的独立目录，不会复制系统 Chrome、`chrome_def` 或其他 profile 的登录态和配置
+- 在 Windows WSL / WSL2 下，新的 `profileDir` 固定落在 `C:\ProgramData\deepright\profiles\chats\<chatId>`；同一 `chatId` 的所有 Agent 复用同一个实例和 Profile，不同 Chat 相互隔离
+- WSL 下 Chat Profile 首次创建为空目录，不会复制系统 Chrome、`chrome_def` 或其他 Profile 的登录态和配置；后续创建会直接复用该目录
 - WSL 下不会清理该目录中的 `Singleton*`、`DevToolsActivePort`、`*.lock`、`*-journal` 等锁/运行态文件；已有 profile 重启时也保持原样
-- 通过 `integration` 运行且未显式覆盖 `--agent-dir` 时，macOS 默认会落在 `~/Library/Application Support/deepright/agent/<agentId>/chrome_${port}`
+- 通过 `integration` 运行时，macOS 固定落在 `~/Library/Containers/cn.deepright.integration/Data/Library/Application Support/deepright/agent/<agentId>/chrome_${port}`
 
 ## instance init
 
@@ -181,8 +181,8 @@
 - 在 macOS、Windows、WSL / WSL2 和Linux下，命令会在新的有头 Chrome/CDP 就绪并写入状态后返回；关闭由集成页面的“完成”按钮或 `instance shutdown` 执行
 - 后续在 `get` / `list` / `create` / `restart` 重载状态时，会自动清理已经退出的 Chrome/CDP 状态
 - 在 Windows WSL / WSL2 下，`init` 会通过插件同目录的 `browser_launcher.sh` 调用 `browser_instance_wsl` 逻辑，以有头模式启动实例
-- 在 Windows WSL / WSL2 下，`init` 会先对同一 `agentId + chatId` 执行一次 `shutdown`，再以 `headless=false` 强制重新拉起有头 Chrome；不会直接复用旧的存活 CDP
-- WSL下如果对应的 `chrome_xxx` profile 不存在，`init` 会直接创建空目录；profile 已存在时保留其全部内容（包括锁/运行态文件），但仍会关闭旧实例并重新启动 Chrome
+- 在 Windows WSL / WSL2 下，`init` 会先对同一 `chatId` 的受管实例执行一次 `shutdown`，再以 `headless=false` 强制重新拉起有头 Chrome；不会直接复用旧的存活 CDP
+- WSL 下如果对应的 Chat Profile 不存在，`init` 会直接创建空目录；Profile 已存在时保留其全部内容（包括锁/运行态文件），但仍会关闭旧实例并重新启动 Chrome
 - WSL强制重新创建是 `init` 内部行为，通过 `DEEPRIGHT_BROWSER_WSL_FORCE_RECREATE` 传递；用户无需、也不能使用 `--force-recreate` 参数
 - 通过集成页面初始化时，“完成”按钮只会在新的有头 Chrome 启动成功后出现；点击该按钮会调用 `instance shutdown`。用户先手动关闭窗口后再点击，关闭操作仍会返回 `OK`
 
@@ -198,7 +198,7 @@
 - 会从 `browser_instance.json` 中定位实例
 - 按 `pid` 结束 Chrome 进程
 - 删除对应状态记录
-- 在 Windows WSL / WSL2 下，`instance stop` 只会关闭指定实例并更新状态；不会清理任何 `chrome_*` 目录或 profile 锁文件
+- 在 Windows WSL / WSL2 下，`instance stop` 只会关闭对应 Chat 的共享实例并更新状态；不会清理 Chat Profile 或 profile 锁文件
 - 成功时输出 `OK`
 
 ## instance shutdown
@@ -214,7 +214,7 @@
 - 在 Windows WSL / WSL2 下，会额外在 Windows 宿主机侧强制结束该进程并确认端口释放
 - 进程关闭后会继续清理状态记录
 - Windows WSL / WSL2 下，端口确认使用绝对路径的 PowerShell 执行；若 Chrome 已被手动关闭，也会完成状态清理并返回 `OK`
-- 在 Windows WSL / WSL2 下，`shutdown` 不会删除 `C:\ProgramData\deepright\chrome_*` 目录
+- 在 Windows WSL / WSL2 下，`shutdown` 不会删除 `C:\ProgramData\deepright\profiles\chats\<chatId>`
 - 如果删除后 `browser_instance.json` 已为空，会一并删除该状态文件
 - 兼容旧版本残留时，不带 `--agentId` / `--chatId` 的 `shutdown` 仍会尝试清理历史固定端口 CDP
 

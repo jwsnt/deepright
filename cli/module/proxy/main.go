@@ -10298,11 +10298,19 @@ func (p *ProxyServer) HandleChatCompletions(w http.ResponseWriter, r *http.Reque
 	buf := make([]byte, 256)
 	logBuf := make([]byte, 0, 1024)
 	var streamErr error
+	clientDisconnected := false
 	for {
 		n, err := resp.Body.Read(buf)
 		if n > 0 {
-			w.Write(buf[:n])
-			flusher.Flush()
+			if !clientDisconnected {
+				if _, writeErr := w.Write(buf[:n]); writeErr != nil {
+					// Continue persisting the upstream stream after a browser reload;
+					// /api/restore will serve those events to the replacement page.
+					clientDisconnected = true
+				} else {
+					flusher.Flush()
+				}
+			}
 			if ch != nil {
 				logBuf = append(logBuf, buf[:n]...)
 				for _, event := range splitCompleteSSEEvents(&logBuf) {

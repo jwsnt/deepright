@@ -77,7 +77,7 @@ func TestBrowserScanAgentProfileDirectoriesRemovesOnlyExpiredChromeDirectories(t
 	}
 }
 
-func TestBrowserResolveProfileCleanupTargetUsesWSLProgramDataDirectory(t *testing.T) {
+func TestBrowserResolveProfileCleanupTargetUsesWSLChatProfileDirectory(t *testing.T) {
 	restore := stubBrowserRuntime()
 	defer restore()
 
@@ -96,12 +96,12 @@ func TestBrowserResolveProfileCleanupTargetUsesWSLProgramDataDirectory(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !ok || target.Platform != "wsl" || target.Root != wslRoot || target.AgentDir {
+	if !ok || target.Platform != "wsl" || target.Root != wslRoot || target.AgentDir || !target.ChatDir {
 		t.Fatalf("target = %+v, ok = %v", target, ok)
 	}
 
-	expired := filepath.Join(wslRoot, "chrome_expired")
-	current := filepath.Join(wslRoot, "chrome_current")
+	expired := filepath.Join(wslRoot, "chat-expired")
+	current := filepath.Join(wslRoot, "chat-current")
 	for _, path := range []string{expired, current} {
 		if err := os.MkdirAll(path, 0o755); err != nil {
 			t.Fatal(err)

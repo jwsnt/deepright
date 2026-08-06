@@ -11954,7 +11954,7 @@ func formatModelTestProviderFailure(status int, detail string) string {
 func modelTestStandardStatusMessage(status int) string {
 	switch {
 	case status == http.StatusBadRequest:
-		return "服务商请求无效（400），请检查模型地址、模型名称与请求参数"
+		return "服务商请求无效（400），请稍后重试。"
 	case status == http.StatusUnauthorized:
 		return "服务商身份认证失败（401），请检查 API Key/Token 是否正确、有效且未过期"
 	case status == http.StatusForbidden:
@@ -17341,7 +17341,10 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 			connMu.Unlock()
 		}
 
-		ctx, cancel := context.WithCancel(r.Context())
+		// The browser's SSE connection is only a live view of the request.  A
+		// refresh cancels r.Context(), but the upstream stream must keep running
+		// so /api/restore can replay the remaining persisted events.
+		ctx, cancel := context.WithCancel(context.Background())
 
 		newBody, err := json.Marshal(reqData)
 		if err != nil {
@@ -17501,14 +17504,19 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 		buf := make([]byte, 256)
 		logBuf := make([]byte, 0, 1024)
 		var streamErr error
+		clientDisconnected := false
 		for {
 			n, err := resp.Body.Read(buf)
 			if n > 0 {
-				if _, writeErr := w.Write(buf[:n]); writeErr != nil {
-					streamErr = writeErr
-					break
+				if !clientDisconnected {
+					if _, writeErr := w.Write(buf[:n]); writeErr != nil {
+						// The page may have refreshed. Keep consuming and logging the
+						// upstream SSE so a new page can resume it through /api/restore.
+						clientDisconnected = true
+					} else {
+						flusher.Flush()
+					}
 				}
-				flusher.Flush()
 				logBuf = append(logBuf, buf[:n]...)
 				for _, event := range splitCompleteSSEEvents(&logBuf) {
 					if sseEventHasDoneMarker(event) {

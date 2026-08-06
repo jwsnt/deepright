@@ -87,12 +87,15 @@ func browserInferMetaLookupBinary(flags map[string]string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if appPath := browserResolveRuntimePathValue(runtimePath, cfg["app"]); appPath != "" {
-		return appPath, nil
+	appDir, err := browserResolveIntegrationAppDir(runtimePath, cfg)
+	if err != nil {
+		return "", err
 	}
-	baseDir := filepath.Dir(runtimePath)
+	if strings.TrimSpace(appDir) == "" {
+		return "", nil
+	}
 	for _, name := range []string{"integration", "integration.exe", "proxy", "proxy.exe"} {
-		candidate := filepath.Join(baseDir, name)
+		candidate := filepath.Join(appDir, name)
 		if info, statErr := os.Stat(candidate); statErr == nil && !info.IsDir() {
 			return candidate, nil
 		}

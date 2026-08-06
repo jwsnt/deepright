@@ -61,12 +61,12 @@ macOS 版本采用“每个 `agentId + chatId` 对应一个稳定端口 + 一个
 
 ### 2. Agent Workspace
 
-macOS 下受管 profile 路径不是写死在某个固定目录，而是按运行时环境解析：
+通过 Integration 运行时，macOS 下受管 profile 使用固定目录：
 
 1. 如果存在 `browser_runtime.json`，优先按其中记录的 integration 读取集成运行时配置
-2. 配置里优先使用 `agent-dir`
-3. 如果没有 `agent-dir`，则尝试 `app-dir/agent`
-4. 如果都没有，再退回到 `browser` 可执行文件所在目录
+2. 忽略配置中的 `agent-dir`、`app-dir` 和 `app`
+3. 固定使用 `~/Library/Containers/cn.deepright.integration/Data/Library/Application Support/deepright/agent`
+4. 未关联 Integration 运行时才退回到 `browser` 可执行文件所在目录
 
 最终某个实例的 profile 路径为：
 
@@ -400,7 +400,7 @@ macOS 和 WSL 最大的差异在于状态与 profile 管理方式：
 
 ### 4. `profileDir` 是推导值，不是持久化真值
 
-如果运行时配置里的 `agent-dir`/`app-dir` 变化了，同一条记录对外展示的 `profileDir` 也可能跟着变。
+Integration 运行时配置里的 `agent-dir`、`app-dir` 或 `app` 变化不会影响同一条记录对外展示的 `profileDir`。
 
 ## 排查建议
 

@@ -289,7 +289,7 @@ func TestHelpHidesLifecycleCommands(t *testing.T) {
 		"./browser instance shutdown --agentId agent-a --chatId chat-001",
 		"./browser shutdown --agentId agent-a --chatId chat-001",
 		"/mnt/c/Program Files/Google/Chrome/Application/chrome.exe",
-		"empty C:\\ProgramData\\deepright\\chrome_<suffix> directory",
+		"C:\\ProgramData\\deepright\\profiles\\chats\\<chatId>",
 	} {
 		if !strings.Contains(text, wanted) {
 			t.Fatalf("help output missing %q\n%s", wanted, text)
@@ -324,7 +324,7 @@ func TestHelpHidesLifecycleCommands(t *testing.T) {
 	}
 }
 
-func TestBrowserRuntimeRootUsesBundledRuntimePluginDir(t *testing.T) {
+func TestBrowserRuntimeRootIgnoresConfiguredAppDir(t *testing.T) {
 	restore := stubBrowserRuntime()
 	defer restore()
 
@@ -346,7 +346,14 @@ func TestBrowserRuntimeRootUsesBundledRuntimePluginDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("browserRuntimeRoot() error = %v", err)
 	}
-	wantRoot := filepath.Join(appDir, "plugins")
+	wantRoot := filepath.Join(
+		runtimepaths.MacAppRuntimeBaseDir(
+			homeDir,
+			runtimepaths.DeepRightMacBundleIdentifier,
+			runtimepaths.DeepRightAppName,
+		),
+		"plugins",
+	)
 	if root != wantRoot {
 		t.Fatalf("root = %q, want %q", root, wantRoot)
 	}
@@ -652,7 +659,7 @@ func TestRunInstanceHelpHidesLifecycleCommands(t *testing.T) {
 	for _, wanted := range []string{
 		"browser instance create --agentId AGENT --chatId CHAT",
 		"on WSL, create calls browser_launcher.sh beside the plugin; profileDir still stays in the normal CLI response",
-		"C:\\ProgramData\\deepright\\chrome_${suffix}",
+		"C:\\ProgramData\\deepright\\profiles\\chats\\<chatId>",
 	} {
 		if !strings.Contains(text, wanted) {
 			t.Fatalf("instance help missing %q\n%s", wanted, text)

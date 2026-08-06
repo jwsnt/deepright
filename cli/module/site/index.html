@@ -9949,6 +9949,7 @@ function createEmptyChatsStoragePayload() {
   return {
     chats: {},
     order: [],
+    activeChat: '',
     agents: {},
     models: {},
     thinking: {},
@@ -15970,6 +15971,10 @@ function setOverlayVisible(overlay, visible, panel) {
   else overlay.removeAttribute('data-overlay-open-seq');
   if (panel) panel.classList.toggle('show', !!visible);
   refreshOverlayStates();
+  // The memo confirmation cards occupy the same lower-right corner as the
+  // chat sticky-note shortcut. Re-evaluate the shortcut whenever an overlay
+  // changes so it is restored immediately after the card goes away.
+  if (isMemoConfirmationOverlay(overlay)) syncStickyNoteView();
 }
 
 function showPassiveOverlay(el) {
@@ -26988,7 +26993,14 @@ function finalizeBootShell() {
   scheduleLayoutSync();
   state.chatOrder.forEach(id => chatAnimPlayed.add(id));
   if (state.chatOrder.length === 0) createNewChat();
-  else switchChat(state.chatOrder[0]);
+  else {
+    const initialChatId = state.chats[state.activeChat] ? state.activeChat : state.chatOrder[0];
+    // `switchChat` owns the initial render and starts recovery polling. Clear
+    // the restored marker first so it does not take the lightweight
+    // already-active path during boot.
+    state.activeChat = null;
+    switchChat(initialChatId);
+  }
   renderChatList();
   setupScrollLazy();
   setupCliSubScrollControls();
@@ -27024,6 +27036,10 @@ async function init() {
   // Resume cancellation confirmations before secondary boot work. This closes
   // the reload window between locally stopping a stream and reaching /api/cancel.
   resumePendingChatCancellationConfirmations();
+  // A page can own several concurrent SSE requests.  The active chat controls
+  // which one is displayed, but every persisted pending request must resume
+  // its own restore poll after a refresh.
+  resumePendingChatRestorePolling();
   releaseBootLoadingOverlay();
   startChatListSync();
   startLocalStorageMaintenance();
@@ -30402,6 +30418,10 @@ function loadChats() {
     const d = JSON.parse(raw);
     if (d) {
       applyChatsStoragePayload(d);
+      const restoredActiveChatId = String(d.activeChat || '').trim();
+      if (restoredActiveChatId && state.chats[restoredActiveChatId]) {
+        state.activeChat = restoredActiveChatId;
+      }
       lastChatsStorageSnapshot = raw;
       let normalizedChanged = false;
       Object.values(state.chats).forEach(chat => {
@@ -30911,6 +30931,7 @@ function buildChatsStoragePayload(sourceChats, sourceOrder) {
   return {
     chats,
     order: Array.isArray(orderSource) ? orderSource.slice() : [],
+    activeChat: String(state.activeChat || '').trim(),
     agents: { ...chatAgents },
     models: normalizeChatModelMap(chatModels),
     thinking: { ...chatThinking },
@@ -34413,6 +34434,7 @@ function switchChat(id) {
   const glowing = document.querySelector('.message.user.glowing');
   if (glowing) glowing.classList.remove('glowing');
   state.activeChat = id;
+  saveChats();
   syncRightSidebarUrlPreviewForActiveChat();
   syncChatSessionCopyButton();
   renderWikiPanel();
@@ -40109,7 +40131,16 @@ function stickyNoteShouldBeHidden() {
     || !!document.getElementById('shutdownOverlay')?.classList.contains('show');
   const sidebarIframeVisible = !!(rightSidebarUrlPreviewState && rightSidebarUrlPreviewState.active)
     && !isRightSidebarUrlPreviewExpanded();
-  return !getStickyNoteChatId() || screenSaverActive || shutdownActive || sidebarIframeVisible;
+  return !getStickyNoteChatId() || screenSaverActive || shutdownActive || sidebarIframeVisible || hasVisibleMemoConfirmationOverlay();
+}
+
+function isMemoConfirmationOverlay(overlay) {
+  return ['tlIgnoreConfirm', 'tlViewConfirm', 'rsConfirm', 'rsDelConfirm'].includes(String(overlay && overlay.id || ''));
+}
+
+function hasVisibleMemoConfirmationOverlay() {
+  return ['tlIgnoreConfirm', 'tlViewConfirm', 'rsConfirm', 'rsDelConfirm']
+    .some(id => document.getElementById(id)?.classList.contains('show'));
 }
 
 function syncStickyNoteView(options = {}) {
@@ -40591,7 +40622,7 @@ function syncPageIframeEscape(event) {
 
 function mapProviderErrorText(code, fallbackMessage) {
   const resolvedCode = Number.parseInt(String(code == null ? '' : code).trim(), 10);
-  if (resolvedCode === 400) return '服务商请求无效（400），请检查模型地址、模型名称与请求参数';
+  if (resolvedCode === 400) return '服务商请求无效（400），请稍后重试。';
   if (resolvedCode === 401) return '模型服务商拒绝访问，请核对API KEY。';
   if (resolvedCode === 403) return '模型访问受限，请核对服务商的地区限制或余额。';
   if (resolvedCode === 404) return '模型或服务地址不存在，请核对服务商配置。';
@@ -42357,6 +42388,14 @@ function resumePendingChatCancellationConfirmations() {
   Object.keys(state.chats || {}).forEach(chatId => {
     if (isChatCancellationConfirmationPending(chatId)) {
       void ensurePendingChatCancellationConfirmation(chatId);
+    }
+  });
+}
+
+function resumePendingChatRestorePolling() {
+  Object.keys(state.chats || {}).forEach(chatId => {
+    if (shouldResumeChatPolling(chatId)) {
+      void ensureChatRestorePolling(chatId);
     }
   });
 }

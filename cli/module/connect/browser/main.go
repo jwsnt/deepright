@@ -639,23 +639,7 @@ func browserIntegrationPluginsRootFromConnectBin(connectBin string) (string, boo
 	return filepath.Join(appDir, "plugins"), true, nil
 }
 
-// browserResolveIntegrationAppDir follows Integration's runtime-directory
-// rules. app-dir/app are retained as compatibility overrides for older
-// deployments, while current static configuration deliberately omits them.
-func browserResolveIntegrationAppDir(runtimePath string, cfg map[string]string) (string, error) {
-	appDir := strings.TrimSpace(cfg["app-dir"])
-	if appDir == "" {
-		if appPath := strings.TrimSpace(cfg["app"]); appPath != "" {
-			appDir = filepath.Dir(appPath)
-		}
-	}
-	if appDir != "" {
-		if abs, err := filepath.Abs(appDir); err == nil {
-			return abs, nil
-		}
-		return filepath.Clean(appDir), nil
-	}
-
+func browserResolveIntegrationAppDir(runtimePath string, _ map[string]string) (string, error) {
 	homeDir, homeErr := browserUserHomeDirFn()
 	switch {
 	case browserRuntimeGOOSFn() == "darwin":
@@ -1185,13 +1169,13 @@ func printHelp(w io.Writer) {
 	fmt.Fprintln(w, "Chrome CDP Runtime:")
 	fmt.Fprintln(w, "  - browser resolves the local Chrome executable automatically, or you can override it with --chrome")
 	fmt.Fprintln(w, "  - browser instance create starts or reuses one Chrome-backed CDP endpoint")
-	fmt.Fprintln(w, "  - browser instance lifecycle commands manage one AgentId + ChatId Chrome instance directly")
+	fmt.Fprintln(w, "  - browser instance lifecycle commands manage one AgentId + ChatId Chrome instance directly; on WSL, all agents inside the same chat share one managed instance")
 	fmt.Fprintln(w, "  - managed instance state is persisted in ./browser_instance.json beside the browser binary")
 	fmt.Fprintln(w, "  - instance create prepares one managed --user-data-dir before launch")
-	fmt.Fprintln(w, "    using <agent workspace>/chrome_${port} on macOS/Linux and C:\\ProgramData\\deepright\\chrome_${suffix} on WSL")
+	fmt.Fprintln(w, "    using <agent workspace>/chrome_${port} on macOS/Linux and C:\\ProgramData\\deepright\\profiles\\chats\\<chatId> on WSL")
 	fmt.Fprintln(w, "  - on WSL, browser resolves Chrome from browser meta chrome first, then falls back to /mnt/c/Program Files/Google/Chrome/Application/chrome.exe")
 	fmt.Fprintln(w, "  - on WSL, instance create uses browser_launcher.sh beside the plugin for browser_instance_wsl launch/reuse logic; if the packaged plugin is missing that script, browser recreates it automatically before launch")
-	fmt.Fprintln(w, "  - on WSL, each fresh managed profile starts as an empty C:\\ProgramData\\deepright\\chrome_<suffix> directory; it does not copy system Chrome data or clean profile locks")
+	fmt.Fprintln(w, "  - on WSL, browser_instance_wsl reuses one persistent Chat-scoped profile under C:\\ProgramData\\deepright\\profiles\\chats\\<chatId>; it does not copy system Chrome data or clean profile locks")
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "Shared Flags:")
 	fmt.Fprintln(w, "  --session NAME             Playwright session name for direct commands")
@@ -1261,7 +1245,7 @@ func printInstanceHelp(w io.Writer) {
 	fmt.Fprintln(w, "  - without a recorded integration runtime, create still accepts --headless none for standalone headed mode")
 	fmt.Fprintln(w, "  - outside WSL, create reuses the managed chrome_${port} directory when it already exists")
 	fmt.Fprintln(w, "  - on WSL, create calls browser_launcher.sh beside the plugin; profileDir still stays in the normal CLI response, and its value comes from the launcher-returned user-data-dir")
-	fmt.Fprintln(w, "  - on WSL, browser_instance_wsl uses a new empty C:\\ProgramData\\deepright\\chrome_${suffix} directory and never copies system Chrome data")
+	fmt.Fprintln(w, "  - on WSL, browser_instance_wsl keeps one persistent Chat-scoped profile at C:\\ProgramData\\deepright\\profiles\\chats\\<chatId>; all agents inside that chat share it and it never copies system Chrome data")
 	fmt.Fprintln(w, "  - on macOS/Linux/Windows, create clones a filtered copy of the current-system Chrome User Data root when chrome_${port} does not exist")
 	fmt.Fprintln(w, "    filtering CacheStorage, OptGuideOnDeviceModel, and other volatile cache paths while keeping login storage such as WebStorage/IndexedDB/Local Storage")
 	fmt.Fprintln(w, "  - create/get/list JSON also include profileDir so the resolved managed user-data-dir is visible")
