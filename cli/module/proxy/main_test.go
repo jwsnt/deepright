@@ -2200,6 +2200,23 @@ func TestProxyChatCompletionsInjectsConfiguredModelMetadata(t *testing.T) {
 		t.Fatalf("chdir: %v", err)
 	}
 	defer os.Chdir(oldwd)
+	if err := os.MkdirAll(filepath.Join(tmp, "config"), 0o755); err != nil {
+		t.Fatalf("mkdir config: %v", err)
+	}
+	configBody, err := json.Marshal(map[string]string{"db": filepath.Join(tmp, "data"), "app-dir": tmp})
+	if err != nil {
+		t.Fatalf("marshal proxy config: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, "config", "config.json"), configBody, 0o644); err != nil {
+		t.Fatalf("write proxy config: %v", err)
+	}
+	sharedDataDB = pooledDB{}
+	defer func() {
+		if sharedDataDB.db != nil {
+			_ = sharedDataDB.db.Close()
+		}
+		sharedDataDB = pooledDB{}
+	}()
 
 	db, err := sql.Open("sqlite", filepath.Join(tmp, "data"))
 	if err != nil {
@@ -2211,8 +2228,8 @@ func TestProxyChatCompletionsInjectsConfiguredModelMetadata(t *testing.T) {
 			Token:            "Bearer test-token",
 			BaseURL:          "https://provider.example/v1",
 			ModelFast:        "deepseek-fast",
-			ModelMultiInput:  "deepseek-vision",
-			ModelMultiOutput: "deepseek-image",
+			ModelMultiInput:  "@deepright",
+			ModelMultiOutput: "@deepright",
 		},
 	}); err != nil {
 		t.Fatalf("seed token config: %v", err)
@@ -2265,11 +2282,11 @@ func TestProxyChatCompletionsInjectsConfiguredModelMetadata(t *testing.T) {
 	if meta["__model_fast"] != "deepseek-fast" {
 		t.Fatalf("metadata.__model_fast = %#v, want %q", meta["__model_fast"], "deepseek-fast")
 	}
-	if meta["__model_multi_input"] != "deepseek-vision" {
-		t.Fatalf("metadata.__model_multi_input = %#v, want %q", meta["__model_multi_input"], "deepseek-vision")
+	if meta["__model_multi_input"] != "@deepright" {
+		t.Fatalf("metadata.__model_multi_input = %#v, want %q", meta["__model_multi_input"], "@deepright")
 	}
-	if meta["__model_multi_output"] != "deepseek-image" {
-		t.Fatalf("metadata.__model_multi_output = %#v, want %q", meta["__model_multi_output"], "deepseek-image")
+	if meta["__model_multi_output"] != "@deepright" {
+		t.Fatalf("metadata.__model_multi_output = %#v, want %q", meta["__model_multi_output"], "@deepright")
 	}
 	if _, exists := meta["__model"]; exists {
 		t.Fatalf("metadata.__model should be absent when config is empty: %#v", meta["__model"])
@@ -8753,6 +8770,103 @@ func TestHandleTokenRenamedModelDeletesPreviousRecord(t *testing.T) {
 	}
 }
 
+func TestDeleteTokenStoreModelClearsMultimodalProviderReferences(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	db, err := sql.Open("sqlite", filepath.Join(tmp, "data"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+	if err := ensureTokenStore(db); err != nil {
+		t.Fatalf("ensureTokenStore: %v", err)
+	}
+	if err := writeTokenStoreConfigs(db, map[string]tokenConfig{
+		"deepright": {Token: "deepright-token"},
+		"deepseek": {
+			Token:            "deepseek-token",
+			ModelBase:        "deepseek-chat",
+			ModelMultiInput:  "@deepright",
+			ModelMultiOutput: "@deepright",
+		},
+	}); err != nil {
+		t.Fatalf("seed token configs: %v", err)
+	}
+
+	if err := deleteTokenStoreModel(db, "deepright"); err != nil {
+		t.Fatalf("delete deepright: %v", err)
+	}
+	models, _, err := readTokenStore(db)
+	if err != nil {
+		t.Fatalf("read token configs: %v", err)
+	}
+	if _, exists := models["deepright"]; exists {
+		t.Fatalf("deepright should be deleted: %+v", models)
+	}
+	deepseek := models["deepseek"]
+	if deepseek.ModelMultiInput != "" || deepseek.ModelMultiOutput != "" {
+		t.Fatalf("multimodal references were not cleared: %+v", deepseek)
+	}
+	if deepseek.ModelBase != "deepseek-chat" {
+		t.Fatalf("unrelated configuration changed: %+v", deepseek)
+	}
+}
+
+func TestWriteTokenStoreChangesClearsReferencesForRemovedProvider(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+
+	db, err := sql.Open("sqlite", filepath.Join(tmp, "data"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+	if err := ensureTokenStore(db); err != nil {
+		t.Fatalf("ensureTokenStore: %v", err)
+	}
+	if err := writeTokenStoreConfigs(db, map[string]tokenConfig{
+		"deepright": {Token: "deepright-token"},
+		"deepseek":  {Token: "deepseek-token"},
+	}); err != nil {
+		t.Fatalf("seed token configs: %v", err)
+	}
+	if err := writeTokenStoreChanges(db, map[string]tokenConfig{
+		"deepseek": {
+			Token:            "deepseek-token",
+			ModelMultiInput:  "@deepright",
+			ModelMultiOutput: "@deepright",
+		},
+	}, []string{"deepright"}); err != nil {
+		t.Fatalf("write token changes: %v", err)
+	}
+	models, _, err := readTokenStore(db)
+	if err != nil {
+		t.Fatalf("read token configs: %v", err)
+	}
+	if _, exists := models["deepright"]; exists {
+		t.Fatalf("deepright should be deleted: %+v", models)
+	}
+	deepseek := models["deepseek"]
+	if deepseek.ModelMultiInput != "" || deepseek.ModelMultiOutput != "" {
+		t.Fatalf("references saved in the same delete transaction were not cleared: %+v", deepseek)
+	}
+}
+
 func TestHandleTokenDeleteModelRemovesLegacyCaseVariants(t *testing.T) {
 	oldwd, err := os.Getwd()
 	if err != nil {
@@ -9143,7 +9257,7 @@ func TestProxyTokenCLIOutputAllModels(t *testing.T) {
 	var stdout bytes.Buffer
 	err := writeProxyTokenCLIOutput(&stdout, map[string]tokenConfig{
 		"kimi":     {Token: "bbb"},
-		"deepseek": {Token: "aaa", ModelFast: "fast-deepseek", ModelMultiInput: "deepseek-vision"},
+		"deepseek": {Token: "aaa", ModelFast: "fast-deepseek", ModelMultiInput: "@deepright"},
 	}, "")
 	if err != nil {
 		t.Fatalf("writeProxyTokenCLIOutput: %v", err)
@@ -9162,7 +9276,7 @@ func TestProxyTokenCLIOutputAllModels(t *testing.T) {
 	if got := payload[0]["deepseek"].ModelFast; got != "fast-deepseek" {
 		t.Fatalf("payload[0] = %+v, want __model_fast", payload[0])
 	}
-	if got := payload[0]["deepseek"].ModelMultiInput; got != "deepseek-vision" {
+	if got := payload[0]["deepseek"].ModelMultiInput; got != "@deepright" {
 		t.Fatalf("payload[0] = %+v, want __model_multi_input", payload[0])
 	}
 	if got := payload[1]["kimi"].Token; got != "bbb" {
@@ -9173,7 +9287,7 @@ func TestProxyTokenCLIOutputAllModels(t *testing.T) {
 func TestProxyTokenCLIOutputSingleModel(t *testing.T) {
 	var stdout bytes.Buffer
 	err := writeProxyTokenCLIOutput(&stdout, map[string]tokenConfig{
-		"deepseek": {Token: "aaa", BaseURL: "https://api.example", ModelMultiOutput: "gpt-image-1"},
+		"deepseek": {Token: "aaa", BaseURL: "https://api.example", ModelMultiOutput: "@deepright"},
 		"kimi":     {Token: "bbb"},
 	}, "deepseek")
 	if err != nil {
@@ -9190,7 +9304,7 @@ func TestProxyTokenCLIOutputSingleModel(t *testing.T) {
 	if payload["deepseek"].BaseURL != "https://api.example" {
 		t.Fatalf("payload = %+v, want only deepseek", payload)
 	}
-	if payload["deepseek"].ModelMultiOutput != "gpt-image-1" {
+	if payload["deepseek"].ModelMultiOutput != "@deepright" {
 		t.Fatalf("payload = %+v, want __model_multi_output", payload)
 	}
 }

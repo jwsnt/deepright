@@ -1,5 +1,9 @@
 # Integration 使用手册
 
+## 多模态服务商引用
+
+模型配置中的 `__model_multi_input` 与 `__model_multi_output` 可以设置为 `@服务商名称`，例如 `@deepright`。Integration 会将该值原样传入普通对话、CLI/GET、飞书、邮件和备忘录任务。删除服务商时，所有引用它的多模态字段会自动清空。
+
 ## 简介
 
 Integration 将 cli-get、proxy、cron、static 四个模块整合为一个完整的 HTTP 服务，统一端口、共享参数，并共享同一份 SQLite 数据。

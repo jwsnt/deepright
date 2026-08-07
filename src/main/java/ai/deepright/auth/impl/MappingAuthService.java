@@ -44,7 +44,6 @@ public class MappingAuthService implements AuthService {
     protected void replace(WorkflowTask workTask, String provider, String token) throws Exception {
         workTask.setProviderAndToken(this.targetProvider, this.targetToken);
         workTask.putMetadata(FeatureField.KEY_PROVIDER, provider);
-
     }
 
     protected void check(WorkflowTask workTask, String provider, String token) throws Exception {

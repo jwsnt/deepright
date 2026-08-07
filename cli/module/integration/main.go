@@ -11048,6 +11048,9 @@ func writeTokenStoreChanges(db *sql.DB, models map[string]tokenConfig, removedMo
 			return err
 		}
 	}
+	if err := clearRemovedMultimodalProviderReferences(tx, removedModels); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 
@@ -11072,6 +11075,74 @@ func normalizeRemovedTokenModels(payload tokenPayload, models map[string]tokenCo
 		removed = append(removed, model)
 	}
 	return removed
+}
+
+func multimodalProviderReference(value string) string {
+	value = strings.TrimSpace(value)
+	if !strings.HasPrefix(value, "@") {
+		return ""
+	}
+	return sharedutil.NormalizeTokenModelName(strings.TrimSpace(strings.TrimPrefix(value, "@")))
+}
+
+func clearRemovedMultimodalProviderReferences(tx *sql.Tx, removedModels []string) error {
+	removed := make(map[string]struct{}, len(removedModels))
+	for _, model := range removedModels {
+		model = sharedutil.NormalizeTokenModelName(model)
+		if model != "" {
+			removed[model] = struct{}{}
+		}
+	}
+	if len(removed) == 0 {
+		return nil
+	}
+	now := time.Now().Format(time.RFC3339)
+
+	rows, err := tx.Query(`SELECT model, __model_multi_input, __model_multi_output FROM token_store`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	type referenceUpdate struct {
+		model            string
+		clearMultiInput  bool
+		clearMultiOutput bool
+	}
+	updates := make([]referenceUpdate, 0)
+	for rows.Next() {
+		var model, multiInput, multiOutput string
+		if err := rows.Scan(&model, &multiInput, &multiOutput); err != nil {
+			return err
+		}
+		_, clearMultiInput := removed[multimodalProviderReference(multiInput)]
+		_, clearMultiOutput := removed[multimodalProviderReference(multiOutput)]
+		if clearMultiInput || clearMultiOutput {
+			updates = append(updates, referenceUpdate{model: model, clearMultiInput: clearMultiInput, clearMultiOutput: clearMultiOutput})
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, update := range updates {
+		if update.clearMultiInput && update.clearMultiOutput {
+			if _, err := tx.Exec(`UPDATE token_store SET __model_multi_input = '', __model_multi_output = '', updated_at = ? WHERE model = ?`, now, update.model); err != nil {
+				return err
+			}
+			continue
+		}
+		if update.clearMultiInput {
+			if _, err := tx.Exec(`UPDATE token_store SET __model_multi_input = '', updated_at = ? WHERE model = ?`, now, update.model); err != nil {
+				return err
+			}
+			continue
+		}
+		if _, err := tx.Exec(`UPDATE token_store SET __model_multi_output = '', updated_at = ? WHERE model = ?`, now, update.model); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func listNewTokenModels(db *sql.DB, models map[string]tokenConfig) ([]string, error) {
@@ -11116,9 +11187,6 @@ func deleteTokenStoreModel(db *sql.DB, model string) error {
 	if err != nil {
 		return err
 	}
-	if len(variants) == 0 {
-		return tx.Commit()
-	}
 
 	now := time.Now().Format(time.RFC3339)
 	for _, variant := range variants {
@@ -11128,6 +11196,9 @@ func deleteTokenStoreModel(db *sql.DB, model string) error {
 		if _, err := tx.Exec(`INSERT INTO proxy_agent_provider_log (agent_id, chat_id, model, token, action, updated_at) VALUES (?,?,?,?,?,?)`, "", "", variant.Model, variant.Token, "delete", now); err != nil {
 			return err
 		}
+	}
+	if err := clearRemovedMultimodalProviderReferences(tx, []string{model}); err != nil {
+		return err
 	}
 	return tx.Commit()
 }

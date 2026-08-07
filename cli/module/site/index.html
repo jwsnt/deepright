@@ -2868,6 +2868,10 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .model-entry.model-test-running .password-wrap > :not(.model-test-wait){visibility:hidden!important}
 @keyframes modelTestWaitPulse{0%,100%{box-shadow:inset 0 0 0 999px rgba(255,150,83,.05)}50%{box-shadow:inset 0 0 0 999px rgba(255,150,83,.15)}}
 @media (prefers-reduced-motion:reduce){.model-test-wait{animation:none;opacity:1;filter:none}}
+.model-test-compact-success{position:absolute;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:0 12px;box-sizing:border-box;border:1px solid rgba(72,185,119,.58);border-radius:14px;background:var(--modal-field-bg);color:#27804d;font-size:12px;font-weight:700;line-height:1.2;text-align:center;white-space:nowrap;user-select:none;pointer-events:auto;box-shadow:inset 0 0 0 999px rgba(72,185,119,.1);animation:modelTestCompactSuccessIn .2s ease-out}
+.model-test-compact-success.show{display:flex}
+@keyframes modelTestCompactSuccessIn{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:scale(1)}}
+[data-theme="dark"] .model-test-compact-success{border-color:rgba(74,211,255,.58);background:var(--modal-field-bg);color:#85e5ff;box-shadow:inset 0 0 0 999px rgba(38,181,234,.13)}
 .model-test-result{max-height:0;overflow:auto;opacity:0;margin:0;padding:0 2px;color:var(--text-secondary);font-size:11px;line-height:1.45;transition:max-height .2s ease,opacity .18s ease,margin .2s ease,padding .2s ease}
 .model-test-result.show{max-height:64px;opacity:1;margin-top:1px;padding:2px 2px 0}
 .model-test-result.success{color:#d85f48}
@@ -2883,6 +2887,8 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .model-config-row{display:flex;flex-direction:column;gap:6px;min-width:0}
 .model-config-split{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;min-width:0;align-items:start}
 .model-config-actions{display:flex;justify-content:flex-end;gap:8px}
+.model-multimodal-provider-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}
+.model-multimodal-provider-footer .model-config-actions{margin-left:auto;flex:0 0 auto}
 .model-config-reset-btn{height:32px;padding:0 14px;border-radius:999px;border:1px solid rgba(var(--accent-rgb),.18);background:rgba(255,255,255,.62);color:var(--text-secondary);cursor:pointer;font-size:12px;font-weight:600;transition:var(--transition)}
 .model-config-reset-btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(var(--accent-soft-rgb),.08)}
 .model-config-clear-btn{height:32px;padding:0 14px;border-radius:999px;border:1px solid rgba(255,90,107,.24);background:rgba(255,255,255,.62);color:var(--error);cursor:pointer;font-size:12px;font-weight:600;transition:var(--transition)}
@@ -2901,6 +2907,23 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .model-config-field span{font-size:12px;line-height:18px;color:var(--text-muted);min-width:0;display:flex;align-items:center;min-height:18px;white-space:nowrap}
 .model-config-field input{width:100%;min-width:0;padding:8px 12px;border:1px solid rgba(var(--accent-rgb),.18);border-radius:14px;background:rgba(255,252,248,.9);color:var(--text-primary);font-size:12px;outline:none;transition:var(--transition);box-shadow:inset 0 1px 0 rgba(255,255,255,.78)}
 .model-config-field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(var(--accent-soft-rgb),.14)}
+.model-multimodal-input-wrap{position:relative;min-width:0}
+.model-multimodal-input-wrap input{padding-left:34px}
+.model-multimodal-provider-trigger{position:absolute;z-index:2;left:7px;top:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:999px;background:transparent;color:var(--text-muted);cursor:pointer;transform:translateY(-50%);transition:var(--transition)}
+.model-multimodal-provider-trigger:hover,.model-multimodal-provider-trigger:focus-visible,.model-multimodal-input-wrap.multimodal-provider-open .model-multimodal-provider-trigger{background:rgba(var(--accent-soft-rgb),.16);color:var(--accent);outline:none}
+.model-multimodal-provider-trigger svg{width:13px;height:13px;transition:transform .16s ease}
+.model-multimodal-input-wrap.multimodal-provider-open .model-multimodal-provider-trigger svg{transform:rotate(180deg)}
+.model-multimodal-provider-trigger:disabled{opacity:.45;cursor:not-allowed;pointer-events:none}
+.model-multimodal-provider-menu{position:absolute;z-index:70;top:calc(100% + 5px);left:0;display:none;flex-direction:column;gap:2px;min-width:100%;max-width:min(240px,calc(100vw - 48px));padding:5px;border:1px solid var(--modal-field-border);border-radius:12px;background:var(--modal-panel-bg-strong);box-shadow:0 14px 30px rgba(16,24,40,.18),inset 0 1px 0 rgba(255,255,255,.72)}
+.model-multimodal-input-wrap.multimodal-provider-open .model-multimodal-provider-menu{display:flex}
+.model-multimodal-provider-option{display:flex;align-items:center;width:100%;min-height:28px;padding:5px 8px;border:0;border-radius:8px;background:transparent;color:var(--text-primary);font-size:12px;line-height:1.2;text-align:left;cursor:pointer}
+.model-multimodal-provider-option:hover,.model-multimodal-provider-option:focus-visible{background:rgba(var(--accent-soft-rgb),.14);color:var(--accent);outline:none}
+.model-multimodal-provider-option.is-selected{color:var(--accent);font-weight:600}
+.model-multimodal-provider-empty{display:block;padding:5px 8px;color:var(--text-muted);font-size:12px;line-height:1.2;white-space:nowrap}
+.model-multimodal-provider-hint{display:none;align-items:center;align-self:start;flex:0 1 auto;width:fit-content;max-width:calc(100% - 180px);min-width:0;min-height:30px;padding:6px 11px;border:1px solid transparent;border-radius:8px;font-size:12px;font-weight:650;line-height:1.35;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-sizing:border-box;box-shadow:inset 0 1px 0 rgba(255,255,255,.24)}
+.model-multimodal-provider-hint.show{display:inline-flex}
+.model-multimodal-provider-hint.show{border-color:rgba(255,142,96,.5);background:linear-gradient(110deg,rgba(255,115,83,.16),rgba(255,189,75,.12));color:#bd6034}
+[data-theme="dark"] .model-multimodal-provider-hint.show{border-color:rgba(74,211,255,.56);background:linear-gradient(110deg,rgba(20,129,212,.3),rgba(32,201,248,.2));color:#85e5ff}
 .model-config-field input[aria-invalid="true"]{border-color:#dc4b4b;box-shadow:0 0 0 3px rgba(220,75,75,.13)}
 .model-config-field .model-url-validation-message{display:none;margin:4px 2px 0;color:#c83f3f!important;font-size:11px!important;line-height:1.35!important;min-height:0!important;white-space:normal!important}
 .model-config-field .model-url-validation-message.show{display:block}
@@ -7752,6 +7775,7 @@ const LOW_POWER_RENDER_MESSAGE_MATH_LIMIT = 12;
 const LOCAL_STORAGE_SIZE_ENCODER = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
 let runtimeModelTokenCache = Object.create(null);
 const modelTestRequests = new Set();
+const modelTestCompactSuccessTimers = new WeakMap();
 let modelTestRequestSequence = 0;
 const MODEL_TEST_CONFIG_KEYS = Object.freeze(['token', '__url', '__model', '__model_fast', '__model_thinking', '__model_multi_input', '__model_multi_output']);
 const DEEPRIGHT_TEST_MODEL = 'deepright';
@@ -8031,6 +8055,22 @@ function normalizeModelConfig(input) {
   };
 }
 
+function getMultimodalProviderReference(value) {
+  const raw = String(value || '').trim();
+  if (!raw.startsWith('@')) return '';
+  return normalizeModelName(raw.slice(1));
+}
+
+function isMultimodalProviderReference(value) {
+  return !!getMultimodalProviderReference(value);
+}
+
+function getMultimodalModelValue(spec, value, kind) {
+  const raw = String(value || '').trim();
+  const supports = kind === 'input' ? !!spec.supportsMultiInput : !!spec.supportsMultiOutput;
+  return supports || isMultimodalProviderReference(raw) ? raw : '';
+}
+
 function getModelCustomConfigSpec(model) {
   const normalized = normalizeModelName(model);
   const spec = modelProviderCatalog[normalized];
@@ -8105,8 +8145,8 @@ function buildEffectiveModelConfig(model, rawConfig) {
     __model: spec.supportsBaseModel ? (cfg.__custom_cleared ? cfg.__model : (cfg.__model || spec.__model || '')) : '',
     __model_fast: spec.supportsFastModel ? (cfg.__custom_cleared ? cfg.__model_fast : (cfg.__model_fast || spec.__model_fast || '')) : '',
     __model_thinking: spec.supportsThinkingModel ? (cfg.__custom_cleared ? cfg.__model_thinking : (cfg.__model_thinking || spec.__model_thinking || '')) : '',
-    __model_multi_input: spec.supportsMultiInput ? (cfg.__custom_cleared ? cfg.__model_multi_input : (cfg.__model_multi_input || spec.__model_multi_input || '')) : '',
-    __model_multi_output: spec.supportsMultiOutput ? (cfg.__custom_cleared ? cfg.__model_multi_output : (cfg.__model_multi_output || spec.__model_multi_output || '')) : ''
+    __model_multi_input: isMultimodalProviderReference(cfg.__model_multi_input) ? cfg.__model_multi_input : (spec.supportsMultiInput ? (cfg.__custom_cleared ? cfg.__model_multi_input : (cfg.__model_multi_input || spec.__model_multi_input || '')) : ''),
+    __model_multi_output: isMultimodalProviderReference(cfg.__model_multi_output) ? cfg.__model_multi_output : (spec.supportsMultiOutput ? (cfg.__custom_cleared ? cfg.__model_multi_output : (cfg.__model_multi_output || spec.__model_multi_output || '')) : '')
   };
   return { cfg, spec, effective };
 }
@@ -46714,8 +46754,8 @@ function getSettingsDraftModels() {
       __model: spec.supportsBaseModel ? String(entry.querySelector('.model-base-model-input') && entry.querySelector('.model-base-model-input').value || '').trim() : '',
       __model_fast: spec.supportsFastModel ? String(entry.querySelector('.model-fast-model-input') && entry.querySelector('.model-fast-model-input').value || '').trim() : '',
       __model_thinking: spec.supportsThinkingModel ? String(entry.querySelector('.model-thinking-model-input') && entry.querySelector('.model-thinking-model-input').value || '').trim() : '',
-      __model_multi_input: spec.supportsMultiInput ? String(entry.querySelector('.model-multi-input-input') && entry.querySelector('.model-multi-input-input').value || '').trim() : '',
-      __model_multi_output: spec.supportsMultiOutput ? String(entry.querySelector('.model-multi-output-input') && entry.querySelector('.model-multi-output-input').value || '').trim() : '',
+      __model_multi_input: getMultimodalModelValue(spec, entry.querySelector('.model-multi-input-input') && entry.querySelector('.model-multi-input-input').value, 'input'),
+      __model_multi_output: getMultimodalModelValue(spec, entry.querySelector('.model-multi-output-input') && entry.querySelector('.model-multi-output-input').value, 'output'),
       __custom_cleared: cleared
     };
   });
@@ -47535,6 +47575,8 @@ function applyModelCurlImportConfig(entry, imported) {
   setValue('.model-thinking-model-input', spec.supportsThinkingModel, imported.model);
   setValue('.model-multi-input-input', spec.supportsMultiInput, imported.model);
   setValue('.model-multi-output-input', spec.supportsMultiOutput, imported.model);
+  syncMultimodalProviderMenu(entry, 'input');
+  syncMultimodalProviderMenu(entry, 'output');
   entry.setAttribute('data-custom-cleared', '0');
   refreshModelEntryPendingState(entry);
   updateModelConfigToggleState(entry);
@@ -47622,8 +47664,15 @@ function copyModelConfigFrom(btn) {
     setInputValue('.model-base-model-input', sourceValueOrTargetDefault(source.spec.supportsBaseModel, source.effective.__model, target.effective.__model));
     setInputValue('.model-fast-model-input', sourceValueOrTargetDefault(source.spec.supportsFastModel, source.effective.__model_fast, target.effective.__model_fast));
     setInputValue('.model-thinking-model-input', sourceValueOrTargetDefault(source.spec.supportsThinkingModel, source.effective.__model_thinking, target.effective.__model_thinking));
-    setInputValue('.model-multi-input-input', sourceValueOrTargetDefault(source.spec.supportsMultiInput, source.effective.__model_multi_input, target.effective.__model_multi_input));
-    setInputValue('.model-multi-output-input', sourceValueOrTargetDefault(source.spec.supportsMultiOutput, source.effective.__model_multi_output, target.effective.__model_multi_output));
+    const setMultimodalValue = (selector, value, kind) => {
+      const input = entry.querySelector(selector);
+      if (!input) return;
+      if (!input.disabled) input.value = getMultimodalModelValue(target.spec, value, kind);
+    };
+    setMultimodalValue('.model-multi-input-input', sourceValueOrTargetDefault(source.spec.supportsMultiInput, source.effective.__model_multi_input, target.effective.__model_multi_input), 'input');
+    setMultimodalValue('.model-multi-output-input', sourceValueOrTargetDefault(source.spec.supportsMultiOutput, source.effective.__model_multi_output, target.effective.__model_multi_output), 'output');
+    syncMultimodalProviderMenu(entry, 'input');
+    syncMultimodalProviderMenu(entry, 'output');
     entry.setAttribute('data-custom-cleared', '0');
   }
   closeModelCopyMenus();
@@ -47657,6 +47706,138 @@ function refreshAddModelButton() {
   addBtn.setAttribute('aria-hidden', hasUnconfiguredModel ? 'false' : 'true');
 }
 
+function getConfiguredMultimodalProviderNames(kind) {
+  const key = kind === 'output' ? '__model_multi_output' : '__model_multi_input';
+  const draftModels = getSettingsDraftModels();
+  const models = Object.keys(draftModels).length ? draftModels : normalizeModelMap(state.settings.models || {});
+  return Object.keys(models)
+    .map(normalizeModelName)
+    .filter(model => {
+      const cfg = normalizeModelConfig(models[model]);
+      if (!cfg.token) return false;
+      // DeepRight is the built-in multimodal provider once it has been configured.
+      if (model === 'deepright') return true;
+      return !!String(cfg[key] || '').trim() && !isMultimodalProviderReference(cfg[key]);
+    })
+    .sort(compareConfiguredModelNames);
+}
+
+function buildMultimodalProviderMenuOptions(kind, currentValue) {
+  const selectedProvider = getMultimodalProviderReference(currentValue);
+  const options = getConfiguredMultimodalProviderNames(kind);
+  const label = kind === 'output' ? '多模态输出' : '多模态输入';
+  const clearOption = selectedProvider
+    ? `<button class="model-multimodal-provider-option" type="button" role="menuitem" data-provider="" onclick="selectMultimodalProvider(this,'${kind}')">取消代理</button>`
+    : '';
+  if (!options.length) {
+    return clearOption || `<span class="model-multimodal-provider-empty">暂无已配置的${label}服务商</span>`;
+  }
+  return clearOption + options.map(provider => (
+    `<button class="model-multimodal-provider-option${provider === selectedProvider ? ' is-selected' : ''}" type="button" role="menuitem" data-provider="${esc(provider).replace(/"/g, '&quot;')}" onclick="selectMultimodalProvider(this,'${kind}')">${esc(provider)}</button>`
+  )).join('');
+}
+
+function syncMultimodalProviderMenu(entry, kind) {
+  if (!entry) return;
+  const input = entry.querySelector(kind === 'output' ? '.model-multi-output-input' : '.model-multi-input-input');
+  const menu = entry.querySelector(kind === 'output' ? '.model-multi-output-provider-menu' : '.model-multi-input-provider-menu');
+  const trigger = entry.querySelector(kind === 'output' ? '.model-multi-output-provider-trigger' : '.model-multi-input-provider-trigger');
+  if (!input || !menu) return;
+  menu.innerHTML = buildMultimodalProviderMenuOptions(kind, input.value);
+  const selectedProvider = getMultimodalProviderReference(input.value);
+  if (trigger) {
+    const label = kind === 'output' ? '多模态输出' : '多模态输入';
+    trigger.title = selectedProvider ? `已选择${label}服务商：${selectedProvider}` : `选择${label}服务商`;
+    trigger.setAttribute('aria-label', trigger.title);
+  }
+}
+
+function refreshMultimodalProviderSelects() {
+  document.querySelectorAll('#modelEntries .model-entry').forEach(entry => {
+    syncMultimodalProviderMenu(entry, 'input');
+    syncMultimodalProviderMenu(entry, 'output');
+  });
+}
+
+function setMultimodalProviderHint(entry, visible) {
+  if (!entry || normalizeModelName(entry.querySelector('select') && entry.querySelector('select').value) === 'deepright') return;
+  const hint = entry.querySelector('.model-multimodal-provider-hint');
+  if (!hint) return;
+  hint.textContent = '正在指定代理多模态模型';
+  hint.classList.toggle('show', !!visible);
+}
+
+function closeMultimodalProviderMenus(exceptWrap) {
+  document.querySelectorAll('#modelEntries .model-multimodal-input-wrap.multimodal-provider-open').forEach(wrap => {
+    if (exceptWrap && wrap === exceptWrap) return;
+    wrap.classList.remove('multimodal-provider-open');
+    const trigger = wrap.querySelector('.model-multimodal-provider-trigger');
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    setMultimodalProviderHint(wrap.closest('.model-entry'), false);
+  });
+}
+
+function ensureMultimodalProviderMenuDismissListener() {
+  if (window.__multimodalProviderMenuDismissBound) return;
+  window.__multimodalProviderMenuDismissBound = true;
+  document.addEventListener('click', event => {
+    if (event.target && event.target.closest && event.target.closest('.model-multimodal-input-wrap')) return;
+    closeMultimodalProviderMenus();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeMultimodalProviderMenus();
+  });
+}
+
+function toggleMultimodalProviderMenu(trigger) {
+  const wrap = trigger && trigger.closest('.model-multimodal-input-wrap');
+  const entry = wrap && wrap.closest('.model-entry');
+  if (!wrap || !entry || trigger.disabled) return;
+  ensureMultimodalProviderMenuDismissListener();
+  const willOpen = !wrap.classList.contains('multimodal-provider-open');
+  closeMultimodalProviderMenus(willOpen ? wrap : null);
+  wrap.classList.toggle('multimodal-provider-open', willOpen);
+  trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+  setMultimodalProviderHint(entry, willOpen);
+}
+
+function dismissMultimodalProviderMenu(menu) {
+  const wrap = menu && menu.closest('.model-multimodal-input-wrap');
+  if (wrap && wrap.classList.contains('multimodal-provider-open')) closeMultimodalProviderMenus();
+}
+
+function selectMultimodalProvider(option, kind) {
+  const entry = option && option.closest('.model-entry');
+  if (!entry) return;
+  const input = entry.querySelector(kind === 'output' ? '.model-multi-output-input' : '.model-multi-input-input');
+  if (!input) return;
+  const provider = normalizeModelName(option.getAttribute('data-provider'));
+  const current = String(input.value || '').trim();
+  input.value = provider ? `@${provider}` : (isMultimodalProviderReference(current) ? '' : current);
+  delete input.dataset.modelAutoFilledBy;
+  entry.setAttribute('data-custom-cleared', '0');
+  updateModelConfigToggleState(entry);
+  syncMultimodalProviderMenu(entry, kind);
+  closeMultimodalProviderMenus();
+  markModelConfigurationDraftChanged(entry);
+}
+
+function clearDeletedMultimodalProviderReferences(provider) {
+  const normalizedProvider = normalizeModelName(provider);
+  if (!normalizedProvider) return;
+  document.querySelectorAll('#modelEntries .model-entry').forEach(entry => {
+    ['input', 'output'].forEach(kind => {
+      const input = entry.querySelector(kind === 'output' ? '.model-multi-output-input' : '.model-multi-input-input');
+      if (!input || getMultimodalProviderReference(input.value) !== normalizedProvider) return;
+      input.value = '';
+      delete input.dataset.modelAutoFilledBy;
+      entry.setAttribute('data-custom-cleared', '0');
+      updateModelConfigToggleState(entry);
+      markModelConfigurationDraftChanged(entry);
+    });
+  });
+}
+
 function refreshModelEntryOptions() {
   document.querySelectorAll('#modelEntries .model-entry').forEach(entry => {
     const select = entry.querySelector('select');
@@ -47667,6 +47848,7 @@ function refreshModelEntryOptions() {
       select.value = currentModel;
     }
   });
+  refreshMultimodalProviderSelects();
   refreshAddModelButton();
 }
 
@@ -47765,11 +47947,44 @@ function modelEntryNeedsConfigurationTestFromDOM(entry) {
   return modelEntryNeedsConfigurationTest(model, getCurrentModelEntryRawConfig(entry), entry.getAttribute('data-original-model'));
 }
 
+function clearModelTestCompactSuccess(entry) {
+  if (!entry) return;
+  const timer = modelTestCompactSuccessTimers.get(entry);
+  if (timer) window.clearTimeout(timer);
+  modelTestCompactSuccessTimers.delete(entry);
+  const compactSuccess = entry.querySelector('.model-test-compact-success');
+  if (compactSuccess) compactSuccess.classList.remove('show');
+}
+
+function showModelTestCompactSuccess(entry, text) {
+  if (!entry) return;
+  clearModelTestCompactSuccess(entry);
+  const compactSuccess = entry.querySelector('.model-test-compact-success');
+  if (!compactSuccess) return;
+  compactSuccess.textContent = '✓ ' + text;
+  compactSuccess.classList.add('show');
+  modelTestCompactSuccessTimers.set(entry, window.setTimeout(() => {
+    if (compactSuccess.isConnected) compactSuccess.classList.remove('show');
+    modelTestCompactSuccessTimers.delete(entry);
+  }, 2000));
+}
+
 function setModelConfigurationTestResult(entry, kind, message) {
   const result = entry && entry.querySelector('.model-test-result');
   const text = limitModelTestMessage(message, kind === 'success' ? '配置成功' : kind === 'cancelled' ? '测试已取消' : '配置错误：测试失败');
   const successResult = entry && entry.querySelector('.model-test-success-result');
+  clearModelTestCompactSuccess(entry);
   if (kind === 'success' && successResult) {
+    if (!entry.classList.contains('config-open')) {
+      successResult.textContent = '';
+      successResult.classList.remove('show');
+      if (result) {
+        result.textContent = '';
+        result.className = 'model-test-result';
+      }
+      showModelTestCompactSuccess(entry, text);
+      return;
+    }
     successResult.textContent = text;
     successResult.classList.add('show');
     if (result) {
@@ -47788,6 +48003,7 @@ function setModelConfigurationTestResult(entry, kind, message) {
 }
 
 function clearModelConfigurationTestResult(entry) {
+  clearModelTestCompactSuccess(entry);
   const result = entry && entry.querySelector('.model-test-result');
   const successResult = entry && entry.querySelector('.model-test-success-result');
   if (result) {
@@ -48043,8 +48259,11 @@ function modelEntryHtml(idx, model, rawConfig, originalModel) {
   const fastAttr = !canCustomize || !spec.supportsFastModel ? ' disabled' : (remotePersisted ? ' readonly' : '');
   const thinkingAttr = !canCustomize || !spec.supportsThinkingModel ? ' disabled' : (remotePersisted ? ' readonly' : '');
   const selectDisabledAttr = providerLocked ? ' disabled title="已保存的模型服务商不可编辑"' : '';
+  const multiProviderSelectAttr = !canCustomize ? ' disabled' : (remotePersisted ? ' disabled' : '');
   const multiInputAttr = !canCustomize || !spec.supportsMultiInput ? ' disabled' : (remotePersisted ? ' readonly' : '');
   const multiOutputAttr = !canCustomize || !spec.supportsMultiOutput ? ' disabled' : (remotePersisted ? ' readonly' : '');
+  const multiInputPlaceholder = spec.supportsMultiInput ? 'vision-model' : '';
+  const multiOutputPlaceholder = spec.supportsMultiOutput ? 'image-model' : '';
   const tokenTitleAttr = remoteMaskedToken
     ? ' title="远程访问已隐藏真实密钥"'
     : '';
@@ -48067,6 +48286,7 @@ function modelEntryHtml(idx, model, rawConfig, originalModel) {
       <div class="${passwordWrapClass}">
         <input class="model-token-input secret-masked" type="text" value="${esc(cfg.token || '')}" maxlength="250" placeholder="填写密钥" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true"${tokenTitleAttr}${tokenInputReadonlyAttr} />
         <span class="model-test-wait" role="status" aria-live="polite">正在测试配置，请耐心等待。</span>
+        <span class="model-test-compact-success" role="status" aria-live="polite">✓ 配置成功</span>
         ${showDeeprightMediaLauncher ? `<button class="password-media-launch-btn" data-media-launcher-kind="password" onclick="handleMediaConfigLaunch(event,this)" onmouseenter="handleMediaConfigLaunchHover(event,this)" onfocus="handleMediaConfigLaunchHover(event,this)" type="button" title="编辑多模态输出参数"><span class="media-output-launch-dot"></span></button>` : ''}
         ${remoteMaskedToken ? '' : `<button class="eye-btn" onclick="toggleEye(this)" type="button">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -48120,24 +48340,35 @@ function modelEntryHtml(idx, model, rawConfig, originalModel) {
           </div>
           <input class="model-thinking-model-input" type="text" value="${esc(cfg.__model_thinking || '')}" placeholder="o3" autocomplete="off"${thinkingAttr} />
         </label>
-        <label class="model-config-field model-multi-input-field${spec.supportsMultiInput ? '' : ' disabled'}">
+        <label class="model-config-field model-multi-input-field">
           <div class="model-config-head">
             <span class="model-config-head-label">多模态输入</span>
           </div>
-          <input class="model-multi-input-input" type="text" value="${esc(cfg.__model_multi_input || '')}" placeholder="vision-model" autocomplete="off"${multiInputAttr} />
+          <div class="model-multimodal-input-wrap">
+            <input class="model-multi-input-input" type="text" value="${esc(cfg.__model_multi_input || '')}" placeholder="${multiInputPlaceholder}" autocomplete="off"${multiInputAttr} />
+            <button class="model-multimodal-provider-trigger model-multi-input-provider-trigger" type="button" onclick="toggleMultimodalProviderMenu(this)" aria-haspopup="menu" aria-expanded="false"${multiProviderSelectAttr}><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m4 6 4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <div class="model-multimodal-provider-menu model-multi-input-provider-menu" role="menu" aria-label="选择多模态输入服务商" onmouseleave="dismissMultimodalProviderMenu(this)">${buildMultimodalProviderMenuOptions('input', cfg.__model_multi_input)}</div>
+          </div>
         </label>
-        <label class="model-config-field model-multi-output-field${spec.supportsMultiOutput ? ' has-launcher' : ' disabled'}">
+        <label class="model-config-field model-multi-output-field${spec.supportsMultiOutput ? ' has-launcher' : ''}">
           <div class="model-multi-output-head">
             <span class="model-multi-output-label">多模态输出</span>
             ${spec.supportsMultiOutput ? `<button class="media-output-launch-btn" data-media-launcher-kind="config" type="button" title="编辑多模态输出参数" onclick="handleMediaConfigLaunch(event,this)" onmouseenter="handleMediaConfigLaunchHover(event,this)" onfocus="handleMediaConfigLaunchHover(event,this)"><span class="media-output-launch-dot"></span></button>` : ''}
           </div>
-          <input class="model-multi-output-input" type="text" value="${esc(cfg.__model_multi_output || '')}" placeholder="image-model" autocomplete="off"${multiOutputAttr} />
+          <div class="model-multimodal-input-wrap">
+            <input class="model-multi-output-input" type="text" value="${esc(cfg.__model_multi_output || '')}" placeholder="${multiOutputPlaceholder}" autocomplete="off"${multiOutputAttr} />
+            <button class="model-multimodal-provider-trigger model-multi-output-provider-trigger" type="button" onclick="toggleMultimodalProviderMenu(this)" aria-haspopup="menu" aria-expanded="false"${multiProviderSelectAttr}><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m4 6 4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <div class="model-multimodal-provider-menu model-multi-output-provider-menu" role="menu" aria-label="选择多模态输出服务商" onmouseleave="dismissMultimodalProviderMenu(this)">${buildMultimodalProviderMenuOptions('output', cfg.__model_multi_output)}</div>
+          </div>
         </label>
       </div>
-      ${canCustomize && !remotePersisted ? `<div class="model-config-actions">
+      <div class="model-multimodal-provider-footer">
+        ${model !== 'deepright' ? '<div class="model-multimodal-provider-hint" role="status" aria-live="polite"></div>' : ''}
+        ${canCustomize && !remotePersisted ? `<div class="model-config-actions">
         <button class="model-config-reset-btn" type="button" onclick="resetModelCustomConfig(this)">重置</button>
         <button class="model-config-clear-btn" type="button" onclick="clearModelCustomConfig(this)">清空</button>
-      </div>` : ''}
+        </div>` : ''}
+      </div>
     </div>
   </div>`;
 }
@@ -48220,6 +48451,7 @@ async function removeModelEntry(btn) {
       }
       state.settings.models = normalizeModelMap(data.models || {});
       syncModelRuntimeTokenCacheFromSettings();
+      clearDeletedMultimodalProviderReferences(persistedModel);
       state.selectedModel = resolveSelectableConfiguredModelName(state.selectedModel, state.settings.models || {}) || null;
     } catch (e) {
       setSettingsErrorMessage('删除模型失败：' + (e && e.message ? e.message : '网络异常'));
@@ -48254,6 +48486,8 @@ function resetModelCustomConfig(btn) {
   setInput('.model-thinking-model-input', cfg.__model_thinking, !(spec.configurable && spec.supportsThinkingModel));
   setInput('.model-multi-input-input', cfg.__model_multi_input, !(spec.configurable && spec.supportsMultiInput));
   setInput('.model-multi-output-input', cfg.__model_multi_output, !(spec.configurable && spec.supportsMultiOutput));
+  syncMultimodalProviderMenu(entry, 'input');
+  syncMultimodalProviderMenu(entry, 'output');
   entry.setAttribute('data-custom-cleared', '0');
   updateModelConfigToggleState(entry);
   markModelConfigurationDraftChanged(entry);
@@ -48276,6 +48510,8 @@ function clearModelCustomConfig(btn) {
   setInput('.model-thinking-model-input', '', !(spec.configurable && spec.supportsThinkingModel));
   setInput('.model-multi-input-input', '', !(spec.configurable && spec.supportsMultiInput));
   setInput('.model-multi-output-input', '', !(spec.configurable && spec.supportsMultiOutput));
+  syncMultimodalProviderMenu(entry, 'input');
+  syncMultimodalProviderMenu(entry, 'output');
   entry.setAttribute('data-custom-cleared', '1');
   updateModelConfigToggleState(entry);
   markModelConfigurationDraftChanged(entry);
@@ -48386,6 +48622,8 @@ function attachModelConfigInputListeners(entry) {
       }
       if (input.dataset.modelAutoFilledBy) delete input.dataset.modelAutoFilledBy;
       copyModelValueToEmptyModelInputs(entry, input);
+      if (selector === '.model-multi-input-input') syncMultimodalProviderMenu(entry, 'input');
+      if (selector === '.model-multi-output-input') syncMultimodalProviderMenu(entry, 'output');
       const hasAnyValue = !!(
         String(entry.querySelector('.model-base-url-input') && entry.querySelector('.model-base-url-input').value || '').trim() ||
         String(entry.querySelector('.model-base-model-input') && entry.querySelector('.model-base-model-input').value || '').trim() ||
@@ -48463,8 +48701,8 @@ function getCurrentModelEntryRawConfig(entry) {
     __model: spec.supportsBaseModel ? String(entry.querySelector('.model-base-model-input') && entry.querySelector('.model-base-model-input').value || '').trim() : '',
     __model_fast: spec.supportsFastModel ? String(entry.querySelector('.model-fast-model-input') && entry.querySelector('.model-fast-model-input').value || '').trim() : '',
     __model_thinking: spec.supportsThinkingModel ? String(entry.querySelector('.model-thinking-model-input') && entry.querySelector('.model-thinking-model-input').value || '').trim() : '',
-    __model_multi_input: spec.supportsMultiInput ? String(entry.querySelector('.model-multi-input-input') && entry.querySelector('.model-multi-input-input').value || '').trim() : '',
-    __model_multi_output: spec.supportsMultiOutput ? String(entry.querySelector('.model-multi-output-input') && entry.querySelector('.model-multi-output-input').value || '').trim() : '',
+    __model_multi_input: getMultimodalModelValue(spec, entry.querySelector('.model-multi-input-input') && entry.querySelector('.model-multi-input-input').value, 'input'),
+    __model_multi_output: getMultimodalModelValue(spec, entry.querySelector('.model-multi-output-input') && entry.querySelector('.model-multi-output-input').value, 'output'),
     __custom_cleared: entry.getAttribute('data-custom-cleared') === '1'
   };
 }
@@ -48755,8 +48993,8 @@ async function saveSettingsAsync() {
       __model: canCustomize && spec.supportsBaseModel ? String(e.querySelector('.model-base-model-input') && e.querySelector('.model-base-model-input').value || '').trim() : '',
       __model_fast: canCustomize && spec.supportsFastModel ? String(e.querySelector('.model-fast-model-input') && e.querySelector('.model-fast-model-input').value || '').trim() : '',
       __model_thinking: canCustomize && spec.supportsThinkingModel ? String(e.querySelector('.model-thinking-model-input') && e.querySelector('.model-thinking-model-input').value || '').trim() : '',
-      __model_multi_input: canCustomize && spec.supportsMultiInput ? String(e.querySelector('.model-multi-input-input') && e.querySelector('.model-multi-input-input').value || '').trim() : '',
-      __model_multi_output: canCustomize && spec.supportsMultiOutput ? String(e.querySelector('.model-multi-output-input') && e.querySelector('.model-multi-output-input').value || '').trim() : '',
+      __model_multi_input: canCustomize ? getMultimodalModelValue(spec, e.querySelector('.model-multi-input-input') && e.querySelector('.model-multi-input-input').value, 'input') : '',
+      __model_multi_output: canCustomize ? getMultimodalModelValue(spec, e.querySelector('.model-multi-output-input') && e.querySelector('.model-multi-output-input').value, 'output') : '',
       __custom_cleared: canCustomize && e.getAttribute('data-custom-cleared') === '1'
     };
     if (!m && !cfg.token && !cfg.__url && !cfg.__model && !cfg.__model_fast && !cfg.__model_thinking && !cfg.__model_multi_input && !cfg.__model_multi_output) return;
@@ -48801,6 +49039,7 @@ async function saveSettingsAsync() {
       }
       state.settings.models = normalizeModelMap(data.models || {});
       syncModelRuntimeTokenCacheFromSettings();
+      normalizedRemovedModels.forEach(clearDeletedMultimodalProviderReferences);
       document.querySelectorAll('#modelEntries .model-entry').forEach(entry => {
         const model = normalizeModelName(entry.querySelector('select') && entry.querySelector('select').value);
         const token = String(entry.querySelector('.model-token-input') && entry.querySelector('.model-token-input').value || '').trim();

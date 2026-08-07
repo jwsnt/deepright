@@ -3213,8 +3213,8 @@ func TestProxyChatCompletionsInjectsConfiguredModelMetadata(t *testing.T) {
 			BaseURL:          "https://provider.example/v1",
 			ModelFast:        "deepseek-fast",
 			ModelThinking:    "",
-			ModelMultiInput:  "deepseek-vision",
-			ModelMultiOutput: "deepseek-image",
+			ModelMultiInput:  "@deepright",
+			ModelMultiOutput: "@deepright",
 		},
 	}); err != nil {
 		t.Fatalf("seed token config: %v", err)
@@ -3267,11 +3267,11 @@ func TestProxyChatCompletionsInjectsConfiguredModelMetadata(t *testing.T) {
 	if meta["__model_fast"] != "deepseek-fast" {
 		t.Fatalf("metadata.__model_fast = %#v, want %q", meta["__model_fast"], "deepseek-fast")
 	}
-	if meta["__model_multi_input"] != "deepseek-vision" {
-		t.Fatalf("metadata.__model_multi_input = %#v, want %q", meta["__model_multi_input"], "deepseek-vision")
+	if meta["__model_multi_input"] != "@deepright" {
+		t.Fatalf("metadata.__model_multi_input = %#v, want %q", meta["__model_multi_input"], "@deepright")
 	}
-	if meta["__model_multi_output"] != "deepseek-image" {
-		t.Fatalf("metadata.__model_multi_output = %#v, want %q", meta["__model_multi_output"], "deepseek-image")
+	if meta["__model_multi_output"] != "@deepright" {
+		t.Fatalf("metadata.__model_multi_output = %#v, want %q", meta["__model_multi_output"], "@deepright")
 	}
 	if _, exists := meta["__model"]; exists {
 		t.Fatalf("metadata.__model should be absent when config is empty: %#v", meta["__model"])
@@ -14841,8 +14841,8 @@ func TestCronExecuteOnceInjectsCurrentModelConfigForAllTaskTypes(t *testing.T) {
 			ModelBase:        "current-base",
 			ModelFast:        "current-fast",
 			ModelThinking:    "current-thinking",
-			ModelMultiInput:  "current-vision",
-			ModelMultiOutput: "current-image",
+			ModelMultiInput:  "@deepright",
+			ModelMultiOutput: "@deepright",
 		},
 	}); err != nil {
 		t.Fatalf("update token config: %v", err)
@@ -14855,7 +14855,7 @@ func TestCronExecuteOnceInjectsCurrentModelConfigForAllTaskTypes(t *testing.T) {
 		_ = json.Unmarshal(body, &request)
 		captured <- request
 		w.Header().Set("Content-Type", "text/event-stream")
-		fmt.Fprint(w, "data: [DONE]\\n\\n")
+		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"ok\"}}]}\n\ndata: [DONE]\n\n")
 	}))
 	defer upstream.Close()
 
@@ -14871,8 +14871,8 @@ func TestCronExecuteOnceInjectsCurrentModelConfigForAllTaskTypes(t *testing.T) {
 		"__model":              "current-base",
 		"__model_fast":         "current-fast",
 		"__model_thinking":     "current-thinking",
-		"__model_multi_input":  "current-vision",
-		"__model_multi_output": "current-image",
+		"__model_multi_input":  "@deepright",
+		"__model_multi_output": "@deepright",
 	}
 	seenTaskTypes := map[string]bool{}
 	for range 3 {
@@ -19465,6 +19465,83 @@ func TestIntegrationHandleTokenRenamedModelDeletesPreviousRecord(t *testing.T) {
 	}
 }
 
+func TestIntegrationDeleteTokenStoreModelClearsMultimodalProviderReferences(t *testing.T) {
+	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "data"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+	if err := ensureTokenStore(db); err != nil {
+		t.Fatalf("ensure token store: %v", err)
+	}
+	if err := writeTokenStoreConfigs(db, map[string]tokenConfig{
+		"deepright": {Token: "deepright-token"},
+		"deepseek": {
+			Token:            "deepseek-token",
+			ModelBase:        "deepseek-chat",
+			ModelMultiInput:  "@deepright",
+			ModelMultiOutput: "@deepright",
+		},
+	}); err != nil {
+		t.Fatalf("seed token configs: %v", err)
+	}
+
+	if err := deleteTokenStoreModel(db, "deepright"); err != nil {
+		t.Fatalf("delete deepright: %v", err)
+	}
+	models, _, err := readTokenStore(db)
+	if err != nil {
+		t.Fatalf("read token configs: %v", err)
+	}
+	if _, exists := models["deepright"]; exists {
+		t.Fatalf("deepright should be deleted: %+v", models)
+	}
+	deepseek := models["deepseek"]
+	if deepseek.ModelMultiInput != "" || deepseek.ModelMultiOutput != "" {
+		t.Fatalf("multimodal references were not cleared: %+v", deepseek)
+	}
+	if deepseek.ModelBase != "deepseek-chat" {
+		t.Fatalf("unrelated configuration changed: %+v", deepseek)
+	}
+}
+
+func TestIntegrationWriteTokenStoreChangesClearsReferencesForRemovedProvider(t *testing.T) {
+	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "data"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+	if err := ensureTokenStore(db); err != nil {
+		t.Fatalf("ensure token store: %v", err)
+	}
+	if err := writeTokenStoreConfigs(db, map[string]tokenConfig{
+		"deepright": {Token: "deepright-token"},
+		"deepseek":  {Token: "deepseek-token"},
+	}); err != nil {
+		t.Fatalf("seed token configs: %v", err)
+	}
+	if err := writeTokenStoreChanges(db, map[string]tokenConfig{
+		"deepseek": {
+			Token:            "deepseek-token",
+			ModelMultiInput:  "@deepright",
+			ModelMultiOutput: "@deepright",
+		},
+	}, []string{"deepright"}); err != nil {
+		t.Fatalf("write token changes: %v", err)
+	}
+	models, _, err := readTokenStore(db)
+	if err != nil {
+		t.Fatalf("read token configs: %v", err)
+	}
+	if _, exists := models["deepright"]; exists {
+		t.Fatalf("deepright should be deleted: %+v", models)
+	}
+	deepseek := models["deepseek"]
+	if deepseek.ModelMultiInput != "" || deepseek.ModelMultiOutput != "" {
+		t.Fatalf("references saved in the same delete transaction were not cleared: %+v", deepseek)
+	}
+}
+
 func TestIntegrationHandleTokenRemotePostMasksResponseButKeepsStoredToken(t *testing.T) {
 	oldwd, err := os.Getwd()
 	if err != nil {
@@ -20241,7 +20318,7 @@ func TestIntegrationHandleSwarmWritesMediaConfig(t *testing.T) {
 func TestIntegrationTokenCLIOutputSingleModel(t *testing.T) {
 	var stdout bytes.Buffer
 	err := writeIntegrationTokenCLIOutput(&stdout, map[string]tokenConfig{
-		"deepseek": {Token: "aaa", BaseURL: "https://api.example", ModelMultiOutput: "gpt-image-1"},
+		"deepseek": {Token: "aaa", BaseURL: "https://api.example", ModelMultiOutput: "@deepright"},
 		"kimi":     {Token: "bbb"},
 	}, "deepseek")
 	if err != nil {
@@ -20258,7 +20335,7 @@ func TestIntegrationTokenCLIOutputSingleModel(t *testing.T) {
 	if payload["deepseek"].BaseURL != "https://api.example" {
 		t.Fatalf("payload = %+v, want only deepseek", payload)
 	}
-	if payload["deepseek"].ModelMultiOutput != "gpt-image-1" {
+	if payload["deepseek"].ModelMultiOutput != "@deepright" {
 		t.Fatalf("payload = %+v, want __model_multi_output", payload)
 	}
 }

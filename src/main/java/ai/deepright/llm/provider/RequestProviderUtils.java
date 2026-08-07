@@ -32,7 +32,7 @@ public class RequestProviderUtils {
     public static Boolean isMultiInputModel(WorkflowTask workTask) throws Exception {
         String provider = RequestProviderUtils.findProvider(workTask);
         // 为空，或者为Gemini或Vertex/Kimi/BigModel
-        return StringUtils.isEmpty(provider) ||
+        return RequestModelSelect.isProxyMultiInput(workTask) || StringUtils.isEmpty(provider) ||
                 (
                         // A：图片 PDf
                         // G/V/B：全模态
@@ -55,7 +55,7 @@ public class RequestProviderUtils {
 
     // 是否为多模态模型
     public static Boolean isMultiOutputModel(WorkflowTask workTask) throws Exception {
-        return RequestProviderUtils.isMultiOutputModel(RequestProviderUtils.findProvider(workTask));
+        return RequestModelSelect.isProxyMultiOutput(workTask) || RequestProviderUtils.isMultiOutputModel(RequestProviderUtils.findProvider(workTask));
     }
 
     public static Boolean isMultiOutputModel(String provider) throws Exception {

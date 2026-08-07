@@ -11,7 +11,6 @@ import ai.deepright.skills.SkillsChecker;
 import ai.deepright.utils.TemplateChecker;
 import ai.deepright.workflow.worktask.ResetStateWorkTask;
 import ai.open.right.WorkflowException;
-import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.resouce.ResourceService;
 import ai.open.right.utils.JsonUtils;
 import ai.open.right.workflow.flow.WorkflowQueue;

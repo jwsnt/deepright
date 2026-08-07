@@ -1,9 +1,8 @@
 package ai.deepright.llm.provider;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
 import ai.deepright.complex.ComplexityMode;
 import ai.deepright.complex.ComplexityUtils;
+import ai.open.right.WorkflowException;
 import ai.open.right.utils.SplitUtils;
 import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.llm.provider.ProviderRequestService;
@@ -34,10 +33,36 @@ public class RequestModelSelect {
 
     public static final String KEY_MODEL_URL = "__url";
 
+    public static final String KEY_PROXY = "@";
+
     static {
         RequestModelSelect.OUTPUT.add("media@image_gen");
         RequestModelSelect.INPUT.add("media@file_gen");
         RequestModelSelect.INPUT.add("media@ocr_gen");
+    }
+
+    public static Boolean isProxyMultiOutput(WorkflowTask workTask) throws Exception {
+        return !StringUtils.isEmpty(RequestModelSelect.proxyMultiOutput(workTask));
+    }
+
+    public static Boolean isProxyMultiInput(WorkflowTask workTask) throws Exception {
+        return !StringUtils.isEmpty(RequestModelSelect.proxyMultiInput(workTask));
+    }
+
+    public static Boolean isProxyAvailable(WorkflowTask workTask) throws Exception {
+        return (RequestModelSelect.multiOutput(workTask) && RequestModelSelect.isProxyMultiOutput(workTask)) || (RequestModelSelect.multiInput(workTask) && RequestModelSelect.isProxyMultiInput(workTask));
+    }
+
+    public static String proxyMultiOutput(WorkflowTask workTask) throws Exception {
+        String provider = MapUtils.getString(workTask.getMetadata(), RequestModelSelect.KEY_MODEL_MULTI_OUTPUT);
+        WorkflowException.checkCondition(!StringUtils.startsWith(provider, RequestModelSelect.KEY_PROXY), "The proxy multi output model is invalid");
+        return StringUtils.substring(provider, RequestModelSelect.KEY_PROXY.length());
+    }
+
+    public static String proxyMultiInput(WorkflowTask workTask) throws Exception {
+        String provider = MapUtils.getString(workTask.getMetadata(), RequestModelSelect.KEY_MODEL_MULTI_INPUT);
+        WorkflowException.checkCondition(!StringUtils.startsWith(provider, RequestModelSelect.KEY_PROXY), "The proxy multi input model is invalid");
+        return StringUtils.substring(provider, RequestModelSelect.KEY_PROXY.length());
     }
 
     public static Map<String, Object> transfer(WorkflowTask workTask, Map<String, Object> metadata) throws Exception {
@@ -94,11 +119,11 @@ public class RequestModelSelect {
         return model.getBase(workTask);
     }
 
-    public static boolean multiOutput(WorkflowTask workTask) throws Exception {
+    public static Boolean multiOutput(WorkflowTask workTask) throws Exception {
         return RequestModelSelect.OUTPUT.contains(SplitUtils.join(workTask));
     }
 
-    public static boolean multiInput(WorkflowTask workTask) throws Exception {
+    public static Boolean multiInput(WorkflowTask workTask) throws Exception {
         return RequestModelSelect.INPUT.contains(SplitUtils.join(workTask));
     }
 
