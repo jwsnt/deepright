@@ -2175,7 +2175,21 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 /* Model indicator */
 .model-indicator{--model-indicator-leading-space:92px;--model-indicator-trailing-space:158px;height:28px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text-muted);line-height:28px;overflow:visible;white-space:nowrap;margin-bottom:6px;position:relative;top:5px;letter-spacing:.06em;text-transform:uppercase;min-width:0}
 .model-indicator-main{display:flex;align-items:center;justify-content:center;gap:6px;min-width:0;max-width:calc(100% - var(--model-indicator-leading-space) - var(--model-indicator-trailing-space));margin:0 auto;padding:0 12px;overflow:hidden}
-.model-indicator-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.model-indicator-main.agent-change-sparkle-main{overflow:visible}
+.model-indicator-text{display:inline-flex;align-items:center;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.model-indicator-text.agent-change-sparkle-wrap{overflow:visible}
+.model-indicator-agent-text{position:relative;display:inline-block;isolation:isolate;white-space:nowrap}
+.model-indicator-model-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.model-indicator-agent-text.agent-change-sparkle{animation:agentChangeTextGlow 3s ease-in-out both}
+.model-indicator-agent-text.agent-change-sparkle::before,.model-indicator-agent-text.agent-change-sparkle::after{content:'';position:absolute;pointer-events:none;z-index:-1}
+.model-indicator-agent-text.agent-change-sparkle::before{inset:-8px -13px;padding:2px;border-radius:999px;background:conic-gradient(from 0deg,transparent 0 7%,var(--agent-change-sparkle-core) 12%,transparent 18%,transparent 32%,var(--agent-change-sparkle-soft) 38%,transparent 44%,transparent 58%,var(--agent-change-sparkle-core) 64%,transparent 70%,transparent 84%,var(--agent-change-sparkle-soft) 90%,transparent 96%);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;filter:drop-shadow(0 0 4px var(--agent-change-sparkle-glow)) drop-shadow(0 0 10px var(--agent-change-sparkle-glow));animation:agentChangeSparkleRing 3s linear both}
+.model-indicator-agent-text.agent-change-sparkle::after{inset:-14px -22px;border-radius:999px;background:radial-gradient(circle at 7% 49%,#fff 0 1px,transparent 2.8px),radial-gradient(circle at 21% 9%,var(--agent-change-sparkle-core) 0 1.6px,transparent 3.6px),radial-gradient(circle at 50% 0%,#fff 0 1.2px,transparent 3px),radial-gradient(circle at 79% 10%,var(--agent-change-sparkle-soft) 0 1.4px,transparent 3.4px),radial-gradient(circle at 94% 48%,#fff 0 1px,transparent 2.8px),radial-gradient(circle at 75% 91%,var(--agent-change-sparkle-core) 0 1.6px,transparent 3.6px),radial-gradient(circle at 50% 100%,#fff 0 1.2px,transparent 3px),radial-gradient(circle at 22% 90%,var(--agent-change-sparkle-soft) 0 1.4px,transparent 3.4px);filter:drop-shadow(0 0 5px var(--agent-change-sparkle-glow));animation:agentChangeSparkleParticles 3s linear both}
+[data-theme="light"] .model-indicator-agent-text{--agent-change-sparkle-core:#ff9700;--agent-change-sparkle-soft:#ffbf54;--agent-change-sparkle-glow:rgba(255,119,0,.7)}
+[data-theme="dark"] .model-indicator-agent-text{--agent-change-sparkle-core:#3edfff;--agent-change-sparkle-soft:#99f3ff;--agent-change-sparkle-glow:rgba(34,205,255,.72)}
+@keyframes agentChangeTextGlow{0%,100%{color:inherit;text-shadow:none}10%,26%,44%,62%,80%{color:var(--agent-change-sparkle-core);text-shadow:0 0 7px var(--agent-change-sparkle-glow),0 0 14px var(--agent-change-sparkle-glow)}}
+@keyframes agentChangeSparkleRing{0%{opacity:0;transform:rotate(-18deg) scale(.78)}7%{opacity:1}84%{opacity:.94}100%{opacity:0;transform:rotate(702deg) scale(1.15)}}
+@keyframes agentChangeSparkleParticles{0%{opacity:0;transform:rotate(0deg) scale(.62)}8%{opacity:1}88%{opacity:.9}100%{opacity:0;transform:rotate(-540deg) scale(1.18)}}
+@media (prefers-reduced-motion:reduce){.model-indicator-agent-text.agent-change-sparkle,.model-indicator-agent-text.agent-change-sparkle::before,.model-indicator-agent-text.agent-change-sparkle::after{animation:none}.model-indicator-agent-text.agent-change-sparkle::before,.model-indicator-agent-text.agent-change-sparkle::after{opacity:.72}}
 .model-indicator-btn{border:none;background:none;cursor:pointer;padding:0;display:flex;align-items:center;animation:sunFlash .8s ease-in-out infinite}
 .model-indicator-btn svg{width:16px;height:16px}
 .model-indicator-btn:hover{opacity:1}
@@ -4477,8 +4491,11 @@ body.quick-fan-transition-active{cursor:progress}
 .file-editor-panel.image-editor .file-editor-content{min-height:0}
 .file-editor-panel.media-preview{width:min(960px,calc(100vw - 32px))}
 .file-editor-panel.media-preview .file-editor-content{display:flex;align-items:center;justify-content:center;min-height:0;overflow:auto}
-.file-editor-panel.media-preview .fe-video-stage{flex:0 0 auto;max-height:none}
-.file-editor-panel.media-preview .fe-video-stage .fe-video{max-height:70vh;object-fit:contain}
+/* Keep a video preview within the space left by its header and editor controls.
+   The stage uses the source ratio so portrait videos shrink in width when their
+   height is constrained, instead of extending behind the trim controls. */
+.file-editor-panel.media-preview .fe-video-stage{flex:0 1 auto;width:min(960px,100%);max-width:100%;max-height:100%;min-width:0;min-height:0;aspect-ratio:var(--fe-video-aspect-ratio,16 / 9)}
+.file-editor-panel.media-preview .fe-video-stage .fe-video{width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain}
 .file-editor-panel:not(.auto-size){height:700px}
 .file-editor-header{padding:8px 12px;font-size:12px;color:var(--text-muted);border-bottom:1px solid color-mix(in srgb,var(--border) 56%,rgba(255,255,255,.26));display:flex;align-items:center;gap:8px;flex-shrink:0;background:linear-gradient(180deg,rgba(255,255,255,.58),rgba(255,255,255,.3))}
 .file-editor-path-wrap{display:flex;align-items:center;gap:7px;min-width:0;flex:1}
@@ -34503,6 +34520,7 @@ function switchChat(id) {
     }
     thinkingEnabled = !!chatThinking[id];
     updateModelIndicator();
+    playAgentChangeSparkle(previousAgentId, nextAgentId);
     updateThinkingUI();
     void syncQueuedCenterInsertedMessagesFromServer(id, getChatAgentId(id), { silent: true });
     refreshChatSandboxStatus(id, { agentId: getChatAgentId(id), toastOnError: false }).catch(() => {});
@@ -34796,6 +34814,7 @@ function bindAgentToChat(chatId, agentId) {
   renderWikiAutoTidyToggle();
   saveChats();
   updateModelIndicator();
+  playAgentChangeSparkle(previousAgentId, resolvedAgentId);
   vfsLoadWorkspace();
   refreshWikiLastUpdate({ silent: true, agentId: resolvedAgentId }).catch(() => {});
   // Check config status for the new agent
@@ -38980,14 +38999,50 @@ async function toggleBrowserFullscreen(event) {
 function updateModelIndicator() {
   const el = document.getElementById('modelIndicator');
   if (!el) return;
+  let agentEl = document.getElementById('agentIndicatorText');
+  let modelEl = document.getElementById('modelIndicatorModel');
+  if (!agentEl || !modelEl) {
+    agentEl = document.createElement('span');
+    agentEl.id = 'agentIndicatorText';
+    agentEl.className = 'model-indicator-agent-text';
+    modelEl = document.createElement('span');
+    modelEl.id = 'modelIndicatorModel';
+    modelEl.className = 'model-indicator-model-text';
+    el.replaceChildren(agentEl, modelEl);
+  }
   const agent = chatAgents[state.activeChat] || state.settings.agentId || '';
   const model = normalizeModelName(state.selectedModel) || '';
-  const parts = [];
-  if (agent) parts.push(truncateAgentIndicatorName(agent, 5));
-  if (model) parts.push(model);
-  const text = parts.join(' · ');
-  el.textContent = text;
+  const agentText = agent ? truncateAgentIndicatorName(agent, 5) : '';
+  agentEl.textContent = agentText;
+  modelEl.textContent = model ? (agentText ? ' · ' : '') + model : '';
   el.title = [agent, model].filter(Boolean).join(' · ');
+}
+
+const AGENT_CHANGE_SPARKLE_MS = 3000;
+let agentChangeSparkleTimer = 0;
+
+function playAgentChangeSparkle(previousAgentId, nextAgentId) {
+  const previous = String(previousAgentId || '').trim();
+  const next = String(nextAgentId || '').trim();
+  if (!previous || !next || previous.toLowerCase() === next.toLowerCase()) return;
+  const agentText = document.getElementById('agentIndicatorText');
+  const indicatorText = document.getElementById('modelIndicator');
+  const indicator = document.getElementById('centerAgentIndicator');
+  if (!agentText || !indicatorText || !indicator) return;
+  if (agentChangeSparkleTimer) clearTimeout(agentChangeSparkleTimer);
+  agentText.classList.remove('agent-change-sparkle');
+  indicatorText.classList.remove('agent-change-sparkle-wrap');
+  indicator.classList.remove('agent-change-sparkle-main');
+  void agentText.offsetWidth;
+  agentText.classList.add('agent-change-sparkle');
+  indicatorText.classList.add('agent-change-sparkle-wrap');
+  indicator.classList.add('agent-change-sparkle-main');
+  agentChangeSparkleTimer = window.setTimeout(() => {
+    agentText.classList.remove('agent-change-sparkle');
+    indicatorText.classList.remove('agent-change-sparkle-wrap');
+    indicator.classList.remove('agent-change-sparkle-main');
+    agentChangeSparkleTimer = 0;
+  }, AGENT_CHANGE_SPARKLE_MS);
 }
 
 let cmdExecuting = false;
@@ -45794,12 +45849,14 @@ async function activateImportedAgentIfNeeded(agentId) {
     hideAgentSelectOverlay();
     return;
   }
-  const agentChanged = String(state.settings.agentId || '').trim() !== importedAgentId;
+  const previousAgentId = String(state.settings.agentId || '').trim();
+  const agentChanged = previousAgentId !== importedAgentId;
   if (agentChanged) startMemoAgentSwitchOverlay();
   state.settings.agentId = importedAgentId;
   saveSettingsToStorage();
   renderWikiAutoTidyToggle();
   updateModelIndicator();
+  playAgentChangeSparkle(previousAgentId, importedAgentId);
   updateBeeIcons();
   updateThinkingUI();
   rsInitNote();
@@ -48800,7 +48857,8 @@ async function saveSettingsAsync() {
     }
   }
   // Check if agent changed and memo has input — reset memo
-  const agentChanged = agentId !== state.settings.agentId;
+  const previousAgentId = String(state.settings.agentId || '').trim();
+  const agentChanged = agentId !== previousAgentId;
   const onboardingChanged = nextOnboardingEnabled !== isOnboardingEnabled();
   if (agentChanged) startMemoAgentSwitchOverlay();
   state.settings.agentId = agentId;
@@ -48852,6 +48910,7 @@ async function saveSettingsAsync() {
   const tip = document.getElementById('memoResetTip');
   if (tip) tip.classList.remove('show');
   updateModelIndicator();
+  playAgentChangeSparkle(previousAgentId, agentId);
   vfsLoadWorkspace();
   if (state.activeChat) {
     updateSandboxUI();
@@ -51815,7 +51874,7 @@ function vfsScreenFormatDuration(milliseconds) {
   return String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0');
 }
 function vfsScreenHasFramePipelineSupport() {
-  return !!(window.MediaStreamTrackProcessor && window.MediaStreamTrackGenerator && window.VideoFrame);
+  return !!(window.MediaStreamTrackProcessor && window.MediaStreamTrackGenerator && window.VideoFrame && window.OffscreenCanvas);
 }
 function vfsScreenSupportedMimeType() {
   return ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find(type => MediaRecorder.isTypeSupported(type));
@@ -51841,12 +51900,16 @@ function vfsScreenSourceCrop(state) {
 }
 function vfsScreenFrameCrop(crop, frame) {
   const video = document.getElementById('vfsScreenSource');
-  const scaleX = frame.codedWidth / video.videoWidth;
-  const scaleY = frame.codedHeight / video.videoHeight;
-  const left = vfsScreenClamp(Math.round(crop.x * scaleX), 0, Math.max(0, frame.codedWidth - 1));
-  const top = vfsScreenClamp(Math.round(crop.y * scaleY), 0, Math.max(0, frame.codedHeight - 1));
-  const right = vfsScreenClamp(Math.round((crop.x + crop.width) * scaleX), left + 1, frame.codedWidth);
-  const bottom = vfsScreenClamp(Math.round((crop.y + crop.height) * scaleY), top + 1, frame.codedHeight);
+  // Canvas drawImage works in the frame's displayed pixel space.  Unlike a
+  // VideoFrame visibleRect it is also valid for odd x/y/width/height values.
+  const frameWidth = frame.displayWidth || frame.codedWidth;
+  const frameHeight = frame.displayHeight || frame.codedHeight;
+  const scaleX = frameWidth / video.videoWidth;
+  const scaleY = frameHeight / video.videoHeight;
+  const left = vfsScreenClamp(Math.round(crop.x * scaleX), 0, Math.max(0, frameWidth - 1));
+  const top = vfsScreenClamp(Math.round(crop.y * scaleY), 0, Math.max(0, frameHeight - 1));
+  const right = vfsScreenClamp(Math.round((crop.x + crop.width) * scaleX), left + 1, frameWidth);
+  const bottom = vfsScreenClamp(Math.round((crop.y + crop.height) * scaleY), top + 1, frameHeight);
   return { x: left, y: top, width: right - left, height: bottom - top };
 }
 function vfsScreenRenderSelection() {
@@ -51977,6 +52040,11 @@ function vfsScreenStartFramePipeline(state, sourceTrack, crop) {
   const outputTrack = new MediaStreamTrackGenerator({ kind: 'video' });
   const reader = processor.readable.getReader();
   const writer = outputTrack.writable.getWriter();
+  const outputWidth = Math.max(1, Math.round(crop.width));
+  const outputHeight = Math.max(1, Math.round(crop.height));
+  const canvas = new OffscreenCanvas(outputWidth, outputHeight);
+  const context = canvas.getContext('2d', { alpha: false });
+  if (!context) throw new Error('浏览器无法创建逐帧裁切画布');
   const pipeline = { active: true, closing: false, inputTrack, outputTrack, reader, writer, writerClosed: false, pump: null };
   pipeline.pump = (async () => {
     try {
@@ -51984,9 +52052,16 @@ function vfsScreenStartFramePipeline(state, sourceTrack, crop) {
         const { value: frame, done } = await reader.read();
         if (done || !frame) break;
         try {
-          const frameOptions = { visibleRect: vfsScreenFrameCrop(crop, frame), timestamp: frame.timestamp };
+          const frameCrop = vfsScreenFrameCrop(crop, frame);
+          // A display track commonly delivers I420/NV12 frames. Constructing
+          // VideoFrame with an arbitrary visibleRect on those frames rejects
+          // odd crop coordinates or dimensions because of chroma alignment.
+          // Paint each delivered frame instead: this remains frame-driven and
+          // timestamp-preserving, while allowing exactly the user's selection.
+          context.drawImage(frame, frameCrop.x, frameCrop.y, frameCrop.width, frameCrop.height, 0, 0, outputWidth, outputHeight);
+          const frameOptions = { timestamp: frame.timestamp };
           if (frame.duration != null) frameOptions.duration = frame.duration;
-          const cropped = new VideoFrame(frame, frameOptions);
+          const cropped = new VideoFrame(canvas, frameOptions);
           try { await writer.write(cropped); } finally { cropped.close(); }
         } finally { frame.close(); }
       }
@@ -58392,8 +58467,12 @@ function feSyncVideoStageToMedia() {
   const media = feMediaElement();
   const stage = document.getElementById('feVideoStage');
   if (!(media instanceof HTMLVideoElement) || !stage || !stage.contains(media)) return;
-  const height = media.getBoundingClientRect().height;
-  if (height > 0) stage.style.height = Math.ceil(height) + 'px';
+  if (media.videoWidth > 0 && media.videoHeight > 0) {
+    stage.style.setProperty('--fe-video-aspect-ratio', media.videoWidth + ' / ' + media.videoHeight);
+  }
+  // The stage is sized by CSS from the remaining flex space. Remove the
+  // previous measured height so a tall or wide video can shrink on either axis.
+  stage.style.removeProperty('height');
 }
 
 function feScheduleVideoStageSync() {

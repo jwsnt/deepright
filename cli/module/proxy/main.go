@@ -9576,6 +9576,12 @@ type dueTask struct {
 	ResponseSchema string
 }
 
+// setDeviceIDHeader preserves the public Header spelling expected by upstream.
+// Header.Set canonicalizes this as Deviceid, which does not retain camel case.
+func setDeviceIDHeader(req *http.Request, deviceID string) {
+	req.Header["DeviceId"] = []string{deviceID}
+}
+
 func runDueTask(p *ProxyServer, db *sql.DB, task dueTask, alreadyStarted bool) bool {
 	if p == nil || db == nil {
 		return false
@@ -9703,6 +9709,7 @@ func runDueTask(p *ProxyServer, db *sql.DB, task dueTask, alreadyStarted bool) b
 
 	detailID := task.ID
 	agentID := task.AgentID
+	deviceID, _ := metaMap["deviceId"].(string)
 	go func() {
 		targetURL := strings.TrimRight(p.currentHost(), "/") + "/v1/chat/completions"
 		req, err := http.NewRequest(http.MethodPost, targetURL, bytes.NewReader(body))
@@ -9715,6 +9722,7 @@ func runDueTask(p *ProxyServer, db *sql.DB, task dueTask, alreadyStarted bool) b
 		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "text/event-stream")
+		setDeviceIDHeader(req, deviceID)
 		if token != "" {
 			req.Header.Set("Authorization", token)
 		}
@@ -10188,6 +10196,8 @@ func (p *ProxyServer) HandleChatCompletions(w http.ResponseWriter, r *http.Reque
 	}
 	proxyReq.Header.Set("Content-Length", fmt.Sprintf("%d", len(newBody)))
 	proxyReq.Header.Set("Accept", "text/event-stream")
+	deviceID, _ := metaMap["deviceId"].(string)
+	setDeviceIDHeader(proxyReq, deviceID)
 
 	resp, err := p.Client.Do(proxyReq)
 	if err != nil {

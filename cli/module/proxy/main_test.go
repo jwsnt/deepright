@@ -49,6 +49,17 @@ func gzipBase64String(input string) string {
 	return sharedutil.GzipBase64String(input)
 }
 
+func TestSetDeviceIDHeaderPreservesCamelCase(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	setDeviceIDHeader(req, "device-1")
+	if got := req.Header["DeviceId"]; len(got) != 1 || got[0] != "device-1" {
+		t.Fatalf("DeviceId header = %#v, want [device-1]", got)
+	}
+	if _, exists := req.Header["Deviceid"]; exists {
+		t.Fatalf("unexpected non-camel-case header: %#v", req.Header)
+	}
+}
+
 func NewProxyClient(connectTimeout time.Duration) *http.Client {
 	return sharedutil.NewProxyClient(connectTimeout)
 }
@@ -673,6 +684,9 @@ func TestProxyInjectsMetadataAndPreservesFields(t *testing.T) {
 	}
 	if capturedHeaders.Get("Accept") != "text/event-stream" {
 		t.Errorf("Accept header not set: %q", capturedHeaders.Get("Accept"))
+	}
+	if capturedHeaders.Get("deviceId") != "test-device-123" {
+		t.Errorf("deviceId header = %q, want test-device-123", capturedHeaders.Get("deviceId"))
 	}
 
 	// model unchanged

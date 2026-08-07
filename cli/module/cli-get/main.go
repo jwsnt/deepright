@@ -687,6 +687,12 @@ func createHTTPClient(connectTimeout, socketTimeout, totalTimeout, idleTimeout t
 // Core logic: heartbeat, execute, publish
 // ═══════════════════════════════════════════════════════════════════════════
 
+// setDeviceIDHeader preserves the public Header spelling expected by upstream.
+// Header.Set canonicalizes this as Deviceid, which does not retain camel case.
+func setDeviceIDHeader(req *http.Request, deviceID string) {
+	req.Header["DeviceId"] = []string{deviceID}
+}
+
 // Heartbeat sends agent metadata to cli/get and returns a task if available.
 func Heartbeat(client *http.Client, host string, metadata *AgentOutput) (*TaskContent, error) {
 	reqBody, _ := json.Marshal(GetRequest{
@@ -696,7 +702,13 @@ func Heartbeat(client *http.Client, host string, metadata *AgentOutput) (*TaskCo
 	})
 
 	url := strings.TrimRight(host, "/") + "/cli/get"
-	resp, err := client.Post(url, "application/json", bytes.NewReader(reqBody))
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(reqBody))
+	if err != nil {
+		return nil, fmt.Errorf("create heartbeat request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	setDeviceIDHeader(req, metadata.DeviceID)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("heartbeat request failed: %w", err)
 	}
@@ -820,7 +832,13 @@ func PublishResult(client *http.Client, host string, result *ResultPayload, meta
 	})
 
 	url := strings.TrimRight(host, "/") + "/cli/pub"
-	resp, err := client.Post(url, "application/json", bytes.NewReader(reqBody))
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(reqBody))
+	if err != nil {
+		return fmt.Errorf("create publish request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	setDeviceIDHeader(req, metadata.DeviceID)
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("publish request failed: %w", err)
 	}

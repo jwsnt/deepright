@@ -2927,6 +2927,12 @@ func integrationMetadataPort(cfg *Config) int {
 	return integrationServicePort
 }
 
+// setDeviceIDHeader preserves the public Header spelling expected by upstream.
+// Header.Set canonicalizes this as Deviceid, which does not retain camel case.
+func setDeviceIDHeader(req *http.Request, deviceID string) {
+	req.Header["DeviceId"] = []string{deviceID}
+}
+
 func heartbeat(client *http.Client, host string, metadata *AgentOutput, cfg *Config) (*TaskContent, error) {
 	metaMap := buildCLIRequestMetadataMap(metadata)
 	if cfg != nil {
@@ -2949,7 +2955,14 @@ func heartbeat(client *http.Client, host string, metadata *AgentOutput, cfg *Con
 	})
 	url := strings.TrimRight(host, "/") + "/cli/get"
 	startedAt := time.Now()
-	resp, err := client.Post(url, "application/json", bytes.NewReader(reqBody))
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(reqBody))
+	if err != nil {
+		return nil, fmt.Errorf("create heartbeat request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	deviceID, _ := metaMap["deviceId"].(string)
+	setDeviceIDHeader(req, deviceID)
+	resp, err := client.Do(req)
 	if err != nil {
 		if integrationHTTPTimeoutError(err) {
 			httpTimeout := 0
@@ -3333,7 +3346,14 @@ func publishResult(client *http.Client, host string, result *ResultPayload, meta
 		"metadata": metaMap,
 	})
 	url := strings.TrimRight(host, "/") + "/cli/pub"
-	resp, err := client.Post(url, "application/json", bytes.NewReader(reqBody))
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(reqBody))
+	if err != nil {
+		return fmt.Errorf("create publish request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	deviceID, _ := metaMap["deviceId"].(string)
+	setDeviceIDHeader(req, deviceID)
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("publish failed: %w", err)
 	}
@@ -11442,6 +11462,8 @@ func handleModelTest(cfg *Config, proxyClient *http.Client) http.HandlerFunc {
 		upstreamReq.Header.Set("Content-Type", "application/json")
 		upstreamReq.Header.Set("Accept", "text/event-stream")
 		upstreamReq.Header.Set("Authorization", request.Token)
+		deviceID, _ := metadata["deviceId"].(string)
+		setDeviceIDHeader(upstreamReq, deviceID)
 
 		client := proxyClient
 		if client == nil {
@@ -11629,12 +11651,13 @@ func modelTestTimeoutSeconds(raw interface{}) (int64, bool) {
 
 func buildModelTestUpstreamRequest(cfg *Config, request modelTestRequest, sessionID, content string) map[string]interface{} {
 	metadata := map[string]interface{}{
-		"test":   true,
-		"type":   "test",
-		"chat":   sessionID,
-		"device": request.Metadata.Device,
-		"theme":  request.Metadata.Theme,
-		"port":   integrationMetadataPort(cfg),
+		"test":     true,
+		"type":     "test",
+		"chat":     sessionID,
+		"device":   request.Metadata.Device,
+		"deviceId": cfg.effectiveDeviceID(),
+		"theme":    request.Metadata.Theme,
+		"port":     integrationMetadataPort(cfg),
 		// Keep the runtime fields required by the upstream /v1/chat/completions
 		// pipeline. They describe this Integration process only; unlike ordinary
 		// chat requests, a model test still does not merge Agent, skills, memory,
@@ -17396,6 +17419,8 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 		}
 		proxyReq.Header.Set("Content-Length", fmt.Sprintf("%d", len(newBody)))
 		proxyReq.Header.Set("Accept", "text/event-stream")
+		deviceID, _ := metaMap["deviceId"].(string)
+		setDeviceIDHeader(proxyReq, deviceID)
 
 		finishSSE := trackIntegrationSSE(cfg)
 		defer finishSSE()
@@ -24117,10 +24142,11 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 		appendChatLogDB(t.AgentID, chatID, chatTypeScheduledTask, "Q", "normal", string(body))
 
 		token := modelCfg.Token
+		deviceID, _ := metaMap["deviceId"].(string)
 
 		// Send to upstream
 		detailID := t.ID
-		go func(agentID, cID string, reqBody []byte, dID int, token, taskType string) {
+		go func(agentID, cID string, reqBody []byte, dID int, token, taskType, deviceID string) {
 			targetURL := strings.TrimRight(cfg.currentHost(), "/") + "/v1/chat/completions"
 			req, err := http.NewRequest(http.MethodPost, targetURL, bytes.NewReader(reqBody))
 			if err != nil {
@@ -24129,6 +24155,7 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 			}
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Accept", "text/event-stream")
+			setDeviceIDHeader(req, deviceID)
 			if token != "" {
 				req.Header.Set("Authorization", token)
 			}
@@ -24175,7 +24202,7 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 				WHERE id = ?`, resultContent, resultContent, resultContent, resultContent, dID)
 			logCronDetailStatusByID(cronDB, dID, "complete")
 			sendSSECompletionNotification(chatTypeScheduledTask, taskType, "", abnormalStream)
-		}(t.AgentID, chatID, body, detailID, token, t.TaskType)
+		}(t.AgentID, chatID, body, detailID, token, t.TaskType, deviceID)
 	}
 }
 

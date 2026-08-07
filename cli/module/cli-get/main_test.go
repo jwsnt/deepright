@@ -35,6 +35,17 @@ func TestCreateHTTPClientForcesHTTP11AndDoesNotFollowRedirects(t *testing.T) {
 	}
 }
 
+func TestSetDeviceIDHeaderPreservesCamelCase(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	setDeviceIDHeader(req, "device-1")
+	if got := req.Header["DeviceId"]; len(got) != 1 || got[0] != "device-1" {
+		t.Fatalf("DeviceId header = %#v, want [device-1]", got)
+	}
+	if _, exists := req.Header["Deviceid"]; exists {
+		t.Fatalf("unexpected non-camel-case header: %#v", req.Header)
+	}
+}
+
 func resetGlobalStateForTest() {
 	loggerState.mu.Lock()
 	oldLogger := loggerState.logger
@@ -67,6 +78,9 @@ func TestHeartbeatRequestFormat(t *testing.T) {
 		}
 		if r.Header.Get("Content-Type") != "application/json" {
 			t.Errorf("expected Content-Type application/json, got %s", r.Header.Get("Content-Type"))
+		}
+		if r.Header.Get("deviceId") != "test-device" {
+			t.Errorf("deviceId header = %q, want test-device", r.Header.Get("deviceId"))
 		}
 
 		body, _ := io.ReadAll(r.Body)
@@ -480,6 +494,9 @@ func TestExecuteAndPublish(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/cli/pub" {
 			t.Errorf("expected path /cli/pub, got %s", r.URL.Path)
+		}
+		if r.Header.Get("deviceId") != "test-device" {
+			t.Errorf("deviceId header = %q, want test-device", r.Header.Get("deviceId"))
 		}
 		body, _ := io.ReadAll(r.Body)
 		json.Unmarshal(body, &capturedPub)

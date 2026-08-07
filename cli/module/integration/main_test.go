@@ -57,6 +57,17 @@ func gzipBase64String(input string) string {
 	return sharedutil.GzipBase64String(input)
 }
 
+func TestSetDeviceIDHeaderPreservesCamelCase(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	setDeviceIDHeader(req, "device-1")
+	if got := req.Header["DeviceId"]; len(got) != 1 || got[0] != "device-1" {
+		t.Fatalf("DeviceId header = %#v, want [device-1]", got)
+	}
+	if _, exists := req.Header["Deviceid"]; exists {
+		t.Fatalf("unexpected non-camel-case header: %#v", req.Header)
+	}
+}
+
 func pluginParamJSON(keys ...string) string {
 	items := make([]map[string]string, 0, len(keys))
 	for _, key := range keys {
@@ -851,6 +862,9 @@ func TestProxyChatCompletions(t *testing.T) {
 	// Verify headers preserved
 	if capturedHeaders.Get("Authorization") != "Bearer sk-test" {
 		t.Errorf("Authorization not preserved")
+	}
+	if capturedHeaders.Get("deviceId") != "test-dev" {
+		t.Errorf("deviceId header = %q, want test-dev", capturedHeaders.Get("deviceId"))
 	}
 
 	// Verify model/message unified
@@ -11280,11 +11294,14 @@ func TestCliGetHeartbeatAndExecute(t *testing.T) {
 	defer os.Chdir(oldwd)
 
 	var capturedGet map[string]interface{}
+	var capturedGetHeaders http.Header
 	var capturedPub PubRequest
 	var capturedPubRaw map[string]interface{}
+	var capturedPubHeaders http.Header
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/cli/get", func(w http.ResponseWriter, r *http.Request) {
+		capturedGetHeaders = r.Header.Clone()
 		body, _ := io.ReadAll(r.Body)
 		json.Unmarshal(body, &capturedGet)
 		w.Header().Set("Content-Type", "application/json")
@@ -11304,6 +11321,7 @@ func TestCliGetHeartbeatAndExecute(t *testing.T) {
 		})
 	})
 	mux.HandleFunc("/cli/pub", func(w http.ResponseWriter, r *http.Request) {
+		capturedPubHeaders = r.Header.Clone()
 		body, _ := io.ReadAll(r.Body)
 		json.Unmarshal(body, &capturedPub)
 		json.Unmarshal(body, &capturedPubRaw)
@@ -11374,6 +11392,9 @@ func TestCliGetHeartbeatAndExecute(t *testing.T) {
 	if getMeta["deviceId"] != "d" {
 		t.Errorf("get deviceId = %v", getMeta["deviceId"])
 	}
+	if capturedGetHeaders.Get("deviceId") != "d" {
+		t.Errorf("cli/get deviceId header = %q, want d", capturedGetHeaders.Get("deviceId"))
+	}
 	if got, ok := getMeta["port"].(float64); !ok || got != 18766 {
 		t.Errorf("get metadata.port = %#v, want 18766", getMeta["port"])
 	}
@@ -11438,6 +11459,9 @@ func TestCliGetHeartbeatAndExecute(t *testing.T) {
 	}
 	if capturedPub.Metadata.DeviceID != "d" {
 		t.Errorf("pub metadata deviceId = %q, want d", capturedPub.Metadata.DeviceID)
+	}
+	if capturedPubHeaders.Get("deviceId") != "d" {
+		t.Errorf("cli/pub deviceId header = %q, want d", capturedPubHeaders.Get("deviceId"))
 	}
 	if capturedPub.Metadata.Knowledge == nil {
 		t.Fatal("pub metadata knowledge should not be nil")
@@ -23110,8 +23134,10 @@ func TestHandleModelTestUsesTransientConfigurationAndReturnsSuccess(t *testing.T
 	workspace := t.TempDir()
 	var captured map[string]interface{}
 	var authorization string
+	var deviceID string
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authorization = r.Header.Get("Authorization")
+		deviceID = r.Header.Get("deviceId")
 		_ = json.NewDecoder(r.Body).Decode(&captured)
 		w.Header().Set("Content-Type", "text/event-stream")
 		_, _ = io.WriteString(w, "data: {\"choices\":[{\"delta\":{\"content\":\"ok\"}}]}\n\ndata: [DONE]\n\n")
@@ -23127,6 +23153,9 @@ func TestHandleModelTestUsesTransientConfigurationAndReturnsSuccess(t *testing.T
 	}
 	if authorization != "Bearer transient-token" {
 		t.Fatalf("authorization = %q", authorization)
+	}
+	if deviceID != "test-device" {
+		t.Fatalf("deviceId header = %q, want test-device", deviceID)
 	}
 	if !strings.Contains(recorder.Body.String(), `"status":0`) || !strings.Contains(recorder.Body.String(), "配置成功") {
 		t.Fatalf("unexpected SSE result: %s", recorder.Body.String())
@@ -23164,6 +23193,9 @@ func TestHandleModelTestUsesTransientConfigurationAndReturnsSuccess(t *testing.T
 	}
 	if metadata["device"] != "page-device" {
 		t.Fatalf("metadata.device = %v, want %q", metadata["device"], "page-device")
+	}
+	if metadata["deviceId"] != "test-device" {
+		t.Fatalf("metadata.deviceId = %v, want %q", metadata["deviceId"], "test-device")
 	}
 	if metadata["theme"] != "cold" {
 		t.Fatalf("metadata.theme = %v, want %q", metadata["theme"], "cold")

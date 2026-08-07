@@ -39,7 +39,7 @@ public class HttpDistributor extends NettyDistributor {
     @Override
     protected NettyRequest buildRequest(ChannelHandlerContext context, NettyInputProxy input) throws Exception {
         NettyRequest request = input.buildRequest(context, this.tokenMapping);
-        String device = StringUtils.defaultIfEmpty(MapUtils.getString(request.getMetadata(), "deviceId"), MapUtils.getString(request.getMetadata(), "device"));
+        String device = MapUtils.getString(request.getMetadata(), "deviceId");
         WorkflowException.checkCondition(StringUtils.isEmpty(device), "The request device must not be empty");
         request.getUserContext().setDevice(device);
         String[] part = SplitUtils.split(this.workflow(request));
