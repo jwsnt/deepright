@@ -24522,6 +24522,9 @@ function handleOnboardingAction(event) {
     case 'custom-multi-output':
       stopOnboarding(false);
       return;
+    case 'multimodal-provider-tour':
+      stopOnboarding(false);
+      return;
     case 'media-output-tour-launch':
       {
         const entry = getMediaConfigTourEntry();
@@ -33042,13 +33045,13 @@ async function insertQueuedCenterRequest(event, chatId, agentId, itemId) {
       try { await postQueuedCenterMessageInsertDelete(resolvedChatId, [tid]); } catch {}
       return false;
     }
-    const state = getQueuedCenterInsertState(item);
-    if (!state) return true;
-    state.phase = 'tracking';
-    state.status = 0;
-    state.error = false;
-    state.httpErrorCount = 0;
-    state.serverBound = true;
+    const insertState = getQueuedCenterInsertState(item);
+    if (!insertState) return true;
+    insertState.phase = 'tracking';
+    insertState.status = 0;
+    insertState.error = false;
+    insertState.httpErrorCount = 0;
+    insertState.serverBound = true;
     syncQueuedCenterInputUI(resolvedChatId, resolvedAgentId);
     return true;
   } catch (err) {
@@ -33060,25 +33063,25 @@ async function insertQueuedCenterRequest(event, chatId, agentId, itemId) {
 }
 
 async function syncQueuedCenterInsertedMessage(chatId, agentId, item) {
-  const state = getQueuedCenterInsertState(item);
-  if (!state || !state.tid || state.removing) return true;
+  const insertState = getQueuedCenterInsertState(item);
+  if (!insertState || !insertState.tid || insertState.removing) return true;
   try {
-    await postQueuedCenterMessageInsertAdd(state.agentId || agentId, chatId, state.tid, String(item && item.text || ''));
+    await postQueuedCenterMessageInsertAdd(insertState.agentId || agentId, chatId, insertState.tid, String(item && item.text || ''));
     if (isChatDeleted(chatId) || !state.chats[chatId]) {
-      try { await postQueuedCenterMessageInsertDelete(chatId, [state.tid]); } catch {}
+      try { await postQueuedCenterMessageInsertDelete(chatId, [insertState.tid]); } catch {}
       return false;
     }
-    state.phase = 'tracking';
-    state.status = 0;
-    state.error = false;
-    state.httpErrorCount = 0;
-    state.serverBound = true;
+    insertState.phase = 'tracking';
+    insertState.status = 0;
+    insertState.error = false;
+    insertState.httpErrorCount = 0;
+    insertState.serverBound = true;
     syncQueuedCenterInputUI(chatId, agentId);
     return true;
   } catch (err) {
-    state.phase = 'tracking';
-    state.httpErrorCount = Math.max(3, Number(state.httpErrorCount || 0) + 1);
-    state.error = true;
+    insertState.phase = 'tracking';
+    insertState.httpErrorCount = Math.max(3, Number(insertState.httpErrorCount || 0) + 1);
+    insertState.error = true;
     syncQueuedCenterInputUI(chatId, agentId);
     vfsShowUploadToast(normalizeMessageInsertErrorMessage(err, '插入待处理消息同步失败'), true);
     return false;
@@ -34251,6 +34254,18 @@ function normalizeLoadedChat(chat) {
   let changed = false;
   chat.rightSidebarUrlPreview = normalizeChatUrlPreviewState(chat.rightSidebarUrlPreview);
   chat.messages.forEach(msg => {
+    if (msg && msg.role === 'user') {
+      const restoreRecordId = normalizeRestoreUserRecordId(msg.restoreRecordId);
+      if (restoreRecordId) {
+        if (msg.restoreRecordId !== restoreRecordId) {
+          msg.restoreRecordId = restoreRecordId;
+          changed = true;
+        }
+      } else if (Object.prototype.hasOwnProperty.call(msg, 'restoreRecordId')) {
+        delete msg.restoreRecordId;
+        changed = true;
+      }
+    }
     if (msg && msg.role === 'user' && msg.messageInsertSynthetic && String(msg.insertTid || '').trim()) {
       if (String(msg.requestSource || '').trim() !== 'message_insert') msg.requestSource = 'message_insert';
       delete msg.messageInsertSynthetic;
@@ -42251,7 +42266,7 @@ async function sendCenterMessage(rawText, options) {
           return closeTargetEntry;
         }
       }
-      return getCenterStreamingAssistantEntry(createIfMissing) || lastAssistantEntry;
+      return getCenterStreamingAssistantEntry(createIfMissing) || findLatestStreamingCenterEntry();
     }
     if (isResponseClosePacket(payload)) {
       const closeTargetEntry = findLatestStreamingCenterEntry();
@@ -42638,9 +42653,11 @@ async function sendCenterMessage(rawText, options) {
           const taskBadgePacket = extractResponseTaskBadgePacket(parsed);
           const hasResetKey = hasResponseResetKey(parsed);
           const controlOnlyPacket = !!(inlineHintPacket.active || taskBadgePacket.active);
-          const pendingUiEntry = controlOnlyPacket
-            ? (findLatestStreamingCenterEntry() || getCenterStreamingAssistantEntry(true))
-            : null;
+          // Progress/control packets (including rag_insert acknowledgements)
+          // belong in the footer indicator. They must not manufacture an empty
+          // center assistant bubble when this SSE round has emitted only CLI
+          // task traffic so far.
+          const pendingUiEntry = controlOnlyPacket ? findLatestStreamingCenterEntry() : null;
           const hasLogicalPacketId = !!packetLogicalId;
           const shouldTrackLiveExplosionSnapshot = !!(
             hasDeltaContent &&
@@ -42652,7 +42669,9 @@ async function sendCenterMessage(rawText, options) {
           const shouldCreateStreamEntry = isCliSub
             ? (hasLogicalPacketId || hasDeltaContent)
             : (!isClosePacket && !controlOnlyPacket && (hasLogicalPacketId || hasDeltaContent));
-          const streamEntry = resolveStreamingAssistantEntry(parsed, shouldCreateStreamEntry);
+          const streamEntry = controlOnlyPacket
+            ? pendingUiEntry
+            : resolveStreamingAssistantEntry(parsed, shouldCreateStreamEntry);
           const assistantMsg = streamEntry && streamEntry.assistantMsg;
           if (assistantMsg) syncAssistantAgentIdFromPacket(assistantMsg, parsed);
           if (hasResetKey && assistantMsg && !isCliSub && !isClosePacket) {
@@ -42715,7 +42734,7 @@ async function sendCenterMessage(rawText, options) {
             chatStreaming[chatId].sawTarget = true;
           }
           if (controlOnlyPacket) {
-            const targetEntry = pendingUiEntry || streamEntry;
+            const targetEntry = pendingUiEntry;
             if (targetEntry) {
               ensureAssistantPendingMeta(targetEntry);
               if (isActiveChat() && shouldRenderAssistantCenterMessage(targetEntry.assistantMsg)) {
@@ -44795,27 +44814,10 @@ function removeChatMessage(chat, targetMsg) {
   return true;
 }
 
-function isSameRestoreUserMessage(msg, text, ts) {
+function isSameRestoreUserMessage(msg, text) {
   if (!msg || msg.role !== 'user') return false;
-  if (normalizeRestoreMessageText(msg.content) !== normalizeRestoreMessageText(text)) return false;
-  if (isMaterializedInsertedUserMessage(msg)) return true;
-  const msgTs = toChatTimestamp(msg.createdAt);
-  const recTs = toChatTimestamp(ts);
-  if (!msgTs || !recTs) return true;
-  return msgTs === recTs;
-}
-
-function isSameRestoreUserContent(msg, text) {
-  if (!msg || msg.role !== 'user') return false;
+  if (isMaterializedInsertedUserMessage(msg)) return false;
   return normalizeRestoreMessageText(msg.content) === normalizeRestoreMessageText(text);
-}
-
-function getLatestUserIndex(chat) {
-  if (!chat || !Array.isArray(chat.messages)) return -1;
-  for (let i = chat.messages.length - 1; i >= 0; i--) {
-    if (chat.messages[i] && chat.messages[i].role === 'user') return i;
-  }
-  return -1;
 }
 
 function findMatchingUserIndex(chat, text) {
@@ -44826,6 +44828,81 @@ function findMatchingUserIndex(chat, text) {
     if (msg && msg.role === 'user' && normalizeRestoreMessageText(msg.content) === normalized) return i;
   }
   return -1;
+}
+
+function normalizeRestoreUserRecordId(value) {
+  const id = String(value == null ? '' : value).trim();
+  return id && /^\d+$/.test(id) && Number(id) > 0 ? id : '';
+}
+
+function findRestoreUserIndexByRecordId(chat, recordId, text) {
+  const normalizedRecordId = normalizeRestoreUserRecordId(recordId);
+  if (!chat || !Array.isArray(chat.messages) || !normalizedRecordId) return -1;
+  for (let i = chat.messages.length - 1; i >= 0; i--) {
+    const msg = chat.messages[i];
+    if (!msg || msg.role !== 'user') continue;
+    if (normalizeRestoreUserRecordId(msg.restoreRecordId) !== normalizedRecordId) continue;
+    return isSameRestoreUserMessage(msg, text) ? i : -1;
+  }
+  return -1;
+}
+
+function findLocalRestoreUserCandidate(chat, text, preferredIndex, recordId) {
+  if (!chat || !Array.isArray(chat.messages)) return -1;
+  const normalizedRecordId = normalizeRestoreUserRecordId(recordId);
+  const candidates = [preferredIndex, getLatestRealUserIndex(chat)];
+  for (const index of candidates) {
+    if (!Number.isInteger(index) || index < 0 || index >= chat.messages.length) continue;
+    const msg = chat.messages[index];
+    const boundRecordId = normalizeRestoreUserRecordId(msg && msg.restoreRecordId);
+    if (boundRecordId && boundRecordId !== normalizedRecordId) continue;
+    if (isSameRestoreUserMessage(msg, text)) return index;
+  }
+  return -1;
+}
+
+// Before restore records were bound to their server row ID, a local Q followed
+// only by transparent message_insert entries could be shown again as a second
+// Q. A second real send cannot be made while the first is still unanswered,
+// so this shape is safe to fold back into one request boundary.
+function collapseDuplicateUnansweredRestoreUsers(chat) {
+  if (!chat || !Array.isArray(chat.messages)) return 0;
+  let changed = 0;
+  for (let i = 1; i < chat.messages.length; i++) {
+    const duplicate = chat.messages[i];
+    if (!duplicate || duplicate.role !== 'user' || isTransparentInsertedRequestBoundaryMessage(duplicate)) continue;
+    let originalIndex = -1;
+    let hasAssistantBetween = false;
+    for (let j = i - 1; j >= 0; j--) {
+      const previous = chat.messages[j];
+      if (!previous) continue;
+      if (previous.role === 'assistant') {
+        hasAssistantBetween = true;
+        break;
+      }
+      if (previous.role !== 'user') continue;
+      if (isTransparentInsertedRequestBoundaryMessage(previous)) continue;
+      originalIndex = j;
+      break;
+    }
+    if (hasAssistantBetween || originalIndex < 0) continue;
+    const original = chat.messages[originalIndex];
+    if (!isSameRestoreUserMessage(original, duplicate.content)) continue;
+    const originalRecordId = normalizeRestoreUserRecordId(original.restoreRecordId);
+    const duplicateRecordId = normalizeRestoreUserRecordId(duplicate.restoreRecordId);
+    if (originalRecordId && duplicateRecordId && originalRecordId !== duplicateRecordId) continue;
+    if (!originalRecordId && duplicateRecordId) original.restoreRecordId = duplicateRecordId;
+    // Keep the server-side Q timestamp when the second bubble is the restored
+    // copy, so lastRequestAt continues to point at the surviving user message.
+    if (toChatTimestamp(duplicate.createdAt)) original.createdAt = duplicate.createdAt;
+    if (toChatTimestamp(chat.lastRequestAt) === toChatTimestamp(duplicate.createdAt)) {
+      chat.lastRequestAt = original.createdAt;
+    }
+    chat.messages.splice(i, 1);
+    i--;
+    changed++;
+  }
+  return changed;
 }
 
 function parseRestoreCliRecordJson(content) {
@@ -44979,11 +45056,14 @@ function findLatestPendingRestoreCliHistoryEntry(chat) {
 }
 
 function appendRestoredRecords(chatId, chat, records) {
-  if (!chat || !Array.isArray(records) || records.length === 0) return 0;
+  if (!chat || !Array.isArray(records)) return 0;
   const restoreAgentId = getChatAgentId(chatId);
-  let added = 0;
+  let added = collapseDuplicateUnansweredRestoreUsers(chat);
+  if (records.length === 0) return added;
   let activeUserIndex = getPendingRequestStartIndex(chat);
-  if (activeUserIndex < 0) activeUserIndex = getLatestUserIndex(chat);
+  if (activeUserIndex < 0 || isTransparentInsertedRequestBoundaryMessage(chat.messages[activeUserIndex])) {
+    activeUserIndex = getLatestRealUserIndex(chat);
+  }
   let activeAssistant = findAssistantForRequest(chat, activeUserIndex);
   records.forEach(rec => {
     if (!rec || !rec.role) return;
@@ -45033,25 +45113,28 @@ function appendRestoredRecords(chatId, chat, records) {
     if (rec.role === 'Q') {
       const text = parseRestoreUserRecord(rec.content);
       if (!text) return;
-      let userIndex = activeUserIndex;
+      const restoreRecordId = normalizeRestoreUserRecordId(rec.id);
+      let userIndex = findRestoreUserIndexByRecordId(chat, restoreRecordId, text);
       const pending = getPendingRequestState(chat);
-      // Only an in-flight request may reuse its already-rendered user message.
-      // A completed memo can legitimately run again with identical content;
-      // that must start a new Q/A round instead of replacing the prior result.
-      const reusePendingUser = chat.pendingRequest && pending.start >= 0 && isSameRestoreUserContent(pending.user, text);
-      if (reusePendingUser) {
-        userIndex = pending.start;
-      } else if (chat.pendingRequest) {
-        const matchedIndex = findMatchingUserIndex(chat, text);
-        if (matchedIndex >= 0) userIndex = matchedIndex;
+      if (userIndex < 0) {
+        const preferredUserIndex = pending.start >= 0 && !isTransparentInsertedRequestBoundaryMessage(pending.user)
+          ? pending.start
+          : activeUserIndex;
+        // A live send renders its Q locally before the server persists it.
+        // Match that one real request boundary by content; inserted messages
+        // are transparent and must never replace the original Q candidate.
+        userIndex = findLocalRestoreUserCandidate(chat, text, preferredUserIndex, restoreRecordId);
       }
-      if (userIndex < 0 || (!reusePendingUser && !isSameRestoreUserMessage(chat.messages[userIndex], text, ts))) {
-        chat.messages.push({ role: 'user', content: text, createdAt: ts });
+      if (userIndex < 0) {
+        const userMessage = { role: 'user', content: text, createdAt: ts };
+        if (restoreRecordId) userMessage.restoreRecordId = restoreRecordId;
+        chat.messages.push(userMessage);
         if (chat.messages.length > MAX_STORE) chat.messages = chat.messages.slice(-MAX_STORE);
         userIndex = chat.messages.length - 1;
         added++;
       } else if (chat.messages[userIndex]) {
         chat.messages[userIndex].createdAt = ts;
+        if (restoreRecordId) chat.messages[userIndex].restoreRecordId = restoreRecordId;
       }
       chat.lastRequestAt = ts;
       activeUserIndex = userIndex;
@@ -45111,7 +45194,7 @@ function appendRestoredRecords(chatId, chat, records) {
         activeAssistant = null;
         return;
       }
-      if (activeUserIndex < 0) activeUserIndex = getLatestUserIndex(chat);
+      if (activeUserIndex < 0) activeUserIndex = getLatestRealUserIndex(chat);
       if (activeUserIndex < 0) return;
       // Restore replays should keep control-only __PROCESS__/__WARN__/__TASK__
       // packets out of center正文, but they still need to refresh the
@@ -45239,7 +45322,7 @@ function appendRestoredRecords(chatId, chat, records) {
         chat.messages.push(activeAssistant);
         if (chat.messages.length > MAX_STORE) chat.messages = chat.messages.slice(-MAX_STORE);
         activeUserIndex = getPendingRequestStartIndex(chat);
-        if (activeUserIndex < 0) activeUserIndex = getLatestUserIndex(chat);
+        if (activeUserIndex < 0) activeUserIndex = getLatestRealUserIndex(chat);
         added++;
         pushedActiveAssistant = true;
       }
@@ -45310,6 +45393,7 @@ function appendRestoredRecords(chatId, chat, records) {
       activeAssistant = null;
     }
   });
+  added += collapseDuplicateUnansweredRestoreUsers(chat);
   mergeTimingOnlyAssistantMessages(chat.messages);
   collapseMultiAssistantRequests(chat.messages);
   if (chat.messages.length > MAX_STORE) chat.messages = chat.messages.slice(-MAX_STORE);
