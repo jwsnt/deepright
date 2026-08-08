@@ -1,16 +1,12 @@
 package ai.deepright.workflow;
 
 import ai.deepright.auth.AuthService;
-import ai.deepright.cli.CliPubData;
 import ai.deepright.cli.CliSubFetcher;
-import ai.deepright.cli.CliSubOps;
-import ai.deepright.feature.FeatureFlag;
 import ai.deepright.feature.FeatureUtils;
 import ai.deepright.llm.notifier.MultiSourceNotifier;
 import ai.deepright.llm.provider.RequestModelSelect;
+import ai.deepright.llm.provider.RequestModelProxy;
 import ai.deepright.router.RouterDevice;
-import ai.open.right.WorkflowException;
-import ai.open.right.utils.JsonUtils;
 import ai.open.right.utils.SplitUtils;
 import ai.open.right.workflow.flow.Workflow;
 import ai.open.right.workflow.flow.WorkflowTask;
@@ -27,10 +23,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import java.nio.file.Paths;
-import java.util.List;
-import java.util.Map;
 
 @Slf4j
 @Setter
@@ -53,37 +45,15 @@ public class ReConfigWorkflow extends WorkflowImpl {
         return workTask;
     }
 
-    // 代理模型
+    // 代理模型（@See TaskFunction）
     protected void proxyMulti(WorkflowTask workTask) throws Exception {
         if (RequestModelSelect.isProxyAvailable(workTask)) {
-            String proxy = this.buildProxy(workTask);
-            String app = FeatureUtils.buildApp(workTask);
-            String path = FeatureUtils.escapePath(FeatureFlag.isWindows(workTask), app + " token --provider " + proxy);
-            CliPubData pubData = this.cliSubFetcher.command(workTask, CliSubOps.builder()
-                    .app(List.of(Paths.get(app).getFileName().toString()))
-                    .r(List.of(path))
-                    .exempted(true)
-                    .build(), path, "");
-            WorkflowException.checkCondition(!(pubData.isOk()), pubData.getCmd());
-            Map<String, String> provider = MapUtils.getMap(JsonUtils.read(pubData.getCmd(), Map.class), proxy);
-            String multiOutput = MapUtils.getString(provider, RequestModelSelect.KEY_MODEL_MULTI_OUTPUT);
-            String multiInput = MapUtils.getString(provider, RequestModelSelect.KEY_MODEL_MULTI_INPUT);
-            String token = MapUtils.getString(provider, "token");
-            String url = MapUtils.getString(provider, "__url");
-            WorkflowException.checkCondition(StringUtils.isEmpty(token), "The proxy provider token can not be empty: " + proxy);
-            workTask.putMetadata(RequestModelSelect.KEY_MODEL_MULTI_OUTPUT, !StringUtils.isEmpty(multiOutput) ? multiOutput : null);
-            workTask.putMetadata(RequestModelSelect.KEY_MODEL_MULTI_INPUT, !StringUtils.isEmpty(multiInput) ? multiInput : null);
-            workTask.putMetadata(ProviderRequestService.KEY_INTERNAL + ProviderRequestService.KEY_TOKEN, token);
-            workTask.putMetadata(RequestModelSelect.KEY_MODEL_URL, !StringUtils.isEmpty(url) ? url : null);
-            workTask.putMetadata(ProviderRequestService.KEY_PROVIDER, proxy);
+            RequestModelProxy.configProxy(this.cliSubFetcher, RequestModelProxy.RequestProxyConfig.builder()
+                    .provider(RequestModelProxy.buildProxy(workTask))
+                    .metadata(workTask.getMetadata())
+                    .workTask(workTask)
+                    .build());
         }
-    }
-
-    protected String buildProxy(WorkflowTask workTask) throws Exception {
-        String proxy = null;
-        proxy = RequestModelSelect.multiOutput(workTask) ? RequestModelSelect.proxyMultiOutput(workTask) : proxy;
-        proxy = RequestModelSelect.multiInput(workTask) ? RequestModelSelect.proxyMultiInput(workTask) : proxy;
-        return proxy;
     }
 
     @Override

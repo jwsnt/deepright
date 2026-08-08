@@ -41,28 +41,46 @@ public class RequestModelSelect {
         RequestModelSelect.INPUT.add("media@ocr_gen");
     }
 
+    public static Boolean isProxyMultiOutput(Map<String, Object> metadata) throws Exception {
+        return StringUtils.startsWith(MapUtils.getString(metadata, RequestModelSelect.KEY_MODEL_MULTI_OUTPUT), RequestModelSelect.KEY_PROXY);
+    }
+
     public static Boolean isProxyMultiOutput(WorkflowTask workTask) throws Exception {
-        return !StringUtils.isEmpty(RequestModelSelect.proxyMultiOutput(workTask));
+        return RequestModelSelect.isProxyMultiOutput(workTask.getMetadata());
+    }
+
+    public static Boolean isProxyMultiInput(Map<String, Object> metadata) throws Exception {
+        return StringUtils.startsWith(MapUtils.getString(metadata, RequestModelSelect.KEY_MODEL_MULTI_INPUT), RequestModelSelect.KEY_PROXY);
     }
 
     public static Boolean isProxyMultiInput(WorkflowTask workTask) throws Exception {
-        return !StringUtils.isEmpty(RequestModelSelect.proxyMultiInput(workTask));
+        return RequestModelSelect.isProxyMultiInput(workTask.getMetadata());
     }
 
     public static Boolean isProxyAvailable(WorkflowTask workTask) throws Exception {
         return (RequestModelSelect.multiOutput(workTask) && RequestModelSelect.isProxyMultiOutput(workTask)) || (RequestModelSelect.multiInput(workTask) && RequestModelSelect.isProxyMultiInput(workTask));
     }
 
+    public static String proxyMultiOutput(Map<String, Object> metadata) throws Exception {
+        String provider = MapUtils.getString(metadata, RequestModelSelect.KEY_MODEL_MULTI_OUTPUT);
+        // 代理模型，不为空值时就必须@开头
+        WorkflowException.checkCondition(!StringUtils.isEmpty(provider) && !StringUtils.startsWith(provider, RequestModelSelect.KEY_PROXY), "The proxy multi output model is invalid");
+        return StringUtils.substring(provider, RequestModelSelect.KEY_PROXY.length());
+    }
+
     public static String proxyMultiOutput(WorkflowTask workTask) throws Exception {
-        String provider = MapUtils.getString(workTask.getMetadata(), RequestModelSelect.KEY_MODEL_MULTI_OUTPUT);
-        WorkflowException.checkCondition(!StringUtils.startsWith(provider, RequestModelSelect.KEY_PROXY), "The proxy multi output model is invalid");
+        return RequestModelSelect.proxyMultiOutput(workTask.getMetadata());
+    }
+
+    public static String proxyMultiInput(Map<String, Object> metadata) throws Exception {
+        String provider = MapUtils.getString(metadata, RequestModelSelect.KEY_MODEL_MULTI_INPUT);
+        // 代理模型，不为空值时就必须@开头
+        WorkflowException.checkCondition(!StringUtils.isEmpty(provider) && !StringUtils.startsWith(provider, RequestModelSelect.KEY_PROXY), "The proxy multi input model is invalid");
         return StringUtils.substring(provider, RequestModelSelect.KEY_PROXY.length());
     }
 
     public static String proxyMultiInput(WorkflowTask workTask) throws Exception {
-        String provider = MapUtils.getString(workTask.getMetadata(), RequestModelSelect.KEY_MODEL_MULTI_INPUT);
-        WorkflowException.checkCondition(!StringUtils.startsWith(provider, RequestModelSelect.KEY_PROXY), "The proxy multi input model is invalid");
-        return StringUtils.substring(provider, RequestModelSelect.KEY_PROXY.length());
+        return RequestModelSelect.proxyMultiInput(workTask.getMetadata());
     }
 
     public static Map<String, Object> transfer(WorkflowTask workTask, Map<String, Object> metadata) throws Exception {
@@ -119,8 +137,16 @@ public class RequestModelSelect {
         return model.getBase(workTask);
     }
 
+    public static Boolean multiOutput(String workflow) throws Exception {
+        return RequestModelSelect.OUTPUT.contains(workflow);
+    }
+
     public static Boolean multiOutput(WorkflowTask workTask) throws Exception {
         return RequestModelSelect.OUTPUT.contains(SplitUtils.join(workTask));
+    }
+
+    public static Boolean multiInput(String workflow) throws Exception {
+        return RequestModelSelect.INPUT.contains(workflow);
     }
 
     public static Boolean multiInput(WorkflowTask workTask) throws Exception {

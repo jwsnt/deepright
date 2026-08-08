@@ -84,6 +84,10 @@ public class FeatureFlag {
         return !StringUtils.isEmpty(FeatureUtils.buildSandBoxPath(workTask));
     }
 
+    public static Boolean isWindows(Map<String, Object> metadata) throws Exception {
+        return FeatureFlag.isWindows(StringUtils.trim(MapUtils.getString(metadata, FeatureField.KEY_SYS)));
+    }
+
     // 与cli.go/get请求一致，{"sys": runtime.GOOS}，据此判断是否为Windows
     public static Boolean isWindows(WorkflowTask workTask) throws Exception {
         return FeatureFlag.isWindows(StringUtils.trim(MapUtils.getString(workTask.getMetadata(), FeatureField.KEY_SYS)));

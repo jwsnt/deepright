@@ -355,6 +355,12 @@ a{color:var(--accent);text-decoration:none}
 @keyframes installBulbRing{0%,100%{opacity:.22;transform:scale(.9)}50%{opacity:.82;transform:scale(1.18)}}
 [data-theme="dark"] .install-app-indicator{color:#ffd54a;background:radial-gradient(circle at 35% 35%,rgba(255,250,219,.98),rgba(255,213,74,.4) 44%,rgba(255,179,0,.16) 70%,transparent 84%)}
 [data-theme="dark"] .install-app-indicator svg{filter:drop-shadow(0 0 7px rgba(255,213,74,.78)) drop-shadow(0 0 16px rgba(255,179,0,.4))}
+.session-recovery-trigger{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;margin-left:auto;border:1px solid rgba(184,108,43,.22);padding:0;border-radius:999px;position:relative;flex-shrink:0;color:#a8672d;background:linear-gradient(180deg,rgba(255,250,242,.98),rgba(250,226,197,.94));box-shadow:inset 0 1px 0 rgba(255,255,255,.82),0 5px 12px rgba(153,88,35,.15);appearance:none;-webkit-appearance:none;cursor:pointer;transition:transform .18s ease,color .18s ease,border-color .18s ease,box-shadow .18s ease,filter .18s ease}
+.session-recovery-trigger:hover,.session-recovery-trigger:focus-visible{transform:translateY(-1px);color:#8e4b1e;border-color:rgba(176,95,29,.44);filter:brightness(1.03);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 7px 16px rgba(153,88,35,.21),0 0 0 2px rgba(220,165,100,.16);outline:none}
+.session-recovery-trigger:disabled{cursor:wait;opacity:.58;transform:none;filter:none}
+.session-recovery-trigger svg{width:13px;height:13px;display:block}
+[data-theme="dark"] .session-recovery-trigger{color:#9ee9ff;border-color:rgba(125,220,255,.32);background:linear-gradient(180deg,rgba(19,67,93,.96),rgba(10,36,59,.94));box-shadow:inset 0 1px 0 rgba(231,253,255,.1),0 7px 16px rgba(0,0,0,.27),0 0 12px rgba(38,198,255,.08)}
+[data-theme="dark"] .session-recovery-trigger:hover,[data-theme="dark"] .session-recovery-trigger:focus-visible{color:#e4fbff;border-color:rgba(145,239,255,.56);box-shadow:inset 0 1px 0 rgba(231,253,255,.15),0 9px 18px rgba(0,0,0,.3),0 0 0 2px rgba(104,220,255,.13),0 0 16px rgba(31,201,255,.16)}
 .chat-list{flex:1;overflow-y:auto;padding:0 8px}
 .chat-item{position:relative;padding:10px 20px 10px 14px;margin:2px 0;border-radius:var(--radius-xs);cursor:pointer;font-size:13px;color:var(--text-secondary);overflow:hidden;transition:var(--transition)}
 .chat-item:hover{background:var(--bg-card)}
@@ -1157,6 +1163,13 @@ animation:queuedInsertExplosion .62s ease-out both}
 .message.assistant .message-meta.shortcut-replies-open{opacity:0;visibility:hidden;transform:translateY(-2px);pointer-events:none;transition:opacity .16s ease,transform .16s ease,visibility 0s linear .16s}
 .message.assistant .message-meta .message-meta-agent{font-weight:700;text-decoration:underline;text-underline-offset:2px;cursor:pointer;transition:color .16s ease}
 .message.assistant .message-meta .message-meta-agent:hover{color:var(--accent)}
+.message.assistant .message-meta-sse-target{display:inline-block;position:relative;isolation:isolate;overflow:visible}
+.message.assistant .message-meta-sse-target.message-meta-sse-updated{animation:agentChangeTextGlow 3s ease-in-out both}
+.message.assistant .message-meta-sse-target.message-meta-sse-updated::before,.message.assistant .message-meta-sse-target.message-meta-sse-updated::after{content:'';position:absolute;pointer-events:none;z-index:-1}
+.message.assistant .message-meta-sse-target.message-meta-sse-updated::before{inset:-8px -13px;padding:2px;border-radius:999px;background:conic-gradient(from 0deg,transparent 0 7%,var(--message-meta-sparkle-core) 12%,transparent 18%,transparent 32%,var(--message-meta-sparkle-soft) 38%,transparent 44%,transparent 58%,var(--message-meta-sparkle-core) 64%,transparent 70%,transparent 84%,var(--message-meta-sparkle-soft) 90%,transparent 96%);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;filter:drop-shadow(0 0 4px var(--message-meta-sparkle-glow)) drop-shadow(0 0 10px var(--message-meta-sparkle-glow));animation:agentChangeSparkleRing 3s linear both}
+.message.assistant .message-meta-sse-target.message-meta-sse-updated::after{inset:-14px -22px;border-radius:999px;background:radial-gradient(circle at 7% 49%,#fff 0 1px,transparent 2.8px),radial-gradient(circle at 21% 9%,var(--message-meta-sparkle-core) 0 1.6px,transparent 3.6px),radial-gradient(circle at 50% 0%,#fff 0 1.2px,transparent 3px),radial-gradient(circle at 79% 10%,var(--message-meta-sparkle-soft) 0 1.4px,transparent 3.4px),radial-gradient(circle at 94% 48%,#fff 0 1px,transparent 2.8px),radial-gradient(circle at 75% 91%,var(--message-meta-sparkle-core) 0 1.6px,transparent 3.6px),radial-gradient(circle at 50% 100%,#fff 0 1.2px,transparent 3px),radial-gradient(circle at 22% 90%,var(--message-meta-sparkle-soft) 0 1.4px,transparent 3.4px);filter:drop-shadow(0 0 5px var(--message-meta-sparkle-glow));animation:agentChangeSparkleParticles 3s linear both}
+[data-theme="light"] .message.assistant .message-meta{--message-meta-sparkle-core:#ff9700;--message-meta-sparkle-soft:#ffbf54;--message-meta-sparkle-glow:rgba(255,119,0,.7)}
+[data-theme="dark"] .message.assistant .message-meta{--message-meta-sparkle-core:#3edfff;--message-meta-sparkle-soft:#99f3ff;--message-meta-sparkle-glow:rgba(34,205,255,.72)}
 .message.user .message-meta{color:rgba(255,255,255,.82)}
 .message.assistant.has-explosion-beacon{overflow:visible}
 .message.assistant.has-explosion-beacon .md-content{padding-left:0;min-height:20px}
@@ -2189,7 +2202,7 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 @keyframes agentChangeTextGlow{0%,100%{color:inherit;text-shadow:none}10%,26%,44%,62%,80%{color:var(--agent-change-sparkle-core);text-shadow:0 0 7px var(--agent-change-sparkle-glow),0 0 14px var(--agent-change-sparkle-glow)}}
 @keyframes agentChangeSparkleRing{0%{opacity:0;transform:rotate(-18deg) scale(.78)}7%{opacity:1}84%{opacity:.94}100%{opacity:0;transform:rotate(702deg) scale(1.15)}}
 @keyframes agentChangeSparkleParticles{0%{opacity:0;transform:rotate(0deg) scale(.62)}8%{opacity:1}88%{opacity:.9}100%{opacity:0;transform:rotate(-540deg) scale(1.18)}}
-@media (prefers-reduced-motion:reduce){.model-indicator-agent-text.agent-change-sparkle,.model-indicator-agent-text.agent-change-sparkle::before,.model-indicator-agent-text.agent-change-sparkle::after{animation:none}.model-indicator-agent-text.agent-change-sparkle::before,.model-indicator-agent-text.agent-change-sparkle::after{opacity:.72}}
+@media (prefers-reduced-motion:reduce){.model-indicator-agent-text.agent-change-sparkle,.model-indicator-agent-text.agent-change-sparkle::before,.model-indicator-agent-text.agent-change-sparkle::after,.message.assistant .message-meta-sse-target.message-meta-sse-updated,.message.assistant .message-meta-sse-target.message-meta-sse-updated::before,.message.assistant .message-meta-sse-target.message-meta-sse-updated::after{animation:none}.model-indicator-agent-text.agent-change-sparkle::before,.model-indicator-agent-text.agent-change-sparkle::after,.message.assistant .message-meta-sse-target.message-meta-sse-updated::before,.message.assistant .message-meta-sse-target.message-meta-sse-updated::after{opacity:.72}}
 .model-indicator-btn{border:none;background:none;cursor:pointer;padding:0;display:flex;align-items:center;animation:sunFlash .8s ease-in-out infinite}
 .model-indicator-btn svg{width:16px;height:16px}
 .model-indicator-btn:hover{opacity:1}
@@ -3287,6 +3300,55 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 [data-theme="dark"] .new-chat-id-panel::before{background:linear-gradient(180deg,rgba(255,255,255,.11),rgba(255,255,255,.03) 42%,rgba(255,255,255,0) 72%)}
 [data-theme="dark"] .new-chat-id-kicker{color:#a8c1ff}
 [data-theme="dark"] .new-chat-id-input{background:rgba(255,255,255,.08);border-color:rgba(169,190,227,.18);color:#ecf3ff;box-shadow:none}
+.session-recovery-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;background:rgba(87,53,31,.16);backdrop-filter:blur(9px) saturate(112%);-webkit-backdrop-filter:blur(9px) saturate(112%);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .22s ease,visibility 0s linear .22s;--overlay-domain-z:200}
+.session-recovery-overlay.show{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .22s ease}
+.session-recovery-panel{width:min(680px,calc(100vw - 48px));max-height:min(620px,calc(100vh - 48px));display:flex;flex-direction:column;overflow:hidden;border:1px solid rgba(181,110,55,.28);border-radius:24px;background:linear-gradient(150deg,rgba(255,254,250,.98),rgba(255,242,227,.96) 52%,rgba(251,228,202,.94));box-shadow:0 28px 72px rgba(92,48,20,.24),inset 0 1px 0 rgba(255,255,255,.88);transform:translateY(10px) scale(.98);transition:transform .22s cubic-bezier(.22,1,.36,1);isolation:isolate}
+.session-recovery-overlay.show .session-recovery-panel{transform:translateY(0) scale(1)}
+.session-recovery-panel::before{content:'';position:absolute;inset:0;z-index:-1;background:radial-gradient(circle at 88% 0%,rgba(255,190,109,.25),transparent 34%),linear-gradient(180deg,rgba(255,255,255,.38),transparent 56%);pointer-events:none}
+.session-recovery-head{display:flex;align-items:flex-start;gap:12px;padding:18px 20px 14px;border-bottom:1px solid rgba(181,110,55,.16)}
+.session-recovery-heading{min-width:0;flex:1}
+.session-recovery-kicker{font-size:10px;line-height:1.2;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#ad6b36}
+.session-recovery-title{margin-top:3px;font-size:18px;line-height:1.25;font-weight:700;color:var(--text-primary)}
+.session-recovery-close{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 28px;border:1px solid rgba(181,110,55,.18);border-radius:999px;background:rgba(255,255,255,.5);color:#9d6539;cursor:pointer;transition:var(--transition)}
+.session-recovery-close:hover,.session-recovery-close:focus-visible{color:#7d421b;border-color:rgba(176,95,29,.42);background:rgba(255,255,255,.74);outline:none}
+.session-recovery-close svg{width:14px;height:14px}
+.session-recovery-list{min-height:118px;overflow:auto;padding:8px 10px 12px}
+.session-recovery-row{display:grid;grid-template-columns:minmax(164px,.8fr) minmax(0,1.8fr);align-items:center;gap:16px;padding:12px 10px;border-radius:15px;color:var(--text-primary);transition:background .16s ease}
+.session-recovery-row:hover{background:rgba(191,117,51,.09)}
+.session-recovery-session{display:flex;align-items:center;gap:7px;min-width:0}
+.session-recovery-id{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:#7b5136}
+.session-recovery-action{width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 22px;padding:0;border:1px solid rgba(178,101,38,.28);border-radius:8px;background:rgba(255,255,255,.63);color:#ad662b;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.84);transition:var(--transition)}
+.session-recovery-action:hover,.session-recovery-action:focus-visible{color:#7f3f17;border-color:rgba(163,82,19,.48);background:#fff8ef;transform:translateY(-1px);outline:none}
+.session-recovery-action:disabled{cursor:wait;opacity:.58;transform:none}
+.session-recovery-action svg{width:12px;height:12px}
+.session-recovery-prompt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:1.35;color:var(--text-primary)}
+.session-recovery-empty{min-height:118px;display:flex;align-items:center;justify-content:center;padding:20px;text-align:center;color:var(--text-muted);font-size:13px;line-height:1.5}
+.session-recovery-error{min-height:118px;display:flex;align-items:center;justify-content:center;padding:20px;text-align:center;color:var(--error);font-size:13px;line-height:1.5}
+.session-recovery-spinner{width:19px;height:19px;border:2px solid rgba(178,101,38,.18);border-top-color:#b26b30;border-radius:50%;animation:sessionRecoverySpin .72s linear infinite}
+.session-recovery-pagination{min-height:42px;display:flex;align-items:center;justify-content:flex-end;gap:9px;padding:8px 16px 10px;border-top:1px solid rgba(181,110,55,.15)}
+.session-recovery-pagination[hidden]{display:none}
+.session-recovery-page-label{min-width:52px;text-align:center;font-size:11px;color:#8c5b38;font-variant-numeric:tabular-nums}
+.session-recovery-page-btn{min-width:54px;height:25px;border:1px solid rgba(181,110,55,.22);border-radius:9px;background:rgba(255,255,255,.55);color:#935b2e;font:inherit;font-size:11px;cursor:pointer;transition:var(--transition)}
+.session-recovery-page-btn:hover:not(:disabled),.session-recovery-page-btn:focus-visible{border-color:rgba(166,85,22,.44);background:rgba(255,255,255,.78);color:#713710;outline:none}
+.session-recovery-page-btn:disabled{cursor:not-allowed;opacity:.45}
+@keyframes sessionRecoverySpin{to{transform:rotate(360deg)}}
+[data-theme="dark"] .session-recovery-overlay{background:rgba(4,12,25,.34);backdrop-filter:blur(11px) saturate(118%);-webkit-backdrop-filter:blur(11px) saturate(118%)}
+[data-theme="dark"] .session-recovery-panel{border-color:rgba(128,203,255,.24);background:linear-gradient(150deg,rgba(13,36,62,.98),rgba(9,27,49,.97) 54%,rgba(8,22,42,.96));box-shadow:0 30px 78px rgba(0,0,0,.48),0 0 40px rgba(41,172,255,.09),inset 0 1px 0 rgba(230,252,255,.1)}
+[data-theme="dark"] .session-recovery-panel::before{background:radial-gradient(circle at 88% 0%,rgba(45,188,255,.17),transparent 35%),linear-gradient(180deg,rgba(229,250,255,.07),transparent 58%)}
+[data-theme="dark"] .session-recovery-head{border-bottom-color:rgba(141,211,255,.14)}
+[data-theme="dark"] .session-recovery-kicker{color:#89dffc}
+[data-theme="dark"] .session-recovery-close{border-color:rgba(132,207,255,.22);background:rgba(179,229,255,.07);color:#9ae5ff}
+[data-theme="dark"] .session-recovery-close:hover,[data-theme="dark"] .session-recovery-close:focus-visible{color:#e7fbff;border-color:rgba(156,233,255,.48);background:rgba(179,229,255,.13)}
+[data-theme="dark"] .session-recovery-row:hover{background:rgba(59,181,255,.09)}
+[data-theme="dark"] .session-recovery-id{color:#a6dff2}
+[data-theme="dark"] .session-recovery-action{border-color:rgba(130,213,255,.28);background:rgba(183,232,255,.07);color:#94e6ff;box-shadow:inset 0 1px 0 rgba(232,253,255,.09)}
+[data-theme="dark"] .session-recovery-action:hover,[data-theme="dark"] .session-recovery-action:focus-visible{color:#e3fbff;border-color:rgba(159,236,255,.52);background:rgba(181,234,255,.14)}
+[data-theme="dark"] .session-recovery-spinner{border-color:rgba(122,210,255,.18);border-top-color:#8eeaff}
+[data-theme="dark"] .session-recovery-pagination{border-top-color:rgba(141,211,255,.14)}
+[data-theme="dark"] .session-recovery-page-label{color:#9ddff7}
+[data-theme="dark"] .session-recovery-page-btn{border-color:rgba(130,213,255,.24);background:rgba(183,232,255,.07);color:#9ce7ff}
+[data-theme="dark"] .session-recovery-page-btn:hover:not(:disabled),[data-theme="dark"] .session-recovery-page-btn:focus-visible{border-color:rgba(159,236,255,.5);background:rgba(181,234,255,.14);color:#e3fbff}
+@media (max-width:620px){.session-recovery-overlay{padding:14px}.session-recovery-panel{width:calc(100vw - 28px);max-height:calc(100vh - 28px);border-radius:20px}.session-recovery-head{padding:15px 16px 12px}.session-recovery-row{grid-template-columns:minmax(120px,.86fr) minmax(0,1.5fr);gap:10px;padding:11px 7px}.session-recovery-id{font-size:10px}.session-recovery-prompt{font-size:12px}}
 .sandbox-card-binding{display:grid;gap:10px;padding:12px 14px;border-radius:16px;background:rgba(255,255,255,.4);border:1px solid color-mix(in srgb,var(--border) 74%,rgba(255,255,255,.32))}
 .sandbox-card-field{display:flex;flex-direction:column;gap:4px;min-width:0}
 .sandbox-card-label{font-size:12px;color:var(--text-secondary)}
@@ -5033,6 +5095,9 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
           <path d="M7 16c1.7-2.1 3.1-3.8 4.2-5.2.5-.7 1.3-.8 1.9-.2L16.2 13c.4.4 1 .4 1.4 0l1.3-1.3"/>
         </svg>
       </button>
+      <button type="button" class="session-recovery-trigger" id="sessionRecoveryTrigger" aria-label="恢复历史会话" title="恢复历史会话" aria-controls="sessionRecoveryOverlay" onclick="openSessionRecoveryOverlay(event)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 8v4l2.7 1.8"/></svg>
+      </button>
       <button type="button" class="install-app-indicator" id="installAppIndicator" aria-hidden="true" aria-label="安装建议" title="" onclick="toggleInstallAppPopover(event)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M9 18h6"/>
@@ -5627,6 +5692,23 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
       <button class="btn btn-primary" type="button" id="newChatIdConfirmBtn" onclick="submitCustomChatId()">新会话</button>
     </div>
   </div>
+</div>
+<div class="session-recovery-overlay" id="sessionRecoveryOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="41" aria-hidden="true" onclick="handleSessionRecoveryOverlayClick(event)">
+  <section class="session-recovery-panel" id="sessionRecoveryPanel" role="dialog" aria-modal="true" aria-labelledby="sessionRecoveryTitle" onclick="event.stopPropagation()">
+    <header class="session-recovery-head">
+      <div class="session-recovery-heading">
+        <div class="session-recovery-kicker">Session Recovery</div>
+        <div class="session-recovery-title" id="sessionRecoveryTitle">恢复历史会话</div>
+      </div>
+      <button type="button" class="session-recovery-close" aria-label="关闭恢复会话" title="关闭" onclick="closeSessionRecoveryOverlay()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+    </header>
+    <div class="session-recovery-list" id="sessionRecoveryList" aria-live="polite"></div>
+    <footer class="session-recovery-pagination" id="sessionRecoveryPagination" hidden>
+      <button type="button" class="session-recovery-page-btn" id="sessionRecoveryPrevBtn" onclick="goToSessionRecoveryPage(-1)">上一页</button>
+      <span class="session-recovery-page-label" id="sessionRecoveryPageLabel">第 1 页</span>
+      <button type="button" class="session-recovery-page-btn" id="sessionRecoveryNextBtn" onclick="goToSessionRecoveryPage(1)">下一页</button>
+    </footer>
+  </section>
 </div>
 <div class="center-notice-overlay" id="modelSelectToast" data-overlay-base data-overlay-domain="center" data-overlay-order="24" data-overlay-passive="1" aria-hidden="true" onclick="if(event.target===this)hideModelSelectToast()">
   <div class="center-notice-card error" id="modelSelectToastCard" onclick="handleModelSelectToastCardClick(event)" onkeydown="handleModelSelectToastCardKeydown(event)" tabindex="-1">
@@ -15774,6 +15856,9 @@ function hideExclusiveOverlayById(id) {
       return true;
     case 'newChatIdOverlay':
       closeCustomChatIdOverlay();
+      return true;
+    case 'sessionRecoveryOverlay':
+      closeSessionRecoveryOverlay();
       return true;
     case 'shutdownConfirmOverlay':
       cancelShutdownConfirm({ restoreFocus: false });
@@ -34264,6 +34349,208 @@ function uuid() {
 }
 
 // ===== Chat Management =====
+const SESSION_RECOVERY_PAGE_SIZE = 10;
+let sessionRecoveryState = {
+  visible: false,
+  loading: false,
+  requestSeq: 0,
+  page: 1,
+  hasMore: false,
+  candidates: [],
+  error: ''
+};
+
+function normalizeSessionRecoveryCandidate(item) {
+  const data = item && typeof item === 'object' ? item : {};
+  return {
+    agentId: String(data.agentId || data.agent_id || '').trim(),
+    chatId: String(data.chatId || data.chat_id || '').trim(),
+    lastPrompt: String(data.lastPrompt || data.last_prompt || '').trim(),
+    completedAt: String(data.completedAt || data.completed_at || '').trim()
+  };
+}
+
+function setSessionRecoveryLoading(loading) {
+  sessionRecoveryState.loading = !!loading;
+  const trigger = document.getElementById('sessionRecoveryTrigger');
+  if (trigger) trigger.disabled = !!loading;
+}
+
+function sessionRecoveryRestoreIconMarkup() {
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.35-5.65"/><path d="M4 4v5h5"/><path d="M12 8v4l2.5 1.7"/></svg>';
+}
+
+function renderSessionRecoveryCandidates() {
+  const list = document.getElementById('sessionRecoveryList');
+  if (!list) return;
+  if (sessionRecoveryState.loading) {
+    list.innerHTML = '<div class="session-recovery-empty"><span class="session-recovery-spinner" aria-label="加载中"></span></div>';
+    renderSessionRecoveryPagination();
+    return;
+  }
+  if (sessionRecoveryState.error) {
+    list.innerHTML = '<div class="session-recovery-error">' + esc(sessionRecoveryState.error) + '</div>';
+    renderSessionRecoveryPagination();
+    return;
+  }
+  const candidates = Array.isArray(sessionRecoveryState.candidates) ? sessionRecoveryState.candidates : [];
+  if (!candidates.length) {
+    list.innerHTML = '<div class="session-recovery-empty">没有可恢复的历史会话</div>';
+    renderSessionRecoveryPagination();
+    return;
+  }
+  list.innerHTML = candidates.map((candidate, index) => {
+    const sessionId = esc(candidate.chatId);
+    const prompt = esc(candidate.lastPrompt);
+    return '<div class="session-recovery-row" title="' + prompt + '">' +
+      '<div class="session-recovery-session"><button type="button" class="session-recovery-action" onclick="restoreSessionRecoveryCandidate(' + index + ')" aria-label="恢复会话 ' + sessionId + '" title="恢复会话">' + sessionRecoveryRestoreIconMarkup() + '</button>' +
+      '<span class="session-recovery-id" title="' + sessionId + '">' + sessionId + '</span></div>' +
+      '<div class="session-recovery-prompt">' + prompt + '</div>' +
+    '</div>';
+  }).join('');
+  renderSessionRecoveryPagination();
+}
+
+function renderSessionRecoveryPagination() {
+  const pagination = document.getElementById('sessionRecoveryPagination');
+  const prevBtn = document.getElementById('sessionRecoveryPrevBtn');
+  const nextBtn = document.getElementById('sessionRecoveryNextBtn');
+  const label = document.getElementById('sessionRecoveryPageLabel');
+  if (!pagination || !prevBtn || !nextBtn || !label) return;
+  const candidates = Array.isArray(sessionRecoveryState.candidates) ? sessionRecoveryState.candidates : [];
+  pagination.hidden = sessionRecoveryState.loading || !!sessionRecoveryState.error || (candidates.length === 0 && sessionRecoveryState.page <= 1);
+  label.textContent = '第 ' + Math.max(Number(sessionRecoveryState.page) || 1, 1) + ' 页';
+  prevBtn.disabled = sessionRecoveryState.loading || sessionRecoveryState.page <= 1;
+  nextBtn.disabled = sessionRecoveryState.loading || !sessionRecoveryState.hasMore;
+}
+
+function handleSessionRecoveryOverlayClick(event) {
+  if (!event || event.target !== event.currentTarget || sessionRecoveryState.loading) return;
+  closeSessionRecoveryOverlay();
+}
+
+function closeSessionRecoveryOverlay() {
+  const overlay = document.getElementById('sessionRecoveryOverlay');
+  if (overlay) setOverlayVisible(overlay, false, document.getElementById('sessionRecoveryPanel'));
+  sessionRecoveryState.visible = false;
+  if (sessionRecoveryState.loading) {
+    sessionRecoveryState.requestSeq += 1;
+    setSessionRecoveryLoading(false);
+  }
+}
+
+function getSessionRecoveryExcludedChatIds() {
+  return (state.chatOrder || []).map(id => String(id || '').trim()).filter(Boolean);
+}
+
+async function loadSessionRecoveryPage(page) {
+  const nextPage = Math.max(Number(page) || 1, 1);
+  if (!sessionRecoveryState.visible || sessionRecoveryState.loading) return;
+  sessionRecoveryState.page = nextPage;
+  sessionRecoveryState.hasMore = false;
+  sessionRecoveryState.candidates = [];
+  sessionRecoveryState.error = '';
+  setSessionRecoveryLoading(true);
+  renderSessionRecoveryCandidates();
+  const requestSeq = ++sessionRecoveryState.requestSeq;
+  const params = new URLSearchParams();
+  params.set('page', String(nextPage));
+  getSessionRecoveryExcludedChatIds().forEach(chatId => params.append('exclude', chatId));
+  params.set('_', String(Date.now()));
+  try {
+    const resp = await fetchExecApi('/api/session_recovery_candidates?' + params.toString(), { cache: 'no-store' });
+    let data = null;
+    try { data = await resp.json(); } catch {}
+    if (requestSeq !== sessionRecoveryState.requestSeq || !sessionRecoveryState.visible) return;
+    if (!resp.ok || !data || data.status !== 0) {
+      const message = (data && (data.content || data.message)) || ('查询失败: HTTP ' + resp.status);
+      throw new Error(message);
+    }
+    const visibleChatIds = new Set(getSessionRecoveryExcludedChatIds());
+    sessionRecoveryState.page = Math.max(Number(data.page) || nextPage, 1);
+    sessionRecoveryState.hasMore = !!data.hasMore;
+    sessionRecoveryState.candidates = (Array.isArray(data.sessions) ? data.sessions : [])
+      .map(normalizeSessionRecoveryCandidate)
+      .filter(item => item.chatId && item.lastPrompt && !visibleChatIds.has(item.chatId))
+      .slice(0, SESSION_RECOVERY_PAGE_SIZE);
+  } catch (err) {
+    if (requestSeq !== sessionRecoveryState.requestSeq || !sessionRecoveryState.visible) return;
+    sessionRecoveryState.error = err && err.message ? err.message : '查询历史会话失败';
+  } finally {
+    if (requestSeq === sessionRecoveryState.requestSeq) {
+      setSessionRecoveryLoading(false);
+      renderSessionRecoveryCandidates();
+    }
+  }
+}
+
+function goToSessionRecoveryPage(delta) {
+  const nextPage = Math.max(1, Number(sessionRecoveryState.page || 1) + Number(delta || 0));
+  if (sessionRecoveryState.loading || nextPage === sessionRecoveryState.page || (delta > 0 && !sessionRecoveryState.hasMore)) return;
+  void loadSessionRecoveryPage(nextPage);
+}
+
+function openSessionRecoveryOverlay(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  if (isOnboardingActive() || sessionRecoveryState.loading) return;
+  closeQuickFanMenu();
+  closeAllSkillExtractPopovers();
+  closeInstallAppPopover();
+  const overlay = document.getElementById('sessionRecoveryOverlay');
+  const panel = document.getElementById('sessionRecoveryPanel');
+  if (!overlay) return;
+  sessionRecoveryState.visible = true;
+  sessionRecoveryState.page = 1;
+  sessionRecoveryState.hasMore = false;
+  sessionRecoveryState.candidates = [];
+  sessionRecoveryState.error = '';
+  renderSessionRecoveryCandidates();
+  showExclusiveOverlay(overlay, panel);
+  void loadSessionRecoveryPage(1);
+}
+
+function restoreSessionRecoveryCandidate(index) {
+  if (sessionRecoveryState.loading) return;
+  const candidate = (sessionRecoveryState.candidates || [])[Number(index)];
+  if (!candidate || !candidate.chatId) return;
+  const chatId = candidate.chatId;
+  if (state.chats[chatId]) {
+    closeSessionRecoveryOverlay();
+    switchChat(chatId);
+    return;
+  }
+  if (state.chatOrder.length >= 10) {
+    closeSessionRecoveryOverlay();
+    showLimitToast();
+    return;
+  }
+  state.chats[chatId] = {
+    id: chatId,
+    messages: [],
+    lastMsg: candidate.lastPrompt,
+    lastCompletionNoticeAt: '',
+    coldHistoryTailAt: '',
+    coldHistoryTailId: 0,
+    historyBeforeAt: '',
+    historyBeforeId: 0,
+    historyHasMore: false
+  };
+  state.chatOrder.unshift(chatId);
+  if (candidate.agentId) chatAgents[chatId] = candidate.agentId;
+  chatThinking[chatId] = false;
+  chatVerify[chatId] = false;
+  chatHtmlOutput[chatId] = false;
+  chatSwarm[chatId] = false;
+  clearChatSandbox(chatId);
+  closeSessionRecoveryOverlay();
+  saveChats();
+  switchChat(chatId);
+  renderChatList();
+}
+
 function focusCustomChatIdInput(selectText) {
   const input = document.getElementById('newChatIdInput');
   if (!input) return;
@@ -34930,6 +35217,12 @@ function renderMessages(options) {
   const renderedMessages = msgs.slice(startIdx);
   state.displayedCount = showCount;
   container.innerHTML = renderedMessages.map(m => msgHtml(m)).join('');
+  const assistantMessageEls = Array.from(container.querySelectorAll('.message-wrap.assistant .message.assistant'));
+  let assistantMessageIndex = 0;
+  renderedMessages.forEach(message => {
+    if (!message || message.role !== 'assistant' || message.error) return;
+    syncAssistantMetaElement(assistantMessageEls[assistantMessageIndex++], message);
+  });
   restoreRenderedAssistantExplosionBeacons(container, renderedMessages);
   const markedInserted = markRenderedInsertedMessagesAnimated(renderedMessages);
   if (markedInserted) saveChats();
@@ -35139,6 +35432,7 @@ function createMessageNode(message, options) {
     if (msgEl) {
       syncAssistantExplosionBeacon(msgEl, message);
       syncAssistantResultMaterialState(msgEl, message);
+      syncAssistantMetaElement(msgEl, message);
     }
   }
   return node;
@@ -35856,16 +36150,7 @@ function flushStreamingMessage(streamKey) {
   syncAssistantResultMaterialState(msgEl, assistantMsg);
   msgEl.classList.remove('type-switch-gap');
   msgEl.style.removeProperty('--stream-gap-height');
-  let metaEl = msgEl.querySelector('.message-meta');
-  const metaHtml = assistantMetaHtml(assistantMsg);
-  if (metaHtml) {
-    if (metaEl) {
-      metaEl.innerHTML = assistantMetaContentHtml(assistantMsg);
-    } else {
-      msgEl.insertAdjacentHTML('beforeend', metaHtml);
-      metaEl = msgEl.querySelector('.message-meta');
-    }
-  }
+  syncAssistantMetaElement(msgEl, assistantMsg);
   const wrap = msgEl.closest('.message-wrap');
   const copyBtn = wrap && wrap.querySelector('.message-copy-btn');
   if (copyBtn) copyBtn.dataset.copyText = assistantMsg.content;
@@ -35919,12 +36204,7 @@ function finalizeActiveStreamingMessageNode(chatId) {
   syncAssistantExplosionBeacon(targetEl, finalMsg);
   renderMathInRoot(mdEl);
   enhanceCenterMessageCodeBlocks(mdEl);
-  let metaEl = targetEl.querySelector('.message-meta');
-  const metaHtml = assistantMetaHtml(finalMsg);
-  if (metaHtml) {
-    if (metaEl) metaEl.innerHTML = assistantMetaContentHtml(finalMsg);
-    else targetEl.insertAdjacentHTML('beforeend', metaHtml);
-  }
+  syncAssistantMetaElement(targetEl, finalMsg);
   const wrap = targetEl.closest('.message-wrap');
   const copyBtn = wrap && wrap.querySelector('.message-copy-btn');
   if (copyBtn) copyBtn.dataset.copyText = finalMsg.content;
@@ -36936,22 +37216,77 @@ function getAssistantExplosionSnapshotBoundaryOverlap(leftText, rightText) {
   return 0;
 }
 
-function assistantMetaHtml(m) {
-  const contentHtml = assistantMetaContentHtml(m);
-  return contentHtml ? `<div class="message-meta">${contentHtml}</div>` : '';
-}
-
 function assistantMetaContentHtml(message) {
   if (!message || !message.receivedAt) return '';
   const timeText = formatMessageTime(message.receivedAt);
-  if (message.cancelMarker) return esc(`${timeText} ${getCancellationMessageText(message.cancelState)}`);
+  let contentHtml = '';
+  if (message.cancelMarker) {
+    contentHtml = esc(`${timeText} ${getCancellationMessageText(message.cancelState)}`);
+    return `<span class="message-meta-sse-target">${contentHtml}</span>`;
+  }
   const statusText = String(message.streamStatus || '等待').trim() || '等待';
   const agentId = getMessageAgentId(message);
   if (statusText === '完成' && agentId) {
     const agentIdAttribute = esc(agentId).replace(/"/g, '&quot;');
-    return `${esc(timeText)} 由 <strong class="message-meta-agent" data-agent-id="${agentIdAttribute}" title="单击切换到该 Agent"> ${esc(agentId)} </strong> 完成`;
+    contentHtml = `${esc(timeText)} 由 <strong class="message-meta-agent" data-agent-id="${agentIdAttribute}" title="单击切换到该 Agent"> ${esc(agentId)} </strong> 完成`;
+  } else {
+    contentHtml = esc(`${timeText} ${statusText}`);
   }
-  return esc(`${timeText} ${statusText}`);
+  return `<span class="message-meta-sse-target">${contentHtml}</span>`;
+}
+
+const ASSISTANT_META_UPDATE_ANIMATION_MS = 3000;
+let assistantMetaUpdateSequence = 0;
+const assistantMetaUpdateStates = new WeakMap();
+const assistantMetaElementTimers = new WeakMap();
+
+function markAssistantMetaUpdated(message) {
+  if (!message || message.role !== 'assistant' || message.error) return false;
+  const contentHtml = assistantMetaContentHtml(message);
+  if (!contentHtml) return false;
+  const now = Date.now();
+  const current = assistantMetaUpdateStates.get(message);
+  // SSE chunks can arrive more frequently than the visible seconds clock. Do
+  // not restart the effect unless the user-visible meta text has changed.
+  if (current && current.contentHtml === contentHtml && current.expiresAt > now) return false;
+  assistantMetaUpdateStates.set(message, {
+    contentHtml,
+    token: String(++assistantMetaUpdateSequence),
+    expiresAt: now + ASSISTANT_META_UPDATE_ANIMATION_MS
+  });
+  return true;
+}
+
+function syncAssistantMetaElement(messageEl, message) {
+  if (!messageEl || !message || message.role !== 'assistant') return null;
+  const contentHtml = assistantMetaContentHtml(message);
+  if (!contentHtml) return null;
+  let metaEl = messageEl.querySelector('.message-meta');
+  if (metaEl) metaEl.innerHTML = contentHtml;
+  else {
+    messageEl.insertAdjacentHTML('beforeend', `<div class="message-meta">${contentHtml}</div>`);
+    metaEl = messageEl.querySelector('.message-meta');
+  }
+  if (!metaEl) return null;
+  const animationTarget = metaEl.querySelector('.message-meta-sse-target') || metaEl;
+  const updateState = assistantMetaUpdateStates.get(message);
+  if (!updateState || updateState.expiresAt <= Date.now() || animationTarget.dataset.messageMetaUpdateToken === updateState.token) return metaEl;
+  animationTarget.dataset.messageMetaUpdateToken = updateState.token;
+  const previousTimer = assistantMetaElementTimers.get(animationTarget);
+  if (previousTimer) clearTimeout(previousTimer);
+  animationTarget.classList.remove('message-meta-sse-updated');
+  void animationTarget.offsetWidth;
+  animationTarget.classList.add('message-meta-sse-updated');
+  assistantMetaElementTimers.set(animationTarget, window.setTimeout(() => {
+    animationTarget.classList.remove('message-meta-sse-updated');
+    assistantMetaElementTimers.delete(animationTarget);
+  }, ASSISTANT_META_UPDATE_ANIMATION_MS));
+  return metaEl;
+}
+
+function assistantMetaHtml(m) {
+  const contentHtml = assistantMetaContentHtml(m);
+  return contentHtml ? `<div class="message-meta">${contentHtml}</div>` : '';
 }
 
 const messageAgentSwitchConfirmState = {
@@ -41780,6 +42115,7 @@ async function sendCenterMessage(rawText, options) {
     ) {
       assistantMsg.pendingUiPlaceholder = true;
     }
+    markAssistantMetaUpdated(assistantMsg);
   }
 
   function ensureAssistantMessageAdded(entry) {
@@ -41804,6 +42140,7 @@ async function sendCenterMessage(rawText, options) {
         entry.msgEl = existingWrap.querySelector('.message');
         if (entry.msgEl) {
           syncAssistantExplosionBeacon(entry.msgEl, assistantMsg);
+          syncAssistantMetaElement(entry.msgEl, assistantMsg);
           syncChatFooterInlineHintUI();
           syncChatTaskBadgeUI({ animateEnter: false });
           scheduleChatScrollControlsSync();
@@ -41821,7 +42158,10 @@ async function sendCenterMessage(rawText, options) {
       if (wrapEl) container.appendChild(wrapEl);
       state.displayedCount++;
       scrollToBottom();
-      if (entry.msgEl) syncAssistantExplosionBeacon(entry.msgEl, assistantMsg);
+      if (entry.msgEl) {
+        syncAssistantExplosionBeacon(entry.msgEl, assistantMsg);
+        syncAssistantMetaElement(entry.msgEl, assistantMsg);
+      }
       syncChatFooterInlineHintUI();
       syncChatTaskBadgeUI({ animateEnter: false });
       scheduleChatScrollControlsSync();
@@ -42173,6 +42513,7 @@ async function sendCenterMessage(rawText, options) {
             assistantMsg.receivedAt = toChatTimestamp(new Date());
             assistantMsg.createdAt = assistantMsg.createdAt || assistantMsg.receivedAt;
             assistantMsg.streamStatus = '等待';
+            const metaChanged = markAssistantMetaUpdated(assistantMsg);
             const explodedSnapshotChanged = captureAssistantExplosionSnapshotForLogicalId(
               assistantMsg,
               packetLogicalId,
@@ -42181,6 +42522,9 @@ async function sendCenterMessage(rawText, options) {
             );
             if (explodedSnapshotChanged && streamEntry && streamEntry.msgEl) {
               syncAssistantExplosionBeacon(streamEntry.msgEl, assistantMsg);
+            }
+            if (metaChanged && streamEntry && streamEntry.msgEl) {
+              scheduleStreamingMessageRender(getStreamingEntryQueueKey(streamEntry), chatId, streamEntry.msgEl, assistantMsg);
             }
             if (explodedSnapshotChanged) syncWikiPanelSsePresentation(chatId);
             continue;
@@ -42265,6 +42609,7 @@ async function sendCenterMessage(rawText, options) {
               assistantMsg.receivedAt = toChatTimestamp(new Date());
               assistantMsg.createdAt = assistantMsg.receivedAt;
               assistantMsg.streamStatus = '等待';
+              markAssistantMetaUpdated(assistantMsg);
               if (!isCliSub) {
                 appendCenterStreamDelta(assistantMsg, parsed, delta.content, {
                   onBeforeReset: () => {
@@ -42552,6 +42897,7 @@ function finishStreamingFor(chatId, options) {
       msg.streamStatus = '完成';
       delete msg.streamPacketType;
       finalizeAssistantTransientFields(msg);
+      markAssistantMetaUpdated(msg);
       completedSessionAssistantMessages.push(msg);
       if (!latestSessionAssistantContent && shouldRenderAssistantCenterMessage(msg)) {
         latestSessionAssistantContent = String(msg.content || '');
@@ -44220,6 +44566,9 @@ function finalizeRestoreAssistantsForRequest(chat, userIndex, ts) {
     msg.streamStatus = '完成';
     delete msg.streamPacketType;
     finalizeAssistantTransientFields(msg);
+    // Restore data/state handling stays unchanged; this only marks the
+    // already-updated footer for the next render.
+    markAssistantMetaUpdated(msg);
     const msgCompletedTs = toChatTimestamp(msg.receivedAt || msg.createdAt || '');
     if (msgCompletedTs && (!completedAssistantTs || msgCompletedTs > completedAssistantTs)) {
       completedAssistantTs = msgCompletedTs;
@@ -44624,6 +44973,7 @@ function appendRestoredRecords(chatId, chat, records) {
           if (!uiAssistant.createdAt) uiAssistant.createdAt = ts;
           const parsed = parseRestoreAssistantRecord(uiAssistant.rawSse);
           applyParsedAssistantSnapshot(uiAssistant, parsed);
+          markAssistantMetaUpdated(uiAssistant);
           activeAssistant = uiAssistant;
         }
         if (inlineHintPacket.active) {
@@ -44732,6 +45082,7 @@ function appendRestoredRecords(chatId, chat, records) {
       if (!activeAssistant.createdAt) activeAssistant.createdAt = ts;
       const parsed = parseRestoreAssistantRecord(activeAssistant.rawSse);
       applyParsedAssistantSnapshot(activeAssistant, parsed);
+      markAssistantMetaUpdated(activeAssistant);
       if (
         isCliSubOnlyRecord &&
         !normalizeMessageText(activeAssistant.content) &&

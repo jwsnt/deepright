@@ -4995,6 +4995,87 @@ func TestHandleRestoreExcludesTimelineBoundary(t *testing.T) {
 	}
 }
 
+func TestHandleSessionRecoveryCandidatesPaginatesAndExcludesVisibleChats(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(oldwd)
+	configureProxyRestoreTestDB(t)
+
+	db, err := sql.Open("sqlite", "data")
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	defer db.Close()
+	initChatTable(db)
+	for _, indexName := range []string{"idx_chat_recovery_latest", "idx_chat_recovery_order", "idx_chat_recovery_prompt"} {
+		var count int
+		if err := db.QueryRow(`SELECT COUNT(1) FROM sqlite_master WHERE type = 'index' AND name = ?`, indexName).Scan(&count); err != nil || count != 1 {
+			t.Fatalf("index %s not created: count=%d err=%v", indexName, count, err)
+		}
+	}
+	insertCompleted := func(chatID, prompt, timestamp string) {
+		t.Helper()
+		if _, err := db.Exec(`INSERT INTO chat_log (agent_id, chat_id, chat_type, role, response_type, content, created_at) VALUES
+			('agent-a', ?, 'page_session', 'Q', 'normal', ?, ?),
+			('agent-a', ?, 'page_session', 'A', 'normal', 'data: [DONE]\n', ?)`,
+			chatID, `{"messages":[{"role":"user","content":"`+prompt+`"}]}`, timestamp+".000", chatID, timestamp+".100"); err != nil {
+			t.Fatalf("seed %s: %v", chatID, err)
+		}
+	}
+	for i := 1; i <= 12; i++ {
+		insertCompleted(fmt.Sprintf("chat-%02d", i), fmt.Sprintf("prompt-%02d", i), fmt.Sprintf("2026-08-08T10:00:%02d", i))
+	}
+	if _, err := db.Exec(`INSERT INTO chat_log (agent_id, chat_id, chat_type, role, response_type, content, created_at) VALUES
+		('agent-a', 'memo-chat', 'scheduled_task', 'Q', 'normal', '{"messages":[{"role":"user","content":"memo"}]}', '2026-08-08T10:01:00.000'),
+		('agent-a', 'memo-chat', 'scheduled_task', 'A', 'normal', 'data: [DONE]', '2026-08-08T10:01:00.100'),
+		('agent-a', 'failed-chat', 'page_session', 'Q', 'normal', '{"messages":[{"role":"user","content":"failed"}]}', '2026-08-08T10:01:01.000'),
+		('agent-a', 'failed-chat', 'page_session', 'A', 'abnormal', 'data: [DONE]', '2026-08-08T10:01:01.100')`); err != nil {
+		t.Fatalf("seed excluded candidates: %v", err)
+	}
+
+	proxy := &ProxyServer{}
+	firstReq := httptest.NewRequest(http.MethodGet, "/api/session_recovery_candidates?page=1&exclude=chat-12", nil)
+	firstRec := httptest.NewRecorder()
+	proxy.HandleSessionRecoveryCandidates(firstRec, firstReq)
+	var firstResp struct {
+		Status   int                        `json:"status"`
+		Page     int                        `json:"page"`
+		PageSize int                        `json:"pageSize"`
+		HasMore  bool                       `json:"hasMore"`
+		Sessions []sessionRecoveryCandidate `json:"sessions"`
+	}
+	if err := json.NewDecoder(firstRec.Body).Decode(&firstResp); err != nil {
+		t.Fatalf("decode first page: %v", err)
+	}
+	if firstRec.Code != http.StatusOK || firstResp.Status != 0 || firstResp.Page != 1 || firstResp.PageSize != 10 || !firstResp.HasMore || len(firstResp.Sessions) != 10 {
+		t.Fatalf("first page = %#v, status=%d", firstResp, firstRec.Code)
+	}
+	if firstResp.Sessions[0].ChatID != "chat-11" || firstResp.Sessions[0].LastPrompt != "prompt-11" || firstResp.Sessions[9].ChatID != "chat-02" {
+		t.Fatalf("unexpected first page sessions: %#v", firstResp.Sessions)
+	}
+
+	secondReq := httptest.NewRequest(http.MethodGet, "/api/session_recovery_candidates?page=2&exclude=chat-12", nil)
+	secondRec := httptest.NewRecorder()
+	proxy.HandleSessionRecoveryCandidates(secondRec, secondReq)
+	var secondResp struct {
+		Status   int                        `json:"status"`
+		HasMore  bool                       `json:"hasMore"`
+		Sessions []sessionRecoveryCandidate `json:"sessions"`
+	}
+	if err := json.NewDecoder(secondRec.Body).Decode(&secondResp); err != nil {
+		t.Fatalf("decode second page: %v", err)
+	}
+	if secondResp.Status != 0 || secondResp.HasMore || len(secondResp.Sessions) != 1 || secondResp.Sessions[0].ChatID != "chat-01" {
+		t.Fatalf("second page = %#v", secondResp)
+	}
+}
+
 func TestHandleRestoreReturnsIncrementalAssistantChunks(t *testing.T) {
 	oldwd, err := os.Getwd()
 	if err != nil {

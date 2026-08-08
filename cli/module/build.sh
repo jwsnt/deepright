@@ -13,11 +13,11 @@ INTEGRATION_DIR="$MODULE_DIR/integration"
 CONNECT_DIR="$MODULE_DIR/connect"
 SITE_DIR="$MODULE_DIR/site"
 CONFIG_DIR="$MODULE_DIR/config"
+CONFIG_FILE="$CONFIG_DIR/config.json"
 CLI_GET_SANDBOX_DIR="$MODULE_DIR/cli-get/sandbox"
 CLI_GET_SANDBOX_MAC_RELEASE_DIR="$CLI_GET_SANDBOX_DIR/release/mac"
 CLI_GET_SANDBOX_WSL_RELEASE_DIR="$CLI_GET_SANDBOX_DIR/release/wsl"
 RELEASE_DIR="$MODULE_DIR/release"
-BUILD_TMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/deepright-module-build.XXXXXX")
 KEY_DIR="${DEEPRIGHT_KEY:-}"
 SIGN_MODE="${DEEPRIGHT_SKIP_SIGN:-auto}"
 SIGN_IDENTITY="${DEEPRIGHT_IDENTITY:-}"
@@ -28,6 +28,32 @@ SIGN_ENABLED=0
 MAC_APP_NAME="${DEEPRIGHT_MAC_APP_NAME:-DeepRight}"
 WINDOWS_BUILDER_RELEASE_LINK=""
 WINDOWS_BUILDER_BUILD_LINK=""
+
+validate_config_json() {
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "error: python3 is required to validate $CONFIG_FILE" >&2
+    return 1
+  fi
+
+  python3 - "$CONFIG_FILE" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+try:
+    with open(path, encoding="utf-8") as config_file:
+        json.load(config_file)
+except (OSError, json.JSONDecodeError) as error:
+    print(f"error: invalid JSON in {path}: {error}", file=sys.stderr)
+    sys.exit(1)
+PY
+}
+
+if ! validate_config_json; then
+  exit 1
+fi
+
+BUILD_TMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/deepright-module-build.XXXXXX")
 
 # Normalize cwd immediately so later subshells do not inherit a deleted caller cwd.
 cd "$SCRIPT_DIR"

@@ -1544,6 +1544,7 @@ curl -X POST 'http://127.0.0.1:8080/api/cron/create?agentId=demo-agent' \
 | POST | `/api/cron/detail/status` | 更新任务明细状态 |
 | POST | `/api/cancel` | 取消指定会话流 |
 | POST | `/api/restore` | 恢复指定会话日志 |
+| GET | `/api/session_recovery_candidates` | 分页查询可恢复的普通会话 |
 | GET | `/api/download` | 下载文件或目录 |
 | GET | `/site/*` | 静态文件服务 |
 
@@ -1601,6 +1602,18 @@ curl -X POST 'http://127.0.0.1:8080/api/cron/create?agentId=demo-agent' \
 - 如果当前环境下 CLI 事件日志查询失败，不会影响原有 `chat_log` restore 主流程；接口会按现有容错语义继续返回已拿到的消息记录
 - 这次补充只覆盖 restore 对 CLI 子任务 `cmd` 的恢复能力，继续复用现有 CLI 日志写入链路和存储表，不新增新的日志表、消息表或额外后台任务
 - 冷历史分页由数据库按 `chatId + createdAt + id` 游标完成：先读取最近一批聊天记录，必要时向前补到该轮 `Q`，再正序返回；不会为冷历史读取、合并或排序 CLI 日志
+
+## /api/session_recovery_candidates
+
+`GET /api/session_recovery_candidates?page=1&exclude=chat-a&exclude=chat-b`
+
+说明：
+
+- 用于历史会话恢复列表；接口只读取现有 `chat_log`，不改变 `/api/restore` 的协议或写入新的日志。
+- `page` 从 1 开始；每页固定最多返回 10 条。响应包含 `page`、`pageSize`、`hasMore` 和 `sessions`。
+- 可重复传入 `exclude`，服务端会在查询时排除这些 `chatId`，供页面排除当前左侧已经显示的会话。
+- 每个候选包含 `agentId`、`chatId`、`lastPrompt`、`completedAt`，只返回普通页面会话中最后一条正常完成（含 `data: [DONE]`）的回答及其对应用户提问。
+- 异常、取消、未完成和定时备忘录会话不会进入候选。查询按完成时间、日志 ID 倒序分页，并使用聊天恢复联合索引完成最新回答、排序和关联提问的查找。
 
 ## /api/cmd
 

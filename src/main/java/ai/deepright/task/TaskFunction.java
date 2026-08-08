@@ -1,6 +1,9 @@
 package ai.deepright.task;
 
-import ai.deepright.cli.*;
+import ai.deepright.cli.CliPrinter;
+import ai.deepright.cli.CliSubFetcher;
+import ai.deepright.cli.CliTransfer;
+import ai.deepright.cli.CliTransferData;
 import ai.deepright.cli.function.CliSubFunction;
 import ai.deepright.feature.FeatureField;
 import ai.deepright.feature.FeatureFlag;
@@ -9,7 +12,7 @@ import ai.deepright.lang.XmlResourceLang;
 import ai.deepright.llm.RetryUtils;
 import ai.deepright.llm.notifier.MultiSourceFlag;
 import ai.deepright.llm.notifier.MultiSourceNotifier;
-import ai.deepright.llm.provider.RequestModelSelect;
+import ai.deepright.llm.provider.RequestModelProxy;
 import ai.deepright.plan.PlanUtils;
 import ai.deepright.router.RouterDevice;
 import ai.deepright.router.RouterService;
@@ -26,7 +29,6 @@ import ai.open.right.workflow.flow.file.impl.SysStore;
 import ai.open.right.workflow.flow.function.FunctionContext;
 import ai.open.right.workflow.flow.function.impl.BaseFunction;
 import ai.open.right.workflow.flow.llm.Segment;
-import ai.open.right.workflow.flow.llm.provider.ProviderRequestService;
 import ai.open.right.workflow.notify.Notifier;
 import ai.open.right.workflow.notify.impl.ShortcutNotifier;
 import ai.open.right.workflow.sync.SyncConfig;
@@ -356,45 +358,15 @@ public class TaskFunction extends BaseFunction implements TaskResult {
         return metadata;
     }
 
+    // @See ReConfigWorkflow
     protected Map<String, Object> buildModelAndToken(WorkflowTask workTask, RouterDevice routerDevice, Map<String, Object> metadata) throws Exception {
         WorkflowException.checkCondition(StringUtils.isEmpty(routerDevice.getProvider()), "The router provider can not be empty");
-        String app = FeatureUtils.buildApp(routerDevice.getMetadata());
-        String path = FeatureUtils.escapePath(FeatureFlag.isWindows(routerDevice.getSys()), app + " token --provider " + routerDevice.getProvider());
-        CliPubData pubData = this.cliSubFetcher.command(workTask, routerDevice, CliSubOps.builder()
-                .app(List.of(Paths.get(app).getFileName().toString()))
-                .r(List.of(path))
-                .exempted(true)
-                .build(), path, "");
-        WorkflowException.checkCondition(!(pubData.isOk()), pubData.getCmd());
-        Map<String, String> provider = MapUtils.getMap(JsonUtils.read(pubData.getCmd(), Map.class), routerDevice.getProvider());
-        String multiOutput = MapUtils.getString(provider, RequestModelSelect.KEY_MODEL_MULTI_OUTPUT);
-        String multiInput = MapUtils.getString(provider, RequestModelSelect.KEY_MODEL_MULTI_INPUT);
-        String thinking = MapUtils.getString(provider, RequestModelSelect.KEY_MODEL_THINKING);
-        String base = MapUtils.getString(provider, RequestModelSelect.KEY_MODEL_BASE);
-        String fast = MapUtils.getString(provider, RequestModelSelect.KEY_MODEL_FAST);
-        String token = MapUtils.getString(provider, "token");
-        String url = MapUtils.getString(provider, "__url");
-        WorkflowException.checkCondition(StringUtils.isEmpty(token), "The router provider token can not be empty: " + routerDevice.getProvider());
-        metadata.put(ProviderRequestService.KEY_INTERNAL + ProviderRequestService.KEY_TOKEN, token);
-        metadata.put(ProviderRequestService.KEY_PROVIDER, routerDevice.getProvider());
-        if (!StringUtils.isEmpty(multiOutput)) {
-            metadata.put(RequestModelSelect.KEY_MODEL_MULTI_OUTPUT, multiOutput);
-        }
-        if (!StringUtils.isEmpty(multiInput)) {
-            metadata.put(RequestModelSelect.KEY_MODEL_MULTI_INPUT, multiInput);
-        }
-        if (!StringUtils.isEmpty(thinking)) {
-            metadata.put(RequestModelSelect.KEY_MODEL_THINKING, thinking);
-        }
-        if (!StringUtils.isEmpty(base)) {
-            metadata.put(RequestModelSelect.KEY_MODEL_BASE, base);
-        }
-        if (!StringUtils.isEmpty(fast)) {
-            metadata.put(RequestModelSelect.KEY_MODEL_FAST, fast);
-        }
-        if (!StringUtils.isEmpty(url)) {
-            metadata.put(RequestModelSelect.KEY_MODEL_URL, url);
-        }
+        RequestModelProxy.configProxy(this.cliSubFetcher, RequestModelProxy.RequestProxyConfig.builder()
+                .provider(routerDevice.getProvider())
+                .routerDevice(routerDevice)
+                .metadata(metadata)
+                .workTask(workTask)
+                .build());
         return metadata;
     }
 

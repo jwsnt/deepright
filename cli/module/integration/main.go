@@ -15301,6 +15301,163 @@ type restoreHistoryMeta struct {
 	BeforeID       int    `json:"beforeId,omitempty"`
 }
 
+// sessionRecoveryCandidate is the small amount of information the site needs
+// to let a user reopen a page session that is no longer in localStorage.
+// The complete transcript remains in chat_log and is loaded through
+// /api/restore only after the user explicitly selects a candidate.
+type sessionRecoveryCandidate struct {
+	AgentID     string `json:"agentId"`
+	ChatID      string `json:"chatId"`
+	LastPrompt  string `json:"lastPrompt"`
+	CompletedAt string `json:"completedAt"`
+}
+
+const (
+	sessionRecoveryCandidatePageSize = 10
+	maxSessionRecoveryCandidatePage  = 100000
+)
+
+func normalizeSessionRecoveryCandidatePage(raw string) (int, error) {
+	if strings.TrimSpace(raw) == "" {
+		return 1, nil
+	}
+	page, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || page <= 0 || page > maxSessionRecoveryCandidatePage {
+		return 0, fmt.Errorf("page must be between 1 and %d", maxSessionRecoveryCandidatePage)
+	}
+	return page, nil
+}
+
+func extractSessionRecoveryPrompt(raw string) string {
+	var request map[string]interface{}
+	if err := json.Unmarshal([]byte(raw), &request); err != nil {
+		return ""
+	}
+	messages, ok := request["messages"].([]interface{})
+	if !ok {
+		return ""
+	}
+	for i := len(messages) - 1; i >= 0; i-- {
+		message, ok := messages[i].(map[string]interface{})
+		if !ok || strings.TrimSpace(fmt.Sprint(message["role"])) != "user" {
+			continue
+		}
+		switch content := message["content"].(type) {
+		case string:
+			return strings.TrimSpace(content)
+		case []interface{}:
+			parts := make([]string, 0, len(content))
+			for _, item := range content {
+				switch value := item.(type) {
+				case string:
+					parts = append(parts, value)
+				case map[string]interface{}:
+					if text, ok := value["text"].(string); ok {
+						parts = append(parts, text)
+					}
+				}
+			}
+			return strings.TrimSpace(strings.Join(parts, ""))
+		default:
+			return strings.TrimSpace(fmt.Sprint(content))
+		}
+	}
+	return ""
+}
+
+func normalizeSessionRecoveryExcludedChatIDs(values []string) []string {
+	seen := make(map[string]struct{})
+	chatIDs := make([]string, 0, len(values))
+	for _, value := range values {
+		chatID := strings.TrimSpace(value)
+		if chatID == "" {
+			continue
+		}
+		if _, exists := seen[chatID]; exists {
+			continue
+		}
+		seen[chatID] = struct{}{}
+		chatIDs = append(chatIDs, chatID)
+	}
+	return chatIDs
+}
+
+func querySessionRecoveryCandidates(page int, excludedChatIDs []string) ([]sessionRecoveryCandidate, bool, error) {
+	if cronDB == nil {
+		return nil, false, fmt.Errorf("db not ready")
+	}
+	page = max(page, 1)
+	offset := (page - 1) * sessionRecoveryCandidatePageSize
+	args := []interface{}{chatTypePageSession}
+	query := `
+		SELECT a.agent_id, a.chat_id, q.content, a.created_at
+		FROM chat_log AS a
+		JOIN chat_log AS q ON q.id = (
+			SELECT previous.id
+			FROM chat_log AS previous
+			WHERE previous.chat_id = a.chat_id
+			  AND previous.role = 'Q'
+			  AND (previous.created_at < a.created_at OR (previous.created_at = a.created_at AND previous.id < a.id))
+			ORDER BY previous.created_at DESC, previous.id DESC
+			LIMIT 1
+		)
+		WHERE a.chat_type = ?
+		  AND a.role = 'A'
+		  AND a.response_type = 'normal'
+		  AND instr(a.content, '[DONE]') > 0
+		  AND a.id = (
+			SELECT latest.id
+			FROM chat_log AS latest
+			WHERE latest.chat_id = a.chat_id
+			  AND latest.chat_type = ?
+			  AND latest.role = 'A'
+			  AND latest.response_type = 'normal'
+			  AND instr(latest.content, '[DONE]') > 0
+			ORDER BY latest.created_at DESC, latest.id DESC
+			LIMIT 1
+		)`
+	args = append(args, chatTypePageSession)
+	excludedChatIDs = normalizeSessionRecoveryExcludedChatIDs(excludedChatIDs)
+	if len(excludedChatIDs) > 0 {
+		placeholders := make([]string, 0, len(excludedChatIDs))
+		for _, chatID := range excludedChatIDs {
+			placeholders = append(placeholders, "?")
+			args = append(args, chatID)
+		}
+		query += ` AND a.chat_id NOT IN (` + strings.Join(placeholders, ",") + `)`
+	}
+	query += ` ORDER BY a.created_at DESC, a.id DESC LIMIT ? OFFSET ?`
+	args = append(args, sessionRecoveryCandidatePageSize+1, offset)
+	rows, err := cronDB.Query(query, args...)
+	if err != nil {
+		return nil, false, err
+	}
+	defer rows.Close()
+
+	candidates := make([]sessionRecoveryCandidate, 0, sessionRecoveryCandidatePageSize+1)
+	for rows.Next() {
+		var candidate sessionRecoveryCandidate
+		var rawPrompt string
+		if err := rows.Scan(&candidate.AgentID, &candidate.ChatID, &rawPrompt, &candidate.CompletedAt); err != nil {
+			return nil, false, err
+		}
+		candidate.ChatID = strings.TrimSpace(candidate.ChatID)
+		candidate.LastPrompt = extractSessionRecoveryPrompt(rawPrompt)
+		if candidate.ChatID == "" || candidate.LastPrompt == "" {
+			continue
+		}
+		candidates = append(candidates, candidate)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false, err
+	}
+	hasMore := len(candidates) > sessionRecoveryCandidatePageSize
+	if hasMore {
+		candidates = candidates[:sessionRecoveryCandidatePageSize]
+	}
+	return candidates, hasMore, nil
+}
+
 func normalizeRestoreRecord(rec *restoreRecord) {
 	if rec == nil {
 		return
@@ -15590,6 +15747,35 @@ func handleRestore() http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{"status": 0, "data": records})
+	}
+}
+
+func handleSessionRecoveryCandidates() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		page, err := normalizeSessionRecoveryCandidatePage(r.URL.Query().Get("page"))
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": err.Error()})
+			return
+		}
+		candidates, hasMore, err := querySessionRecoveryCandidates(page, r.URL.Query()["exclude"])
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": 1, "content": "query error: " + err.Error()})
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":   0,
+			"page":     page,
+			"pageSize": sessionRecoveryCandidatePageSize,
+			"hasMore":  hasMore,
+			"sessions": candidates,
+		})
 	}
 }
 
@@ -21227,6 +21413,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/cron/detail/status", handleCronDetailStatus())
 	mux.HandleFunc("/api/cancel", handleCancel(&cfg))
 	mux.HandleFunc("/api/restore", handleRestore())
+	mux.HandleFunc("/api/session_recovery_candidates", handleSessionRecoveryCandidates())
 	mux.HandleFunc("/api/chat_session_log", handleChatSessionLog())
 	mux.HandleFunc("/log_round", handleLogRound(&cfg))
 	mux.HandleFunc("/log_skill", handleLogSkill(&cfg))
@@ -24307,6 +24494,7 @@ func initCronDB() {
 	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_chat_agent_chat ON chat_log(agent_id, chat_id)`)
 	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_chat_agent_chat_time ON chat_log(agent_id, chat_id, created_at)`)
 	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_chat_chat_time_id ON chat_log(chat_id, created_at, id)`)
+	ensureChatRecoveryIndexes(cronDB)
 	cronDB.Exec(`CREATE TABLE IF NOT EXISTS agent_message_log (id INTEGER PRIMARY KEY AUTOINCREMENT, agent_id TEXT NOT NULL DEFAULT '', chat_id TEXT NOT NULL DEFAULT '', content TEXT NOT NULL, log_type INTEGER NOT NULL, created_at TEXT NOT NULL)`)
 	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_agent_message_log_chat_type_time ON agent_message_log(chat_id, log_type, created_at)`)
 	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_agent_message_log_chat_time_id ON agent_message_log(chat_id, created_at, id)`)
@@ -24315,6 +24503,15 @@ func initCronDB() {
 	cronDB.Exec(`CREATE TABLE IF NOT EXISTS cmd_log (id INTEGER PRIMARY KEY AUTOINCREMENT, agent_id TEXT NOT NULL, chat_id TEXT NOT NULL, tid TEXT NOT NULL, cmd TEXT NOT NULL, result TEXT NOT NULL DEFAULT '', status INTEGER NOT NULL DEFAULT -1, received_at TEXT NOT NULL, completed_at TEXT NOT NULL DEFAULT '')`)
 	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_cmd_agent_chat ON cmd_log(agent_id, chat_id)`)
 	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_cmd_agent_chat_time ON cmd_log(agent_id, chat_id, received_at)`)
+}
+
+func ensureChatRecoveryIndexes(db *sql.DB) {
+	if db == nil {
+		return
+	}
+	db.Exec(`CREATE INDEX IF NOT EXISTS idx_chat_recovery_latest ON chat_log(chat_type, role, response_type, chat_id, created_at DESC, id DESC)`)
+	db.Exec(`CREATE INDEX IF NOT EXISTS idx_chat_recovery_order ON chat_log(chat_type, role, response_type, created_at DESC, id DESC, chat_id)`)
+	db.Exec(`CREATE INDEX IF NOT EXISTS idx_chat_recovery_prompt ON chat_log(chat_id, role, created_at DESC, id DESC)`)
 }
 
 func startIntegrationLogRetentionCleanup(ctx context.Context) {
