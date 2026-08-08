@@ -999,7 +999,7 @@ animation:queuedInsertExplosion .62s ease-out both}
 .message::before{content:'';position:absolute;inset:1px 1px auto; height:48%;border-radius:inherit;background:linear-gradient(180deg,rgba(255,255,255,.42),rgba(255,255,255,0));pointer-events:none;opacity:.72}
 .message.type-switch-burst{animation:messageTypeSwitchPulse 1.5s cubic-bezier(.18,.82,.22,1) both;overflow:visible;isolation:isolate;z-index:6}
 .message.type-switch-gap{animation:messageTypeSwitchGap .16s ease-out both}
-.message.type-switch-gap .md-content{opacity:0;transform:scale(.88);min-height:var(--stream-gap-height,56px)}
+.message.type-switch-gap .md-content{opacity:0;min-height:var(--stream-gap-height,56px)}
 .message.type-switch-gap .message-meta{opacity:.34}
 .message.type-switch-incoming{animation:messageTypeSwitchIncoming .9s cubic-bezier(.16,.82,.24,1) both}
 .message.type-switch-incoming .md-content{animation:messageTypeSwitchIncomingContent .9s cubic-bezier(.16,.82,.24,1) both}
@@ -1034,10 +1034,10 @@ animation:queuedInsertExplosion .62s ease-out both}
 [data-theme="dark"] .message-stream-burst::before{background:radial-gradient(circle at center,rgba(var(--accent-soft-rgb),.44) 0%,rgba(var(--accent-rgb),.26) 24%,rgba(var(--accent-rgb),.14) 46%,rgba(var(--accent-rgb),0) 76%)}
 [data-theme="dark"] .message-stream-burst::after{background:radial-gradient(circle at 35% 35%,rgba(238,252,255,.98),rgba(var(--accent-soft-rgb),.78) 40%,rgba(var(--accent-rgb),.16) 72%,rgba(var(--accent-rgb),0) 100%);box-shadow:0 0 14px rgba(var(--accent-soft-rgb),.34)}
 [data-theme="dark"] .message-stream-burst-particle{background:radial-gradient(circle at 35% 35%,rgba(240,252,255,1),rgba(var(--accent-soft-rgb),.9) 42%,rgba(var(--accent-rgb),.2) 76%,rgba(var(--accent-rgb),0) 100%);box-shadow:0 0 18px rgba(var(--accent-soft-rgb),.52)}
-@keyframes messageTypeSwitchPulse{0%{transform:translate3d(0,0,0) scale(1);filter:brightness(1);box-shadow:var(--glass-shadow)}16%{transform:translate3d(-5px,0,0) scale(1.02);filter:brightness(1.06)}34%{transform:translate3d(7px,-1px,0) scale(1.048);filter:brightness(1.22);box-shadow:0 0 0 1px rgba(188,228,255,.44),0 0 0 14px rgba(142,205,255,.2),0 30px 76px rgba(90,142,255,.28)}52%{transform:translate3d(-4px,1px,0) scale(1.018);filter:brightness(1.08)}100%{transform:translate3d(0,0,0) scale(1);filter:brightness(1);box-shadow:var(--glass-shadow)}}
+@keyframes messageTypeSwitchPulse{0%{filter:brightness(1);box-shadow:var(--glass-shadow)}16%{filter:brightness(1.06)}34%{filter:brightness(1.22);box-shadow:0 0 0 1px rgba(188,228,255,.44),0 0 0 14px rgba(142,205,255,.2),0 30px 76px rgba(90,142,255,.28)}52%{filter:brightness(1.08)}100%{filter:brightness(1);box-shadow:var(--glass-shadow)}}
 @keyframes messageTypeSwitchGap{0%{filter:brightness(1)}100%{filter:brightness(1.12)}}
-@keyframes messageTypeSwitchIncoming{0%{transform:translate3d(0,10px,0) scale(.97);filter:brightness(1.18)}100%{transform:translate3d(0,0,0) scale(1);filter:brightness(1)}}
-@keyframes messageTypeSwitchIncomingContent{0%{opacity:0;transform:translate3d(0,18px,0) scale(.95);filter:blur(10px)}100%{opacity:1;transform:translate3d(0,0,0) scale(1);filter:blur(0)}}
+@keyframes messageTypeSwitchIncoming{0%{filter:brightness(1.18)}100%{filter:brightness(1)}}
+@keyframes messageTypeSwitchIncomingContent{0%{opacity:0;filter:blur(10px)}100%{opacity:1;filter:blur(0)}}
 @keyframes messageStreamBurstCopy{0%{opacity:1;transform:scale(1);filter:blur(0)}28%{opacity:1;transform:scale(1.16)}100%{opacity:0;transform:scale(1.36);filter:blur(22px)}}
 @keyframes messageStreamBurstCollectCopy{0%,52%{opacity:0;transform:translate3d(0,0,0) scale(.28);filter:blur(16px)}60%{opacity:.98;transform:translate3d(0,0,0) scale(.58);filter:blur(8px)}78%{opacity:.84;transform:translate3d(calc(var(--stream-collect-x,0px) * .56),calc(var(--stream-collect-y,0px) * .56),0) scale(.34);filter:blur(8px)}100%{opacity:0;transform:translate3d(var(--stream-collect-x,0px),var(--stream-collect-y,0px),0) scale(.08);filter:blur(14px)}}
 @keyframes messageStreamBurstFlash{0%{opacity:0;transform:scale(.64)}16%{opacity:1}100%{opacity:0;transform:scale(1.56)}}
