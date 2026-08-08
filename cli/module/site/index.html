@@ -7764,6 +7764,7 @@ const WIKI_TOUR_CLICK_KEY = 'deepright_wiki_tour_clicked';
 const WIKI_AUTO_TOUR_CLICK_KEY = 'deepright_wiki_auto_tour_clicked';
 const TASK_START_TOUR_CLICK_KEY = 'deepright_task_start_tour_clicked';
 const MODEL_CUSTOM_TOUR_CLICK_KEY = 'deepright_model_custom_tour_clicked';
+const MULTIMODAL_PROVIDER_TOUR_CLICK_KEY = 'deepright_multimodal_provider_tour_clicked';
 const MEDIA_OUTPUT_TOUR_CLICK_KEY = 'deepright_media_output_tour_clicked';
 const MODEL_CONFIG_GLOW_TOUR_SEEN_KEY = 'deepright_model_config_glow_tour_seen';
 const MODEL_URL_SAFETY_TOUR_CLICK_KEY = 'deepright_model_url_safety_tour_clicked';
@@ -8599,6 +8600,11 @@ const TASK_BADGE_LEAVE_MS = 220;
 
 // Per-chat streaming state: { chatId: { streaming: bool, abortCtrl: AbortController|null } }
 let chatStreaming = {};
+// Deleted chats can still have in-flight fetches and queue callbacks. Keep a
+// page-lifetime tombstone so late completions cannot recreate work for them.
+const deletedChatIds = new Set();
+const DELETE_CHAT_CANCEL_ATTEMPTS = 3;
+const DELETE_CHAT_CANCEL_RETRY_MS = 15000;
 let chatFooterInlineHints = {};
 let chatRequestFooterNotices = {};
 let chatTaskBadges = {};
@@ -11529,6 +11535,20 @@ function markModelCustomTourClickRecord() {
   } catch {}
 }
 
+function hasMultimodalProviderTourClickRecord() {
+  try {
+    return localStorage.getItem(MULTIMODAL_PROVIDER_TOUR_CLICK_KEY) === '1';
+  } catch {
+    return true;
+  }
+}
+
+function markMultimodalProviderTourClickRecord() {
+  try {
+    localStorage.setItem(MULTIMODAL_PROVIDER_TOUR_CLICK_KEY, '1');
+  } catch {}
+}
+
 function hasMediaOutputTourClickRecord() {
   try {
     return localStorage.getItem(MEDIA_OUTPUT_TOUR_CLICK_KEY) === '1';
@@ -12194,6 +12214,19 @@ function getOnboardingStepConfig(step) {
         cardWidth: 542,
         cardMinHeight: 126,
         cardNoWrap: true
+      };
+    case 'multimodal-provider-tour':
+      return {
+        domain: 'center',
+        selector: '#modelEntries .model-entry.onboarding-model-config-target.config-open .model-multimodal-provider-hint.show',
+        message: '可以通过配置代理模型，支持多模态能力。',
+        actionLabel: '完成',
+        padding: 10,
+        highlightPadding: 14,
+        cardPlacement: 'above',
+        cardWidth: 360,
+        cardMinHeight: 112,
+        cardOffsetY: 18
       };
     case 'media-output-tour-launch':
       return {
@@ -16648,7 +16681,7 @@ function handleModelConfigOverflowPreviewLeave(input) {
 }
 
 function isSettingsOnboardingStep(step) {
-  return ['models-intro', 'model-config-glow-toggle', 'model-config-glow-panel', 'custom-url', 'custom-fast', 'custom-thinking', 'custom-multi-input', 'custom-multi-output', 'media-output-tour-launch', 'media-output-tour-panel', 'media-output-tour-agent', 'model-url-safety-tour-toggle', 'new-agent', 'swarm-tour-toggle', 'swarm-tour-thinking', 'swarm-tour-model', 'swarm-tour-desc', 'swarm-tour-confirm', 'swarm-tour-settings-bee', 'remote-agent-tour-toggle', 'remote-agent-tour-panel', 'remote-agent-tour-confirm', 'remote-agent-tour-settings-save', 'remote-agent-tour-deviceid', 'sse-503-settings', 'agent-transfer-tour-export', 'agent-transfer-tour-import'].includes(String(step || '').trim());
+  return ['models-intro', 'model-config-glow-toggle', 'model-config-glow-panel', 'custom-url', 'custom-fast', 'custom-thinking', 'custom-multi-input', 'custom-multi-output', 'multimodal-provider-tour', 'media-output-tour-launch', 'media-output-tour-panel', 'media-output-tour-agent', 'model-url-safety-tour-toggle', 'new-agent', 'swarm-tour-toggle', 'swarm-tour-thinking', 'swarm-tour-model', 'swarm-tour-desc', 'swarm-tour-confirm', 'swarm-tour-settings-bee', 'remote-agent-tour-toggle', 'remote-agent-tour-panel', 'remote-agent-tour-confirm', 'remote-agent-tour-settings-save', 'remote-agent-tour-deviceid', 'sse-503-settings', 'agent-transfer-tour-export', 'agent-transfer-tour-import'].includes(String(step || '').trim());
 }
 
 function isModelConfigGlowTourOnboardingStep(step) {
@@ -16657,6 +16690,10 @@ function isModelConfigGlowTourOnboardingStep(step) {
 
 function isModelCustomTourOnboardingStep(step) {
   return ['custom-url', 'custom-fast', 'custom-thinking', 'custom-multi-input', 'custom-multi-output'].includes(String(step || '').trim());
+}
+
+function isMultimodalProviderTourOnboardingStep(step) {
+  return String(step || '').trim() === 'multimodal-provider-tour';
 }
 
 function isTaskStartTourOnboardingStep(step) {
@@ -22273,7 +22310,7 @@ function setOnboardingStep(step) {
   if (next === 'open-settings') {
     applyLeftSidebarState(false);
   }
-  if (isModelCustomTourOnboardingStep(next) || next === 'model-url-safety-tour-toggle') {
+  if (isModelCustomTourOnboardingStep(next) || isMultimodalProviderTourOnboardingStep(next) || next === 'model-url-safety-tour-toggle') {
     ensureOnboardingModelConfigOpen();
   }
   if (isTaskStartTourOnboardingStep(next)) {
@@ -22809,6 +22846,9 @@ function stopOnboarding(markComplete) {
   }
   onboardingState.active = false;
   onboardingState.step = '';
+  if (isMultimodalProviderTourOnboardingStep(lastStep)) {
+    closeMultimodalProviderMenus();
+  }
   setOnboardingTarget(null, null);
   syncSettingsOnboardingLayer(null, null);
   syncMemoMetaPreviewOnboardingLayer(null, null);
@@ -23699,6 +23739,24 @@ function startModelCustomTourOnboarding(entry) {
   ensureOnboardingModelConfigOpen(resolvedEntry);
   setOnboardingStep('custom-url');
   return true;
+}
+
+function startMultimodalProviderTourOnboarding(entry) {
+  return withOnboardingStartLock(() => {
+    if (hasMultimodalProviderTourClickRecord() || !isSettingsOpen()) return false;
+    const resolvedEntry = entry && entry.closest ? entry.closest('.model-entry') : null;
+    const model = normalizeModelName(resolvedEntry && resolvedEntry.querySelector('select') && resolvedEntry.querySelector('select').value);
+    if (!resolvedEntry || model === 'deepright') return false;
+    const hint = resolvedEntry.querySelector('.model-multimodal-provider-hint');
+    if (!hint) return false;
+    setOnboardingModelConfigEntryTarget(resolvedEntry);
+    closeMultimodalProviderMenus();
+    markMultimodalProviderTourClickRecord();
+    onboardingState.active = true;
+    setOnboardingStep('multimodal-provider-tour');
+    setMultimodalProviderHint(resolvedEntry, true);
+    return true;
+  });
 }
 
 function startMediaConfigTourOnboarding(entry, trigger) {
@@ -32369,6 +32427,7 @@ function releaseQueuedCenterRecoveredInsertHold(chatId, agentId, options) {
 function ensureQueuedCenterQueue(chatId, agentId) {
   const resolvedChatId = String(chatId || '').trim();
   const resolvedAgentId = String(agentId != null ? agentId : getChatAgentId(resolvedChatId)).trim();
+  if (isChatDeleted(resolvedChatId) || !state.chats[resolvedChatId]) return null;
   const scopeKey = getQueuedCenterScopeKey(resolvedChatId, resolvedAgentId);
   if (!scopeKey) return null;
   if (!queuedCenterRequests[scopeKey]) {
@@ -32741,7 +32800,7 @@ function mergeQueuedCenterInsertedItemsFromServer(chatId, agentId, items) {
 
 function shouldConvertQueuedCenterInsertedMessagesToPending(chatId) {
   const resolvedChatId = String(chatId || '').trim();
-  if (!resolvedChatId || isChatBusy(resolvedChatId) || isChatSendDispatching(resolvedChatId)) return false;
+  if (!resolvedChatId || isChatDeleted(resolvedChatId) || isChatBusy(resolvedChatId) || isChatSendDispatching(resolvedChatId)) return false;
   const chat = state.chats[resolvedChatId];
   if (!chat) return true;
   if (chat.pendingRequest) return false;
@@ -32827,13 +32886,20 @@ function syncQueuedCenterInsertedMessagesFromServer(chatId, agentId, options) {
   const resolvedAgentId = String(agentId != null ? agentId : getChatAgentId(resolvedChatId)).trim();
   const scopeKey = getQueuedCenterScopeKey(resolvedChatId, resolvedAgentId);
   const opts = options || {};
-  if (!scopeKey) return Promise.resolve([]);
+  if (!scopeKey || isChatDeleted(resolvedChatId) || !state.chats[resolvedChatId]) return Promise.resolve([]);
   const previous = queuedCenterInsertRestoreTasks[scopeKey] || Promise.resolve([]);
   const task = previous
     .catch(() => [])
     .then(async () => {
       try {
         const fetchedItems = await fetchQueuedCenterMessageInsertList(resolvedChatId, opts.limit || QUEUED_CENTER_REQUEST_LIMIT);
+        if (isChatDeleted(resolvedChatId) || !state.chats[resolvedChatId]) {
+          const deletedTids = fetchedItems.map(item => String(item && item.tid || '').trim()).filter(Boolean);
+          if (deletedTids.length > 0) {
+            try { await postQueuedCenterMessageInsertDelete(resolvedChatId, deletedTids); } catch {}
+          }
+          return [];
+        }
         const staleMaterializedTids = [];
         const items = fetchedItems.filter(rawItem => {
           const tid = String(rawItem && rawItem.tid || '').trim();
@@ -32972,6 +33038,10 @@ async function insertQueuedCenterRequest(event, chatId, agentId, itemId) {
   syncQueuedCenterInputUI(resolvedChatId, resolvedAgentId);
   try {
     await postQueuedCenterMessageInsertAdd(resolvedAgentId, resolvedChatId, tid, String(item.text || ''));
+    if (isChatDeleted(resolvedChatId) || !state.chats[resolvedChatId]) {
+      try { await postQueuedCenterMessageInsertDelete(resolvedChatId, [tid]); } catch {}
+      return false;
+    }
     const state = getQueuedCenterInsertState(item);
     if (!state) return true;
     state.phase = 'tracking';
@@ -32994,6 +33064,10 @@ async function syncQueuedCenterInsertedMessage(chatId, agentId, item) {
   if (!state || !state.tid || state.removing) return true;
   try {
     await postQueuedCenterMessageInsertAdd(state.agentId || agentId, chatId, state.tid, String(item && item.text || ''));
+    if (isChatDeleted(chatId) || !state.chats[chatId]) {
+      try { await postQueuedCenterMessageInsertDelete(chatId, [state.tid]); } catch {}
+      return false;
+    }
     state.phase = 'tracking';
     state.status = 0;
     state.error = false;
@@ -34014,6 +34088,7 @@ function collapseRequestAssistantsToSingleCancelled(chat, userIndex, ts) {
 }
 
 function scheduleQueuedCenterRequestDrain(chatId, agentId) {
+  if (isChatDeleted(chatId) || !state.chats[chatId]) return;
   const resolvedAgentId = String(agentId != null ? agentId : getChatAgentId(chatId)).trim();
   const queue = getQueuedCenterQueue(chatId, resolvedAgentId);
   syncQueuedCenterRecoveredInsertHold(chatId, resolvedAgentId);
@@ -34024,6 +34099,7 @@ function scheduleQueuedCenterRequestDrain(chatId, agentId) {
   const scopeKey = String(queue.scopeKey || getQueuedCenterScopeKey(chatId, resolvedAgentId)).trim();
   queue.draining = true;
   setTimeout(async () => {
+    if (isChatDeleted(chatId) || !state.chats[chatId]) return;
     const latestQueue = scopeKey ? queuedCenterRequests[scopeKey] || null : null;
     if (!latestQueue) {
       syncQueuedCenterInputUI(chatId, resolvedAgentId);
@@ -34039,6 +34115,7 @@ function scheduleQueuedCenterRequestDrain(chatId, agentId) {
       const insertDeleted = await ensureQueuedCenterInsertDeleted(chatId, nextItem, {
         errorMessage: '删除插入待处理消息失败，已阻止自动发送'
       });
+      if (isChatDeleted(chatId) || !state.chats[chatId]) return;
       if (!insertDeleted) {
         syncQueuedCenterInputUI(chatId, resolvedAgentId);
         return;
@@ -34643,6 +34720,7 @@ function createNewChat(preferredId) {
   let id = requestedId || uuid();
   if (requestedId && state.chats[id]) return false;
   while (!requestedId && state.chats[id]) id = uuid();
+  deletedChatIds.delete(id);
   state.chats[id] = { id, messages: [], lastMsg: '新会话', lastCompletionNoticeAt: '', coldHistoryTailAt: '', coldHistoryTailId: 0, historyBeforeAt: '', historyBeforeId: 0, historyHasMore: false };
   state.chatOrder.unshift(id);
   // Bind current agent and model to new chat
@@ -34672,26 +34750,119 @@ function cancelDelete() {
   setOverlayVisible(document.getElementById('deleteConfirmOverlay'), false, document.getElementById('deleteConfirm'));
 }
 
+function isChatDeleted(chatId) {
+  const resolvedChatId = String(chatId || '').trim();
+  return !!(resolvedChatId && deletedChatIds.has(resolvedChatId));
+}
+
+function collectQueuedCenterInsertTidsForChat(chatId) {
+  const resolvedChatId = String(chatId || '').trim();
+  const tids = new Set();
+  if (!resolvedChatId) return tids;
+  Object.keys(queuedCenterRequests).forEach(scopeKey => {
+    const queue = queuedCenterRequests[scopeKey];
+    if (!queue || String(queue.chatId || '').trim() !== resolvedChatId) return;
+    (Array.isArray(queue.items) ? queue.items : []).forEach(item => {
+      const tid = getQueuedCenterInsertTid(item);
+      if (tid) tids.add(tid);
+    });
+  });
+  return tids;
+}
+
+function stopDeletedChatAsyncWork(chatId) {
+  const resolvedChatId = String(chatId || '').trim();
+  const chat = state.chats[resolvedChatId];
+  const stream = chatStreaming[resolvedChatId];
+  const restore = restorePolling[resolvedChatId];
+  const preflight = preflightTimers[resolvedChatId];
+  const shouldCancelServer = !!(
+    (stream && stream.requestDispatched !== false)
+    || (restore && restore.active)
+    || (chat && chat.pendingRequest)
+  );
+  bumpChatConversationMutationToken(resolvedChatId);
+  if (stream) {
+    stream.cancelling = true;
+    if (stream.abortCtrl) stream.abortCtrl.abort();
+    delete chatStreaming[resolvedChatId];
+  }
+  if (preflight) {
+    if (preflight.timer) clearTimeout(preflight.timer);
+    delete preflightTimers[resolvedChatId];
+    if (typeof preflight.reject === 'function') {
+      try { preflight.reject(new DOMException('Aborted', 'AbortError')); } catch {}
+    }
+  }
+  stopChatRestorePolling(resolvedChatId);
+  stopLiveCliEventPolling(resolvedChatId);
+  setChatSendDispatching(resolvedChatId, false);
+  delete chatCancellationRecovery[resolvedChatId];
+  return shouldCancelServer;
+}
+
+async function clearDeletedChatServerQueue(chatId, initialTids) {
+  const resolvedChatId = String(chatId || '').trim();
+  const tids = initialTids instanceof Set ? new Set(initialTids) : new Set();
+  let failed = false;
+  try {
+    const items = await fetchQueuedCenterMessageInsertList(resolvedChatId, 20);
+    items.forEach(item => {
+      const tid = String(item && item.tid || '').trim();
+      if (tid) tids.add(tid);
+    });
+  } catch {
+    failed = true;
+  }
+  if (tids.size > 0) {
+    try {
+      await postQueuedCenterMessageInsertDelete(resolvedChatId, Array.from(tids));
+    } catch {
+      failed = true;
+    }
+  }
+  if (failed) vfsShowUploadToast('会话已删除，但待发送消息清理失败', true);
+  return !failed;
+}
+
+async function cancelDeletedChatServerRequest(chatId) {
+  const cancelled = await requestChatCancel(chatId, {
+    attempts: DELETE_CHAT_CANCEL_ATTEMPTS,
+    retryDelayMs: DELETE_CHAT_CANCEL_RETRY_MS,
+    awaitConnection: true
+  });
+  if (!cancelled) vfsShowUploadToast('会话已删除，但取消请求失败，后端可能仍在处理', true);
+  return cancelled;
+}
+
+function cleanUpDeletedChat(chatId) {
+  const resolvedChatId = String(chatId || '').trim();
+  if (!resolvedChatId) return;
+  const queuedInsertTids = collectQueuedCenterInsertTidsForChat(resolvedChatId);
+  const shouldCancelServer = stopDeletedChatAsyncWork(resolvedChatId);
+  clearQueuedCenterQueuesForChat(resolvedChatId);
+  void clearDeletedChatServerQueue(resolvedChatId, queuedInsertTids);
+  if (shouldCancelServer) void cancelDeletedChatServerRequest(resolvedChatId);
+}
+
 function confirmDelete() {
   const id = pendingDeleteId;
   if (!id) return;
   setOverlayVisible(document.getElementById('deleteConfirmOverlay'), false, document.getElementById('deleteConfirm'));
   pendingDeleteId = null;
+  deletedChatIds.add(id);
+  cleanUpDeletedChat(id);
   delete state.chats[id];
   clearPageAnnotationsForChat(id, { skipRender: true });
-  // Abort and clean up streaming for deleted chat
-  if (chatStreaming[id]) {
-    if (chatStreaming[id].abortCtrl) chatStreaming[id].abortCtrl.abort();
-    delete chatStreaming[id];
-  }
-  stopChatRestorePolling(id);
   removeChatSkillIndicatorState(id);
   delete restoreReloadQueue[id];
   delete restoreNoDataTipKeys[id];
   delete chatDrafts[id];
   delete chatStickyNotes[id];
+  clearMemoViewRecovery(id);
   clearChatTaskBadges(id);
-  clearQueuedCenterQueuesForChat(id);
+  clearChatFooterInlineHint(id);
+  clearChatRequestFooterNotice(id);
   delete chatModels[id];
   delete chatAgents[id];
   delete chatThinking[id];
@@ -41801,7 +41972,7 @@ async function submitCenterMessageEdit(event) {
 async function sendCenterMessage(rawText, options) {
   const opts = options || {};
   const chatId = String(opts.chatId || state.activeChat || '').trim();
-  if (!chatId || isChatBusy(chatId) || isChatSendDispatching(chatId)) return false;
+  if (!chatId || isChatDeleted(chatId) || !state.chats[chatId] || isChatBusy(chatId) || isChatSendDispatching(chatId)) return false;
   if (agentSelectOverlayVisible) return false;
   const preserveToggleMetadata = !!opts.preserveToggleMetadata;
   let requestSource = String(opts.requestSource || '').trim();
@@ -41889,6 +42060,7 @@ async function sendCenterMessage(rawText, options) {
     // Check agent validity before sending
     const valid = await checkAgentValidity(chatId);
     if (!valid) return false;
+    if (isChatDeleted(chatId) || !state.chats[chatId]) return false;
     const pageResponseCodes = await readPageResponseCodes();
     const chatAgentId = String(chatAgents[chatId] || state.settings.agentId || '').trim();
     const routerRemote = await getAgentRouterRemoteConfig(chatAgentId);
@@ -48115,7 +48287,10 @@ function setMultimodalProviderHint(entry, visible) {
   const hint = entry.querySelector('.model-multimodal-provider-hint');
   if (!hint) return;
   hint.textContent = '正在指定代理多模态模型';
-  hint.classList.toggle('show', !!visible);
+  const keepVisibleForTour = isOnboardingActive()
+    && isMultimodalProviderTourOnboardingStep(onboardingState.step)
+    && entry.classList.contains('onboarding-model-config-target');
+  hint.classList.toggle('show', !!visible || keepVisibleForTour);
 }
 
 function closeMultimodalProviderMenus(exceptWrap) {
@@ -48125,6 +48300,10 @@ function closeMultimodalProviderMenus(exceptWrap) {
     const trigger = wrap.querySelector('.model-multimodal-provider-trigger');
     if (trigger) trigger.setAttribute('aria-expanded', 'false');
     setMultimodalProviderHint(wrap.closest('.model-entry'), false);
+  });
+  document.querySelectorAll('#modelEntries .model-entry').forEach(entry => {
+    if (exceptWrap && entry.contains(exceptWrap)) return;
+    setMultimodalProviderHint(entry, false);
   });
 }
 
@@ -48146,6 +48325,7 @@ function toggleMultimodalProviderMenu(trigger) {
   if (!wrap || !entry || trigger.disabled) return;
   ensureMultimodalProviderMenuDismissListener();
   const willOpen = !wrap.classList.contains('multimodal-provider-open');
+  if (willOpen && startMultimodalProviderTourOnboarding(entry)) return;
   closeMultimodalProviderMenus(willOpen ? wrap : null);
   wrap.classList.toggle('multimodal-provider-open', willOpen);
   trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');

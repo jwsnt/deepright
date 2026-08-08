@@ -30,6 +30,7 @@ http://127.0.0.1:9876/site/
 - 当前服务商不支持该能力时，模型名输入框不可编辑，但仍可选择服务商引用。
 - 当前服务商不支持该能力时，字段默认保持为空；只有通过小箭头选择服务商后才会配置代理。
 - 打开代理菜单时，配置区底部会临时显示“正在指定代理多模态模型”；暖色界面显示暖色光带，冷色界面显示冷色光带。选择、移出菜单或按 `Esc` 后提示会自动消失。
+- 当前浏览器首次点击任一非 `deepright` 模型客户化配置中“多模态输入”或“多模态输出”左侧的小箭头时，会额外显示独立新手引导：代理菜单会先关闭，再高亮“正在指定代理多模态模型”并提示“可以通过配置代理模型，支持多模态能力。”；点击 `完成` 后需再次点击小箭头才能选择服务商。这条记录在引导展示时立即保存，输入／输出和所有模型客户化配置共用同一条首次记录；关闭设置里的“新手引导”总开关后不会触发。
 - 未展开客户化配置时，点击测试并成功后，密钥输入区会短暂显示“✓ 配置成功”约 2 秒；展开客户化配置后的成功提示保持原有位置。
 - 删除某服务商会自动清空其它模型对该服务商的多模态引用。
 
@@ -566,6 +567,8 @@ Seedream 特殊说明：
 - 当前请求执行中时，如果点击的是取消按钮，则会优先取消当前正在执行的那一轮请求，而不是重复向待发送列表追加消息
 - 当前请求结束后，待发送列表会按顺序自动发送；轮到某条消息时，页面会先清理它关联的 `message_insert` 记录，清理成功才会把它从列表里移除并继续发送
 - 如果上述 `message_insert` 清理失败，这条消息会继续留在队列头部，当前轮自动发送会直接停住，等待下次重试或人工处理
+- 确认删除会话时，页面会立即中止该会话的预发送、SSE 读取、恢复轮询和自动出队，并清空浏览器内的待发送消息；同时查询并物理删除服务端 `message_insert` 中该会话仍待处理的消息。删除与响应完成或自动出队同时发生时，删除优先，晚到结果不会恢复会话或再发起请求。
+- 对已经发往服务端的会话请求，页面会立刻调用取消接口；若未确认成功，之后每隔 `15` 秒再尝试一次，最多共 `3` 次。三次均失败后不再持续重试，并提示“会话已删除，但取消请求失败，后端可能仍在处理”；待发送消息清理失败也会提示。
 - 待发送消息一旦从队列里取出开始执行，就不会因为成功、取消、异常或其他终止状态再次自动塞回队列，整个队列始终保持严格的单向消费
 - 待发送列表浮层会保持在输入区同域的最高展示层级，不会再被沙盒按钮、全屏按钮或同区域其他浮层遮挡
 - 响应实时流式渲染，支持标准 Markdown、LaTeX 公式（例如 `$E=mc^2$`、`$$\int_0^1 x^2 dx$$`）、图片、HTML 嵌入
@@ -955,6 +958,7 @@ Header 中 `Authorization` 为对应模型的密钥。
 - assistant 响应 URL / 路径行内气泡与点击动作浮层：`/path/to/deepright/cli/module/site/iteration/20260704-4/REQUIREMENT.md`
 - assistant URL / 路径气泡与 restore 恢复 CLI 子任务历史：`/path/to/deepright/cli/module/site/iteration/20260705-1/REQUIREMENT.md`
 - 特殊 SSE 新开浏览器页面：`/path/to/deepright/cli/module/site/iteration/20260804-1/REQUIREMENT.md`
+- 删除会话时取消请求与待发送队列：`/path/to/deepright/cli/module/site/iteration/20260808-3/REQUIREMENT.md`；使用说明：`/path/to/deepright/cli/module/site/iteration/20260808-3/USER_GUIDE.md`
 - 冷历史会话轻量恢复：`/path/to/deepright/cli/module/site/iteration/20260709-1/REQUIREMENT.md`
 - 本地存储预算自动治理：`/path/to/deepright/cli/module/site/iteration/20260711-3/REQUIREMENT.md`
 - 首次点击右侧备忘录区域引导：`/path/to/deepright/cli/module/site/iteration/20260526-3/REQUIREMENT.md`
@@ -973,6 +977,7 @@ Header 中 `Authorization` 为对应模型的密钥。
 - 首次点击右侧知识库自动整理开关引导：`/path/to/deepright/cli/module/site/iteration/20260530-2/REQUIREMENT.md`
 - 首次点击模型客户化配置 URL 引导：`/path/to/deepright/cli/module/site/iteration/20260530-3/REQUIREMENT.md`
 - 首次点击模型客户化配置小图标引导：`/path/to/deepright/cli/module/site/iteration/20260607-1/REQUIREMENT.md`
+- 首次点击多模态代理选择小箭头引导：`/path/to/deepright/cli/module/site/iteration/20260808-2/REQUIREMENT.md`；使用说明：`/path/to/deepright/cli/module/site/iteration/20260808-2/USER_GUIDE.md`
 - 首次点击 `deviceId` 复制 / `R` 小图标远程 Agent 引导：`/path/to/deepright/cli/module/site/iteration/20260530-5/REQUIREMENT.md`
 - 插件浮层参数展示 `key + placeholder`：`/path/to/deepright/cli/module/site/iteration/20260610-6/REQUIREMENT.md`
 - 插件 `scope` 规则来源：`/path/to/deepright/cli/module/connect/PLUGIN.md`
