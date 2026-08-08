@@ -2064,17 +2064,17 @@ body.queued-center-sort-active,body.queued-center-sort-active *{user-select:none
 .input-editable *{text-align:center}
 .input-editable:empty::before{content:attr(data-placeholder);color:var(--text-muted)}
 .input-editable.locked{opacity:.72;cursor:not-allowed}
-.input-editable .at-bubble{display:inline-flex;align-items:center;gap:3px;box-sizing:border-box;max-width:calc(100% - 4px);min-width:0;overflow:hidden;background:linear-gradient(180deg,var(--input-bubble-bg-start),var(--input-bubble-bg-end));border:1px solid var(--input-bubble-border);box-shadow:var(--input-bubble-shadow);color:var(--input-bubble-text);font-size:12px;padding:1px 7px;border-radius:10px;vertical-align:middle;margin:0 2px;user-select:all;line-height:1.6;position:relative;transition:background .24s ease,border-color .24s ease,color .24s ease,box-shadow .24s ease,filter .16s ease}
-.input-editable .at-bubble[data-prefix="[FILE:"]{--input-bubble-bg-start:var(--input-bubble-file-bg-start);--input-bubble-bg-end:var(--input-bubble-file-bg-end);--input-bubble-border:var(--input-bubble-file-border);--input-bubble-text:var(--input-bubble-file-text);cursor:pointer}
-.input-editable .at-bubble[data-prefix="[FILE:"]:hover{filter:brightness(1.04)}
+.input-editable .at-bubble,#miniappDebugReasonInput .at-bubble{display:inline-flex;align-items:center;gap:3px;box-sizing:border-box;max-width:calc(100% - 4px);min-width:0;overflow:hidden;background:linear-gradient(180deg,var(--input-bubble-bg-start),var(--input-bubble-bg-end));border:1px solid var(--input-bubble-border);box-shadow:var(--input-bubble-shadow);color:var(--input-bubble-text);font-size:12px;padding:1px 7px;border-radius:10px;vertical-align:middle;margin:0 2px;user-select:all;line-height:1.6;position:relative;transition:background .24s ease,border-color .24s ease,color .24s ease,box-shadow .24s ease,filter .16s ease}
+.input-editable .at-bubble[data-prefix="[FILE:"],.input-editable .at-bubble[data-bubble-kind="url"],#miniappDebugReasonInput .at-bubble[data-prefix="[FILE:"],#miniappDebugReasonInput .at-bubble[data-bubble-kind="url"]{--input-bubble-bg-start:var(--input-bubble-file-bg-start);--input-bubble-bg-end:var(--input-bubble-file-bg-end);--input-bubble-border:var(--input-bubble-file-border);--input-bubble-text:var(--input-bubble-file-text);cursor:pointer}
+.input-editable .at-bubble[data-prefix="[FILE:"]:hover,.input-editable .at-bubble[data-bubble-kind="url"]:hover,#miniappDebugReasonInput .at-bubble[data-prefix="[FILE:"]:hover,#miniappDebugReasonInput .at-bubble[data-bubble-kind="url"]:hover{filter:brightness(1.04)}
 .input-editable .at-bubble[data-prefix="[SKILL:"]{--input-bubble-bg-start:var(--input-bubble-skill-bg-start);--input-bubble-bg-end:var(--input-bubble-skill-bg-end);--input-bubble-border:var(--input-bubble-skill-border);--input-bubble-text:var(--input-bubble-skill-text)}
 .input-editable .at-bubble[data-prefix="[TEAM:"]{--input-bubble-bg-start:var(--input-bubble-team-bg-start);--input-bubble-bg-end:var(--input-bubble-team-bg-end);--input-bubble-border:var(--input-bubble-team-border);--input-bubble-text:var(--input-bubble-team-text)}
 .input-editable .at-bubble[data-bubble-kind="image"]{--input-bubble-bg-start:var(--input-bubble-image-bg-start);--input-bubble-bg-end:var(--input-bubble-image-bg-end);--input-bubble-border:var(--input-bubble-image-border);--input-bubble-text:var(--input-bubble-image-text)}
-.input-editable .at-bubble .bubble-label{display:inline-block;max-width:320px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.input-editable .at-bubble .bubble-del{flex:0 0 auto}
-.input-editable .at-bubble .bubble-del{width:10px;height:10px;opacity:.5;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;border:none;background:none;padding:0;vertical-align:middle}
-.input-editable .at-bubble .bubble-del:hover{opacity:1}
-.input-editable .at-bubble .bubble-del svg{width:10px;height:10px;color:currentColor}
+.input-editable .at-bubble .bubble-label,#miniappDebugReasonInput .at-bubble .bubble-label{display:inline-block;max-width:320px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.input-editable .at-bubble .bubble-del,#miniappDebugReasonInput .at-bubble .bubble-del{flex:0 0 auto}
+.input-editable .at-bubble .bubble-del,#miniappDebugReasonInput .at-bubble .bubble-del{width:10px;height:10px;opacity:.5;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;border:none;background:none;padding:0;vertical-align:middle}
+.input-editable .at-bubble .bubble-del:hover,#miniappDebugReasonInput .at-bubble .bubble-del:hover{opacity:1}
+.input-editable .at-bubble .bubble-del svg,#miniappDebugReasonInput .at-bubble .bubble-del svg{width:10px;height:10px;color:currentColor}
 .rs-note-input .at-bubble{max-width:calc(100% - 4px)}
 .rs-note-input .at-bubble .bubble-label{max-width:240px}
 .sticky-note-widget{position:fixed;inset:0;z-index:2147483647;pointer-events:none}
@@ -40813,10 +40813,10 @@ function insertStickyUrlBubble(url) {
   const input = getStickyNoteInput();
   const value = String(url || '').trim();
   if (!input || !value) return false;
-  insertBubbleAtCursor('[URL:' + value + ']', value, input, {
-    bubbleKind: 'url',
-    valuePrefix: '[URL:',
-    valueSuffix: ']'
+  const link = resolveMessageHttpLink(value);
+  if (!link) return false;
+  insertBubbleAtCursor('[URL:' + buildMessageHttpBubbleLabel(link.href, value) + ']', value, input, {
+    bubbleKind: 'url'
   });
   return true;
 }
@@ -49921,6 +49921,142 @@ function handleInput(el) {
   if (el.id === 'msgInput') syncCenterComposerState(state.activeChat);
   if (el.id === 'stickyNoteInput') scheduleStickyNotePersist();
 }
+
+const AUTO_INPUT_BUBBLE_SELECTOR = '.input-editable, #miniappDebugReasonInput';
+
+function getAutoBubbleEditableInput(target) {
+  const element = target instanceof Element ? target : target && target.parentElement;
+  if (!(element instanceof Element)) return null;
+  const input = element.closest(AUTO_INPUT_BUBBLE_SELECTOR);
+  return input instanceof Element && !input.closest('[data-canvas-content]') ? input : null;
+}
+
+function isAutoBubbleInputTextNode(node, input) {
+  if (!node || node.nodeType !== Node.TEXT_NODE || !String(node.textContent || '').trim()) return false;
+  const parent = node.parentElement;
+  return !!(parent && input.contains(parent) && !parent.closest('.at-bubble'));
+}
+
+function getAutoBubbleMatches(text) {
+  return findMessagePathMatches(text);
+}
+
+function buildAutoInputBubble(ownerDoc, match) {
+  const bubble = ownerDoc.createElement('span');
+  const rawValue = String(match && match.text || '').trim();
+  const isFile = match && match.kind === 'file';
+  const value = isFile && /^\[FILE:/i.test(rawValue)
+    ? String(match.filePath || rawValue).trim()
+    : rawValue;
+  const display = isFile
+    ? '[FILE:' + buildMessageFileBubbleLabel(rawValue, match.filePath) + ']'
+    : '[URL:' + buildMessageHttpBubbleLabel(match.href, rawValue) + ']';
+  bubble.className = 'at-bubble';
+  bubble.contentEditable = 'false';
+  bubble.setAttribute('data-value', value);
+  bubble.setAttribute('data-prefix', isFile ? '[FILE:' : '');
+  bubble.setAttribute('data-suffix', isFile ? ']' : '');
+  bubble.setAttribute('data-bubble-kind', isFile ? 'file' : 'url');
+  bubble.setAttribute('title', rawValue || value);
+  bubble.innerHTML = buildBubbleHtml(display);
+  return bubble;
+}
+
+function setAutoInputBubbleCaret(selection, restore) {
+  if (!selection || !restore) return;
+  const range = document.createRange();
+  if (restore.kind === 'text' && restore.node && restore.node.isConnected) {
+    range.setStart(restore.node, Math.max(0, Math.min(restore.offset, restore.node.textContent.length)));
+  } else if (restore.kind === 'before' && restore.node && restore.node.isConnected) {
+    range.setStartBefore(restore.node);
+  } else if (restore.kind === 'after' && restore.node && restore.node.isConnected) {
+    range.setStartAfter(restore.node);
+  } else {
+    return;
+  }
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+function replaceAutoBubbleTextNode(node, matches, selectionState) {
+  if (!node || !node.parentNode || !matches.length) return null;
+  const source = String(node.textContent || '');
+  const ownerDoc = node.ownerDocument || document;
+  const fragment = ownerDoc.createDocumentFragment();
+  let cursor = 0;
+  let restore = null;
+  const selectedHere = selectionState && selectionState.node === node ? selectionState.offset : -1;
+  const appendText = (start, end) => {
+    if (end <= start) return null;
+    const textNode = ownerDoc.createTextNode(source.slice(start, end));
+    fragment.appendChild(textNode);
+    if (selectedHere >= start && selectedHere <= end && !restore) {
+      restore = { kind: 'text', node: textNode, offset: selectedHere - start };
+    }
+    return textNode;
+  };
+  matches.forEach(match => {
+    const start = Math.max(cursor, match.start);
+    appendText(cursor, start);
+    const bubble = buildAutoInputBubble(ownerDoc, match);
+    fragment.appendChild(bubble);
+    if (!restore && selectedHere >= start && selectedHere <= match.end) {
+      restore = selectedHere === start ? { kind: 'before', node: bubble } : { kind: 'after', node: bubble };
+    }
+    cursor = match.end;
+  });
+  const tail = appendText(cursor, source.length);
+  if (!restore && selectedHere >= cursor) {
+    restore = tail ? { kind: 'text', node: tail, offset: selectedHere - cursor } : null;
+  }
+  node.parentNode.replaceChild(fragment, node);
+  return restore;
+}
+
+function autoConvertEditableInputBubbles(input) {
+  if (!(input instanceof Element) || !input.matches(AUTO_INPUT_BUBBLE_SELECTOR)) return false;
+  const selection = window.getSelection();
+  const range = selection && selection.rangeCount === 1 ? selection.getRangeAt(0) : null;
+  const selectionState = range && range.collapsed && input.contains(range.startContainer) && range.startContainer.nodeType === Node.TEXT_NODE
+    ? { node: range.startContainer, offset: range.startOffset }
+    : null;
+  const walker = document.createTreeWalker(input, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      return isAutoBubbleInputTextNode(node, input) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+    }
+  });
+  const pending = [];
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    const matches = getAutoBubbleMatches(node.textContent);
+    if (matches.length) pending.push({ node, matches });
+  }
+  if (!pending.length) return false;
+  let restore = null;
+  pending.forEach(item => {
+    const nextRestore = replaceAutoBubbleTextNode(item.node, item.matches, selectionState);
+    if (!restore && nextRestore) restore = nextRestore;
+  });
+  setAutoInputBubbleCaret(selection, restore);
+  return true;
+}
+
+function syncAutoInputBubbleMutation(input) {
+  if (!input) return;
+  if (input.id === 'msgInput') syncCenterComposerState(state.activeChat);
+  if (input.id === 'stickyNoteInput') scheduleStickyNotePersist();
+  if (input.id === 'miniappDebugReasonInput') syncMiniappDebugConfirmState();
+}
+
+function finalizeEditableInputBubbles(input) {
+  if (autoConvertEditableInputBubbles(input)) syncAutoInputBubbleMutation(input);
+}
+
+document.addEventListener('blur', event => {
+  const input = getAutoBubbleEditableInput(event.target);
+  if (input) finalizeEditableInputBubbles(input);
+}, true);
 
 function getAtMenuId() {
   if (atSourceEl && atSourceEl.id === 'stickyNoteInput') return 'stickyNoteAtMenu';
@@ -64077,7 +64213,7 @@ async function showMessagePathActionsForAnchor(anchor) {
 }
 
 function isInputActionBubbleElement(target) {
-  const bubble = closestFromEventTarget(target, '#msgInput .at-bubble, #rsNoteInput .at-bubble');
+  const bubble = closestFromEventTarget(target, '.input-editable .at-bubble, #miniappDebugReasonInput .at-bubble');
   if (!(bubble instanceof Element)) return null;
   const prefix = String(bubble.getAttribute('data-prefix') || '').trim();
   const rawValue = getInputBubbleRawValue(bubble);
@@ -68389,6 +68525,8 @@ document.addEventListener('paste', async e => {
     e.preventDefault();
     const text = clipboard.getData('text/plain');
     document.execCommand('insertText', false, text);
+    const input = getAutoBubbleEditableInput(el);
+    if (input) finalizeEditableInputBubbles(input);
   }
 });
 
