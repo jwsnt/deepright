@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	messageinsert "cli-get/messageinsert"
 	"compress/gzip"
 	"database/sql"
@@ -255,6 +256,26 @@ func TestShouldSleepAfterHeartbeat(t *testing.T) {
 	}
 	if !shouldSleepAfterHeartbeat(nil, io.EOF) {
 		t.Fatal("shouldSleepAfterHeartbeat(nil, err) = false, want true")
+	}
+}
+
+func TestHeartbeatStateLoggerRecordsOnlyStateTransitions(t *testing.T) {
+	var output bytes.Buffer
+	logger := newHeartbeatStateLogger(&output)
+	logger.now = func() time.Time {
+		return time.Date(2026, time.August, 9, 12, 34, 56, 0, time.FixedZone("CST", 8*60*60))
+	}
+
+	logger.transition(heartbeatStateFetch, "heartbeat")
+	logger.transition(heartbeatStateFetch, "immediate_retry")
+	logger.transition(heartbeatStateAwait, "idle_check_reached")
+	logger.transition(heartbeatStateSleep, "heartbeat_error")
+
+	want := "cli-get: state transition time=2026-08-09T12:34:56+08:00 from=init to=fetch reason=heartbeat\n" +
+		"cli-get: state transition time=2026-08-09T12:34:56+08:00 from=fetch to=await reason=idle_check_reached\n" +
+		"cli-get: state transition time=2026-08-09T12:34:56+08:00 from=await to=sleep reason=heartbeat_error\n"
+	if got := output.String(); got != want {
+		t.Fatalf("state transition logs = %q, want %q", got, want)
 	}
 }
 

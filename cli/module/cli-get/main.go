@@ -907,6 +907,45 @@ func shouldAwaitAfterCliGetFailure(immediatelyRetryByCheck bool) bool {
 	return !immediatelyRetryByCheck
 }
 
+// heartbeatState is the lifecycle state of the main cli/get polling loop.
+// Keeping it separate from task execution makes a blocked upstream request,
+// an idle poll interval, and an error backoff distinguishable in the logs.
+type heartbeatState string
+
+const (
+	heartbeatStateInit  heartbeatState = "init"
+	heartbeatStateFetch heartbeatState = "fetch"
+	heartbeatStateAwait heartbeatState = "await"
+	heartbeatStateSleep heartbeatState = "sleep"
+)
+
+type heartbeatStateLogger struct {
+	state  heartbeatState
+	now    func() time.Time
+	writer io.Writer
+}
+
+func newHeartbeatStateLogger(writer io.Writer) *heartbeatStateLogger {
+	return &heartbeatStateLogger{
+		state:  heartbeatStateInit,
+		now:    time.Now,
+		writer: writer,
+	}
+}
+
+// transition records only actual state changes so a sequence of immediate
+// heartbeat retries does not flood stdout.
+func (logger *heartbeatStateLogger) transition(next heartbeatState, reason string) {
+	if logger == nil || logger.state == next {
+		return
+	}
+	if logger.writer != nil {
+		fmt.Fprintf(logger.writer, "cli-get: state transition time=%s from=%s to=%s reason=%s\n",
+			logger.now().Format(time.RFC3339Nano), logger.state, next, reason)
+	}
+	logger.state = next
+}
+
 func sandboxStateForTask(metadata *AgentOutput, task *TaskContent) (sandboxStateRecord, error) {
 	if taskShouldBypassSandbox(task) {
 		return sandboxStateRecord{}, nil
@@ -1624,17 +1663,21 @@ func main() {
 	fmt.Printf("cli-get started: host=%s, agent-dir=%s, threads=%d, queue=%d, sleep=%dms, await=%dms, check=%d, retry_interval=%dms, retry_times=%d, sandbox_app=%s\n",
 		cfg.Host, cfg.AgentDir, cfg.Thread, cfg.Queue, cfg.SleepMs, cfg.AwaitMs, cfg.Check, cfg.RetryIntervalMs, cfg.RetryTimes, cfg.SandboxApp)
 	commandCheck := newCliGetCommandCheck()
+	stateLogger := newHeartbeatStateLogger(os.Stdout)
 
 	// Master heartbeat loop
 	for {
 		if len(taskQueue) >= cap(taskQueue) {
 			fmt.Printf("cli-get: task queue full pending=%d capacity=%d, skip /cli/get\n", len(taskQueue), cap(taskQueue))
+			stateLogger.transition(heartbeatStateSleep, "task_queue_full")
 			time.Sleep(sleepDur)
 			continue
 		}
+		stateLogger.transition(heartbeatStateFetch, "heartbeat")
 		metadata, err := getAgentOutput(cfg.AgentDir, cfg.Device, agentTTL)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "agent scan error: %v\n", err)
+			stateLogger.transition(heartbeatStateSleep, "agent_scan_error")
 			time.Sleep(sleepDur)
 			continue
 		}
@@ -1644,9 +1687,11 @@ func main() {
 			fmt.Fprintf(os.Stderr, "heartbeat error: %v\n", err)
 			if shouldAwaitAfterCliGetFailure(commandCheck.shouldImmediatelyRetry(false, cfg.Check)) {
 				heartbeatBackoff = sleepDur
+				stateLogger.transition(heartbeatStateAwait, "heartbeat_error_check_reached")
 				time.Sleep(awaitDur)
 				continue
 			}
+			stateLogger.transition(heartbeatStateSleep, "heartbeat_error")
 			time.Sleep(heartbeatBackoff)
 			heartbeatBackoff = nextHeartbeatBackoff(heartbeatBackoff, sleepDur, maxHeartbeatBackoff)
 			continue
@@ -1665,6 +1710,7 @@ func main() {
 		if immediatelyRetry {
 			continue
 		}
+		stateLogger.transition(heartbeatStateAwait, "idle_check_reached")
 		time.Sleep(awaitDur)
 	}
 }
