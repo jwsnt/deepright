@@ -618,6 +618,7 @@ type TaskContent struct {
 	Chat    string `json:"chat"`
 	SubOps  struct {
 		Exempted bool     `json:"exempted"`
+		Echo     bool     `json:"echo"`
 		App      []string `json:"app"`
 		W        []string `json:"w"`
 		R        []string `json:"r"`

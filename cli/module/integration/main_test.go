@@ -68,6 +68,29 @@ func TestSetDeviceIDHeaderPreservesCamelCase(t *testing.T) {
 	}
 }
 
+func TestIntegrationDNSLookupTimeout(t *testing.T) {
+	timeoutErr := &net.DNSError{Err: "i/o timeout", IsTimeout: true}
+	if !integrationDNSLookupTimeout(fmt.Errorf("dial upstream: %w", timeoutErr)) {
+		t.Fatal("wrapped DNS timeout was not detected")
+	}
+	if integrationDNSLookupTimeout(&net.DNSError{Err: "no such host", IsNotFound: true}) {
+		t.Fatal("non-timeout DNS error was reported as a timeout")
+	}
+	if integrationDNSLookupTimeout(context.DeadlineExceeded) {
+		t.Fatal("non-DNS timeout was reported as a DNS timeout")
+	}
+}
+
+func TestIntegrationTaskContentParsesEchoFlag(t *testing.T) {
+	var task TaskContent
+	if err := json.Unmarshal([]byte(`{"tid":"echo-off","cmd":"echo hidden","chat":"chat-echo","subOps":{"echo":false}}`), &task); err != nil {
+		t.Fatalf("unmarshal task: %v", err)
+	}
+	if task.SubOps.Echo {
+		t.Fatal("task.SubOps.Echo = true, want false")
+	}
+}
+
 func pluginParamJSON(keys ...string) string {
 	items := make([]map[string]string, 0, len(keys))
 	for _, key := range keys {
@@ -12307,8 +12330,8 @@ func TestHandleRestoreIncludesCLIGetAndCLIPubLogs(t *testing.T) {
 	}()
 
 	if _, err := cronDB.Exec(`INSERT INTO agent_message_log (agent_id, chat_id, content, log_type, created_at) VALUES
-		('a','chat-r','{\"task\":\"run\"}',?, '2026-05-13T12:00:00.100'),
-		('a','chat-r','{\"status\":0}',?, '2026-05-13T12:00:00.200')`,
+		('a','chat-r','{"tid":"task-r","cmd":"run","subOps":{"echo":false}}',?, '2026-05-13T12:00:00.100'),
+		('a','chat-r','{"tid":"task-r","status":0,"cmd":"done"}',?, '2026-05-13T12:00:00.200')`,
 		logTypeCLIGet, logTypeCLIPub); err != nil {
 		t.Fatalf("seed event logs: %v", err)
 	}
@@ -12326,6 +12349,8 @@ func TestHandleRestoreIncludesCLIGetAndCLIPubLogs(t *testing.T) {
 		Data   []struct {
 			Role    string `json:"role"`
 			LogType int    `json:"logType"`
+			ChatID  string `json:"chatId"`
+			Content string `json:"content"`
 		} `json:"data"`
 	}
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
@@ -12342,6 +12367,12 @@ func TestHandleRestoreIncludesCLIGetAndCLIPubLogs(t *testing.T) {
 	}
 	if resp.Data[1].Role != "cli/pub" || resp.Data[1].LogType != logTypeCLIPub {
 		t.Fatalf("second = %#v", resp.Data[1])
+	}
+	if resp.Data[0].ChatID != "chat-r" || !strings.Contains(resp.Data[0].Content, `"tid":"task-r"`) || !strings.Contains(resp.Data[0].Content, `"echo":false`) {
+		t.Fatalf("cli/get identity and echo were not preserved: %#v", resp.Data[0])
+	}
+	if resp.Data[1].ChatID != "chat-r" || !strings.Contains(resp.Data[1].Content, `"tid":"task-r"`) {
+		t.Fatalf("cli/pub identity was not preserved: %#v", resp.Data[1])
 	}
 }
 

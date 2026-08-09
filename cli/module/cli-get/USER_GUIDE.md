@@ -8,6 +8,7 @@ CLI-Get 是一个心跳上报与任务执行客户端。它以心跳方式将 Ag
 - 当前版本实际为两段式流水线：`cli/get -> 本地任务队列 -> 执行 -> 本地发布队列 -> cli/pub`
 - 当任务的非空 `chat` 命中有效 `sandbox_exe` 时：`cli/get -> 对应模式的 CLI_SANDBOX -cmd -> cli/pub`
 - 如果 `cli/get` 响应任务中带有 `subOps.exempted=true`，则即使当前会话已开启沙盒，也仍然走原始链路：`cli/get -> 本地 Shell 执行 -> cli/pub`
+- `subOps.echo=false` 仅供页面在会话恢复时隐藏该任务；cli-get 仍照常入队、执行、记录并通过 `cli/pub` 回传结果，缺失该字段保持既有语义
 - 如果当前工作目录共享 SQLite `data` 的 `message_insert` 表中存在当前 `chat` 的待上传插入消息，则会在 `cli/pub` 前自动附带最多 `5` 条 `insert` 记录；发布成功后自动改为已上传
 
 ### 命令环境

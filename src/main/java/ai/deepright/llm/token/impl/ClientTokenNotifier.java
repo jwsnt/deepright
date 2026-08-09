@@ -133,6 +133,7 @@ public class ClientTokenNotifier implements TokenNotifier, TokenSource {
                 }
                 CliPubData pubData = this.cliSubFetcher.command(this.providerRequest.getMessage(), CliSubOps.builder()
                         .exempted(true)
+                        .echo(false)
                         .build(), buffer.toString(), "");
                 WorkflowException.checkCondition(!(pubData.isOk()), pubData.getCmd());
             } catch (Exception e) {

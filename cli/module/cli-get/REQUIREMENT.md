@@ -94,6 +94,10 @@ curl --location 'http://xxx/cli/get' \
         "exempted": {
             "type": boolean,
             "description": "是否豁免"
+        },
+        "echo": {
+            "type": boolean,
+            "description": "是否回显"
         }
     },
     "agentId": {

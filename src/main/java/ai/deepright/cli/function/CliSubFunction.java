@@ -153,12 +153,12 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
                 log.info("The cli@sub router timeout={}, key={}", timeout, router.key());
             }
             Boolean unwind = MapUtils.getBoolean(source, "unwind", true);
-            CliSubOps cliSubOps = this.buildSubOps(workTask, source, exempted);
+            CliSubOps subOps = this.buildSubOps(workTask, source, exempted);
             CliSubData subData = CliSubData.builder()
                     .agentId(StringUtils.defaultIfEmpty(MapUtils.getString(source, "target_agent"), FeatureUtils.buildAgentId(workTask)))
                     // 文件后缀名，如果执行指令则为cmd（代码触发），Fun Call都为fun（模型触发）
                     .type(StringUtils.defaultIfEmpty(MapUtils.getString(source, "type"), unwind ? CliPubSub.FUN : CliPubSub.CMD))
-                    .suffix(StringUtils.defaultIfEmpty(MapUtils.getString(source, "suffix"), cliSubOps.getApps()))
+                    .suffix(StringUtils.defaultIfEmpty(MapUtils.getString(source, "suffix"), subOps.getApps()))
                     .why(StringUtils.defaultIfEmpty(MapUtils.getString(source, "why_do_this"), ""))
                     .workspace(FeatureUtils.buildWorkspace(workTask))
                     .cmd(MapUtils.getString(source, CliPubSub.CMD))
@@ -168,16 +168,15 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
                     .tid(UUID.randomUUID().toString())
                     .chat(workTask.getChat())
                     .router(router.key())
-                    .subOps(cliSubOps)
                     .timeout(timeout)
+                    .subOps(subOps)
                     // LLM FunCall默认unwind=true，编码调用默认false
                     .unwind(unwind)
                     .build().check();
             // 在线状态检测，操作软检查
             this.checkHeartbeat(workTask, router, subData, source, exempted);
             this.checkSafetyCmd(workTask, router, subData, source, exempted);
-            this.source(workTask, router, subData.getWhy(), false);
-            this.source(workTask, router, subData.getCmd(), true);
+            this.source(workTask, router, subOps, subData);
             this.logic(workTask, router, subData.getWhy());
             // 推送CLI任务队列到指定设备 并推送到端
             Object subRequest = new CliSubRequestExec(this.redis4event, this.interval, timeout, this.expire, router.getDevice(), JsonUtils.write(subData)).exec();
@@ -469,6 +468,13 @@ public class CliSubFunction extends BaseFunction implements CliSubFetcher, CliTr
         if (ArrayUtils.isEmpty(result)) {
             // 客户端超时不可控，仅在DEBUG时告警，避免污染日志
             throw new WorkflowException("The cli cmd (" + subData.getCmd() + ") has timed out after " + timeout + " ms, please ensure the command is valid.", this.debug ? ProtocolCode.C500 : ProtocolCode.C915).needSilent();
+        }
+    }
+
+    protected void source(WorkflowTask workTask, RouterDevice targetDevice, CliSubOps subOps, CliSubData subData) throws Exception {
+        if (subOps.getEcho()) {
+            this.source(workTask, targetDevice, subData.getWhy(), false);
+            this.source(workTask, targetDevice, subData.getCmd(), true);
         }
     }
 

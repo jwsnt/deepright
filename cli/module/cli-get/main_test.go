@@ -1096,7 +1096,7 @@ func TestSandboxStateSettingKeepsAllowedDirPerChat(t *testing.T) {
 }
 
 func TestHeartbeatParsesExemptedFlagFromTaskContent(t *testing.T) {
-	taskJSON := `{"timeout":5000,"suffix":"cmd","type":"cmd","tid":"t-exempted","cmd":"echo hi","agentId":"a","chat":"chat-1","subOps":{"exempted":true}}`
+	taskJSON := `{"timeout":5000,"suffix":"cmd","type":"cmd","tid":"t-exempted","cmd":"echo hi","agentId":"a","chat":"chat-1","subOps":{"exempted":true,"echo":false}}`
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -1126,6 +1126,9 @@ func TestHeartbeatParsesExemptedFlagFromTaskContent(t *testing.T) {
 	}
 	if !task.SubOps.Exempted {
 		t.Fatal("expected task.SubOps.Exempted = true")
+	}
+	if task.SubOps.Echo {
+		t.Fatal("expected task.SubOps.Echo = false")
 	}
 }
 

@@ -8621,7 +8621,6 @@ let restorePolling = {};
 // Keep the server-confirmation phase separate from the SSE reader so it can
 // survive a reload and the next page can finish the cancel request.
 let chatCancellationRecovery = {};
-let liveCliEventPolling = {};
 let restoreReloadQueue = {};
 let chatConversationMutationTokens = {};
 let restoreNoDataTipKeys = {};
@@ -34321,7 +34320,11 @@ function normalizeLoadedChat(chat) {
   if (mergeTimingOnlyAssistantMessages(chat.messages)) changed = true;
   if (collapseMultiAssistantRequests(chat.messages)) changed = true;
   const cliHistoryBefore = JSON.stringify(Array.isArray(chat.cliCommandHistory) ? chat.cliCommandHistory : []);
-  chat.cliCommandHistory = normalizeCliCommandHistoryList(chat.cliCommandHistory);
+  // `live-cli:*` belonged to the removed real-time restore poller. CLI panel
+  // data now comes only from SSE during a live request or from restore after
+  // an interruption, so stale entries from that poller must not survive.
+  chat.cliCommandHistory = normalizeCliCommandHistoryList(chat.cliCommandHistory)
+    .filter(entry => !String(entry && entry.id || '').startsWith('live-cli:'));
   if (cliHistoryBefore !== JSON.stringify(chat.cliCommandHistory)) changed = true;
   const pending = getPendingRequestState(chat);
   if (!Number.isFinite(Number(chat.lastRestoreId))) chat.lastRestoreId = 0;
@@ -34810,7 +34813,6 @@ function stopDeletedChatAsyncWork(chatId) {
     }
   }
   stopChatRestorePolling(resolvedChatId);
-  stopLiveCliEventPolling(resolvedChatId);
   setChatSendDispatching(resolvedChatId, false);
   delete chatCancellationRecovery[resolvedChatId];
   return shouldCancelServer;
@@ -41378,6 +41380,44 @@ function isResponseCliSub(payload) {
   return payload.biz === 'cli' && payload.workflow === 'sub';
 }
 
+function isResponseCliSubEchoDisabled(payload) {
+  if (!isResponseCliSub(payload)) return false;
+  const choice = payload && payload.choices && payload.choices[0];
+  const metadata = choice && choice.metadata && typeof choice.metadata === 'object' ? choice.metadata : null;
+  const delta = choice && choice.delta && typeof choice.delta === 'object' ? choice.delta : null;
+  const message = choice && choice.message && typeof choice.message === 'object' ? choice.message : null;
+  const parseNestedTask = value => {
+    if (typeof value !== 'string') return null;
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  };
+  const deltaTask = parseNestedTask(delta && delta.content);
+  const messageTask = parseNestedTask(message && message.content);
+  const candidates = [
+    payload && payload.subOps,
+    payload && payload.sub_ops,
+    payload && payload.metadata && payload.metadata.subOps,
+    payload && payload.metadata && payload.metadata.sub_ops,
+    payload && payload.data && payload.data.subOps,
+    payload && payload.data && payload.data.sub_ops,
+    metadata && metadata.subOps,
+    metadata && metadata.sub_ops,
+    delta && delta.subOps,
+    delta && delta.sub_ops,
+    message && message.subOps,
+    message && message.sub_ops,
+    deltaTask && deltaTask.subOps,
+    deltaTask && deltaTask.sub_ops,
+    messageTask && messageTask.subOps,
+    messageTask && messageTask.sub_ops
+  ];
+  return candidates.some(subOps => subOps && typeof subOps === 'object' && subOps.echo === false);
+}
+
 function extractResponseResetKey(payload) {
   const choice = payload && payload.choices && payload.choices[0];
   const value = choice && choice.metadata && choice.metadata.__RESET__;
@@ -41459,33 +41499,9 @@ function extractResponseAgentId(payload) {
   return String(value == null ? '' : value).trim();
 }
 
-function extractResponseExplosionCreatedKey(payload) {
-  const value = payload && payload.created;
-  return String(value == null ? '' : value).trim();
-}
-
-function extractResponseExplosionWorkflowKey(payload) {
-  const workflow = String(payload && payload.workflow || '').trim();
-  const biz = String(payload && payload.biz || '').trim();
-  if (!workflow && !biz) return '';
-  return [biz || 'default', workflow || 'default'].join('@');
-}
-
 function extractResponseExplosionGroupKey(payload) {
-  if (!payload || typeof payload !== 'object') return '';
-  const createdKey = extractResponseExplosionCreatedKey(payload);
-  const workflowKey = extractResponseExplosionWorkflowKey(payload);
-  if (!createdKey || !workflowKey) return '';
-  return 'snapshot:' + workflowKey + ':' + createdKey;
-}
-
-function extractResponseCenterLogicalPacketId(payload) {
-  if (!payload || typeof payload !== 'object') return '';
-  const createdKey = String(payload.created == null ? '' : payload.created).trim();
-  const workflow = String(payload.workflow || '').trim();
-  const biz = String(payload.biz || '').trim();
-  if (!createdKey || (!workflow && !biz)) return '';
-  return 'center:' + (biz || 'default') + '@' + (workflow || 'default') + ':' + createdKey;
+  const id = extractResponseLogicalPacketId(payload);
+  return id ? 'snapshot:' + id : '';
 }
 
 function extractResponseLogicalPacketId(payload) {
@@ -42559,7 +42575,6 @@ async function sendCenterMessage(rawText, options) {
     }
     chat.lastRequestAt = requestTs;
     setChatPendingRequest(chatId, true, requestTs);
-    ensureLiveCliEventPolling(chatId, { startTimeline: requestTs, restart: true });
     if (isActiveChat()) showWorking(true);
 
     let chatCompletionsUrl = '/v1/chat/completions';
@@ -42625,6 +42640,11 @@ async function sendCenterMessage(rawText, options) {
         }
         try {
           const parsed = JSON.parse(data);
+          // `echo=false` changes only this browser-side CLI presentation.
+          // The server-side task has already been dispatched and continues to
+          // execute/publish normally; this merely keeps its cli/sub packets
+          // out of the right-side CLI panel.
+          if (isResponseCliSubEchoDisabled(parsed)) continue;
           const confirmedInsertTid = extractResponseMessageInsertTid(parsed);
           if (confirmedInsertTid) confirmQueuedCenterInsertedMessage(chatId, chatAgentId, confirmedInsertTid);
           const choice = parsed.choices && parsed.choices[0];
@@ -42645,9 +42665,7 @@ async function sendCenterMessage(rawText, options) {
           const packetExplosionGroupKey = extractResponseExplosionGroupKey(parsed);
           const isCliSub = isResponseCliSub(parsed);
           const isClosePacket = isResponseClosePacket(parsed);
-          const packetLogicalId = (!isCliSub && !isClosePacket)
-            ? normalizeStreamLogicalId(extractResponseCenterLogicalPacketId(parsed) || extractResponseLogicalPacketId(parsed))
-            : normalizeStreamLogicalId(extractResponseLogicalPacketId(parsed));
+          const packetLogicalId = normalizeStreamLogicalId(extractResponseLogicalPacketId(parsed));
           const packetSnapshotGroupKey = resolveAssistantExplosionGroupKey(packetLogicalId, packetExplosionGroupKey);
           const inlineHintPacket = extractResponseFooterInlineHintPacket(parsed);
           const taskBadgePacket = extractResponseTaskBadgePacket(parsed);
@@ -42860,10 +42878,21 @@ async function sendCenterMessage(rawText, options) {
         } catch {}
       }
     }
-    flushStreamingAutoUrlPreviewCandidates();
-    finishStreamingFor(chatId, { completedNormally: true });
+    // A final line need not end with a newline. It is successful only when it
+    // is the explicit protocol marker; every other EOF is abnormal.
+    if (buffer.trim() === 'data: [DONE]') {
+      if (lastAssistantEntry) appendLiveAssistantRawSse(buffer.trim(), lastAssistantEntry);
+      flushStreamingAutoUrlPreviewCandidates();
+      finishStreamingFor(chatId, { completedNormally: true });
+      saveChats();
+      return true;
+    }
+    // A network EOF without the SSE protocol's explicit completion marker is
+    // abnormal. Do not present it as a successful completed response.
+    renderAssistantErrorState('连接已中断，请重试', lastAssistantEntry);
+    finishStreamingFor(chatId);
     saveChats();
-    return true;
+    return false;
   } catch (err) {
     const csState = chatStreaming[chatId];
     const isCancelling = !!((csState && csState.cancelling) || abortCtrl.signal.aborted);
@@ -43035,8 +43064,6 @@ function finishStreamingFor(chatId, options) {
   const completedNormally = !!(options && options.completedNormally === true);
   const wikiThinkingCollection = captureWikiThinkingCollectionAnimation(chatId, { completedNormally });
   delete wikiThinkingExpandedState.byChat[String(chatId || '').trim()];
-  void performLiveCliEventPoll(chatId).catch(() => {});
-  stopLiveCliEventPolling(chatId);
   const streamState = chatStreaming[chatId];
   const streamSessionToken = String(streamState && streamState.sessionToken || '').trim();
   const isFirstSuccessfulAssistantResponse = completedNormally && !hasSuccessfulCompletedAssistantResponseOutsideSession(streamSessionToken);
@@ -43979,7 +44006,6 @@ function clearChatConversation(chatId) {
     delete preflightTimers[resolvedChatId];
   }
   stopChatRestorePolling(resolvedChatId);
-  stopLiveCliEventPolling(resolvedChatId);
   setChatSendDispatching(resolvedChatId, false);
   removeChatSkillIndicatorState(resolvedChatId);
   delete restoreReloadQueue[resolvedChatId];
@@ -43998,6 +44024,7 @@ function clearChatConversation(chatId) {
   clearPageAnnotationsForChat(resolvedChatId, { skipRender: true });
   chat.messages = [];
   chat.cliCommandHistory = [];
+  chat.restoreCliTaskStates = {};
   chat.lastMsg = '新会话';
   chat.pendingRequest = false;
   chat.lastRequestAt = '';
@@ -44327,9 +44354,7 @@ function parseRestoreAssistantRecord(raw) {
       const packetExplosionGroupKey = extractResponseExplosionGroupKey(parsed);
       const isCliSub = isResponseCliSub(parsed);
       const isClosePacket = isResponseClosePacket(parsed);
-      const packetLogicalId = (!isCliSub && !isClosePacket)
-        ? (extractResponseCenterLogicalPacketId(parsed) || extractResponseLogicalPacketId(parsed))
-        : extractResponseLogicalPacketId(parsed);
+      const packetLogicalId = extractResponseLogicalPacketId(parsed);
       const packetSnapshotGroupKey = resolveAssistantExplosionGroupKey(packetLogicalId, packetExplosionGroupKey);
       const shouldTrackLiveExplosionSnapshot = !!(
         choice.delta &&
@@ -44342,7 +44367,7 @@ function parseRestoreAssistantRecord(raw) {
       if (hasResponseResetKey(parsed)) {
         const stagedResetExplosion = stageAssistantExplosionSnapshotFromCurrentContent(
           assistantState,
-          extractResponseCenterLogicalPacketId(parsed) || extractResponseLogicalPacketId(parsed),
+          extractResponseLogicalPacketId(parsed),
           { markCurrentLogicalExploded: false }
         );
         if (stagedResetExplosion) {
@@ -44514,11 +44539,7 @@ function extractRestoreLogicalPacketId(raw) {
     if (!data || data === '[DONE]') return;
     try {
       const parsed = JSON.parse(data);
-      const isCliSub = isResponseCliSub(parsed);
-      const isClosePacket = isResponseClosePacket(parsed);
-      const nextLogicalId = (!isCliSub && !isClosePacket)
-        ? (extractResponseCenterLogicalPacketId(parsed) || extractResponseLogicalPacketId(parsed))
-        : extractResponseLogicalPacketId(parsed);
+      const nextLogicalId = extractResponseLogicalPacketId(parsed);
       if (nextLogicalId) logicalId = nextLogicalId;
     } catch {}
   });
@@ -44998,6 +45019,60 @@ function extractRestoreCliGetCommand(content) {
   return trimmed;
 }
 
+function findRestoreCliTaskPayload(value, seen, depth) {
+  if (depth > 6 || value == null) return null;
+  if (typeof value === 'string') {
+    const parsed = parseRestoreCliRecordJson(value);
+    return parsed ? findRestoreCliTaskPayload(parsed, seen, depth + 1) : null;
+  }
+  if (typeof value !== 'object') return null;
+  if (seen.has(value)) return null;
+  seen.add(value);
+  if (typeof value.tid === 'string' && value.tid.trim()) return value;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const task = findRestoreCliTaskPayload(item, seen, depth + 1);
+      if (task) return task;
+    }
+    return null;
+  }
+  for (const key of ['data', 'record', 'task', 'payload', 'message', 'content', 'delta', 'choices', 'messages']) {
+    if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+    const task = findRestoreCliTaskPayload(value[key], seen, depth + 1);
+    if (task) return task;
+  }
+  return null;
+}
+
+function extractRestoreCliTaskInfo(content) {
+  const payload = parseRestoreCliRecordJson(content);
+  const task = payload ? findRestoreCliTaskPayload(payload, new Set(), 0) : null;
+  const tid = String(task && task.tid || '').trim();
+  return {
+    tid,
+    command: extractRestoreCliGetCommand(content),
+    echoDisabled: !!(task && task.subOps && typeof task.subOps === 'object' && task.subOps.echo === false)
+  };
+}
+
+function ensureChatRestoreCliTaskStates(chat) {
+  if (!chat) return {};
+  if (!chat.restoreCliTaskStates || typeof chat.restoreCliTaskStates !== 'object' || Array.isArray(chat.restoreCliTaskStates)) {
+    chat.restoreCliTaskStates = {};
+  }
+  return chat.restoreCliTaskStates;
+}
+
+function removeCliCommandHistoryEntry(chat, entryId) {
+  const resolvedEntryId = String(entryId || '').trim();
+  if (!chat || !resolvedEntryId) return false;
+  const history = ensureChatCliCommandHistory(chat);
+  const next = history.filter(item => String(item && item.id || '').trim() !== resolvedEntryId);
+  if (next.length === history.length) return false;
+  chat.cliCommandHistory = next;
+  return true;
+}
+
 function extractRestoreCliPubOutput(content) {
   const trimmed = String(content || '').trim();
   if (!trimmed) return '';
@@ -45044,17 +45119,6 @@ function upsertRestoreCliHistoryEntry(chat, entry) {
   return { entry: next, changed };
 }
 
-function findLatestPendingRestoreCliHistoryEntry(chat) {
-  const history = ensureChatCliCommandHistory(chat);
-  for (let i = history.length - 1; i >= 0; i--) {
-    const entry = normalizeCliCommandHistoryEntry(history[i]);
-    if (!entry) continue;
-    if (!String(entry.id || '').startsWith('restore-cli:get:')) continue;
-    if (entry.done === false) return entry;
-  }
-  return null;
-}
-
 function appendRestoredRecords(chatId, chat, records) {
   if (!chat || !Array.isArray(records)) return 0;
   const restoreAgentId = getChatAgentId(chatId);
@@ -45074,29 +45138,65 @@ function appendRestoredRecords(chatId, chat, records) {
       if (Number.isFinite(recId) && recId > 0) chat.lastRestoreId = recId;
     }
     if (rec.role === 'cli/get') {
-      const command = extractRestoreCliGetCommand(rec.content);
-      if (!command) return;
+      const task = extractRestoreCliTaskInfo(rec.content);
+      if (!task.tid || !task.command) return;
+      const taskStates = ensureChatRestoreCliTaskStates(chat);
+      const previousState = taskStates[task.tid] && typeof taskStates[task.tid] === 'object'
+        ? taskStates[task.tid]
+        : {};
+      if (task.echoDisabled) {
+        const removed = removeCliCommandHistoryEntry(chat, previousState.entryId);
+        taskStates[task.tid] = {
+          visible: false,
+          entryId: '',
+          pendingOutput: String(previousState.pendingOutput || ''),
+          done: previousState.done === true
+        };
+        if (removed) added++;
+        return;
+      }
+      const command = task.command;
       const entryId = buildRestoreCliHistoryId(rec, command, ts);
       const existingEntry = normalizeCliCommandHistoryEntry(
         ensureChatCliCommandHistory(chat).find(item => item && String(item.id || '').trim() === entryId)
       );
+      const pendingOutput = String(previousState.pendingOutput || '');
+      const isDone = previousState.done === true;
       const result = upsertRestoreCliHistoryEntry(chat, {
         id: entryId,
         type: 'manual-cmd',
         command,
-        output: existingEntry ? existingEntry.output : '',
+        output: existingEntry ? existingEntry.output : pendingOutput,
         ok: existingEntry ? existingEntry.ok : null,
-        done: existingEntry ? existingEntry.done : false,
+        done: existingEntry ? existingEntry.done : isDone,
         createdAt: (existingEntry && existingEntry.createdAt) || ts,
         updatedAt: (existingEntry && existingEntry.done ? existingEntry.updatedAt : ts) || ts
       });
+      taskStates[task.tid] = {
+        visible: true,
+        entryId,
+        done: existingEntry ? existingEntry.done : isDone
+      };
       if (result && result.changed) added++;
       return;
     }
     if (rec.role === 'cli/pub') {
-      const pendingEntry = findLatestPendingRestoreCliHistoryEntry(chat);
-      if (!pendingEntry) return;
+      const task = extractRestoreCliTaskInfo(rec.content);
+      if (!task.tid) return;
       const output = extractRestoreCliPubOutput(rec.content);
+      const taskStates = ensureChatRestoreCliTaskStates(chat);
+      const taskState = taskStates[task.tid];
+      if (!taskState || typeof taskState !== 'object') return;
+      taskState.done = true;
+      if (taskState.visible === false) return;
+      if (!taskState.entryId) {
+        taskState.pendingOutput = output;
+        return;
+      }
+      const pendingEntry = normalizeCliCommandHistoryEntry(
+        ensureChatCliCommandHistory(chat).find(item => item && String(item.id || '').trim() === taskState.entryId)
+      );
+      if (!pendingEntry) return;
       const result = upsertRestoreCliHistoryEntry(chat, {
         ...pendingEntry,
         id: pendingEntry.id,
@@ -45448,184 +45548,6 @@ function buildRestoreNoDataTipKey(timeline, lastId, memoViewTimeline) {
   return [String(timeline || '').trim(), String(lastId || 0), String(memoViewTimeline || '').trim()].join('|');
 }
 
-function buildLiveCliHistoryId(rec, command, ts) {
-  const recId = rec && rec.id != null ? String(rec.id).trim() : '';
-  if (recId) return 'live-cli:get:' + recId;
-  const stamp = toChatTimestamp(ts || new Date()) || '';
-  return 'live-cli:get:' + stamp + ':' + String(command || '').trim();
-}
-
-function findLatestPendingLiveCliHistoryEntry(chat) {
-  const history = ensureChatCliCommandHistory(chat);
-  for (let i = history.length - 1; i >= 0; i--) {
-    const entry = normalizeCliCommandHistoryEntry(history[i]);
-    if (!entry) continue;
-    if (!String(entry.id || '').startsWith('live-cli:get:')) continue;
-    if (entry.done === false) return entry;
-  }
-  return null;
-}
-
-function appendLiveCliHistoryRecords(chatId, chat, records) {
-  if (!chat || !Array.isArray(records) || records.length === 0) return 0;
-  let changed = 0;
-  records.forEach(rec => {
-    if (!rec || !rec.role) return;
-    const ts = rec.createdAt || toChatTimestamp(new Date());
-    if (rec.role === 'cli/get') {
-      const command = extractRestoreCliGetCommand(rec.content);
-      if (!command) return;
-      const entryId = buildLiveCliHistoryId(rec, command, ts);
-      const existingEntry = normalizeCliCommandHistoryEntry(
-        ensureChatCliCommandHistory(chat).find(item => item && String(item.id || '').trim() === entryId)
-      );
-      const result = upsertRestoreCliHistoryEntry(chat, {
-        id: entryId,
-        type: 'manual-cmd',
-        command,
-        output: existingEntry ? existingEntry.output : '',
-        ok: existingEntry ? existingEntry.ok : null,
-        done: existingEntry ? existingEntry.done : false,
-        createdAt: (existingEntry && existingEntry.createdAt) || ts,
-        updatedAt: (existingEntry && existingEntry.done ? existingEntry.updatedAt : ts) || ts
-      });
-      if (result && result.changed) changed++;
-      return;
-    }
-    if (rec.role === 'cli/pub') {
-      const pendingEntry = findLatestPendingLiveCliHistoryEntry(chat);
-      if (!pendingEntry) return;
-      const output = extractRestoreCliPubOutput(rec.content);
-      const result = upsertRestoreCliHistoryEntry(chat, {
-        ...pendingEntry,
-        id: pendingEntry.id,
-        type: 'manual-cmd',
-        output,
-        ok: pendingEntry.ok === false ? false : true,
-        done: true,
-        createdAt: pendingEntry.createdAt || ts,
-        updatedAt: ts
-      });
-      if (result && result.changed) changed++;
-    }
-  });
-  if (changed > 0 && state.activeChat === chatId) {
-    restoreCliSubPanel(chatId);
-    triggerCliTaskPanelFlash();
-  }
-  return changed;
-}
-
-function normalizeLiveCliEventPollTimeline(value) {
-  const normalized = toChatTimestamp(value);
-  if (normalized) return normalized;
-  return '1970-01-01T00:00:00';
-}
-
-function stopLiveCliEventPolling(chatId) {
-  const resolvedChatId = String(chatId || '').trim();
-  if (!resolvedChatId) return;
-  const poll = liveCliEventPolling[resolvedChatId];
-  if (!poll) return;
-  poll.active = false;
-  poll.running = false;
-  if (poll.timer) clearTimeout(poll.timer);
-  delete liveCliEventPolling[resolvedChatId];
-}
-
-async function performLiveCliEventPoll(chatId) {
-  const resolvedChatId = String(chatId || '').trim();
-  const poll = liveCliEventPolling[resolvedChatId];
-  const chat = state.chats[resolvedChatId];
-  const streamState = chatStreaming[resolvedChatId];
-  if (!poll || !poll.active || !chat || !streamState || !streamState.streaming || !chat.pendingRequest) {
-    return { ok: false, stopped: true, added: 0 };
-  }
-  const mutationToken = getChatConversationMutationToken(resolvedChatId);
-  const timeline = normalizeLiveCliEventPollTimeline(poll.timeline || chat.lastRequestAt || getChatRestoreTimeline(chat));
-  const lastId = Number.isFinite(Number(poll.lastId)) && Number(poll.lastId) > 0 ? Number(poll.lastId) : 0;
-  const resp = await fetchExecApi('/api/restore?chat=' + encodeURIComponent(resolvedChatId) + '&timeline=' + encodeURIComponent(timeline) + '&lastId=' + encodeURIComponent(String(lastId)), { method: 'POST' });
-  let data = null;
-  try {
-    data = await resp.json();
-  } catch {}
-  if (isChatConversationMutationStale(resolvedChatId, mutationToken)) {
-    return { ok: false, stopped: true, added: 0, cleared: true };
-  }
-  if (!resp.ok || !data || data.status !== 0) {
-    const message = (data && (data.content || data.message)) || ('加载 CLI 子任务失败: HTTP ' + resp.status);
-    throw new Error(message);
-  }
-  const records = Array.isArray(data.data) ? data.data : [];
-  if (records.length > 0) {
-    const latestRecord = records[records.length - 1] || {};
-    poll.timeline = normalizeLiveCliEventPollTimeline(latestRecord.createdAt || poll.timeline || timeline);
-    const latestId = Number(latestRecord.id || 0);
-    poll.lastId = Number.isFinite(latestId) && latestId > 0 ? latestId : 0;
-  } else if (!poll.timeline) {
-    poll.timeline = timeline;
-  }
-  const added = appendLiveCliHistoryRecords(resolvedChatId, chat, records);
-  if (added > 0) saveChats();
-  return { ok: true, stopped: false, added };
-}
-
-function ensureLiveCliEventPolling(chatId, options) {
-  const resolvedChatId = String(chatId || '').trim();
-  if (!resolvedChatId) return;
-  const chat = state.chats[resolvedChatId];
-  if (!chat) return;
-  const opts = options || {};
-  const startTimeline = normalizeLiveCliEventPollTimeline(opts.startTimeline || chat.lastRequestAt || getChatRestoreTimeline(chat));
-  let poll = liveCliEventPolling[resolvedChatId];
-  if (!poll || opts.restart === true) {
-    stopLiveCliEventPolling(resolvedChatId);
-    poll = {
-      active: true,
-      running: false,
-      timer: null,
-      timeline: startTimeline,
-      lastId: 0
-    };
-    liveCliEventPolling[resolvedChatId] = poll;
-  } else {
-    poll.active = true;
-    if (!poll.timeline) poll.timeline = startTimeline;
-  }
-  if (poll.running || poll.timer) return;
-  const run = async () => {
-    const current = liveCliEventPolling[resolvedChatId];
-    const currentChat = state.chats[resolvedChatId];
-    const currentStream = chatStreaming[resolvedChatId];
-    if (!current || !current.active || current.running) return;
-    if (!currentChat || !currentChat.pendingRequest || !currentStream || !currentStream.streaming) {
-      stopLiveCliEventPolling(resolvedChatId);
-      return;
-    }
-    current.running = true;
-    try {
-      await performLiveCliEventPoll(resolvedChatId);
-    } catch {}
-    finally {
-      const latest = liveCliEventPolling[resolvedChatId];
-      const latestChat = state.chats[resolvedChatId];
-      const latestStream = chatStreaming[resolvedChatId];
-      if (!latest || latest !== current) return;
-      latest.running = false;
-      if (!latest.active || !latestChat || !latestChat.pendingRequest || !latestStream || !latestStream.streaming) {
-        stopLiveCliEventPolling(resolvedChatId);
-        return;
-      }
-      const nextDelay = isLowPowerRenderingEnabled() ? 3000 : 1200;
-      latest.timer = setTimeout(() => {
-        if (liveCliEventPolling[resolvedChatId] === latest) latest.timer = null;
-        run();
-      }, nextDelay);
-    }
-  };
-  run();
-}
-
 function shouldShowRestoreNoDataTip(chatId, key) {
   const resolvedChatId = String(chatId || '').trim();
   if (!resolvedChatId || !key) return false;
@@ -45906,6 +45828,7 @@ async function performReloadColdHistoryChat(chatId, opts) {
     } else {
       chat.messages = historyMessages.slice();
       chat.cliCommandHistory = [];
+      chat.restoreCliTaskStates = {};
       clearChatTaskBadges(resolvedChatId);
       clearChatFooterInlineHint(resolvedChatId);
       clearChatRequestFooterNotice(resolvedChatId);

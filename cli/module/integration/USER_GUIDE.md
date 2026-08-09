@@ -837,6 +837,7 @@ curl http://127.0.0.1:8080/install_app
 - `cli/get` 只有在服务端返回可执行任务时才记录日志；当响应 `content` 为 `null` 或空字符串时不记录
 - `cli/pub` 统一日志中的 `content` 保存的是 `GZIP+Base64` 之前的原始执行结果，便于直接恢复与导出查看
 - `/api/restore` 现在会额外合并返回同一 `agentId + chat` 下的 `cli/get` 与 `cli/pub` 记录，并继续保持统一 `data[]` 时间线输出
+- `cli/get.subOps.echo=false` 只是恢复态页面不显示该任务的元数据；Integration 仍照常调度任务、记录 `cli/get` / `cli/pub` 并处理结果。任务与结果保留 `chatId`、`tid`，供页面按 `chatId + tid` 关联
 - 合并返回的 CLI 记录会保留原始 `content`，不在 restore 链路中提前裁剪成摘要，便于 site 直接恢复右侧 `CMD` 子任务历史
 - 合并排序固定为先按 `createdAt` 升序，再按 `id` 升序，保证前端可以按单一时间线消费消息与 CLI 事件
 - `chat_log` 与 `agent_message_log` 都增加了统一的 30 天保留策略

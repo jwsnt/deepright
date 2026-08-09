@@ -2850,6 +2850,7 @@ type TaskContent struct {
 	Chat    string `json:"chat"`
 	SubOps  struct {
 		Exempted bool     `json:"exempted"`
+		Echo     bool     `json:"echo"`
 		App      []string `json:"app"`
 		W        []string `json:"w"`
 		R        []string `json:"r"`
@@ -2918,6 +2919,18 @@ func integrationHTTPTimeoutError(err error) bool {
 	}
 	var netErr net.Error
 	return errors.As(err, &netErr) && netErr.Timeout()
+}
+
+// integrationDNSLookupTimeout reports whether an upstream request failed
+// specifically while DNS resolution timed out. Keep it separate from the
+// broader HTTP timeout check so chat-proxy logs can be correlated with a
+// user's failed request.
+func integrationDNSLookupTimeout(err error) bool {
+	if err == nil {
+		return false
+	}
+	var dnsErr *net.DNSError
+	return errors.As(err, &dnsErr) && dnsErr.Timeout()
 }
 
 func integrationMetadataPort(cfg *Config) int {
@@ -17690,6 +17703,9 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 			// appending a misleading "Failed to forward" error to the chat.
 			if errors.Is(ctx.Err(), context.Canceled) || errors.Is(err, context.Canceled) {
 				return
+			}
+			if integrationDNSLookupTimeout(err) {
+				log.Printf("proxy: upstream DNS lookup timeout: host=%s chat=%s agent=%s err=%v", proxyReq.URL.Hostname(), chatID, chatAgentID, err)
 			}
 			if chatID != "" {
 				appendChatLogDB(chatAgentID, chatID, chatType, "A", "abnormal", "Failed to forward: "+err.Error())

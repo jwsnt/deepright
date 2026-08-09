@@ -25,6 +25,9 @@ public class CliSubOps {
     @Builder.Default
     protected Boolean exempted = false;
 
+    @Builder.Default
+    protected Boolean echo = true;
+
     protected List<String> app;
 
     protected List<String> w;
