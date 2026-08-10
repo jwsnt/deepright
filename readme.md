@@ -1,8 +1,6 @@
 # DeepRight
 
-浏览器优先的 AI Agent 运行时：本机 Client 管理页面、Agent 与插件，远程 Harness 负责业务执行。
-
-> **本手册建议使用AI阅读并构建。**
+> **本手册建议使用AI阅读并构建**
 
 DeepRight 由浏览器端、客户端代理和远程服务端三部分组成。浏览器只与本机的 Client Proxy Server 通信；Client 负责提供本地 Web 页面、管理 Agent/插件，并将需要远程执行的请求转发至 Remote Harness Server。
 
@@ -20,34 +18,33 @@ flowchart LR
     Server <--> Redis
 ```
 
-Remote Harness Server（`server`）并非独立的底层框架：它**构建在 `right-framework` 之上**。`right-framework` 提供工作流、网络通信、配置、存储等基础能力；`server` 在此基础上实现 DeepRight 的路由、鉴权、安全、任务和媒体等业务能力。
+Remote Harness Server（`server`）并非独立的底层框架：它**构建在 `right-framework` 之上**。`right-framework` 提供工作流、网络通信、配置、存储等基础能力；`server` 在此基础上实现路由、鉴权、安全、任务和媒体等业务能力扩展。
 
 ## Quick Start
 
-以下示例适用于 Linux 开发环境；它用最少的命令启动完整链路。首次执行前请先满足后文的 JDK 22、Go 1.22+ 和 Python 3 要求。
+以下示例适用于 MacOS / Linux 开发环境；它用最少的命令启动完整链路。首次执行前请先满足后文的 JDK 22、Go 1.22+ 和 Python 3 要求。
 
 ```bash
 # 终端 1：编译并启动 Remote Harness Server（从项目根目录执行）
-(cd right-framework && ./mvnw clean install -DskipTests) && (cd server && ./mvnw clean package)
-CHAT_HTTP_HOST=http://127.0.0.1 CHAT_HTTP_PORT=9998 \
-  java -jar server/target/deepright-1.0.jar
+cd right-framework && ./mvnw clean install -DskipTests) && (cd server && ./mvnw clean package
+java -jar server/target/deepright-1.0.jar
 
 # 终端 2：构建并启动 Linux Client Proxy Server
-(cd client/module && ./build.sh linux)
+cd client/module && ./build.sh
 cd client/module/release/linux/x86
-./integration --host http://127.0.0.1:9998
+./integration
 ```
 
 随后在浏览器打开 `http://127.0.0.1:57896`。Client 的发布配置将本地端口设为 `57896`；可通过 `./integration --port <端口>` 覆盖。
 
-Windows 和 macOS 的安装包构建、签名及交付方式见后文的「构建 Client Proxy Server」；生产部署的服务端配置见「启动 Remote Harness Server」。
+Windows 和 MacOS 的安装包构建、签名及交付方式见后文的「构建 Client Proxy Server」；生产部署的服务端配置见「启动 Remote Harness Server」。
 
 ## 为什么选择 DeepRight？
 
 | 能力 | DeepRight 的实现方式 |
 | --- | --- |
 | 本地浏览器体验 | 浏览器仅访问本机的 Go Client Proxy Server；页面、Agent 状态与插件管理均由 Client 提供。 |
-| 远程能力隔离 | Client 只将需要远程处理的请求转发至 Java Remote Harness Server，浏览器无需直接暴露远程服务。 |
+| 远程能力隔离 | Client 只将需要远程处理的请求转发至 Remote Harness Server，浏览器无需直接暴露远程服务。 |
 | 框架复用 | 业务服务 `server` 建立在 `right-framework` 之上，复用工作流、网络、配置和存储能力。 |
 | 跨平台交付 | 同一构建脚本生成 Linux、Windows WSL2 和 macOS 的 Client 交付物。 |
 
