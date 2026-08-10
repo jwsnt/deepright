@@ -1,6 +1,6 @@
 # <a href="https://www.deepright.cn/">DeepRight</a>
 
-> **本手册建议使用AI阅读并构建，构件提示词：请克隆https://github.com/jwsnt/deepright到下载目录，并开始构建**
+> **本手册建议使用AI构建，构件提示词：请克隆https://github.com/jwsnt/deepright到下载目录，并开始构建**
 
 DeepRight 由浏览器端、客户端代理和远程服务端三部分组成。浏览器只与本机的 Client Proxy Server 通信；Client 负责提供本地 Web 页面、管理 Agent/插件，并将需要远程执行的请求转发至 Remote Harness Server。
 
