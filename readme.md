@@ -354,3 +354,6 @@ java -jar server/target/deepright-1.0.jar
 # 4) 构建全部 Client 平台交付物
 (cd client && ./build.sh all)
 ```
+
+## 现在试用版本
++ 欢迎品尝：https://www.deepright.cn/
