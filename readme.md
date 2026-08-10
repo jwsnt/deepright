@@ -1,13 +1,13 @@
 # DeepRight
 
-> **本手册建议使用AI阅读并构建**
+> **本手册建议使用AI阅读并构建。**
 
 DeepRight 由浏览器端、客户端代理和远程服务端三部分组成。浏览器只与本机的 Client Proxy Server 通信；Client 负责提供本地 Web 页面、管理 Agent/插件，并将需要远程执行的请求转发至 Remote Harness Server。
 
 ```mermaid
 flowchart LR
     Browser["浏览器\n只连接本机 Client"]
-    Client["Client Proxy Server\nGo · client/module\n页面、Agent、插件、请求代理"]
+    Client["Client Proxy Server\nGo · client\n页面、Agent、插件、请求代理"]
     Server["Remote Harness Server\nJava / Spring Boot · server\n基于 right-framework 的远程业务层"]
     Framework["right-framework\nJava 基础框架\n工作流、网络、配置与存储能力"]
     Redis[("Redis\n默认可使用内嵌 Redis")]
@@ -30,8 +30,8 @@ cd right-framework && ./mvnw clean install -DskipTests) && (cd server && ./mvnw 
 java -jar server/target/deepright-1.0.jar
 
 # 终端 2：构建并启动 Linux Client Proxy Server
-cd client/module && ./build.sh
-cd client/module/release/linux/x86
+cd client && ./build.sh
+cd client/release/linux/x86
 ./integration
 ```
 
@@ -54,7 +54,7 @@ Windows 和 MacOS 的安装包构建、签名及交付方式见后文的「构�
 sequenceDiagram
     autonumber
     participant Browser as "浏览器（Web UI）"
-    participant Client as "Client Proxy Server\nGo · client/module"
+    participant Client as "Client Proxy Server\nGo · client"
     participant Server as "Remote Harness Server\nJava · server"
 
     Browser->>Client: 访问本机页面/API（发布配置默认 :57896）
@@ -67,7 +67,7 @@ sequenceDiagram
 
 | 目录 | 技术栈 | 责任 |
 | --- | --- | --- |
-| `client/module` | Go | 构建桌面端/本地 Client Proxy Server，提供浏览器访问的页面、API、插件和 Agent 运行时。 |
+| `client` | Go | 构建桌面端/本地 Client Proxy Server，提供浏览器访问的页面、API、插件和 Agent 运行时。 |
 | `server` | Java 22、Spring Boot | 基于 `right-framework` 实现的 Remote Harness Server：处理 Client 转发的远程业务请求，以及路由、鉴权、安全、任务和媒体等业务能力。 |
 | `right-framework` | Java、Maven | `server` 依赖的底层 Java 框架，提供工作流、网络、配置和存储等通用能力；以 `ai.open.right:right-starter:0.01-SNAPSHOT` 的 Maven 坐标被 `server` 引用。必须先安装到本地 Maven 仓库。 |
 
@@ -79,7 +79,7 @@ sequenceDiagram
 flowchart TD
     A["安装 JDK 22、Go 1.22+、Python 3"] --> B["编译 right-framework\n安装到本机 Maven 仓库"]
     B --> C["编译 server\n生成可运行 JAR"]
-    A --> D["执行 client/module/build.sh"]
+    A --> D["执行 client/build.sh"]
     D --> E["生成 macOS / Linux / Windows Client 交付物"]
     C --> F["启动 Remote Harness Server"]
     E --> G["安装并启动 Client Proxy Server"]
@@ -123,9 +123,9 @@ python3 --version
 | Maven 依赖 | `server` 直接依赖 `ai.open.right:right-starter:0.01-SNAPSHOT`；该坐标由 `right-framework` 的 `install` 写入本地 Maven 仓库。 | 不能跳过 framework 的 `install`；首次构建需要联网下载 Maven Wrapper 和第三方依赖。 |
 | 服务端打包 | `server` 的 Spring Boot Maven 插件在 `package` 阶段执行 `repackage`。 | `server/target/deepright-1.0.jar` 是包含依赖、可直接 `java -jar` 的包。 |
 | Go 版本 | `integration`、`proxy`、`connect`、`agent` 等主要 Go 模块要求 Go 1.22；少数辅助模块是 Go 1.21。 | 统一使用 Go 1.22+ 即可满足全部模块。 |
-| Client 主程序 | `build.sh` 从 `client/module/integration` 交叉编译 `integration`，并从 `client/module/connect` 编译插件。 | 交付目录中的 `integration`、`plugins/`、`site/`、`config/` 必须作为整体保留。 |
+| Client 主程序 | `build.sh` 从 `client/integration` 交叉编译 `integration`，并从 `client/connect` 编译插件。 | 交付目录中的 `integration`、`plugins/`、`site/`、`config/` 必须作为整体保留。 |
 | 构建校验 | 构建开始会以 Python 3 校验 `config/config.json`；结束前会执行浏览器插件契约测试。 | Python 3 是必需工具；构建不只是 Go 编译，还会运行测试校验。 |
-| 发布目录 | `build.sh` 会重置对应的 `release/` 目录并清理中间编译产物。 | 不要将手工文件放在 `client/module/release/` 内；需要保留的运行数据应放在发布目录以外。 |
+| 发布目录 | `build.sh` 会重置对应的 `release/` 目录并清理中间编译产物。 | 不要将手工文件放在 `client/release/` 内；需要保留的运行数据应放在发布目录以外。 |
 
 平台附加要求如下：
 
@@ -216,12 +216,12 @@ tail -f logs/deepright-server.log
 
 ## 构建 Client Proxy Server
 
-客户端构建脚本位于 **`client/module/build.sh`**，而不是 `client/build.sh`。脚本会交叉编译 Go 的主程序与插件，复制页面和配置，并按目标平台生成安装/分发包。
+客户端构建脚本位于 **`client/build.sh`**。脚本会交叉编译 Go 的主程序与插件，复制页面和配置，并按目标平台生成安装/分发包。
 
 先进入脚本目录：
 
 ```bash
-cd client/module
+cd client
 chmod +x build.sh
 ```
 
@@ -229,7 +229,7 @@ chmod +x build.sh
 
 ```mermaid
 flowchart LR
-    Script["client/module/build.sh"]
+    Script["client/build.sh"]
     Script --> All["./build.sh 或 ./build.sh all\n全部目标"]
     Script --> Linux["./build.sh linux\nLinux x86_64 与 ARM64"]
     Script --> Windows["./build.sh windows\nWindows 单文件安装包"]
@@ -246,7 +246,7 @@ flowchart LR
 例如，在 Apple Silicon Mac 上构建 macOS 分发包且不进行代码签名：
 
 ```bash
-cd client/module
+cd client
 DEEPRIGHT_SKIP_SIGN=1 ./build.sh mac
 ```
 
@@ -257,7 +257,7 @@ DEEPRIGHT_SKIP_SIGN=1 ./build.sh mac
 构建结束时，脚本会打印 `Build completed:`，并列出 `release/` 中的最终文件。典型交付物如下：
 
 ```text
-client/module/release/
+client/release/
 ├── linux/
 │   ├── x86/                         # Linux x86_64 运行目录
 │   │   ├── integration              # Client Proxy Server 可执行文件
@@ -292,7 +292,7 @@ client/module/release/
 在 Linux 的解压/构建目录中，Client 的基础启动方式为：
 
 ```bash
-cd client/module/release/linux/x86
+cd client/release/linux/x86
 ./integration
 ```
 
@@ -313,7 +313,7 @@ http://127.0.0.1:57896
 将 Client 指向实际的 Remote Harness Server 前，检查发布包中的配置文件：
 
 ```bash
-cd client/module/release/linux/x86
+cd client/release/linux/x86
 grep '"host"' config/config.json
 ```
 
@@ -349,8 +349,8 @@ grep '"host"' config/config.json
 java -jar server/target/deepright-1.0.jar
 
 # 3) 构建 macOS Client（无签名开发构建示例）
-(cd client/module && DEEPRIGHT_SKIP_SIGN=1 ./build.sh mac)
+(cd client && DEEPRIGHT_SKIP_SIGN=1 ./build.sh mac)
 
 # 4) 构建全部 Client 平台交付物
-(cd client/module && ./build.sh all)
+(cd client && ./build.sh all)
 ```
