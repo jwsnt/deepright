@@ -14,6 +14,7 @@ import org.apache.commons.collections.MapUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -64,6 +65,7 @@ public class CustomerAnthropicRequestService extends AnthropicRequestService {
         request.setMaxTokens(MapUtils.getInteger(llmQuery.getMetadata(), CustomerAnthropicRequestService.MAX_TOKENS, Math.min(this.maxTokens, (int) (RequestContextUtils.limit(llmQuery, request.getModel()) * this.rate))));
     }
 
+    @ConditionalOnProperty(name = "anthropic.enable", havingValue = "true", matchIfMissing = false)
     @Configuration
     @Setter
     @Getter

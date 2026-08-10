@@ -1469,13 +1469,15 @@ body.rs-url-preview-expanded.center-overlay-focus .rs-url-preview-floating-switc
 .rs-url-preview.is-overlay-suspended{opacity:0;visibility:hidden;pointer-events:none;transform:translateY(14px) scale(.982);filter:blur(12px);transition:opacity .2s ease,transform .24s ease,filter .24s ease,visibility 0s linear .24s}
 .rs-url-preview.is-overlay-suspended::before,.rs-url-preview.is-overlay-suspended::after{opacity:0}
 .rs-url-preview.is-overlay-suspended .rs-url-preview-frame-shell,.rs-url-preview.is-overlay-suspended .rs-url-preview-frame{opacity:0;pointer-events:none}
-.rs-url-preview-expand-btn{position:fixed;top:calc(var(--rs-url-preview-toolbar-top,18px) + 22px);left:calc(var(--rs-url-preview-boundary-left,0px) - 9px);z-index:260;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .24s ease,filter .24s ease,visibility 0s linear .24s}
-body.rs-url-preview-toolbar-visible .rs-url-preview-expand-btn{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .24s ease,filter .24s ease,visibility 0s linear 0s,transform .22s ease,box-shadow .22s ease}
-.rs-url-preview-toolbar-closing .rs-url-preview-expand-btn{opacity:0;filter:blur(8px);pointer-events:none}
-body.meta-preview-focus .rs-url-preview-expand-btn{filter:blur(8px) saturate(.86);opacity:.34;pointer-events:none}
-body.center-overlay-focus .rs-url-preview-expand-btn{filter:blur(8px) saturate(.86);opacity:.34;pointer-events:none}
-body.rs-url-preview-expanded .rs-url-preview-expand-btn{opacity:0;visibility:hidden;pointer-events:none}
-#app.shutdown-sequence ~ .rs-url-preview-expand-btn{filter:blur(14px) saturate(.8) brightness(.78);opacity:.34;pointer-events:none}
+.rs-url-preview-expand-btn,.rs-url-preview-refresh-btn{position:fixed;left:calc(var(--rs-url-preview-boundary-left,0px) - 9px);z-index:260;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .24s ease,filter .24s ease,visibility 0s linear .24s}
+.rs-url-preview-expand-btn{top:calc(var(--rs-url-preview-toolbar-top,18px) + 22px)}
+.rs-url-preview-refresh-btn{top:calc(var(--rs-url-preview-toolbar-top,18px) + 44px)}
+body.rs-url-preview-toolbar-visible .rs-url-preview-expand-btn,body.rs-url-preview-toolbar-visible .rs-url-preview-refresh-btn{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .24s ease,filter .24s ease,visibility 0s linear 0s,transform .22s ease,box-shadow .22s ease}
+.rs-url-preview-toolbar-closing .rs-url-preview-expand-btn,.rs-url-preview-toolbar-closing .rs-url-preview-refresh-btn{opacity:0;filter:blur(8px);pointer-events:none}
+body.meta-preview-focus .rs-url-preview-expand-btn,body.meta-preview-focus .rs-url-preview-refresh-btn{filter:blur(8px) saturate(.86);opacity:.34;pointer-events:none}
+body.center-overlay-focus .rs-url-preview-expand-btn,body.center-overlay-focus .rs-url-preview-refresh-btn{filter:blur(8px) saturate(.86);opacity:.34;pointer-events:none}
+body.rs-url-preview-expanded .rs-url-preview-expand-btn,body.rs-url-preview-expanded .rs-url-preview-refresh-btn{opacity:0;visibility:hidden;pointer-events:none}
+#app.shutdown-sequence ~ .rs-url-preview-expand-btn,#app.shutdown-sequence ~ .rs-url-preview-refresh-btn{filter:blur(14px) saturate(.8) brightness(.78);opacity:.34;pointer-events:none}
 .rs-url-preview-loading{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;padding:24px;pointer-events:none;opacity:0;visibility:hidden;transition:opacity .26s ease,filter .34s ease,visibility 0s linear .26s}
 .rs-url-preview-loading::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,248,242,.84),rgba(252,236,225,.74) 38%,rgba(247,223,205,.6));backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.48)}
 .rs-url-preview-loading::after{content:'';position:absolute;inset:10% 8%;border-radius:28px;background:radial-gradient(circle at center,rgba(var(--accent-soft-rgb),.22),rgba(var(--accent-soft-rgb),0) 62%);filter:blur(22px);opacity:.92;animation:rsUrlPreviewLoadingGlow 2.4s ease-in-out infinite}
@@ -1509,7 +1511,7 @@ body.rs-url-preview-expanded .rs-url-preview-expanded-backdrop{opacity:1;visibil
 .page-iframe-close{position:fixed;top:calc(var(--rs-url-preview-expanded-inset) - 10px);right:calc(var(--rs-url-preview-expanded-inset) + 2px);left:auto;z-index:1000;width:32px;height:32px;border-radius:10px;touch-action:manipulation}
 .page-iframe-close svg{width:13px;height:13px}
 .page-iframe-close[hidden]{display:none!important}
-#rsUrlPreviewFloatingSwitch.is-overlay-suspended,#rsUrlPreviewExpandBtn.is-overlay-suspended{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s ease,filter .2s ease,visibility 0s linear .2s}
+#rsUrlPreviewFloatingSwitch.is-overlay-suspended,#rsUrlPreviewExpandBtn.is-overlay-suspended,#rsUrlPreviewRefreshBtn.is-overlay-suspended{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s ease,filter .2s ease,visibility 0s linear .2s}
 [data-theme="dark"] .rs-url-preview-expanded-backdrop{background:linear-gradient(180deg,rgba(6,12,24,.28),rgba(6,12,24,.4))}
 [data-energy-saver="on"] .rs-url-preview,
 [data-low-power-rendering="on"] .rs-url-preview{transform:none;filter:none;transition-duration:.16s}
@@ -5641,6 +5643,9 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
 <div class="rs-url-preview-expanded-backdrop" id="rsUrlPreviewExpandedBackdrop" aria-hidden="true"></div>
 <button type="button" class="rs-url-preview-switch rs-url-preview-expand-btn" id="rsUrlPreviewExpandBtn" title="展开网站浏览" aria-label="展开网站浏览" onclick="expandRightSidebarUrlPreview(event)">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"></path><path d="M16 3h3a2 2 0 0 1 2 2v3"></path><path d="M8 21H5a2 2 0 0 1-2-2v-3"></path><path d="M16 21h3a2 2 0 0 0 2-2v-3"></path></svg>
+</button>
+<button type="button" class="rs-url-preview-switch rs-url-preview-refresh-btn" id="rsUrlPreviewRefreshBtn" title="刷新网站浏览" aria-label="刷新网站浏览" onclick="refreshRightSidebarUrlPreview(event)">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0 2.1 5.4"></path><path d="M20 4v7h-7"></path></svg>
 </button>
 <button type="button" class="rs-url-preview-switch rs-url-preview-floating-switch" id="rsUrlPreviewFloatingSwitch" title="关闭网站浏览" aria-label="关闭网站浏览" onclick="handleRightSidebarUrlPreviewFloatingSwitch(event)">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m6.5 6.5 11 11"></path><path d="m17.5 6.5-11 11"></path></svg>
@@ -15199,6 +15204,22 @@ function expandRightSidebarUrlPreview(event) {
   return setRightSidebarUrlPreviewExpanded(true);
 }
 
+function refreshRightSidebarUrlPreview(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  const href = rightSidebarUrlPreviewState.active
+    ? normalizeRightSidebarUrlPreviewHref(rightSidebarUrlPreviewState.href)
+    : '';
+  const chatId = String(rightSidebarUrlPreviewState.chatId || state.activeChat || '').trim();
+  if (!href || !chatId || isRightSidebarUrlPreviewExpanded()) return false;
+  rightSidebarUrlPreviewState.requestKey = createRightSidebarUrlPreviewRequestKey();
+  rightSidebarUrlPreviewWatchKey = '';
+  renderRightSidebarUrlPreview();
+  return true;
+}
+
 function restoreRightSidebarUrlPreviewExpanded(event) {
   if (event) {
     event.preventDefault();
@@ -15432,11 +15453,12 @@ function renderRightSidebarUrlPreview() {
   const titleEl = document.getElementById('rsUrlPreviewTitle');
   const subtitleEl = document.getElementById('rsUrlPreviewSubtitle');
   const expandBtn = document.getElementById('rsUrlPreviewExpandBtn');
+  const refreshBtn = document.getElementById('rsUrlPreviewRefreshBtn');
   const floatingSwitch = document.getElementById('rsUrlPreviewFloatingSwitch');
   const frame = document.getElementById('rsUrlPreviewFrame');
   const loadingEl = document.getElementById('rsUrlPreviewLoading');
   const empty = document.getElementById('rsUrlPreviewEmpty');
-  if (!rightSidebar || !preview || !expandedBackdrop || !titleEl || !subtitleEl || !expandBtn || !floatingSwitch || !frame || !loadingEl || !empty || !body) return;
+  if (!rightSidebar || !preview || !expandedBackdrop || !titleEl || !subtitleEl || !expandBtn || !refreshBtn || !floatingSwitch || !frame || !loadingEl || !empty || !body) return;
   bindRightSidebarUrlPreviewFrameEvents();
   const finalizeInactivePreview = () => {
     rightSidebar.classList.remove('previewing-url-closing');
@@ -15495,6 +15517,7 @@ function renderRightSidebarUrlPreview() {
     rightSidebarUrlPreviewCleanupTimer = 0;
   }
   expandBtn.setAttribute('aria-hidden', active && !expanded ? 'false' : 'true');
+  refreshBtn.setAttribute('aria-hidden', active && !expanded ? 'false' : 'true');
   floatingSwitch.innerHTML = expanded
     ? RIGHT_SIDEBAR_URL_PREVIEW_RESTORE_ICON_HTML
     : RIGHT_SIDEBAR_URL_PREVIEW_CLOSE_ICON_HTML;
@@ -15844,7 +15867,7 @@ function isCenterModalOverlay(el) {
 function syncRightSidebarUrlPreviewOverlaySuspension(suspended) {
   const next = !!suspended;
   document.body.classList.toggle('rs-url-preview-overlay-suspended', next);
-  ['rsUrlPreview', 'rsUrlPreviewExpandedBackdrop', 'rsUrlPreviewExpandBtn', 'rsUrlPreviewFloatingSwitch'].forEach(id => {
+  ['rsUrlPreview', 'rsUrlPreviewExpandedBackdrop', 'rsUrlPreviewExpandBtn', 'rsUrlPreviewRefreshBtn', 'rsUrlPreviewFloatingSwitch'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     el.classList.toggle('is-overlay-suspended', next);
@@ -49827,19 +49850,79 @@ function isGenericClipboardImageName(file, name) {
   return /^image\.(?:png|jpe?g|webp|gif|bmp|svg)$/i.test(String(name || '').trim());
 }
 
+function isSystemUploadImage(file, name) {
+  const type = String((file && file.type) || '').trim().toLowerCase().split(';')[0];
+  if (type.startsWith('image/')) return true;
+  return /\.(?:png|jpe?g|webp|gif|bmp|svg)$/i.test(String(name || '').trim());
+}
+
+function createSystemUploadBatchToken() {
+  return String(Date.now()) + '_' + randomToken(6);
+}
+
+function buildSystemUploadFileName(file, rawName, token, index) {
+  const name = getFsBasename(normalizeFsPath(rawName)) || 'file';
+  const fallbackExtension = getClipboardFallbackExtension(file && file.type);
+  // macOS screenshots copied through the system clipboard are named
+  // "image.png". Keep their compact, unique image_tmp naming.
+  if (isGenericClipboardImageName(file, name)) {
+    return 'image_tmp_' + token + '_' + index + '.' + fallbackExtension;
+  }
+  const prefix = isSystemUploadImage(file, name) ? 'image_tmp' : 'file_tmp';
+  return prefix + '_' + token + '_' + index + '_' + name;
+}
+
+function createUniqueSystemUploadBatch(uploadItems, emptyDirs) {
+  const token = createSystemUploadBatchToken();
+  const items = Array.from(uploadItems || [])
+    .filter(item => item && item.file instanceof File)
+    .map(item => ({ ...item, relativePath: normalizeFsPath(item.relativePath || item.file.name || '') }))
+    .filter(item => item.relativePath);
+  const dirs = Array.from(emptyDirs || []).map(normalizeFsPath).filter(Boolean);
+  const directoryRoots = new Set();
+  const rootOrder = [];
+  const addDirectoryRoot = root => {
+    const value = String(root || '').trim();
+    if (!value) return;
+    if (!directoryRoots.has(value)) directoryRoots.add(value);
+    if (!rootOrder.includes(value)) rootOrder.push(value);
+  };
+
+  dirs.forEach(path => addDirectoryRoot(path.split('/')[0]));
+  items.forEach(item => {
+    const parts = item.relativePath.split('/');
+    if (parts.length > 1) addDirectoryRoot(parts[0]);
+  });
+
+  const directoryRootMap = new Map();
+  rootOrder.forEach((root, index) => {
+    directoryRootMap.set(root, 'dir_tmp_' + token + '_' + index + '_' + (getFsBasename(root) || 'folder'));
+  });
+  const uploadedItems = items.map((item, index) => {
+    const parts = item.relativePath.split('/');
+    const root = parts[0];
+    const relativePath = directoryRoots.has(root)
+      ? [directoryRootMap.get(root), ...parts.slice(1)].join('/')
+      : buildSystemUploadFileName(item.file, root, token, index);
+    return { ...item, relativePath, displayName: getFsBasename(relativePath) };
+  });
+  const createdDirs = dirs.map(path => {
+    const parts = path.split('/');
+    const root = parts[0];
+    return directoryRoots.has(root)
+      ? [directoryRootMap.get(root), ...parts.slice(1)].join('/')
+      : ('dir_tmp_' + token + '_0_' + (getFsBasename(root) || 'folder'));
+  });
+  return { uploadItems: uploadedItems, emptyDirs: Array.from(new Set(createdDirs)) };
+}
+
 function buildClipboardUploadItems(files) {
-  const timestamp = Date.now();
-  return Array.from(files || []).map((file, index) => {
-    const name = String(file.name || '').trim();
+  const uploadItems = Array.from(files || []).map(file => {
     const fallbackExtension = getClipboardFallbackExtension(file.type);
-    // macOS screenshots copied through the system clipboard are named
-    // "image.png". Preserve each one as a distinct attachment instead of
-    // overwriting an earlier tmp/image.png upload.
-    const relativePath = isGenericClipboardImageName(file, name)
-      ? ('image_tmp_' + timestamp + '_' + index + '.' + fallbackExtension)
-      : (name || ('paste_' + timestamp + '_' + randomToken(6) + '_' + index + '.' + fallbackExtension));
+    const relativePath = String(file.name || '').trim() || ('paste.' + fallbackExtension);
     return { file, relativePath, displayName: getFsBasename(relativePath) };
   });
+  return createUniqueSystemUploadBatch(uploadItems, []).uploadItems;
 }
 
 function handleInput(el) {
@@ -55755,11 +55838,11 @@ async function extractSystemDropItemsFromDataTransfer(dataTransfer) {
         const normalized = normalizeFsPath(dirPath);
         if (normalized && !nonEmptyDirSet.has(normalized)) emptyDirs.push(normalized);
       });
-      return { uploadItems, emptyDirs };
+      return createUniqueSystemUploadBatch(uploadItems, emptyDirs);
     }
   }
   const files = normalizeUploadFileItems(dt.files || []);
-  return { uploadItems: files, emptyDirs };
+  return createUniqueSystemUploadBatch(files, emptyDirs);
 }
 
 async function uploadSystemItemsToBubbles(uploadItems, emptyDirs, targetEl, domain) {

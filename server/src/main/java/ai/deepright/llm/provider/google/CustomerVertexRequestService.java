@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -70,6 +71,7 @@ public class CustomerVertexRequestService extends VertexRequestService {
                 .build()));
     }
 
+    @ConditionalOnProperty(name = "vertex.enable", havingValue = "true", matchIfMissing = false)
     @Configuration
     @Setter
     @Getter
