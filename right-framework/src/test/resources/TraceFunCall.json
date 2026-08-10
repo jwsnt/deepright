@@ -1,0 +1,191 @@
+{
+  "trackDimension": {
+    "dimension": {
+      "llmQuery": {
+        "workTask": {
+          "timestamp": 1754897255160,
+          "deepness": 3,
+          "funCallTrack": "d392f46f-1376-4e73-b5ad-25fbdb75b1cb",
+          "workflow": "action",
+          "biz": "task",
+          "protocol": "chat",
+          "query": "The user's original query: 跨多个维度对比 10 个前端工程师招聘JD：包括核心招聘特征、学历要求、目标技能储备、工作强度以及招聘公司口碑\n##################\nThe planning step 1: 1，请提供您希望对比的10份前端工程师招聘JD（Job Description）的完整文本内容，以便进行后续的详细分析。\n",
+          "userContext": {
+            "language": "UNKNOWN",
+            "system": "UNKNOWN",
+            "device": "UNKNOWN",
+            "region": "UNKNOWN",
+            "brand": "UNKNOWN",
+            "model": "UNKNOWN"
+          },
+          "metadata": {
+            "_plan_times": 1,
+            "__fun__call": {
+              "responses": [
+                {
+                  "response": "[]",
+                  "name": "Tools_hjxCRxiwCQBiwxDRjAwyTjxjRATCjyCD",
+                  "valid": true
+                },
+                {
+                  "response": "[]",
+                  "name": "Tools_hjxCRxiwCQBiwxDRjAwyTjxjRATCjyCD",
+                  "valid": true
+                }
+              ],
+              "requests": [
+                {
+                  "args": {
+                    "query": "前端工程师招聘JD",
+                    "num_results": "10"
+                  },
+                  "name": "Tools_hjxCRxiwCQBiwxDRjAwyTjxjRATCjyCD",
+                  "valid": true
+                },
+                {
+                  "args": {
+                    "query": "前端开发工程师 招聘",
+                    "num_results": "10"
+                  },
+                  "name": "Tools_hjxCRxiwCQBiwxDRjAwyTjxjRATCjyCD",
+                  "valid": true
+                }
+              ],
+              "valid": true
+            }
+          },
+          "notifier": "endpoint",
+          "upstream": "action",
+          "chat": "1754897165645",
+          "device": "UNKNOWN",
+          "trace": "223e8805-df94-42ab-b212-1ed2c4ebee0c",
+          "conversation": "1754897165645"
+        },
+        "protocol": "chat",
+        "query": "The user's original query: 跨多个维度对比 10 个前端工程师招聘JD：包括核心招聘特征、学历要求、目标技能储备、工作强度以及招聘公司口碑\n##################\nThe planning step 1: 1，请提供您希望对比的10份前端工程师招聘JD（Job Description）的完整文本内容，以便进行后续的详细分析。\n",
+        "userContext": {
+          "language": "UNKNOWN",
+          "system": "UNKNOWN",
+          "device": "UNKNOWN",
+          "region": "UNKNOWN",
+          "brand": "UNKNOWN",
+          "model": "UNKNOWN"
+        },
+        "timestamp": 1754897255160,
+        "biz": "task",
+        "metadata": {
+          "_plan_times": 1,
+          "__fun__call": {
+            "responses": [
+              {
+                "response": "[]",
+                "name": "Tools_hjxCRxiwCQBiwxDRjAwyTjxjRATCjyCD",
+                "valid": true
+              },
+              {
+                "response": "[]",
+                "name": "Tools_hjxCRxiwCQBiwxDRjAwyTjxjRATCjyCD",
+                "valid": true
+              }
+            ],
+            "requests": [
+              {
+                "args": {
+                  "query": "前端工程师招聘JD",
+                  "num_results": "10"
+                },
+                "name": "Tools_hjxCRxiwCQBiwxDRjAwyTjxjRATCjyCD",
+                "valid": true
+              },
+              {
+                "args": {
+                  "query": "前端开发工程师 招聘",
+                  "num_results": "10"
+                },
+                "name": "Tools_hjxCRxiwCQBiwxDRjAwyTjxjRATCjyCD",
+                "valid": true
+              }
+            ],
+            "valid": true
+          }
+        },
+        "deepness": 3,
+        "workflow": "action",
+        "notifier": "endpoint",
+        "upstream": "action",
+        "chat": "1754897165645",
+        "device": "UNKNOWN",
+        "trace": "223e8805-df94-42ab-b212-1ed2c4ebee0c",
+        "funCallTrack": "d392f46f-1376-4e73-b5ad-25fbdb75b1cb",
+        "conversation": "1754897165645"
+      },
+      "protocol": "chat",
+      "query": "The user's original query: 跨多个维度对比 10 个前端工程师招聘JD：包括核心招聘特征、学历要求、目标技能储备、工作强度以及招聘公司口碑\n##################\nThe planning step 1: 1，请提供您希望对比的10份前端工程师招聘JD（Job Description）的完整文本内容，以便进行后续的详细分析。\n",
+      "userContext": {
+        "language": "UNKNOWN",
+        "system": "UNKNOWN",
+        "device": "UNKNOWN",
+        "region": "UNKNOWN",
+        "brand": "UNKNOWN",
+        "model": "UNKNOWN"
+      },
+      "timestamp": 1754897255160,
+      "biz": "task",
+      "metadata": {
+        "_plan_times": 1,
+        "__fun__call": {
+          "responses": [
+            {
+              "response": "[]",
+              "name": "Tools_hjxCRxiwCQBiwxDRjAwyTjxjRATCjyCD",
+              "valid": true
+            },
+            {
+              "response": "[]",
+              "name": "Tools_hjxCRxiwCQBiwxDRjAwyTjxjRATCjyCD",
+              "valid": true
+            }
+          ],
+          "requests": [
+            {
+              "args": {
+                "query": "前端工程师招聘JD",
+                "num_results": "10"
+              },
+              "name": "Tools_hjxCRxiwCQBiwxDRjAwyTjxjRATCjyCD",
+              "valid": true
+            },
+            {
+              "args": {
+                "query": "前端开发工程师 招聘",
+                "num_results": "10"
+              },
+              "name": "Tools_hjxCRxiwCQBiwxDRjAwyTjxjRATCjyCD",
+              "valid": true
+            }
+          ],
+          "valid": true
+        }
+      },
+      "deepness": 3,
+      "workflow": "action",
+      "notifier": "endpoint",
+      "upstream": "action",
+      "chat": "1754897165645",
+      "device": "UNKNOWN",
+      "trace": "223e8805-df94-42ab-b212-1ed2c4ebee0c",
+      "funCallTrack": "d392f46f-1376-4e73-b5ad-25fbdb75b1cb",
+      "conversation": "1754897165645"
+    },
+    "track": "d392f46f-1376-4e73-b5ad-25fbdb75b1cb"
+  },
+  "response": "[]",
+  "request": {
+    "args": {
+      "query": "前端开发工程师 招聘",
+      "num_results": "10"
+    },
+    "name": "Tools_hjxCRxiwCQBiwxDRjAwyTjxjRATCjyCD",
+    "valid": true
+  }
+}

@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" 未使用的导入 EnableScheduling 应该删除。\n\n为了2000字，我需要详细描述每个问题。但指令说“不回答无关内容”，所以"}}

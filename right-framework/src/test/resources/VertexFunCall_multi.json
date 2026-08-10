@@ -1,0 +1,99 @@
+[
+  {
+    "candidates": [
+      {
+        "content": {
+          "role": "model",
+          "parts": [
+            {
+              "functionCall": {
+                "name": "Workflow_skills__main",
+                "args": {
+                  "why_do_this": "加载Bug修复技能以遵循标准修复流程。",
+                  "path": "bug-fix/SKILL.md"
+                }
+              },
+              "thoughtSignature": "ZTI0ODMwYTctNWNkNi00MmZlLTk5OGItZWU1MzllNzJiOWMz"
+            }
+          ]
+        }
+      }
+    ],
+    "usageMetadata": {
+      "trafficType": "ON_DEMAND"
+    },
+    "modelVersion": "gemini-3-flash-preview",
+    "createTime": "2026-01-08T09:43:07.475098Z",
+    "responseId": "K3xfadr_HO2v694PoK6L4As"
+  },
+  {
+    "candidates": [
+      {
+        "content": {
+          "role": "model",
+          "parts": [
+            {
+              "functionCall": {
+                "name": "Workflow_skills__main",
+                "args": {
+                  "path": "ide-operations/file-operations/SKILL.md",
+                  "why_do_this": "加载IDE文件操作技能以进行代码读取和修改。"
+                }
+              }
+            }
+          ]
+        },
+        "finishReason": "STOP",
+        "safetyRatings": [
+          {
+            "category": "HARM_CATEGORY_HATE_SPEECH",
+            "probability": "NEGLIGIBLE",
+            "probabilityScore": 1.8145863e-06,
+            "severity": "HARM_SEVERITY_NEGLIGIBLE",
+            "severityScore": 0.035605013
+          },
+          {
+            "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+            "probability": "NEGLIGIBLE",
+            "probabilityScore": 1.961658e-07,
+            "severity": "HARM_SEVERITY_NEGLIGIBLE"
+          },
+          {
+            "category": "HARM_CATEGORY_HARASSMENT",
+            "probability": "NEGLIGIBLE",
+            "probabilityScore": 3.3597811e-07,
+            "severity": "HARM_SEVERITY_NEGLIGIBLE",
+            "severityScore": 0.013869226
+          },
+          {
+            "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+            "probability": "NEGLIGIBLE",
+            "probabilityScore": 9.530987e-09,
+            "severity": "HARM_SEVERITY_NEGLIGIBLE"
+          }
+        ]
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 1766,
+      "candidatesTokenCount": 72,
+      "totalTokenCount": 1838,
+      "trafficType": "ON_DEMAND",
+      "promptTokensDetails": [
+        {
+          "modality": "TEXT",
+          "tokenCount": 1766
+        }
+      ],
+      "candidatesTokensDetails": [
+        {
+          "modality": "TEXT",
+          "tokenCount": 72
+        }
+      ]
+    },
+    "modelVersion": "gemini-3-flash-preview",
+    "createTime": "2026-01-08T09:43:07.475098Z",
+    "responseId": "K3xfadr_HO2v694PoK6L4As"
+  }
+]

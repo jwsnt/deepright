@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"笔误。或者我需要检查代码是否有足够内容。\n\n另一个想法：用户可能错误地写了“"}}

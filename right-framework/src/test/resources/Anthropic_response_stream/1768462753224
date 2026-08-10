@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"长。\n\n或许代码有问题需要长篇分析，但代码很简单。\n\n另一个想法：用户可能期望"}}

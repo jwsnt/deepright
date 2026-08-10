@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"代码）\n2. 需要修改的问题列表\n\n然后结尾`[FINISH]`。\n\n但代码本身可能没有多个"}}

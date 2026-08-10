@@ -1,0 +1,20 @@
+{
+  "introduce": {
+    "llm": {
+      "dynamic": {
+        "stopOnFailed": false,
+        "dynamic": "dynamicPrompt"
+      }
+    }
+  },
+  "dynamicPrompt": {
+    "llm": {
+      "rag": [
+        {
+          "replace": "#meta",
+          "key": "rag_meta"
+        }
+      ]
+    }
+  }
+}

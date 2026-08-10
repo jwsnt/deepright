@@ -1,0 +1,34 @@
+[
+  {
+    "candidates": [
+      {
+        "content": {
+          "role": "model",
+          "parts": [
+            {
+              "functionCall": {
+                "name": "workflow2",
+                "args": {
+                  "location": "华北"
+                }
+              }
+            },
+            {
+              "functionCall": {
+                "name": "workflow4",
+                "args": {
+                  "location": "华北",
+                  "index": 100
+                }
+              }
+            }
+          ]
+        },
+        "finishReason": "STOP"
+      }
+    ],
+    "modelVersion": "gemini-1.5-flash-001",
+    "createTime": "2025-03-09T11:26:35.549190Z",
+    "responseId": "63rNZ8bCIdmOm9IP8ImS0Qg"
+  }
+]

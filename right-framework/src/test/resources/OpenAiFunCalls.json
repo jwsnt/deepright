@@ -1,0 +1,1 @@
+data: {"id": "chatcmpl-67d17131da33297be1b74c05", "object": "chat.completion.chunk", "created": 1741779250, "model": "moonshot-v1-8k", "choices":[{"index": 0, "delta": {"tool_calls":[{"index": 0, "id": "workflow3:0", "type": "function", "function": {"name": "workflow3","arguments": ""}}]}, "finish_reason": null}], "system_fingerprint": "fpv0_c31cc979"}

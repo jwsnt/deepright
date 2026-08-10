@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"。\n\n列出问题：\n1. main方法抛出通用异常。\n2. @EnableAsync 注解的 proxyTargetClass 属性冗余。\n3. 其他可能问题"}}

@@ -1,0 +1,17 @@
+{
+  "jsonrpc": "2.0",
+  "id": "req-003",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "role": "user",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "I'd like to book a flight."
+        }
+      ]
+    },
+    "messageId": "c53ba666-3f97-433c-a87b-6084276babe2"
+  }
+}

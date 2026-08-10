@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"\n但为了达到2000字，我可能需要详细描述每个问题。但指令说“不需要回答无关内容”，所以可能只"}}

@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"有问题的代码”，结合上下文，可能是输出整个代码片段。\n\n为了安全，我输出整个代码，然后列出问题。\n\n字数："}}

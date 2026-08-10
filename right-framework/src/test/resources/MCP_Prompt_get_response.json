@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1757399648803,
+  "result": {
+    "description": "Introduce myself",
+    "messages": [
+      {
+        "role": "user",
+        "content": {
+          "type": "text",
+          "text": "My name is right. Work at the AI Center."
+        }
+      }
+    ]
+  }
+}

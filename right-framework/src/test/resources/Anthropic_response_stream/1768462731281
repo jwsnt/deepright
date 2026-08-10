@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":". **代码格式**：代码格式看起来整洁，但为了完整性，可以检查缩进等。代码中使用了空格缩"}}

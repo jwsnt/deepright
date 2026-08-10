@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"100行。问题描述每个几句话。总共可能500字左右。\n\n为了达到2000字"}}

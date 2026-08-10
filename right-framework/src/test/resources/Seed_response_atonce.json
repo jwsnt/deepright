@@ -1,0 +1,15 @@
+{
+  "model": "doubao-seedream-4-5-251128",
+  "created": 1768564213,
+  "data": [
+    {
+      "url": "https://ark-content-generation-v2-cn-beijing.tos-cn-beijing.volces.com/doubao-seedream-4-5/021768564201358943be5294e080788be4ca008f262f4f3be6c6a_0.jpeg?X-Tos-Algorithm=TOS4-HMAC-SHA256&X-Tos-Credential=MOCK_AK_PLACEHOLDER%2F20260116%2Fcn-beijing%2Ftos%2Frequest&X-Tos-Date=20260116T115013Z&X-Tos-Expires=86400&X-Tos-Signature=c251328a021fd99ebe287b320d12a9fe637f02b433e390035be70753a58a7cc2&X-Tos-SignedHeaders=host&x-tos-process=image%2Fwatermark%2Cimage_YXNzZXRzL3dhdGVybWFya192MS5wbmc_eC10b3MtcHJvY2Vzcz1pbWFnZS9yZXNpemUscF8xMzg%3D%2Cx_121%2Cy_121",
+      "size": "2112x1824"
+    }
+  ],
+  "usage": {
+    "generated_images": 1,
+    "output_tokens": 15048,
+    "total_tokens": 15048
+  }
+}

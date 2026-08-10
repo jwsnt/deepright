@@ -1,0 +1,40 @@
+{
+  "content": {
+    "role": "model",
+    "parts": [
+      {
+        "text": "6DfyDbuA36Ab+g3"
+      }
+    ]
+  },
+  "finishReason": "MAX_TOKENS",
+  "safetyRatings": [
+    {
+      "category": "HARM_CATEGORY_HATE_SPEECH",
+      "probability": "NEGLIGIBLE",
+      "probabilityScore": 3.934089E-7,
+      "severity": "HARM_SEVERITY_NEGLIGIBLE"
+    },
+    {
+      "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+      "probability": "NEGLIGIBLE",
+      "probabilityScore": 2.6324735E-5,
+      "severity": "HARM_SEVERITY_NEGLIGIBLE",
+      "severityScore": 0.05176162
+    },
+    {
+      "category": "HARM_CATEGORY_HARASSMENT",
+      "probability": "NEGLIGIBLE",
+      "probabilityScore": 2.5527046E-5,
+      "severity": "HARM_SEVERITY_NEGLIGIBLE",
+      "severityScore": 0.11416904
+    },
+    {
+      "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+      "probability": "NEGLIGIBLE",
+      "probabilityScore": 2.166715E-8,
+      "severity": "HARM_SEVERITY_NEGLIGIBLE",
+      "severityScore": 0.0042377114
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+event: message_start
+data: {"type":"message_start","message":{"id":"05b7cc83886a0aa0720db223e7d37640","type":"message","role":"assistant","content":[],"model":"MiniMax-M2.1","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":185,"output_tokens":0},"service_tier":"standard"}}

@@ -1,0 +1,74 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "functionCall": {
+              "name": "Tools_shell__cmd",
+              "args": {
+                "cmd": "cd ~/DEV/gocli && go mod init gocli || true",
+                "why_do_this": "初始化Go模块，确保依赖管理正常。如果已经初始化过，忽略错误。"
+              }
+            },
+            "thoughtSignature": "CicB4/H/Xu2CMtiGwct5OIZzEfBky2t72cAwY9LURpl2tPU7sqZ64CAKXQHj8f9eVrAZOIz4GNN6vg6e9SdOTbJ7gdZcJkjyjiZtdzoHVtKCc8tmjdQmgQ9+QWNrBS9cYmt2BjZ5vUF3wr5yxA9luVkFWUcggGabd4azrLsKyfti5YBBsRGfrApRAePx/14Rp8z+KCyh9uLfPMEkTQCIVomSO0r7xnfNfm2TbiHiEFtWr1cWrABmOrSSMY81zXFl6IT3s8RUwucxQuC1Q8lZ0dLjFkBxg3G06lOxCnQB4/H/Xq8iZpzhDvl7LF7gc25jVcmUqWSdo0TXTwD89Uzt9WyZiIwEcToECX8cTq3lxqi109CkCgtqaMDdoH+K1n5Sv7SSr6JfsTgAMBeIFNI3TjW6pMQY4wdZ07LHkmoV+W+g67ozICZJ8oGX5oiEYnJ56QqJAQHj8f9efd6C025v5fjQ0RpXOZTh+nfZ/tJJXRRFg+sKhCr57mumDtQGipQTnWZiR+IkwoptFEVgsvldF+nLuE/i+Rcw8kQdLurjYWqjt/f4yi7Z+aCoH3U/RDE3bppjIZynzUdOISxSRp+QDWEP4Kwjk1bXGYFdtSpYm1rpEjiVl1JwK0OtLl6hCs0BAePx/141izGDAiBQOsmltexhdQytFFO6xp0acOvEnM32oPohikfL3/OQ95EE0YDY2BReZwBW0pNAxIjGAwVRm9J4upC2z811SBAgYsBc7C0dlXqVA8Wh5je9Hop4x/GwnC/81sOaaRME+RKynM62V7rHhtjCvXy7/67m/O9SNxKnjUSR0D3dd0gPvBc6gbrlB3JG08M0RcLfUPsq3OJsYr/hOuQmWYWOa4ckhafoivEGG4COMli4Mx9q9InnDX5eyPdk1dygpSLZbSCcIQr7AQHj8f9eZtfxsF0zrtkBgmz+2TImSYUdRyp5+AUF4NyBubtehMU48WzDwsdhar3sLQ7UAMSFEgHAgNslc8o6TXIq/aFyyuOWAelKO4eb2HMaaRRXfpInvAdIxsMWYyq3uEW4oAjXgOHHNnYFPdo9kn3xOUNa9b3u45uo7o0431ik5BWfv5wWy3DVc5JoJ1cDS+XJLfRz1hDkpVKppz64d7V26tLjdqIH4DWbxP5yctpYTgqdOd3mS9/xIQ0aPDPpijqgVQVVoxnYz4+1h3WyswfonkI2xWyXuRjjfqMkHjMQeakfq9mNJ/w1AaWPRyvBku51bDLQj87ooRlN"
+          }
+        ]
+      },
+      "finishReason": "STOP",
+      "safetyRatings": [
+        {
+          "category": "HARM_CATEGORY_HATE_SPEECH",
+          "probability": "NEGLIGIBLE",
+          "probabilityScore": 2.1369373e-05,
+          "severity": "HARM_SEVERITY_NEGLIGIBLE",
+          "severityScore": 0.0411672
+        },
+        {
+          "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+          "probability": "NEGLIGIBLE",
+          "probabilityScore": 0.00012659078,
+          "severity": "HARM_SEVERITY_NEGLIGIBLE",
+          "severityScore": 0.08941597
+        },
+        {
+          "category": "HARM_CATEGORY_HARASSMENT",
+          "probability": "NEGLIGIBLE",
+          "probabilityScore": 3.2423752e-06,
+          "severity": "HARM_SEVERITY_NEGLIGIBLE",
+          "severityScore": 0.036738083
+        },
+        {
+          "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+          "probability": "NEGLIGIBLE",
+          "probabilityScore": 6.912083e-08,
+          "severity": "HARM_SEVERITY_NEGLIGIBLE",
+          "severityScore": 0.07361114
+        }
+      ]
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 1429,
+    "candidatesTokenCount": 46,
+    "totalTokenCount": 1672,
+    "trafficType": "ON_DEMAND",
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 1429
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 46
+      }
+    ],
+    "thoughtsTokenCount": 197
+  },
+  "modelVersion": "gemini-3-pro-preview",
+  "createTime": "2025-11-24T07:37:08.199668Z",
+  "responseId": "JAskafSXDLy-694Pv5bo0Q0"
+}

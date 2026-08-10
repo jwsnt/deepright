@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"2000字可能是个错误。或许是“200字”或“500字”，但我应该遵循指令。代码和问题"}}

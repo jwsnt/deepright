@@ -1,0 +1,106 @@
+data: {
+"jsonrpc": "2.0",
+"id": 1,
+"result": {
+"id": "225d6247-06ba-4cda-a08b-33ae35c8dcfa",
+"contextId": "05217e44-7e9f-473e-ab4f-2c2dde50a2b1",
+"status": {
+"state": "submitted",
+"timestamp": "2025-04-02T16:59:25.331844"
+},
+"history": [
+{
+"role": "user",
+"parts": [
+{
+"kind": "text",
+"text": "write a long paper describing the attached pictures"
+},
+{
+"kind": "file",
+"file": {
+"mimeType": "image/png",
+"data": "<base64-encoded-content>"
+}
+}
+],
+"messageId": "bbb7dee1-cf5c-4683-8a6f-4114529da5eb",
+"taskId": "225d6247-06ba-4cda-a08b-33ae35c8dcfa",
+"contextId": "05217e44-7e9f-473e-ab4f-2c2dde50a2b1"
+}
+],
+"kind": "task",
+"metadata": {
+}
+}
+}
+
+data: {
+"jsonrpc": "2.0",
+"id": 1,
+"result": {
+"taskId": "225d6247-06ba-4cda-a08b-33ae35c8dcfa",
+"contextId": "05217e44-7e9f-473e-ab4f-2c2dde50a2b1",
+"artifact": {
+"artifactId": "9b6934dd-37e3-4eb1-8766-962efaab63a1",
+"parts": [
+{"kind": "text", "text": "<section 1...>"}
+]
+},
+"append": false,
+"lastChunk": false,
+"kind": "artifact-update"
+}
+}
+
+data: {
+"jsonrpc": "2.0",
+"id": 1,
+"result": {
+"taskId": "225d6247-06ba-4cda-a08b-33ae35c8dcfa",
+"contextId": "05217e44-7e9f-473e-ab4f-2c2dde50a2b1",
+"artifact": {
+"artifactId": "9b6934dd-37e3-4eb1-8766-962efaab63a1",
+"parts": [
+{"kind": "text", "text": "<section 2...>"}
+],
+},
+"append": true,
+"lastChunk": false,
+"kind": "artifact-update"
+}
+}
+
+
+data: {
+"jsonrpc": "2.0",
+"id": 1,
+"result": {
+"taskId": "225d6247-06ba-4cda-a08b-33ae35c8dcfa",
+"contextId": "05217e44-7e9f-473e-ab4f-2c2dde50a2b1",
+"artifact": {
+"artifactId": "9b6934dd-37e3-4eb1-8766-962efaab63a1",
+"parts": [
+{"kind": "text", "text": "<section 3...>"}
+]
+},
+"append": true,
+"lastChunk": true,
+"kind": "artifact-update"
+}
+}
+
+data: {
+"jsonrpc": "2.0",
+"id": 1,
+"result": {
+"taskId": "225d6247-06ba-4cda-a08b-33ae35c8dcfa",
+"contextId": "05217e44-7e9f-473e-ab4f-2c2dde50a2b1",
+"status": {
+"state": "completed",
+"timestamp": "2025-04-02T16:59:35.331844"
+},
+"final": true,
+"kind": "status-update"
+}
+}

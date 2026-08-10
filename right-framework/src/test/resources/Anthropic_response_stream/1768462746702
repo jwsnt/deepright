@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"输出代码和问题。\n\n最终输出结构：\n- 代码\n- 问题列表\n- [FINISH]\n\n问题列表应该清晰"}}

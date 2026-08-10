@@ -1,0 +1,29 @@
+---
+CREATE
+---
+curl --location 'http://127.0.0.1:8080/mis/history/glimpse' \
+--header 'Content-Type: application/json' \
+--data '{
+    "device": "ella device",
+    "biz": "example/example105",
+    "chat": "10086",
+    "repositories": [
+        "workflow1"
+    ],
+    "content": [
+        {
+            "answer": "我的回答1",
+            "query": "我的提问1"
+        },
+        {
+            "answer": "我的回答2",
+            "query": "我的提问2"
+        }
+    ]
+}'
+---
+FETCH
+http://127.0.0.1:8080/mis/history/glimpse?device=ella device&chat=10086&biz=example/example105&scene=workflow1
+---
+CLEAR
+curl --location --request DELETE 'http://127.0.0.1:8080/mis/history/glimpse?device=ella%20device&chat=10086&biz=example%2Fexample105&scene=workflow1'

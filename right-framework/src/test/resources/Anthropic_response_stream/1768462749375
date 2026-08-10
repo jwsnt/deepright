@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"SourceAutoConfiguration 很好，如果不需要数据库。\n\n所以，主要问题是：\n- 异常处理\n- 冗余注解\n- 未使用导入（"}}

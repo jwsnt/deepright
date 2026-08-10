@@ -1,0 +1,48 @@
+package ai.open.right.workflow.a2a.server.cmd;
+
+import ai.open.right.workflow.a2a.A2ARequest;
+import ai.open.right.workflow.a2a.protocol.MessageRequest;
+import ai.open.right.workflow.sync.SyncCallable;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.BeanUtils;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Setter
+@Getter
+@Slf4j
+public class A2ACmdMessageStream extends A2ACmdExportMessage {
+
+    public static final String METHOD = "message/stream";
+
+    @Override
+    public SyncCallable buildSyncCallable(A2ARequest a2aRequest, MessageRequest messageRequest) throws Exception {
+        return new A2ACmdCallableStream(a2aRequest, messageRequest);
+    }
+
+    @Override
+    public Boolean support(A2ARequest a2aRequest) throws Exception {
+        return StringUtils.equalsIgnoreCase(a2aRequest.getMethod(), A2ACmdMessageStream.METHOD);
+    }
+
+    @ConditionalOnProperty(name = "a2a.enable", havingValue = "true", matchIfMissing = false)
+    @Configuration
+    @Setter
+    @Getter
+    public static class InitConfig extends A2ACmdInitConfig {
+
+        @Bean(name = A2ACmdMessageStream.METHOD)
+        @ConditionalOnMissingBean(name = A2ACmdMessageStream.METHOD)
+        public A2ACmdMessageStream a2aCmdMessageStream() throws Exception {
+            A2ACmdMessageStream a2aCmdMessageStream = new A2ACmdMessageStream();
+            BeanUtils.copyProperties(this, a2aCmdMessageStream);
+            log.info("A2ACmdMessageStream inited: timeout4Llm={}", a2aCmdMessageStream.getTimeout4Llm());
+            return a2aCmdMessageStream;
+        }
+    }
+}

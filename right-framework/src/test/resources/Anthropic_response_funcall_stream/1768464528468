@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"获取第10周的食材\n2. 然后根据返回的食材，再调用 `Workflow_funcall_workflow__cooking` 来获取烹饪方法\n3. 最后将结果整理"}}

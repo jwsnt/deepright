@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"可优化**：尽管代码格式基本正确，但为了提高可读性，可以考虑在注解和括号周围添加适当的空格，例如 `@"}}

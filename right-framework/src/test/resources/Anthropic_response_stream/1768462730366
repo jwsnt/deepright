@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"方法中，`throws Exception` 是不推荐的。应该捕获异常并适当处理，例如记录日志或显示错误信息。\n2. **注解冗"}}

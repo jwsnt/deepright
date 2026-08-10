@@ -1,0 +1,18 @@
+{
+  "id": "87fb52a9-cd71-4fcd-9d8b-425af73cac4e",
+  "object": "chat.completion.chunk",
+  "created": 1762241221,
+  "model": "deepseek-chat",
+  "system_fingerprint": "fp_ffc7281d48_prod0820_fp8_kvcache",
+  "choices": [
+    {
+      "index": 0,
+      "delta": {
+        "role": "assistant",
+        "content": ""
+      },
+      "logprobs": null,
+      "finish_reason": null
+    }
+  ]
+}

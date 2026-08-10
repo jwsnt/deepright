@@ -1,0 +1,2 @@
+event: content_block_stop
+data: {"type":"content_block_stop","index":1}

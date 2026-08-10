@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  简体中文（zh-CN）字符串资源。
+  请与默认语言文件（如 strings.xml / values/strings.xml）中的 string name 保持一致，仅翻译文本内容。
+-->
+<resources>
+    <string name="app_name">Right 框架</string>
+    <string name="action_ok">确定</string>
+    <string name="action_cancel">取消</string>
+    <string name="error_unknown">发生未知错误，请稍后重试。</string>
+</resources>

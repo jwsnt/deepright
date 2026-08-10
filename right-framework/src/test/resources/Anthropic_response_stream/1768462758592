@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"    public static void main(String[] args) throws Exception {\n        SpringApplication.run(MainApplication.class, args);\n    }\n}\n```\n\n问题描述：\n1. **异常处理不当**：main 方法"}}

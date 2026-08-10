@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"。\n\n例如：\n问题1: main方法抛出通用异常，应该捕获特定异常。\n问题2: @EnableAsync 注解可以简化为 @EnableAsync。\n问题3:"}}

@@ -1,0 +1,2 @@
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"input_tokens":185,"output_tokens":1914}}

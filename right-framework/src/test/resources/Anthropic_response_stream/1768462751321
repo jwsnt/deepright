@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"风格问题，但代码看起来整洁。\n\n现在，输出。\n\n首先，输出有问题的代码：整个代码。\n\n然后，输出问题"}}

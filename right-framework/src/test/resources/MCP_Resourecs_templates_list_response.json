@@ -1,0 +1,14 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1757334812156,
+  "result": {
+    "resourceTemplates": [
+      {
+        "name": "java_code_review",
+        "uriTemplate": "java://{level}/{dept}",
+        "description": "通用代码的Code Review.其中{language}表示编程语言,{level}表示使用者等级,需要替换",
+        "mimeType": "text/plain"
+      }
+    ]
+  }
+}

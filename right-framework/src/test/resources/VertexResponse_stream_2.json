@@ -1,0 +1,32 @@
+[
+  {
+    "candidates": [
+      {
+        "content": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "12345"
+            }
+          ]
+        }
+      }
+    ]
+  }
+]
+[
+  {
+    "candidates": [
+      {
+        "content": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "ABCDE"
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

@@ -1,0 +1,39 @@
+{
+  "jsonrpc": "2.0",
+  "id": "req-003",
+  "result": {
+    "id": "3f36680c-7f37-4a5f-945e-d78981fafd36",
+    "contextId": "c295ea44-7543-4f78-b524-7a38915ad6e4",
+    "status": {
+      "state": "input-required",
+      "message": {
+        "role": "agent",
+        "parts": [
+          {
+            "kind": "text",
+            "text": "Sure, I can help with that! Where would you like to fly to, and from where? Also, what are your preferred travel dates?"
+          }
+        ],
+        "messageId": "c2e1b2dd-f200-4b04-bc22-1b0c65a1aad2",
+        "taskId": "3f36680c-7f37-4a5f-945e-d78981fafd36",
+        "contextId": "c295ea44-7543-4f78-b524-7a38915ad6e4"
+      },
+      "timestamp": "2024-03-15T10:10:00Z"
+    },
+    "history": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "kind": "text",
+            "text": "I'd like to book a flight."
+          }
+        ],
+        "messageId": "c53ba666-3f97-433c-a87b-6084276babe2",
+        "taskId": "3f36680c-7f37-4a5f-945e-d78981fafd36",
+        "contextId": "c295ea44-7543-4f78-b524-7a38915ad6e4"
+      }
+    ],
+    "kind": "task"
+  }
+}

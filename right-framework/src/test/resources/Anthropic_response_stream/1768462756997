@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"ab3773ad8839c97877a816c07b2da9feb4d68e35d94dd8b9c1b6dd33eb4662fc"}}

@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"声明了 `throws Exception`，这会抛出通用异常，不利于错误定位和维护。应该捕获具体异常并处理"}}

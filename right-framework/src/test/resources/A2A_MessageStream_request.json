@@ -1,0 +1,25 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "message/stream",
+  "params": {
+    "message": {
+      "role": "user",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "write a long paper describing the attached pictures"
+        },
+        {
+          "kind": "file",
+          "file": {
+            "mimeType": "image/png",
+            "data": "<base64-encoded-content>"
+          }
+        }
+      ],
+      "messageId": "bbb7dee1-cf5c-4683-8a6f-4114529da5eb"
+    },
+    "metadata": {}
+  }
+}

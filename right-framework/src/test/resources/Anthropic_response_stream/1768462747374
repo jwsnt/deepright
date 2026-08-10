@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"：如代码没有错误处理，但main方法中抛异常是不好的。\n\n或许可以添加更多通用建议"}}

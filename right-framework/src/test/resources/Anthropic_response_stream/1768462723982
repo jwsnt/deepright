@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"要求我作为代码自动化CR助理，检查提交的代码是否有质量问题。指令是：\n- 2000字，在结尾处输出`[FINISH]`\n-"}}

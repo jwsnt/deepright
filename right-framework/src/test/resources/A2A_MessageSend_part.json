@@ -1,0 +1,68 @@
+{
+  "message": {
+    "contextId": "ABCDE",
+    "taskId": "56789",
+    "role": "user",
+    "parts": [
+      {
+        "kind": "text",
+        "text": "tell me a joke1"
+      },
+      {
+        "kind": "data",
+        "data": {
+          "HELLO": "WORLD",
+          "WORLD": {
+            "OK": 100
+          }
+        }
+      },
+      {
+        "kind": "text",
+        "text": "tell me a joke2"
+      },
+      {
+        "kind": "data",
+        "data": {
+          "kind": "text",
+          "text": "tell me a joke3"
+        }
+      },
+      {
+        "kind": "file",
+        "file": {
+          "name": "input_image1.png",
+          "mimeType": "image/png",
+          "bytes": "iVBORw0KGgoAAAANSUhEUgAAAAUA...",
+          "#": "Base64 encoded image data"
+        }
+      },
+      {
+        "kind": "text",
+        "text": "tell me a joke4"
+      },
+      {
+        "kind": "file",
+        "file": {
+          "name": "input_image2.png",
+          "mimeType": "image/png",
+          "bytes": "iVBORw0KGgoAAAANSUhEUgAAAAUA...",
+          "#": "Base64 encoded image data"
+        }
+      }
+    ],
+    "messageId": "9229e770-767c-417b-a0b0-f0741243c589",
+    "metadata": {
+      "A": "B",
+      "C": {
+        "D": 100
+      },
+      "E": {
+        "PART": {
+          "kind": "text",
+          "text": "tell me a joke"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"问题的部分，而不是整个代码。\n\n但用户说“输出有问题的代码”，可能整个代码。\n\n为了安全，我输出整个代码。\n\n最终计划"}}

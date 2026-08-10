@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"进，看起来一致。\n4. **其他考虑**：没有明显的语法错误或逻辑错误。\n\n用户要求首先输出有问题的代码"}}

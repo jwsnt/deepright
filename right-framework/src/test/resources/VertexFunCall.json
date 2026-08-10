@@ -1,0 +1,162 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "functionCall": {
+              "name": "_TDCASyhjQBATQjTTS",
+              "args": {
+                "start": 0,
+                "q": "前端工程师 招聘 JD LinkedIn",
+                "num": 10
+              }
+            }
+          },
+          {
+            "functionCall": {
+              "name": "_TDCASyhjQBATQjTTS",
+              "args": {
+                "start": 0,
+                "q": "前端工程师 招聘 JD 拉勾",
+                "num": 10
+              }
+            }
+          },
+          {
+            "functionCall": {
+              "name": "_TDCASyhjQBATQjTTS",
+              "args": {
+                "num": 10,
+                "q": "前端工程师 招聘 JD BOSS直聘",
+                "start": 0
+              }
+            }
+          },
+          {
+            "functionCall": {
+              "name": "_TDCASyhjQBATQjTTS",
+              "args": {
+                "q": "前端工程师 招聘 JD 招聘网站",
+                "num": 10,
+                "start": 0
+              }
+            }
+          },
+          {
+            "functionCall": {
+              "name": "_TDCASyhjQBATQjTTS",
+              "args": {
+                "num": 10,
+                "start": 0,
+                "q": "前端工程师 招聘 JD"
+              }
+            }
+          },
+          {
+            "functionCall": {
+              "name": "_TDCASyhjQBATQjTTS",
+              "args": {
+                "start": 0,
+                "q": "前端开发工程师 招聘 JD LinkedIn",
+                "num": 10
+              }
+            }
+          },
+          {
+            "functionCall": {
+              "name": "_TDCASyhjQBATQjTTS",
+              "args": {
+                "start": 0,
+                "q": "前端开发工程师 招聘 JD 拉勾",
+                "num": 10
+              }
+            }
+          },
+          {
+            "functionCall": {
+              "name": "_TDCASyhjQBATQjTTS",
+              "args": {
+                "start": 0,
+                "q": "前端开发工程师 招聘 JD BOSS直聘",
+                "num": 10
+              }
+            }
+          },
+          {
+            "functionCall": {
+              "name": "_TDCASyhjQBATQjTTS",
+              "args": {
+                "start": 0,
+                "q": "前端开发工程师 招聘 JD 招聘网站",
+                "num": 10
+              }
+            }
+          },
+          {
+            "functionCall": {
+              "name": "_TDCASyhjQBATQjTTS",
+              "args": {
+                "q": "前端开发工程师 招聘 JD",
+                "start": 0,
+                "num": 10
+              }
+            }
+          }
+        ]
+      },
+      "finishReason": "STOP",
+      "safetyRatings": [
+        {
+          "category": "HARM_CATEGORY_HATE_SPEECH",
+          "probability": "NEGLIGIBLE",
+          "probabilityScore": 9.923673e-07,
+          "severity": "HARM_SEVERITY_NEGLIGIBLE"
+        },
+        {
+          "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+          "probability": "NEGLIGIBLE",
+          "probabilityScore": 3.086619e-09,
+          "severity": "HARM_SEVERITY_NEGLIGIBLE",
+          "severityScore": 0.08217189
+        },
+        {
+          "category": "HARM_CATEGORY_HARASSMENT",
+          "probability": "NEGLIGIBLE",
+          "probabilityScore": 1.1696673e-07,
+          "severity": "HARM_SEVERITY_NEGLIGIBLE",
+          "severityScore": 0.15951794
+        },
+        {
+          "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+          "probability": "NEGLIGIBLE",
+          "probabilityScore": 2.3892965e-10,
+          "severity": "HARM_SEVERITY_NEGLIGIBLE"
+        }
+      ],
+      "avgLogprobs": -0.0076116436029196807
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 2240,
+    "candidatesTokenCount": 233,
+    "totalTokenCount": 2473,
+    "trafficType": "ON_DEMAND",
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 2240
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 233
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash-001",
+  "createTime": "2025-08-07T03:00:08.358122Z",
+  "responseId": "uBaUaOrtFYvwmecP7f7guQ8"
+}

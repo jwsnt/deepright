@@ -1,0 +1,33 @@
+{
+  "candidates": [
+    {
+      "content": {},
+      "finishReason": "MALFORMED_FUNCTION_CALL",
+      "finishMessage": "Malformed function call: ` 工具只能执行独立的 Python 脚本，而不能启动一个持续运行的 Web 服务。因此，我将为您提供完整的 FastAPI 代码，并解释如何运行它。在 `",
+      "index": 0,
+      "safetyRatings": [
+        {
+          "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+          "probability": "LOW"
+        },
+        {
+          "category": "HARM_CATEGORY_HATE_SPEECH",
+          "probability": "NEGLIGIBLE"
+        },
+        {
+          "category": "HARM_CATEGORY_HARASSMENT",
+          "probability": "NEGLIGIBLE"
+        },
+        {
+          "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+          "probability": "NEGLIGIBLE"
+        }
+      ]
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 8,
+    "candidatesTokenCount": 726,
+    "totalTokenCount": 734
+  }
+}

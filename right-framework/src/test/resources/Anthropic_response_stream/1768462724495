@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" 首先输出有问题的代码，然后输出需要修改的问题，不回答无关内容。\n\n用户提供了一个Java代码片段：\n\n```java\npackage ai.open.right;\n\nimport org.springframework.boot.SpringApplication;\nimport"}}

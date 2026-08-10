@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" class MainApplication {\n\n    public static void main(String[] args) throws Exception {\n        SpringApplication.run(MainApplication.class, args);\n    }\n}\n```\n\n我需要检查这个代码是否有质量问题。质量问题"}}

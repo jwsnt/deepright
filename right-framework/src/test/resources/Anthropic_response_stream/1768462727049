@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" 导入：导入了一些Spring Boot相关的类。看起来正确。\n- 注解：\n  - `@PropertySource(\"classpath:application.properties\")`：这用于"}}

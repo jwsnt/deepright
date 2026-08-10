@@ -1,0 +1,27 @@
+{
+  "id": "87fb52a9-cd71-4fcd-9d8b-425af73cac4e",
+  "object": "chat.completion.chunk",
+  "created": 1762241221,
+  "model": "deepseek-chat",
+  "system_fingerprint": "fp_ffc7281d48_prod0820_fp8_kvcache",
+  "choices": [
+    {
+      "index": 0,
+      "delta": {
+        "tool_calls": [
+          {
+            "index": 0,
+            "id": "call_00_K5Fldaw0lI9k3BJg2X2NLfso",
+            "type": "function",
+            "function": {
+              "name": "Tools_RxSTQRzCBwxARDxjyBihigBxxzBSjBCj",
+              "arguments": ""
+            }
+          }
+        ]
+      },
+      "logprobs": null,
+      "finish_reason": null
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1757392379091,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"timezone\": \"Asia/Shanghai\",\n  \"datetime\": \"2025-09-09T12:32:59+08:00\",\n  \"is_dst\": false\n}"
+      }
+    ],
+    "isError": false
+  }
+}

@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"。\n\n但为了简洁，只列出现实问题。\n\n代码中还有其他问题吗？\n- "}}

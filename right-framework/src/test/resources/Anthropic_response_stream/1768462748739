@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"PropertySource 可能不需要，如果application.properties 是默认的，但这里指定了，可能没问题。\n- 排除Data"}}

@@ -1,0 +1,30 @@
+{
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "script_score": {
+            "query": {
+              "match_all": {}
+            },
+            "script": {
+              "source": "cosineSimilarity(params.query_vector, 'vector_field') + 1.0",
+              "params": {
+                "query_vector": []
+              }
+            },
+            "boost": 0.6
+          }
+        },
+        {
+          "match": {
+            "text_field": {
+              "query": "这是一段模拟的搜索文本",
+              "boost": 1.5
+            }
+          }
+        }
+      ]
+    }
+  }
+}

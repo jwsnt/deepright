@@ -1,0 +1,35 @@
+{
+  "jsonrpc": "2.0",
+  "id": "req-007",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "role": "user",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "Analyze this image and highlight any faces."
+        },
+        {
+          "kind": "data",
+          "data": {
+            "name": "input_image.png",
+            "mimeType": "image/png",
+            "bytes": "iVBORw0KGgoAAAANSUhEUgAAAAUA...",
+            "#": "Base64 encoded image data"
+          }
+        },
+        {
+          "kind": "error",
+          "data": {
+            "name": "input_image.png",
+            "mimeType": "image/png",
+            "bytes": "iVBORw0KGgoAAAANSUhEUgAAAAUA...",
+            "#": "Base64 encoded image data"
+          }
+        }
+      ],
+      "messageId": "6dbc13b5-bd57-4c2b-b503-24e381b6c8d6"
+    }
+  }
+}

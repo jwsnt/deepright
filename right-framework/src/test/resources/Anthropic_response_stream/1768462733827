@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"2000字可能有点多。或许是笔误，意思是“200字”或类似？但用户明确说"}}

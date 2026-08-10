@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"\n- 主类：`MainApplication` 是标准的Spring Boot启动类。\n- `main` 方法：调用`SpringApplication.run`，抛出了`Exception`。在main方法"}}

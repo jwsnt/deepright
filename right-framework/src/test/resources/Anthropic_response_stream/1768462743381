@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"：\n- 先输出代码本身（可能整个代码）\n- 然后输出问题列表，每个问题描述一下。\n\n但问题描述"}}

@@ -1,0 +1,84 @@
+{
+  "mcpExports": [
+    "mcp_server_tools_call@cr"
+  ],
+  "mcpServers": {
+    "gitlab": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-gitlab"
+      ],
+      "env": {
+        "GITLAB_PERSONAL_ACCESS_TOKEN": "glpat-MOCK_TOKEN_PLACEHOLDER",
+        "GITLAB_API_URL": "https://git.com/api/v4"
+      }
+    },
+    "SQLite Explorer": {
+      "processor": 2,
+      "command": "python3",
+      "args": [
+        "src/test/resources/mcp/sqllite_server.py"
+      ]
+    },
+    "secure-filesystem-server": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem@2025.3.28",
+        "/",
+        "/"
+      ]
+    },
+    "echo": {
+      "command": "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+      "args": [
+        "src/test/resources/mcp/echo_script.py"
+      ]
+    },
+    "test": {
+      "command": "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+      "args": [
+        "src/test/resources/mcp/test_script.py"
+      ]
+    },
+    "empty-server": {
+      "processor": 2,
+      "command": "python3",
+      "args": [
+        "src/test/resources/mcp/empty_server.py"
+      ]
+    },
+    "schema-server": {
+      "processor": 2,
+      "command": "python3",
+      "args": [
+        "src/test/resources/mcp/schema_script.py"
+      ]
+    },
+    "multi_roles_prompt": {
+      "processor": 2,
+      "command": "python3",
+      "args": [
+        "src/test/resources/mcp/multi_roles_prompt_script.py"
+      ]
+    },
+    "dynamic_resource": {
+      "processor": 2,
+      "command": "python3",
+      "args": [
+        "src/test/resources/mcp/dynamic_resource.py"
+      ]
+    },
+    "http_streaming": {
+      "type": "streamableHttp",
+      "baseUrl": "http://127.0.0.1:8000/mcp",
+      "headers": {}
+    },
+    "http_streaming_error": {
+      "type": "streamableHttpError",
+      "baseUrl": "http://127.0.0.1:8000/mcp",
+      "headers": {}
+    }
+  }
+}

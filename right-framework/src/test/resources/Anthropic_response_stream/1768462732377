@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"，然后输出需要修改的问题。所以，我需要：\n- 先复制代码。\n- 然后列出问题。\n\n指令是“不回答无关内容”，所以只输出代码"}}

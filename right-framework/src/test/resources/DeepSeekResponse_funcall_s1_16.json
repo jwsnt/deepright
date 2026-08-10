@@ -1,0 +1,25 @@
+{
+  "choices": [
+    {
+      "delta": {
+        "tool_calls": [
+          {
+            "function": {
+              "arguments": ""
+            },
+            "index": 0,
+            "id": "",
+            "type": "function"
+          }
+        ]
+      },
+      "index": 16
+    }
+  ],
+  "object": "chat.completion.chunk",
+  "usage": null,
+  "created": 1762392034,
+  "system_fingerprint": null,
+  "model": "qwen3-coder-plus",
+  "id": "chatcmpl-96de9f89-f85b-4d47-b45b-e8560ac0f114"
+}

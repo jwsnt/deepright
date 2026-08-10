@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":";\n\n@PropertySource(\"classpath:application.properties\")\n@EnableAsync(proxyTargetClass = true)\n@SpringBootApplication(exclude = {\n        DataSourceAutoConfiguration.class\n})\npublic class MainApplication {\n\n"}}

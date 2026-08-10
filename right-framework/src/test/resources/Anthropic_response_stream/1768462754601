@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"，描述每个问题详细一些，以接近2000字，但可能还是不够。\n\n代码本身有不到"}}

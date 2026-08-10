@@ -1,0 +1,26 @@
+{
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "script_score": {
+            "query": {
+              "match_all": {}
+            },
+            "script": {
+              "source": "cosineSimilarity(params.query_vector, 'vector_field') + 1.0",
+              "params": {
+              }
+            },
+            "boost": 0.6
+          }
+        },
+        {
+          "match": {
+            "boost": 0.4
+          }
+        }
+      ]
+    }
+  }
+}

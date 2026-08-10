@@ -1,0 +1,3 @@
+curl --location 'http://127.0.0.1:8080/mis/events/glimpse?chat=chatId&device=deviceId' \
+--header 'Content-Type: application/json' \
+--data ''

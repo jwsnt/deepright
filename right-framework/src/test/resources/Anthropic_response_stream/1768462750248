@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"。\n\n问题列表：\n1. main方法声明 throws Exception，不推荐。\n2. @EnableAsync(proxyTargetClass = true) 中 proxyTargetClass = true"}}

@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"今天是第10周，想知道可以烹饪哪些食材以及如何烹饪。\n\n我需要：\n1. 首先调用 `Workflow_funcall_workflow__materials` 来"}}

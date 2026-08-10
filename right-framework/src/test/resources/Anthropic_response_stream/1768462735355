@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"几点。为了满足字数，我需要扩展解释，但指令说“不回答无关内容”，所以可能只输出"}}

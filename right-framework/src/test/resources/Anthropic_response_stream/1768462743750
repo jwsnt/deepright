@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"可能简短。为了2000字，我需要详细。\n\n或许“2000字”是针对"}}

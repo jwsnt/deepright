@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"加载属性文件，看起来合理。\n  - `@EnableAsync(proxyTargetClass = true)`：启用异步处理，使用CGLIB代理。"}}

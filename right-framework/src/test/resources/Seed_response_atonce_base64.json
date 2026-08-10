@@ -1,0 +1,15 @@
+{
+  "model": "doubao-seedream-4-5-251128",
+  "created": 1768564213,
+  "data": [
+    {
+      "b64_json": "aGVsbG8gd29ybGQK",
+      "size": "2112x1824"
+    }
+  ],
+  "usage": {
+    "generated_images": 1,
+    "output_tokens": 15048,
+    "total_tokens": 15048
+  }
+}

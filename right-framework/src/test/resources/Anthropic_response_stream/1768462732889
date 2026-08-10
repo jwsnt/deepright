@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"和问题。\n\n字数要求：2000字。这可能是个误解。指令说“2000字”，但代码和问题可能"}}

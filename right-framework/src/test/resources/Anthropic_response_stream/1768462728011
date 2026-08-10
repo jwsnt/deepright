@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"`proxyTargetClass = true` 是默认值，所以可能冗余，但也可以接受。\n  - `@SpringBootApplication(ex"}}

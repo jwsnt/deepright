@@ -1,0 +1,35 @@
+{
+  "headers": {
+    "conversation": "conversation_10086",
+    "chat": "chat_10086",
+    "device": "device_10086",
+    "trace": "trace_10086",
+    "sec-fetch-mode": "cors",
+    "content-length": "144",
+    "accept-language": "*",
+    "host": "127.0.0.1:9997",
+    "connection": "keep-alive",
+    "content-type": "application/json",
+    "HOME": "/Users/shenjiawei",
+    "accept-encoding": "gzip, deflate",
+    "accept": "application/json, text/event-stream",
+    "user-agent": "node"
+  },
+  "content": {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "tools/call",
+    "params": {
+      "_meta": {
+        "progressToken": 2
+      },
+      "name": "mcp_server_tools_call:cr",
+      "arguments": {
+        "week": 220
+      }
+    }
+  },
+  "trace": "6a9475a5-7bbb-4758-b2dd-c1f543cb7cd8",
+  "method": "TOOLS/CALL",
+  "id": 2
+}

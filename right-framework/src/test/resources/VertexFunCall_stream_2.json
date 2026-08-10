@@ -1,0 +1,83 @@
+[
+{
+  "candidates": [
+    {
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "functionCall": {
+              "name": "Tools_yCiDABCTxQhygwwBAgwTTRhgQzxhADSi",
+              "args": {
+                "q": "最新AI行业趋势 2023-2024"
+              }
+            },
+            "thoughtSignature": "Co4GAcu98PD6bOHFVPN7G6bmiQuEMmmvooum8i+jfiQzebI8p3wHc2Vb1gReqDVqTsuULEDiAVLhAWaPFB03eA/KUoHjhBmyXxQQvBfX9K5CDKxnE0FdDZro9sRPZR2h68npHW1HiyqfWax98kpX8LCIM8yBY9nb6tBme54LU5YTtkTU8z1592sSnvwgVJyQs3vW3GbOggRarJrSqUt8ZVSGzjqzmEMhV22v91a0Aps34E+oHwr07oXzH7Dlnq6MyrUQFbtQemgMjrAeUTgQwQQaAkDRdWTe6WUWAk/3eLaqr6c5DkUniXj89giAcodC3Z1p1K3Z/Rjs9Y/Z9CswSWV37QqnY/IpHBU60n4ZH655KL+EL8iWY+WcvV7PkPuI1s/1lXYfDStntN/iOyrBhX7sP5fCYk4lHQ1ma5kBZg7hf7EBpSC56KWekbD8TBM38OffFxXSwqH5IVb/1iebLrt97/wnk3A3MEVZMzBkFdavoxvnFhZrGdyGh7qbwQXmHKBCCAxOKHCV0VL1RPDV4DS5mpEV7Fu6z6hgdDYP0h4+Zn2CU7w/4zqSVe+IiNWvnvaWwIxRDqyqSzC/0WJp5zBF2GLRE95Q1xWPw/AvcTM7Q4Hx6KZJ494IU1Pb8FaG/vDq02MQvdXcOuujeUpfo63uafuo14+PCRtgALoQ3VRRnmhZHtC3kYMwAYBF+oAObPdaHXUV661ScSIOD4FfaPjg9c3AlMu6djQAwHJbpyvQOOpiggVun78ILlpWkb0BLpOyzCah6vcQBknI5jE00PiQj573CX7ZUPLqxM4Q6n/jaxBDDwd/rRRy/d88i2Zm6eL89jcUqvxFbyLyDUlMdQSNDhTLMVjd6cs9ExpG+ar8Si3Q9Rpg5oO+uxmOIT2nUrFVWrLGPsRYO8ZBMIc/TzZovGMeTf6IsvdkPdmayPIK2opz4LiINQ2HTXUpzD1A6wUxtirdsuFaLT3y5qb1Bni2QMpHWDxJpRbC2f41Hsxy3f2DBB3PNlmsx5wPtmysAUFDjXVpD8cFJs1v78idF1k="
+          }
+        ]
+      },
+      "finishReason": "STOP",
+      "safetyRatings": [
+        {
+          "category": "HARM_CATEGORY_HATE_SPEECH",
+          "probability": "NEGLIGIBLE",
+          "probabilityScore": 8.80531e-05,
+          "severity": "HARM_SEVERITY_NEGLIGIBLE",
+          "severityScore": 0.06795937
+        },
+        {
+          "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+          "probability": "NEGLIGIBLE",
+          "probabilityScore": 0.1824937,
+          "severity": "HARM_SEVERITY_NEGLIGIBLE",
+          "severityScore": 0.009999186
+        },
+        {
+          "category": "HARM_CATEGORY_HARASSMENT",
+          "probability": "NEGLIGIBLE",
+          "probabilityScore": 1.5406442e-05,
+          "severity": "HARM_SEVERITY_NEGLIGIBLE",
+          "severityScore": 0.049905576
+        },
+        {
+          "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+          "probability": "NEGLIGIBLE",
+          "probabilityScore": 2.0821177e-05,
+          "severity": "HARM_SEVERITY_NEGLIGIBLE",
+          "severityScore": 0.06412119
+        }
+      ],
+      "avgLogprobs": -0.74475828806559241
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 16796,
+    "candidatesTokenCount": 36,
+    "totalTokenCount": 17017,
+    "cachedContentTokenCount": 16263,
+    "trafficType": "ON_DEMAND",
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 16796
+      }
+    ],
+    "cacheTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 16263
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 36
+      }
+    ],
+    "thoughtsTokenCount": 185
+  },
+  "modelVersion": "gemini-2.5-flash",
+  "createTime": "2025-08-11T09:36:02.689343Z",
+  "responseId": "grmZaL-JKse7ld8Py_aHoQw"
+}
+]

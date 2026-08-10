@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"响应内容，但代码很短，所以可能需要添加解释。但指令说“不回答无关内容”，所以可能只输出代码和问题"}}

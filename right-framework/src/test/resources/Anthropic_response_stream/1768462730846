@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"余**：`@EnableAsync(proxyTargetClass = true)` 中，`proxyTargetClass = true` 是默认行为，所以可以简化为`@EnableAsync`。\n3"}}

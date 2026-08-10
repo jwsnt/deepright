@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"可能总共几百字，所以我需要扩展解释每个问题。\n\n指令说“不回答无关内容”，所以可能只输出代码和问题，不添加额外文本。\n"}}

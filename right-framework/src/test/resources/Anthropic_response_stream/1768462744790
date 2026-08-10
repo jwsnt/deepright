@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"。\n\n我认为最好遵守指令：输出代码，然后输出问题。不添加额外文本。\n\n但字数2000字可能不合理。或许是“200字”的"}}

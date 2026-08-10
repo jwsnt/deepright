@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"：\n1. 复制代码。\n2. 列出问题，每个问题用几句话描述。\n3. [FINISH]\n\n字数可能"}}

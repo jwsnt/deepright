@@ -1,0 +1,2 @@
+event: image_generation.partial_succeeded
+data: {"type":"image_generation.partial_succeeded","model":"doubao-seedream-4-5-251128","created":1768571013,"image_index":2,"b64_json":"aGVsbG8gd29ybGQK","size":"1728x2304"}

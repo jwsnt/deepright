@@ -1,0 +1,80 @@
+[
+  {
+    "candidates": [
+      {
+        "content": {
+          "role": "model",
+          "parts": [
+            {
+              "functionCall": {
+                "name": "Workflow_SiBThBRiyyABSjSxTwjyjxRRQTjgQiRh",
+                "args": {
+                  "__query": "mkdir -p /Users/shenjiawei/DEV/right_gen/artifact"
+                }
+              },
+              "thoughtSignature": "Ci8B4/H/XsJ1gZ8pg5ERxlfAbcRGBNKWDmDjaiCjEyiXEHxYq5DzERiRLsmWJlvIMApzAePx/148vc7nfzTaV0SqcgATc+GwX9hwD0i9l/nFhBfxJtaUFN9YJFLDWI1/IddfLcnKxF6QNUQH276NFMoAvsSra/yG5COtUqTpKBE8e4gSOZBgJRjwHu850SXxJVJTMlGUJBnbaA5W0Ha/crEVFQgV5wpnAePx/14ebg+cdzY6a9qMMHoyK2fY1w/2IvbbE6pZTV+ym2FW6EfXCyFn7hNpTjSbL/V6vFvk5fxkACR3UNji5SjbgRodnni0gIYXJaUiwIa50Va1r/Wf5ymxE/AkzZlkLbu6HxHBsQqbAQHj8f9eoPVmimkl5wtklKcm3e05BNLTlDpkUMLJ7Ut3c6h/4XRrL+a0ubc/zKkmRR691wDJzj4etLB+I5bue2mMKtRkYO/iFSKx+2okseSTkr9goVEJciGT1UMxzAwe4a1sw/NvMSuD0SAvjIBc83pTjLNDULFIB7TkiUW+sfqUzVhOv4uY0U83xMH+hoIVpMbBuL2GwtfobNcuCqMBAePx/16iCNgnELXxxYfpn6pPm90t3opWfFcACUn4kP1ANaevSHdsnv2wVmIas4rQgz/FZzoQA6c/LQcm74Xh5ql9QZjUKBvWboSfp52rVUYwdvLoWyrjrc+J2sj5ef+baE3xRmh4T4KH3cQP50LMNndip4goWxMboD5+gVei1X3VbYyQd5FS+U4X9Map78fxtY+nDLQTL+EohbIwJ37o89KteQp2AePx/16JTntf/OyyVuWrqDz+9TP86wTCIS6K5MzC/g7yIcju+VtwavM5XEGsDyikd5HdfBS2pNIIxVBpkhdcMhV2Cr9f68ZceM9yXnN3qqu05fDUxBItaiPXsOIlM9SsKj7ve/GjLnqMk/gJj68HoARwBWa9HQ=="
+            }
+          ]
+        },
+        "finishReason": "STOP",
+        "safetyRatings": [
+          {
+            "category": "HARM_CATEGORY_HATE_SPEECH",
+            "probability": "NEGLIGIBLE",
+            "probabilityScore": 0.0000028228962,
+            "severity": "HARM_SEVERITY_NEGLIGIBLE"
+          },
+          {
+            "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+            "probability": "NEGLIGIBLE",
+            "probabilityScore": 0.000008326602,
+            "severity": "HARM_SEVERITY_NEGLIGIBLE",
+            "severityScore": 0.050995544
+          },
+          {
+            "category": "HARM_CATEGORY_HARASSMENT",
+            "probability": "NEGLIGIBLE",
+            "probabilityScore": 2.8246285e-7,
+            "severity": "HARM_SEVERITY_NEGLIGIBLE",
+            "severityScore": 0.013328001
+          },
+          {
+            "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+            "probability": "NEGLIGIBLE",
+            "probabilityScore": 2.4470422e-8,
+            "severity": "HARM_SEVERITY_NEGLIGIBLE"
+          }
+        ]
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 2408,
+      "candidatesTokenCount": 38,
+      "totalTokenCount": 2572,
+      "cachedContentTokenCount": 2391,
+      "trafficType": "ON_DEMAND",
+      "promptTokensDetails": [
+        {
+          "modality": "TEXT",
+          "tokenCount": 2408
+        }
+      ],
+      "cacheTokensDetails": [
+        {
+          "modality": "TEXT",
+          "tokenCount": 2391
+        }
+      ],
+      "candidatesTokensDetails": [
+        {
+          "modality": "TEXT",
+          "tokenCount": 38
+        }
+      ],
+      "thoughtsTokenCount": 126
+    },
+    "modelVersion": "gemini-2.5-flash",
+    "createTime": "2025-10-15T11:39:44.871734Z",
+    "responseId": "AIjvaLaaNbi6ld8PyJ_H8Qk"
+  }
+]

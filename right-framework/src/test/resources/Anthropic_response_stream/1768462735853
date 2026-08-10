@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"代码和问题，不额外解释。\n\n用户说：“首先输出有问题的代码，然后输出需要修改的问题” – 所以结构是：\n1. 有问题的代码（可能整个"}}

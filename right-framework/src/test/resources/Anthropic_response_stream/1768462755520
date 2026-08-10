@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"，我需要添加解释。\n\n但指令说“不回答无关内容”，所以可能只输出代码和问题。\n\n或许“输出有问题的代码”意思是指出代码行有"}}

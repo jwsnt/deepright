@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"我检查整个代码库，但只提供了一个文件。所以，只分析这个文件。\n\n我决定输出代码和问题"}}

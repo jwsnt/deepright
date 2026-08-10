@@ -1,0 +1,34 @@
+{
+  "_fun_customer": [
+    {
+      "description": "获取天气",
+      "name": "workflow2",
+      "properties": {
+        "city": {
+          "type": "string",
+          "description": "城市名称,可以是多个"
+        },
+        "description": {
+          "type": "string",
+          "description": "时间范围，比如最近几个月"
+        }
+      },
+      "required": [
+        "city"
+      ]
+    },
+    {
+      "description": "获取用户所在地区",
+      "name": "workflow3",
+      "properties": {
+        "location": {
+          "type": "string",
+          "description": "比如华东或华北"
+        }
+      },
+      "required": [
+        "location"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"可能包括：\n- 代码风格\n- 最佳实践\n- 潜在错误\n- 冗余代码\n- 安全问题\n- 性能"}}

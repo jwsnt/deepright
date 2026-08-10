@@ -1,0 +1,19 @@
+{
+  "id": "90e11fb0-802c-426b-8d7d-79a82c7fe4bc",
+  "invocationId": "e-70e353da-4082-42ea-bd56-79a08c34f752",
+  "author": "right-demo",
+  "content": {
+    "parts": [
+      {
+        "text": "好的，请您提供需要检查的代码。我将尽力找出其中的质量问题，并按照您要求的格式给出反馈。\n"
+      }
+    ],
+    "role": "model"
+  },
+  "actions": {
+    "stateDelta": {},
+    "artifactDelta": {},
+    "requestedAuthConfigs": {}
+  },
+  "timestamp": 1758013102361
+}

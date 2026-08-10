@@ -1,0 +1,12 @@
+{
+  "#http header": "Authorization: Bearer <server_jwt_for_webhook_audience>（如果服务器验证了 webhook）",
+
+  "id": "43667960-d455-4453-b0cf-1bae4955270d",
+  "contextId": "c295ea44-7543-4f78-b524-7a38915ad6e4",
+  "status": {
+    "state": "completed",
+    "timestamp": "2024-03-15T18:30:00Z"
+  },
+  "kind": "task",
+  "#": "... other fields ..."
+}

@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" 是默认，可以省略。\n3. 导入了 org.springframework.scheduling.annotation.EnableScheduling 但未使用，应该删除。\n4. 可能其他"}}

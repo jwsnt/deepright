@@ -1,0 +1,28 @@
+{
+  "headers": {
+    "sec-fetch-mode": "cors",
+    "content-length": "122",
+    "accept-language": "*",
+    "host": "127.0.0.1:9997",
+    "connection": "keep-alive",
+    "content-type": "application/json",
+    "HOME": "/Users/shenjiawei",
+    "accept-encoding": "gzip, deflate",
+    "accept": "application/json, text/event-stream",
+    "user-agent": "node"
+  },
+  "content": {
+    "jsonrpc": "2.0",
+    "id": 3,
+    "method": "resources/read",
+    "params": {
+      "_meta": {
+        "progressToken": 3
+      },
+      "uri": "mcp_server_tools_call/cr/abc"
+    }
+  },
+  "trace": "2ea503fb-2f1f-4d47-9d70-a1c2acf564e2",
+  "method": "RESOURCES/READ",
+  "id": 3
+}

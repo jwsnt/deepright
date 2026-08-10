@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"EnableAsync` 和 `@SpringBootApplication` 之间保持一致缩进。\n[FINISH]"}}

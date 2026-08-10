@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1757401537305,
+  "result": {
+    "contents": [
+      {
+        "uri": "program://java/%E5%88%9D%E7%BA%A7",
+        "mimeType": "text/plain",
+        "text": "可读性"
+      }
+    ]
+  }
+}

@@ -1,0 +1,84 @@
+[
+{
+  "candidates": [
+    {
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "functionCall": {
+              "name": "Tools_yCiDABCTxQhygwwBAgwTTRhgQzxhADSi",
+              "args": {
+                "num": "10",
+                "q": "AI Agent开发工程师 招聘"
+              }
+            },
+            "thoughtSignature": "CskFAcu98PBIFspT3Grd3qVuZz5n7YhH18DqKsjNWUNfMjiEfaCMwZbjQUrJviGIbn3cxK/SWOHS1FKGImwwhPA9mKWoRAp/zWlSV933LC8GS1EatcqPADBTt1RAjTA1Mxv7tpheDBsV+WrDBWZPezYFL61as/QvTBpoDOOUlEusYNCvbjNoM9Kc4Ez3RPhiG4EQvMGVyQBNqK+TKhl+9AjNDJ+BKMhMazBCahX0pR/hvvxiWA8Ed2V9xzry6ReTF/z3sPBVStrEC2rOPAtTej+nrrXlqg0f7J5PNdBsJBC6gvdQjRSU31dyE/RGP1GHaxSgeFxvSLl/beP4C6dIq617TfR/flRf0lmgkYN/jWfFdGokiAENSu42uTpMsJ73Sa5BP1apim/2C+5yG9D90AX8RTo+fVhLdfil0pS46tXU57Y9EgNLzbLt/z4opIkzTZ2bYQZb4hSIo6rsk1VfSmU6zDqfWsYki7gtzBDPqYv2h/yKDeiN17nUAFZxmt+FeGt8hRoPT8SIvZ9QoG3eXYkUCqk8nYZbCMpdqEV5FTU4cmO1qtiZQyCzLvBUn/rnyFMzUipwjUSh/e4yP9f/Apox/qmD4vjmVdepwdDBl46XtTWVWPCosxgx0R4co9NzW8qTmptmkW90b/Po9t6IOr31HEIGP4iYBNWkDu9J6PXDVkpFIkluEgfL84HVF2Eri4TQuT/x8p0epjoPjLdpujulH6gQKsDFgBbvSpmiq2u6ufgQynRauZ7EHsCoUrJ/eCIcH3adgobTaTXW6Cfd4HXPgDcc//QUcoYegsgDSyjd8TQC+Rakg33YtvsQ+lugHyLJe2pf8lYEEdPEhvs7UoF3mLW40MJO0KI4EmoFD6tJ1O7YGZn5lbSyVN+g+0GMqisELo4EJpKeg5eW9B2WxTca1c1CUZtsjFskJzDHNYALLonXaMyzReOncEY="
+          }
+        ]
+      },
+      "finishReason": "STOP",
+      "safetyRatings": [
+        {
+          "category": "HARM_CATEGORY_HATE_SPEECH",
+          "probability": "NEGLIGIBLE",
+          "probabilityScore": 0.00011531123,
+          "severity": "HARM_SEVERITY_NEGLIGIBLE",
+          "severityScore": 0.035452187
+        },
+        {
+          "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+          "probability": "LOW",
+          "probabilityScore": 0.22557938,
+          "severity": "HARM_SEVERITY_NEGLIGIBLE",
+          "severityScore": 0.0016001463
+        },
+        {
+          "category": "HARM_CATEGORY_HARASSMENT",
+          "probability": "NEGLIGIBLE",
+          "probabilityScore": 1.5014378e-05,
+          "severity": "HARM_SEVERITY_NEGLIGIBLE",
+          "severityScore": 0.025204271
+        },
+        {
+          "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+          "probability": "NEGLIGIBLE",
+          "probabilityScore": 3.7088783e-05,
+          "severity": "HARM_SEVERITY_NEGLIGIBLE",
+          "severityScore": 0.06269568
+        }
+      ],
+      "avgLogprobs": -0.93512498178789694
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 16781,
+    "candidatesTokenCount": 31,
+    "totalTokenCount": 16971,
+    "cachedContentTokenCount": 6194,
+    "trafficType": "ON_DEMAND",
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 16781
+      }
+    ],
+    "cacheTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 6194
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 31
+      }
+    ],
+    "thoughtsTokenCount": 159
+  },
+  "modelVersion": "gemini-2.5-flash",
+  "createTime": "2025-08-11T10:18:42.366246Z",
+  "responseId": "gsOZaKatFrComecPuLqw8Qw"
+}
+]

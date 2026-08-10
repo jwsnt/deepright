@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"问题\n- 可维护性问题\n\n让我分析代码：\n- 包声明：`package ai.open.right;` 看起来正常。\n-"}}

@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"问题，我需要列出所有发现的问题。\n\n或许“输出有问题的代码”意思是指出代码中哪里有问题，而不是复制整个代码。但用户说“输出"}}

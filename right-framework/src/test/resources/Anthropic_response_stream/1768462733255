@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"不多。可能是指整个响应不超过2000字？还是检查代码的内容？我需要确保响应简洁，但达到"}}

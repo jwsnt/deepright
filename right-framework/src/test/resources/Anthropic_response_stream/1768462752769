@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"可能只输出简短描述。\n\n或许“2000字”是错误，我应该忽略字数，专注于内容。\n\n但用户说“2000字”，所以我需要确保响应"}}

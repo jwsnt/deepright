@@ -1,0 +1,35 @@
+{
+  "took": 9,
+  "timed_out": false,
+  "_shards": {
+    "total": 1,
+    "successful": 1,
+    "skipped": 0,
+    "failed": 0
+  },
+  "hits": {
+    "total": {
+      "value": 1,
+      "relation": "eq"
+    },
+    "max_score": 3.1824832,
+    "hits": [
+      {
+        "_index": "my",
+        "_id": "5379IZUBlEIDBfYoUf1-",
+        "_score": 3.1824832,
+        "_source": {
+          "text_field": "这是要存储的文本信息，可用于后续的搜索和分析1"
+        }
+      },
+      {
+        "_index": "my",
+        "_id": "5379IZUBlEIDBfYoUf1-",
+        "_score": 3.1824832,
+        "_source": {
+          "text_field": "这是要存储的文本信息，可用于后续的搜索和分析2"
+        }
+      }
+    ]
+  }
+}

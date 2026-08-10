@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"中，抛出通用异常是不好的实践，应该捕获或处理特定异常。\n\n主要问题：\n1. **异常处理**：在main"}}

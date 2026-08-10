@@ -1,0 +1,35 @@
+{
+  "jsonrpc": "2.0",
+  "id": 9,
+  "method": "message/send",
+  "params": {
+    "message": {
+      "role": "user",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "Show me a list of my open IT tickets",
+          "metadata": {
+            "mimeType": "application/json",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "ticketNumber": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "messageId": "85b26db5-ffbb-4278-a5da-a7b09dea1b47"
+    },
+    "metadata": {}
+  }
+}

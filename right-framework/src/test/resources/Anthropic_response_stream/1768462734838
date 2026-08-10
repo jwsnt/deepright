@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"`[FINISH]`” – 可能意味着响应应该大约2000字，但代码和问题可能少。代码只有几十行，问题可能"}}

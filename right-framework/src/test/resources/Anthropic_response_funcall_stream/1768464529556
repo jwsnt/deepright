@@ -1,0 +1,2 @@
+event: content_block_start
+data: {"type":"content_block_start","index":2,"content_block":{"type":"tool_use","id":"call_function_o218h2t0pp0r_1","name":"Workflow_funcall_workflow__materials","input":{}}}

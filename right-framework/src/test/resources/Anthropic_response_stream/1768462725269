@@ -1,0 +1,2 @@
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"cheduling.annotation.EnableScheduling;\n\n@PropertySource(\"classpath:application.properties\")\n@EnableAsync(proxyTargetClass = true)\n@SpringBootApplication(exclude = {\n        DataSourceAutoConfiguration.class\n})\npublic"}}

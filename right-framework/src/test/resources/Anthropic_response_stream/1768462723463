@@ -1,0 +1,2 @@
+event: ping
+data: {"type":"ping"}

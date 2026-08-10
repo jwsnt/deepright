@@ -1,0 +1,24 @@
+{
+  "message": {
+    "role": "user",
+    "parts": [
+      {
+        "kind": "text",
+        "text": "tell me a joke"
+      }
+    ],
+    "messageId": "9229e770-767c-417b-a0b0-f0741243c589",
+    "metadata": {
+      "A": "B",
+      "C": {
+        "D": 100
+      },
+      "E": {
+        "PART": {
+          "kind": "text",
+          "text": "tell me a joke"
+        }
+      }
+    }
+  }
+}
