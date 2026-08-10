@@ -13,7 +13,7 @@
 - `main.go`：独立运行入口
 - `server/`：路由注册逻辑
 
-模块名来自 [`go.mod`](./go.mod)：
+模块名来自 [`go.mod`](go.mod)：
 
 ```go
 module static-server
@@ -23,7 +23,7 @@ module static-server
 
 ### 2.1 主程序入口
 
-- [`main.go`](./main.go)
+- [`main.go`](main.go)
   - 解析命令行参数。
   - 解析站点目录路径。
   - 初始化 `http.ServeMux`。
@@ -32,21 +32,21 @@ module static-server
 
 ### 2.2 静态服务内核
 
-- [`server/server.go`](./server/server.go)
+- [`server/server.go`](server/server.go)
   - 对外只暴露一个核心函数：
     - `Register(mux *http.ServeMux, siteDir string) error`
   - 负责校验目录并注册 `/site/` 前缀对应的文件服务。
 
 ### 2.3 测试与样例
 
-- [`main_test.go`](./main_test.go)
+- [`main_test.go`](main_test.go)
   - 验证真实 HTTP 服务能从 `/site/` 读取测试文件。
-- [`server/server_test.go`](./server/server_test.go)
+- [`server/server_test.go`](server/server_test.go)
   - 验证注册成功、非法路径、文件路径误传、以及 `/site/` 前缀映射行为。
 - [`test-case/`](./test-case/)
   - 提供最小静态文件样例：
-    - [`hello.html`](./test-case/hello.html)
-    - [`js/hello.js`](./test-case/js/hello.js)
+    - [`hello.html`](test-case/hello.html)
+    - [`js/hello.js`](test-case/js/hello.js)
 
 ## 3. 启动与配置设计
 
@@ -216,7 +216,7 @@ info, err := os.Stat(absDir)
 
 ### 7.1 独立运行
 
-独立运行时，由 [`main.go`](./main.go) 自己创建 `ServeMux` 并监听端口。
+独立运行时，由 [`main.go`](main.go) 自己创建 `ServeMux` 并监听端口。
 
 适用场景：
 
@@ -240,7 +240,7 @@ info, err := os.Stat(absDir)
 
 ### 8.1 `main_test.go`
 
-[`main_test.go`](./main_test.go) 当前做的是接近集成测试的验证：
+[`main_test.go`](main_test.go) 当前做的是接近集成测试的验证：
 
 - 新建一个 `ServeMux`
 - 调用 `server.Register(mux, "test-case")`

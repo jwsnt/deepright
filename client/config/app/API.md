@@ -60,7 +60,7 @@ integration service cancel --chat chat-001
 
 ## 页面主题说明
 
-`themeLabel` 只用于向外部本地页面传递当前页面上下文；DeepRight 首页不读取该 query 来切换主题。完整的配色令牌、视觉规则和 `light` / `dark` 实现约定见 [DESIGN.md](./DESIGN.md)。
+`themeLabel` 只用于向外部本地页面传递当前页面上下文；DeepRight 首页不读取该 query 来切换主题。完整的配色令牌、视觉规则和 `light` / `dark` 实现约定见 [DESIGN.md](DESIGN.md)。
 
 ## 路由总览
 

@@ -9,7 +9,7 @@
 
 它不是一个常驻服务，也没有 HTTP 接口。模块对外暴露的是命令行入口和一个可复用的共享内核包 `skillscore`，供其他模块直接调用。
 
-当前模块名来自 [`go.mod`](./go.mod)：
+当前模块名来自 [`go.mod`](go.mod)：
 
 ```go
 module skill-scanner
@@ -21,7 +21,7 @@ module skill-scanner
 
 ### 2.1 主程序入口
 
-- [`main.go`](./main.go)
+- [`main.go`](main.go)
   - 命令行分发入口。
   - 支持三种运行模式：
     - 普通扫描
@@ -31,7 +31,7 @@ module skill-scanner
 
 ### 2.2 共享扫描内核
 
-- [`skillscore/skillscore.go`](./skillscore/skillscore.go)
+- [`skillscore/skillscore.go`](skillscore/skillscore.go)
   - 定义技能数据结构与告警数据结构。
   - 实现 front matter 解析、字段校验、目录扫描、JSON 输出。
   - 提供多个扫描变体：
@@ -43,16 +43,16 @@ module skill-scanner
 
 ### 2.3 告警持久化
 
-- [`skillscore/warning_store.go`](./skillscore/warning_store.go)
+- [`skillscore/warning_store.go`](skillscore/warning_store.go)
   - 提供 SQLite 存储 `skills_warning` 表。
   - 实现 warning 全量同步、列表查询、JSON 输出。
   - 内部维护按绝对路径缓存的 `WarningStore` 实例。
 
 ### 2.4 测试与样例
 
-- [`main_test.go`](./main_test.go)
+- [`main_test.go`](main_test.go)
   - 覆盖 CLI 对外暴露能力与 SQLite 同步行为。
-- [`skillscore/skillscore_test.go`](./skillscore/skillscore_test.go)
+- [`skillscore/skillscore_test.go`](skillscore/skillscore_test.go)
   - 覆盖 front matter、字段校验、扫描边界、正则规则。
 - [`test-case/`](./test-case/)
   - 提供扫描测试样本。

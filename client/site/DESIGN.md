@@ -4,8 +4,8 @@
 
 `site` 模块当前并不是一个独立的 Go Web 服务，而是一个以前端页面为中心的站点模块：
 
-- 核心实现集中在单文件前端 [`index.html`](./index.html) 中，HTML、CSS、JavaScript 全部内嵌。
-- 静态资源只有少量辅助文件，其中最关键的是 [`sw.js`](./sw.js)。
+- 核心实现集中在单文件前端 [`index.html`](index.html) 中，HTML、CSS、JavaScript 全部内嵌。
+- 静态资源只有少量辅助文件，其中最关键的是 [`sw.js`](sw.js)。
 - Go 代码只承担两个很小的辅助能力：
   - [`filenamelookup`](./filenamelookup/)：按文件名在工作区内查找候选路径。
   - [`skillrepairprompt`](./skillrepairprompt/)：生成修复 `SKILL.md` 的标准提示语。
@@ -22,14 +22,14 @@
 
 ### 2.1 前端主页面
 
-- [`index.html`](./index.html)
+- [`index.html`](index.html)
   - 模块核心。
   - 同时包含页面结构、主题样式、聊天渲染、右侧面板、VFS、引导、缓存、轮询调度、模型设置、插件状态、知识库面板等所有前端逻辑。
   - 代码规模很大，属于单体脚本架构。
 
 ### 2.2 Service Worker
 
-- [`sw.js`](./sw.js)
+- [`sw.js`](sw.js)
   - 当前仅负责消息图片缓存。
   - 缓存名固定为 `deepright-message-images-v1`。
   - 安装后 `skipWaiting()`，激活时清理同前缀旧缓存并 `clients.claim()`。
@@ -41,7 +41,7 @@
 
 ### 2.3 Go 辅助包
 
-- [`filenamelookup/lookup.go`](./filenamelookup/lookup.go)
+- [`filenamelookup/lookup.go`](filenamelookup/lookup.go)
   - 对外暴露 `NormalizeCandidate` 与 `Lookup`。
   - 只接受“文件名”，不接受路径。
   - 搜索顺序固定为：
@@ -50,7 +50,7 @@
     - `images`
   - 搜索 `workspace` 时会排除 `tmp/` 和 `images/`，避免重复结果。
 
-- [`skillrepairprompt/prompt.go`](./skillrepairprompt/prompt.go)
+- [`skillrepairprompt/prompt.go`](skillrepairprompt/prompt.go)
   - 对外暴露 `NormalizeSkillPath` 与 `Build`。
   - 只接受绝对路径，且目标文件必须名为 `SKILL.md`。
   - 固定产出格式：
@@ -58,13 +58,13 @@
 
 ### 2.4 CLI 包装
 
-- [`cmd/filenamelookup/main.go`](./cmd/filenamelookup/main.go)
+- [`cmd/filenamelookup/main.go`](cmd/filenamelookup/main.go)
   - 参数：
     - `-root`
     - `-name`
   - 调用 `filenamelookup.Lookup`，输出 JSON。
 
-- [`cmd/skillrepairprompt/main.go`](./cmd/skillrepairprompt/main.go)
+- [`cmd/skillrepairprompt/main.go`](cmd/skillrepairprompt/main.go)
   - 参数：
     - `-path`
   - 也支持读取第一个位置参数。
@@ -504,7 +504,7 @@ type Match struct {
 
 ### 9.1 `filenamelookup` 测试
 
-[`filenamelookup/lookup_test.go`](./filenamelookup/lookup_test.go) 当前覆盖：
+[`filenamelookup/lookup_test.go`](filenamelookup/lookup_test.go) 当前覆盖：
 
 - `NormalizeCandidate` 的清洗与路径拒绝逻辑。
 - `Lookup` 的搜索顺序：
@@ -515,7 +515,7 @@ type Match struct {
 
 ### 9.2 `skillrepairprompt` 测试
 
-[`skillrepairprompt/prompt_test.go`](./skillrepairprompt/prompt_test.go) 当前覆盖：
+[`skillrepairprompt/prompt_test.go`](skillrepairprompt/prompt_test.go) 当前覆盖：
 
 - `Build("/tmp/demo/SKILL.md")` 的固定输出。
 - 非绝对路径、空路径、非 `SKILL.md` 文件名时的报错。
