@@ -858,7 +858,7 @@ html[data-chat-scrolling="1"] #chatContainer .message-stream-burst-particle{
 }
 
 /* Chat area */
-.chat-container{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;padding:30px 24px 5px;margin:10px 18px 0;display:flex;flex-direction:column;scroll-behavior:smooth;position:relative;z-index:1;min-height:0;border-radius:40px;background:
+.chat-container{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;overflow-anchor:none;padding:30px 24px 5px;margin:10px 18px 0;display:flex;flex-direction:column;scroll-behavior:smooth;position:relative;z-index:1;min-height:0;border-radius:40px;background:
   linear-gradient(180deg,rgba(255,252,249,.9),rgba(255,244,236,.8) 46%,rgba(255,229,212,.58) 100%);
   border:1px solid rgba(18,18,18,.1);
   box-shadow:0 24px 72px rgba(18,18,18,.09),inset 0 1px 0 rgba(255,255,255,.84),inset 0 -28px 40px rgba(255,69,0,.05);
@@ -998,12 +998,13 @@ animation:queuedInsertExplosion .62s ease-out both}
 .message{max-width:100%;width:100%;margin:8px auto;padding:14px 18px;border-radius:24px;line-height:1.6;font-size:14px;animation:fadeIn .3s ease;backdrop-filter:blur(22px) saturate(160%);-webkit-backdrop-filter:blur(22px) saturate(160%);box-shadow:var(--glass-shadow);position:relative;overflow:hidden;min-width:0}
 .message::before{content:'';position:absolute;inset:1px 1px auto; height:48%;border-radius:inherit;background:linear-gradient(180deg,rgba(255,255,255,.42),rgba(255,255,255,0));pointer-events:none;opacity:.72}
 .message.type-switch-burst{animation:messageTypeSwitchPulse 1.5s cubic-bezier(.18,.82,.22,1) both;overflow:visible;isolation:isolate;z-index:6}
+.message.stream-burst-host{overflow:visible}
 .message.type-switch-gap{animation:messageTypeSwitchGap .16s ease-out both}
 .message.type-switch-gap .md-content{opacity:0;min-height:var(--stream-gap-height,56px)}
 .message.type-switch-gap .message-meta{opacity:.34}
 .message.type-switch-incoming{animation:messageTypeSwitchIncoming .9s cubic-bezier(.16,.82,.24,1) both}
 .message.type-switch-incoming .md-content{animation:messageTypeSwitchIncomingContent .9s cubic-bezier(.16,.82,.24,1) both}
-.message-stream-burst{position:fixed;pointer-events:none;z-index:9999;overflow:visible;contain:layout paint;border-radius:var(--stream-burst-radius,24px)}
+.message-stream-burst{position:absolute;inset:0;pointer-events:none;z-index:12;overflow:visible;contain:layout;border-radius:var(--stream-burst-radius,24px)}
 .message-stream-burst::before{content:'';position:absolute;inset:-24% -18%;border-radius:inherit;background:radial-gradient(circle at center,rgba(255,255,255,.96) 0%,rgba(214,238,255,.72) 18%,rgba(121,184,255,.28) 46%,rgba(var(--accent-rgb),0) 76%);opacity:0;animation:messageStreamBurstFlash 1.8s ease-out forwards}
 .message-stream-burst::after{content:'';position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:999px;background:radial-gradient(circle at 35% 35%,rgba(255,255,255,.98),rgba(var(--accent-soft-rgb),.86) 38%,rgba(var(--accent-rgb),.12) 72%,rgba(var(--accent-rgb),0) 100%);box-shadow:0 0 18px rgba(var(--accent-soft-rgb),.42);opacity:0;transform:translate(calc(-50% + var(--stream-collect-x,0px)),calc(-50% + var(--stream-collect-y,0px))) scale(.2);animation:messageStreamBurstCollectPulse 1.8s cubic-bezier(.16,.84,.24,1) forwards}
 .message-stream-burst-copy{position:relative;z-index:2;width:100%;height:100%;transform-origin:center center;animation:messageStreamBurstCopy 1.8s cubic-bezier(.18,.84,.24,1) forwards;will-change:transform,opacity,filter;filter:drop-shadow(0 0 22px rgba(200,235,255,.85))}
@@ -36040,6 +36041,7 @@ function cleanupStreamingTypeSwapClasses(msgEl) {
   msgEl.classList.remove('type-switch-burst');
   msgEl.classList.remove('type-switch-gap');
   msgEl.classList.remove('type-switch-incoming');
+  msgEl.classList.remove('stream-burst-host');
   msgEl.style.removeProperty('--stream-gap-height');
 }
 
@@ -36078,10 +36080,6 @@ function createStreamingTypeSwapBurstOverlay(msgEl) {
   if (!(rect.width > 0) || !(rect.height > 0)) return null;
   const overlay = document.createElement('div');
   overlay.className = 'message-stream-burst';
-  overlay.style.left = Math.round(rect.left) + 'px';
-  overlay.style.top = Math.round(rect.top) + 'px';
-  overlay.style.width = Math.max(1, Math.round(rect.width)) + 'px';
-  overlay.style.height = Math.max(1, Math.round(rect.height)) + 'px';
   const computed = window.getComputedStyle(msgEl);
   overlay.style.setProperty('--stream-burst-radius', computed.borderRadius || '24px');
   const targetRect = resolveAssistantExplosionCollectTargetRect(msgEl);
@@ -36132,11 +36130,12 @@ function createStreamingTypeSwapBurstOverlay(msgEl) {
     particles.appendChild(particle);
   }
   overlay.appendChild(particles);
-  document.body.appendChild(overlay);
+  msgEl.appendChild(overlay);
 
   const cleanupMs = getStreamTypeSwapTiming().cleanupMs + 220;
   window.setTimeout(() => {
     if (overlay.parentNode) overlay.remove();
+    if (!msgEl.querySelector('.message-stream-burst')) msgEl.classList.remove('stream-burst-host');
   }, cleanupMs);
   return overlay;
 }
@@ -36146,6 +36145,7 @@ function playStreamingTypeSwapBurst(msgEl) {
   const mdEl = msgEl.querySelector('.md-content');
   if (!mdEl || !String(mdEl.textContent || '').trim()) return;
   document.querySelectorAll('.message-stream-burst').forEach(node => node.remove());
+  msgEl.classList.add('stream-burst-host');
   createStreamingTypeSwapBurstOverlay(msgEl);
   if (isLowPowerRenderingEnabled()) return;
   const timing = getStreamTypeSwapTiming();
@@ -36302,7 +36302,11 @@ function flushStreamingMessage(streamKey) {
   if (!msgEl || !assistantMsg || !msgEl.isConnected) return;
   const chatId = String(stateItem.chatId || '').trim();
   const container = document.getElementById('chatContainer');
-  const keepBottom = state.activeChat === chatId && isChatNearBottom(container);
+  const composer = document.getElementById('msgInput');
+  const composerFocused = !!composer && (document.activeElement === composer || composer.contains(document.activeElement));
+  // While composing a follow-up, do not compete with caret visibility by
+  // continuously forcing the chat to its bottom as SSE content re-renders.
+  const keepBottom = state.activeChat === chatId && !composerFocused && isChatNearBottom(container);
   msgEl.classList.add('streaming');
   let mdEl = msgEl.querySelector('.md-content');
   if (!mdEl) {
@@ -49817,11 +49821,23 @@ function getClipboardFiles(clipboard) {
     .filter(file => file instanceof File);
 }
 
+function isGenericClipboardImageName(file, name) {
+  const type = String((file && file.type) || '').trim().toLowerCase().split(';')[0];
+  if (!type.startsWith('image/')) return false;
+  return /^image\.(?:png|jpe?g|webp|gif|bmp|svg)$/i.test(String(name || '').trim());
+}
+
 function buildClipboardUploadItems(files) {
+  const timestamp = Date.now();
   return Array.from(files || []).map((file, index) => {
     const name = String(file.name || '').trim();
     const fallbackExtension = getClipboardFallbackExtension(file.type);
-    const relativePath = name || ('paste_' + Date.now() + '_' + randomToken(6) + '_' + index + '.' + fallbackExtension);
+    // macOS screenshots copied through the system clipboard are named
+    // "image.png". Preserve each one as a distinct attachment instead of
+    // overwriting an earlier tmp/image.png upload.
+    const relativePath = isGenericClipboardImageName(file, name)
+      ? ('image_tmp_' + timestamp + '_' + index + '.' + fallbackExtension)
+      : (name || ('paste_' + timestamp + '_' + randomToken(6) + '_' + index + '.' + fallbackExtension));
     return { file, relativePath, displayName: getFsBasename(relativePath) };
   });
 }
