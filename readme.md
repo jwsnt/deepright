@@ -1,4 +1,4 @@
-# DeepRight
+# <a href="https://www.deepright.cn/">DeepRight</a>
 
 > **本手册建议使用AI阅读并构建。**
 
