@@ -10767,7 +10767,7 @@ function savePageAnnotation() {
   const selected = pageAnnotationState.selection;
   const input = document.getElementById('pageAnnotationInput');
   if (!selected || !input) return false;
-  const note = extractContent(input, true).trim();
+  const note = extractRequestContent(input).trim();
   if (!note) {
     vfsShowUploadToast('请输入我的备注', true);
     focusEditableInput(input);
@@ -26349,7 +26349,7 @@ function setMiniappDebugError(message) {
 
 function getMiniappDebugReason() {
   const input = document.getElementById('miniappDebugReasonInput');
-  return input ? extractContent(input, true).trim() : '';
+  return input ? extractRequestContent(input).trim() : '';
 }
 
 function syncMiniappDebugConfirmState() {
@@ -41014,7 +41014,7 @@ function bindStickyNoteInput() {
 
 function getInputText() {
   const el = document.getElementById('msgInput');
-  return extractContent(el, true).trim();
+  return extractRequestContent(el).trim();
 }
 
 function normalizeMessageFileOwners(value) {
@@ -41046,10 +41046,18 @@ function getInputRawText() {
 
 function getMemoInputText() {
   const el = document.getElementById('rsNoteInput');
-  return extractContent(el, true).trim();
+  return extractRequestContent(el).trim();
 }
 
-function extractContent(root, includeBubbles) {
+// Request payloads use the original URL/file values while keeping the editor
+// bubbles intact.  Skills and Agent/TEAM bubbles remain explicit tokens so the
+// backend continues to receive their existing routing instructions.
+function extractRequestContent(root) {
+  return extractContent(root, true, { unwrapResourceBubbles: true });
+}
+
+function extractContent(root, includeBubbles, options) {
+  const opts = options || {};
   let text = '';
   root.childNodes.forEach((node, i) => {
     if (node.nodeType === Node.TEXT_NODE) {
@@ -41059,14 +41067,18 @@ function extractContent(root, includeBubbles) {
         const prefix = node.getAttribute('data-prefix') || '';
         const suffix = node.getAttribute('data-suffix') || '';
         const rawValue = node.getAttribute('data-value') || '';
-        text += prefix + rawValue + suffix;
+        const bubbleKind = String(node.getAttribute('data-bubble-kind') || '').toLowerCase();
+        const isResourceBubble = bubbleKind === 'url' || bubbleKind === 'file' || prefix === '[FILE:';
+        text += opts.unwrapResourceBubbles && isResourceBubble
+          ? rawValue
+          : prefix + rawValue + suffix;
       }
     } else if (node.nodeName === 'BR') {
       text += '\n';
     } else {
       // Block elements (div, p) — add newline before if not first
       if (i > 0 && /^(DIV|P)$/i.test(node.nodeName)) text += '\n';
-      text += extractContent(node, includeBubbles);
+      text += extractContent(node, includeBubbles, opts);
     }
   });
   return text;
@@ -42009,7 +42021,7 @@ async function submitCenterMessageEdit(event) {
   const chatId = String(centerMessageEditState.chatId || state.activeChat || '').trim();
   if (!chatId) return false;
   const input = document.getElementById('messageEditInput');
-  const text = extractContent(input, true).trim();
+  const text = extractRequestContent(input).trim();
   if (!text) {
     vfsShowUploadToast('请输入要发送的内容', true);
     if (input) focusEditableInput(input);
