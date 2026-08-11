@@ -5,6 +5,7 @@ autodump/
 server/logs/
 server/target/
 server/autodump/
+server/src/main/resources/key/*
 right-framework/target/
 *.DS_Store
 # CLI 工具

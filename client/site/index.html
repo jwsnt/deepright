@@ -8766,6 +8766,11 @@ let messageRenderCache = new Map();
 let wikiRenderCache = new Map();
 let wikiSidebarPresentation = { mode: 'wiki', signature: '' };
 let wikiThinkingExpandedState = { byChat: Object.create(null) };
+// A beacon may be updated by the streaming renderer before the sidebar's
+// synchronous render path gets a chance to observe the same message object.
+// Keep one frame-level reconciliation queued for the active chat.
+let wikiPanelSseSyncFrame = 0;
+let wikiPanelSseSyncChatId = '';
 let limitToastTimer = null;
 let modelSelectToastTimer = null;
 let modelSelectToastGuideTimer = null;
@@ -27876,16 +27881,24 @@ function getActiveChatThinkingSnapshots() {
   const streamState = chatStreaming[chatId];
   const sessionToken = String(streamState && streamState.sessionToken || '').trim();
   const pending = getPendingRequestState(chat);
-  const messages = sessionToken
+  const requestMessages = getAssistantsForRequest(chat, pending.start).filter(message => (
+    message && !message.error && !isAssistantCancelledMessage(message)
+  ));
+  const sessionMessages = sessionToken
     ? (Array.isArray(chat.messages) ? chat.messages.filter(message => (
       message &&
       message.role === 'assistant' &&
       !message.error &&
       String(message.streamSessionToken || '').trim() === sessionToken
     )) : [])
-    : getAssistantsForRequest(chat, pending.start).filter(message => (
-      message && !message.error && !isAssistantCancelledMessage(message)
-    ));
+    : [];
+  // During a live DOM/type-swap render, a message can be materialized before
+  // its transient session token is retained.  Prefer the token-scoped set when
+  // it already contains thought snapshots, otherwise fall back to the current
+  // pending request so the sidebar and its beacon remain in lockstep.
+  const messages = sessionMessages.some(message => getAssistantExplosionSnapshots(message).length > 0)
+    ? sessionMessages
+    : requestMessages;
   const seen = new Map();
   let order = 0;
   messages.forEach(message => {
@@ -27976,6 +27989,26 @@ function restoreWikiContentAfterThinking(contentEl, wikiState) {
 function syncWikiPanelSsePresentation(chatId) {
   if (String(chatId || '').trim() !== String(state.activeChat || '').trim()) return;
   renderWikiPanel();
+}
+
+function queueWikiPanelSsePresentation(chatId) {
+  const resolvedChatId = String(chatId || '').trim();
+  if (!resolvedChatId || resolvedChatId !== String(state.activeChat || '').trim()) return;
+  wikiPanelSseSyncChatId = resolvedChatId;
+  if (wikiPanelSseSyncFrame) return;
+  wikiPanelSseSyncFrame = requestAnimationFrame(() => {
+    const queuedChatId = wikiPanelSseSyncChatId;
+    wikiPanelSseSyncFrame = 0;
+    wikiPanelSseSyncChatId = '';
+    syncWikiPanelSsePresentation(queuedChatId);
+  });
+}
+
+function queueWikiPanelSsePresentationForMessage(message) {
+  const activeChatId = String(state.activeChat || '').trim();
+  const activeChat = activeChatId ? state.chats[activeChatId] : null;
+  if (!activeChat || !Array.isArray(activeChat.messages) || !activeChat.messages.includes(message)) return;
+  queueWikiPanelSsePresentation(activeChatId);
 }
 
 function renderWikiPanel() {
@@ -37317,6 +37350,7 @@ function syncAssistantExplosionBeacon(msgEl, message) {
       renderAssistantExplosionFloatingPopover(existing);
       scrollAssistantExplosionBeaconListToBottom(existing);
     }
+    if (snapshots.length) queueWikiPanelSsePresentationForMessage(message);
     return;
   }
   const host = document.createElement('div');
@@ -37332,6 +37366,7 @@ function syncAssistantExplosionBeacon(msgEl, message) {
   bindAssistantExplosionBeaconInteractions(next);
   if (existing) existing.replaceWith(next);
   else msgEl.insertBefore(next, msgEl.firstChild);
+  if (snapshots.length) queueWikiPanelSsePresentationForMessage(message);
 }
 
 window.addEventListener('resize', queueAssistantExplosionFloatingPopoverReposition);
