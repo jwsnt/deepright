@@ -1,10 +1,7 @@
 package ai.deepright.workflow.worktask;
 
-import ai.open.right.protocol.ProtocolCode;
-
-import ai.open.right.WorkflowException;
-
 import ai.deepright.router.RouterService;
+import ai.open.right.WorkflowException;
 import ai.open.right.workflow.flow.WorkflowTask;
 
 public class HeartbeatWorkTask extends MarkQueryWorkTask {

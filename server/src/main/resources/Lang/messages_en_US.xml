@@ -3,7 +3,6 @@
 <properties>
     <entry key="assistant.filegen.hint">[资源必须小于 #max bytes, 请重试]</entry>
     <entry key="assistant.logic.hint">[重新制定目标]</entry>
-    <entry key="assistant.close.hint">[耗时 #time]</entry>
     <entry key="memory.markdown.important">重要程度</entry>
     <entry key="memory.markdown.datetime">时间</entry>
     <entry key="memory.markdown.digest">摘要</entry>

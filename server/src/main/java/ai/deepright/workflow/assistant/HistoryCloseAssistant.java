@@ -1,8 +1,6 @@
 package ai.deepright.workflow.assistant;
 
 import ai.deepright.feature.FeatureFlag;
-import ai.deepright.feature.FeatureUtils;
-import ai.deepright.lang.XmlResourceLang;
 import ai.deepright.memory.MemoryService;
 import ai.deepright.memory.impl.DefMemoryService;
 import ai.open.right.workflow.flow.WorkflowQueue;
@@ -12,7 +10,6 @@ import ai.open.right.workflow.flow.config.WorkflowConfig;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -21,15 +18,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.time.ZoneId;
-import java.util.concurrent.TimeUnit;
-
 @Slf4j
 @Getter
 @Setter
 public class HistoryCloseAssistant extends PassageAssistant {
-
-    public static final String LANG_KEY_ASSISTANT_CLOSE_HINT = "assistant.close.hint";
 
     protected MemoryService memoryService;
 
@@ -52,11 +44,7 @@ public class HistoryCloseAssistant extends PassageAssistant {
 
     @Override
     protected String buildCloseContent(WorkflowConfig workflowConfig, WorkflowTask workTask) throws Exception {
-        if (!FeatureFlag.isSilent(workTask)) {
-            return StringUtils.repeat(System.lineSeparator(), 2) + XmlResourceLang.get(HistoryCloseAssistant.LANG_KEY_ASSISTANT_CLOSE_HINT).replace("#time", TimeUnit.SECONDS.convert(System.currentTimeMillis() - workTask.getCreated(), java.util.concurrent.TimeUnit.MILLISECONDS) + "'s");
-        } else {
-            return "";
-        }
+        return "";
     }
 
     // 关闭前提交记忆

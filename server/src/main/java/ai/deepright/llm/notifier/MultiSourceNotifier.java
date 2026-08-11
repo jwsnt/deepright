@@ -8,6 +8,7 @@ import ai.open.right.workflow.notify.NotifierWriteBack;
 import ai.open.right.workflow.notify.impl.SourceNotifier;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,6 +23,8 @@ public class MultiSourceNotifier extends SourceNotifier {
 
     public static final String MAIN = "main@main";
 
+    public static final String SUB = "sub";
+
     @Override
     public void notify(Segment segment, RedirectContext redirectContext, NotifierWriteBack notifierWriteBack, List<MediaContext> mediaContext) throws Exception {
         // Goal等价于Main处理
@@ -32,7 +35,7 @@ public class MultiSourceNotifier extends SourceNotifier {
     protected Segment buildSegment(Segment segment, RedirectContext redirectContext, NotifierWriteBack notifierWriteBack, List<MediaContext> mediaContext) throws Exception {
         try {
             // 客户端气泡爆炸逻辑（workflow=main@main + workflow=__开头交替）
-            Segment withOutMeta = segment.copyWithId();
+            Segment withOutMeta = this.resetWorkflow(segment.copyWithId(), redirectContext, notifierWriteBack, mediaContext);
             Map<String, Object> metadata = new HashMap<String, Object>();
             metadata.put(MultiSourceFlag.TASK_START, MapUtils.getString(withOutMeta.getMetadata(), MultiSourceFlag.TASK_START));
             metadata.put(MultiSourceFlag.TASK_CLOSE, MapUtils.getString(withOutMeta.getMetadata(), MultiSourceFlag.TASK_CLOSE));
@@ -53,6 +56,12 @@ public class MultiSourceNotifier extends SourceNotifier {
             this.rewriteSegment(segment.getContent(), redirectContext, notifierWriteBack, mediaContext);
             segment.mark();
         }
+    }
+
+    protected Segment resetWorkflow(Segment segment, RedirectContext redirectContext, NotifierWriteBack notifierWriteBack, List<MediaContext> mediaContext) throws Exception {
+        // 标准化Workflow, 防止展示错位
+        segment.setWorkflow(!StringUtils.equalsIgnoreCase(segment.getWorkflow(), MultiSourceNotifier.SUB) ? MultiSourceNotifier.MAIN : segment.getWorkflow());
+        return segment;
     }
 
     protected void rewriteSegment(String segment, RedirectContext redirectContext, NotifierWriteBack notifierWriteBack, List<MediaContext> mediaContext) throws Exception {
