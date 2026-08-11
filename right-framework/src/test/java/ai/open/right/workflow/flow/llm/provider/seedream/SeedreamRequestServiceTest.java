@@ -1,6 +1,7 @@
 package ai.open.right.workflow.flow.llm.provider.seedream;
 
 import ai.open.right.ObjectBuilder;
+import ai.open.right.utils.JsonUtils;
 import ai.open.right.workflow.flow.llm.LLMQuery;
 import ai.open.right.workflow.flow.llm.config.LLMConfig;
 import ai.open.right.workflow.flow.llm.config.LLMPromptService;
@@ -70,7 +71,7 @@ public class SeedreamRequestServiceTest {
         seedRequestService.setProviderToken(new ProviderToken());
         seedRequestService.request(request1, llmConfig, llmQuery);
         Assertions.assertEquals("claude-3-opus-20240229", request1.getModel(), "Should use service model");
-        Assertions.assertEquals("sk-ant-service-token", request1.getToken(), "Should use service token");
+        Assertions.assertEquals("Bearer sk-ant-service-token", request1.getToken(), "Should use service token with Bearer prefix");
 
         // 场景 2: AnthropicRequest 中已有 model 和 token，不应被 Service 默认值覆盖
         SeedreamRequest request2 = new SeedreamRequest();
@@ -79,7 +80,29 @@ public class SeedreamRequestServiceTest {
         seedRequestService.request(request2, llmConfig, llmQuery);
 
         Assertions.assertEquals("claude-3-opus-20240229", request2.getModel(), "Should keep request model");
-        Assertions.assertEquals("sk-ant-service-token", request2.getToken(), "Should keep request token");
+        Assertions.assertEquals("Bearer sk-ant-service-token", request2.getToken(), "Should use service token with Bearer prefix");
+    }
+
+    @Test
+    public void testRequestDisablesUnsupportedSequentialGenerationForProModel() throws Exception {
+        seedRequestService.setModel("doubao-seedream-5-0-pro-260628");
+        seedRequestService.setToken("seedream-token");
+        seedRequestService.setProviderToken(new ProviderToken());
+
+        LLMConfig llmConfig = new LLMConfig();
+        llmConfig.setStream(true);
+        Map<String, Object> additional = new HashMap<String, Object>();
+        additional.put(SeedreamRequestService.KEY_SEQUENTIAL_IMAGE_GENERATION, "enabled");
+        llmConfig.setAdditional(additional);
+
+        SeedreamRequest request = new SeedreamRequest();
+        seedRequestService.request(request, llmConfig, ObjectBuilder.buildLLMQuery());
+
+        Assertions.assertNull(request.getSequential(), "Pro models must omit sequential_image_generation");
+        Assertions.assertFalse(request.getStream(), "Pro models do not support streaming image generation");
+        String body = JsonUtils.write(new SeedreamRouter.SeedreamMessage(request));
+        Assertions.assertFalse(body.contains("\"sequential_image_generation\":"), "Downstream request body must omit sequential_image_generation");
+        Assertions.assertTrue(body.contains("\"stream\":false"), "Downstream request body must disable streaming");
     }
 
     /**
@@ -107,4 +130,3 @@ public class SeedreamRequestServiceTest {
         Assertions.assertEquals("seedream-4-5", seedRequestService.getModel(ObjectBuilder.buildWorkflowTask()));
     }
 }
-

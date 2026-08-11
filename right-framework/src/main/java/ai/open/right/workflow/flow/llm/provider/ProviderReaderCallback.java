@@ -139,7 +139,9 @@ public class ProviderReaderCallback implements Runnable, FutureCallback<Void> {
                 log.warn("The request={} failed={}", this.request.getUrl(), ex.getMessage());
             }
             this.failed = true;
-            this.notifyException(WorkflowException.create(ex.getMessage(), WorkflowException.code(ex, ProtocolCode.C800)).needSilent(ex));
+            Integer code = WorkflowException.code(ex, ProtocolCode.C800);
+            String message = ProtocolCode.C400.equals(code) ? this.request.getProviderData().getResponse() : ex.getMessage();
+            this.notifyException(WorkflowException.create(message, code).needSilent(ex));
         } catch (Exception e) {
             WorkflowException.dolog(e);
         } finally {

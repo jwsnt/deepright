@@ -6,7 +6,6 @@ import ai.deepright.cli.CliSubOps;
 import ai.deepright.feature.FeatureUtils;
 import ai.deepright.utils.TemplateChecker;
 import ai.open.right.WorkflowException;
-import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.resouce.ResourceService;
 import ai.open.right.utils.JsonUtils;
 import ai.open.right.workflow.flow.WorkflowTask;
@@ -158,7 +157,12 @@ public class CliVerifyFunction extends BaseFunction {
         protected String buildPushExists(WorkflowTask workTask, String url, String yes, String no) throws Exception {
             StringBuffer cmd = new StringBuffer();
             // 网络或file:///开头就保持原样，否则加上前缀
-            url = !MediaTransferUtils.isNetwork(url) ? StringUtils.startsWithIgnoreCase(url, "file:///") ? url : "file:///" + url : url;
+            // 统一为 file:/// 开头：
+            // ///Users/a.png -> file:///Users/a.png
+            // file:/Users/a.png -> file:///Users/a.png
+            // file:///Users/a.png -> file:///Users/a.png
+            // file:////Users/a.png -> file:///Users/a.png
+            url = !MediaTransferUtils.isNetwork(url) ? "file:///" + url.replaceFirst("(?i)^file:/*", "").replaceFirst("^/+", "").replace(" ", "%20") : url;
             // curl -s -I "路径或URL" > nul && echo 存在 1 || echo 不存在 0
             cmd.append("curl -s -I ").append(FeatureUtils.escapeShell(workTask, url)).append(" && echo ").append(FeatureUtils.escapeShell(workTask, yes)).append("|| echo ").append(FeatureUtils.escapeShell(workTask, no));
             return cmd.toString();

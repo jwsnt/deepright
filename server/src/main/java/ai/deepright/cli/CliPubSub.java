@@ -1,17 +1,12 @@
 package ai.deepright.cli;
 
-import static org.springframework.util.ObjectUtils.isEmpty;
-
-import ai.open.right.protocol.ProtocolCode;
-
+import ai.deepright.feature.FeatureUtils;
 import ai.open.right.WorkflowException;
-
 import ai.open.right.context.UserContext;
 import ai.open.right.utils.BytesUtils;
 import ai.open.right.utils.GzipUtils;
 import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.file.FileStore;
-import ai.deepright.feature.FeatureUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 

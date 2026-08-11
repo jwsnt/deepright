@@ -42,6 +42,8 @@ public class SeedreamRequestService extends ProviderRequestService<SeedreamReque
 
     public static final String NAME = "SeedRequestService";
 
+    public static final String PRO = "seedream-5-0-pro";
+
     // https://console.volcengine.com/ark/region:ark+cn-beijing/model/detail?Id=doubao-seedream-4-5
     protected String model;
 
@@ -70,6 +72,21 @@ public class SeedreamRequestService extends ProviderRequestService<SeedreamReque
         request.setMimeType(MapUtils.getString(llmQuery.getMetadata(), ProviderRequestService.KEY_INTERNAL + SeedreamRequestService.KEY_MIMETYPE, MapUtils.getString(llmConfig.getAdditional(), OpenAiRequestService.KEY_MIMETYPE)));
         request.setSeed(MapUtils.getInteger(llmQuery.getMetadata(), ProviderRequestService.KEY_INTERNAL + OpenAiRequestService.KEY_SEED, MapUtils.getInteger(llmConfig.getAdditional(), OpenAiRequestService.KEY_SEED)));
         request.setApi(ProviderRequest.REQUEST_SEEDREAM);
+        this.adapt(request, llmConfig, llmQuery);
+    }
+
+    protected void adapt(SeedreamRequest request, LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
+        // https://console.volcengine.com/ark/region:cn-beijing/docs/82379/1541523?lang=zh
+        // 生成单图（不支持配置 sequential_image_generation）
+        if (StringUtils.contains(request.getModel(), SeedreamRequestService.PRO)) {
+            request.setSequential(null);
+            request.setStream(false);
+        }
+    }
+
+    @Override
+    protected String buildToken(SeedreamRequest request, LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
+        return ProviderRequestService.KEY_PREFIX + super.buildToken(request, llmConfig, llmQuery);
     }
 
     @Override
@@ -90,7 +107,7 @@ public class SeedreamRequestService extends ProviderRequestService<SeedreamReque
     @Getter
     public static class InitConfig extends ProviderRequestInitConfig {
 
-        @Value("${seedream.model:doubao-seedream-4-5-251128}")
+        @Value("${seedream.model:doubao-seedream-5-0-pro-260628}")
         protected String model;
 
         @Value("${seedream.token:}")

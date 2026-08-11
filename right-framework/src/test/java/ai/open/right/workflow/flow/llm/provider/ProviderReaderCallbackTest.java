@@ -2,6 +2,7 @@ package ai.open.right.workflow.flow.llm.provider;
 
 import ai.open.right.ObjectBuilder;
 import ai.open.right.WorkflowException;
+import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.llm.LLMCallback;
 import ai.open.right.workflow.flow.llm.Message;
@@ -22,6 +23,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class ProviderReaderCallbackTest {
 
@@ -79,6 +81,62 @@ public class ProviderReaderCallbackTest {
         };
         providerReaderCallback.failed(new WorkflowException("OK"));
         Assert.assertEquals(2, atomicInteger.get());
+    }
+
+    @Test
+    public void testFailed_badRequestUsesProviderResponseAndReleases() {
+        BlockingQueue<Object> queue = new ArrayBlockingQueue<>(1);
+        LLMCallback llmCallback = EasyMock.createMock(LLMCallback.class);
+        WorkflowTask wfTask = ObjectBuilder.buildWorkflowTask();
+        AtomicReference<WorkflowException> notifiedException = new AtomicReference<>();
+        AtomicReference<WorkflowException> dumpedException = new AtomicReference<>();
+        OpenAiRequest request = new OpenAiRequest() {
+            @Override
+            public void autoDump(WorkflowException exception) {
+                dumpedException.set(exception);
+            }
+        };
+        request.getProviderData().setResponse("provider validation response");
+        ProviderReaderCallback callback = new ProviderReaderCallback(
+                readerConfig(ObjectBuilder.buildActualNotifierManagerWithWriteBackDirect(), llmCallback, request, 0, 1000), queue, request, wfTask) {
+            @Override
+            protected void notifyException(WorkflowException exception) {
+                notifiedException.set(exception);
+            }
+        };
+
+        callback.failed(new IllegalArgumentException("client validation message"));
+
+        Assert.assertTrue(callback.getFailed());
+        Assert.assertTrue(callback.getReleased());
+        Assert.assertNotNull(notifiedException.get());
+        Assert.assertEquals(ProtocolCode.C400, notifiedException.get().getCode());
+        Assert.assertEquals("provider validation response", notifiedException.get().getMessage());
+        Assert.assertNotNull(dumpedException.get());
+        Assert.assertEquals(ProtocolCode.C400, dumpedException.get().getCode());
+    }
+
+    @Test
+    public void testFailed_nonBadRequestUsesExceptionMessage() {
+        BlockingQueue<Object> queue = new ArrayBlockingQueue<>(1);
+        LLMCallback llmCallback = EasyMock.createMock(LLMCallback.class);
+        WorkflowTask wfTask = ObjectBuilder.buildWorkflowTask();
+        AtomicReference<WorkflowException> notifiedException = new AtomicReference<>();
+        OpenAiRequest request = new OpenAiRequest();
+        ProviderReaderCallback callback = new ProviderReaderCallback(
+                readerConfig(ObjectBuilder.buildActualNotifierManagerWithWriteBackDirect(), llmCallback, request, 0, 1000), queue, request, wfTask) {
+            @Override
+            protected void notifyException(WorkflowException exception) {
+                notifiedException.set(exception);
+            }
+        };
+
+        callback.failed(new WorkflowException("upstream unavailable", ProtocolCode.C503).needSilent());
+
+        Assert.assertNotNull(notifiedException.get());
+        Assert.assertEquals(ProtocolCode.C503, notifiedException.get().getCode());
+        Assert.assertEquals("upstream unavailable", notifiedException.get().getMessage());
+        Assert.assertTrue(notifiedException.get().getSilent());
     }
 
     @Test

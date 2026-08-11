@@ -130,7 +130,7 @@ public class SeedreamRouter extends ProviderRouter<SeedreamRequest> {
         }
 
         protected void check(SeedreamRequest seedreamRequest) throws Exception {
-            int images = CollectionUtils.size(seedreamRequest.getMediaContext());
+            int images = !CollectionUtils.isEmpty(seedreamRequest.getMediaContext()) ? CollectionUtils.size(seedreamRequest.getMediaContext()) : 0;
             Assert.isTrue(images <= seedreamRequest.getImages(), "The media context quantity is incorrect: " + seedreamRequest.getImages() + " ,please check the `images` parameter");
         }
     }
