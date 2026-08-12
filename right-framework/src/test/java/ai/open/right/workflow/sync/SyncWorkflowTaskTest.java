@@ -606,6 +606,37 @@ public class SyncWorkflowTaskTest {
     }
 
     @Test
+    public void emptyQuery_clearsLocalQueryAndResetRestoresMarkedQuery() {
+        WorkflowTask workflowTask = ObjectBuilder.buildLLMQuery();
+        workflowTask.setQuery("initial");
+        SyncWorkflowTask syncTask = new SyncWorkflowTask(workflowTask, null, 1000);
+
+        syncTask.markQuery();
+        syncTask.emptyQuery();
+
+        Assertions.assertNull(syncTask.getQuery());
+        Assertions.assertEquals("initial", workflowTask.getQuery());
+
+        syncTask.resetQuery();
+        Assertions.assertEquals("initial", syncTask.getQuery());
+    }
+
+    @Test
+    public void exeWorkflow_withNullReQuery_buildsNullContentSegment() throws Exception {
+        WorkflowTask workflowTask = ObjectBuilder.buildWorkflowTask();
+        workflowTask.setQuery(null);
+
+        SyncWorkflowTask.exeWorkflow(new NotifierServiceImpl() {
+            @Override
+            public void notify(Segment segment, RedirectContext redirectContext, NotifierWriteBack notifierWriteBack,
+                               List<MediaContext> mediaContext) {
+                Assertions.assertNull(segment.getContent());
+            }
+        }, null, workflowTask, "BIZ", "WORKFLOW", new HashMap<>(), new ArrayList<>(), null,
+                null, null, 1000, 1000, "CHAT", true);
+    }
+
+    @Test
     public void getCreated_returnsNonNullCreationTime() {
         WorkflowTask workflowTask = ObjectBuilder.buildWorkflowTask();
         SyncWorkflowTask syncTask = new SyncWorkflowTask(workflowTask, null, 1000);

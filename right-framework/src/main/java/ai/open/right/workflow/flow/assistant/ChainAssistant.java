@@ -26,7 +26,7 @@ abstract public class ChainAssistant {
 
     protected void notify(WorkflowTask workTask, String workflow, Map<String, Object> metadata, List<MediaContext> mediaContext, String notifier, String protocol, String content, Integer code) throws Exception {
         Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
-                .content(new StringBuffer(content))
+                .content(content != null ? new StringBuffer(content) : null)
                 .notifier(notifier)
                 .workflow(workflow)
                 .metadata(metadata)

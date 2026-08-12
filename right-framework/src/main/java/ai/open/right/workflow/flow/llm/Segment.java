@@ -172,7 +172,10 @@ public interface Segment extends NettySegment, Dimension, RedirectContext {
     }
 
     public static Segment failed(WorkflowTask workTask, String message, String notifier, Integer code) {
-        Segment.SegmentConfig segmentConfig = SegmentConfig.builder().content(new StringBuffer(message)).notifier(StringUtils.defaultIfEmpty(notifier, Notifier.ENDPOINT)).code(code).build();
+        Segment.SegmentConfig segmentConfig = SegmentConfig.builder()
+                .notifier(StringUtils.defaultIfEmpty(notifier, Notifier.ENDPOINT))
+                .content(message != null ? new StringBuffer(message) : null)
+                .code(code).build();
         return Segment.build(workTask, segmentConfig);
     }
 
@@ -233,7 +236,6 @@ public interface Segment extends NettySegment, Dimension, RedirectContext {
         public static void check(Segment segment) {
             Assert.hasText(segment.getConversation(), "Conversation can not be empty");
             Assert.notNull(segment.getUserContext(), "UserContext can not be empty");
-            Assert.notNull(segment.getContent(), "Segment content can not be empty");
             Assert.notNull(segment.getWorkflow(), "Workflow can not be empty");
             Assert.notNull(segment.getDeepness(), "Deepness can not be empty");
             Assert.hasText(segment.getNotifier(), "Notifier can not be empty");

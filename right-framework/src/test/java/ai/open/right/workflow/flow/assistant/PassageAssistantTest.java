@@ -124,6 +124,21 @@ public class PassageAssistantTest {
     }
 
     @Test
+    public void close_withNullQuery_buildsNullContentSegment() throws Exception {
+        WorkflowTask workflowTask = ObjectBuilder.buildWorkflowTask();
+        workflowTask.setQuery(null);
+        PassageAssistant passageAssistant = new PassageAssistant();
+        passageAssistant.setNotifierService(new NotifierServiceImpl() {
+            @Override
+            public void notify(Segment segment, NotifierWriteBack notifierWriteBack) {
+                Assert.assertNull(segment.getContent());
+            }
+        });
+
+        passageAssistant.close(new WorkflowConfig(), workflowTask);
+    }
+
+    @Test
     public void testInit() throws Exception {
         NotifierServiceImpl notifierManager = EasyMock.createMock(NotifierServiceImpl.class);
         SignalFactory signalFactory = EasyMock.createMock(SignalFactory.class);

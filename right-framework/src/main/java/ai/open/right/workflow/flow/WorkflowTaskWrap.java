@@ -226,6 +226,12 @@ public class WorkflowTaskWrap implements WorkflowTask {
     }
 
     @Override
+    public WorkflowTaskWrap emptyQuery() {
+        this.workTask.emptyQuery();
+        return this;
+    }
+
+    @Override
     public Boolean isFromFunMerge() {
         return this.workTask.isFromFunMerge();
     }

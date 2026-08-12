@@ -88,7 +88,11 @@ abstract public class ProviderStream<T extends ProviderRequest> implements Signa
         Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
                 // 指定Chain则使用Request配置的通知方式，如果没配置则使用Localhost。没有指定Chain则使用Endpoint
                 // 如果是Fun Call则使用Endpoint
-                .notifier(this.request.getMessage().isFromFunCall() ? this.request.getNotifier(Notifier.ENDPOINT) : (this.request.hasChain() ? this.request.getNotifier(Notifier.LOCALHOST) : Notifier.ENDPOINT)).workflow(this.request.hasChain() ? this.request.getChain() : this.request.getMessage().getWorkflow()).content(this.contentBuffer).stream(this.request.getStream()).build();
+                .notifier(this.request.getMessage().isFromFunCall() ? this.request.getNotifier(Notifier.ENDPOINT) : (this.request.hasChain() ? this.request.getNotifier(Notifier.LOCALHOST) : Notifier.ENDPOINT))
+                .workflow(this.request.hasChain() ? this.request.getChain() : this.request.getMessage().getWorkflow())
+                .stream(this.request.getStream())
+                .content(this.contentBuffer)
+                .build();
         this.segment = Segment.build(this.request.getMessage(), segmentConfig);
         // 初始化LLM包装响应前缀
         this.contentBuffer.append(StringUtils.defaultIfEmpty((this.request).getPrefix(), ""));

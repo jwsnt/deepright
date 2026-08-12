@@ -25,7 +25,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "@modelcontextprotocol/server-filesystem@2025.3.28",
+        "@modelcontextprotocol/server-filesystem@2025.1.14",
         "/",
         "/"
       ]

@@ -28,7 +28,7 @@ public class McpClientTest {
             return;
         }
         String command = McpClientTest.NPX + File.separator + "npx";
-        try (McpStdioClient stdClient = new McpStdioClient("secure-filesystem-server", command, "-y", "@modelcontextprotocol/server-filesystem@2025.3.28", "/", "/")) {
+        try (McpStdioClient stdClient = new McpStdioClient("secure-filesystem-server", command, "-y", "@modelcontextprotocol/server-filesystem@2025.1.14", "/", "/")) {
             stdClient.stdInput = new McpBufferedReader(new BufferedReader(new InputStreamReader(new ByteArrayInputStream("HELLO".getBytes()))));
             stdClient.toolsCall("list_directory", Collections.singletonMap("path", "/"), ObjectBuilder.buildMcpDimensionWithMcpConfig());
         } catch (WorkflowException e) {

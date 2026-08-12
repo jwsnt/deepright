@@ -31,7 +31,7 @@ public class ChainSelectAssistant extends DefaultAssistant {
         Assert.isTrue(workflowConfig.hasSelector(), "ChainSelect `selector` can not be empty, please check config");
         String chain = this.chainSelectService.selectChain(workflowConfig.getChainSelectConfig(), workTask);
         Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
-                .content(new StringBuffer(StringUtils.defaultIfBlank(workTask.getQuery(), "")))
+                .content(workTask.getQuery() != null ? new StringBuffer(workTask.getQuery()) : null)
                 .metadata(workTask.getMetadata())
                 .workflow(chain)
                 .build();

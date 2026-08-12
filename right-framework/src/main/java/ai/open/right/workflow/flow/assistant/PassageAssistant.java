@@ -45,7 +45,7 @@ public class PassageAssistant extends DefaultAssistant {
     protected void close(WorkflowConfig workflowConfig, WorkflowTask workTask) throws Exception {
         // 使用Code=0主动关闭
         Segment segment = Segment.build(workTask, Segment.SegmentConfig.builder()
-                .content(new StringBuffer(this.buildCloseContent(workflowConfig, workTask)))
+                .content(workTask.getQuery() != null ? new StringBuffer(this.buildCloseContent(workflowConfig, workTask)) : null)
                 .notifier(Notifier.SOURCE)
                 .code(ProtocolCode.C0)
                 .build());

@@ -3,6 +3,7 @@ package ai.open.right.workflow.flow.llm.signal.impl;
 import ai.open.right.ObjectBuilder;
 import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.llm.Message;
+import ai.open.right.workflow.flow.llm.Segment;
 import ai.open.right.workflow.flow.llm.signal.SignalConfig;
 import ai.open.right.workflow.notify.impl.NotifierServiceImpl;
 import ai.open.right.workflow.sync.SyncWorkflowTask;
@@ -27,6 +28,27 @@ public class SignalDistributorImplTest {
 
         SignalDistributorImpl distributor = new SignalDistributorImpl();
         Assert.assertEquals("OK", distributor.getSignalResponse(Arrays.asList(syncWorkflowTask)));
+    }
+
+    @Test
+    public void notify_buildsSegmentForNonNullResponse() throws Exception {
+        Message message = Message.build(ObjectBuilder.buildLLMQuery());
+        SignalDistributorImpl distributor = new SignalDistributorImpl();
+        distributor.setNotifierService(new NotifierServiceImpl() {
+            @Override
+            public void notify(Segment segment, ai.open.right.context.RedirectContext redirectContext,
+                               ai.open.right.workflow.notify.NotifierWriteBack notifierWriteBack) {
+                Assert.assertEquals("response", segment.getContent());
+            }
+        });
+
+        distributor.notify(message, "response", "TARGET");
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void notify_rejectsNullResponseBeforeBuildingSegment() throws Exception {
+        SignalDistributorImpl distributor = new SignalDistributorImpl();
+        distributor.notify(Message.build(ObjectBuilder.buildLLMQuery()), null, "TARGET");
     }
 
     @Test

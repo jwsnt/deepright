@@ -329,6 +329,12 @@ public class MessageDelegate implements Message {
     }
 
     @Override
+    public MessageDelegate emptyQuery() {
+        this.llmQuery.emptyQuery();
+        return this;
+    }
+
+    @Override
     public Boolean isFromFunMerge() {
         return this.llmQuery.isFromFunMerge();
     }

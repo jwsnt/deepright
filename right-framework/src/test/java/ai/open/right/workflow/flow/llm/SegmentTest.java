@@ -49,10 +49,27 @@ public class SegmentTest {
         SegmentDelegate s = new SegmentDelegate();
         s.setContent("HELLO WORLD");
         assertEquals(11, s.getContent().length());
+        s.mark();
 
-        // 边界情况：设置内容为 null
+        // 设置 null 后应清空内容，后续 mark 不应因 contentBuffer 为 null 抛出异常
         s.setContent(null);
-        assertEquals(0, s.getContent().length());
+        assertDoesNotThrow(s::mark);
+        assertNull(s.getContent());
+        assertNull(s.getStart());
+
+        // 未初始化内容时，读取应返回 null
+        assertNull(new SegmentDelegate().getContent());
+    }
+
+    @Test
+    public void constructorWithNullQueryKeepsContentNull() {
+        WorkflowTask workflowTask = ObjectBuilder.buildWorkflowTask();
+        workflowTask.setQuery(null);
+        SegmentDelegate segment = new SegmentDelegate(workflowTask);
+
+        assertNull(segment.getContent());
+        assertDoesNotThrow(segment::mark);
+        assertNull(segment.getStart());
     }
 
     @Test
@@ -140,6 +157,16 @@ public class SegmentTest {
         assertEquals(message, segment.getContent());
         assertEquals(code, segment.getCode());
         assertEquals(Notifier.ENDPOINT, segment.getNotifier());
+    }
+
+    @Test
+    public void testFailedWithNullMessageBuildsNullContentSegment() {
+        WorkflowTask workflowTask = ObjectBuilder.buildWorkflowTask();
+        workflowTask.setQuery(null);
+
+        Segment segment = Segment.failed(workflowTask, (String) null, Notifier.ENDPOINT, ProtocolCode.C500);
+
+        assertNull(segment.getContent());
     }
 
     @Test
@@ -368,4 +395,3 @@ public class SegmentTest {
         assertNull(config.getCode());
     }
 }
-

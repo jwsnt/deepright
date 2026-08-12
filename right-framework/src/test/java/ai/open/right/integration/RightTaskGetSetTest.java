@@ -111,6 +111,12 @@ class RightTaskGetSetTest {
     }
 
     @Test
+    void emptyQuery_clearsQuery() {
+        assertSame(rightTask, rightTask.emptyQuery());
+        assertNull(rightTask.getQuery());
+    }
+
+    @Test
     void testSetBiz() {
         String newBiz = "new-biz";
         rightTask.setBiz(newBiz);

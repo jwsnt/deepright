@@ -187,6 +187,15 @@ public class WorkflowTaskImplTest {
     }
 
     @Test
+    public void emptyQuery_clearsSegmentContent() {
+        SegmentDelegate segment = new SegmentDelegate(ObjectBuilder.buildWorkflowTask());
+        LocalhostNotifier.WorkflowTaskImpl task = new LocalhostNotifier.WorkflowTaskImpl(segment, new NothingWriteBack());
+
+        Assert.assertSame(task, task.emptyQuery());
+        Assert.assertNull(task.getQuery());
+    }
+
+    @Test
     public void ignoreClosed_delegatesToNotifierWriteBack() throws Exception {
         NothingWriteBack nwb = new NothingWriteBack();
         SegmentDelegate segment = new SegmentDelegate(ObjectBuilder.buildWorkflowTask());

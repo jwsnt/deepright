@@ -38,13 +38,8 @@ public class HistoryCloseAssistant extends PassageAssistant {
             // 后台任务标记不关闭通道，@See CliTaskFunction && KnowledgeService
             this.chainOr2Endpoint(workflowConfig, workTask, workTask.getQuery());
         } else {
-            super.execute(workflowConfig, workTask);
+            super.execute(workflowConfig, workTask.emptyQuery());
         }
-    }
-
-    @Override
-    protected String buildCloseContent(WorkflowConfig workflowConfig, WorkflowTask workTask) throws Exception {
-        return "";
     }
 
     // 关闭前提交记忆

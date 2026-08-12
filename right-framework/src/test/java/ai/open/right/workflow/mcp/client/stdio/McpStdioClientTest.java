@@ -90,7 +90,7 @@ public class McpStdioClientTest {
             return;
         }
         String command = McpStdioClientTest.NPX + File.separator + "npx";
-        try (McpStdioClient stdClient = new McpStdioClient("secure-filesystem-server", command, "-y", "@modelcontextprotocol/server-filesystem@2025.3.28", "/", "/")) {
+        try (McpStdioClient stdClient = new McpStdioClient("secure-filesystem-server", command, "-y", "@modelcontextprotocol/server-filesystem@2025.1.14", "/", "/")) {
             Assert.assertNotNull(stdClient.toolsList(ObjectBuilder.buildMcpDimensionWithMcpConfig()).toString());
             Assert.assertTrue(stdClient.toolsCall("list_directory", Collections.singletonMap("path", "/"), ObjectBuilder.buildMcpDimensionWithMcpConfig()).toString().contains("[FILE]"));
         }

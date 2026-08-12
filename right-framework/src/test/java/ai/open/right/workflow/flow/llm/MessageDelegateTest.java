@@ -108,6 +108,15 @@ public class MessageDelegateTest {
     }
 
     @Test
+    public void emptyQuery_delegatesToLlmQuery() {
+        ai.open.right.workflow.flow.llm.LLMQuery llmQuery = ObjectBuilder.buildLLMQuery();
+        MessageDelegate delegate = new MessageDelegate(llmQuery);
+
+        Assert.assertSame(delegate, delegate.emptyQuery());
+        Assert.assertNull(llmQuery.getQuery());
+    }
+
+    @Test
     public void testSetHistoryWithEmpty() {
         MessageDelegate delegate = new MessageDelegate(ObjectBuilder.buildLLMQuery());
         delegate.addHistories(new ArrayList<>());

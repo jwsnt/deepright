@@ -20,6 +20,7 @@ import org.easymock.EasyMock;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
 
@@ -710,7 +711,7 @@ public class NettyWriterTest {
         }
     }
 
-    @Test
+    @Test(expected = WorkflowException.class)
     public void testWriteCodeNull() throws Exception {
         ChannelHandlerContext context = EasyMock.createMock(ChannelHandlerContext.class);
         Attribute<Byte> attributeServer = EasyMock.createMock(Attribute.class);
@@ -749,7 +750,7 @@ public class NettyWriterTest {
         Attribute<Byte> attributeHttp = EasyMock.createMock(Attribute.class);
         EasyMock.expect(attributeHttp.get()).andReturn(NettyAttributes.CONNECTION_ONCE).anyTimes();
         EasyMock.expect(context.attr(NettyAttributes.CONNECTION_TYPE)).andReturn(attributeHttp).anyTimes();
-        NettySegment segment = ObjectBuilder.buildEmptyNettySegment();
+        Segment segment = ObjectBuilder.buildSegment(Segment.SegmentConfig.builder().code(0).build());
         Attribute<Byte> attributeServer = EasyMock.createMock(Attribute.class);
         EasyMock.expect(attributeServer.get()).andReturn(NettyAttributes.SERVER_HTTP).anyTimes();
         EasyMock.expect(context.attr(NettyAttributes.SERVER_TYPE)).andReturn(attributeServer).anyTimes();
@@ -757,7 +758,7 @@ public class NettyWriterTest {
         EasyMock.expect(context.attr(NettyAttributes.CORS_TYPE)).andReturn(attributeServer).anyTimes();
         EasyMock.expect(context.alloc()).andReturn(ByteBufAllocator.DEFAULT).anyTimes();
         Channel channel = EasyMock.createMock(Channel.class);
-        SocketAddress socketAddress = EasyMock.createMock(SocketAddress.class);
+        SocketAddress socketAddress = new InetSocketAddress(0);
         EasyMock.expect(channel.remoteAddress()).andReturn(socketAddress).anyTimes();
         EasyMock.expect(channel.isOpen()).andReturn(true).anyTimes();
         EasyMock.expect(context.channel()).andReturn(channel).anyTimes();
@@ -766,7 +767,7 @@ public class NettyWriterTest {
         EasyMock.expect(closeFuture.addListener(NettyAlarm.INSTANCE)).andReturn(returnFuture).anyTimes();
         EasyMock.expect(context.writeAndFlush(EasyMock.anyObject(ByteBuf.class))).andReturn(closeFuture).anyTimes();
         EasyMock.expect(context.close()).andReturn(closeFuture).anyTimes();
-        EasyMock.replay(closeFuture, returnFuture, channel, socketAddress, attributeServer, attributeHttp, context);
+        EasyMock.replay(closeFuture, returnFuture, channel, attributeServer, attributeHttp, context);
         NettyWriter.write(context, segment);
         EasyMock.verify(context);
     }

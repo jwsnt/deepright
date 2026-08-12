@@ -114,7 +114,7 @@ public class ForkServiceImpl implements ForkService {
     // 分发
     protected void fork2Target(WorkflowTask workTask, String workflow) throws Exception {
         Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
-                .content(new StringBuffer(workTask.getQuery()))
+                .content(workTask.getQuery() != null ? new StringBuffer(workTask.getQuery()) : null)
                 .metadata(workTask.getMetadata())
                 // 固定为Localhost
                 .notifier(Notifier.LOCALHOST)

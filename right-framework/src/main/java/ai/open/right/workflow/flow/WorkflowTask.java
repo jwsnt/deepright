@@ -84,6 +84,9 @@ public interface WorkflowTask extends NotifierWriteBack, RedirectContext, Workfl
 
     public WorkflowTask printQuery();
 
+    // 置空Query
+    public WorkflowTask emptyQuery();
+
     // 恢复最后Mark的Query
     public void resetQuery();
 

@@ -4,10 +4,13 @@ import ai.open.right.ObjectBuilder;
 import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.config.WorkflowConfig;
 import ai.open.right.workflow.flow.llm.LLMQueryService;
+import ai.open.right.workflow.flow.llm.Segment;
 import ai.open.right.workflow.flow.llm.signal.SignalFactory;
 import ai.open.right.workflow.flow.select.ChainSelectConfig;
 import ai.open.right.workflow.flow.select.ChainSelectService;
 import ai.open.right.workflow.notify.NotifierService;
+import ai.open.right.workflow.notify.NotifierWriteBack;
+import ai.open.right.workflow.notify.impl.NotifierServiceImpl;
 import org.easymock.EasyMock;
 import org.junit.Assert;
 import org.junit.Test;
@@ -33,6 +36,27 @@ public class ChainSelectAssistantTest {
         chainSelectAssistant.setChainSelectService(chainSelectService);
         chainSelectAssistant.execute(workflowConfig, workflowTask);
         EasyMock.verify(chainSelectService);
+    }
+
+    @Test
+    public void execute_withNullQuery_buildsNullContentSegment() throws Exception {
+        WorkflowTask workflowTask = ObjectBuilder.buildWorkflowTask();
+        workflowTask.setQuery(null);
+        WorkflowConfig workflowConfig = new WorkflowConfig();
+        ChainSelectConfig chainSelectConfig = new ChainSelectConfig();
+        chainSelectConfig.setDynamic("DYNAMIC");
+        workflowConfig.setChainSelectConfig(chainSelectConfig);
+        ChainSelectAssistant assistant = new ChainSelectAssistant();
+        assistant.setChainSelectService((config, task) -> "TARGET");
+        assistant.setNotifierService(new NotifierServiceImpl() {
+            @Override
+            public void notify(Segment segment, ai.open.right.context.RedirectContext redirectContext,
+                               NotifierWriteBack notifierWriteBack) {
+                Assert.assertNull(segment.getContent());
+            }
+        });
+
+        assistant.execute(workflowConfig, workflowTask);
     }
 
     @Test

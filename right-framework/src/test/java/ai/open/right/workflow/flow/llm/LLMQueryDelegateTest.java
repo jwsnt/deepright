@@ -168,6 +168,15 @@ public class LLMQueryDelegateTest {
     }
 
     @Test
+    public void emptyQuery_delegatesToWorkTask() {
+        WorkflowTask task = ObjectBuilder.buildWorkflowTask();
+        LLMQueryDelegate delegate = new LLMQueryDelegate(task, "WR", "NO");
+
+        Assertions.assertSame(delegate, delegate.emptyQuery());
+        Assertions.assertNull(task.getQuery());
+    }
+
+    @Test
     public void testDelMeta1() throws Exception {
         LLMQueryDelegate delegate = new LLMQueryDelegate(ObjectBuilder.buildWorkflowTask(), "WR", "NO");
         Assertions.assertNull(delegate.delMetadata("HELLO", String.class));

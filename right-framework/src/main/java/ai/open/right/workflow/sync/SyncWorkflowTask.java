@@ -282,6 +282,12 @@ public class SyncWorkflowTask extends SyncWriteBack implements WorkflowTask {
     }
 
     @Override
+    public SyncWorkflowTask emptyQuery() {
+        this.query = null;
+        return this;
+    }
+
+    @Override
     public Boolean isFromFunMerge() {
         return ProviderRequestService.isFromFunMerge(this.getMetadata());
     }
@@ -336,7 +342,7 @@ public class SyncWorkflowTask extends SyncWriteBack implements WorkflowTask {
         Assert.hasText(syncWorkflowTask.getBiz(), "Biz can not be empty");
         Segment segment = Segment.build(syncWorkflowTask, Segment.SegmentConfig.builder()
                 .upstream(SplitUtils.join(workTask.getWorkflow(), workTask.getBiz()))
-                .content(new StringBuffer(reQuery))
+                .content(reQuery != null ? new StringBuffer(reQuery) : null)
                 .notifier(Notifier.LOCALHOST)
                 .metadata(metadata)
                 .build());

@@ -335,6 +335,12 @@ public class RightTask implements WorkflowTask {
     }
 
     @Override
+    public RightTask emptyQuery() {
+        this.rightConfig.setQuery(null);
+        return this;
+    }
+
+    @Override
     public Boolean containChatTrack() {
         return this.rightConfig.getChatTrack();
     }

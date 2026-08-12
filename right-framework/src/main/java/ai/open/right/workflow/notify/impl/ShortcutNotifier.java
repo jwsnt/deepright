@@ -28,7 +28,14 @@ public class ShortcutNotifier {
 
     public void endpoint(WorkflowTask workTask, String biz, String workflow, Map<String, Object> metadata, String content, Integer code) throws Exception {
         String[] part = SplitUtils.split(workflow, biz);
-        Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder().content(new StringBuffer(content)).biz(part[0]).workflow(part[1]).notifier(Notifier.ENDPOINT).metadata(metadata).code(code).build();
+        Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
+                .content(content != null ? new StringBuffer(content) : null)
+                .notifier(Notifier.ENDPOINT)
+                .metadata(metadata)
+                .workflow(part[1])
+                .biz(part[0])
+                .code(code)
+                .build();
         Segment segment = Segment.build(workTask, segmentConfig);
         // Can not use chainOr2Endpoint
         this.notifierService.notify(segment, workTask, workTask);
@@ -73,7 +80,14 @@ public class ShortcutNotifier {
 
     public void source(WorkflowTask workTask, String biz, String workflow, Map<String, Object> metadata, String content, Integer code) throws Exception {
         String[] part = SplitUtils.split(workflow, biz);
-        Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder().content(new StringBuffer(content)).biz(part[0]).workflow(part[1]).notifier(Notifier.SOURCE).metadata(metadata).code(code).build();
+        Segment.SegmentConfig segmentConfig = Segment.SegmentConfig.builder()
+                .content(content != null ? new StringBuffer(content) : null)
+                .notifier(Notifier.SOURCE)
+                .metadata(metadata)
+                .workflow(part[1])
+                .biz(part[0])
+                .code(code)
+                .build();
         Segment segment = Segment.build(workTask, segmentConfig);
         // Can not use chainOr2Endpoint
         this.notifierService.notify(segment, workTask, workTask);

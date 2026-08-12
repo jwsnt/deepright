@@ -193,6 +193,22 @@ public class ShortcutNotifierTest {
     }
 
     @Test
+    public void endpointAndSource_withNullContent_buildNullContentSegments() throws Exception {
+        WorkflowTask workflowTask = ObjectBuilder.buildWorkflowTask();
+        workflowTask.setQuery(null);
+        ShortcutNotifier shortcutNotifier = new ShortcutNotifier();
+        shortcutNotifier.setNotifierService(new NotifierServiceImpl() {
+            @Override
+            public void notify(Segment segment, RedirectContext redirectContext, NotifierWriteBack notifierWriteBack) {
+                Assert.assertNull(segment.getContent());
+            }
+        });
+
+        shortcutNotifier.endpoint(workflowTask, null);
+        shortcutNotifier.source(workflowTask, null);
+    }
+
+    @Test
     public void testEndpointWithWorkflowAndMetadataAndCode() throws Exception {
         WorkflowTask workflowTask = ObjectBuilder.buildWorkflowTask();
         workflowTask.putMetadata("taskKey", "taskVal");

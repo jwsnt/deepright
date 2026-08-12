@@ -111,20 +111,23 @@ public class NettyRequestTest {
     public void testWriterWithWs() throws Exception {
         ChannelHandlerContext context = EasyMock.createMock(ChannelHandlerContext.class);
         Attribute<Byte> attribute = EasyMock.createMock(Attribute.class);
+        Channel channel = EasyMock.createMock(Channel.class);
         EasyMock.expect(attribute.get()).andReturn(NettyAttributes.SERVER_WS).anyTimes();
         EasyMock.replay(attribute);
         EasyMock.expect(context.attr(NettyAttributes.SERVER_TYPE)).andReturn(attribute).anyTimes();
+        EasyMock.expect(context.channel()).andReturn(channel).anyTimes();
+        EasyMock.expect(channel.remoteAddress()).andReturn(null).anyTimes();
         EasyMock.expect(context.alloc()).andReturn(ByteBufAllocator.DEFAULT).anyTimes();
         ChannelFuture closeFuture = EasyMock.createMock(ChannelFuture.class);
         ChannelFuture returnFuture = EasyMock.createMock(ChannelFuture.class);
         EasyMock.expect(closeFuture.addListener(NettyAlarm.INSTANCE)).andReturn(returnFuture).anyTimes();
         EasyMock.replay(closeFuture, returnFuture);
         EasyMock.expect(context.writeAndFlush(EasyMock.anyObject(ByteBuf.class))).andReturn(closeFuture).anyTimes();
-        EasyMock.replay(context);
+        EasyMock.replay(context, channel);
         NettyRequest request = new NettyRequest();
         request.setChannel(context);
         request.writeBack(ObjectBuilder.buildSegment());
-        EasyMock.verify(context, attribute, closeFuture, returnFuture);
+        EasyMock.verify(context, attribute, channel, closeFuture, returnFuture);
     }
 
     @Test
@@ -659,6 +662,13 @@ public class NettyRequestTest {
         Assert.assertEquals("changed-query", request.getQuery());
         request.resetQuery();
         Assert.assertEquals("marked-query", request.getQuery());
+    }
+
+    @Test
+    public void emptyQuery_clearsQuery() {
+        NettyRequest request = (NettyRequest) ObjectBuilder.buildWorkflowTask();
+        Assert.assertSame(request, request.emptyQuery());
+        Assert.assertNull(request.getQuery());
     }
 
     @Test

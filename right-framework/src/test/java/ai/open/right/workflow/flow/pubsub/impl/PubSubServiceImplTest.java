@@ -134,6 +134,17 @@ public class PubSubServiceImplTest {
     }
 
     @Test
+    public void testSegmentWithNullContent() throws Exception {
+        PubSubServiceImpl pubSubService = new PubSubServiceImpl();
+        WorkflowTask workflowTask = ObjectBuilder.buildWorkflowTask();
+        workflowTask.setQuery(null);
+
+        Segment segment = pubSubService.segment(new PubSubConfig(), workflowTask, null, "WORLD");
+
+        Assert.assertNull(segment.getContent());
+    }
+
+    @Test
     public void testSegmentWithNotifier() throws Exception {
         PubSubServiceImpl pubSubService = new PubSubServiceImpl();
         PubSubConfig pubSubConfig = new PubSubConfig();

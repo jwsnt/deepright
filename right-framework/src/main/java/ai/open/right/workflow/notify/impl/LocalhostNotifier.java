@@ -348,6 +348,12 @@ public class LocalhostNotifier implements Notifier {
         }
 
         @Override
+        public WorkflowTaskImpl emptyQuery() {
+            this.segment.setContent(null);
+            return this;
+        }
+
+        @Override
         public Boolean containChatTrack() {
             return this.chatTrack;
         }
@@ -417,6 +423,7 @@ public class LocalhostNotifier implements Notifier {
             this.notifierWriteBack.close();
         }
     }
+
     @Configuration
     @Setter
     @Getter

@@ -276,6 +276,12 @@ public class LLMQueryDelegate implements LLMQuery {
     }
 
     @Override
+    public LLMQueryDelegate emptyQuery() {
+        this.workTask.emptyQuery();
+        return this;
+    }
+
+    @Override
     public Boolean isFromFunMerge() {
         return this.workTask.isFromFunMerge();
     }

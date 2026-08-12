@@ -377,4 +377,13 @@ public class WorkflowTaskWrapTest {
         wrap.resetQuery();
         Assert.assertEquals("original", wrap.getQuery());
     }
+
+    @Test
+    public void emptyQuery_delegatesToWorkTask() {
+        WorkflowTask task = ObjectBuilder.buildWorkflowTask();
+        WorkflowTaskWrap wrap = new WorkflowTaskWrap(task);
+
+        Assert.assertSame(wrap, wrap.emptyQuery());
+        Assert.assertNull(task.getQuery());
+    }
 }

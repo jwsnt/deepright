@@ -5,8 +5,11 @@ import ai.open.right.protocol.Protocol;
 import ai.open.right.protocol.ProtocolCode;
 import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.config.WorkflowConfig;
+import ai.open.right.workflow.flow.llm.Segment;
 import ai.open.right.workflow.flow.media.MediaContext;
 import ai.open.right.workflow.notify.Notifier;
+import ai.open.right.workflow.notify.NotifierWriteBack;
+import ai.open.right.workflow.notify.impl.NotifierServiceImpl;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -23,6 +26,24 @@ public class ChainAssistantTest {
         };
         chainAssistant.setNotifierService(ObjectBuilder.buildActualNotifierManagerWithNothing());
         Assert.assertNotNull(chainAssistant.getNotifierService());
+    }
+
+    @Test
+    public void notify_withNullContent_buildsNullContentSegment() throws Exception {
+        WorkflowTask workflowTask = ObjectBuilder.buildWorkflowTask();
+        workflowTask.setQuery(null);
+        ChainAssistant assistant = new ChainAssistant() {
+        };
+        assistant.setNotifierService(new NotifierServiceImpl() {
+            @Override
+            public void notify(Segment segment, ai.open.right.context.RedirectContext redirectContext,
+                               NotifierWriteBack notifierWriteBack, List<MediaContext> mediaContext) {
+                Assert.assertNull(segment.getContent());
+            }
+        });
+
+        assistant.notify(workflowTask, workflowTask.getWorkflow(), null, null,
+                Notifier.LOCALHOST, Protocol.CHAT, null, ProtocolCode.C200);
     }
 
     @Test

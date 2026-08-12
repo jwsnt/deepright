@@ -192,7 +192,7 @@ public class PubSubServiceImpl implements PubSubService {
                 // 指定状态码
                 .code(pubSubConfig != null ? pubSubConfig.getCode() : ProtocolCode.C200)
                 .metadata(Collections.singletonMap(PubSubServiceImpl.KEY, key))
-                .content(new StringBuffer(query))
+                .content(query != null ? new StringBuffer(query) : null)
                 .build();
         return Segment.build(workTask, segmentConfig);
     }

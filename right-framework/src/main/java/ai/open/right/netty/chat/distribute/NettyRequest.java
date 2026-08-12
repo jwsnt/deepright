@@ -298,6 +298,12 @@ public class NettyRequest implements WorkflowTask {
     }
 
     @Override
+    public NettyRequest emptyQuery() {
+        this.query = null;
+        return this;
+    }
+
+    @Override
     public Boolean isFromFunMerge() {
         return ProviderRequestService.isFromFunMerge(this.getMetadata());
     }

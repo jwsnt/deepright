@@ -103,7 +103,7 @@ public class SignalDistributorImpl implements SignalDistributor {
         Assert.hasText(response, "Signal response can not be empty");
         Assert.hasText(workflow, "Signal workflow can not be empty");
         Segment.SegmentConfig config = Segment.SegmentConfig.builder()
-                .content(new StringBuffer(response))
+                .content(response != null ? new StringBuffer(response) : null)
                 .notifier(Notifier.LOCALHOST)
                 .workflow(workflow)
                 .build();

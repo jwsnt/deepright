@@ -5,6 +5,8 @@ import ai.open.right.workflow.flow.WorkflowTask;
 import ai.open.right.workflow.flow.config.WorkflowConfig;
 import ai.open.right.workflow.flow.fork.ForkConfig;
 import ai.open.right.workflow.flow.fork.ForkTarget;
+import ai.open.right.workflow.flow.llm.Segment;
+import ai.open.right.workflow.notify.NotifierWriteBack;
 import ai.open.right.workflow.notify.impl.NotifierServiceImpl;
 import ai.open.right.workflow.sync.SyncWorkflowTask;
 import org.easymock.EasyMock;
@@ -24,6 +26,22 @@ public class ForkServiceImplTest {
         ForkServiceImpl forkService = new ForkServiceImpl();
         forkService.setNotifierService(ObjectBuilder.buildActualNotifierManagerWithNothing());
         forkService.setTimeout(10000);
+        forkService.fork2Target(workflowTask, "Target");
+    }
+
+    @Test
+    public void fork2Target_withNullQuery_buildsNullContentSegment() throws Exception {
+        WorkflowTask workflowTask = ObjectBuilder.buildWorkflowTask();
+        workflowTask.setQuery(null);
+        ForkServiceImpl forkService = new ForkServiceImpl();
+        forkService.setNotifierService(new NotifierServiceImpl() {
+            @Override
+            public void notify(Segment segment, ai.open.right.context.RedirectContext redirectContext,
+                               NotifierWriteBack notifierWriteBack) {
+                Assert.assertNull(segment.getContent());
+            }
+        });
+
         forkService.fork2Target(workflowTask, "Target");
     }
 

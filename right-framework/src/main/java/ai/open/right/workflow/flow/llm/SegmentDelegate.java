@@ -81,7 +81,7 @@ public class SegmentDelegate implements Segment {
     public SegmentDelegate(WorkflowTask workTask) {
         this();
         this.workTask = workTask;
-        this.contentBuffer = new StringBuffer(StringUtils.defaultString(workTask.getQuery(), ""));
+        this.contentBuffer = workTask.getQuery() != null ? new StringBuffer(workTask.getQuery()) : null;
         this.upstream = SplitUtils.join(workTask.getWorkflow(), workTask.getBiz());
         this.metadata = new HashMap<String, Object>(workTask.getMetadata());
         this.userContext = workTask.getUserContext();
@@ -148,7 +148,7 @@ public class SegmentDelegate implements Segment {
 
     @Override
     public String getContent() {
-        return this.contentBuffer.substring(this.start);
+        return this.contentBuffer != null ? this.contentBuffer.substring(this.start) : null;
     }
 
     @Override
@@ -224,14 +224,18 @@ public class SegmentDelegate implements Segment {
 
     @Override
     public void setContent(String content) {
-        String currentContent = StringUtils.defaultString(content, "");
-        if (this.contentBuffer != null) {
-            this.contentBuffer.delete(0, this.contentBuffer.length());
-            this.contentBuffer.append(currentContent);
+        if (content != null) {
+            if (this.contentBuffer != null) {
+                this.contentBuffer.delete(0, this.contentBuffer.length());
+                this.contentBuffer.append(content);
+            } else {
+                this.contentBuffer = new StringBuffer(content);
+            }
+            this.start = 0;
         } else {
-            this.contentBuffer = new StringBuffer(currentContent);
+            this.contentBuffer = null;
+            this.start = null;
         }
-        this.start = 0;
     }
 
     @Override
@@ -247,7 +251,7 @@ public class SegmentDelegate implements Segment {
 
     @Override
     public void mark() {
-        this.start = this.contentBuffer.length();
+        this.start = this.contentBuffer != null ? this.contentBuffer.length() : null;
     }
 
     public void init() {
