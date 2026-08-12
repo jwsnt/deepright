@@ -44,9 +44,12 @@ public class NettyWriter {
                         log.debug("Channel write [DONE]={}", ctx.channel().remoteAddress());
                     }
                     buffer = ctx.alloc().directBuffer();
-                    buffer.writeBytes(NettyWriter.STREAM_START.retainedDuplicate());
-                    NettyWriter.writeBuffer(ctx, segment, buffer);
-                    buffer.writeBytes(NettyWriter.STREAM_CLOSE.retainedDuplicate());
+                    // ""发送，Null不发送
+                    if (segment.getContent() != null) {
+                        buffer.writeBytes(NettyWriter.STREAM_START.retainedDuplicate());
+                        NettyWriter.writeHttpBuffer(ctx, segment, buffer);
+                        buffer.writeBytes(NettyWriter.STREAM_CLOSE.retainedDuplicate());
+                    }
                     buffer.writeBytes(NettyWriter.STREAM_START.retainedDuplicate());
                     buffer.writeBytes(NettyWriter.STREAM_DONE.retainedDuplicate());
                     // 写入后关闭
@@ -62,21 +65,29 @@ public class NettyWriter {
                 if (log.isDebugEnabled()) {
                     log.debug("Channel write http response :{}", ctx.channel().remoteAddress());
                 }
-                buffer = ctx.alloc().directBuffer();
-                NettyWriter.writeBuffer(ctx, segment, buffer);
-                NettyWriter.writeHttp(ctx, segment, buffer);
-                // writeHttp 已将 buffer 所有权转移给 Netty，标记为 null 防止 catch 块误释放
-                buffer = null;
+                // 非Stream（At Once）时Content不能为Null
+                WorkflowException.checkCondition(!NettyWriter.isStream(ctx) && segment.getContent() == null, "Channel write http response is null");
+                // ""发送，Null不发送
+                if (segment.getContent() != null) {
+                    buffer = ctx.alloc().directBuffer();
+                    NettyWriter.writeHttpBuffer(ctx, segment, buffer);
+                    NettyWriter.writeHttp(ctx, segment, buffer);
+                    // writeHttp 已将 buffer 所有权转移给 Netty，标记为 null 防止 catch 块误释放
+                    buffer = null;
+                }
             } else if (NettyWriter.isWsService(ctx)) {
                 // 处理Ws服务
-                buffer = ctx.alloc().directBuffer();
-                try (OutputStream output = new NettyOutputBuffer(buffer)) {
-                    // 自定义格式的Segment
-                    JsonUtils.write(output, segment);
+                if (log.isDebugEnabled()) {
+                    log.debug("Channel write ws response :{}", ctx.channel().remoteAddress());
                 }
-                NettyWriter.writeWs(ctx, buffer);
-                // writeWs 已将 buffer 所有权转移给 Netty，标记为 null 防止 catch 块误释放
-                buffer = null;
+                // ""发送，Null不发送
+                if (segment.getContent() != null) {
+                    buffer = ctx.alloc().directBuffer();
+                    NettyWriter.writeWsBuffer(ctx, segment, buffer);
+                    NettyWriter.writeWs(ctx, buffer);
+                    // writeWs 已将 buffer 所有权转移给 Netty，标记为 null 防止 catch 块误释放
+                    buffer = null;
+                }
             } else {
                 throw new WorkflowException("Can not support this network protocol", ProtocolCode.C400);
             }
@@ -92,23 +103,31 @@ public class NettyWriter {
         }
     }
 
-    public static void writeBuffer(ChannelHandlerContext ctx, NettySegment segment, ByteBuf byteBuf) throws Exception {
+    public static void writeHttpBuffer(ChannelHandlerContext ctx, NettySegment segment, ByteBuf byteBuf) throws Exception {
         try (OutputStream output = new NettyOutputBuffer(byteBuf)) {
             // 转为Open AI格式的Http Response
             JsonUtils.write(output, new NettyHttpResponse(segment, NettyWriter.isStream(ctx), NettyWriter.isSse(ctx)));
         }
     }
 
+    public static void writeWsBuffer(ChannelHandlerContext ctx, NettySegment segment, ByteBuf byteBuf) throws Exception {
+        try (OutputStream output = new NettyOutputBuffer(byteBuf)) {
+            // 自定义格式的Segment
+            JsonUtils.write(output, segment);
+        }
+    }
+
     // 写入HTTP报文（Once/Stream），并控制关闭通道
     // 注意：此方法会将byteBuf所有权转移给Netty，调用成功后，上层不应再释放byteBuf
-    public static void writeHttp(ChannelHandlerContext ctx, NettyStream stream, ByteBuf byteBuf) throws Exception {
+    public static void writeHttp(ChannelHandlerContext ctx, NettySegment segment, ByteBuf byteBuf) throws Exception {
         // writeStream/writeOnce 会将 byteBuf 传递给 Netty，所有权即转移
         // 即使后续抛出异常，也不应该由调用者释放，而是由 Netty 负责
         if (NettyWriter.isStream(ctx)) {
-            NettyWriter.writeStream(ctx, stream, byteBuf);
+            // Stream模式下，如果空报文不写入通道
+            NettyWriter.writeStream(ctx, segment, byteBuf);
         } else {
             // Http Once 发送完成后关闭连接
-            NettyWriter.writeOnce(ctx, stream, byteBuf);
+            NettyWriter.writeOnce(ctx, segment, byteBuf);
         }
     }
 

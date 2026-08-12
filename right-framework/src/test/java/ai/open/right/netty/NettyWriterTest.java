@@ -4,22 +4,100 @@ import ai.open.right.ObjectBuilder;
 import ai.open.right.WorkflowException;
 import ai.open.right.netty.chat.NettySegment;
 import ai.open.right.netty.chat.server.NettyAttributes;
+import ai.open.right.netty.chat.server.http.NettyErrorSegment;
 import ai.open.right.workflow.flow.llm.Segment;
 import ai.open.right.workflow.flow.llm.SegmentDelegate;
 import io.netty.buffer.*;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.util.Attribute;
+import org.easymock.Capture;
 import org.easymock.EasyMock;
 import org.junit.Assert;
 import org.junit.Test;
 
 import java.net.SocketAddress;
+import java.nio.charset.StandardCharsets;
 
 public class NettyWriterTest {
+
+    @Test
+    public void testWriteHttpStreamWithNullContentDoesNotWrite() throws Exception {
+        ChannelHandlerContext context = EasyMock.createMock(ChannelHandlerContext.class);
+        Attribute<Byte> serverType = EasyMock.createMock(Attribute.class);
+        Attribute<Byte> connectionType = EasyMock.createMock(Attribute.class);
+        Channel channel = EasyMock.createMock(Channel.class);
+        EasyMock.expect(context.attr(NettyAttributes.SERVER_TYPE)).andReturn(serverType).anyTimes();
+        EasyMock.expect(serverType.get()).andReturn(NettyAttributes.SERVER_HTTP).anyTimes();
+        EasyMock.expect(context.attr(NettyAttributes.CONNECTION_TYPE)).andReturn(connectionType).anyTimes();
+        EasyMock.expect(connectionType.get()).andReturn(NettyAttributes.CONNECTION_STREAM).anyTimes();
+        EasyMock.expect(context.channel()).andReturn(channel).anyTimes();
+        EasyMock.expect(channel.remoteAddress()).andReturn(null).anyTimes();
+
+        EasyMock.replay(context, serverType, connectionType, channel);
+        NettyWriter.write(context, ObjectBuilder.buildEmptyNettySegment());
+        EasyMock.verify(context, serverType, connectionType, channel);
+    }
+
+    @Test
+    public void testWriteHttpOnceWithNullContentIsRejected() throws Exception {
+        ChannelHandlerContext context = EasyMock.createMock(ChannelHandlerContext.class);
+        Attribute<Byte> serverType = EasyMock.createMock(Attribute.class);
+        Attribute<Byte> connectionType = EasyMock.createMock(Attribute.class);
+        Channel channel = EasyMock.createMock(Channel.class);
+        EasyMock.expect(context.attr(NettyAttributes.SERVER_TYPE)).andReturn(serverType).anyTimes();
+        EasyMock.expect(serverType.get()).andReturn(NettyAttributes.SERVER_HTTP).anyTimes();
+        EasyMock.expect(context.attr(NettyAttributes.CONNECTION_TYPE)).andReturn(connectionType).anyTimes();
+        EasyMock.expect(connectionType.get()).andReturn(NettyAttributes.CONNECTION_ONCE).anyTimes();
+        EasyMock.expect(context.channel()).andReturn(channel).anyTimes();
+        EasyMock.expect(channel.remoteAddress()).andReturn(null).anyTimes();
+
+        EasyMock.replay(context, serverType, connectionType, channel);
+        try {
+            NettyWriter.write(context, ObjectBuilder.buildEmptyNettySegment());
+            Assert.fail("HTTP AtOnce must reject a null Content");
+        } catch (WorkflowException expected) {
+            // expected
+        }
+        EasyMock.verify(context, serverType, connectionType, channel);
+    }
+
+    @Test
+    public void testForceCloseStreamWithNullContentWritesDoneOnly() throws Exception {
+        ChannelHandlerContext context = EasyMock.createMock(ChannelHandlerContext.class);
+        Attribute<Byte> connectionType = EasyMock.createMock(Attribute.class);
+        NettySegment segment = EasyMock.createMock(NettySegment.class);
+        ChannelFuture future = EasyMock.createMock(ChannelFuture.class);
+        Channel channel = EasyMock.createMock(Channel.class);
+        Capture<Object> response = EasyMock.newCapture();
+
+        EasyMock.expect(segment.getCode()).andReturn(0).anyTimes();
+        EasyMock.expect(segment.getContent()).andReturn(null).anyTimes();
+        segment.mark();
+        EasyMock.expectLastCall().once();
+        EasyMock.expect(context.attr(NettyAttributes.CONNECTION_TYPE)).andReturn(connectionType).anyTimes();
+        EasyMock.expect(connectionType.get()).andReturn(NettyAttributes.CONNECTION_STREAM).anyTimes();
+        EasyMock.expect(context.channel()).andReturn(channel).anyTimes();
+        EasyMock.expect(channel.remoteAddress()).andReturn(null).anyTimes();
+        EasyMock.expect(context.alloc()).andReturn(ByteBufAllocator.DEFAULT).once();
+        EasyMock.expect(context.writeAndFlush(EasyMock.capture(response))).andReturn(future).once();
+        EasyMock.expect(future.addListener(EasyMock.anyObject())).andReturn(future).once();
+
+        EasyMock.replay(context, connectionType, segment, future, channel);
+        NettyWriter.write(context, segment);
+        EasyMock.verify(context, connectionType, segment, future, channel);
+
+        DefaultHttpContent content = (DefaultHttpContent) response.getValue();
+        try {
+            Assert.assertEquals("data: [DONE]\n\n", content.content().toString(StandardCharsets.UTF_8));
+        } finally {
+            content.release();
+        }
+    }
 
     @Test
     public void testWriteHttp() throws Exception {
@@ -53,18 +131,36 @@ public class NettyWriterTest {
     public void testWriteWs() throws Exception {
         ChannelHandlerContext context = EasyMock.createMock(ChannelHandlerContext.class);
         Attribute<Byte> attribute = EasyMock.createMock(Attribute.class);
+        Channel channel = EasyMock.createMock(Channel.class);
         EasyMock.expect(attribute.get()).andReturn(NettyAttributes.SERVER_WS).anyTimes();
         EasyMock.replay(attribute);
         EasyMock.expect(context.attr(NettyAttributes.SERVER_TYPE)).andReturn(attribute).anyTimes();
+        EasyMock.expect(context.channel()).andReturn(channel).anyTimes();
+        EasyMock.expect(channel.remoteAddress()).andReturn(null).anyTimes();
         EasyMock.expect(context.alloc()).andReturn(ByteBufAllocator.DEFAULT).anyTimes();
         ChannelFuture closeFuture = EasyMock.createMock(ChannelFuture.class);
         ChannelFuture returnFuture = EasyMock.createMock(ChannelFuture.class);
         EasyMock.expect(closeFuture.addListener(NettyAlarm.INSTANCE)).andReturn(returnFuture).anyTimes();
         EasyMock.replay(closeFuture, returnFuture);
         EasyMock.expect(context.writeAndFlush(EasyMock.anyObject(ByteBuf.class))).andReturn(closeFuture).anyTimes();
-        EasyMock.replay(context);
+        EasyMock.replay(context, channel);
+        NettyWriter.write(context, NettyErrorSegment.builder().code(200).content("CONTENT").build());
+        EasyMock.verify(context, attribute, channel, closeFuture, returnFuture);
+    }
+
+    @Test
+    public void testWriteWsWithNullContentDoesNotWrite() throws Exception {
+        ChannelHandlerContext context = EasyMock.createMock(ChannelHandlerContext.class);
+        Attribute<Byte> serverType = EasyMock.createMock(Attribute.class);
+        Channel channel = EasyMock.createMock(Channel.class);
+        EasyMock.expect(context.attr(NettyAttributes.SERVER_TYPE)).andReturn(serverType).anyTimes();
+        EasyMock.expect(serverType.get()).andReturn(NettyAttributes.SERVER_WS).anyTimes();
+        EasyMock.expect(context.channel()).andReturn(channel).anyTimes();
+        EasyMock.expect(channel.remoteAddress()).andReturn(null).anyTimes();
+
+        EasyMock.replay(context, serverType, channel);
         NettyWriter.write(context, ObjectBuilder.buildEmptyNettySegment());
-        EasyMock.verify(context, attribute, closeFuture, returnFuture);
+        EasyMock.verify(context, serverType, channel);
     }
 
     @Test(expected = IllegalArgumentException.class)
