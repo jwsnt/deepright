@@ -6,6 +6,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -24,15 +25,20 @@ import (
 )
 
 const (
-	wav2lipTaskQueued    = "queued"
-	wav2lipTaskRunning   = "running"
-	wav2lipTaskCompleted = "completed"
-	wav2lipTaskCancelled = "cancelled"
-	wav2lipTaskFailed    = "failed"
-	wav2lipTaskLogLimit  = 128 * 1024
-	wav2lipProbeTimeout  = time.Minute
+	wav2lipTaskQueued      = "queued"
+	wav2lipTaskRunning     = "running"
+	wav2lipTaskCompleted   = "completed"
+	wav2lipTaskCancelled   = "cancelled"
+	wav2lipTaskFailed      = "failed"
+	wav2lipTaskLogLimit    = 128 * 1024
+	wav2lipProbeTimeout    = time.Minute
+	wav2lipScenarioQuality = "quality"
+	wav2lipScenarioFast    = "fast"
+	wav2lipScenarioMotion  = "motion"
+	wav2lipModelGAN        = "wav2lip_gan"
 	// The checkpoint is kept separate from the source tree so the existing
 	// runtime probe can verify it before scheduling a lip-sync task.
+	wav2lipOfficialCheckpointURL    = "https://drive.google.com/uc?export=download&id=15G3U08c8xsCkOqQxE38Z2XXDnPcOptNk"
 	wav2lipDomesticCheckpointURL    = "https://hf-mirror.com/camenduru/Wav2Lip/resolve/main/checkpoints/wav2lip_gan.pth"
 	wav2lipDomesticCheckpointSHA256 = "ca9ab7b7b812c0e80a6e70a5977c545a1e8a365a6c49d5e533023c034d7ac3d8"
 )
@@ -49,6 +55,50 @@ type wav2lipCheckResponse struct {
 	Status    int    `json:"status"`
 }
 type wav2lipRuntime struct{ Python, Script, Checkpoint string }
+type wav2lipModelArtifact struct {
+	ID, Name, Filename, OfficialURL, BackupURL, SHA256 string
+}
+type wav2lipScenario struct {
+	ID, Name, Description, Model string
+	ResizeFactor                 int
+	NoSmooth                     bool
+}
+
+var wav2lipModelArtifacts = map[string]wav2lipModelArtifact{
+	wav2lipModelGAN: {
+		ID: wav2lipModelGAN, Name: "Wav2Lip GAN", Filename: "wav2lip_gan.pth",
+		OfficialURL: wav2lipOfficialCheckpointURL, BackupURL: wav2lipDomesticCheckpointURL, SHA256: wav2lipDomesticCheckpointSHA256,
+	},
+}
+
+// wav2lipScenarioFor deliberately exposes only non-geometric controls. Face
+// boxes and crop coordinates depend on each source video, so callers must not
+// have to guess them to choose an output-quality preset.
+func wav2lipScenarioFor(value string) (wav2lipScenario, bool) {
+	switch strings.TrimSpace(value) {
+	case "", wav2lipScenarioQuality:
+		return wav2lipScenario{ID: wav2lipScenarioQuality, Name: "质量优先", Description: "原始分辨率并保留人脸框平滑，适合正式输出。", Model: wav2lipModelGAN, ResizeFactor: 1}, true
+	case wav2lipScenarioFast:
+		return wav2lipScenario{ID: wav2lipScenarioFast, Name: "快速预览", Description: "缩小到一半分辨率后推理，优先速度和显存占用。", Model: wav2lipModelGAN, ResizeFactor: 2}, true
+	case wav2lipScenarioMotion:
+		return wav2lipScenario{ID: wav2lipScenarioMotion, Name: "快速运动", Description: "原始分辨率并关闭人脸框平滑，减少快速运动时的跟随滞后。", Model: wav2lipModelGAN, ResizeFactor: 1, NoSmooth: true}, true
+	default:
+		return wav2lipScenario{}, false
+	}
+}
+
+func wav2lipScenarioLogParameters(s wav2lipScenario) string {
+	return "场景=" + s.Name + "；resize_factor=" + strconv.Itoa(s.ResizeFactor) + "；nosmooth=" + strconv.FormatBool(s.NoSmooth)
+}
+
+func wav2lipScenarioCommandParameters(s wav2lipScenario) string {
+	value := "--resize_factor=" + strconv.Itoa(s.ResizeFactor)
+	if s.NoSmooth {
+		value += " --nosmooth"
+	}
+	return value
+}
+
 type wav2lipStagingFiles struct {
 	Directory string
 	Video     string
@@ -398,6 +448,7 @@ type wav2lipTask struct {
 	AudioPath     string `json:"audioPath"`
 	OutputPath    string `json:"outputPath,omitempty"`
 	SavedAs       string `json:"savedAs,omitempty"`
+	Scenario      string `json:"scenario"`
 	FailureReason string `json:"failureReason,omitempty"`
 	Status        string `json:"status"`
 	Progress      int    `json:"progress"`
@@ -419,6 +470,7 @@ type wav2lipTaskCreateRequest struct {
 type wav2lipTaskCreateItem struct {
 	VideoPath string `json:"videoPath"`
 	AudioPath string `json:"audioPath"`
+	Scenario  string `json:"scenario"`
 }
 type wav2lipTaskActionRequest struct {
 	AgentID string `json:"agentId"`
@@ -437,6 +489,7 @@ var (
 	wav2lipTasks          *wav2lipTaskManager
 	wav2lipLookPath       = integrationCommandLookPath
 	wav2lipCommandContext = exec.CommandContext
+	wav2lipHTTPClient     = http.DefaultClient
 	wav2lipNow            = time.Now
 	wav2lipCheckCache     struct {
 		sync.Mutex
@@ -503,39 +556,140 @@ func wav2lipRuntimeFor(cacheFor time.Duration, workspace string) (wav2lipRuntime
 
 func wav2lipRuntimeCandidates(workspace string) []wav2lipRuntime {
 	values := make([]wav2lipRuntime, 0, 1)
-	add := func(home, checkpoint string) {
-		home, checkpoint = strings.TrimSpace(home), strings.TrimSpace(checkpoint)
-		if home == "" || checkpoint == "" {
-			return
-		}
-		script, err := filepath.Abs(filepath.Join(home, "inference.py"))
-		if err != nil {
-			return
-		}
-		checkpoint, err = filepath.Abs(checkpoint)
-		if err != nil {
-			return
-		}
+	for _, candidate := range wav2lipRuntimePaths(workspace, wav2lipModelGAN) {
+		script, checkpoint := candidate.Script, candidate.Checkpoint
 		scriptInfo, scriptErr := os.Stat(script)
 		checkpointInfo, checkpointErr := os.Stat(checkpoint)
 		if scriptErr != nil || scriptInfo.IsDir() || checkpointErr != nil || checkpointInfo.IsDir() || checkpointInfo.Size() == 0 {
-			return
-		}
-		for _, value := range values {
-			if value.Script == script && value.Checkpoint == checkpoint {
-				return
-			}
+			continue
 		}
 		values = append(values, wav2lipRuntime{Script: script, Checkpoint: checkpoint})
 	}
+	return values
+}
+
+// wav2lipRuntimePaths keeps the fixed installation layout but does not require
+// the checkpoint to exist yet, allowing a running task to retrieve its model.
+func wav2lipRuntimePaths(workspace, model string) []wav2lipRuntime {
+	artifact, ok := wav2lipModelArtifacts[strings.TrimSpace(model)]
+	if !ok {
+		return nil
+	}
 	workspace = strings.TrimSpace(workspace)
 	if workspace == "" {
-		return values
+		return nil
 	}
 	home := filepath.Join(workspace, "wav2lip")
-	// Installation, checking and task execution use this same fixed layout.
-	add(home, filepath.Join(home, "checkpoints", "wav2lip_gan.pth"))
-	return values
+	script, err := filepath.Abs(filepath.Join(home, "inference.py"))
+	if err != nil {
+		return nil
+	}
+	checkpoint, err := filepath.Abs(filepath.Join(home, "checkpoints", artifact.Filename))
+	if err != nil {
+		return nil
+	}
+	return []wav2lipRuntime{{Script: script, Checkpoint: checkpoint}}
+}
+
+func wav2lipModelFileMatches(path, expectedSHA256 string) bool {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() || info.Size() == 0 {
+		return false
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return false
+	}
+	return fmt.Sprintf("%x", hash.Sum(nil)) == strings.TrimSpace(expectedSHA256)
+}
+
+// ensureWav2LipRuntime downloads only the fixed model selected by a trusted
+// scenario. The download helper retries the configured official and backup
+// sources without mixing partially downloaded data between them.
+func (m *wav2lipTaskManager) ensureWav2LipRuntime(ctx context.Context, taskID int64, workspace string, scenario wav2lipScenario) (wav2lipRuntime, error) {
+	model, ok := wav2lipModelArtifacts[scenario.Model]
+	if !ok {
+		return wav2lipRuntime{}, errors.New("Wav2Lip 场景模型无效")
+	}
+	if runtimeValue, ok := wav2lipRuntimeFor(time.Hour, workspace); ok && wav2lipModelFileMatches(runtimeValue.Checkpoint, model.SHA256) {
+		return runtimeValue, nil
+	}
+	var lastErr error
+	for _, candidate := range wav2lipRuntimePaths(workspace, model.ID) {
+		scriptInfo, err := os.Stat(candidate.Script)
+		if err != nil || scriptInfo.IsDir() {
+			lastErr = errors.New("未找到 Wav2Lip 推理脚本")
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(candidate.Checkpoint), 0o755); err != nil {
+			lastErr = err
+			m.appendLog(taskID, "无法创建 Wav2Lip 模型目录："+err.Error())
+			continue
+		}
+		if !wav2lipModelFileMatches(candidate.Checkpoint, model.SHA256) {
+			m.appendLog(taskID, "未检测到 "+model.Name+"，正在下载到："+candidate.Checkpoint)
+			temporaryPath := candidate.Checkpoint + ".deepright.part"
+			lastProgress := int64(-1)
+			_, err := downloadModelWithFallback(ctx, resumableModelDownloadConfig{
+				Client:             wav2lipHTTPClient,
+				URL:                model.OfficialURL,
+				BackupURL:          model.BackupURL,
+				PartPath:           temporaryPath,
+				SourceID:           "gdrive:Rudrabha/Wav2Lip",
+				Revision:           "15G3U08c8xsCkOqQxE38Z2XXDnPcOptNk",
+				ArtifactPath:       model.Filename,
+				BackupSourceID:     "hf-mirror:camenduru/Wav2Lip",
+				BackupRevision:     "main",
+				BackupArtifactPath: "checkpoints/" + model.Filename,
+				IdleTimeout:        modelTaskDownloadReadTimeout(m.cfg),
+				Workers:            modelTaskDownloadWorkers(m.cfg),
+				Retries:            modelTaskDownloadRetries(m.cfg),
+				Progress: func(copied, total int64) {
+					if total <= 0 {
+						return
+					}
+					progress := copied * 100 / total
+					if progress >= 100 || progress/10 > lastProgress/10 {
+						lastProgress = progress
+						m.appendLog(taskID, fmt.Sprintf("%s 已下载 %d%%。", model.Name, progress))
+					}
+				},
+				Retry: func(worker, part, parts, retry, retries int, err error) {
+					m.appendLog(taskID, model.Name+modelDownloadRetryMessage(worker, part, parts, retry, retries, err))
+				},
+			}, func(message string) { m.appendLog(taskID, model.Name+"："+message) })
+			if err != nil {
+				lastErr = err
+				m.appendLog(taskID, model.Name+" 下载失败（官方源与备用源均已按顺序重试）："+err.Error())
+				continue
+			}
+			if !wav2lipModelFileMatches(temporaryPath, model.SHA256) {
+				_ = os.Remove(temporaryPath)
+				removeModelDownloadState(temporaryPath)
+				lastErr = errors.New(model.Name + " 模型校验失败")
+				continue
+			}
+			if err := os.Rename(temporaryPath, candidate.Checkpoint); err != nil {
+				lastErr = err
+				continue
+			}
+			removeModelDownloadState(temporaryPath)
+			m.appendLog(taskID, model.Name+" 下载并校验完成。")
+		}
+		if runtimeValue, ok := wav2lipRuntimeFor(0, workspace); ok && runtimeValue.Checkpoint == candidate.Checkpoint {
+			return runtimeValue, nil
+		}
+		lastErr = errors.New("模型下载后仍无法通过 Wav2Lip 运行环境检查")
+	}
+	if lastErr != nil {
+		return wav2lipRuntime{}, fmt.Errorf("%s 模型不可用: %w", model.Name, lastErr)
+	}
+	return wav2lipRuntime{}, errors.New("未找到可下载 Wav2Lip 模型的安装路径")
 }
 
 func wav2lipRequiredPaths(workspace string) string {
@@ -674,7 +828,7 @@ func ensureWav2LipTaskSchema(db *sql.DB) error {
 	}
 	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS wav2lip_task (
 		id INTEGER PRIMARY KEY AUTOINCREMENT, agent_id TEXT NOT NULL, video_path TEXT NOT NULL, audio_path TEXT NOT NULL, output_path TEXT NOT NULL DEFAULT '', saved_as TEXT NOT NULL DEFAULT '',
-		status TEXT NOT NULL DEFAULT 'queued', progress INTEGER NOT NULL DEFAULT 0, started_at TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, logs TEXT NOT NULL DEFAULT '', failure_reason TEXT NOT NULL DEFAULT '', cancel_requested INTEGER NOT NULL DEFAULT 0
+		status TEXT NOT NULL DEFAULT 'queued', progress INTEGER NOT NULL DEFAULT 0, started_at TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, logs TEXT NOT NULL DEFAULT '', failure_reason TEXT NOT NULL DEFAULT '', scenario TEXT NOT NULL DEFAULT 'quality', cancel_requested INTEGER NOT NULL DEFAULT 0
 	); CREATE INDEX IF NOT EXISTS idx_wav2lip_task_agent_created ON wav2lip_task(agent_id, id DESC); CREATE INDEX IF NOT EXISTS idx_wav2lip_task_queue ON wav2lip_task(status, cancel_requested, id);`)
 	if err != nil {
 		return err
@@ -684,7 +838,7 @@ func ensureWav2LipTaskSchema(db *sql.DB) error {
 		return err
 	}
 	defer rows.Close()
-	hasFailureReason := false
+	hasFailureReason, hasScenario := false, false
 	for rows.Next() {
 		var cid, notNull, primaryKey int
 		var name, columnType string
@@ -695,13 +849,25 @@ func ensureWav2LipTaskSchema(db *sql.DB) error {
 		if name == "failure_reason" {
 			hasFailureReason = true
 		}
+		if name == "scenario" {
+			hasScenario = true
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return err
 	}
 	if !hasFailureReason {
 		_, err = db.Exec(`ALTER TABLE wav2lip_task ADD COLUMN failure_reason TEXT NOT NULL DEFAULT ''`)
+		if err != nil {
+			return err
+		}
 	}
+	if !hasScenario {
+		if _, err = db.Exec(`ALTER TABLE wav2lip_task ADD COLUMN scenario TEXT NOT NULL DEFAULT 'quality'`); err != nil {
+			return err
+		}
+	}
+	_, err = db.Exec(`UPDATE wav2lip_task SET scenario = ? WHERE trim(scenario) = ''`, wav2lipScenarioQuality)
 	return err
 }
 func startWav2LipTaskManager(ctx context.Context, cfg *Config) {
@@ -797,7 +963,7 @@ func (m *wav2lipTaskManager) claim() (*wav2lipTask, error) {
 		return nil, err
 	}
 	defer tx.Rollback()
-	task, err := scanWav2LipTask(tx.QueryRow(`SELECT id,agent_id,video_path,audio_path,output_path,saved_as,status,progress,started_at,created_at,updated_at,logs,failure_reason,cancel_requested FROM wav2lip_task WHERE status=? AND cancel_requested=0 ORDER BY id LIMIT 1`, wav2lipTaskQueued))
+	task, err := scanWav2LipTask(tx.QueryRow(`SELECT id,agent_id,video_path,audio_path,output_path,saved_as,scenario,status,progress,started_at,created_at,updated_at,logs,failure_reason,cancel_requested FROM wav2lip_task WHERE status=? AND cancel_requested=0 ORDER BY id LIMIT 1`, wav2lipTaskQueued))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, tx.Commit()
 	}
@@ -894,6 +1060,10 @@ func validateWav2LipAudio(ctx context.Context, path string) error {
 	return nil
 }
 func (m *wav2lipTaskManager) extract(ctx context.Context, task wav2lipTask) error {
+	scenario, ok := wav2lipScenarioFor(task.Scenario)
+	if !ok {
+		return errors.New("Wav2Lip 场景无效")
+	}
 	status, ffmpeg := checkFFmpegDependency()
 	if status != http.StatusOK || !ffmpeg.Available {
 		return errors.New("FFmpeg 或 FFprobe 未安装")
@@ -920,9 +1090,9 @@ func (m *wav2lipTaskManager) extract(ctx context.Context, task wav2lipTask) erro
 	if err != nil {
 		return errors.New("Agent 工作目录不存在")
 	}
-	runtimeValue, ok := wav2lipRuntimeFor(time.Hour, workspace)
-	if !ok {
-		return errors.New("未检测到可用的 Wav2Lip")
+	runtimeValue, err := m.ensureWav2LipRuntime(ctx, task.ID, workspace, scenario)
+	if err != nil {
+		return err
 	}
 	m.appendLog(task.ID, taskKnownPythonEnvironment(runtimeValue.Python, runtimeValue.Script))
 	target, err := resolveCaseInsensitiveUnderRoot(workspace, filepath.FromSlash(task.OutputPath))
@@ -940,6 +1110,7 @@ func (m *wav2lipTaskManager) extract(ctx context.Context, task wav2lipTask) erro
 	m.appendLog(task.ID, "输出视频绝对路径："+target)
 	m.appendLog(task.ID, "Wav2Lip 推理脚本："+runtimeValue.Script)
 	m.appendLog(task.ID, "Wav2Lip 模型权重："+runtimeValue.Checkpoint)
+	m.appendLog(task.ID, "Wav2Lip "+wav2lipScenarioLogParameters(scenario))
 	part, err := os.CreateTemp(filepath.Dir(target), ".wav2lip-*.mp4")
 	if err != nil {
 		return err
@@ -958,7 +1129,7 @@ func (m *wav2lipTaskManager) extract(ctx context.Context, task wav2lipTask) erro
 			_ = os.Remove(temporary)
 		}
 		m.appendLog(task.ID, "正在使用 "+device+" 执行 Wav2Lip 推理。")
-		m.appendLog(task.ID, "实际 Wav2Lip 模型参数：--checkpoint_path="+runtimeValue.Checkpoint+" --face="+video+" --audio="+audio+" --outfile="+target+" --device="+device)
+		m.appendLog(task.ID, "实际 Wav2Lip 模型参数：--checkpoint_path="+runtimeValue.Checkpoint+" --face="+video+" --audio="+audio+" --outfile="+target+" "+wav2lipScenarioCommandParameters(scenario)+" --device="+device)
 		// Wav2Lip's unmodified inference.py builds its final FFmpeg command as
 		// a string without quoting --audio or --outfile.  The Agent workspace on
 		// macOS commonly contains "Application Support", so pass only paths from
@@ -969,7 +1140,7 @@ func (m *wav2lipTaskManager) extract(ctx context.Context, task wav2lipTask) erro
 			return stageErr
 		}
 		m.appendLog(task.ID, "Wav2Lip 执行参数路径映射：--face="+staging.Video+" --audio="+staging.Audio+" --outfile="+staging.Output)
-		err = m.runWav2Lip(ctx, task.ID, runtimeValue, device, staging.Video, staging.Audio, staging.Output)
+		err = m.runWav2Lip(ctx, task.ID, runtimeValue, device, staging.Video, staging.Audio, staging.Output, scenario)
 		if err == nil {
 			_ = os.Remove(temporary)
 			err = m.transcodeWav2LipOutputToH264(ctx, task.ID, ffmpegPath, staging.Output, temporary)
@@ -1018,8 +1189,12 @@ func wav2lipPreferredDevices() []string {
 	return []string{"cuda", "cpu"}
 }
 
-func wav2lipInvocationArgs(r wav2lipRuntime, video, audio, output string) []string {
-	return []string{"-c", wav2lipRuntimeBootstrap, r.Script, "--checkpoint_path", r.Checkpoint, "--face", video, "--audio", audio, "--outfile", output}
+func wav2lipInvocationArgs(r wav2lipRuntime, video, audio, output string, scenario wav2lipScenario) []string {
+	args := []string{"-c", wav2lipRuntimeBootstrap, r.Script, "--checkpoint_path", r.Checkpoint, "--face", video, "--audio", audio, "--outfile", output, "--resize_factor", strconv.Itoa(scenario.ResizeFactor)}
+	if scenario.NoSmooth {
+		args = append(args, "--nosmooth")
+	}
+	return args
 }
 
 func wav2lipProbeArgs(script string) []string {
@@ -1116,8 +1291,8 @@ func (m *wav2lipTaskManager) transcodeWav2LipOutputToH264(ctx context.Context, t
 	return fmt.Errorf("Wav2Lip 输出无法转码为浏览器兼容的 H.264 MP4，请安装支持 libx264 或硬件 H.264 编码的 FFmpeg：%s", videoTrimCommandError(err, output))
 }
 
-func (m *wav2lipTaskManager) runWav2Lip(ctx context.Context, id int64, r wav2lipRuntime, device, video, audio, output string) error {
-	cmd := wav2lipCommandContext(ctx, r.Python, wav2lipInvocationArgs(r, video, audio, output)...)
+func (m *wav2lipTaskManager) runWav2Lip(ctx context.Context, id int64, r wav2lipRuntime, device, video, audio, output string, scenario wav2lipScenario) error {
+	cmd := wav2lipCommandContext(ctx, r.Python, wav2lipInvocationArgs(r, video, audio, output, scenario)...)
 	// Some dependencies launch short-lived shell helpers before the bootstrap
 	// script changes directory. Always give the whole child-process tree a
 	// durable upstream working directory; never inherit a task staging directory
@@ -1302,13 +1477,17 @@ func (m *wav2lipTaskManager) create(request wav2lipTaskCreateRequest) ([]wav2lip
 	if err != nil {
 		return nil, errors.New("Agent 不存在")
 	}
-	type source struct{ video, audio, output, saved string }
+	type source struct{ video, audio, output, saved, scenario string }
 	sources := []source{}
 	seen, reserved := map[string]bool{}, map[string]bool{}
 	for _, item := range request.Tasks {
 		videoPath, audioPath := normalizeQuotedPathArg(item.VideoPath), normalizeQuotedPathArg(item.AudioPath)
 		if videoPath == "" || audioPath == "" {
 			return nil, errors.New("每个任务都必须选择一个视频和一个音频文件")
+		}
+		scenario, ok := wav2lipScenarioFor(item.Scenario)
+		if !ok {
+			return nil, errors.New("Wav2Lip 场景无效")
 		}
 		key := videoPath + "\x00" + audioPath
 		if seen[key] {
@@ -1341,7 +1520,7 @@ func (m *wav2lipTaskManager) create(request wav2lipTaskCreateRequest) ([]wav2lip
 		if err != nil {
 			return nil, err
 		}
-		sources = append(sources, source{filepath.ToSlash(videoRelative), filepath.ToSlash(audioRelative), filepath.ToSlash(output), saved})
+		sources = append(sources, source{filepath.ToSlash(videoRelative), filepath.ToSlash(audioRelative), filepath.ToSlash(output), saved, scenario.ID})
 	}
 	if len(sources) == 0 {
 		return nil, errors.New("未找到可添加的视频文件")
@@ -1354,7 +1533,7 @@ func (m *wav2lipTaskManager) create(request wav2lipTaskCreateRequest) ([]wav2lip
 	now := wav2lipTimestamp()
 	created := make([]wav2lipTask, 0, len(sources))
 	for _, source := range sources {
-		result, err := tx.Exec(`INSERT INTO wav2lip_task(agent_id,video_path,audio_path,output_path,saved_as,status,progress,created_at,updated_at,logs,cancel_requested) VALUES(?,?,?,?,?,?,?,?,?,?,0)`, request.AgentID, source.video, source.audio, source.output, source.saved, wav2lipTaskQueued, 0, now, now, "")
+		result, err := tx.Exec(`INSERT INTO wav2lip_task(agent_id,video_path,audio_path,output_path,saved_as,scenario,status,progress,created_at,updated_at,logs,cancel_requested) VALUES(?,?,?,?,?,?,?,?,?,?,?,0)`, request.AgentID, source.video, source.audio, source.output, source.saved, source.scenario, wav2lipTaskQueued, 0, now, now, "")
 		if err != nil {
 			return nil, err
 		}
@@ -1362,7 +1541,7 @@ func (m *wav2lipTaskManager) create(request wav2lipTaskCreateRequest) ([]wav2lip
 		if err != nil {
 			return nil, err
 		}
-		created = append(created, wav2lipTask{ID: id, AgentID: request.AgentID, VideoPath: source.video, AudioPath: source.audio, OutputPath: source.output, SavedAs: source.saved, Status: wav2lipTaskQueued, CreatedAt: now, UpdatedAt: now})
+		created = append(created, wav2lipTask{ID: id, AgentID: request.AgentID, VideoPath: source.video, AudioPath: source.audio, OutputPath: source.output, SavedAs: source.saved, Scenario: source.scenario, Status: wav2lipTaskQueued, CreatedAt: now, UpdatedAt: now})
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
@@ -1408,7 +1587,7 @@ func (m *wav2lipTaskManager) list(agentID, status string, page int, logs bool) (
 		column = "logs"
 	}
 	args = append(args, result.PageSize, (page-1)*result.PageSize)
-	rows, err := m.db.Query(`SELECT id,agent_id,video_path,audio_path,output_path,saved_as,status,progress,started_at,created_at,updated_at,`+column+`,failure_reason,cancel_requested FROM wav2lip_task WHERE `+where+` ORDER BY id DESC LIMIT ? OFFSET ?`, args...)
+	rows, err := m.db.Query(`SELECT id,agent_id,video_path,audio_path,output_path,saved_as,scenario,status,progress,started_at,created_at,updated_at,`+column+`,failure_reason,cancel_requested FROM wav2lip_task WHERE `+where+` ORDER BY id DESC LIMIT ? OFFSET ?`, args...)
 	if err != nil {
 		return result, err
 	}
@@ -1426,7 +1605,7 @@ func (m *wav2lipTaskManager) log(agentID string, id int64) (wav2lipTask, error) 
 	if id <= 0 || !isValidMediaPreviewAgentID(strings.TrimSpace(agentID)) {
 		return wav2lipTask{}, errors.New("任务参数无效")
 	}
-	return scanWav2LipTask(m.db.QueryRow(`SELECT id,agent_id,video_path,audio_path,output_path,saved_as,status,progress,started_at,created_at,updated_at,logs,failure_reason,cancel_requested FROM wav2lip_task WHERE id=? AND agent_id=?`, id, strings.TrimSpace(agentID)))
+	return scanWav2LipTask(m.db.QueryRow(`SELECT id,agent_id,video_path,audio_path,output_path,saved_as,scenario,status,progress,started_at,created_at,updated_at,logs,failure_reason,cancel_requested FROM wav2lip_task WHERE id=? AND agent_id=?`, id, strings.TrimSpace(agentID)))
 }
 func (m *wav2lipTaskManager) cancelTask(agentID string, id int64) error {
 	now := wav2lipTimestamp()
@@ -1490,7 +1669,7 @@ type wav2lipScanner interface{ Scan(...interface{}) error }
 func scanWav2LipTask(scanner wav2lipScanner) (wav2lipTask, error) {
 	var task wav2lipTask
 	var cancelled int
-	err := scanner.Scan(&task.ID, &task.AgentID, &task.VideoPath, &task.AudioPath, &task.OutputPath, &task.SavedAs, &task.Status, &task.Progress, &task.StartedAt, &task.CreatedAt, &task.UpdatedAt, &task.Logs, &task.FailureReason, &cancelled)
+	err := scanner.Scan(&task.ID, &task.AgentID, &task.VideoPath, &task.AudioPath, &task.OutputPath, &task.SavedAs, &task.Scenario, &task.Status, &task.Progress, &task.StartedAt, &task.CreatedAt, &task.UpdatedAt, &task.Logs, &task.FailureReason, &cancelled)
 	task.CancelAsked = cancelled != 0
 	return task, err
 }

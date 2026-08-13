@@ -78,7 +78,7 @@ func printIntegrationAPIRVMHelp(stdout io.Writer) {
 	fmt.Fprintln(stdout, "Usage:")
 	fmt.Fprintln(stdout, "  integration api rvm <check|list|create|cancel|restart|delete|log> [options]")
 	fmt.Fprintln(stdout, "")
-	fmt.Fprintln(stdout, "功能：视频提取主体。任务进入与文字转语音、音频转写、图片主体提取、人物视频对口型共用的模型等待队列；未取得执行名额时状态为 queued。")
+	fmt.Fprintln(stdout, "功能：视频提取人物。任务进入与文字转语音、音频转写、图片主体提取、人物视频对口型共用的模型等待队列；未取得执行名额时状态为 queued。")
 	fmt.Fprintln(stdout, "")
 	fmt.Fprintln(stdout, "Commands:")
 	fmt.Fprintln(stdout, "  check       检查受控环境能否运行 RVM")
@@ -91,13 +91,13 @@ func printIntegrationAPIRVMHelp(stdout io.Writer) {
 	fmt.Fprintln(stdout, "")
 	fmt.Fprintln(stdout, "Create options:")
 	fmt.Fprintln(stdout, "  --path PATH         工作区相对视频路径；可重复，最多 64 个")
-	fmt.Fprintln(stdout, "  --scenario NAME     standard（默认）、quality 或 fast；可提供一次或每个 --path 一次")
+	fmt.Fprintln(stdout, "  --scenario NAME     fast（速度优先，默认）或 quality（质量优先）；可提供一次或每个 --path 一次")
 	fmt.Fprintln(stdout, "")
 	fmt.Fprintln(stdout, "Examples:")
 	fmt.Fprintln(stdout, "  integration api rvm check")
 	fmt.Fprintln(stdout, "  integration api rvm list --agentId demo-agent --status queued --page 1")
 	fmt.Fprintln(stdout, "  integration api rvm create --agentId demo-agent --path videos/source.mp4 --scenario quality")
-	fmt.Fprintln(stdout, "  integration api rvm create --agentId demo-agent --path videos/a.mp4 --path videos/b.mov --scenario standard --scenario fast")
+	fmt.Fprintln(stdout, "  integration api rvm create --agentId demo-agent --path videos/a.mp4 --path videos/b.mov --scenario fast --scenario quality")
 	fmt.Fprintln(stdout, "  integration api rvm cancel --agentId demo-agent --id 12")
 	fmt.Fprintln(stdout, "  integration api rvm restart --agentId demo-agent --id 12")
 	fmt.Fprintln(stdout, "  integration api rvm log --agentId demo-agent --id 12")
@@ -106,7 +106,7 @@ func printIntegrationAPIRVMHelp(stdout io.Writer) {
 func runIntegrationAPIRVMCreateCLI(args []string, stdout, stderr io.Writer) int {
 	fs, addr, port, output, pretty := newIntegrationAPICommonFlagSet(
 		"integration api rvm create",
-		"integration api rvm create --agentId ID --path VIDEO_PATH [--path VIDEO_PATH ...] [--scenario standard|quality|fast] [--addr URL] [--port 8080]",
+		"integration api rvm create --agentId ID --path VIDEO_PATH [--path VIDEO_PATH ...] [--scenario fast|quality] [--addr URL] [--port 8080]",
 		"Call POST /api/rvm/tasks. Each path must be a video under the selected Agent workspace. A scenario supplied once applies to every path; otherwise provide one scenario per path.",
 		stderr,
 	)
@@ -141,7 +141,7 @@ func runIntegrationAPIRVMCreateCLI(args []string, stdout, stderr io.Writer) int 
 	}
 	request := rvmTaskCreateRequest{AgentID: strings.TrimSpace(*agentID), Tasks: make([]rvmTaskCreateItem, 0, len(cleanPaths))}
 	for index, path := range cleanPaths {
-		scenario, err := integrationAPITaskScenarioValue(scenarios, index, len(cleanPaths), rvmScenarioStandard, "--scenario")
+		scenario, err := integrationAPITaskScenarioValue(scenarios, index, len(cleanPaths), rvmScenarioFast, "--scenario")
 		if err != nil {
 			fmt.Fprintln(stderr, err.Error())
 			return 1
@@ -209,11 +209,12 @@ func printIntegrationAPIWav2LipHelp(stdout io.Writer) {
 	fmt.Fprintln(stdout, "Create options:")
 	fmt.Fprintln(stdout, "  --videoPath PATH    工作区相对视频路径；可重复")
 	fmt.Fprintln(stdout, "  --audioPath PATH    工作区相对音频路径；可重复，数量及顺序必须与 --videoPath 一致")
+	fmt.Fprintln(stdout, "  --scenario NAME     quality（默认）、fast 或 motion；可提供一次或为每组视频音频提供一次")
 	fmt.Fprintln(stdout, "")
 	fmt.Fprintln(stdout, "Examples:")
 	fmt.Fprintln(stdout, "  integration api wav2lip check")
 	fmt.Fprintln(stdout, "  integration api wav2lip list --agentId demo-agent --status running --page 1")
-	fmt.Fprintln(stdout, "  integration api wav2lip create --agentId demo-agent --videoPath videos/person.mp4 --audioPath audios/line.wav")
+	fmt.Fprintln(stdout, "  integration api wav2lip create --agentId demo-agent --videoPath videos/person.mp4 --audioPath audios/line.wav --scenario quality")
 	fmt.Fprintln(stdout, "  integration api wav2lip create --agentId demo-agent --videoPath videos/a.mp4 --audioPath audios/a.wav --videoPath videos/b.mp4 --audioPath audios/b.mp3")
 	fmt.Fprintln(stdout, "  integration api wav2lip cancel --agentId demo-agent --id 12")
 	fmt.Fprintln(stdout, "  integration api wav2lip restart --agentId demo-agent --id 12")
@@ -223,17 +224,18 @@ func printIntegrationAPIWav2LipHelp(stdout io.Writer) {
 func runIntegrationAPIWav2LipCreateCLI(args []string, stdout, stderr io.Writer) int {
 	fs, addr, port, output, pretty := newIntegrationAPICommonFlagSet(
 		"integration api wav2lip create",
-		"integration api wav2lip create --agentId ID --videoPath VIDEO_PATH --audioPath AUDIO_PATH [--videoPath VIDEO_PATH --audioPath AUDIO_PATH ...] [--addr URL] [--port 8080]",
+		"integration api wav2lip create --agentId ID --videoPath VIDEO_PATH --audioPath AUDIO_PATH [--videoPath VIDEO_PATH --audioPath AUDIO_PATH ...] [--scenario quality|fast|motion] [--addr URL] [--port 8080]",
 		"Call POST /api/wav2lip/tasks. Video and audio values form pairs in their supplied order and must be files under the selected Agent workspace.",
 		stderr,
 	)
 	agentID := fs.String("agentId", "", "Agent ID")
 	fs.StringVar(agentID, "agent", "", "Agent ID")
-	var videos, audios integrationStringSliceFlag
+	var videos, audios, scenarios integrationStringSliceFlag
 	fs.Var(&videos, "videoPath", "workspace-relative video path; may be repeated")
 	fs.Var(&videos, "video-path", "workspace-relative video path; may be repeated")
 	fs.Var(&audios, "audioPath", "workspace-relative audio path; may be repeated")
 	fs.Var(&audios, "audio-path", "workspace-relative audio path; may be repeated")
+	fs.Var(&scenarios, "scenario", "quality, fast, or motion; may be repeated")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
@@ -259,7 +261,12 @@ func runIntegrationAPIWav2LipCreateCLI(args []string, stdout, stderr io.Writer) 
 			fmt.Fprintln(stderr, "--videoPath and --audioPath values cannot be empty")
 			return 1
 		}
-		request.Tasks = append(request.Tasks, wav2lipTaskCreateItem{VideoPath: video, AudioPath: audio})
+		scenario, err := integrationAPITaskScenarioValue(scenarios, index, len(videos), wav2lipScenarioQuality, "--scenario")
+		if err != nil {
+			fmt.Fprintln(stderr, err.Error())
+			return 1
+		}
+		request.Tasks = append(request.Tasks, wav2lipTaskCreateItem{VideoPath: video, AudioPath: audio, Scenario: scenario})
 	}
 	body, err := json.Marshal(request)
 	if err != nil {

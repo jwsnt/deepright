@@ -182,7 +182,7 @@ func TestIntegrationAPIWav2LipCreateAndHelpCLI(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 			t.Fatalf("decode request: %v", err)
 		}
-		if request.AgentID != "demo-agent" || len(request.Tasks) != 2 || request.Tasks[0].VideoPath != "videos/a.mp4" || request.Tasks[0].AudioPath != "audios/a.wav" || request.Tasks[1].VideoPath != "videos/b.mov" || request.Tasks[1].AudioPath != "audios/b.mp3" {
+		if request.AgentID != "demo-agent" || len(request.Tasks) != 2 || request.Tasks[0].VideoPath != "videos/a.mp4" || request.Tasks[0].AudioPath != "audios/a.wav" || request.Tasks[0].Scenario != wav2lipScenarioQuality || request.Tasks[1].VideoPath != "videos/b.mov" || request.Tasks[1].AudioPath != "audios/b.mp3" || request.Tasks[1].Scenario != wav2lipScenarioQuality {
 			t.Fatalf("unexpected Wav2Lip create request: %#v", request)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -198,7 +198,7 @@ func TestIntegrationAPIWav2LipCreateAndHelpCLI(t *testing.T) {
 	if code := runIntegrationAPIWav2LipCLI([]string{"--help"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("help exit code = %d", code)
 	}
-	for _, text := range []string{"check", "list", "create", "cancel", "restart", "delete", "log", "--videoPath", "--audioPath"} {
+	for _, text := range []string{"check", "list", "create", "cancel", "restart", "delete", "log", "--videoPath", "--audioPath", "--scenario"} {
 		if !strings.Contains(stdout.String(), text) {
 			t.Fatalf("help does not contain %q: %s", text, stdout.String())
 		}

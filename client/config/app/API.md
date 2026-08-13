@@ -35,7 +35,7 @@ integration api edit --agentId demo --path USER.md --content '# hello'
 integration api whisper create --agentId demo --path audios/meeting.mp3 --scenario chinese_meeting
 integration api rembg create --agentId demo --path images/product.jpg --model u2net --alpha-matting
 integration api voxcpm create --agentId demo --textPath scripts/intro.txt --outputName intro.wav
-integration api wav2lip create --agentId demo --videoPath videos/person.mp4 --audioPath audios/line.wav
+integration api wav2lip create --agentId demo --videoPath videos/person.mp4 --audioPath audios/line.wav --scenario quality
 integration api rvm create --agentId demo --path videos/product.mp4 --scenario quality
 integration service cancel --chat chat-001
 ```
@@ -1009,6 +1009,8 @@ integration api voxcpm log --agentId demo-agent --id 12
 
 Wav2Lip 将当前 Agent 工作区的一组视频和一组音频配对，生成 `videos/<视频名>_lip_sync.mp4`；输出冲突时由服务端改用安全名称，绝不覆盖已有文件。任务和其它四类媒体任务共享 `config/config.json.modelTask.concurrence` 等待队列。CLI 的视频与音频参数按出现顺序配对，必须数量相同，最多 64 组。
 
+`--scenario` 不要求填写人脸框、裁剪或边距坐标：`quality`（默认，原始分辨率并保留人脸框平滑）、`fast`（以一半分辨率快速预览）和 `motion`（原始分辨率、关闭人脸框平滑，适合快速移动）。三个场景都使用受控的 `wav2lip_gan.pth` 权重；运行任务时发现权重缺失，会先从官方源下载，失败后自动回退镜像源并校验 SHA-256，完整过程写入任务日志。
+
 ```bash
 # 查看受控 Python、脚本和权重是否可用，以及查询正在执行的任务
 integration api wav2lip check
@@ -1018,7 +1020,8 @@ integration api wav2lip list --agentId demo-agent --status running --page 1
 integration api wav2lip create \
   --agentId demo-agent \
   --videoPath videos/person.mp4 \
-  --audioPath audios/line.wav
+  --audioPath audios/line.wav \
+  --scenario quality
 
 # 按顺序提交两组配对
 integration api wav2lip create \

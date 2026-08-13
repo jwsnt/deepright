@@ -1,8 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -40,6 +45,24 @@ func TestWav2LipMediaAllowLists(t *testing.T) {
 	}
 }
 
+func TestWav2LipQualityScenariosAvoidGeometricInputs(t *testing.T) {
+	quality, ok := wav2lipScenarioFor(wav2lipScenarioQuality)
+	if !ok || quality.ResizeFactor != 1 || quality.NoSmooth {
+		t.Fatalf("quality scenario = %#v, %v", quality, ok)
+	}
+	fast, ok := wav2lipScenarioFor(wav2lipScenarioFast)
+	if !ok || fast.ResizeFactor != 2 || fast.NoSmooth {
+		t.Fatalf("fast scenario = %#v, %v", fast, ok)
+	}
+	motion, ok := wav2lipScenarioFor(wav2lipScenarioMotion)
+	if !ok || motion.ResizeFactor != 1 || !motion.NoSmooth {
+		t.Fatalf("motion scenario = %#v, %v", motion, ok)
+	}
+	if _, ok := wav2lipScenarioFor("--box 1 2 3 4"); ok {
+		t.Fatal("arbitrary Wav2Lip arguments must not be accepted as a scenario")
+	}
+}
+
 func TestWav2LipRuntimeCandidatesUseFixedGANPaths(t *testing.T) {
 	workspace := t.TempDir()
 	home := filepath.Join(workspace, "wav2lip")
@@ -59,9 +82,83 @@ func TestWav2LipRuntimeCandidatesUseFixedGANPaths(t *testing.T) {
 	}
 }
 
+func TestEnsureWav2LipRuntimeDownloadsScenarioModel(t *testing.T) {
+	model := []byte("wav2lip-model")
+	sum := sha256.Sum256(model)
+	usedBackup := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/official" {
+			http.Error(w, "unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		usedBackup = true
+		http.ServeContent(w, r, "wav2lip_gan.pth", time.Unix(0, 0), bytes.NewReader(model))
+	}))
+	defer server.Close()
+	workspace := t.TempDir()
+	home := filepath.Join(workspace, "wav2lip")
+	if err := os.MkdirAll(home, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, "inference.py"), []byte("# test"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := ensureWav2LipTaskSchema(db); err != nil {
+		t.Fatal(err)
+	}
+	result, err := db.Exec(`INSERT INTO wav2lip_task(agent_id,video_path,audio_path,output_path,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)`, "agent-a", "input.mp4", "voice.wav", "output.mp4", wav2lipTaskRunning, "now", "now")
+	if err != nil {
+		t.Fatal(err)
+	}
+	taskID, err := result.LastInsertId()
+	if err != nil {
+		t.Fatal(err)
+	}
+	previousArtifacts, previousClient := wav2lipModelArtifacts, wav2lipHTTPClient
+	previousLookPath, previousCommand := wav2lipLookPath, wav2lipCommandContext
+	wav2lipModelArtifacts = map[string]wav2lipModelArtifact{wav2lipModelGAN: {ID: wav2lipModelGAN, Name: "Wav2Lip GAN", Filename: "wav2lip_gan.pth", OfficialURL: server.URL + "/official", BackupURL: server.URL + "/backup", SHA256: fmt.Sprintf("%x", sum)}}
+	wav2lipHTTPClient = server.Client()
+	wav2lipLookPath = func(string) (string, error) { return "python3", nil }
+	wav2lipCommandContext = func(ctx context.Context, _ string, _ ...string) *exec.Cmd { return exec.CommandContext(ctx, "true") }
+	t.Cleanup(func() {
+		wav2lipModelArtifacts, wav2lipHTTPClient = previousArtifacts, previousClient
+		wav2lipLookPath, wav2lipCommandContext = previousLookPath, previousCommand
+	})
+	wav2lipCheckCache.Lock()
+	previousCache := wav2lipCheckCache.entries
+	wav2lipCheckCache.entries = nil
+	wav2lipCheckCache.Unlock()
+	t.Cleanup(func() {
+		wav2lipCheckCache.Lock()
+		wav2lipCheckCache.entries = previousCache
+		wav2lipCheckCache.Unlock()
+	})
+	scenario, _ := wav2lipScenarioFor(wav2lipScenarioQuality)
+	runtimeValue, err := (&wav2lipTaskManager{cfg: &Config{}, db: db}).ensureWav2LipRuntime(context.Background(), taskID, workspace, scenario)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runtimeValue.Checkpoint != filepath.Join(home, "checkpoints", "wav2lip_gan.pth") {
+		t.Fatalf("checkpoint = %q", runtimeValue.Checkpoint)
+	}
+	got, err := os.ReadFile(runtimeValue.Checkpoint)
+	if err != nil || !bytes.Equal(got, model) {
+		t.Fatalf("downloaded model = %q, %v", got, err)
+	}
+	if !usedBackup {
+		t.Fatal("model download did not retry the backup source")
+	}
+}
+
 func TestWav2LipInvocationUsesOnlyOfficialFixedArguments(t *testing.T) {
 	runtime := wav2lipRuntime{Python: "python3", Script: "/agent/wav2lip/inference.py", Checkpoint: "/agent/wav2lip/checkpoints/wav2lip_gan.pth"}
-	args := wav2lipInvocationArgs(runtime, "/agent/tmp/input.mp4", "/agent/tmp/voice.mp3", "/tmp/output.mp4")
+	scenario, _ := wav2lipScenarioFor(wav2lipScenarioQuality)
+	args := wav2lipInvocationArgs(runtime, "/agent/tmp/input.mp4", "/agent/tmp/voice.mp3", "/tmp/output.mp4", scenario)
 	joined := strings.Join(args, " ")
 	for _, expected := range []string{"-c", "--checkpoint_path " + runtime.Checkpoint, "--face /agent/tmp/input.mp4", "--audio /agent/tmp/voice.mp3", "--outfile /tmp/output.mp4"} {
 		if !strings.Contains(joined, expected) {
@@ -78,6 +175,20 @@ func TestWav2LipInvocationUsesOnlyOfficialFixedArguments(t *testing.T) {
 	}
 	if !strings.Contains(args[1], "_deepright_compatible_mel") || !strings.Contains(args[1], "kwargs.setdefault('sr', args[0])") {
 		t.Fatalf("runtime wrapper must adapt newer librosa without editing Wav2Lip: %q", args[1])
+	}
+}
+
+func TestWav2LipInvocationAppliesOnlyScenarioQualityParameters(t *testing.T) {
+	runtime := wav2lipRuntime{Python: "python3", Script: "/agent/wav2lip/inference.py", Checkpoint: "/agent/wav2lip/checkpoints/wav2lip_gan.pth"}
+	fast, _ := wav2lipScenarioFor(wav2lipScenarioFast)
+	fastArgs := strings.Join(wav2lipInvocationArgs(runtime, "input.mp4", "voice.wav", "output.mp4", fast), " ")
+	if !strings.Contains(fastArgs, "--resize_factor 2") || strings.Contains(fastArgs, "--nosmooth") {
+		t.Fatalf("fast scenario arguments = %q", fastArgs)
+	}
+	motion, _ := wav2lipScenarioFor(wav2lipScenarioMotion)
+	motionArgs := strings.Join(wav2lipInvocationArgs(runtime, "input.mp4", "voice.wav", "output.mp4", motion), " ")
+	if !strings.Contains(motionArgs, "--resize_factor 1") || !strings.Contains(motionArgs, "--nosmooth") {
+		t.Fatalf("motion scenario arguments = %q", motionArgs)
 	}
 }
 
@@ -153,7 +264,8 @@ func TestRunWav2LipUsesStableUpstreamWorkingDirectory(t *testing.T) {
 	t.Cleanup(func() { wav2lipCommandContext = previous })
 	manager := &wav2lipTaskManager{db: db}
 	runtime := wav2lipRuntime{Python: "python3", Script: filepath.Join(upstreamDirectory, "inference.py")}
-	if err := manager.runWav2Lip(context.Background(), id, runtime, "cpu", "input.mp4", "audio.wav", output); err != nil {
+	scenario, _ := wav2lipScenarioFor(wav2lipScenarioQuality)
+	if err := manager.runWav2Lip(context.Background(), id, runtime, "cpu", "input.mp4", "audio.wav", output, scenario); err != nil {
 		t.Fatal(err)
 	}
 	task, err := manager.log("agent-a", id)

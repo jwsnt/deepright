@@ -7,6 +7,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -32,14 +33,19 @@ const (
 	rvmTaskFailed       = "failed"
 	rvmTaskLogLimit     = 128 * 1024
 	rvmProbeTimeout     = time.Minute
-	rvmScenarioStandard = "standard"
+	rvmScenarioStandard = "standard" // Legacy tasks created before model selection.
 	rvmScenarioQuality  = "quality"
 	rvmScenarioFast     = "fast"
+	rvmModelMobileNetV3 = "mobilenetv3"
+	rvmModelResNet50    = "resnet50"
 	// A domestic mirror for the checkpoint expected by the unmodified RVM
 	// script. The install request includes the digest so the installer can
 	// reject a changed community copy before placing it in the workspace.
-	rvmDomesticCheckpointURL    = "https://hf-mirror.com/DJ02-a/video_matting_RVM/resolve/main/rvm_mobilenetv3.pth"
-	rvmDomesticCheckpointSHA256 = "3c7c1d92033f7c38d6577c481d13a195d7d80a159b960f4f3119ac7b534cf4f8"
+	rvmOfficialCheckpointBaseURL = "https://github.com/PeterL1n/RobustVideoMatting/releases/download/v1.0.0/"
+	rvmDomesticCheckpointBaseURL = "https://hf-mirror.com/DJ02-a/video_matting_RVM/resolve/main/"
+	rvmDomesticCheckpointURL     = rvmDomesticCheckpointBaseURL + "rvm_mobilenetv3.pth"
+	rvmResNet50BackupURL         = "https://ghproxy.net/https://github.com/PeterL1n/RobustVideoMatting/releases/download/v1.0.0/rvm_resnet50.pth"
+	rvmDomesticCheckpointSHA256  = "3c7c1d92033f7c38d6577c481d13a195d7d80a159b960f4f3119ac7b534cf4f8"
 )
 
 type rvmCheckConfig struct {
@@ -54,11 +60,19 @@ type rvmCheckResponse struct {
 	Status    int    `json:"status"`
 }
 type rvmRuntime struct{ Python, Script, Checkpoint string }
+type rvmModelArtifact struct {
+	ID, Name, Variant, Filename, OfficialURL, BackupURL, SHA256 string
+}
 type rvmScenario struct {
-	Name            string
+	Name, Model     string
 	DownsampleRatio string
 	VideoMbps       string
 	SequenceChunk   string
+}
+
+var rvmModelArtifacts = map[string]rvmModelArtifact{
+	rvmModelMobileNetV3: {ID: rvmModelMobileNetV3, Name: "速度优先", Variant: rvmModelMobileNetV3, Filename: "rvm_mobilenetv3.pth", OfficialURL: rvmOfficialCheckpointBaseURL + "rvm_mobilenetv3.pth", BackupURL: rvmDomesticCheckpointBaseURL + "rvm_mobilenetv3.pth", SHA256: rvmDomesticCheckpointSHA256},
+	rvmModelResNet50:    {ID: rvmModelResNet50, Name: "质量优先", Variant: rvmModelResNet50, Filename: "rvm_resnet50.pth", OfficialURL: rvmOfficialCheckpointBaseURL + "rvm_resnet50.pth", BackupURL: rvmResNet50BackupURL},
 }
 
 // rvmCompatibilityBootstrap runs the unmodified upstream script while fixing
@@ -157,6 +171,7 @@ var (
 	rvmTasks          *rvmTaskManager
 	rvmLookPath       = integrationCommandLookPath
 	rvmCommandContext = exec.CommandContext
+	rvmHTTPClient     = http.DefaultClient
 	rvmNow            = time.Now
 	rvmCheckCache     struct {
 		sync.Mutex
@@ -167,15 +182,33 @@ var (
 func rvmScenarioFor(value string) (string, rvmScenario, bool) {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		value = rvmScenarioStandard
+		value = rvmScenarioFast
 	}
 	values := map[string]rvmScenario{
-		rvmScenarioStandard: {Name: "标准主体提取", VideoMbps: "4", SequenceChunk: "1"},
-		rvmScenarioQuality:  {Name: "精细边缘提取", DownsampleRatio: "1", VideoMbps: "8", SequenceChunk: "1"},
-		rvmScenarioFast:     {Name: "快速主体提取", DownsampleRatio: "0.25", VideoMbps: "2", SequenceChunk: "1"},
+		// Keep legacy records runnable, but all newly created tasks use fast or quality.
+		rvmScenarioStandard: {Name: "速度优先", Model: rvmModelMobileNetV3, VideoMbps: "4", SequenceChunk: "1"},
+		rvmScenarioQuality:  {Name: "质量优先", Model: rvmModelResNet50, DownsampleRatio: "1", VideoMbps: "8", SequenceChunk: "1"},
+		rvmScenarioFast:     {Name: "速度优先", Model: rvmModelMobileNetV3, DownsampleRatio: "0.25", VideoMbps: "2", SequenceChunk: "1"},
 	}
 	info, ok := values[value]
 	return value, info, ok
+}
+
+func rvmModelForScenario(value string) (rvmModelArtifact, bool) {
+	_, scenario, ok := rvmScenarioFor(value)
+	if !ok {
+		return rvmModelArtifact{}, false
+	}
+	model, ok := rvmModelArtifacts[scenario.Model]
+	return model, ok
+}
+
+func rvmScenarioLogDescription(scenario rvmScenario) string {
+	parts := []string{"模式=" + scenario.Name, "模型=" + scenario.Model, "视频码率=" + scenario.VideoMbps + " Mbps", "序列分块=" + scenario.SequenceChunk}
+	if scenario.DownsampleRatio != "" {
+		parts = append(parts, "下采样比例="+scenario.DownsampleRatio)
+	}
+	return strings.Join(parts, "；")
 }
 
 func rvmTimestamp() string { return rvmNow().Format(time.RFC3339Nano) }
@@ -213,8 +246,12 @@ func rvmRuntimeFor(cacheFor time.Duration, workspace string) (rvmRuntime, bool) 
 // returned values are ready for both the dependency check and task execution;
 // callers must not reconstruct a script or checkpoint path from the workspace.
 func rvmRuntimesFor(cacheFor time.Duration, workspace string) []rvmRuntime {
+	return rvmRuntimesForModel(cacheFor, workspace, rvmModelMobileNetV3)
+}
+
+func rvmRuntimesForModel(cacheFor time.Duration, workspace, model string) []rvmRuntime {
 	values := make([]rvmRuntime, 0, 3)
-	for _, candidate := range rvmRuntimeCandidates(workspace) {
+	for _, candidate := range rvmRuntimeCandidatesForModel(workspace, model) {
 		key := candidate.Script + "\x00" + candidate.Checkpoint
 		now := rvmNow()
 		rvmCheckCache.Lock()
@@ -250,6 +287,10 @@ func rvmRuntimesFor(cacheFor time.Duration, workspace string) []rvmRuntime {
 }
 
 func rvmRuntimeCandidates(workspace string) []rvmRuntime {
+	return rvmRuntimeCandidatesForModel(workspace, rvmModelMobileNetV3)
+}
+
+func rvmRuntimeCandidatesForModel(workspace, model string) []rvmRuntime {
 	values := make([]rvmRuntime, 0, 5)
 	add := func(script, checkpoint string) {
 		script, checkpoint = strings.TrimSpace(script), strings.TrimSpace(checkpoint)
@@ -277,21 +318,29 @@ func rvmRuntimeCandidates(workspace string) []rvmRuntime {
 		}
 		values = append(values, rvmRuntime{Script: script, Checkpoint: checkpoint})
 	}
-	for _, candidate := range rvmCandidatePaths(workspace) {
+	for _, candidate := range rvmCandidatePathsForModel(workspace, model) {
 		add(candidate.Script, candidate.Checkpoint)
 	}
 	return values
 }
 
 func rvmCandidatePaths(workspace string) []rvmRuntime {
+	return rvmCandidatePathsForModel(workspace, rvmModelMobileNetV3)
+}
+
+func rvmCandidatePathsForModel(workspace, model string) []rvmRuntime {
 	workspace = strings.TrimSpace(workspace)
 	if workspace == "" {
+		return nil
+	}
+	artifact, ok := rvmModelArtifacts[strings.TrimSpace(model)]
+	if !ok {
 		return nil
 	}
 	rvmHome := filepath.Join(workspace, "rvm")
 	nestedHome := filepath.Join(rvmHome, "RobustVideoMatting")
 	workspaceHome := filepath.Join(workspace, "RobustVideoMatting")
-	checkpoint := func(home string) string { return filepath.Join(home, "weights", "rvm_mobilenetv3.pth") }
+	checkpoint := func(home string) string { return filepath.Join(home, "weights", artifact.Filename) }
 	// The first entry is the documented layout. The remaining entries support
 	// the layouts created by a normal `git clone RobustVideoMatting` command.
 	// Keep script and checkpoint paired so the path selected by preflight is
@@ -311,6 +360,110 @@ func rvmRequiredPaths(workspace string) string {
 		paths = append(paths, candidate.Script+" 与 "+candidate.Checkpoint)
 	}
 	return strings.Join(paths, "；或 ")
+}
+
+func rvmCandidateScriptExists(candidate rvmRuntime) bool {
+	info, err := os.Stat(candidate.Script)
+	return err == nil && !info.IsDir()
+}
+
+func rvmModelFileMatches(path, expectedSHA256 string) bool {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() || info.Size() == 0 {
+		return false
+	}
+	if strings.TrimSpace(expectedSHA256) == "" {
+		return true
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return false
+	}
+	return fmt.Sprintf("%x", hash.Sum(nil)) == expectedSHA256
+}
+
+func (m *rvmTaskManager) ensureRVMRuntimes(ctx context.Context, taskID int64, workspace, scenarioValue string) ([]rvmRuntime, error) {
+	model, ok := rvmModelForScenario(scenarioValue)
+	if !ok {
+		return nil, errors.New("视频提取人物模式无效")
+	}
+	if runtimes := rvmRuntimesForModel(time.Hour, workspace, model.ID); len(runtimes) > 0 {
+		return runtimes, nil
+	}
+	var lastErr error
+	for index, candidate := range rvmCandidatePathsForModel(workspace, model.ID) {
+		if !rvmCandidateScriptExists(candidate) {
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(candidate.Checkpoint), 0o755); err != nil {
+			lastErr = err
+			m.appendLog(taskID, "无法创建 "+model.Name+" 模型目录："+err.Error())
+			continue
+		}
+		if !rvmModelFileMatches(candidate.Checkpoint, model.SHA256) {
+			m.appendLog(taskID, "未检测到 "+model.Name+" 模型，正在下载到："+candidate.Checkpoint)
+			temporaryPath := candidate.Checkpoint + ".deepright.part"
+			lastProgress := int64(-1)
+			_, err := downloadModelWithFallback(ctx, resumableModelDownloadConfig{
+				Client:             rvmHTTPClient,
+				URL:                model.OfficialURL,
+				BackupURL:          model.BackupURL,
+				PartPath:           temporaryPath,
+				SourceID:           "github:PeterL1n/RobustVideoMatting",
+				Revision:           "v1.0.0",
+				ArtifactPath:       model.Filename,
+				BackupSourceID:     "hf-mirror:DJ02-a/video_matting_RVM",
+				BackupRevision:     "main",
+				BackupArtifactPath: model.Filename,
+				IdleTimeout:        modelTaskDownloadReadTimeout(m.cfg),
+				Workers:            modelTaskDownloadWorkers(m.cfg),
+				Retries:            modelTaskDownloadRetries(m.cfg),
+				Progress: func(copied, total int64) {
+					if total <= 0 {
+						return
+					}
+					progress := copied * 100 / total
+					if progress >= 100 || progress/10 > lastProgress/10 {
+						lastProgress = progress
+						m.appendLog(taskID, fmt.Sprintf("%s 模型已下载 %d%%。", model.Name, progress))
+					}
+				},
+				Retry: func(worker, part, parts, retry, retries int, err error) {
+					m.appendLog(taskID, model.Name+" 模型"+modelDownloadRetryMessage(worker, part, parts, retry, retries, err))
+				},
+			}, func(message string) { m.appendLog(taskID, model.Name+" 模型："+message) })
+			if err != nil {
+				lastErr = err
+				m.appendLog(taskID, fmt.Sprintf("%s 模型下载失败，尝试现有回退路径（%d/%d）：%s", model.Name, index+2, len(rvmCandidatePathsForModel(workspace, model.ID)), err.Error()))
+				continue
+			}
+			if !rvmModelFileMatches(temporaryPath, model.SHA256) {
+				_ = os.Remove(temporaryPath)
+				removeModelDownloadState(temporaryPath)
+				lastErr = errors.New(model.Name + " 模型校验失败")
+				continue
+			}
+			if err := os.Rename(temporaryPath, candidate.Checkpoint); err != nil {
+				lastErr = err
+				continue
+			}
+			removeModelDownloadState(temporaryPath)
+			m.appendLog(taskID, model.Name+" 模型下载并校验完成。")
+		}
+		if runtimes := rvmRuntimesForModel(0, workspace, model.ID); len(runtimes) > 0 {
+			return runtimes, nil
+		}
+		lastErr = errors.New("模型下载后仍无法通过 RVM 运行环境检查")
+	}
+	if lastErr != nil {
+		return nil, fmt.Errorf("%s 模型不可用: %w", model.Name, lastErr)
+	}
+	return nil, fmt.Errorf("未找到可下载 %s 模型的 RVM 安装路径", model.Name)
 }
 
 func rvmPythonCandidates() []string {
@@ -369,8 +522,10 @@ func rvmRuntimeForStartup(cacheFor time.Duration, cfg *Config) (rvmRuntime, bool
 
 func rvmInstallRequest(template, workspace string) string {
 	request := strings.ReplaceAll(template, "$workspace", workspace)
-	checkpoint := filepath.Join(workspace, "rvm", "weights", "rvm_mobilenetv3.pth")
-	return request + "\n\n模型下载要求：先按配置中的官方权重地址下载 `rvm_mobilenetv3.pth` 到 `" + checkpoint + "`。官方源失败后回退国内源 `" + rvmDomesticCheckpointURL + "`。下载连接超时最多 30 秒，连续 90 秒无字节进度必须终止并报告。完成后校验 SHA-256 必须为 `" + rvmDomesticCheckpointSHA256 + "`。"
+	weights := filepath.Join(workspace, "rvm", "weights")
+	mobile := rvmModelArtifacts[rvmModelMobileNetV3]
+	resnet := rvmModelArtifacts[rvmModelResNet50]
+	return request + "\n\n模型下载要求：安装 " + mobile.Name + " 模型 `" + mobile.Filename + "` 到 `" + filepath.Join(weights, mobile.Filename) + "`，并安装 " + resnet.Name + " 模型 `" + resnet.Filename + "` 到 `" + filepath.Join(weights, resnet.Filename) + "`。两者均优先使用官方源，失败后分别回退国内源 `" + mobile.BackupURL + "` 和 `" + resnet.BackupURL + "`。" + mobile.Filename + " 的 SHA-256 必须为 `" + mobile.SHA256 + "`。下载连接超时最多 30 秒，连续 90 秒无字节进度必须终止并报告。"
 }
 
 func rvmWorkspaceForRequest(cfg *Config, agentID string) (string, string, error) {
@@ -600,10 +755,11 @@ func (m *rvmTaskManager) execute(parent context.Context, task rvmTask) {
 	}()
 	_, scenario, validScenario := rvmScenarioFor(task.Scenario)
 	if !validScenario {
-		_, scenario, _ = rvmScenarioFor(rvmScenarioStandard)
+		_, scenario, _ = rvmScenarioFor(rvmScenarioFast)
 	}
-	m.appendLog(task.ID, "开始使用 RVM 提取视频主体（"+scenario.Name+"）。优先使用 GPU，失败会自动回退 CPU。")
-	m.appendLog(task.ID, "任务目的：提取视频主体，生成透明 MOV 和黑底 MP4 预览。")
+	m.appendLog(task.ID, "开始使用 RVM 提取视频人物（"+scenario.Name+"）。优先使用 GPU，失败会自动回退 CPU。")
+	m.appendLog(task.ID, "执行配置："+rvmScenarioLogDescription(scenario)+"。")
+	m.appendLog(task.ID, "任务目的：提取视频人物，生成透明 MOV 和黑底 MP4 预览。")
 	if err := m.extract(ctx, task); err != nil {
 		if errors.Is(ctx.Err(), context.Canceled) || m.cancelled(task.ID) {
 			m.finish(task.ID, rvmTaskCancelled, 0, "任务已取消。")
@@ -612,7 +768,7 @@ func (m *rvmTaskManager) execute(parent context.Context, task rvmTask) {
 		}
 		return
 	}
-	m.finish(task.ID, rvmTaskCompleted, 100, "视频主体提取完成。")
+	m.finish(task.ID, rvmTaskCompleted, 100, "视频人物提取完成。")
 }
 func isRVMVideo(path string) bool {
 	mime, ok := mediaPreviewMIMEType(path)
@@ -654,9 +810,9 @@ func (m *rvmTaskManager) extract(ctx context.Context, task rvmTask) error {
 	if err != nil {
 		return errors.New("Agent 工作目录不存在")
 	}
-	runtimes := rvmRuntimesFor(time.Hour, workspace)
-	if len(runtimes) == 0 {
-		return errors.New("未检测到可用的 Robust Video Matting")
+	runtimes, err := m.ensureRVMRuntimes(ctx, task.ID, workspace, task.Scenario)
+	if err != nil {
+		return err
 	}
 	target, err := resolveCaseInsensitiveUnderRoot(workspace, filepath.FromSlash(task.OutputPath))
 	if err != nil || !ensureWritablePathWithinRoot(workspace, target) {
@@ -752,9 +908,10 @@ func rvmPreferredDevices() []string {
 func rvmInvocationArgs(r rvmRuntime, scenarioValue, device, source, foreground, alpha string) []string {
 	_, scenario, validScenario := rvmScenarioFor(scenarioValue)
 	if !validScenario {
-		_, scenario, _ = rvmScenarioFor(rvmScenarioStandard)
+		_, scenario, _ = rvmScenarioFor(rvmScenarioFast)
 	}
-	args := []string{"-c", rvmCompatibilityBootstrap, r.Script, "--variant", "mobilenetv3", "--checkpoint", r.Checkpoint, "--device", device, "--input-source", source, "--output-type", "video", "--output-foreground", foreground, "--output-alpha", alpha, "--output-video-mbps", scenario.VideoMbps, "--seq-chunk", scenario.SequenceChunk}
+	model := rvmModelArtifacts[scenario.Model]
+	args := []string{"-c", rvmCompatibilityBootstrap, r.Script, "--variant", model.Variant, "--checkpoint", r.Checkpoint, "--device", device, "--input-source", source, "--output-type", "video", "--output-foreground", foreground, "--output-alpha", alpha, "--output-video-mbps", scenario.VideoMbps, "--seq-chunk", scenario.SequenceChunk}
 	if scenario.DownsampleRatio != "" {
 		args = append(args, "--downsample-ratio", scenario.DownsampleRatio)
 	}
@@ -1039,13 +1196,13 @@ func (m *rvmTaskManager) ensureAvailableOutputPath(task *rvmTask, workspace, tar
 }
 func (m *rvmTaskManager) create(request rvmTaskCreateRequest) ([]rvmTask, error) {
 	if m == nil || m.cfg == nil || m.db == nil {
-		return nil, errors.New("视频主体任务服务未就绪")
+		return nil, errors.New("视频提取人物任务服务未就绪")
 	}
 	request.AgentID = strings.TrimSpace(request.AgentID)
 	if len(request.Tasks) == 0 {
 		request.Tasks = make([]rvmTaskCreateItem, 0, len(request.Paths))
 		for _, path := range request.Paths {
-			request.Tasks = append(request.Tasks, rvmTaskCreateItem{Path: path, Scenario: rvmScenarioStandard})
+			request.Tasks = append(request.Tasks, rvmTaskCreateItem{Path: path, Scenario: rvmScenarioFast})
 		}
 	}
 	if !isValidMediaPreviewAgentID(request.AgentID) || len(request.Tasks) == 0 || len(request.Tasks) > 64 {
@@ -1068,7 +1225,7 @@ func (m *rvmTaskManager) create(request rvmTaskCreateRequest) ([]rvmTask, error)
 		seen[path] = true
 		scenarioID, _, validScenario := rvmScenarioFor(item.Scenario)
 		if !validScenario {
-			return nil, errors.New("视频主体提取场景无效")
+			return nil, errors.New("视频提取人物模式无效")
 		}
 		absolute, _, status, msg := resolveMediaPreviewFile(m.cfg, request.AgentID, path)
 		if status != 0 {
@@ -1110,6 +1267,10 @@ func (m *rvmTaskManager) create(request rvmTaskCreateRequest) ([]rvmTask, error)
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
+	}
+	for _, task := range created {
+		_, scenario, _ := rvmScenarioFor(task.Scenario)
+		m.appendLog(task.ID, "任务已创建，执行配置："+rvmScenarioLogDescription(scenario)+"。")
 	}
 	m.signal()
 	return created, nil
@@ -1253,7 +1414,7 @@ func readRVMAction(w http.ResponseWriter, r *http.Request) (rvmTaskActionRequest
 func handleRVMTasks() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if rvmTasks == nil {
-			writeRVMJSON(w, http.StatusServiceUnavailable, map[string]interface{}{"status": 1, "content": "视频主体任务服务未就绪"})
+			writeRVMJSON(w, http.StatusServiceUnavailable, map[string]interface{}{"status": 1, "content": "视频提取人物任务服务未就绪"})
 			return
 		}
 		switch r.Method {
@@ -1301,7 +1462,7 @@ func rvmActionHandler(action func(*rvmTaskManager, rvmTaskActionRequest) error) 
 			return
 		}
 		if rvmTasks == nil {
-			writeRVMJSON(w, http.StatusServiceUnavailable, map[string]interface{}{"status": 1, "content": "视频主体任务服务未就绪"})
+			writeRVMJSON(w, http.StatusServiceUnavailable, map[string]interface{}{"status": 1, "content": "视频提取人物任务服务未就绪"})
 			return
 		}
 		request, err := readRVMAction(w, r)
@@ -1334,7 +1495,7 @@ func handleRVMTaskLog() http.HandlerFunc {
 			return
 		}
 		if rvmTasks == nil {
-			writeRVMJSON(w, http.StatusServiceUnavailable, map[string]interface{}{"status": 1, "content": "视频主体任务服务未就绪"})
+			writeRVMJSON(w, http.StatusServiceUnavailable, map[string]interface{}{"status": 1, "content": "视频提取人物任务服务未就绪"})
 			return
 		}
 		id, err := strconv.ParseInt(r.URL.Query().Get("id"), 10, 64)

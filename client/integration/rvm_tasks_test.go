@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"database/sql"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -128,6 +130,57 @@ func TestRVMRuntimesForRetainsFallbackLayouts(t *testing.T) {
 	}
 }
 
+func TestEnsureRVMRuntimesDownloadsSelectedResNet50(t *testing.T) {
+	workspace := t.TempDir()
+	home := filepath.Join(workspace, "rvm")
+	if err := os.MkdirAll(home, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, "inference.py"), []byte("# test"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("resnet50-checkpoint"))
+	}))
+	defer server.Close()
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`CREATE TABLE rvm_task (id INTEGER PRIMARY KEY, logs TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '')`); err != nil {
+		t.Fatal(err)
+	}
+	oldLookPath, oldCommand, oldClient, oldArtifacts, oldCache := rvmLookPath, rvmCommandContext, rvmHTTPClient, rvmModelArtifacts, rvmCheckCache
+	t.Cleanup(func() {
+		rvmLookPath, rvmCommandContext, rvmHTTPClient, rvmModelArtifacts, rvmCheckCache = oldLookPath, oldCommand, oldClient, oldArtifacts, oldCache
+	})
+	rvmLookPath = func(string) (string, error) { return "python3", nil }
+	rvmCommandContext = func(_ context.Context, _ string, _ ...string) *exec.Cmd { return exec.Command("true") }
+	rvmHTTPClient = server.Client()
+	artifacts := make(map[string]rvmModelArtifact, len(rvmModelArtifacts))
+	for key, value := range rvmModelArtifacts {
+		artifacts[key] = value
+	}
+	resnet := artifacts[rvmModelResNet50]
+	resnet.OfficialURL, resnet.BackupURL = server.URL, ""
+	artifacts[rvmModelResNet50] = resnet
+	rvmModelArtifacts = artifacts
+	rvmCheckCache = struct {
+		sync.Mutex
+		entries map[string]rvmCachedRuntime
+	}{}
+	manager := &rvmTaskManager{cfg: &Config{ModelTaskDownload: 1, ModelTaskRetry: 0, ModelTaskTimeout: 10}, db: db}
+	runtimes, err := manager.ensureRVMRuntimes(context.Background(), 1, workspace, rvmScenarioQuality)
+	if err != nil || len(runtimes) != 1 {
+		t.Fatalf("ensureRVMRuntimes() = %#v, %v", runtimes, err)
+	}
+	checkpoint := filepath.Join(home, "weights", "rvm_resnet50.pth")
+	if content, err := os.ReadFile(checkpoint); err != nil || string(content) != "resnet50-checkpoint" {
+		t.Fatalf("downloaded checkpoint = %q, %v", content, err)
+	}
+}
+
 func TestRVMInvocationUsesCompatibilityWrapper(t *testing.T) {
 	runtime := rvmRuntime{Python: "python3", Script: "/agent/rvm/inference.py", Checkpoint: "/agent/rvm/weights/rvm_mobilenetv3.pth"}
 	args := rvmInvocationArgs(runtime, rvmScenarioStandard, "mps", "/agent/tmp/input.mp4", "/tmp/foreground.mov", "/tmp/alpha.mov")
@@ -150,12 +203,25 @@ func TestRVMProbeUsesTheSameCompatibilityBootstrap(t *testing.T) {
 }
 
 func TestRVMScenarioDefaultsAndValidation(t *testing.T) {
-	value, standard, ok := rvmScenarioFor("")
-	if !ok || value != rvmScenarioStandard || standard.Name != "标准主体提取" {
-		t.Fatalf("empty scenario = (%q, %#v, %v), want standard scenario", value, standard, ok)
+	value, scenario, ok := rvmScenarioFor("")
+	if !ok || value != rvmScenarioFast || scenario.Name != "速度优先" || scenario.Model != rvmModelMobileNetV3 {
+		t.Fatalf("empty scenario = (%q, %#v, %v), want fast MobileNetV3 scenario", value, scenario, ok)
 	}
 	if _, _, ok := rvmScenarioFor("unknown"); ok {
 		t.Fatal("unknown RVM scenario must be rejected")
+	}
+}
+
+func TestRVMScenarioLogDescriptionIncludesModeAndParameters(t *testing.T) {
+	_, scenario, ok := rvmScenarioFor(rvmScenarioQuality)
+	if !ok {
+		t.Fatal("quality scenario must be valid")
+	}
+	got := rvmScenarioLogDescription(scenario)
+	for _, value := range []string{"模式=质量优先", "模型=resnet50", "视频码率=8 Mbps", "序列分块=1", "下采样比例=1"} {
+		if !strings.Contains(got, value) {
+			t.Fatalf("log description %q is missing %q", got, value)
+		}
 	}
 }
 
@@ -170,11 +236,11 @@ func TestRVMScenarioInvocationArgs(t *testing.T) {
 		return false
 	}
 	for _, test := range []struct {
-		scenario, mbps, downsample string
+		scenario, mbps, downsample, variant string
 	}{
-		{rvmScenarioStandard, "4", ""},
-		{rvmScenarioQuality, "8", "1"},
-		{rvmScenarioFast, "2", "0.25"},
+		{rvmScenarioStandard, "4", "", rvmModelMobileNetV3},
+		{rvmScenarioQuality, "8", "1", rvmModelResNet50},
+		{rvmScenarioFast, "2", "0.25", rvmModelMobileNetV3},
 	} {
 		args := rvmInvocationArgs(runtime, test.scenario, "cpu", "/input.mp4", "/foreground.mov", "/alpha.mov")
 		if !containsPair(args, "--output-video-mbps", test.mbps) || !containsPair(args, "--seq-chunk", "1") {
@@ -183,10 +249,13 @@ func TestRVMScenarioInvocationArgs(t *testing.T) {
 		if got := containsPair(args, "--downsample-ratio", test.downsample); got != (test.downsample != "") {
 			t.Fatalf("%s downsample args = %#v", test.scenario, args)
 		}
+		if !containsPair(args, "--variant", test.variant) {
+			t.Fatalf("%s variant args = %#v", test.scenario, args)
+		}
 	}
 	args := rvmInvocationArgs(runtime, "unknown", "cpu", "/input.mp4", "/foreground.mov", "/alpha.mov")
-	if !containsPair(args, "--output-video-mbps", "4") || containsPair(args, "--downsample-ratio", "1") {
-		t.Fatalf("unknown scenario must safely fall back to standard invocation: %#v", args)
+	if !containsPair(args, "--output-video-mbps", "2") || !containsPair(args, "--downsample-ratio", "0.25") || !containsPair(args, "--variant", rvmModelMobileNetV3) {
+		t.Fatalf("unknown scenario must safely fall back to fast invocation: %#v", args)
 	}
 }
 
@@ -317,8 +386,8 @@ func TestRVMRuntimeForStartupFindsAgentWorkspace(t *testing.T) {
 func TestRVMInstallRequestExpandsWorkspace(t *testing.T) {
 	workspace := "/agents/current"
 	got := rvmInstallRequest("请安装 robust video matting，模型与代码存放至 `$workspace/rvm` 目录下", workspace)
-	if !strings.Contains(got, "请安装 robust video matting，模型与代码存放至 `/agents/current/rvm` 目录下") || !strings.Contains(got, rvmDomesticCheckpointURL) || !strings.Contains(got, rvmDomesticCheckpointSHA256) {
-		t.Fatalf("install request missing expanded workspace or verified domestic source: %q", got)
+	if !strings.Contains(got, "请安装 robust video matting，模型与代码存放至 `/agents/current/rvm` 目录下") || !strings.Contains(got, rvmDomesticCheckpointURL) || !strings.Contains(got, rvmResNet50BackupURL) || !strings.Contains(got, "rvm_resnet50.pth") || !strings.Contains(got, rvmDomesticCheckpointSHA256) {
+		t.Fatalf("install request missing expanded workspace or both model downloads: %q", got)
 	}
 }
 

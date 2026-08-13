@@ -51,7 +51,7 @@ description: 管理文字转语音、音频文字提取、图片主体提取、�
 ```
 + 如果模型未安装，则使用`#config`中`wav2lip.install`属性要求的规格下载安装
 
-###### RVM 视频提取主体
+###### RVM 视频提取人物
 + `rvm create --agentId ID --path VIDEO`。`--path`可重复，最多64个，`--scenario standard|quality|fast`可提供一次或逐视频提供
 ```
 #app api rvm create --agentId "#agentId" --path "videos/product.mp4" --scenario quality
