@@ -218,7 +218,7 @@ func TestRVMScenarioLogDescriptionIncludesModeAndParameters(t *testing.T) {
 		t.Fatal("quality scenario must be valid")
 	}
 	got := rvmScenarioLogDescription(scenario)
-	for _, value := range []string{"模式=质量优先", "模型=resnet50", "视频码率=8 Mbps", "序列分块=1", "下采样比例=1"} {
+	for _, value := range []string{"模式=质量优先", "模型=resnet50", "视频码率=24 Mbps", "序列分块=1", "下采样比例=1"} {
 		if !strings.Contains(got, value) {
 			t.Fatalf("log description %q is missing %q", got, value)
 		}
@@ -238,9 +238,9 @@ func TestRVMScenarioInvocationArgs(t *testing.T) {
 	for _, test := range []struct {
 		scenario, mbps, downsample, variant string
 	}{
-		{rvmScenarioStandard, "4", "", rvmModelMobileNetV3},
-		{rvmScenarioQuality, "8", "1", rvmModelResNet50},
-		{rvmScenarioFast, "2", "0.25", rvmModelMobileNetV3},
+		{rvmScenarioStandard, "16", "", rvmModelMobileNetV3},
+		{rvmScenarioQuality, "24", "1", rvmModelResNet50},
+		{rvmScenarioFast, "16", "0.25", rvmModelMobileNetV3},
 	} {
 		args := rvmInvocationArgs(runtime, test.scenario, "cpu", "/input.mp4", "/foreground.mov", "/alpha.mov")
 		if !containsPair(args, "--output-video-mbps", test.mbps) || !containsPair(args, "--seq-chunk", "1") {
@@ -254,7 +254,7 @@ func TestRVMScenarioInvocationArgs(t *testing.T) {
 		}
 	}
 	args := rvmInvocationArgs(runtime, "unknown", "cpu", "/input.mp4", "/foreground.mov", "/alpha.mov")
-	if !containsPair(args, "--output-video-mbps", "2") || !containsPair(args, "--downsample-ratio", "0.25") || !containsPair(args, "--variant", rvmModelMobileNetV3) {
+	if !containsPair(args, "--output-video-mbps", "16") || !containsPair(args, "--downsample-ratio", "0.25") || !containsPair(args, "--variant", rvmModelMobileNetV3) {
 		t.Fatalf("unknown scenario must safely fall back to fast invocation: %#v", args)
 	}
 }
@@ -305,7 +305,7 @@ func TestRVMPreviewFFmpegArgsFlattensAlphaOnBlack(t *testing.T) {
 			t.Fatalf("preview conversion must not map the alpha-bearing MOV directly: %q", args)
 		}
 	}
-	if !strings.Contains(joined, "-map [preview]") || !strings.Contains(joined, "-c:v libx264") || !strings.Contains(joined, "-pix_fmt yuv420p") {
+	if !strings.Contains(joined, "-map [preview]") || !strings.Contains(joined, "-c:v libx264") || !strings.Contains(joined, "-crf 16") || !strings.Contains(joined, "-pix_fmt yuv420p") {
 		t.Fatalf("unexpected preview conversion args: %q", args)
 	}
 }
@@ -316,7 +316,7 @@ func TestRVMFFmpegFallbackArgumentsPreserveAlphaAndPreview(t *testing.T) {
 		t.Fatalf("qtrle MOV args = %#v", mov)
 	}
 	preview := rvmPreviewFFmpegArgsWithCodec("result.mov", "result.mp4", "h264_nvenc")
-	if got := strings.Join(preview, " "); !strings.Contains(got, "-c:v h264_nvenc") || !strings.Contains(got, "-b:v 8M") || strings.Contains(got, "mpeg4") {
+	if got := strings.Join(preview, " "); !strings.Contains(got, "-c:v h264_nvenc") || !strings.Contains(got, "-b:v 16M") || strings.Contains(got, "mpeg4") {
 		t.Fatalf("hardware H.264 preview args = %#v", preview)
 	}
 }

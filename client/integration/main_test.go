@@ -4101,7 +4101,7 @@ func TestHandleUploadReturnsAbsoluteAgentTmpDestination(t *testing.T) {
 	}
 }
 
-func TestHandleUploadUsesRequestedDirectoryAndFallsBackToWorkspaceRoot(t *testing.T) {
+func TestHandleUploadUsesRequestedDirectoryAndCreatesWorkspaceTmp(t *testing.T) {
 	agentRoot := t.TempDir()
 	workspace := filepath.Join(agentRoot, "agent-a")
 	targetDir := filepath.Join(workspace, "assets")
@@ -4165,14 +4165,12 @@ func TestHandleUploadUsesRequestedDirectoryAndFallsBackToWorkspaceRoot(t *testin
 
 	fallbackRec := httptest.NewRecorder()
 	handleUpload(&Config{AgentDir: agentRoot})(fallbackRec, newUploadRequest(""))
-	if got := decodeDest(fallbackRec); got != resolvedWorkspace {
-		t.Fatalf("fallback destination = %q, want workspace root %q", got, resolvedWorkspace)
+	tmpDir := filepath.Join(resolvedWorkspace, "tmp")
+	if got := decodeDest(fallbackRec); got != tmpDir {
+		t.Fatalf("default destination = %q, want workspace tmp %q", got, tmpDir)
 	}
-	if _, err := os.Stat(filepath.Join(workspace, "nested", "clip.mp4")); err != nil {
-		t.Fatalf("uploaded file missing from workspace root: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(workspace, "tmp")); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("tmp should not be created by fallback, stat error = %v", err)
+	if _, err := os.Stat(filepath.Join(tmpDir, "nested", "clip.mp4")); err != nil {
+		t.Fatalf("uploaded file missing from workspace tmp: %v", err)
 	}
 }
 

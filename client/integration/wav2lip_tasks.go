@@ -1268,9 +1268,9 @@ func wav2lipH264FFmpegArgs(source, destination string, encoder ffmpegVideoEncode
 		"-c:a", "aac",
 	}
 	if encoder.Name == "libx264" {
-		args = append(args, "-crf", "18", "-preset", "medium")
+		args = append(args, "-crf", "16", "-preset", "medium")
 	} else {
-		args = append(args, "-b:v", "8M")
+		args = append(args, "-b:v", "16M")
 	}
 	return append(args, "-movflags", "+faststart", "-f", "mp4", "-n", destination)
 }

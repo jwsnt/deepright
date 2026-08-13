@@ -45,6 +45,11 @@ const (
 	voxcpmDefaultHuggingFaceResolveBase = "https://huggingface.co/openbmb/VoxCPM2/resolve/main/"
 	voxcpmModelHeaderTimeout            = 30 * time.Second
 	voxcpmModelIdleTimeout              = 90 * time.Second
+	voxcpmGenerationHeartbeatInterval   = 20 * time.Second
+	// The upstream one-shot CLI has no progress callback. Long passages use
+	// its batch command so every completed natural-language segment is an
+	// observable, durable unit of progress.
+	voxcpmBatchSegmentRuneLimit = 200
 
 	voxcpmScenarioBalanced      = "balanced"
 	voxcpmScenarioQuality       = "quality"
@@ -680,52 +685,17 @@ func (m *voxcpmTaskManager) generate(ctx context.Context, task voxcpmTask) error
 		return fmt.Errorf("ModelScope 国内源准备 VoxCPM2 模型失败：%w", mirrorErr)
 	}
 	m.appendLog(task.ID, "ModelScope 国内源模型已校验，开始从本地加载 VoxCPM2。")
-	diagnostics, err := m.runGenerate(ctx, task.ID, executable, text, reference, temporary, device, scenario, control, modelPath)
-	if err != nil {
-		if ctx.Err() != nil {
-			return context.Canceled
-		}
-		if voxcpmCLIArgumentError(diagnostics) {
-			if cloning {
-				m.appendLog(task.ID, "检测到 VoxCPM CLI 参数接口不兼容；旧版克隆接口还需要参考文本，当前任务未提供该文本，无法安全回退。")
-				return errors.New("当前 VoxCPM CLI 不兼容，且参考音色克隆需要参考文本才能回退")
+	segments := voxcpmTextSegments(text, voxcpmBatchSegmentRuneLimit)
+	if len(segments) > 1 {
+		m.appendLog(task.ID, fmt.Sprintf("长文本共 %d 个字符，已按自然语句拆为 %d 段；每完成一段都会记录实际转换进度。", utf8.RuneCountInString(text), len(segments)))
+		if err := m.runBatchGenerate(ctx, task.ID, executable, temporary, segments, reference, device, scenario, control, modelPath); err != nil {
+			if ctx.Err() != nil {
+				return context.Canceled
 			}
-			m.appendLog(task.ID, "检测到 VoxCPM CLI 参数接口不兼容，已回退到兼容的直接合成模式（CPU、忽略表达风格）重新尝试。")
-			if _, retryErr := m.runGenerateFlat(ctx, task.ID, executable, text, temporary, scenario, modelPath); retryErr != nil {
-				if ctx.Err() != nil {
-					return context.Canceled
-				}
-				return retryErr
-			}
-			m.appendLog(task.ID, "VoxCPM 已使用兼容直接合成模式完成。")
-		} else if voxcpmGPUDevice(device) {
-			m.appendLog(task.ID, "VoxCPM 使用 "+strings.ToUpper(device)+" 配音失败，已自动回退到 CPU 重新尝试一次。")
-			cpuDiagnostics, retryErr := m.runGenerate(ctx, task.ID, executable, text, reference, temporary, "cpu", scenario, control, modelPath)
-			if retryErr != nil {
-				if ctx.Err() != nil {
-					return context.Canceled
-				}
-				if voxcpmCLIArgumentError(cpuDiagnostics) && !cloning {
-					m.appendLog(task.ID, "CPU 回退检测到 VoxCPM CLI 参数接口不兼容，已继续回退到兼容的直接合成模式（忽略表达风格）重新尝试。")
-					if _, flatErr := m.runGenerateFlat(ctx, task.ID, executable, text, temporary, scenario, modelPath); flatErr == nil {
-						m.appendLog(task.ID, "VoxCPM 已使用兼容直接合成模式完成。")
-					} else {
-						if ctx.Err() != nil {
-							return context.Canceled
-						}
-						return flatErr
-					}
-				} else if voxcpmCLIArgumentError(cpuDiagnostics) && cloning {
-					m.appendLog(task.ID, "CPU 回退检测到 VoxCPM CLI 参数接口不兼容；旧版克隆接口还需要参考文本，当前任务未提供该文本，无法安全回退。")
-					return errors.New("当前 VoxCPM CLI 不兼容，且参考音色克隆需要参考文本才能回退")
-				} else {
-					return retryErr
-				}
-			}
-			m.appendLog(task.ID, "VoxCPM 已使用 CPU 回退完成。")
-		} else {
 			return err
 		}
+	} else if err := m.runGenerateWithFallback(ctx, task.ID, executable, text, reference, temporary, device, scenario, control, modelPath); err != nil {
+		return err
 	}
 	info, err := os.Stat(temporary)
 	if err != nil || info.IsDir() || info.Size() == 0 {
@@ -743,6 +713,60 @@ func (m *voxcpmTaskManager) generate(ctx context.Context, task voxcpmTask) error
 	completed = true
 	m.progress(task.ID, 100)
 	return nil
+}
+
+func (m *voxcpmTaskManager) runGenerateWithFallback(ctx context.Context, taskID int64, executable, text, reference, temporary, device string, scenario voxcpmScenario, control, modelPath string) error {
+	cloning := reference != ""
+	diagnostics, err := m.runGenerate(ctx, taskID, executable, text, reference, temporary, device, scenario, control, modelPath)
+	if err == nil {
+		return nil
+	}
+	if ctx.Err() != nil {
+		return context.Canceled
+	}
+	if voxcpmCLIArgumentError(diagnostics) {
+		if cloning {
+			m.appendLog(taskID, "检测到 VoxCPM CLI 参数接口不兼容；旧版克隆接口还需要参考文本，当前任务未提供该文本，无法安全回退。")
+			return errors.New("当前 VoxCPM CLI 不兼容，且参考音色克隆需要参考文本才能回退")
+		}
+		m.appendLog(taskID, "检测到 VoxCPM CLI 参数接口不兼容，已回退到兼容的直接合成模式（CPU、忽略表达风格）重新尝试。")
+		if _, retryErr := m.runGenerateFlat(ctx, taskID, executable, text, temporary, scenario, modelPath); retryErr != nil {
+			if ctx.Err() != nil {
+				return context.Canceled
+			}
+			return retryErr
+		}
+		m.appendLog(taskID, "VoxCPM 已使用兼容直接合成模式完成。")
+		return nil
+	}
+	if !voxcpmGPUDevice(device) {
+		return err
+	}
+	m.appendLog(taskID, "VoxCPM 使用 "+strings.ToUpper(device)+" 配音失败，已自动回退到 CPU 重新尝试一次。")
+	cpuDiagnostics, retryErr := m.runGenerate(ctx, taskID, executable, text, reference, temporary, "cpu", scenario, control, modelPath)
+	if retryErr == nil {
+		m.appendLog(taskID, "VoxCPM 已使用 CPU 回退完成。")
+		return nil
+	}
+	if ctx.Err() != nil {
+		return context.Canceled
+	}
+	if voxcpmCLIArgumentError(cpuDiagnostics) && !cloning {
+		m.appendLog(taskID, "CPU 回退检测到 VoxCPM CLI 参数接口不兼容，已继续回退到兼容的直接合成模式（忽略表达风格）重新尝试。")
+		if _, flatErr := m.runGenerateFlat(ctx, taskID, executable, text, temporary, scenario, modelPath); flatErr == nil {
+			m.appendLog(taskID, "VoxCPM 已使用兼容直接合成模式完成。")
+			return nil
+		} else if ctx.Err() != nil {
+			return context.Canceled
+		} else {
+			return flatErr
+		}
+	}
+	if voxcpmCLIArgumentError(cpuDiagnostics) && cloning {
+		m.appendLog(taskID, "CPU 回退检测到 VoxCPM CLI 参数接口不兼容；旧版克隆接口还需要参考文本，当前任务未提供该文本，无法安全回退。")
+		return errors.New("当前 VoxCPM CLI 不兼容，且参考音色克隆需要参考文本才能回退")
+	}
+	return retryErr
 }
 
 func (m *voxcpmTaskManager) runGenerate(ctx context.Context, taskID int64, executable, text, reference, output, device string, scenario voxcpmScenario, control, modelPath string) (string, error) {
@@ -799,11 +823,190 @@ func (m *voxcpmTaskManager) runGenerateFlat(ctx context.Context, taskID int64, e
 	return m.runGenerateArgs(ctx, taskID, executable, output, args)
 }
 
+// runBatchGenerate keeps one VoxCPM model instance alive for all long-text
+// segments. The upstream batch command reports a "Saved:" line after every
+// segment, which is the only exact text-conversion progress it exposes.
+func (m *voxcpmTaskManager) runBatchGenerate(ctx context.Context, taskID int64, executable, output string, segments []string, reference, device string, scenario voxcpmScenario, control, modelPath string) error {
+	if len(segments) < 2 {
+		return errors.New("长文本分段数量无效")
+	}
+	batchDir := output + ".segments"
+	if err := os.Mkdir(batchDir, 0o700); err != nil {
+		return fmt.Errorf("无法创建长文本配音分段目录: %w", err)
+	}
+	defer os.RemoveAll(batchDir)
+	input := filepath.Join(batchDir, "input.txt")
+	if err := os.WriteFile(input, []byte(strings.Join(segments, "\n")+"\n"), 0o600); err != nil {
+		return fmt.Errorf("无法写入长文本分段文件: %w", err)
+	}
+	args := []string{"batch", "--input", input, "--output-dir", batchDir,
+		"--cfg-value", strconv.FormatFloat(scenario.CFGValue, 'f', -1, 64),
+		"--inference-timesteps", strconv.Itoa(scenario.InferenceTimesteps)}
+	if reference != "" {
+		args = append(args, "--reference-audio", reference)
+	}
+	if control != "" {
+		args = append(args, "--control", control)
+	}
+	if scenario.Normalize {
+		args = append(args, "--normalize")
+	}
+	if scenario.Denoise && reference != "" {
+		args = append(args, "--denoise")
+	} else {
+		args = append(args, "--no-denoiser")
+	}
+	if device != "" {
+		args = append(args, "--device", device)
+	}
+	if modelPath != "" {
+		args = append(args, "--model-path", modelPath)
+	}
+
+	totalRunes := 0
+	for _, segment := range segments {
+		totalRunes += utf8.RuneCountInString(segment)
+	}
+	var progressMu sync.Mutex
+	completedSegments, completedRunes := 0, 0
+	stopHeartbeat := m.startBatchGenerationHeartbeat(taskID, totalRunes, len(segments), func() (int, int) {
+		progressMu.Lock()
+		defer progressMu.Unlock()
+		return completedSegments, completedRunes
+	})
+	defer stopHeartbeat()
+	onLine := func(line string) {
+		if !strings.HasPrefix(line, "Saved:") {
+			return
+		}
+		progressMu.Lock()
+		if completedSegments >= len(segments) {
+			progressMu.Unlock()
+			return
+		}
+		completedRunes += utf8.RuneCountInString(segments[completedSegments])
+		completedSegments++
+		finished, converted := completedSegments, completedRunes
+		progressMu.Unlock()
+		percentage := converted * 100 / totalRunes
+		m.progress(taskID, 30+finished*60/len(segments))
+		m.appendLog(taskID, fmt.Sprintf("文字转换进度：第 %d/%d 段已完成，已转换 %d/%d 个字符（%d%%）。", finished, len(segments), converted, totalRunes, percentage))
+	}
+	if _, err := m.runGenerateCommand(ctx, taskID, executable, "", args, false, onLine); err != nil {
+		return err
+	}
+	inputs := make([]string, 0, len(segments))
+	for index := range segments {
+		part := filepath.Join(batchDir, fmt.Sprintf("output_%03d.wav", index+1))
+		info, err := os.Stat(part)
+		if err != nil || info.IsDir() || info.Size() == 0 {
+			return fmt.Errorf("VoxCPM 长文本第 %d/%d 段未生成有效 WAV", index+1, len(segments))
+		}
+		inputs = append(inputs, part)
+	}
+	m.appendLog(taskID, "所有文字分段均已转换，正在无重编码合并 WAV。")
+	if err := voxcpmConcatWAV(ctx, inputs, output); err != nil {
+		return err
+	}
+	m.progress(taskID, 95)
+	m.appendLog(taskID, "长文本 WAV 合并完成。")
+	return nil
+}
+
+func (m *voxcpmTaskManager) startBatchGenerationHeartbeat(taskID int64, totalRunes, segmentCount int, progress func() (int, int)) func() {
+	startedAt := time.Now()
+	done := make(chan struct{})
+	var stopOnce sync.Once
+	m.progress(taskID, 30)
+	m.appendLog(taskID, fmt.Sprintf("VoxCPM 推理进程已启动：将按 %d 个文本分段依次转换，共 %d 个字符。", segmentCount, totalRunes))
+	go func() {
+		ticker := time.NewTicker(voxcpmGenerationHeartbeatInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case now := <-ticker.C:
+				completed, converted := progress()
+				current := completed + 1
+				if current > segmentCount {
+					current = segmentCount
+				}
+				percentage := 0
+				if totalRunes > 0 {
+					percentage = converted * 100 / totalRunes
+				}
+				m.appendLog(taskID, fmt.Sprintf("文字转换仍在执行：第 %d/%d 段进行中，已转换 %d/%d 个字符（%d%%），已运行 %s。", current, segmentCount, converted, totalRunes, percentage, now.Sub(startedAt).Round(time.Second)))
+			}
+		}
+	}()
+	return func() { stopOnce.Do(func() { close(done) }) }
+}
+
+func voxcpmConcatWAV(ctx context.Context, inputs []string, output string) error {
+	ffmpeg, err := exec.LookPath("ffmpeg")
+	if err != nil {
+		return errors.New("长文本 WAV 合并需要 ffmpeg，但当前未检测到")
+	}
+	manifest := output + ".concat.txt"
+	defer os.Remove(manifest)
+	lines := make([]string, 0, len(inputs))
+	for _, input := range inputs {
+		// The paths are task-private, but quote according to ffmpeg concat's
+		// syntax so a valid workspace path cannot change the command meaning.
+		lines = append(lines, "file '"+strings.ReplaceAll(input, "'", "'\\\\''")+"'")
+	}
+	if err := os.WriteFile(manifest, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
+		return fmt.Errorf("无法写入 WAV 合并清单: %w", err)
+	}
+	result, err := exec.CommandContext(ctx, ffmpeg, "-nostdin", "-y", "-f", "concat", "-safe", "0", "-i", manifest, "-c", "copy", output).CombinedOutput()
+	if err != nil {
+		detail := strings.TrimSpace(string(result))
+		if detail != "" {
+			return fmt.Errorf("合并长文本 WAV 失败: %s", detail)
+		}
+		return fmt.Errorf("合并长文本 WAV 失败: %w", err)
+	}
+	return nil
+}
+
+func voxcpmTextSegments(text string, limit int) []string {
+	if limit < 1 {
+		return []string{strings.TrimSpace(text)}
+	}
+	runes := []rune(strings.TrimSpace(text))
+	segments := make([]string, 0, len(runes)/limit+1)
+	for start := 0; start < len(runes); {
+		end := start + limit
+		if end >= len(runes) {
+			end = len(runes)
+		} else {
+			for candidate := end - 1; candidate > start; candidate-- {
+				if strings.ContainsRune("。！？；.!?;\n", runes[candidate]) {
+					end = candidate + 1
+					break
+				}
+			}
+		}
+		if segment := strings.TrimSpace(string(runes[start:end])); segment != "" {
+			segments = append(segments, segment)
+		}
+		start = end
+	}
+	return segments
+}
+
 func (m *voxcpmTaskManager) runGenerateArgs(ctx context.Context, taskID int64, executable, output string, args []string) (string, error) {
+	return m.runGenerateCommand(ctx, taskID, executable, output, args, true, nil)
+}
+
+func (m *voxcpmTaskManager) runGenerateCommand(ctx context.Context, taskID int64, executable, heartbeatOutput string, args []string, resetOutput bool, onLine func(string)) (string, error) {
 	// A failed backend may leave partial audio in place. Start each fallback
 	// attempt from an empty task-private temporary file.
-	if err := os.Truncate(output, 0); err != nil {
-		return "", fmt.Errorf("无法重置配音临时文件: %w", err)
+	if resetOutput {
+		if err := os.Truncate(heartbeatOutput, 0); err != nil {
+			return "", fmt.Errorf("无法重置配音临时文件: %w", err)
+		}
 	}
 	m.appendLog(taskID, "实际 VoxCPM 参数："+strings.Join(voxcpmLoggedArgs(args), " "))
 	cmd := voxcpmCommandContext(ctx, executable, args...)
@@ -821,15 +1024,22 @@ func (m *voxcpmTaskManager) runGenerateArgs(ctx context.Context, taskID int64, e
 	if err := cmd.Start(); err != nil {
 		return "", fmt.Errorf("无法启动 voxcpm: %w", err)
 	}
+	if heartbeatOutput != "" {
+		stopHeartbeat := m.startGenerationHeartbeat(taskID, heartbeatOutput, voxcpmArgumentRuneCount(args))
+		defer stopHeartbeat()
+	}
 	var copiedStdout, copiedStderr strings.Builder
 	var captures sync.WaitGroup
 	captures.Add(2)
-	go func() { defer captures.Done(); m.capture(taskID, stdout, &copiedStdout) }()
-	go func() { defer captures.Done(); m.capture(taskID, stderr, &copiedStderr) }()
+	go func() { defer captures.Done(); m.captureWithLineHook(taskID, stdout, &copiedStdout, onLine) }()
+	go func() { defer captures.Done(); m.captureWithLineHook(taskID, stderr, &copiedStderr, onLine) }()
 	// Wait closes its pipe readers. Drain both streams before calling it so a
 	// failed process cannot turn its real error into a misleading closed-pipe log.
 	captures.Wait()
 	err = cmd.Wait()
+	if err == nil {
+		m.progress(taskID, 90)
+	}
 	diagnostics := copiedStdout.String() + "\n" + copiedStderr.String()
 	if err != nil {
 		if ctx.Err() != nil {
@@ -838,6 +1048,46 @@ func (m *voxcpmTaskManager) runGenerateArgs(ctx context.Context, taskID int64, e
 		return diagnostics, taskExecutionError("VoxCPM", err, diagnostics)
 	}
 	return diagnostics, nil
+}
+
+// startGenerationHeartbeat makes the otherwise quiet model inference visible
+// for long passages. VoxCPM's CLI does not expose token-level progress, so we
+// deliberately report the known text length, elapsed time, and whether its
+// temporary WAV has started receiving audio instead of inventing a percentage.
+func (m *voxcpmTaskManager) startGenerationHeartbeat(taskID int64, output string, textRunes int) func() {
+	startedAt := time.Now()
+	done := make(chan struct{})
+	var stopOnce sync.Once
+	m.progress(taskID, 30)
+	m.appendLog(taskID, fmt.Sprintf("VoxCPM 推理进程已启动：正在合成 %d 个字符。模型加载完成后可能会静默推理；任务会每 20 秒报告仍在执行。", textRunes))
+	go func() {
+		ticker := time.NewTicker(voxcpmGenerationHeartbeatInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case now := <-ticker.C:
+				elapsed := now.Sub(startedAt).Round(time.Second)
+				if info, err := os.Stat(output); err == nil && info.Size() > 44 {
+					m.progress(taskID, 70)
+					m.appendLog(taskID, fmt.Sprintf("VoxCPM 仍在执行：已运行 %s，临时 WAV 正在写入（%d 字节）。", elapsed, info.Size()))
+				} else {
+					m.appendLog(taskID, fmt.Sprintf("VoxCPM 仍在执行：已运行 %s，正在推理文本（%d 个字符）；暂未开始写入 WAV。", elapsed, textRunes))
+				}
+			}
+		}
+	}()
+	return func() { stopOnce.Do(func() { close(done) }) }
+}
+
+func voxcpmArgumentRuneCount(args []string) int {
+	for index := 0; index+1 < len(args); index++ {
+		if args[index] == "--text" {
+			return utf8.RuneCountInString(args[index+1])
+		}
+	}
+	return 0
 }
 
 // The text is already traceable through the controlled input file path. Keep
@@ -1307,6 +1557,10 @@ func voxcpmPythonInterpreter(voxcpmPath string) string {
 }
 
 func (m *voxcpmTaskManager) capture(id int64, reader io.Reader, copied *strings.Builder) {
+	m.captureWithLineHook(id, reader, copied, nil)
+}
+
+func (m *voxcpmTaskManager) captureWithLineHook(id int64, reader io.Reader, copied *strings.Builder, onLine func(string)) {
 	scanner := bufio.NewScanner(reader)
 	scanner.Buffer(make([]byte, 4096), 128*1024)
 	// huggingface_hub updates tqdm in place with carriage returns. Splitting on
@@ -1315,6 +1569,9 @@ func (m *voxcpmTaskManager) capture(id int64, reader io.Reader, copied *strings.
 	for scanner.Scan() {
 		if line := strings.TrimSpace(scanner.Text()); line != "" {
 			m.appendLog(id, line)
+			if onLine != nil {
+				onLine(line)
+			}
 			if copied != nil && copied.Len() < 128*1024 {
 				remaining := 128*1024 - copied.Len()
 				if len(line) > remaining {

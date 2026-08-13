@@ -10179,8 +10179,9 @@ func handleAgentCreate(cfg *Config) http.HandlerFunc {
 // resolveUploadDestination keeps uploads inside an Agent workspace.  A caller
 // may explicitly name an existing relative directory with the dest query
 // parameter. When preferTmp is set, that directory's existing tmp child takes
-// precedence. The legacy/default destination is the workspace tmp when it
-// already exists; a workspace without tmp receives the upload at its root.
+// precedence. The default destination is always the workspace tmp directory;
+// create it safely for newly provisioned Agent workspaces so task UIs can
+// consistently refer to uploaded files as tmp/<name>.
 func resolveUploadDestination(workspace, requestedDest string, hasRequestedDest, preferTmp bool) (string, error) {
 	workspaceAbs, err := filepath.Abs(workspace)
 	if err != nil {
@@ -10218,10 +10219,17 @@ func resolveUploadDestination(workspace, requestedDest string, hasRequestedDest,
 	}
 
 	tmpDir := filepath.Join(workspaceAbs, "tmp")
-	if info, err := os.Stat(tmpDir); err == nil && info.IsDir() && ensureWritablePathWithinRoot(workspaceAbs, tmpDir) {
-		return tmpDir, nil
+	if !ensureWritablePathWithinRoot(workspaceAbs, tmpDir) {
+		return "", fmt.Errorf("invalid upload destination")
 	}
-	return workspaceAbs, nil
+	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+		return "", fmt.Errorf("create upload tmp directory failed: %w", err)
+	}
+	info, err := os.Stat(tmpDir)
+	if err != nil || !info.IsDir() || !ensureWritablePathWithinRoot(workspaceAbs, tmpDir) {
+		return "", fmt.Errorf("invalid upload destination")
+	}
+	return tmpDir, nil
 }
 
 func handleUpload(cfg *Config) http.HandlerFunc {
@@ -21379,6 +21387,12 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/rvm/tasks/restart", handleRVMTaskRestart())
 	mux.HandleFunc("/api/rvm/tasks/delete", handleRVMTaskDelete())
 	mux.HandleFunc("/api/rvm/tasks/log", handleRVMTaskLog())
+	mux.HandleFunc("/api/sam2/check", handleSAM2Check(&cfg))
+	mux.HandleFunc("/api/sam2/tasks", handleSAM2Tasks())
+	mux.HandleFunc("/api/sam2/tasks/cancel", handleSAM2TaskCancel())
+	mux.HandleFunc("/api/sam2/tasks/restart", handleSAM2TaskRestart())
+	mux.HandleFunc("/api/sam2/tasks/delete", handleSAM2TaskDelete())
+	mux.HandleFunc("/api/sam2/tasks/log", handleSAM2TaskLog())
 	mux.HandleFunc("/api/wav2lip/check", handleWav2LipCheck(&cfg))
 	mux.HandleFunc("/api/wav2lip/tasks", handleWav2LipTasks())
 	mux.HandleFunc("/api/wav2lip/tasks/cancel", handleWav2LipTaskCancel())
@@ -21522,6 +21536,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	startWhisperTaskManager(ctx, &cfg)
 	startRembgTaskManager(ctx, &cfg)
 	startRVMTaskManager(ctx, &cfg)
+	startSAM2TaskManager(ctx, &cfg)
 	startWav2LipTaskManager(ctx, &cfg)
 	startVoxCPMTaskManager(ctx, &cfg)
 	sleepManager := newIntegrationSleepManager(caffeinateInterval)

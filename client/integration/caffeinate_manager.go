@@ -409,10 +409,12 @@ func integrationCaffeinatePendingTask() (bool, error) {
 		UNION ALL SELECT 1 FROM rembg_task WHERE status IN (?, ?)
 		UNION ALL SELECT 1 FROM voxcpm_task WHERE status IN (?, ?)
 		UNION ALL SELECT 1 FROM rvm_task WHERE status IN (?, ?)
+		UNION ALL SELECT 1 FROM sam2_task WHERE status IN (?, ?)
 	)`,
 		wav2lipTaskQueued, wav2lipTaskRunning,
 		rembgTaskQueued, rembgTaskRunning,
 		voxcpmTaskQueued, voxcpmTaskRunning,
+		rvmTaskQueued, rvmTaskRunning,
 		rvmTaskQueued, rvmTaskRunning,
 	).Scan(&exists)
 	if err != nil {

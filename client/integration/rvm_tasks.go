@@ -186,9 +186,9 @@ func rvmScenarioFor(value string) (string, rvmScenario, bool) {
 	}
 	values := map[string]rvmScenario{
 		// Keep legacy records runnable, but all newly created tasks use fast or quality.
-		rvmScenarioStandard: {Name: "速度优先", Model: rvmModelMobileNetV3, VideoMbps: "4", SequenceChunk: "1"},
-		rvmScenarioQuality:  {Name: "质量优先", Model: rvmModelResNet50, DownsampleRatio: "1", VideoMbps: "8", SequenceChunk: "1"},
-		rvmScenarioFast:     {Name: "速度优先", Model: rvmModelMobileNetV3, DownsampleRatio: "0.25", VideoMbps: "2", SequenceChunk: "1"},
+		rvmScenarioStandard: {Name: "速度优先", Model: rvmModelMobileNetV3, VideoMbps: "16", SequenceChunk: "1"},
+		rvmScenarioQuality:  {Name: "质量优先", Model: rvmModelResNet50, DownsampleRatio: "1", VideoMbps: "24", SequenceChunk: "1"},
+		rvmScenarioFast:     {Name: "速度优先", Model: rvmModelMobileNetV3, DownsampleRatio: "0.25", VideoMbps: "16", SequenceChunk: "1"},
 	}
 	info, ok := values[value]
 	return value, info, ok
@@ -1075,9 +1075,9 @@ func rvmPreviewFFmpegArgsWithCodec(movPath, previewPath, codec string) []string 
 		"-map", "[preview]",
 	}
 	if codec == "libx264" {
-		args = append(args, "-c:v", "libx264", "-crf", "18", "-preset", "medium")
+		args = append(args, "-c:v", "libx264", "-crf", "16", "-preset", "medium")
 	} else {
-		args = append(args, "-c:v", codec, "-b:v", "8M")
+		args = append(args, "-c:v", codec, "-b:v", "16M")
 	}
 	return append(args, "-pix_fmt", "yuv420p", "-movflags", "+faststart", previewPath)
 }

@@ -312,7 +312,7 @@ func modelTaskDownloadReadTimeout(cfg *Config) time.Duration {
 }
 
 // reserveModelTaskSlot keeps a queued task in its table until the shared
-// queue has capacity. table is always one of the five compile-time task table
+// queue has capacity. table is always one of the compile-time task table
 // names below, never caller input.
 func reserveModelTaskSlot(ctx context.Context, cfg *Config, db *sql.DB, table string) (bool, error) {
 	if db == nil {
@@ -320,7 +320,7 @@ func reserveModelTaskSlot(ctx context.Context, cfg *Config, db *sql.DB, table st
 	}
 	var query string
 	switch table {
-	case "whisper_task", "rembg_task", "rvm_task", "wav2lip_task", "voxcpm_task":
+	case "whisper_task", "rembg_task", "rvm_task", "sam2_task", "wav2lip_task", "voxcpm_task":
 		query = fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM %s WHERE status = ? AND cancel_requested = 0)", table)
 	default:
 		return false, errors.New("unknown model task table")

@@ -582,3 +582,28 @@ func TestVoxCPMGPUDevice(t *testing.T) {
 		}
 	}
 }
+
+func TestVoxCPMArgumentRuneCount(t *testing.T) {
+	if got := voxcpmArgumentRuneCount([]string{"design", "--text", "你好，VoxCPM！", "--output", "voice.wav"}); got != 10 {
+		t.Fatalf("text rune count = %d, want 10", got)
+	}
+	if got := voxcpmArgumentRuneCount([]string{"design", "--output", "voice.wav"}); got != 0 {
+		t.Fatalf("missing text rune count = %d, want 0", got)
+	}
+}
+
+func TestVoxCPMTextSegmentsPreserveTextAndPreferSentenceBoundaries(t *testing.T) {
+	text := "第一句很短。第二句也很短！第三句继续。"
+	segments := voxcpmTextSegments(text, 10)
+	if got := strings.Join(segments, ""); got != text {
+		t.Fatalf("segmented text = %q, want %q", got, text)
+	}
+	if len(segments) != 3 || segments[0] != "第一句很短。" || segments[1] != "第二句也很短！" {
+		t.Fatalf("sentence segments = %#v", segments)
+	}
+	longWord := strings.Repeat("字", 11)
+	segments = voxcpmTextSegments(longWord, 4)
+	if got := strings.Join(segments, ""); got != longWord || len(segments) != 3 {
+		t.Fatalf("hard-limit segments = %#v", segments)
+	}
+}

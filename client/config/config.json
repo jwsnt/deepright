@@ -52,7 +52,7 @@
   },
   "sam2": {
     "check": 24,
-    "install": ""
+    "install": "定位兼容的 CPython3.11，记录绝对路径为`$PYTHON`。官方 Python 源为`https://www.python.org/downloads/`，官方 PyPI 源为`https://pypi.org/simple`。将 Meta SAM2 官方代码`https://github.com/facebookresearch/sam2.git`安装到`$workspace/sam2`，固定使用可复现的稳定提交。必须执行`$PYTHON -m pip install -e $workspace/sam2`安装 SAM2 及其全部声明依赖（包括`iopath`、Hydra、Pillow）；不得只设置`PYTHONPATH`。下载最基础模型`sam2_hiera_tiny.pt`到`$workspace/sam2/checkpoints/sam2_hiera_tiny.pt`，官方模型源为`https://dl.fbaipublicfiles.com/segment_anything_2/072824/sam2_hiera_tiny.pt`。运行时应用会通过 FFmpeg 将视频抽为 JPEG 帧目录再交给 SAM2，因此不依赖在 macOS Python 3.12 上通常不可用的`decord`；请确保 FFmpeg 与 FFprobe 可用。官方代码、PyPI 或模型下载失败时，分别回退至`https://ghproxy.net/https://github.com/facebookresearch/sam2.git`、`https://pypi.tuna.tsinghua.edu.cn/simple`和`https://hf-mirror.com/facebook/sam2-hiera-tiny/resolve/main/sam2_hiera_tiny.pt`，切换来源后重新下载，禁止混用断点数据。用同一解释器导入`sam2`并完成一个最小视频预测器初始化验证。安装完成后输出解释器、代码路径、tiny 模型路径、实际模型源和验证结果。"
   },
   "rvm": {
     "check": 24,

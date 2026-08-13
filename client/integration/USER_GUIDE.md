@@ -1,5 +1,9 @@
 # Integration 使用手册
 
+## 迭代 20260813-1：SAM2 视频物体提取
+
+Integration 提供 `/api/sam2/check` 及 `/api/sam2/tasks` 队列接口，用于使用 SAM2 从用户在首帧提供的点击点、框选或掩码图跟踪视频物体；三种标注均未提供时，SAM2 自动选择首帧最显著主体。任务仅接受 tiny、small、base、large 四种受控模型，日志和列表均保存所选模型。模型权重缺失时按官方源、备用源顺序下载；透明 MOV 和黑底 MP4 预览写入当前 Agent 的 `videos/`。完整说明见 [iteration/20260813-1/USER_GUIDE.md](iteration/20260813-1/USER_GUIDE.md)。
+
 ## 多模态服务商引用
 
 模型配置中的 `__model_multi_input` 与 `__model_multi_output` 可以设置为 `@服务商名称`，例如 `@deepright`。Integration 会将该值原样传入普通对话、CLI/GET、飞书、邮件和备忘录任务。删除服务商时，所有引用它的多模态字段会自动清空。

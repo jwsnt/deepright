@@ -167,7 +167,7 @@ func TestIntegrationCaffeinatePendingTaskUsesQueuedAndRunningMediaTasks(t *testi
 				t.Fatal(err)
 			}
 			defer db.Close()
-			for _, ensure := range []func(*sql.DB) error{ensureWav2LipTaskSchema, ensureRembgTaskSchema, ensureVoxCPMTaskSchema, ensureRVMTaskSchema} {
+			for _, ensure := range []func(*sql.DB) error{ensureWav2LipTaskSchema, ensureRembgTaskSchema, ensureVoxCPMTaskSchema, ensureRVMTaskSchema, ensureSAM2TaskSchema} {
 				if err := ensure(db); err != nil {
 					t.Fatal(err)
 				}

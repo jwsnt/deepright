@@ -280,13 +280,17 @@ func TestRunWav2LipUsesStableUpstreamWorkingDirectory(t *testing.T) {
 func TestWav2LipH264FFmpegArgsUseBrowserCompatibleCodec(t *testing.T) {
 	args := wav2lipH264FFmpegArgs("result.mp4", "output.mp4", ffmpegVideoEncoder{Name: "libx264"})
 	joined := strings.Join(args, " ")
-	for _, required := range []string{"-c:v libx264", "-c:a aac", "format=yuv420p", "-movflags +faststart", "-f mp4"} {
+	for _, required := range []string{"-c:v libx264", "-crf 16", "-c:a aac", "format=yuv420p", "-movflags +faststart", "-f mp4"} {
 		if !strings.Contains(joined, required) {
 			t.Fatalf("H.264 output arguments missing %q: %#v", required, args)
 		}
 	}
 	if strings.Contains(joined, "mpeg4") {
 		t.Fatalf("Wav2Lip browser preview must not fall back to mpeg4: %#v", args)
+	}
+	hardwareArgs := strings.Join(wav2lipH264FFmpegArgs("result.mp4", "output.mp4", ffmpegVideoEncoder{Name: "h264_videotoolbox", Hardware: true}), " ")
+	if !strings.Contains(hardwareArgs, "-b:v 16M") {
+		t.Fatalf("hardware H.264 output arguments must use the high-quality bitrate: %#v", hardwareArgs)
 	}
 }
 
