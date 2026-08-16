@@ -1,6 +1,8 @@
 package connectsvc
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -8,6 +10,65 @@ import (
 	"testing"
 	"time"
 )
+
+func TestRunLocalPluginCommandTimeoutLeavesProcessRunning(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("plugin shell script test is not supported on windows")
+	}
+
+	marker := filepath.Join(t.TempDir(), "completed")
+	script := filepath.Join(t.TempDir(), "slow-plugin")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nsleep 0.08\nprintf survived > \"$2\"\n"), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	_, err := runLocalPluginCommand(ctx, script, "name", marker)
+	var timeoutErr *localPluginCommandTimeoutError
+	if !errors.As(err, &timeoutErr) {
+		t.Fatalf("runLocalPluginCommand() error = %v, want timeout error", err)
+	}
+	if !strings.Contains(timeoutErr.Error(), "process was left running") {
+		t.Fatalf("timeout error = %q, want left-running reason", timeoutErr)
+	}
+
+	deadline := time.Now().Add(time.Second)
+	for {
+		if content, readErr := os.ReadFile(marker); readErr == nil {
+			if string(content) != "survived" {
+				t.Fatalf("marker = %q, want survived", content)
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("timed out probe did not continue running")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func TestRunLocalPluginCommandRecordsExitSignal(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("plugin shell script test is not supported on windows")
+	}
+
+	script := filepath.Join(t.TempDir(), "signal-plugin")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nkill -TERM $$\n"), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, err := runLocalPluginCommand(ctx, script, "name")
+	var exitErr *localPluginCommandExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("runLocalPluginCommand() error = %v, want exit error", err)
+	}
+	if !strings.Contains(exitErr.Error(), "signal") || !strings.Contains(exitErr.Error(), "command=name") {
+		t.Fatalf("exit error = %q, want signal and command reason", exitErr)
+	}
+}
 
 func TestDefaultLocalPluginDir(t *testing.T) {
 	dir, err := DefaultLocalPluginDir()

@@ -1,9 +1,11 @@
 package connectsvc
 
 import (
+	"bytes"
 	"connect/sharedutil"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -16,6 +18,90 @@ import (
 )
 
 const localPluginCommandTimeout = 5 * time.Second
+
+const localPluginMetadataOutputLimit = 64 * 1024
+
+var localPluginProbes = struct {
+	sync.Mutex
+	running map[string]*localPluginProbe
+}{
+	running: make(map[string]*localPluginProbe),
+}
+
+type localPluginProbe struct {
+	done chan struct{}
+
+	mu       sync.Mutex
+	output   []byte
+	err      error
+	timedOut bool
+}
+
+type localPluginCommandTimeoutError struct {
+	Command string
+	Timeout time.Duration
+}
+
+func (e *localPluginCommandTimeoutError) Error() string {
+	return fmt.Sprintf("plugin metadata command timed out after %s; process was left running (command=%s)", e.Timeout, e.Command)
+}
+
+type localPluginCommandInProgressError struct {
+	Command string
+}
+
+func (e *localPluginCommandInProgressError) Error() string {
+	return fmt.Sprintf("plugin metadata command is still running after an earlier timeout (command=%s)", e.Command)
+}
+
+type localPluginCommandExitError struct {
+	Command string
+	Err     error
+	Stderr  string
+}
+
+func (e *localPluginCommandExitError) Error() string {
+	state := strings.TrimSpace(e.Err.Error())
+	if exitErr, ok := e.Err.(*exec.ExitError); ok && exitErr.ProcessState != nil {
+		state = strings.TrimSpace(exitErr.ProcessState.String())
+	}
+	if strings.Contains(strings.ToLower(state), "signal:") {
+		return fmt.Sprintf("plugin metadata command exited due to %s (command=%s)", state, e.Command)
+	}
+	if stderr := strings.TrimSpace(e.Stderr); stderr != "" {
+		return fmt.Sprintf("plugin metadata command failed: %s (command=%s): %s", state, e.Command, stderr)
+	}
+	return fmt.Sprintf("plugin metadata command failed: %s (command=%s)", state, e.Command)
+}
+
+func (e *localPluginCommandExitError) Unwrap() error {
+	return e.Err
+}
+
+type localPluginOutputBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *localPluginOutputBuffer) Write(p []byte) (int, error) {
+	originalLen := len(p)
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	remaining := localPluginMetadataOutputLimit - b.buf.Len()
+	if remaining > 0 {
+		if len(p) > remaining {
+			p = p[:remaining]
+		}
+		_, _ = b.buf.Write(p)
+	}
+	return originalLen, nil
+}
+
+func (b *localPluginOutputBuffer) Bytes() []byte {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return append([]byte(nil), b.buf.Bytes()...)
+}
 
 func init() {
 	sharedutil.ApplySystemPath()
@@ -90,6 +176,12 @@ func scanLocalPlugins(pluginDir string) ([]PluginInfo, error) {
 		path := filepath.Join(pluginDir, name)
 		item, err := inspectLocalPlugin(path)
 		if err != nil {
+			var inProgress *localPluginCommandInProgressError
+			if errors.As(err, &inProgress) {
+				// The original timeout has already been recorded. Avoid turning a
+				// temporarily stuck probe into a high-frequency log storm.
+				continue
+			}
 			log.Printf("plugins meta skip %s: %v", name, err)
 			continue
 		}
@@ -195,21 +287,87 @@ func inspectLocalPlugin(path string) (PluginInfo, error) {
 }
 
 func runLocalPluginCommand(ctx context.Context, path string, args ...string) ([]byte, error) {
-	cmd, err := buildLocalPluginCommand(ctx, path, args...)
+	startedAt := time.Now()
+	command := strings.Join(args, " ")
+	key := path + "\x00" + command
+
+	localPluginProbes.Lock()
+	if _, exists := localPluginProbes.running[key]; exists {
+		localPluginProbes.Unlock()
+		return nil, &localPluginCommandInProgressError{Command: command}
+	}
+	probe := &localPluginProbe{done: make(chan struct{})}
+	localPluginProbes.running[key] = probe
+	localPluginProbes.Unlock()
+
+	cmd, err := buildLocalPluginCommand(path, args...)
 	if err != nil {
+		removeLocalPluginProbe(key, probe)
 		return nil, err
 	}
-	out, err := cmd.Output()
-	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok {
-			return nil, fmt.Errorf("%w: %s", err, strings.TrimSpace(string(ee.Stderr)))
+	var stdout, stderr localPluginOutputBuffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Start(); err != nil {
+		removeLocalPluginProbe(key, probe)
+		return nil, err
+	}
+
+	go waitForLocalPluginProbe(key, probe, cmd, command, filepath.Base(path), &stdout, &stderr)
+
+	select {
+	case <-probe.done:
+		probe.mu.Lock()
+		defer probe.mu.Unlock()
+		return append([]byte(nil), probe.output...), probe.err
+	case <-ctx.Done():
+		select {
+		case <-probe.done:
+			probe.mu.Lock()
+			defer probe.mu.Unlock()
+			return append([]byte(nil), probe.output...), probe.err
+		default:
 		}
-		return nil, err
+		probe.mu.Lock()
+		probe.timedOut = true
+		probe.mu.Unlock()
+		return nil, &localPluginCommandTimeoutError{Command: command, Timeout: time.Since(startedAt).Round(time.Millisecond)}
 	}
-	return out, nil
 }
 
-func buildLocalPluginCommand(ctx context.Context, path string, args ...string) (*exec.Cmd, error) {
+func waitForLocalPluginProbe(key string, probe *localPluginProbe, cmd *exec.Cmd, command, plugin string, stdout, stderr *localPluginOutputBuffer) {
+	err := cmd.Wait()
+	if err != nil {
+		err = &localPluginCommandExitError{Command: command, Err: err, Stderr: string(stderr.Bytes())}
+	}
+
+	probe.mu.Lock()
+	probe.output = stdout.Bytes()
+	probe.err = err
+	timedOut := probe.timedOut
+	probe.mu.Unlock()
+	close(probe.done)
+	removeLocalPluginProbe(key, probe)
+
+	if !timedOut {
+		return
+	}
+	if err != nil {
+		log.Printf("plugins meta probe completed after timeout plugin=%s command=%s: %v", plugin, command, err)
+		return
+	}
+	log.Printf("plugins meta probe completed after timeout plugin=%s command=%s: success", plugin, command)
+}
+
+func removeLocalPluginProbe(key string, probe *localPluginProbe) {
+	localPluginProbes.Lock()
+	defer localPluginProbes.Unlock()
+	if localPluginProbes.running[key] == probe {
+		delete(localPluginProbes.running, key)
+	}
+}
+
+func buildLocalPluginCommand(path string, args ...string) (*exec.Cmd, error) {
 	dir := filepath.Dir(path)
 	if strings.TrimSpace(dir) == "" {
 		dir = "."
@@ -223,36 +381,36 @@ func buildLocalPluginCommand(ctx context.Context, path string, args ...string) (
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".py":
 		if info.Mode()&0o111 != 0 {
-			cmd = exec.CommandContext(ctx, path, args...)
+			cmd = exec.Command(path, args...)
 			break
 		}
 		pythonBin, err := resolveLocalInterpreter("python3", "python")
 		if err != nil {
 			return nil, err
 		}
-		cmd = exec.CommandContext(ctx, pythonBin, append([]string{path}, args...)...)
+		cmd = exec.Command(pythonBin, append([]string{path}, args...)...)
 	case ".js":
 		if info.Mode()&0o111 != 0 {
-			cmd = exec.CommandContext(ctx, path, args...)
+			cmd = exec.Command(path, args...)
 			break
 		}
 		nodeBin, err := resolveLocalInterpreter("node")
 		if err != nil {
 			return nil, err
 		}
-		cmd = exec.CommandContext(ctx, nodeBin, append([]string{path}, args...)...)
+		cmd = exec.Command(nodeBin, append([]string{path}, args...)...)
 	case ".go":
 		if info.Mode()&0o111 != 0 {
-			cmd = exec.CommandContext(ctx, path, args...)
+			cmd = exec.Command(path, args...)
 			break
 		}
 		goBin, err := resolveLocalInterpreter("go")
 		if err != nil {
 			return nil, err
 		}
-		cmd = exec.CommandContext(ctx, goBin, append([]string{"run", path}, args...)...)
+		cmd = exec.Command(goBin, append([]string{"run", path}, args...)...)
 	default:
-		cmd = exec.CommandContext(ctx, path, args...)
+		cmd = exec.Command(path, args...)
 	}
 
 	cmd.Dir = dir

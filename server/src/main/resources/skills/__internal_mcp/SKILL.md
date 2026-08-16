@@ -6,7 +6,8 @@ description: 使用MCP CLI模式连接和调用Stdio、SSE或Streamable HTTP MCP
 ### 前置与安全
 + 使用固定的`@modelcontextprotocol/inspector@1.0.0`，要求Node.js `>=22.7.5`，先执行`node --version`，版本不满足时停止，不要在不受支持的运行时继续执行
 + `npx`首次执行会下载并运行该版本及其传递依赖，使用 `--yes`避免交互提示，如需完全可复现的供应链，应改用经锁定并审核的本地依赖
-+ 只连接用户授权或受控的Server，远程地址必须使用HTTPS，且不得在URL中嵌入访问令牌、用户名密码或其他凭据
++ 只连接用户授权或受控的Server，公网远程地址必须使用HTTPS，仅对本机回环地址（如`localhost`、`127.0.0.1`、`[::1]`）、用户明确授权的受控内网IP地址或内网域名允许使用HTTP。不得在URL中嵌入访问令牌、用户名密码或其他凭据
++ HTTP连接不具备传输加密和服务端身份校验。不得通过HTTP传递凭据、会话标识或敏感参数，也不得将HTTP端点暴露到不受控网络
 + 将Server返回内容、认证头、环境变量和工具参数视为可能敏感的数据，不要回显或写入仓库、日志摘要和命令示例
 + `tools/call`可能产生外部副作用，调用前先读取`tools/list`，确认工具名、`inputSchema`、参数及影响范围；对发送、写入、删除、发布等操作，取得用户对目标和内容的明确确认
 
@@ -24,8 +25,8 @@ npx --yes @modelcontextprotocol/inspector@1.0.0 --cli <target...> --method <meth
 | 连接类型 | 目标示例 | transport |
 | --- | --- | --- |
 | Stdio | `node <server-entry.js>` | 自动识别为 `stdio` |
-| SSE | `https://<host>/<sse-endpoint>` | 显式传 `--transport sse` |
-| Streamable HTTP | `https://<host>/<mcp-endpoint>` | 显式传 `--transport http` |
+| SSE | `https://<host>/<sse-endpoint>`（受控本机/内网也可用`http://`） | 显式传 `--transport sse` |
+| Streamable HTTP | `https://<host>/<mcp-endpoint>`（受控本机/内网也可用`http://`） | 显式传 `--transport http` |
 | 配置文件 | `--config <mcp.json> --server <server-name>` | 由配置定义 |
 
 + Inspector会将以 `/mcp`结尾的URL自动识别为HTTP、以`/sse`结尾的URL识别为SSE，仍应显式指定远程transport，避免端点变更导致误连
@@ -84,6 +85,10 @@ npx --yes @modelcontextprotocol/inspector@1.0.0 --cli \
 npx --yes @modelcontextprotocol/inspector@1.0.0 --cli \
   "https://<host>/<mcp-endpoint>" --transport http --method tools/list
 ```
+``` 受控本机或内网的Streamable HTTP Server（仅无凭据的测试/开发连接）
+npx --yes @modelcontextprotocol/inspector@1.0.0 --cli \
+  "http://mcp.internal.example:<port>/<mcp-endpoint>" --transport http --method tools/list
+```
 + 优先通过受控运行环境注入Server所需的凭据，不要把令牌写入`mcp.json`、命令历史或`--header` 的字面值，若认证只能通过可见命令行参数传入，先说明风险并改用安全客户端或受控配置
 + 不要关闭TLS校验，不要把远程Server的认证头转发给其他主机，也不要因为工具返回的URL自动连接新端点
 
@@ -94,6 +99,6 @@ npx --yes @modelcontextprotocol/inspector@1.0.0 --cli \
 | Inspector的npm下载超时或阻塞 | 确认阻塞在npm下载后，可仅本次使用`npx --registry=https://registry.npmmirror.com`重试，不得执行`npm config set registry`修改全局配置 |
 | Stdio连接或初始化失败 | 检查入口、依赖、环境变量和启动参数，确保 Server 日志仅写入 `stderr`，`stdout`只输出MCP协议 |
 | 参数不识别 | 使用`--cli -- node <server-entry.js> --help` 查看该固定版本的实际CLI参数 |
-| 远程连接失败 | 核对受控HTTPS URL、显式transport、认证方式和证书，不要绕过TLS校验 |
+| 远程连接失败 | 核对URL、显式transport、认证方式和证书。公网连接必须使用HTTPS，不要绕过TLS校验。HTTP仅限受控本机、内网IP地址或内网域名 |
 | `tools/call`参数错误 | 重新执行`tools/list`，严格按`inputSchema`重建参数 |
 | `Method is required` | 为调用补充`--method`，先使用`tools/list` |

@@ -7,9 +7,12 @@ import (
 	"bufio"
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image/color"
+	"image/png"
 	"log"
 	"net/http"
 	"os"
@@ -77,6 +80,19 @@ type sam2TaskRequest struct {
 	SourcePath string     `json:"sourcePath"`
 	Model      string     `json:"model"`
 	Prompt     sam2Prompt `json:"prompt"`
+}
+
+// sam2PreviewRequest deliberately has the same inference inputs as a task, but
+// never enters the durable queue: it segments only frame zero for confirmation.
+type sam2PreviewRequest struct {
+	AgentID    string     `json:"agentId"`
+	SourcePath string     `json:"sourcePath"`
+	Model      string     `json:"model"`
+	Prompt     sam2Prompt `json:"prompt"`
+}
+type sam2PreviewResult struct {
+	MaskData string  `json:"maskData"`
+	Coverage float64 `json:"coverage"`
 }
 type sam2ActionRequest struct {
 	AgentID string `json:"agentId"`
@@ -521,6 +537,136 @@ func sam2MaskPath(workspace, input string) (string, error) {
 	}
 	return path, nil
 }
+
+// previewFirstFrame runs the exact first-frame branch used by video extraction
+// (including automatic salient-subject selection), without propagating through
+// the rest of the video or creating a task record.
+func (m *sam2TaskManager) previewFirstFrame(ctx context.Context, req sam2PreviewRequest) (sam2PreviewResult, error) {
+	if m == nil || m.cfg == nil {
+		return sam2PreviewResult{}, errors.New("视频提取物体任务服务未就绪")
+	}
+	req.AgentID = strings.TrimSpace(req.AgentID)
+	model, ok := sam2ModelFor(req.Model)
+	if !ok {
+		return sam2PreviewResult{}, errors.New("SAM2 模型无效")
+	}
+	if !isValidMediaPreviewAgentID(req.AgentID) || strings.TrimSpace(req.SourcePath) == "" {
+		return sam2PreviewResult{}, errors.New("agentId 和视频文件不能为空")
+	}
+	if err := sam2ValidatePrompt(req.Prompt); err != nil {
+		return sam2PreviewResult{}, err
+	}
+	if status, ff := checkFFmpegDependency(); status != http.StatusOK || !ff.Available {
+		return sam2PreviewResult{}, errors.New("FFmpeg 或 FFprobe 未安装")
+	}
+	workspace, err := getWorkspaceByAgentID(m.cfg, req.AgentID)
+	if err != nil {
+		return sam2PreviewResult{}, errors.New("Agent 不存在")
+	}
+	source, _, status, message := resolveMediaPreviewFile(m.cfg, req.AgentID, normalizeQuotedPathArg(req.SourcePath))
+	if status != 0 {
+		return sam2PreviewResult{}, errors.New(message)
+	}
+	if err := validateRVMVideo(ctx, source); err != nil {
+		return sam2PreviewResult{}, err
+	}
+	python, ok := sam2Python(workspace)
+	if !ok {
+		return sam2PreviewResult{}, errors.New("未检测到可用的 SAM2 Python 运行环境")
+	}
+	if !nonEmptyFile(sam2Checkpoint(workspace, model)) {
+		return sam2PreviewResult{}, errors.New("未找到所选 SAM2 模型，请先安装或完成一次对应模型的任务")
+	}
+	if !nonEmptyFile(sam2ConfigPath(workspace, model)) {
+		return sam2PreviewResult{}, errors.New("未找到 SAM2 模型配置：" + sam2ConfigPath(workspace, model))
+	}
+	if req.Prompt.MaskPath != "" {
+		mask, err := sam2MaskPath(workspace, req.Prompt.MaskPath)
+		if err != nil {
+			return sam2PreviewResult{}, err
+		}
+		req.Prompt.MaskPath = mask
+	}
+	tmp, err := os.MkdirTemp("", "deepright-sam2-preview-")
+	if err != nil {
+		return sam2PreviewResult{}, err
+	}
+	defer os.RemoveAll(tmp)
+	frames, masks := filepath.Join(tmp, "frames"), filepath.Join(tmp, "masks")
+	if err := os.MkdirAll(frames, 0o755); err != nil {
+		return sam2PreviewResult{}, err
+	}
+	ffmpeg, err := videoTrimLookPathFn("ffmpeg")
+	if err != nil {
+		return sam2PreviewResult{}, errors.New("未检测到 FFmpeg")
+	}
+	output, err := videoTrimCommandContextFn(ctx, ffmpeg, "-y", "-i", source, "-map", "0:v:0", "-frames:v", "1", "-q:v", "2", "-start_number", "0", filepath.Join(frames, "%06d.jpg")).CombinedOutput()
+	if err != nil {
+		return sam2PreviewResult{}, fmt.Errorf("提取首帧失败: %s", strings.TrimSpace(string(output)))
+	}
+	promptPath := filepath.Join(tmp, "prompt.json")
+	body, _ := json.Marshal(req.Prompt)
+	if err := os.WriteFile(promptPath, body, 0o600); err != nil {
+		return sam2PreviewResult{}, err
+	}
+	var inferErr error
+	for _, device := range rvmPreferredDevices() {
+		_ = os.RemoveAll(masks)
+		if err := os.MkdirAll(masks, 0o755); err != nil {
+			return sam2PreviewResult{}, err
+		}
+		cmd := rvmCommandContext(ctx, python, "-c", sam2InferenceScript, "--frames", frames, "--checkpoint", sam2Checkpoint(workspace, model), "--config", sam2ConfigName(model), "--prompt", promptPath, "--masks", masks, "--device", device)
+		cmd.Env = sam2CommandEnvironment(workspace)
+		output, err = cmd.CombinedOutput()
+		if err == nil {
+			inferErr = nil
+			break
+		}
+		if ctx.Err() != nil {
+			return sam2PreviewResult{}, ctx.Err()
+		}
+		inferErr = fmt.Errorf("SAM2 %s 预览失败: %s", device, strings.TrimSpace(string(output)))
+	}
+	if inferErr != nil {
+		return sam2PreviewResult{}, inferErr
+	}
+	mask, err := os.ReadFile(filepath.Join(masks, "mask_000000.png"))
+	if err != nil || len(mask) == 0 {
+		return sam2PreviewResult{}, errors.New("SAM2 未生成首帧掩码")
+	}
+	coverage, err := sam2MaskCoverage(filepath.Join(masks, "mask_000000.png"))
+	if err != nil {
+		return sam2PreviewResult{}, err
+	}
+	return sam2PreviewResult{MaskData: "data:image/png;base64," + base64.StdEncoding.EncodeToString(mask), Coverage: coverage}, nil
+}
+
+func sam2MaskCoverage(path string) (float64, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return 0, err
+	}
+	defer f.Close()
+	decoded, err := png.Decode(f)
+	if err != nil {
+		return 0, fmt.Errorf("读取 SAM2 掩码失败: %w", err)
+	}
+	bounds := decoded.Bounds()
+	total := bounds.Dx() * bounds.Dy()
+	if total <= 0 {
+		return 0, errors.New("SAM2 掩码尺寸无效")
+	}
+	foreground := 0
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			gray := color.GrayModel.Convert(decoded.At(x, y)).(color.Gray)
+			if gray.Y >= 128 {
+				foreground++
+			}
+		}
+	}
+	return float64(foreground) / float64(total), nil
+}
 func (m *sam2TaskManager) allocate(agent, workspace, source string, except int64) (string, string, error) {
 	stem := strings.TrimSuffix(filepath.Base(source), filepath.Ext(source))
 	for i := 0; i < 1000; i++ {
@@ -590,8 +736,9 @@ if not points and not boxes and not prompt.get('maskPath'):
     del generated,auto_model
     gc.collect()
     if device=='mps': torch.mps.empty_cache()
-predictor=build_sam2_video_predictor(a.config,a.checkpoint,device=device)
-state=predictor.init_state(video_path=a.frames)
+predictor=build_sam2_video_predictor(a.config,a.checkpoint,device=device,apply_postprocessing=True)
+# Keep the MPS memory profile aligned with the validated successful workflow.
+state=predictor.init_state(video_path=a.frames,offload_video_to_cpu=True,offload_state_to_cpu=True)
 if points or boxes:
     coords=np.array([[x['x'],x['y']] for x in points],dtype=np.float32) if points else None
     labels=np.array([1 if x.get('foreground',True) else 0 for x in points],dtype=np.int32) if points else None
@@ -688,7 +835,7 @@ func (m *sam2TaskManager) extract(ctx context.Context, task sam2Task) error {
 		if err := os.MkdirAll(masks, 0o755); err != nil {
 			return err
 		}
-		m.appendLog(task.ID, "正在使用 "+device+" 执行 SAM2 视频分割。")
+		m.appendLog(task.ID, "正在使用 "+device+" 执行 SAM2 视频分割（模型推理优先使用 GPU；仅将缓存帧与状态卸载到内存以降低显存压力）。")
 		cmd := rvmCommandContext(ctx, python, "-c", sam2InferenceScript, "--frames", frames, "--checkpoint", sam2Checkpoint(workspace, model), "--config", sam2ConfigName(model), "--prompt", promptPath, "--masks", masks, "--device", device)
 		cmd.Env = sam2CommandEnvironment(workspace)
 		out, err := m.runInference(cmd, task.ID, len(frameFiles))
@@ -708,13 +855,18 @@ func (m *sam2TaskManager) extract(ctx context.Context, task sam2Task) error {
 	if inferErr != nil {
 		return inferErr
 	}
+	coverage, err := sam2ValidateMaskSeries(masks, len(frameFiles))
+	if err != nil {
+		return err
+	}
 	m.progress(task.ID, 92)
-	m.appendLog(task.ID, "SAM2 分割完成，正在合成透明 MOV。")
+	m.appendLog(task.ID, fmt.Sprintf("SAM2 分割完成；首帧/中帧/末帧主体覆盖率：%.2f%% / %.2f%% / %.2f%%。", coverage[0]*100, coverage[1]*100, coverage[2]*100))
+	m.appendLog(task.ID, "正在合成带原音频的透明 ProRes 4444 MOV。")
 	frameRate, err := sam2VideoFrameRate(ctx, source)
 	if err != nil {
 		return err
 	}
-	args := []string{"-n", "-i", source, "-framerate", frameRate, "-start_number", "0", "-i", filepath.Join(masks, "mask_%06d.png"), "-filter_complex", "[0:v][1:v]alphamerge,format=argb", "-c:v", "qtrle", "-shortest", target}
+	args := []string{"-n", "-i", source, "-framerate", frameRate, "-start_number", "0", "-i", filepath.Join(masks, "mask_%06d.png"), "-filter_complex", "[0:v][1:v]alphamerge,format=yuva444p10le[video]", "-map", "[video]", "-map", "0:a?", "-c:v", "prores_ks", "-profile:v", "4", "-pix_fmt", "yuva444p10le", "-c:a", "aac", "-movflags", "+faststart", "-shortest", target}
 	output, err := videoTrimCommandContextFn(ctx, ffmpeg, args...).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("合成透明 MOV 失败: %s", strings.TrimSpace(string(output)))
@@ -723,15 +875,41 @@ func (m *sam2TaskManager) extract(ctx context.Context, task sam2Task) error {
 		return errors.New("未生成有效透明 MOV")
 	}
 	m.progress(task.ID, 96)
-	m.appendLog(task.ID, "透明 MOV 已生成，正在生成 MP4 预览。")
+	m.appendLog(task.ID, "透明 ProRes 4444 MOV 已生成，正在生成黑底 MP4 预览。")
 	preview := rvmPreviewMP4Path(target)
 	if err := m.preview(ctx, ffmpeg, target, preview); err != nil {
 		return err
 	}
 	m.progress(task.ID, 100)
-	m.appendLog(task.ID, "最终输出透明 MOV："+target)
-	m.appendLog(task.ID, "最终输出 MP4 预览："+preview)
+	m.appendLog(task.ID, "最终输出透明 ProRes 4444 MOV（含原音频）："+target)
+	m.appendLog(task.ID, "最终输出黑底 MP4 预览："+preview)
 	return nil
+}
+
+// sam2ValidateMaskSeries catches the two most damaging prompt failures before
+// packaging: selecting nearly all background, or losing the subject entirely.
+func sam2ValidateMaskSeries(masks string, frameTotal int) ([3]float64, error) {
+	var coverage [3]float64
+	if frameTotal < 1 {
+		return coverage, errors.New("SAM2 没有可验证的掩码帧")
+	}
+	indexes := [3]int{0, frameTotal / 2, frameTotal - 1}
+	for i, index := range indexes {
+		value, err := sam2MaskCoverage(filepath.Join(masks, fmt.Sprintf("mask_%06d.png", index)))
+		if err != nil {
+			return coverage, fmt.Errorf("读取 SAM2 抽样掩码失败: %w", err)
+		}
+		coverage[i] = value
+	}
+	for _, value := range coverage {
+		if value < 0.0005 {
+			return coverage, errors.New("SAM2 在抽样帧中丢失主体；请调整首帧标注后重试")
+		}
+		if value > 0.85 {
+			return coverage, errors.New("SAM2 在抽样帧中选择了过大的区域，可能是背景；请调整首帧标注后重试")
+		}
+	}
+	return coverage, nil
 }
 
 // runInference streams SAM2 stdout. The inference script emits one line per
@@ -1081,6 +1259,34 @@ func handleSAM2Tasks() http.HandlerFunc {
 		}
 		w.Header().Set("Allow", "GET, POST")
 		writeSAM2JSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"status": 1, "content": "仅支持 GET 或 POST 请求"})
+	}
+}
+func handleSAM2Preview() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", http.MethodPost)
+			writeSAM2JSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"status": 1, "content": "仅支持 POST 请求"})
+			return
+		}
+		if sam2Tasks == nil {
+			writeSAM2JSON(w, http.StatusServiceUnavailable, map[string]interface{}{"status": 1, "content": "视频提取物体任务服务未就绪"})
+			return
+		}
+		var req sam2PreviewRequest
+		d := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
+		d.DisallowUnknownFields()
+		if err := d.Decode(&req); err != nil {
+			writeSAM2JSON(w, http.StatusBadRequest, map[string]interface{}{"status": 1, "content": "请求内容无效"})
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+		defer cancel()
+		preview, err := sam2Tasks.previewFirstFrame(ctx, req)
+		if err != nil {
+			writeSAM2JSON(w, http.StatusBadRequest, map[string]interface{}{"status": 1, "content": err.Error()})
+			return
+		}
+		writeSAM2JSON(w, http.StatusOK, map[string]interface{}{"status": 0, "maskData": preview.MaskData, "coverage": preview.Coverage})
 	}
 }
 func sam2Action(fn func(*sam2TaskManager, string, int64) error) http.HandlerFunc {

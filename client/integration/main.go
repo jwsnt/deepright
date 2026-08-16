@@ -21388,6 +21388,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/rvm/tasks/delete", handleRVMTaskDelete())
 	mux.HandleFunc("/api/rvm/tasks/log", handleRVMTaskLog())
 	mux.HandleFunc("/api/sam2/check", handleSAM2Check(&cfg))
+	mux.HandleFunc("/api/sam2/preview", handleSAM2Preview())
 	mux.HandleFunc("/api/sam2/tasks", handleSAM2Tasks())
 	mux.HandleFunc("/api/sam2/tasks/cancel", handleSAM2TaskCancel())
 	mux.HandleFunc("/api/sam2/tasks/restart", handleSAM2TaskRestart())
