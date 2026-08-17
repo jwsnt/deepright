@@ -95,8 +95,8 @@
     "app": 30
   },
   "temp": {
-    "clear": 168,
-    "pack": 168,
+    "clear": 72,
+    "pack": 48,
     "scan": 2
   },
   "install_app": {

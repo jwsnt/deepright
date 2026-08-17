@@ -10538,7 +10538,7 @@ function getPageAnnotationListHtml(chatId, message) {
   const annotations = getPageAnnotationsForTarget(chatId, target.targetId);
   if (!annotations.length) return '';
   return `<div class="page-annotation-list" aria-label="页面备注"><button class="page-annotation-clear-all" type="button" onclick="openPageAnnotationClearConfirm()" title="完全清除标注" aria-label="完全清除标注"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.25 2.5h5.5l.58 1.2h3.42a.75.75 0 1 1 0 1.5h-.64l-.7 10.18a2.3 2.3 0 0 1-2.3 2.12H6.89a2.3 2.3 0 0 1-2.3-2.12L3.89 5.2h-.64a.75.75 0 1 1 0-1.5h3.42Zm-1.86 2.7.7 10.08c.02.4.34.72.75.72h6.32c.4 0 .73-.32.75-.72l.7-10.08Zm2.32 2.04c.41 0 .75.34.75.75v5.22a.75.75 0 1 1-1.5 0V8c0-.41.34-.75.75-.75Zm4.58 0c.41 0 .75.34.75.75v5.22a.75.75 0 1 1-1.5 0V8c0-.41.34-.75.75-.75Z"></path></svg></button>${annotations.map(annotation => {
-    const title = ('引用内容：' + annotation.quote + '\n我的备注：' + annotation.note).replace(/"/g, '&quot;');
+    const title = ('引用内容：' + annotation.quote + '\n我的标注：' + annotation.note).replace(/"/g, '&quot;');
     const quoteText = String(annotation.quote || '').replace(/\s+/g, ' ').trim();
     const quotePreview = Array.from(quoteText).slice(0, 5).join('') + (Array.from(quoteText).length > 5 ? '...' : '');
     return `<span class="page-annotation-chip" title="${esc(title)}"><span class="page-annotation-chip-text">${esc(quotePreview)}</span><button class="page-annotation-chip-edit" type="button" onclick='openPageAnnotationEdit(${JSON.stringify(String(annotation.id))}); return false;' title="编辑标注" aria-label="编辑标注"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M14.69 2.86a2.1 2.1 0 0 1 2.97 2.97l-8.3 8.3a2.3 2.3 0 0 1-1.03.6l-3.06.78a.75.75 0 0 1-.91-.91l.78-3.06a2.3 2.3 0 0 1 .6-1.03Zm1.91 1.06a.6.6 0 0 0-.85 0l-1.06 1.06 1.91 1.9 1.06-1.05a.6.6 0 0 0 0-.85Zm-2.97 2.12-7.43 7.43a.8.8 0 0 0-.2.35l-.5 1.96 1.96-.5a.8.8 0 0 0 .35-.2l7.43-7.43Z"></path></svg></button><button class="page-annotation-chip-del" type="button" onclick='deletePageAnnotation(${JSON.stringify(String(annotation.id))}); return false;' title="删除标注" aria-label="删除标注">×</button></span>`;
@@ -10794,7 +10794,7 @@ function savePageAnnotation() {
   if (!selected || !input) return false;
   const note = extractRequestContent(input).trim();
   if (!note) {
-    vfsShowUploadToast('请输入我的备注', true);
+    vfsShowUploadToast('请输入我的标注', true);
     focusEditableInput(input);
     return false;
   }
@@ -11004,7 +11004,7 @@ function composePageAnnotationsForSend(chatId, userText) {
   const prefix = [
     '### 标注内容',
     '',
-    '| 引用内容 | 我的备注 |',
+    '| 引用内容 | 我的标注 |',
     '| --- | --- |',
     ...annotations.map(annotation => `| ${toMarkdownTableCell(annotation.quote)} | ${toMarkdownTableCell(annotation.note)} |`)
   ].join('\n');
@@ -27402,6 +27402,7 @@ async function init() {
     document.addEventListener(evt, () => {
       syncBrowserFullscreenSidebarState();
       syncFullscreenToggleUI();
+      syncBrowserFullscreenKeyboardLock();
     });
   });
   document.addEventListener('scroll', hideModelConfigOverflowPreview, true);
@@ -39537,6 +39538,42 @@ function getFullscreenElement() {
 function supportsBrowserFullscreen() {
   const target = document.documentElement;
   return !!(target && (target.requestFullscreen || target.webkitRequestFullscreen || target.mozRequestFullScreen || target.msRequestFullscreen));
+}
+
+function supportsBrowserFullscreenKeyboardLock() {
+  const keyboard = navigator.keyboard;
+  return !!(keyboard && typeof keyboard.lock === 'function' && typeof keyboard.unlock === 'function');
+}
+
+let browserFullscreenKeyboardLockRequest = Promise.resolve();
+
+function syncBrowserFullscreenKeyboardLock() {
+  if (!supportsBrowserFullscreenKeyboardLock()) return;
+  const keyboard = navigator.keyboard;
+  const shouldLockEscape = !!getFullscreenElement() && browserFullscreenRequestedByToggle;
+  browserFullscreenKeyboardLockRequest = browserFullscreenKeyboardLockRequest
+    .catch(() => {})
+    .then(() => shouldLockEscape ? keyboard.lock(['Escape']) : keyboard.unlock())
+    .catch(() => {});
+}
+
+function handleBrowserFullscreenEscape(event) {
+  if (
+    !event ||
+    event.key !== 'Escape' ||
+    event.defaultPrevented ||
+    event.isComposing ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.altKey ||
+    !getFullscreenElement() ||
+    !browserFullscreenRequestedByToggle ||
+    getFrontKeyboardOverlay()
+  ) return false;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  void exitBrowserFullscreenMode().catch(() => {});
+  return true;
 }
 
 function requestBrowserFullscreen() {
@@ -59454,14 +59491,18 @@ document.addEventListener('keydown', e => {
     feSetImageCutoutActive(false);
     return;
   }
+  if (handleOnboardingKeyboardShortcuts(e)) return;
+  if (handleOverlayKeyboardShortcuts(e)) {
+    e.stopImmediatePropagation();
+    return;
+  }
+  if (handleBrowserFullscreenEscape(e)) return;
   if (e.key === 'Escape') closeQuickFanMenu();
   if (e.key === 'Escape') closeAssistantShortcutModal();
   if (e.key === 'Escape') closeAllSkillExtractPopovers();
   if (e.key === 'Escape') closeInstallAppPopover();
   if (e.key === 'Escape') closeSoulTidyPopover();
-  if (handleOnboardingKeyboardShortcuts(e)) return;
-  handleOverlayKeyboardShortcuts(e);
-});
+}, true);
 document.addEventListener('pointerdown', pluginModalDismissFromExternalEvent, true);
 document.addEventListener('dragstart', pluginModalDismissFromExternalEvent, true);
 document.addEventListener('wheel', pluginModalDismissFromExternalEvent, { capture: true, passive: true });
@@ -62859,6 +62900,7 @@ const MESSAGE_PATH_BOUNDARY_BEFORE = /[\s`"'([{<（【《“‘,.:;!?，。；�
 const MESSAGE_PATH_BOUNDARY_AFTER = /[\s`"')\]}>,.:;!?，。；：！？、）】》”’]/;
 const MESSAGE_TARGET_TERMINATOR = /[,.!?;:，。；：！？、]/;
 const MESSAGE_TARGET_EMBEDDED_START = /[.:](?=(?:https?:\/\/|www\.|file:\/\/\/|~\/|\/|(?:skills|tmp)(?:\/|$)|(?:SOUL|USER)\.md))/i;
+const MESSAGE_FILE_EXTENSION_BEFORE_HAN = /\.[A-Za-z0-9][A-Za-z0-9._-]{0,31}(?=\p{Script=Han})/u;
 // HTTP URL 仅支持 ASCII。这样诸如“github.com/owner/repo帮我看看”中的中文
 // 会保留为普通消息文本，而不会被编码进 URL 或包含在链接气泡中。
 const MESSAGE_HTTP_BASECASE = /^(?:https?:\/\/|www\.)[A-Za-z0-9._~:/?@#$%&*+=-]+/i;
@@ -62980,6 +63022,19 @@ function trimMessagePathCandidate(value) {
   return raw
     .replace(/[`"')\]}>.,:;!?，。；：！？、）】》”’]+$/, '')
     .trim();
+}
+
+function findMessageFileExtensionTerminatorIndex(value) {
+  const source = String(value || '');
+  if (!source) return -1;
+  const match = source.match(MESSAGE_FILE_EXTENSION_BEFORE_HAN);
+  return match && Number.isInteger(match.index) ? match.index + match[0].length : -1;
+}
+
+function isMessageFileExtensionTextBoundary(value, nextCharacter) {
+  return !!nextCharacter
+    && /\p{Script=Han}/u.test(nextCharacter)
+    && /\.[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/u.test(String(value || ''));
 }
 
 function findMessageTargetEmbeddedTerminatorIndex(value) {
@@ -63230,6 +63285,8 @@ function extractAgentDirPrefixedMessagePath(sourceText, agentDir) {
     candidate += ch;
     index += 1;
   }
+  const extensionTerminatorIndex = findMessageFileExtensionTerminatorIndex(candidate);
+  if (extensionTerminatorIndex >= 0) candidate = candidate.slice(0, extensionTerminatorIndex);
   return extractMessageFilePath(candidate);
 }
 
@@ -63285,7 +63342,8 @@ function isValidMessagePathBoundary(text, start, end) {
   const before = start > 0 ? text[start - 1] : '';
   const after = end < text.length ? text[end] : '';
   if (before && !MESSAGE_PATH_BOUNDARY_BEFORE.test(before)) return false;
-  if (after && !MESSAGE_PATH_BOUNDARY_AFTER.test(after)) return false;
+  if (after && !MESSAGE_PATH_BOUNDARY_AFTER.test(after)
+    && !isMessageFileExtensionTextBoundary(text.slice(start, end), after)) return false;
   return true;
 }
 
@@ -63300,7 +63358,9 @@ function hasOverlappingMessageMatch(matches, start, end) {
 }
 
 function findAgentDirPathTerminatorIndex(source, start) {
-  return extendMessagePathCandidateEnd(source, start, Math.max(0, start));
+  const end = extendMessagePathCandidateEnd(source, start, Math.max(0, start));
+  const extensionTerminatorIndex = findMessageFileExtensionTerminatorIndex(source.slice(start, end));
+  return extensionTerminatorIndex >= 0 ? start + extensionTerminatorIndex : end;
 }
 
 function buildAgentDirPrefixedMessageMatch(source, start, agentDir) {
@@ -63314,7 +63374,9 @@ function buildAgentDirPrefixedMessageMatch(source, start, agentDir) {
   const filePath = extractMessageFilePath(candidate);
   if (!filePath || !filePath.startsWith(normalizedAgentDir)) return null;
   const after = end < source.length ? source[end] : '';
-  if (after && !MESSAGE_PATH_BOUNDARY_AFTER.test(after) && after !== '\n' && after !== '\r') return null;
+  if (after && !MESSAGE_PATH_BOUNDARY_AFTER.test(after)
+    && !isMessageFileExtensionTextBoundary(candidate, after)
+    && after !== '\n' && after !== '\r') return null;
   return { start, end, text: candidate, href: candidate, filePath, kind: 'file' };
 }
 
@@ -63376,6 +63438,11 @@ function findMessagePathMatches(text) {
     const initialCandidate = String(match[0] || '');
     if (/^file:\/\/\/|^~\/|^\//i.test(initialCandidate)) {
       candidateEnd = extendMessagePathCandidateEnd(source, candidateStart, candidateEnd);
+    }
+    const extensionTerminatorIndex = findMessageFileExtensionTerminatorIndex(source.slice(candidateStart, candidateEnd));
+    if (extensionTerminatorIndex >= 0) {
+      candidateEnd = candidateStart + extensionTerminatorIndex;
+      MESSAGE_LINK_MATCHER.lastIndex = candidateEnd + 1;
     }
     const embeddedTerminatorIndex = findMessageTargetEmbeddedTerminatorIndex(source.slice(candidateStart, candidateEnd));
     if (embeddedTerminatorIndex >= 0) {
@@ -63618,7 +63685,8 @@ function splitMessagePathAnchorAtTerminator(anchor) {
   if (!match || match.end >= rawText.length) return false;
   const nextCharacter = rawText[match.end];
   const shouldSplit = MESSAGE_TARGET_TERMINATOR.test(nextCharacter)
-    || (match.kind === 'http' && isValidHttpMessageBoundary(rawText, match.start, match.end));
+    || (match.kind === 'http' && isValidHttpMessageBoundary(rawText, match.start, match.end))
+    || (match.kind === 'file' && isMessageFileExtensionTextBoundary(match.text, nextCharacter));
   if (!shouldSplit) return false;
   const ownerDoc = anchor.ownerDocument || document;
   const fragment = ownerDoc.createDocumentFragment();
