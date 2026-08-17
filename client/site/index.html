@@ -586,6 +586,11 @@ a{color:var(--accent);text-decoration:none}
 [data-energy-saver="on"] .working-indicator-chip{
   box-shadow:none !important;
 }
+[data-energy-saver="on"] .message,
+[data-low-power-rendering="on"] .message{
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+}
 [data-energy-saver="on"] .chat-container,
 [data-low-power-rendering="on"] .chat-container{
   background-clip:padding-box;
@@ -1107,6 +1112,7 @@ animation:queuedInsertExplosion .62s ease-out both}
 .message .md-content.render-plain{white-space:normal}
 .message .md-content.render-plain br{content:''}
 .message.assistant.streaming .md-content::after{content:'▌';animation:blink .6s step-end infinite;color:var(--accent)}
+.message.assistant.streaming .md-content.render-plain{white-space:pre-wrap}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
 .message.assistant .md-content p{margin:6px 0}
 .message .md-content h1,.message .md-content h2,.message .md-content h3,.message .md-content h4,.message .md-content h5,.message .md-content h6{margin:10px 0 8px;line-height:1.3;font-weight:700}
@@ -8823,6 +8829,7 @@ let bootLoadingState = {
 let streamRenderQueue = {};
 const STREAM_TYPE_SWAP_TIMING_NORMAL = Object.freeze({ holdMs: 2000, incomingMs: 900, cleanupMs: 2000 });
 const STREAM_TYPE_SWAP_TIMING_SAVER = Object.freeze({ holdMs: 320, incomingMs: 220, cleanupMs: 420 });
+const LOW_POWER_STREAM_RENDER_INTERVAL_MS = 100;
 const STREAM_TYPE_SWAP_BURST_PARTICLE_COUNT = 18;
 let quickPluginStatusRequestSeq = 0;
 let quickPluginMetaRequestSeq = 0;
@@ -36084,9 +36091,15 @@ function getStreamingRenderQueueEntriesForChat(chatId) {
 
 function flushStreamingMessageImmediately(streamKey) {
   const stateItem = streamRenderQueue[streamKey];
-  if (!stateItem || !stateItem.frame) return;
-  cancelAnimationFrame(stateItem.frame);
-  stateItem.frame = null;
+  if (!stateItem) return;
+  if (stateItem.frame) {
+    cancelAnimationFrame(stateItem.frame);
+    stateItem.frame = null;
+  }
+  if (stateItem.lowPowerTimer) {
+    clearTimeout(stateItem.lowPowerTimer);
+    stateItem.lowPowerTimer = null;
+  }
   flushStreamingMessage(streamKey);
 }
 
@@ -36096,6 +36109,10 @@ function forceFlushStreamingMessage(streamKey) {
   if (stateItem.frame) {
     cancelAnimationFrame(stateItem.frame);
     stateItem.frame = null;
+  }
+  if (stateItem.lowPowerTimer) {
+    clearTimeout(stateItem.lowPowerTimer);
+    stateItem.lowPowerTimer = null;
   }
   stateItem.holdUntil = 0;
   flushStreamingMessage(streamKey);
@@ -36137,6 +36154,25 @@ function clearStreamingMessageDisplay(msgEl) {
   mdEl.classList.remove('render-plain');
   mdEl.removeAttribute('data-rich-pending');
   mdEl.removeAttribute('data-math-enhanced');
+}
+
+function renderLowPowerStreamingText(mdEl, stateItem, content) {
+  const nextContent = normalizeRenderableMessageText(content);
+  const previousContent = String(stateItem.lowPowerRenderedContent || '');
+  const textNode = stateItem.lowPowerTextNode;
+  const canAppend = !!(
+    textNode &&
+    textNode.parentNode === mdEl &&
+    nextContent.indexOf(previousContent) === 0
+  );
+  if (canAppend) {
+    const delta = nextContent.slice(previousContent.length);
+    if (delta) textNode.appendData(delta);
+  } else {
+    mdEl.textContent = nextContent;
+    stateItem.lowPowerTextNode = mdEl.firstChild;
+  }
+  stateItem.lowPowerRenderedContent = nextContent;
 }
 
 function resolveAssistantExplosionCollectTargetRect(msgEl) {
@@ -36365,6 +36401,9 @@ function primeStreamingTypeSwap(streamKey, msgEl, assistantMsgOverride) {
   cleanupStreamingTypeSwapClasses(msgEl);
   playStreamingTypeSwapBurst(msgEl);
   clearStreamingMessageDisplay(msgEl);
+  stateItem.lowPowerTextNode = null;
+  stateItem.lowPowerRenderedContent = '';
+  stateItem.lastLowPowerRenderAt = 0;
   void msgEl.offsetWidth;
   msgEl.classList.add('type-switch-gap');
   const timing = getStreamTypeSwapTiming();
@@ -36397,7 +36436,7 @@ function flushStreamingMessage(streamKey) {
   }
   let usedPlainFallback = false;
   if (lowPowerRendering) {
-    mdEl.innerHTML = renderMessageContent(assistantMsg.content, { plain: true, decoratePaths: true });
+    renderLowPowerStreamingText(mdEl, stateItem, assistantMsg.content);
     mdEl.classList.add('render-plain');
     mdEl.removeAttribute('data-rich-pending');
     mdEl.removeAttribute('data-math-enhanced');
@@ -36418,8 +36457,10 @@ function flushStreamingMessage(streamKey) {
     mdEl.classList.add('render-plain');
     mdEl.innerHTML = renderMessageContent(assistantMsg.content, { plain: true, decoratePaths: true });
   }
-  decorateChatMessagePathLinks(mdEl);
-  maybeQueueMessageUrlTourFromRoot(mdEl);
+  if (!lowPowerRendering) {
+    decorateChatMessagePathLinks(mdEl);
+    maybeQueueMessageUrlTourFromRoot(mdEl);
+  }
   syncAssistantExplosionBeacon(msgEl, assistantMsg);
   syncAssistantResultMaterialState(msgEl, assistantMsg);
   msgEl.classList.remove('type-switch-gap');
@@ -36428,6 +36469,7 @@ function flushStreamingMessage(streamKey) {
   const wrap = msgEl.closest('.message-wrap');
   const copyBtn = wrap && wrap.querySelector('.message-copy-btn');
   if (copyBtn) copyBtn.dataset.copyText = assistantMsg.content;
+  if (lowPowerRendering) stateItem.lastLowPowerRenderAt = Date.now();
   if (!usedPlainFallback && !lowPowerRendering) warmRenderedMessageImages(wrap || msgEl);
   if (keepBottom) setInstantScrollTop(container, container.scrollHeight);
   scheduleChatScrollControlsSync();
@@ -36436,12 +36478,29 @@ function flushStreamingMessage(streamKey) {
 function scheduleStreamingMessageRender(streamKey, chatId, msgEl, assistantMsg) {
   if (!streamKey || !chatId || !msgEl || !assistantMsg) return;
   const current = streamRenderQueue[streamKey] || {};
+  if (current.msgEl && current.msgEl !== msgEl) {
+    current.lowPowerTextNode = null;
+    current.lowPowerRenderedContent = '';
+    current.lastLowPowerRenderAt = 0;
+  }
   current.chatId = chatId;
   current.msgEl = msgEl;
   current.assistantMsg = assistantMsg;
   streamRenderQueue[streamKey] = current;
   if ((current.holdUntil || 0) > Date.now()) return;
-  if (current.frame) return;
+  if (current.frame || current.lowPowerTimer) return;
+  if (isLowPowerRenderingEnabled()) {
+    const elapsed = Date.now() - (Number(current.lastLowPowerRenderAt) || 0);
+    const delay = Math.max(0, LOW_POWER_STREAM_RENDER_INTERVAL_MS - elapsed);
+    if (delay > 0) {
+      current.lowPowerTimer = setTimeout(() => {
+        current.lowPowerTimer = null;
+        if (streamRenderQueue[streamKey] !== current || current.frame) return;
+        current.frame = requestAnimationFrame(() => flushStreamingMessage(streamKey));
+      }, delay);
+      return;
+    }
+  }
   current.frame = requestAnimationFrame(() => flushStreamingMessage(streamKey));
 }
 
@@ -43208,6 +43267,10 @@ function finishStreamingFor(chatId, options) {
     if (queued && queued.frame) {
       cancelAnimationFrame(queued.frame);
       queued.frame = null;
+    }
+    if (queued && queued.lowPowerTimer) {
+      clearTimeout(queued.lowPowerTimer);
+      queued.lowPowerTimer = null;
     }
     clearStreamingTypeSwapTimers(queued);
     if (queued && queued.msgEl) cleanupStreamingTypeSwapClasses(queued.msgEl);
