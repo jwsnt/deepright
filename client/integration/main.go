@@ -6715,6 +6715,163 @@ func handleMediaPreview(cfg *Config) http.HandlerFunc {
 	}
 }
 
+type mediaCopyRequest struct {
+	SourceAgentID string `json:"sourceAgentId"`
+	TargetAgentID string `json:"targetAgentId"`
+	Path          string `json:"path"`
+}
+
+type mediaCopyResponse struct {
+	Status  int    `json:"status"`
+	Content string `json:"content,omitempty"`
+	AgentID string `json:"agentId,omitempty"`
+	Path    string `json:"path,omitempty"`
+	SavedAs string `json:"savedAs,omitempty"`
+}
+
+func writeMediaCopyResponse(w http.ResponseWriter, status int, response mediaCopyResponse) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(response)
+}
+
+func copyMediaFileExclusive(source, destination string, mode fs.FileMode) error {
+	input, err := os.Open(source)
+	if err != nil {
+		return err
+	}
+	defer input.Close()
+
+	if mode.Perm() == 0 {
+		mode = 0o644
+	}
+	output, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode.Perm())
+	if err != nil {
+		return err
+	}
+	completed := false
+	defer func() {
+		if !completed {
+			_ = output.Close()
+			_ = os.Remove(destination)
+		}
+	}()
+	if _, err := io.Copy(output, input); err != nil {
+		return err
+	}
+	if err := output.Sync(); err != nil {
+		return err
+	}
+	if err := output.Close(); err != nil {
+		return err
+	}
+	completed = true
+	return nil
+}
+
+func mediaCopyDestination(source, targetWorkspace, relativePath string, sourceInfo os.FileInfo) (string, string, error) {
+	relativePath = filepath.Clean(relativePath)
+	if relativePath == "." || filepath.IsAbs(relativePath) || strings.HasPrefix(relativePath, ".."+string(filepath.Separator)) {
+		return "", "", errors.New("invalid media path")
+	}
+	targetDirectory := filepath.Join(targetWorkspace, filepath.Dir(relativePath))
+	if !ensureWritablePathWithinRoot(targetWorkspace, targetDirectory) {
+		return "", "", errors.New("invalid copy destination")
+	}
+	if err := os.MkdirAll(targetDirectory, 0o755); err != nil {
+		return "", "", fmt.Errorf("create copy destination: %w", err)
+	}
+	resolvedDirectory, err := filepath.EvalSymlinks(targetDirectory)
+	if err != nil || !ensureWritablePathWithinRoot(targetWorkspace, resolvedDirectory) {
+		return "", "", errors.New("invalid copy destination")
+	}
+
+	filename := filepath.Base(relativePath)
+	extension := filepath.Ext(filename)
+	basename := strings.TrimSuffix(filename, extension)
+	timestamp := time.Now().Format("20060102_150405")
+	for sequence := 0; sequence < 1000; sequence++ {
+		candidateName := filename
+		if sequence > 0 {
+			suffix := "_" + timestamp
+			if sequence > 1 {
+				suffix += "_" + strconv.Itoa(sequence)
+			}
+			candidateName = basename + suffix + extension
+		}
+		candidateRelative := filepath.Join(filepath.Dir(relativePath), candidateName)
+		candidate := filepath.Join(resolvedDirectory, candidateName)
+		if !ensureWritablePathWithinRoot(targetWorkspace, candidate) {
+			return "", "", errors.New("invalid copy destination")
+		}
+		if err := copyMediaFileExclusive(source, candidate, sourceInfo.Mode()); err == nil {
+			return filepath.ToSlash(candidateRelative), candidate, nil
+		} else if !os.IsExist(err) {
+			return "", "", fmt.Errorf("copy media file: %w", err)
+		}
+	}
+	return "", "", errors.New("too many media files with the same name")
+}
+
+// handleMediaCopy copies one supported media file into another Agent workspace
+// without changing the source file, which keeps historical message references valid.
+func handleMediaCopy(cfg *Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", http.MethodPost)
+			writeMediaCopyResponse(w, http.StatusMethodNotAllowed, mediaCopyResponse{Status: 1, Content: "only POST requests are supported"})
+			return
+		}
+		var request mediaCopyRequest
+		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10))
+		if err := decoder.Decode(&request); err != nil {
+			writeMediaCopyResponse(w, http.StatusBadRequest, mediaCopyResponse{Status: 1, Content: "invalid media copy request"})
+			return
+		}
+		request.SourceAgentID = strings.TrimSpace(request.SourceAgentID)
+		request.TargetAgentID = strings.TrimSpace(request.TargetAgentID)
+		if !isValidMediaPreviewAgentID(request.SourceAgentID) || !isValidMediaPreviewAgentID(request.TargetAgentID) {
+			writeMediaCopyResponse(w, http.StatusBadRequest, mediaCopyResponse{Status: 1, Content: "sourceAgentId and targetAgentId are required"})
+			return
+		}
+		if request.SourceAgentID == request.TargetAgentID {
+			writeMediaCopyResponse(w, http.StatusBadRequest, mediaCopyResponse{Status: 1, Content: "source and target Agent must differ"})
+			return
+		}
+		source, sourceInfo, status, message := resolveMediaPreviewFile(cfg, request.SourceAgentID, request.Path)
+		if status != 0 {
+			writeMediaCopyResponse(w, status, mediaCopyResponse{Status: 1, Content: message})
+			return
+		}
+		if !sourceInfo.Mode().IsRegular() {
+			writeMediaCopyResponse(w, http.StatusBadRequest, mediaCopyResponse{Status: 1, Content: "path must reference a regular media file"})
+			return
+		}
+		sourceWorkspace, err := getWorkspaceByAgentID(cfg, request.SourceAgentID)
+		if err != nil {
+			writeMediaCopyResponse(w, http.StatusNotFound, mediaCopyResponse{Status: 1, Content: "source Agent workspace does not exist"})
+			return
+		}
+		targetWorkspace, err := getWorkspaceByAgentID(cfg, request.TargetAgentID)
+		if err != nil {
+			writeMediaCopyResponse(w, http.StatusNotFound, mediaCopyResponse{Status: 1, Content: "target Agent workspace does not exist"})
+			return
+		}
+		relativePath, err := filepath.Rel(sourceWorkspace, source)
+		if err != nil || relativePath == "." || strings.HasPrefix(relativePath, ".."+string(filepath.Separator)) {
+			writeMediaCopyResponse(w, http.StatusBadRequest, mediaCopyResponse{Status: 1, Content: "media file must be inside the source Agent workspace"})
+			return
+		}
+		targetPath, savedAs, err := mediaCopyDestination(source, targetWorkspace, relativePath, sourceInfo)
+		if err != nil {
+			log.Printf("media copy %s/%s -> %s failed: %v", request.SourceAgentID, filepath.ToSlash(relativePath), request.TargetAgentID, err)
+			writeMediaCopyResponse(w, http.StatusInternalServerError, mediaCopyResponse{Status: 1, Content: "copy media file failed"})
+			return
+		}
+		writeMediaCopyResponse(w, http.StatusOK, mediaCopyResponse{Status: 0, AgentID: request.TargetAgentID, Path: targetPath, SavedAs: savedAs})
+	}
+}
+
 type VideoTrimRequest struct {
 	AgentID    string                `json:"agentId"`
 	Path       string                `json:"path"`
@@ -21367,6 +21524,7 @@ func runIntegrationForeground(args []string, stderr io.Writer) int {
 	mux.HandleFunc("/api/del", handleDel(&cfg))
 	mux.HandleFunc("/api/raw", handleRaw(&cfg))
 	mux.HandleFunc("/api/media_preview", handleMediaPreview(&cfg))
+	mux.HandleFunc("/api/media/copy", handleMediaCopy(&cfg))
 	mux.HandleFunc("/api/ffmpeg/check", handleFFmpegCheck())
 	mux.HandleFunc("/api/bubblewrap/check", handleBubblewrapCheck())
 	mux.HandleFunc("/api/whisper/check", handleWhisperCheck())

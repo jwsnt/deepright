@@ -3707,3 +3707,11 @@ Integration 新增 Wav2Lip 队列。`config/config.json.wav2lip.check` 控制成
 完整说明见 [iteration/20260802-4/USER_GUIDE.md](iteration/20260802-4/USER_GUIDE.md)。
 
 Wav2Lip 执行中如识别到 PyTorch `unexpected EOF`，会将原始堆栈转换为“人脸检测模型缓存不完整或损坏”的持久化失败原因，并指引清理 `~/.cache/torch/hub/checkpoints/s3fd-619a316812.pth` 后重新执行；原始输出仍保留在任务日志中。
+
+---
+
+## 迭代 20260818-1：跨 Agent 媒体文件复制
+
+`POST /api/media/copy` 只接受源 Agent、目标 Agent 和源工作区相对路径。服务端验证两个 Agent、文件类型及路径边界，仅复制图片、音频和视频；客户端提供的绝对路径不会参与解析。源与目标 Agent 必须不同。
+
+目标副本保留源文件的相对目录，缺失目录自动创建；无同名冲突时保留文件名，冲突时在扩展名前追加时间戳，且不覆盖已有文件。该接口只复制，不移动或删除源文件；失败时清除未完成的目标文件。成功响应返回目标 Agent、相对路径和绝对路径，供页面更新文件气泡并重新打开预览。完整说明见 [iteration/20260818-1/USER_GUIDE.md](iteration/20260818-1/USER_GUIDE.md)。

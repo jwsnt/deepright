@@ -4704,6 +4704,7 @@ body.quick-fan-transition-active{cursor:progress}
 .fe-ffmpeg-install-card{width:min(390px,100%);padding:20px;border:1px solid color-mix(in srgb,var(--border) 60%,var(--accent) 40%);border-radius:16px;background:color-mix(in srgb,var(--bg-card) 88%,rgba(255,255,255,.92));box-shadow:0 24px 54px rgba(81,43,28,.24)}
 .fe-ffmpeg-install-card h3{margin:0;color:var(--text-primary);font-size:16px}.fe-ffmpeg-install-card p{margin:8px 0 0;color:var(--text-secondary);font-size:13px;line-height:1.55}.fe-ffmpeg-install-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.fe-ffmpeg-install-actions button{min-width:78px;height:32px;border:1px solid var(--border);border-radius:9px;background:var(--bg-input);color:var(--text-secondary);font-size:12px;font-weight:650;cursor:pointer}.fe-ffmpeg-install-actions .confirm{border-color:transparent;background:linear-gradient(135deg,var(--accent-hover),var(--accent));color:#fff}
 .dependency-check-lock{position:fixed;inset:0;z-index:255;display:flex;align-items:center;justify-content:center;padding:24px;background:color-mix(in srgb,var(--bg-main) 48%,rgba(255,255,255,.5));backdrop-filter:blur(4px) saturate(120%);-webkit-backdrop-filter:blur(4px) saturate(120%);cursor:wait}.dependency-check-lock[hidden]{display:none!important}.dependency-check-lock-card{display:flex;align-items:center;gap:10px;max-width:min(360px,100%);padding:14px 17px;border:1px solid color-mix(in srgb,var(--accent) 42%,var(--border));border-radius:13px;background:var(--bg-card);box-shadow:0 18px 42px rgba(0,0,0,.18);color:var(--text-primary);font-size:13px;font-weight:700;line-height:1.4}.dependency-check-lock-spinner{width:18px;height:18px;flex:0 0 auto;border:2px solid rgba(var(--accent-rgb),.2);border-top-color:var(--accent);border-radius:50%;animation:feMediaTrimSaveSpin .72s linear infinite}
+.dependency-install-notice-stack{position:fixed;right:18px;bottom:18px;z-index:calc(var(--overlay-z-center) + 14);display:flex;flex-direction:column;align-items:stretch;gap:10px;width:min(390px,calc(100vw - 36px))}.dependency-install-notice-stack[hidden]{display:none!important}.dependency-install-notice{display:flex;align-items:center;gap:9px;width:100%;padding:11px 13px;border:1px solid color-mix(in srgb,var(--accent) 48%,var(--border));border-radius:12px;background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 13%,var(--bg-card)),color-mix(in srgb,var(--brand-cyan) 12%,var(--bg-card)));box-shadow:0 14px 32px rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.34);color:var(--text-primary);font-size:12px;font-weight:700;line-height:1.45}.dependency-install-notice-spinner{width:16px;height:16px;flex:0 0 auto;border:2px solid rgba(var(--accent-rgb),.24);border-top-color:var(--accent);border-radius:50%;animation:feMediaTrimSaveSpin .72s linear infinite}.dependency-install-notice-text{min-width:0;flex:1}.dependency-install-notice-view{flex:0 0 auto;min-width:54px;height:28px;padding:0 10px;border:1px solid color-mix(in srgb,var(--accent) 52%,var(--border));border-radius:8px;background:color-mix(in srgb,var(--accent) 10%,var(--bg-input));color:var(--accent);font-size:12px;font-weight:750;cursor:pointer;transition:var(--transition)}.dependency-install-notice-view:hover{border-color:var(--accent);background:linear-gradient(135deg,var(--accent-hover),var(--accent));color:#fff}.dependency-install-notice-view:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(var(--accent-rgb),.22)}.dependency-install-notice.completed{border-color:color-mix(in srgb,#32a866 58%,var(--border));background:color-mix(in srgb,#32a866 12%,var(--bg-card))}.dependency-install-notice.completed .dependency-install-notice-spinner{border-color:rgba(50,168,102,.22);border-top-color:#32a866;animation:none}
 @media (max-width:680px){.file-editor-media-controls{flex-wrap:wrap}.fe-media-progress{order:3;flex-basis:100%}.fe-media-status{max-width:100%}.fe-media-volume-wrap{margin-left:auto}.fe-color-picker-toast.media,.fe-coordinate-picker-progress.media{bottom:98px}}
 .fe-image-editor{display:flex;flex-direction:column;gap:12px;padding:12px}
 .fe-image-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
@@ -4879,6 +4880,7 @@ body.quick-fan-transition-active{cursor:progress}
 .domain-upload-lock.center{left:var(--center-domain-left);right:var(--center-domain-right)}
 .domain-upload-lock.right{left:calc(100vw - var(--right-sidebar-width-current));right:0}
 #centerUploadLock{left:0;right:0}
+#mediaAgentCopyLock{left:0;right:0}
 .domain-upload-lock::before{content:'';position:absolute;inset:-35%;background:radial-gradient(circle at 20% 20%,rgba(var(--accent-rgb),.28),transparent 45%),radial-gradient(circle at 80% 15%,rgba(var(--accent-soft-rgb),.24),transparent 42%),radial-gradient(circle at 50% 85%,rgba(var(--accent-rgb),.18),transparent 46%);opacity:.85;animation:pluginModalLockGlow 2.4s ease-in-out infinite}
 .domain-upload-lock-card{position:relative;z-index:1;width:min(320px,100%);padding:22px 20px 18px;border:1px solid color-mix(in srgb,var(--border) 72%,var(--accent) 28%);border-radius:22px;background:linear-gradient(180deg,color-mix(in srgb,var(--bg-card) 92%,#fff 8%),color-mix(in srgb,var(--bg-card) 98%,transparent));box-shadow:0 22px 58px rgba(16,24,40,.18);display:flex;flex-direction:column;align-items:center;text-align:center}
 .domain-upload-lock-spinner{width:42px;height:42px;border-radius:50%;border:2px solid rgba(var(--accent-rgb),.18);border-top-color:var(--accent);border-right-color:rgba(var(--accent-rgb),.5);animation:vfsSpin .8s linear infinite}
@@ -5825,6 +5827,24 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     </div>
   </div>
 </div>
+<div class="memo-preview-delete-confirm-overlay" id="mediaAgentCopyConfirm" data-overlay-base data-overlay-domain="global" data-overlay-order="88" aria-hidden="true" onclick="event.stopPropagation()">
+  <div class="memo-preview-delete-confirm-card" id="mediaAgentCopyConfirmCard" role="dialog" aria-modal="true" aria-labelledby="mediaAgentCopyConfirmTitle" aria-describedby="mediaAgentCopyConfirmDesc" tabindex="-1">
+    <p class="memo-preview-delete-confirm-title" id="mediaAgentCopyConfirmTitle">复制媒体文件</p>
+    <p class="memo-preview-delete-confirm-desc" id="mediaAgentCopyConfirmDesc"></p>
+    <div class="memo-preview-delete-confirm-actions">
+      <button type="button" id="mediaAgentCopyCancelBtn" onclick="feMediaAgentCopyCancel()">取消</button>
+      <button type="button" class="primary" id="mediaAgentCopyConfirmBtn" onclick="feMediaAgentCopyConfirm()">确认复制</button>
+    </div>
+  </div>
+</div>
+<div class="domain-upload-lock" id="mediaAgentCopyLock" data-overlay-base data-overlay-domain="global" data-overlay-order="89" aria-hidden="true">
+  <div class="domain-upload-lock-card" tabindex="-1">
+    <div class="domain-upload-lock-spinner"></div>
+    <div class="domain-upload-lock-title">正在复制媒体文件</div>
+    <div class="domain-upload-lock-desc" id="mediaAgentCopyLockDesc">正在复制到当前会话的 Agent 工作目录，请稍候</div>
+    <div class="domain-upload-lock-progress"><span></span></div>
+  </div>
+</div>
 <div class="cmd-overlay" id="cmdOverlay" data-overlay-base data-overlay-domain="center" data-overlay-order="30" onclick="cmdOverlayClick(event)">
   <div class="cmd-panel" id="cmdPanel">
     <div class="cmd-panel-main">
@@ -6589,7 +6609,24 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
 </div>
 <style>
 #wav2lipTaskList .whisper-task-meta>span:first-child{flex:0 0 auto;white-space:nowrap}#wav2lipTaskList .whisper-task-meta{justify-content:flex-start}#wav2lipTaskList .whisper-task-meta .whisper-task-output{flex:0 1 auto;width:auto;max-width:320px}#wav2lipTaskList .whisper-task-meta .whisper-task-output:last-child{flex:1 1 0;width:0;max-width:none}
-#sam2TaskOverlay .sam2-task-controls{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 10px;font-size:11px}#sam2TaskOverlay .sam2-task-controls>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary)}#sam2TaskOverlay .sam2-task-controls select,#sam2TaskOverlay .sam2-task-controls input{height:27px;box-sizing:border-box;border:1px solid var(--border);border-radius:6px;background:var(--bg-input);color:var(--text-primary);font-size:11px}#sam2TaskOverlay .sam2-task-file-button{position:relative;display:inline-flex;align-items:center;height:27px;padding:0 7px;border:1px solid var(--border);border-radius:6px;background:var(--bg-button);color:var(--text-primary);font-size:12px;cursor:pointer}#sam2TaskOverlay .sam2-task-file-button:hover{border-color:var(--accent)}#sam2TaskOverlay .sam2-task-file-button input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}#sam2TaskMaskPath{width:250px;padding:0 7px}.sam2-task-canvas-wrap{display:flex;align-items:center;justify-content:center;min-height:160px;max-height:260px;margin:0 0 10px;overflow:hidden;border:1px solid var(--border);border-radius:8px;background:#111}.sam2-task-stage{position:relative;width:min(100%,460px);height:160px;line-height:0}.sam2-task-stage video{display:block;width:100%;height:100%;background:#111;object-fit:fill}.sam2-task-stage canvas{position:absolute;inset:0;width:100%;height:100%;cursor:not-allowed}.sam2-task-stage.ready canvas{cursor:crosshair}.sam2-task-stage .sam2-task-stage-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;color:var(--text-muted);font-size:12px;line-height:1.4;pointer-events:none}.sam2-task-stage.ready .sam2-task-stage-empty{display:none}.sam2-task-preview-results{margin:0 0 10px;padding:9px;border:1px solid color-mix(in srgb,var(--accent) 38%,var(--border));border-radius:8px;background:color-mix(in srgb,var(--accent) 5%,var(--bg-card));}.sam2-task-preview-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px;color:var(--text-secondary);font-size:11px}.sam2-task-preview-head strong{color:var(--text-primary)}.sam2-task-preview-actions{display:flex;gap:6px}.sam2-task-preview-images{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.sam2-task-preview-images figure{min-width:0;margin:0}.sam2-task-preview-images figcaption{margin:0 0 4px;color:var(--text-secondary);font-size:11px}.sam2-task-preview-images canvas{display:block;width:100%;height:auto;border:1px solid var(--border);border-radius:5px;background:#111}.sam2-task-preview-coverage{margin:0 0 7px;color:var(--text-secondary);font-size:11px}.sam2-task-preview-coverage.warn{color:#d79922}@media(max-width:680px){.sam2-task-preview-images{grid-template-columns:1fr}}
+#sam2TaskOverlay .sam2-task-controls{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 10px;font-size:11px}
+#sam2TaskOverlay .sam2-task-controls>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary)}
+#sam2TaskOverlay .sam2-task-controls select,#sam2TaskOverlay .sam2-task-controls input{height:27px;box-sizing:border-box;border:1px solid var(--border);border-radius:6px;background:var(--bg-input);color:var(--text-primary);font-size:11px}
+#sam2TaskOverlay .sam2-task-file-button{position:relative;display:inline-flex;align-items:center;height:27px;padding:0 7px;border:1px solid var(--border);border-radius:6px;background:var(--bg-button);color:var(--text-primary);font-size:12px;cursor:pointer}
+#sam2TaskOverlay .sam2-task-file-button:hover{border-color:var(--accent)}
+#sam2TaskOverlay .sam2-task-file-button input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+#sam2TaskOverlay .sam2-task-action-button{height:27px;padding:0 9px;border:1px solid color-mix(in srgb,var(--accent) 36%,var(--border));border-radius:6px;background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 11%,var(--bg-button)),color-mix(in srgb,var(--brand-cyan) 11%,var(--bg-button)));box-shadow:0 5px 14px rgba(var(--accent-rgb),.09),inset 0 1px 0 rgba(255,255,255,.18);color:var(--text-primary);font-size:11px;font-weight:700;cursor:pointer;transition:var(--transition)}
+#sam2TaskOverlay .sam2-task-action-button:hover:not(:disabled),#sam2TaskOverlay .sam2-task-action-button:focus-visible:not(:disabled){border-color:var(--accent);background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 19%,var(--bg-button)),color-mix(in srgb,var(--brand-cyan) 18%,var(--bg-button)));box-shadow:0 7px 17px rgba(var(--accent-rgb),.15),inset 0 1px 0 rgba(255,255,255,.24);outline:none;transform:translateY(-1px)}
+#sam2TaskOverlay .sam2-task-action-button:disabled{opacity:.5;cursor:not-allowed;box-shadow:none}
+#sam2TaskOverlay .sam2-task-action-button-preview{border-color:color-mix(in srgb,var(--accent) 64%,var(--brand-sky));background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 78%,var(--bg-button)),color-mix(in srgb,var(--brand-sky) 66%,var(--accent)));color:var(--brand-cyan-soft)!important;text-shadow:0 1px 8px rgba(0,0,0,.22);box-shadow:0 7px 17px rgba(var(--accent-rgb),.18),inset 0 1px 0 rgba(255,255,255,.25)}
+#sam2TaskOverlay .sam2-task-action-button-preview:hover:not(:disabled),#sam2TaskOverlay .sam2-task-action-button-preview:focus-visible:not(:disabled){filter:brightness(1.07);color:var(--brand-cyan-soft)!important}
+#sam2TaskOverlay .sam2-task-action-button-preview:disabled{border-color:color-mix(in srgb,var(--accent) 34%,var(--border));background:color-mix(in srgb,var(--accent) 9%,var(--bg-button));color:var(--text-secondary)!important;opacity:1;text-shadow:none}
+#sam2TaskOverlay .sam2-task-preview-actions button{height:27px;padding:0 10px;border:1px solid color-mix(in srgb,var(--accent) 42%,var(--border));border-radius:6px;background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 10%,var(--bg-button)),color-mix(in srgb,var(--brand-cyan) 13%,var(--bg-button)));box-shadow:0 5px 14px rgba(var(--accent-rgb),.1),inset 0 1px 0 rgba(255,255,255,.2);color:var(--text-primary);font-size:11px;font-weight:700;cursor:pointer;transition:var(--transition)}
+#sam2TaskOverlay .sam2-task-preview-actions button:hover,#sam2TaskOverlay .sam2-task-preview-actions button:focus-visible{border-color:var(--accent);box-shadow:0 7px 17px rgba(var(--accent-rgb),.16),inset 0 1px 0 rgba(255,255,255,.26);outline:none;transform:translateY(-1px)}
+#sam2TaskOverlay .sam2-task-preview-actions .sam2-task-preview-start{border-color:color-mix(in srgb,var(--accent) 68%,var(--brand-sky));background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 83%,var(--bg-button)),color-mix(in srgb,var(--brand-sky) 70%,var(--accent)));color:var(--brand-cyan-soft)!important;text-shadow:0 1px 8px rgba(0,0,0,.2)}
+#sam2TaskOverlay .sam2-task-preview-actions .sam2-task-preview-start:hover,#sam2TaskOverlay .sam2-task-preview-actions .sam2-task-preview-start:focus-visible{color:var(--brand-cyan-soft)!important;filter:brightness(1.07)}
+#sam2TaskMaskPath{flex:1 1 250px;min-width:180px;max-width:100%;padding:0 7px}
+.sam2-task-canvas-wrap{display:flex;align-items:center;justify-content:center;min-height:160px;max-height:260px;margin:0 0 10px;overflow:hidden;border:1px solid var(--border);border-radius:8px;background:#111}.sam2-task-stage{position:relative;width:min(100%,460px);height:160px;line-height:0}.sam2-task-stage video{display:block;width:100%;height:100%;background:#111;object-fit:fill}.sam2-task-stage canvas{position:absolute;inset:0;width:100%;height:100%;cursor:not-allowed}.sam2-task-stage.ready canvas{cursor:crosshair}.sam2-task-stage .sam2-task-stage-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;color:var(--text-muted);font-size:12px;line-height:1.4;pointer-events:none}.sam2-task-stage.ready .sam2-task-stage-empty{display:none}.sam2-task-preview-results{margin:0 0 10px;padding:9px;border:1px solid color-mix(in srgb,var(--accent) 38%,var(--border));border-radius:8px;background:color-mix(in srgb,var(--accent) 5%,var(--bg-card));}.sam2-task-preview-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px;color:var(--text-secondary);font-size:11px}.sam2-task-preview-head strong{color:var(--text-primary)}.sam2-task-preview-actions{display:flex;gap:6px}.sam2-task-preview-images{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.sam2-task-preview-images figure{min-width:0;margin:0}.sam2-task-preview-images figcaption{margin:0 0 4px;color:var(--text-secondary);font-size:11px}.sam2-task-preview-canvas-wrap{position:relative;line-height:0}.sam2-task-preview-images canvas{display:block;width:100%;height:auto;border:1px solid var(--border);border-radius:5px;background:#111}.sam2-task-preview-image-actions{position:absolute;top:7px;left:7px;display:flex;gap:5px;z-index:1;line-height:1}.sam2-task-preview-image-actions button{height:25px;padding:0 8px;border:1px solid color-mix(in srgb,var(--accent) 48%,var(--border));border-radius:6px;background:color-mix(in srgb,var(--bg-card) 76%,var(--accent) 24%);box-shadow:0 5px 12px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.2);color:var(--brand-cyan-soft);font-size:11px;font-weight:700;cursor:pointer;transition:var(--transition)}.sam2-task-preview-image-actions button:hover,.sam2-task-preview-image-actions button:focus-visible{border-color:var(--accent);background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 56%,var(--bg-card)),color-mix(in srgb,var(--brand-sky) 42%,var(--bg-card)));color:var(--brand-cyan-soft);outline:none;transform:translateY(-1px)}.sam2-task-preview-coverage{margin:0 0 7px;color:var(--text-secondary);font-size:11px}.sam2-task-preview-coverage.warn{color:#d79922}@media(max-width:680px){.sam2-task-preview-images{grid-template-columns:1fr}}
 #wav2lipTaskOverlay .wav2lip-task-scenario-select{box-sizing:border-box;flex:0 0 106px;width:106px;height:26px;padding:0 23px 0 7px;border:1px solid color-mix(in srgb,var(--accent) 42%,var(--border));border-radius:7px;outline:0;background:color-mix(in srgb,var(--accent) 8%,var(--bg-input));color:var(--accent);font-size:11px;font-weight:650;cursor:pointer}#wav2lipTaskOverlay .wav2lip-task-scenario-select:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 16%,transparent)}#wav2lipTaskList .wav2lip-task-meta-scenario{flex:0 0 auto;white-space:nowrap;color:var(--text-secondary);font-size:10px}
 .whisper-task-foot-copy{display:flex;flex:1;flex-direction:column;gap:2px;min-width:0}.whisper-task-foot-copy.audio-task-foot-copy{align-self:flex-end}.whisper-task-foot-copy.rembg-task-foot-copy{transform:translateY(5px)}.audio-task-foot-copy .whisper-task-foot-status:empty{display:none}.whisper-task-scenario-hint{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary);font-size:11px}.rembg-task-pending-options{display:flex;flex:0 1 auto;flex-direction:row;align-items:center;gap:8px}.rembg-task-model-select{width:120px;max-width:120px}.whisper-task-output{flex:0 1 380px;width:380px;max-width:380px}#rvmTaskOverlay .whisper-task-pending-item .whisper-task-scenario-select{flex:0 0 132px;width:132px;max-width:132px}#voxcpmTaskOverlay .whisper-task-pending-item{display:grid;grid-template-columns:200px 200px 153px 100px 56px;align-items:center;gap:8px;min-width:0;white-space:nowrap}#voxcpmTaskOverlay .voxcpm-task-pending-sources{display:contents}#voxcpmTaskOverlay .voxcpm-task-pending-sources button{box-sizing:border-box;width:200px;min-width:200px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#voxcpmTaskOverlay .voxcpm-task-pending-sources button.ready{border-color:var(--accent);color:var(--accent)}#voxcpmTaskOverlay .voxcpm-task-control-input{box-sizing:border-box;width:153px;min-width:153px;max-width:153px;height:26px;padding:0 8px;border:1px solid color-mix(in srgb,var(--accent) 42%,var(--border));border-radius:7px;outline:0;background:var(--bg-input);color:var(--text-primary);font-size:11px}#voxcpmTaskOverlay .voxcpm-task-control-input::placeholder{color:var(--text-muted)}#voxcpmTaskOverlay .voxcpm-task-control-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 16%,transparent)}#voxcpmTaskOverlay .whisper-task-scenario-select{box-sizing:border-box;width:100px;min-width:100px;max-width:100px}#voxcpmTaskOverlay .whisper-task-pending-item>.danger{box-sizing:border-box;width:56px;min-width:56px;padding:0}#voxcpmTaskList .whisper-task-row-title strong{flex:1 1 0;min-width:0}#voxcpmTaskList .whisper-task-status,#voxcpmTaskList .whisper-task-row-inline-actions{flex:0 0 auto;white-space:nowrap}#voxcpmTaskList .whisper-task-row-inline-actions button{white-space:nowrap}#voxcpmTaskList .voxcpm-task-meta{display:flex;flex-direction:column;align-items:stretch;gap:3px;overflow:visible}#voxcpmTaskList .voxcpm-task-meta-line{display:flex;align-items:center;gap:12px;min-width:0;overflow:visible}#voxcpmTaskList .voxcpm-task-meta-start{flex:0 0 auto;white-space:nowrap}#voxcpmTaskList .voxcpm-task-meta-path,#voxcpmTaskList .whisper-task-output{display:block;flex:1 1 0;width:0;min-width:0;max-width:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.task-full-path.has-full-path-tooltip{cursor:help}.voxcpm-task-path-tooltip{position:fixed;z-index:calc(var(--overlay-z-center) + 80);max-width:min(720px,calc(100vw - 24px));max-height:120px;overflow:auto;padding:7px 9px;border:1px solid color-mix(in srgb,var(--accent) 34%,var(--border));border-radius:8px;background:color-mix(in srgb,var(--bg-card) 94%,#111 6%);box-shadow:0 12px 28px rgba(0,0,0,.26);color:var(--text-primary);font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:500;letter-spacing:0;white-space:normal;word-break:break-all;pointer-events:none}.voxcpm-task-path-tooltip[hidden]{display:none!important}@media(max-width:520px){#rvmTaskOverlay .whisper-task-pending-item .whisper-task-scenario-select{flex-basis:100%;width:100%;max-width:100%}#voxcpmTaskOverlay .whisper-task-pending-item{grid-template-columns:1fr 1fr;align-items:start;white-space:normal}#voxcpmTaskOverlay .voxcpm-task-pending-sources{display:grid;grid-column:1 / -1;grid-template-columns:1fr;gap:6px}#voxcpmTaskOverlay .voxcpm-task-pending-sources button,#voxcpmTaskOverlay .voxcpm-task-control-input,#voxcpmTaskOverlay .whisper-task-scenario-select{width:100%;min-width:0;max-width:none}#voxcpmTaskOverlay .whisper-task-pending-item>.danger{justify-self:end}}
 </style>
@@ -6627,9 +6664,9 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
     <div class="whisper-task-body">
       <div class="sam2-task-controls"><label class="sam2-task-file-button">选择视频<input type="file" id="sam2TaskVideoFile" accept="video/*,.mp4,.m4v,.webm,.ogv,.mov,.mkv,.avi,.mpg,.mpeg" onchange="feSAM2TaskHandleVideo(this.files)"></label><span id="sam2TaskSource">未选择视频</span><label>模型 <select id="sam2TaskModel" onchange="feSAM2TaskInvalidatePreview()"><option value="tiny">速度优先（tiny）</option><option value="small">兼顾精度（small）</option><option value="base">综合均衡（base）</option><option value="large">高精度分割（large）</option></select></label></div>
       <div class="sam2-task-canvas-wrap"><div class="sam2-task-stage" id="sam2TaskStage"><video id="sam2TaskVideo" muted playsinline preload="auto" aria-label="视频首帧预览"></video><canvas id="sam2TaskCanvas" width="640" height="360" aria-label="视频首帧标注区域"></canvas><span class="sam2-task-stage-empty" id="sam2TaskStageEmpty">选择视频后加载首帧</span></div></div>
-      <div class="sam2-task-controls"><label>标注 <select id="sam2TaskTool"><option value="point">点击点</option><option value="box">框选区域</option></select></label><label>点击类型 <select id="sam2TaskPointType"><option value="foreground">目标</option><option value="background">排除</option></select></label><button type="button" onclick="feSAM2TaskClearPrompt()">清空标注</button><button type="button" id="sam2TaskPreviewBtn" onclick="feSAM2TaskRequestPreview()">预览首帧提取</button><span id="sam2TaskPromptHint"></span></div>
-      <div class="sam2-task-controls"><label>掩码模式 <select id="sam2TaskMaskMode" onchange="feSAM2TaskInvalidatePreview()"><option value="green">绿幕抠图</option><option value="white">白底抠图</option><option value="black">黑底抠图</option><option value="transparent">透明擦除抠图</option></select></label><button type="button" onclick="document.getElementById('sam2TaskMaskFile').click()">选择掩码图</button><input id="sam2TaskMaskPath" type="text" oninput="feSAM2TaskInvalidatePreview()" placeholder="或输入当前 Agent 工作区绝对路径"><span id="sam2TaskMaskHint"></span></div>
-      <div class="sam2-task-preview-results" id="sam2TaskPreviewResults" hidden><div class="sam2-task-preview-head"><span><strong>首帧提取预览</strong>：<span id="sam2TaskPreviewCountdown">30 秒后自动开始完整提取</span></span><span class="sam2-task-preview-actions"><button type="button" onclick="feSAM2TaskCancelPreviewStart()">取消本次</button><button type="button" class="primary" onclick="feSAM2TaskConfirmPreviewStart()">立即开始</button></span></div><div class="sam2-task-preview-coverage" id="sam2TaskPreviewCoverage"></div><div class="sam2-task-preview-images"><figure><figcaption>原始首帧</figcaption><canvas id="sam2TaskPreviewSource" aria-label="原始视频首帧"></canvas></figure><figure><figcaption>绿色覆盖（确认主体边界）</figcaption><canvas id="sam2TaskPreviewOverlay" aria-label="SAM2 首帧绿色覆盖预览"></canvas></figure><figure><figcaption>提取结果（棋盘格表示透明）</figcaption><canvas id="sam2TaskPreviewOutput" aria-label="SAM2 首帧透明提取结果"></canvas></figure></div></div>
+      <div class="sam2-task-controls"><label>标注 <select id="sam2TaskTool"><option value="point">点击点</option><option value="box">框选区域</option></select></label><label>类型 <select id="sam2TaskPointType"><option value="foreground">目标</option><option value="background">排除</option></select></label><label>掩码模式 <select id="sam2TaskMaskMode" onchange="feSAM2TaskInvalidatePreview()"><option value="green">绿幕抠图</option><option value="white">白底抠图</option><option value="black">黑底抠图</option><option value="transparent">透明擦除抠图</option></select></label><button class="sam2-task-action-button" type="button" onclick="document.getElementById('sam2TaskMaskFile').click()">选择掩码图</button><input id="sam2TaskMaskPath" type="text" oninput="feSAM2TaskInvalidatePreview()" placeholder="或输入当前 Agent 工作区绝对路径"></div>
+      <div class="sam2-task-controls"><button class="sam2-task-action-button" type="button" onclick="feSAM2TaskClearPrompt()">清空标注</button><button class="sam2-task-action-button" type="button" onclick="feSAM2TaskClearMask()">清空掩码</button><button class="sam2-task-action-button sam2-task-action-button-preview" type="button" id="sam2TaskPreviewBtn" onclick="feSAM2TaskRequestPreview()">预览首帧</button><span id="sam2TaskPromptHint"></span></div>
+      <div class="sam2-task-preview-results" id="sam2TaskPreviewResults" hidden><div class="sam2-task-preview-head"><span><strong>首帧提取预览</strong>：<span id="sam2TaskPreviewCountdown">30 秒后自动开始完整提取</span></span><span class="sam2-task-preview-actions"><button class="sam2-task-preview-cancel" type="button" onclick="feSAM2TaskCancelPreviewStart()">取消</button><button class="sam2-task-preview-start" type="button" onclick="feSAM2TaskConfirmPreviewStart()">开始</button></span></div><div class="sam2-task-preview-coverage" id="sam2TaskPreviewCoverage"></div><div class="sam2-task-preview-images"><figure><figcaption>原始首帧</figcaption><div class="sam2-task-preview-canvas-wrap"><canvas id="sam2TaskPreviewSource" aria-label="原始视频首帧"></canvas></div></figure><figure><figcaption>绿色覆盖（确认主体边界）</figcaption><div class="sam2-task-preview-canvas-wrap"><span class="sam2-task-preview-image-actions"><button type="button" onclick="feSAM2TaskDownloadPreviewAsset('overlay')">下载</button><button type="button" onclick="feSAM2TaskCopyPreviewAsset('overlay')">复制</button></span><canvas id="sam2TaskPreviewOverlay" aria-label="SAM2 首帧绿色覆盖预览"></canvas></div></figure><figure><figcaption>提取结果（棋盘格表示透明）</figcaption><div class="sam2-task-preview-canvas-wrap"><span class="sam2-task-preview-image-actions"><button type="button" onclick="feSAM2TaskDownloadPreviewAsset('output')">下载</button><button type="button" onclick="feSAM2TaskCopyPreviewAsset('output')">复制</button></span><canvas id="sam2TaskPreviewOutput" aria-label="SAM2 首帧透明提取结果"></canvas></div></figure></div></div>
       <div class="whisper-task-toolbar"><label class="whisper-task-filter">状态 <select id="sam2TaskStatusFilter" onchange="feSAM2TaskChangeStatus(this.value)"><option value="">全部</option><option value="queued">排队中</option><option value="running">执行中</option><option value="completed">已完成</option><option value="cancelled">已取消</option><option value="failed">失败</option></select></label><span class="whisper-task-count" id="sam2TaskCount"></span></div>
       <div class="whisper-task-list" id="sam2TaskList" aria-live="polite"></div>
       <div class="whisper-task-log" id="sam2TaskLog" hidden><div class="whisper-task-log-head"><span id="sam2TaskLogTitle">执行日志</span><button class="whisper-task-log-toggle" type="button" onclick="feSAM2TaskCloseLog()" aria-label="收起日志">×</button></div><pre id="sam2TaskLogText"></pre></div>
@@ -7144,6 +7181,7 @@ body.boot-ready .boot-loading-overlay{opacity:0;visibility:hidden;pointer-events
 <div class="dependency-check-lock" id="dependencyCheckLock" role="status" aria-live="assertive" aria-atomic="true" aria-label="正在检查依赖，界面已锁定" tabindex="-1" hidden>
   <div class="dependency-check-lock-card"><span class="dependency-check-lock-spinner" aria-hidden="true"></span><span id="dependencyCheckLockText">正在检查依赖，请稍候…</span></div>
 </div>
+<div class="dependency-install-notice-stack" id="dependencyInstallNoticeStack" aria-live="polite" aria-atomic="true" hidden></div>
 <div class="fe-ffmpeg-install-dialog" id="feWhisperInstallDialog" role="dialog" aria-modal="true" aria-labelledby="feWhisperInstallTitle" aria-describedby="feWhisperInstallDesc" hidden onclick="feHandleWhisperInstallDialogClick(event)">
   <div class="fe-ffmpeg-install-card" tabindex="-1" onclick="event.stopPropagation()">
     <h3 id="feWhisperInstallTitle">需要安装 Whisper</h3>
@@ -34272,6 +34310,7 @@ function queueCenterMessageAfterBusy(chatId, rawText, agentId, fileOwners, optio
 
 function syncActiveChatAsyncControls() {
   const activeChatId = String(state.activeChat || '').trim();
+  feRenderDependencyInstallNotice(activeChatId);
   if (!activeChatId) {
     showWorking(false);
     showPreflight(false);
@@ -34958,6 +34997,7 @@ function confirmDelete() {
   setOverlayVisible(document.getElementById('deleteConfirmOverlay'), false, document.getElementById('deleteConfirm'));
   pendingDeleteId = null;
   deletedChatIds.add(id);
+  feClearDependencyInstallMonitorForChat(id);
   cleanUpDeletedChat(id);
   delete state.chats[id];
   clearPageAnnotationsForChat(id, { skipRender: true });
@@ -35012,6 +35052,7 @@ function bindDeleteConfirmActions() {
 function switchChat(id) {
   if (state.activeChat === id) {
     if (clearChatCompletionStar(id)) renderChatList();
+    feRenderDependencyInstallNotice(id);
     syncRightSidebarUrlPreviewForActiveChat();
     syncChatSessionCopyButton();
     syncQueuedCenterInputUI(id, getChatAgentId(id));
@@ -41133,9 +41174,14 @@ function bindStickyNoteInput() {
   });
 }
 
+function isEditableInputTextEmpty(value) {
+  return !String(value || '').replace(/[\s\u00a0\u200b-\u200d\u2060\ufeff]/g, '');
+}
+
 function getInputText() {
   const el = document.getElementById('msgInput');
-  return extractRequestContent(el).trim();
+  const text = extractRequestContent(el);
+  return isEditableInputTextEmpty(text) ? '' : text.trim();
 }
 
 function normalizeMessageFileOwners(value) {
@@ -43453,6 +43499,7 @@ function setSendBtnStop(isStop) {
 function syncCenterComposerState(chatId, options) {
   const resolvedChatId = String(chatId || state.activeChat || '').trim();
   const input = document.getElementById('msgInput');
+  normalizeEmptyEditableInput(input);
   const resolvedAgentId = resolvedChatId ? getChatAgentId(resolvedChatId) : '';
   const queueFull = !!(resolvedChatId && isQueuedCenterRequestLimitReached(resolvedChatId, resolvedAgentId));
   const dispatching = !!(resolvedChatId && isChatSendDispatching(resolvedChatId));
@@ -49843,7 +49890,10 @@ async function saveSettingsAsync() {
   if (onboardingChanged) setOnboardingEnabled(nextOnboardingEnabled);
   renderWikiAutoTidyToggle();
   refreshWikiLastUpdate({ silent: true, agentId }).catch(() => {});
-  if (state.activeChat) chatAgents[state.activeChat] = agentId;
+  if (state.activeChat) {
+    chatAgents[state.activeChat] = agentId;
+    feRenderDependencyInstallNotice(state.activeChat);
+  }
   if (state.activeChat && !Object.prototype.hasOwnProperty.call(chatThinking, state.activeChat)) {
     chatThinking[state.activeChat] = false;
   }
@@ -49930,7 +49980,27 @@ function normalizeBubbleDisplayText(display) {
 }
 
 function buildBubbleHtml(display) {
-  return '<span class="bubble-label">' + esc(display) + '</span><button class="bubble-del" onmousedown="event.preventDefault();const root=this.closest(\'[contenteditable]\');this.parentElement.remove();if(root)root.dispatchEvent(new Event(\'input\',{bubbles:true}))"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>';
+  return '<span class="bubble-label">' + esc(display) + '</span><button class="bubble-del" onmousedown="event.preventDefault();removeInputBubble(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>';
+}
+
+function normalizeEmptyEditableInput(input) {
+  if (!(input instanceof Element)) return false;
+  const hasBubbles = !!input.querySelector('.at-bubble');
+  const plainText = extractContent(input, false);
+  if (hasBubbles || !isEditableInputTextEmpty(plainText)) return false;
+  if (!input.innerHTML) return false;
+  input.innerHTML = '';
+  return true;
+}
+
+function removeInputBubble(button) {
+  const bubble = button && button.closest ? button.closest('.at-bubble') : null;
+  const root = bubble && bubble.closest ? bubble.closest('[contenteditable="true"]') : null;
+  if (!bubble || !root) return;
+  bubble.remove();
+  normalizeEmptyEditableInput(root);
+  if (root.id === 'msgInput') syncCenterComposerState(state.activeChat);
+  root.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 function getImageExtensionFromMime(type) {
@@ -50100,6 +50170,7 @@ function buildClipboardUploadItems(files) {
 function handleInput(el) {
   if (!el || el.classList.contains('locked')) return;
   if (isOnboardingActive() && (isAtTourOnboardingStep(onboardingState.step) || isBrowserPluginHoverTourOnboardingStep(onboardingState.step))) return;
+  normalizeEmptyEditableInput(el);
   enforceEditableInputCharLimit(el);
   // Check if @ was just typed at cursor
   const sel = window.getSelection();
@@ -56009,6 +56080,12 @@ function getVfsDropOwnerAgentId(dataTransfer) {
   return String(dataTransfer.getData('application/x-vfs-agent-id') || '').trim();
 }
 
+function getInputMediaSelectedAgentId() {
+  const selectedAgentId = String(document.getElementById('agentSelect')?.value || '').trim();
+  if (selectedAgentId) return selectedAgentId;
+  return String(state.settings.agentId || getChatAgentId(state.activeChat) || '').trim();
+}
+
 async function extractSystemDropItemsFromDataTransfer(dataTransfer) {
   const dt = dataTransfer;
   if (!dt) return { uploadItems: [], emptyDirs: [] };
@@ -56058,7 +56135,7 @@ async function extractSystemDropItemsFromDataTransfer(dataTransfer) {
 }
 
 async function uploadSystemItemsToBubbles(uploadItems, emptyDirs, targetEl, domain) {
-  const agentId = state.settings.agentId || getChatAgentId(state.activeChat);
+  const agentId = getInputMediaSelectedAgentId();
   if (!agentId) throw new Error('请先选择 Agent');
   const items = Array.isArray(uploadItems) ? uploadItems : [];
   const dirs = Array.isArray(emptyDirs) ? emptyDirs : [];
@@ -60614,7 +60691,7 @@ async function feOpenRembgTasks() { if(feRembgTaskCheckPending)return;const agen
 async function feOpenRVMTask(){if(feRVMTaskCheckPending)return;const agentId=String(feGetPreviewAgentID()||'').trim(),source=String(feAgentRelPath||'').trim();if(feFileType!=='video'||!agentId||!source||source.startsWith('/')){feSetMediaStatus('无法确定当前 Agent 工作目录中的视频文件');return;}feRVMTaskCheckPending=true;feUpdateRVMTaskButton();try{const ffmpeg=await feCheckExternalDependency('/api/ffmpeg/check','正在检查 FFmpeg，请稍候…');if(!ffmpeg.available){feShowFFmpegInstallDialog(ffmpeg.install,'rvm-preview');return;}const rvm=await feCheckExternalDependency('/api/rvm/check?agentId='+encodeURIComponent(agentId),'正在检查 Robust Video Matting，请稍候…');if(!rvm.available){feShowRVMInstallDialog(rvm.install);return;}feSetMediaStatus('');feRVMTaskOpen(agentId,source);}catch(error){feSetMediaStatus('依赖检查失败：'+((error&&error.message)||'请重试'));}finally{feRVMTaskCheckPending=false;feUpdateRVMTaskButton();}}
 function feShowRembgInstallDialog(request) { request=String(request||'').trim();if(!request){feSetMediaStatus('rembg 安装请求配置为空');return;}feRembgInstallRequest=request;const dialog=document.getElementById('feRembgInstallDialog'),button=document.getElementById('feRembgInstallConfirmBtn');if(dialog)dialog.hidden=false;window.setTimeout(()=>button?.focus({preventScroll:true}),0); }
 function feCancelRembgInstall() { const dialog=document.getElementById('feRembgInstallDialog');if(dialog)dialog.hidden=true;feRembgInstallRequest=''; }
-async function feConfirmRembgInstall() { const request=String(feRembgInstallRequest||'').trim();if(!request)return;feCancelRembgInstall();feClose();const sent=await sendCenterMessage(request,{clearInputAfterSend:false,toastOnSuccess:'',requestSource:'rembg_install'});if(!sent)vfsShowUploadToast('未能发送 rembg 安装请求，请检查当前 Chat',true); }
+async function feConfirmRembgInstall() { const request=String(feRembgInstallRequest||'').trim();if(!request)return;feCancelRembgInstall();await feDispatchDependencyInstall(request,{label:'图片提取主体',checkURL:'/api/rembg/check',requestSource:'rembg_install',closeCurrent:()=>{feRembgTaskClose();feClose();}}); }
 
 // Video matting follows the image-task list semantics but only accepts videos.
 const feRVMTaskDefaultScenario='fast';
@@ -60650,11 +60727,11 @@ async function feRVMTaskRefreshLog(state,id){const taskID=Number(id);if(!state||
 function feRVMTaskCloseLog(){const state=feRVMTaskState;if(state){state.logTaskID=0;state.logRequestSequence++;}const panel=document.getElementById('rvmTaskLog');if(panel)panel.hidden=true;}
 function feShowRVMInstallDialog(request){request=String(request||'').trim();if(!request){vfsShowUploadToast('Robust Video Matting 安装请求配置为空',true);return;}feRVMInstallRequest=request;const dialog=document.getElementById('feRVMInstallDialog'),button=document.getElementById('feRVMInstallConfirmBtn');if(dialog)dialog.hidden=false;window.setTimeout(()=>button?.focus({preventScroll:true}),0);}
 function feCancelRVMInstall(){const dialog=document.getElementById('feRVMInstallDialog');if(dialog)dialog.hidden=true;feRVMInstallRequest='';}
-async function feConfirmRVMInstall(){const request=String(feRVMInstallRequest||'').trim();if(!request)return;feCancelRVMInstall();const sent=await sendCenterMessage(request,{clearInputAfterSend:false,toastOnSuccess:'',requestSource:'rvm_install'});if(!sent)vfsShowUploadToast('未能发送 Robust Video Matting 安装请求，请检查当前 Chat',true);}
+async function feConfirmRVMInstall(){const request=String(feRVMInstallRequest||'').trim(),agentId=feDependencyInstallAgentID(feRVMTaskState&&feRVMTaskState.agentId,feGetPreviewAgentID(),vfsAgentId);if(!request)return;feCancelRVMInstall();await feDispatchDependencyInstall(request,{label:'视频提取人物',checkURL:feDependencyInstallCheckURL('/api/rvm/check',agentId),requestSource:'rvm_install',closeCurrent:()=>{feRVMTaskClose();feClose();}});}
 
 function feShowWav2LipInstallDialog(request){request=String(request||'').trim();if(!request){vfsShowUploadToast('Wav2Lip 安装请求配置为空',true);return;}feWav2LipInstallRequest=request;const dialog=document.getElementById('feWav2LipInstallDialog'),button=document.getElementById('feWav2LipInstallConfirmBtn');if(dialog)dialog.hidden=false;window.setTimeout(()=>button?.focus({preventScroll:true}),0);}
 function feCancelWav2LipInstall(){const dialog=document.getElementById('feWav2LipInstallDialog');if(dialog)dialog.hidden=true;feWav2LipInstallRequest='';}
-async function feConfirmWav2LipInstall(){const request=String(feWav2LipInstallRequest||'').trim();if(!request)return;feCancelWav2LipInstall();const sent=await sendCenterMessage(request,{clearInputAfterSend:false,toastOnSuccess:'',requestSource:'wav2lip_install'});if(!sent)vfsShowUploadToast('未能发送 Wav2Lip 安装请求，请检查当前 Chat',true);}
+async function feConfirmWav2LipInstall(){const request=String(feWav2LipInstallRequest||'').trim(),agentId=feDependencyInstallAgentID(feWav2LipTaskState&&feWav2LipTaskState.agentId,feGetPreviewAgentID(),vfsAgentId);if(!request)return;feCancelWav2LipInstall();await feDispatchDependencyInstall(request,{label:'视频对口型',checkURL:feDependencyInstallCheckURL('/api/wav2lip/check',agentId),requestSource:'wav2lip_install',closeCurrent:()=>{feWav2LipTaskClose();feClose();}});}
 async function feOpenWav2LipTask(){if(feWav2LipTaskCheckPending)return;const agentId=String(feGetPreviewAgentID()||'').trim(),source=String(feAgentRelPath||'').trim();if(feFileType!=='video'||!agentId||!source||source.startsWith('/')){feSetMediaStatus('无法确定当前 Agent 工作目录中的视频文件');return;}feWav2LipTaskCheckPending=true;feUpdateWav2LipTaskButton();try{const ffmpeg=await feCheckExternalDependency('/api/ffmpeg/check','正在检查 FFmpeg，请稍候…');if(!ffmpeg.available){feShowFFmpegInstallDialog(ffmpeg.install,'wav2lip-preview');return;}const result=await feCheckExternalDependency('/api/wav2lip/check?agentId='+encodeURIComponent(agentId),'正在检查 Wav2Lip，请稍候…');if(!result.available){feShowWav2LipInstallDialog(result.install);return;}feSetMediaStatus('');feWav2LipTaskOpen(agentId,source);}catch(error){feSetMediaStatus('依赖检查失败：'+((error&&error.message)||'请重试'));}finally{feWav2LipTaskCheckPending=false;feUpdateWav2LipTaskButton();}}
 function feWav2LipTaskSetStatus(message,error){const s=feWav2LipTaskState;if(!s)return;s.status=String(message||'');s.error=!!error;const el=document.getElementById('wav2lipTaskStatus');if(el){el.textContent=s.status;el.classList.toggle('notice',!!s.status&&!s.error);el.classList.toggle('error',s.error);}}
 function feWav2LipTaskByID(id){return feWav2LipTaskState&&feWav2LipTaskState.tasks.find(x=>Number(x.id)===Number(id));}
@@ -61653,6 +61730,20 @@ document.addEventListener('keydown', event => {
   event.stopImmediatePropagation();
 }, true);
 
+const feDependencyInstallMonitors=new Map();
+let feDependencyInstallMonitorSerial=0;
+function feDependencyInstallAgentID(...values){for(const value of values){const id=String(value||'').trim();if(id)return id;}return '';}
+function feDependencyInstallCheckURL(path,agentId=''){const id=String(agentId||'').trim();return id?path+(path.includes('?')?'&':'?')+'agentId='+encodeURIComponent(id):path;}
+function feDependencyInstallAgentForChat(chatId){const id=String(chatId||'').trim();return id?String(getChatAgentId(id)||'').trim():'';}
+function feDependencyInstallMonitorsForChat(chatId){const agentId=feDependencyInstallAgentForChat(chatId);if(!agentId)return[];return Array.from(feDependencyInstallMonitors.values()).filter(monitor=>monitor.agentId===agentId).sort((left,right)=>right.id-left.id);}
+function feDependencyInstallNoticeHide(){const stack=document.getElementById('dependencyInstallNoticeStack');if(!stack)return;stack.replaceChildren();stack.hidden=true;}
+function feDependencyInstallNoticeMessage(monitor){return monitor.status==='completed'?monitor.label+' 组件已安装完成，可以重新打开任务。':'正在安装'+monitor.label+'组件';}
+function feRenderDependencyInstallNotice(chatId=state.activeChat){const stack=document.getElementById('dependencyInstallNoticeStack'),monitors=feDependencyInstallMonitorsForChat(chatId);if(!stack||!monitors.length){feDependencyInstallNoticeHide();return;}const cards=document.createDocumentFragment();for(const monitor of monitors){const card=document.createElement('div'),spinner=document.createElement('span'),text=document.createElement('span'),view=document.createElement('button');card.className='dependency-install-notice'+(monitor.status==='completed'?' completed':'');card.setAttribute('role','region');card.setAttribute('aria-label','组件安装进度');spinner.className='dependency-install-notice-spinner';spinner.setAttribute('aria-hidden','true');text.className='dependency-install-notice-text';text.textContent=feDependencyInstallNoticeMessage(monitor);view.className='dependency-install-notice-view';view.type='button';view.textContent='查看';view.setAttribute('aria-label','查看 '+monitor.label+' 组件安装会话');view.addEventListener('click',()=>feOpenDependencyInstallChat(monitor.id));card.append(spinner,text,view);cards.append(card);}stack.replaceChildren(cards);stack.hidden=false;}
+function feClearDependencyInstallMonitor(monitorID){const id=Number(monitorID),monitor=feDependencyInstallMonitors.get(id);if(!monitor)return false;if(monitor.pollTimer)window.clearTimeout(monitor.pollTimer);if(monitor.hideTimer)window.clearTimeout(monitor.hideTimer);feDependencyInstallMonitors.delete(id);feRenderDependencyInstallNotice(state.activeChat);return true;}
+function feClearDependencyInstallMonitorForChat(chatId){const id=String(chatId||'').trim();let cleared=false;for(const monitor of Array.from(feDependencyInstallMonitors.values())){if(monitor.chatId!==id)continue;if(monitor.pollTimer)window.clearTimeout(monitor.pollTimer);if(monitor.hideTimer)window.clearTimeout(monitor.hideTimer);feDependencyInstallMonitors.delete(monitor.id);cleared=true;}if(cleared)feRenderDependencyInstallNotice(state.activeChat);return cleared;}
+function feStartDependencyInstallMonitor(chatId,label,checkURL){const originChatId=String(chatId||'').trim(),agentId=feDependencyInstallAgentForChat(originChatId);if(!originChatId||!agentId)return null;const monitor={id:++feDependencyInstallMonitorSerial,agentId,chatId:originChatId,pollTimer:null,hideTimer:null,label:String(label||'组件'),checkURL:String(checkURL||''),status:'installing'};feDependencyInstallMonitors.set(monitor.id,monitor);feRenderDependencyInstallNotice(originChatId);const poll=async()=>{const current=feDependencyInstallMonitors.get(monitor.id);if(!current)return;try{const response=await fetch(monitor.checkURL,{cache:'no-store'}),result=await response.json();const refreshed=feDependencyInstallMonitors.get(monitor.id);if(!refreshed)return;if(response.ok&&result&&result.available){refreshed.pollTimer=null;refreshed.status='completed';feRenderDependencyInstallNotice(state.activeChat);refreshed.hideTimer=window.setTimeout(()=>feClearDependencyInstallMonitor(monitor.id),5000);return;}}catch{}const refreshed=feDependencyInstallMonitors.get(monitor.id);if(refreshed)refreshed.pollTimer=window.setTimeout(poll,5000);};monitor.pollTimer=window.setTimeout(poll,2500);return monitor;}
+function feOpenDependencyInstallChat(monitorID){const monitor=feDependencyInstallMonitors.get(Number(monitorID));if(!monitor)return;const chat=state.chats[monitor.chatId];if(!chat){feClearDependencyInstallMonitor(monitor.id);vfsShowUploadToast('执行安装的会话已不存在',true);return;}switchChat(monitor.chatId);}
+async function feDispatchDependencyInstall(request,{label,checkURL,requestSource,closeCurrent}){const chatId=String(state.activeChat||'').trim();if(typeof closeCurrent==='function')closeCurrent();const monitor=feStartDependencyInstallMonitor(chatId,label,checkURL);const sent=await sendCenterMessage(request,{chatId,clearInputAfterSend:false,toastOnSuccess:'',requestSource});if(sent)return true;if(monitor)feClearDependencyInstallMonitor(monitor.id);vfsShowUploadToast('未能发送 '+label+' 安装请求，请检查对应会话',true);return false;}
 function feWhisperInstallDialogOpen() {
   const dialog = document.getElementById('feWhisperInstallDialog');
   return !!(dialog && !dialog.hidden);
@@ -61687,9 +61778,7 @@ async function feConfirmWhisperInstall() {
   if (confirm) confirm.disabled = true;
   if (dialog) dialog.hidden = true;
   feWhisperInstallRequest = '';
-  feClose();
-  const sent = await sendCenterMessage(request, { clearInputAfterSend: false, toastOnSuccess: '', requestSource: 'whisper_install' });
-  if (!sent) vfsShowUploadToast('未能发送 Whisper 安装请求，请检查当前 Chat', true);
+  await feDispatchDependencyInstall(request,{label:'音频提取文字',checkURL:'/api/whisper/check',requestSource:'whisper_install',closeCurrent:()=>{feWhisperTaskClose();feClose();}});
   if (confirm) confirm.disabled = false;
 }
 
@@ -61740,10 +61829,7 @@ async function feConfirmVoxCPMInstall() {
   if (dialog) dialog.hidden = true;
   feVoxCPMInstallRequest = '';
   feVoxCPMInstallOrigin = '';
-  if (origin === 'text-preview') feClose();
-  else vfsHideCreate();
-  const sent = await sendCenterMessage(request, { clearInputAfterSend: false, toastOnSuccess: '', requestSource: 'voxcpm_install' });
-  if (!sent) vfsShowUploadToast('未能发送 voxcpm 安装请求，请检查当前 Chat', true);
+  await feDispatchDependencyInstall(request,{label:'文字转为音频',checkURL:'/api/voxcpm/check',requestSource:'voxcpm_install',closeCurrent:()=>{feVoxCPMTaskClose();if(origin==='text-preview')feClose();else vfsHideCreate();}});
   if (confirm) confirm.disabled = false;
 }
 
@@ -64181,9 +64267,216 @@ async function copyMessagePathValueToClipboard(value) {
   vfsShowUploadToast('已复制到剪贴板', false, { placement: 'vfs' });
 }
 
-function buildMessageFileActionItems(actionState) {
+const feMediaAgentCopyState = {
+  actionState: null,
+  targetAgentId: '',
+  items: [],
+  copying: false,
+  previousFocus: null
+};
+
+function feMediaCopyTargetAgentId() {
+  const selectedAgentId = String(document.getElementById('agentSelect')?.value || '').trim();
+  if (selectedAgentId) return selectedAgentId;
+  const chatId = String(state && state.activeChat || '').trim();
+  return chatId && typeof getChatAgentId === 'function'
+    ? String(getChatAgentId(chatId) || '').trim()
+    : '';
+}
+
+function feIsMediaCopyInputBubble(bubble) {
+  return bubble instanceof Element && !!bubble.closest('#msgInput, #rsNoteInput');
+}
+
+function feMediaCopyIsSupported(actionState) {
+  return !!actionState && ['image', 'audio', 'video'].includes(detectFileType(String(actionState.filePath || '')));
+}
+
+function feMediaAgentCopyItemKey(sourceAgentId, sourcePath) {
+  return String(sourceAgentId || '').trim() + '\n' + normalizeFsPath(sourcePath);
+}
+
+function feCollectMediaAgentCopyItems(sourceBubble, actionState, targetAgentId) {
+  const itemsByKey = new Map();
+  const addItem = (sourceAgentId, sourcePath) => {
+    const normalizedAgentId = String(sourceAgentId || '').trim();
+    const normalizedPath = normalizeFsPath(sourcePath);
+    if (!normalizedAgentId || !normalizedPath || normalizedAgentId === targetAgentId) return;
+    if (!['image', 'audio', 'video'].includes(detectFileType(normalizedPath))) return;
+    const key = feMediaAgentCopyItemKey(normalizedAgentId, normalizedPath);
+    if (!itemsByKey.has(key)) itemsByKey.set(key, { sourceAgentId: normalizedAgentId, sourcePath: normalizedPath, key });
+  };
+  addItem(actionState && actionState.agentId, actionState && actionState.filePath);
+  const inputRoot = sourceBubble instanceof Element ? sourceBubble.closest('#msgInput, #rsNoteInput') : null;
+  if (inputRoot instanceof Element) {
+    inputRoot.querySelectorAll('.at-bubble[data-prefix="[FILE:"][data-agent-id]').forEach(bubble => {
+      addItem(getMessagePathOwnerAgentId(bubble), extractMessageFilePath(bubble.getAttribute('data-value') || ''));
+    });
+  }
+  return Array.from(itemsByKey.values());
+}
+
+function feOpenMessageFilePreview(actionState, sourceBubble) {
+  const targetAgentId = feMediaCopyTargetAgentId();
+  if (!feIsMediaCopyInputBubble(sourceBubble) || !feMediaCopyIsSupported(actionState) || !targetAgentId || targetAgentId === String(actionState.agentId || '').trim()) {
+    return feOpen(actionState.filePath, { agentId: actionState.agentId, workspaceRoot: actionState.workspaceRoot });
+  }
+  const items = feCollectMediaAgentCopyItems(sourceBubble, actionState, targetAgentId);
+  if (!items.length) return feOpen(actionState.filePath, { agentId: actionState.agentId, workspaceRoot: actionState.workspaceRoot });
+  feMediaAgentCopyState.actionState = actionState;
+  feMediaAgentCopyState.targetAgentId = targetAgentId;
+  feMediaAgentCopyState.items = items;
+  feMediaAgentCopyState.copying = false;
+  feMediaAgentCopyState.previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const description = document.getElementById('mediaAgentCopyConfirmDesc');
+  if (description) {
+    description.textContent = '需要复制输入框文件到当前 Agent 吗？';
+  }
+  const overlay = document.getElementById('mediaAgentCopyConfirm');
+  const card = document.getElementById('mediaAgentCopyConfirmCard');
+  setOverlayVisible(overlay, true, card);
+  window.setTimeout(() => {
+    const confirm = document.getElementById('mediaAgentCopyConfirmBtn');
+    if (confirm instanceof HTMLElement) confirm.focus({ preventScroll: true });
+  }, 0);
+}
+
+function feMediaAgentCopyReset({ restoreFocus = false } = {}) {
+  const previousFocus = feMediaAgentCopyState.previousFocus;
+  feMediaAgentCopyState.actionState = null;
+  feMediaAgentCopyState.targetAgentId = '';
+  feMediaAgentCopyState.items = [];
+  feMediaAgentCopyState.copying = false;
+  feMediaAgentCopyState.previousFocus = null;
+  if (restoreFocus && previousFocus && previousFocus.isConnected) {
+    window.setTimeout(() => previousFocus.focus({ preventScroll: true }), 0);
+  }
+}
+
+function feMediaAgentCopyCancel() {
+  if (!feMediaAgentCopyState.actionState || feMediaAgentCopyState.copying) return;
+  setOverlayVisible(document.getElementById('mediaAgentCopyConfirm'), false, document.getElementById('mediaAgentCopyConfirmCard'));
+  feMediaAgentCopyReset({ restoreFocus: true });
+}
+
+function feMediaAgentCopySetLock(locked) {
+  const overlay = document.getElementById('mediaAgentCopyLock');
+  const card = overlay ? overlay.querySelector('.domain-upload-lock-card') : null;
+  setOverlayVisible(overlay, !!locked, card);
+  if (locked && card instanceof HTMLElement) {
+    try { card.focus({ preventScroll: true }); } catch { card.focus(); }
+  }
+}
+
+function feMediaAgentCopyRefreshBubbles(sourceAgentId, sourcePath, targetAgentId, targetPath) {
+  const normalizedSourcePath = normalizeFsPath(sourcePath);
+  const roots = [document.getElementById('msgInput'), document.getElementById('rsNoteInput')].filter(root => root instanceof Element);
+  roots.forEach(root => {
+    let changed = false;
+    root.querySelectorAll('.at-bubble[data-prefix="[FILE:"][data-agent-id]').forEach(bubble => {
+      const bubbleAgentId = getMessagePathOwnerAgentId(bubble);
+      const bubblePath = normalizeFsPath(extractMessageFilePath(bubble.getAttribute('data-value') || ''));
+      if (bubbleAgentId !== sourceAgentId || bubblePath !== normalizedSourcePath) return;
+      bubble.setAttribute('data-agent-id', targetAgentId);
+      bubble.setAttribute('data-value', targetPath);
+      bubble.innerHTML = buildBubbleHtml(buildBubbleDisplayFromPath(targetPath));
+      changed = true;
+    });
+    if (changed) root.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+async function feMediaAgentCopyConfirm() {
+  const active = feMediaAgentCopyState.actionState;
+  const targetAgentId = String(feMediaAgentCopyState.targetAgentId || '').trim();
+  const items = Array.isArray(feMediaAgentCopyState.items) ? feMediaAgentCopyState.items.slice() : [];
+  if (!active || !targetAgentId || !items.length || feMediaAgentCopyState.copying) return;
+  const activeKey = feMediaAgentCopyItemKey(active.agentId, active.filePath);
+  if (!activeKey) {
+    feMediaAgentCopyCancel();
+    vfsShowUploadToast('无法确定待复制媒体文件', true);
+    return;
+  }
+  feMediaAgentCopyState.copying = true;
+  setOverlayVisible(document.getElementById('mediaAgentCopyConfirm'), false, document.getElementById('mediaAgentCopyConfirmCard'));
+  const lockDescription = document.getElementById('mediaAgentCopyLockDesc');
+  if (lockDescription) lockDescription.textContent = '正在复制 0/' + items.length + ' 个文件到当前 Agent 工作目录，请稍候';
+  feMediaAgentCopySetLock(true);
+  try {
+    const copiedWorkspace = await getWorkspaceForAgent(targetAgentId);
+    if (!copiedWorkspace) throw new Error('无法确认当前 Agent 工作目录');
+    const copiedItems = new Map();
+    const failedItems = [];
+    for (let index = 0; index < items.length; index++) {
+      const item = items[index];
+      if (lockDescription) lockDescription.textContent = '正在复制 ' + index + '/' + items.length + ' 个文件到当前 Agent 工作目录，请稍候';
+      try {
+        const sourceWorkspace = item.key === activeKey
+          ? normalizeFsPath(active.workspaceRoot || '')
+          : await getWorkspaceForAgent(item.sourceAgentId);
+        const relativePath = sourceWorkspace && isPathWithinWorkspace(item.sourcePath, sourceWorkspace)
+          ? relativeFsPath(sourceWorkspace, item.sourcePath)
+          : '';
+        if (!relativePath) throw new Error('无法确定源 Agent 工作目录');
+        const response = await fetch('/api/media/copy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sourceAgentId: item.sourceAgentId, targetAgentId, path: relativePath })
+        });
+        let result = null;
+        try { result = await response.json(); } catch {}
+        if (!response.ok || !result || result.status !== 0 || !result.savedAs || !result.path || String(result.agentId || '').trim() !== targetAgentId) {
+          throw new Error(result && result.content || '复制失败');
+        }
+        const copiedPath = normalizeFsPath(result.savedAs || '');
+        if (!copiedPath || !isPathWithinWorkspace(copiedPath, copiedWorkspace)) throw new Error('无法确认目标文件路径');
+        feMediaAgentCopyRefreshBubbles(item.sourceAgentId, item.sourcePath, targetAgentId, copiedPath);
+        copiedItems.set(item.key, copiedPath);
+      } catch (error) {
+        failedItems.push(error && error.message || '复制失败');
+      }
+    }
+    if (lockDescription) lockDescription.textContent = '已完成 ' + items.length + '/' + items.length + ' 个文件的复制处理';
+    if (failedItems.length) {
+      throw new Error('已复制 ' + copiedItems.size + '/' + items.length + ' 个文件；' + failedItems[0]);
+    }
+    const previewPath = copiedItems.get(activeKey);
+    if (!previewPath) throw new Error('复制完成，但找不到待预览文件');
+    feMediaAgentCopySetLock(false);
+    feMediaAgentCopyReset();
+    await feOpen(previewPath, { agentId: targetAgentId, workspaceRoot: copiedWorkspace });
+  } catch (error) {
+    vfsShowUploadToast('复制媒体文件失败：' + ((error && error.message) || '请重试'), true);
+  } finally {
+    feMediaAgentCopySetLock(false);
+    if (feMediaAgentCopyState.copying) feMediaAgentCopyReset({ restoreFocus: true });
+  }
+}
+
+document.addEventListener('keydown', event => {
+  const active = feMediaAgentCopyState.actionState;
+  if (!active && !feMediaAgentCopyState.copying) return;
+  if (feMediaAgentCopyState.copying) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return;
+  }
+  if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    feMediaAgentCopyCancel();
+  } else if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    void feMediaAgentCopyConfirm();
+  }
+}, true);
+
+function buildMessageFileActionItems(actionState, options) {
   const actions = [];
   if (!actionState) return actions;
+  const sourceBubble = options && options.sourceBubble;
   const canOpenDirectory = actionState.dirExists && localAdminControlIsAvailable();
   const copyValue = String(actionState.rawPath || actionState.filePath || '').trim();
   if (copyValue) {
@@ -64198,10 +64491,7 @@ function buildMessageFileActionItems(actionState) {
     actions.push({
       label: '预览',
       onClick: async () => {
-        feOpen(actionState.filePath, {
-          agentId: actionState.agentId,
-          workspaceRoot: actionState.workspaceRoot
-        });
+        await feOpenMessageFilePreview(actionState, sourceBubble);
       }
     });
   }
@@ -64520,7 +64810,7 @@ async function showInputBubbleActionsForElement(bubble) {
   const actionState = await resolveMessageFileActionState(rawValue, null, getMessagePathOwnerAgentId(bubble));
   if (!actionState) return;
   actionState.rawPath = rawValue;
-  const actions = buildMessageFileActionItems(actionState);
+  const actions = buildMessageFileActionItems(actionState, { sourceBubble: bubble });
   if (actions.length) showSelectionActionBubble(rect, actions);
 }
 
@@ -68770,30 +69060,37 @@ function feSAM2TaskUpdateButton(){const button=document.getElementById('feSAM2Ta
 function feSAM2TaskFitPreview(video){const stage=document.getElementById('sam2TaskStage'),wrap=document.querySelector('#sam2TaskOverlay .sam2-task-canvas-wrap');if(!stage||!wrap||!video||!video.videoWidth||!video.videoHeight)return;const ratio=video.videoWidth/video.videoHeight,maxWidth=Math.max(1,wrap.clientWidth),width=Math.max(1,Math.min(maxWidth,260*ratio)),height=Math.max(1,width/ratio);stage.style.width=Math.round(width)+'px';stage.style.height=Math.round(height)+'px';}
 function feSAM2TaskSetFrameReady(s,ready){if(feSAM2TaskState!==s)return;s.frameReady=!!ready;const stage=document.getElementById('sam2TaskStage'),video=document.getElementById('sam2TaskVideo'),canvas=document.getElementById('sam2TaskCanvas');if(stage)stage.classList.toggle('ready',s.frameReady);if(s.frameReady&&video&&canvas&&video.videoWidth&&video.videoHeight){feSAM2TaskFitPreview(video);canvas.width=video.videoWidth;canvas.height=video.videoHeight;}feSAM2TaskDraw();}
 function feSAM2TaskDraw(){const s=feSAM2TaskState,canvas=document.getElementById('sam2TaskCanvas');if(!s||!canvas)return;const ctx=canvas.getContext('2d');ctx.clearRect(0,0,canvas.width,canvas.height);if(!s.frameReady)return;ctx.lineWidth=Math.max(2,canvas.width/500);s.prompt.points.forEach(p=>{ctx.beginPath();ctx.fillStyle=p.foreground?'#32d583':'#ff5c70';ctx.arc(p.x,p.y,Math.max(5,canvas.width/120),0,Math.PI*2);ctx.fill();});s.prompt.boxes.forEach(b=>{ctx.strokeStyle='#5da9ff';ctx.strokeRect(b.xMin,b.yMin,b.xMax-b.xMin,b.yMax-b.yMin);});if(s.drag){const b=s.drag;ctx.strokeStyle='#fff';ctx.setLineDash([6,4]);ctx.strokeRect(b.xMin,b.yMin,b.xMax-b.xMin,b.yMax-b.yMin);ctx.setLineDash([]);}}
-function feSAM2TaskPromptHint(){const s=feSAM2TaskState,el=document.getElementById('sam2TaskPromptHint');if(!s||!el)return;const p=s.prompt,parts=[];if(p.points.length)parts.push('点击点 '+p.points.length);if(p.boxes.length)parts.push('框选 '+p.boxes.length);if(p.maskPath)parts.push('掩码图');el.textContent=parts.length?'已设置：'+parts.join('、'):'未设置标注：将自动提取最显著主体';}
+function feSAM2TaskPromptHint(){const s=feSAM2TaskState,el=document.getElementById('sam2TaskPromptHint');if(!s||!el)return;const p=s.prompt,parts=[];if(p.points.length)parts.push('点击点 '+p.points.length);if(p.boxes.length)parts.push('框选 '+p.boxes.length);el.textContent=parts.length?'已设置：'+parts.join('、'):'';}
 function feSAM2TaskRender(){const s=feSAM2TaskState;if(!s)return;const list=document.getElementById('sam2TaskList'),count=document.getElementById('sam2TaskCount'),filter=document.getElementById('sam2TaskStatusFilter'),start=document.getElementById('sam2TaskStartBtn'),preview=document.getElementById('sam2TaskPreviewBtn');if(count)count.textContent='共 '+s.total+' 条';if(filter)filter.value=s.statusFilter;if(start)start.disabled=s.creating||s.previewing||!s.sourcePath||!s.previewReady;if(preview)preview.disabled=s.creating||s.previewing||!s.sourcePath||!s.frameReady;if(list){list.innerHTML=!s.tasks.length?'<div class="whisper-task-empty">暂无视频物体提取任务。请先预览首帧，确认主体后再开始完整提取。</div>':s.tasks.map(t=>{const id=Number(t.id),status=String(t.status||''),done=status==='completed',acts=(done?'<button type="button" onclick="feSAM2TaskPreview('+id+')">预览</button><button type="button" onclick="feSAM2TaskCopy('+id+')">复制</button>':'')+((status==='queued'||status==='running')?'<button class="danger" type="button" onclick="feSAM2TaskAction(\'cancel\','+id+')">取消</button>':'')+((status==='failed'||status==='cancelled')?'<button type="button" onclick="feSAM2TaskAction(\'restart\','+id+')">重新开始</button><button class="danger" type="button" onclick="feSAM2TaskAction(\'delete\','+id+')">删除</button>':'');return '<article class="whisper-task-row"><div class="whisper-task-row-main"><div class="whisper-task-row-title"><strong>'+esc(String(t.sourcePath||''))+'</strong><span class="whisper-task-status '+esc(status)+'">'+esc(feWhisperTaskStatusName(status))+'</span><span class="whisper-task-row-inline-actions">'+acts+'</span></div><div class="whisper-task-progress"><i style="width:'+Math.max(0,Math.min(100,Number(t.progress)||0))+'%"></i></div><div class="whisper-task-meta"><span>模型：'+esc(String(t.modelName||t.model||''))+'</span><span>'+esc(feSAM2PromptText(t.prompt||{}))+'</span><span>视频：'+esc(String(t.outputPath||'等待生成'))+'</span></div></div><div class="whisper-task-row-actions"><button type="button" onclick="feSAM2TaskShowLog('+id+')">日志</button></div></article>';}).join('');}feSAM2TaskPromptHint();feSAM2TaskDraw();feSAM2TaskSetStatus(s.status,s.error);}
 function feSAM2PromptText(p){const a=[];if(Array.isArray(p.points)&&p.points.length)a.push('点击点 '+p.points.length);if(Array.isArray(p.boxes)&&p.boxes.length)a.push('框选');if(p.maskPath)a.push('掩码 '+({green:'绿幕',white:'白底',black:'黑底',transparent:'透明擦除'}[p.maskMode]||''));return a.length?a.join('、'):'自动最显著主体';}
 function feSAM2TaskCanvasPosition(event){const c=document.getElementById('sam2TaskCanvas'),r=c.getBoundingClientRect();return {x:Math.max(0,Math.min(c.width,(event.clientX-r.left)*c.width/r.width)),y:Math.max(0,Math.min(c.height,(event.clientY-r.top)*c.height/r.height))};}
 function feSAM2TaskBindPreview(){const canvas=document.getElementById('sam2TaskCanvas'),video=document.getElementById('sam2TaskVideo');if(!canvas||!video||canvas.dataset.sam2Bound)return;canvas.dataset.sam2Bound='1';canvas.addEventListener('pointerdown',e=>{const s=feSAM2TaskState;if(!s||!s.frameReady)return;e.preventDefault();const p=feSAM2TaskCanvasPosition(e);if(document.getElementById('sam2TaskTool').value==='point'){feSAM2TaskInvalidatePreview();s.prompt.points.push({x:Math.round(p.x),y:Math.round(p.y),foreground:document.getElementById('sam2TaskPointType').value!=='background'});feSAM2TaskRender();return;}s.drag={xMin:p.x,yMin:p.y,xMax:p.x,yMax:p.y};canvas.setPointerCapture(e.pointerId);feSAM2TaskDraw();});canvas.addEventListener('pointermove',e=>{const s=feSAM2TaskState;if(!s||!s.drag)return;const p=feSAM2TaskCanvasPosition(e);s.drag.xMax=p.x;s.drag.yMax=p.y;feSAM2TaskDraw();});const finish=e=>{const s=feSAM2TaskState;if(!s||!s.drag)return;const b=s.drag;s.drag=null;const x1=Math.min(b.xMin,b.xMax),x2=Math.max(b.xMin,b.xMax),y1=Math.min(b.yMin,b.yMax),y2=Math.max(b.yMin,b.yMax);if(x2-x1>3&&y2-y1>3){feSAM2TaskInvalidatePreview();s.prompt.boxes=[{xMin:Math.round(x1),yMin:Math.round(y1),xMax:Math.round(x2),yMax:Math.round(y2)}];}feSAM2TaskRender();};canvas.addEventListener('pointerup',finish);canvas.addEventListener('pointercancel',finish);video.addEventListener('loadedmetadata',()=>{const s=feSAM2TaskState;if(!s)return;feSAM2TaskSetFrameReady(s,false);video.pause();if(video.currentTime!==0)video.currentTime=0;});video.addEventListener('loadeddata',()=>{const s=feSAM2TaskState;if(!s)return;video.pause();feSAM2TaskSetFrameReady(s,true);feSAM2TaskSetStatus('首帧已就绪，可点击或框选主体。',false);});video.addEventListener('seeked',()=>{const s=feSAM2TaskState;if(!s)return;video.pause();feSAM2TaskSetFrameReady(s,true);});video.addEventListener('error',()=>{const s=feSAM2TaskState;if(!s)return;feSAM2TaskSetFrameReady(s,false);feSAM2TaskSetStatus('无法读取视频首帧，请检查视频编码。',true);});}
-function feSAM2TaskOpen(agentId,sourcePath=''){feSAM2TaskState={agentId:String(agentId||''),sourcePath:String(sourcePath||''),model:'tiny',prompt:{points:[],boxes:[],maskPath:'',maskMode:'green'},tasks:[],total:0,statusFilter:'',creating:false,previewing:false,previewReady:false,previewRequestID:0,previewStartTimer:null,status:'',error:false,logID:0,frameReady:false,drag:null,poller:null};showExclusiveOverlay(document.getElementById('sam2TaskOverlay'),document.getElementById('sam2TaskPanel'));feSAM2TaskBindPreview();feSAM2TaskLoadFrame();feSAM2TaskRender();void feSAM2TaskRefresh();startFileTaskPolling(feSAM2TaskState,feSAM2TaskRefresh);}
+function feSAM2TaskOpen(agentId,sourcePath=''){feSAM2TaskState={agentId:String(agentId||''),sourcePath:String(sourcePath||''),model:'tiny',prompt:{points:[],boxes:[],maskPath:'',maskMode:'green'},tasks:[],total:0,statusFilter:'',creating:false,previewing:false,previewReady:false,previewAssets:{},previewAssetSaves:{},previewOutputAssetCanvas:null,previewRequestID:0,previewStartTimer:null,status:'',error:false,logID:0,frameReady:false,drag:null,poller:null};showExclusiveOverlay(document.getElementById('sam2TaskOverlay'),document.getElementById('sam2TaskPanel'));feSAM2TaskBindPreview();feSAM2TaskLoadFrame();feSAM2TaskRender();void feSAM2TaskRefresh();startFileTaskPolling(feSAM2TaskState,feSAM2TaskRefresh);}
 function feSAM2TaskClose(){const s=feSAM2TaskState;if(!s)return;if(s.poller)window.clearInterval(s.poller);feSAM2TaskInvalidatePreview();const video=document.getElementById('sam2TaskVideo');if(video){video.pause();video.removeAttribute('src');video.load();}feSAM2TaskState=null;setOverlayVisible(document.getElementById('sam2TaskOverlay'),false,document.getElementById('sam2TaskPanel'));}
 function feSAM2TaskLoadFrame(){const s=feSAM2TaskState,video=document.getElementById('sam2TaskVideo'),empty=document.getElementById('sam2TaskStageEmpty'),stage=document.getElementById('sam2TaskStage');if(!s||!video)return;feSAM2TaskSetFrameReady(s,false);if(stage){stage.style.removeProperty('width');stage.style.removeProperty('height');}s.drag=null;if(!s.sourcePath){if(empty)empty.textContent='选择视频后加载首帧';video.pause();video.removeAttribute('src');video.load();return;}if(empty)empty.textContent='正在加载视频首帧…';feSAM2TaskSetStatus('正在加载视频首帧…',false);video.pause();video.src='/api/media_preview?agentId='+encodeURIComponent(s.agentId)+'&path='+encodeURIComponent(s.sourcePath);video.load();}
 async function feSAM2TaskRefresh(){const s=feSAM2TaskState;if(!s||!s.agentId)return;try{const q=new URLSearchParams({agentId:s.agentId,page:'1'});if(s.statusFilter)q.set('status',s.statusFilter);const r=await fetch('/api/sam2/tasks?'+q,{cache:'no-store'}),v=await r.json();if(!r.ok||!v||v.status!==0)throw new Error(v&&v.content||'读取任务失败');if(feSAM2TaskState!==s)return;s.tasks=Array.isArray(v.tasks)?v.tasks:[];s.total=Number(v.total)||0;if(s.logID)void feSAM2TaskRefreshLog(s,s.logID);}catch(e){if(feSAM2TaskState===s)feSAM2TaskSetStatus('刷新任务失败：'+((e&&e.message)||'请重试'),true);}finally{if(feSAM2TaskState===s)feSAM2TaskRender();}}
 function feSAM2TaskChangeStatus(value){if(!feSAM2TaskState)return;feSAM2TaskState.statusFilter=String(value||'');void feSAM2TaskRefresh();}
 function feSAM2TaskChooseVideo(){document.getElementById('sam2TaskVideoFile').click();}
 async function feSAM2TaskHandleVideo(files){const s=feSAM2TaskState;try{const items=normalizeUploadFileItems(files).filter(feRVMVideoItem);if(!s||!items.length)throw new Error('请选择视频文件');const r=await uploadItemsToAgentTmp(items.slice(0,1),{agentId:s.agentId});if(feSAM2TaskState!==s)return;feSAM2TaskInvalidatePreview();s.sourcePath=String(r.uploadedWorkspacePaths&&r.uploadedWorkspacePaths[0]||'');if(!s.sourcePath)throw new Error('服务端未返回上传文件');s.prompt={points:[],boxes:[],maskPath:'',maskMode:'green'};feSAM2TaskLoadFrame();feSAM2TaskRender();}catch(e){if(feSAM2TaskState===s)feSAM2TaskSetStatus('添加视频失败：'+((e&&e.message)||'请重试'),true);}finally{document.getElementById('sam2TaskVideoFile').value='';}}
-async function feSAM2TaskHandleMask(files){const s=feSAM2TaskState;try{const items=normalizeUploadFileItems(files);if(!s||!items.length)throw new Error('请选择掩码图');const r=await uploadItemsToAgentTmp(items.slice(0,1),{agentId:s.agentId});if(feSAM2TaskState!==s)return;feSAM2TaskInvalidatePreview();s.prompt.maskPath=String(r.uploadedWorkspacePaths&&r.uploadedWorkspacePaths[0]||'');if(!s.prompt.maskPath)throw new Error('服务端未返回上传文件');s.prompt.maskMode=document.getElementById('sam2TaskMaskMode').value;document.getElementById('sam2TaskMaskHint').textContent=s.prompt.maskPath;feSAM2TaskRender();}catch(e){if(feSAM2TaskState===s)feSAM2TaskSetStatus('上传掩码图失败：'+((e&&e.message)||'请重试'),true);}finally{document.getElementById('sam2TaskMaskFile').value='';}}
-function feSAM2TaskClearPrompt(){const s=feSAM2TaskState;if(!s)return;feSAM2TaskInvalidatePreview();s.prompt.points=[];s.prompt.boxes=[];s.prompt.maskPath='';document.getElementById('sam2TaskMaskPath').value='';document.getElementById('sam2TaskMaskHint').textContent='';feSAM2TaskRender();}
-function feSAM2TaskRequestData(s){const direct=String(document.getElementById('sam2TaskMaskPath').value||'').trim();if(direct)s.prompt.maskPath=direct;s.prompt.maskMode=document.getElementById('sam2TaskMaskMode').value;s.model=document.getElementById('sam2TaskModel').value;return {agentId:s.agentId,sourcePath:s.sourcePath,model:s.model,prompt:s.prompt};}
-function feSAM2TaskInvalidatePreview(){const s=feSAM2TaskState;if(!s)return;s.previewRequestID=(Number(s.previewRequestID)||0)+1;s.previewReady=false;if(s.previewStartTimer)window.clearInterval(s.previewStartTimer);s.previewStartTimer=null;s.previewExpiresAt=0;const results=document.getElementById('sam2TaskPreviewResults');if(results)results.hidden=true;}
+async function feSAM2TaskHandleMask(files){const s=feSAM2TaskState;try{const items=normalizeUploadFileItems(files);if(!s||!items.length)throw new Error('请选择掩码图');const r=await uploadItemsToAgentTmp(items.slice(0,1),{agentId:s.agentId});if(feSAM2TaskState!==s)return;feSAM2TaskInvalidatePreview();s.prompt.maskPath=String(r.uploadedWorkspacePaths&&r.uploadedWorkspacePaths[0]||'');if(!s.prompt.maskPath)throw new Error('服务端未返回上传文件');s.prompt.maskMode=document.getElementById('sam2TaskMaskMode').value;const input=document.getElementById('sam2TaskMaskPath');if(input)input.value=String(r.uploadedAbsPaths&&r.uploadedAbsPaths[0]||'');feSAM2TaskRender();}catch(e){if(feSAM2TaskState===s)feSAM2TaskSetStatus('上传掩码图失败：'+((e&&e.message)||'请重试'),true);}finally{document.getElementById('sam2TaskMaskFile').value='';}}
+function feSAM2TaskClearPrompt(){const s=feSAM2TaskState;if(!s)return;feSAM2TaskInvalidatePreview();s.prompt.points=[];s.prompt.boxes=[];feSAM2TaskRender();}
+function feSAM2TaskClearMask(){const s=feSAM2TaskState;if(!s)return;feSAM2TaskInvalidatePreview();s.prompt.maskPath='';document.getElementById('sam2TaskMaskFile').value='';document.getElementById('sam2TaskMaskPath').value='';feSAM2TaskRender();}
+async function feSAM2TaskRequestData(s){const direct=normalizeFsPath(document.getElementById('sam2TaskMaskPath').value||'');if(direct){if(direct.startsWith('/')){const workspace=await getWorkspaceForAgent(s.agentId);if(!workspace||!isPathWithinWorkspace(direct,workspace))throw new Error('掩码图绝对路径必须位于当前 Agent 工作区');s.prompt.maskPath=relativeFsPath(workspace,direct);}else{s.prompt.maskPath=direct;}}s.prompt.maskMode=document.getElementById('sam2TaskMaskMode').value;s.model=document.getElementById('sam2TaskModel').value;return {agentId:s.agentId,sourcePath:s.sourcePath,model:s.model,prompt:s.prompt};}
+function feSAM2TaskInvalidatePreview(){const s=feSAM2TaskState;if(!s)return;s.previewRequestID=(Number(s.previewRequestID)||0)+1;s.previewReady=false;s.previewAssets={};s.previewAssetSaves={};s.previewOutputAssetCanvas=null;if(s.previewStartTimer)window.clearInterval(s.previewStartTimer);s.previewStartTimer=null;s.previewExpiresAt=0;const results=document.getElementById('sam2TaskPreviewResults');if(results)results.hidden=true;}
 function feSAM2TaskDrawChecker(ctx,w,h){const size=Math.max(8,Math.round(w/48));for(let y=0;y<h;y+=size)for(let x=0;x<w;x+=size){ctx.fillStyle=((x/size+y/size)&1)?'#d7d7d7':'#f4f4f4';ctx.fillRect(x,y,size,size);}}
-function feSAM2TaskRenderPreview(mask,coverage){const s=feSAM2TaskState,video=document.getElementById('sam2TaskVideo'),source=document.getElementById('sam2TaskPreviewSource'),overlay=document.getElementById('sam2TaskPreviewOverlay'),output=document.getElementById('sam2TaskPreviewOutput'),results=document.getElementById('sam2TaskPreviewResults'),coverageEl=document.getElementById('sam2TaskPreviewCoverage');if(!s||!video||!source||!overlay||!output||!results||!video.videoWidth)return;const scale=Math.min(1,960/video.videoWidth),w=Math.max(1,Math.round(video.videoWidth*scale)),h=Math.max(1,Math.round(video.videoHeight*scale));for(const canvas of [source,overlay,output]){canvas.width=w;canvas.height=h;}source.getContext('2d').drawImage(video,0,0,w,h);const overlayCtx=overlay.getContext('2d');overlayCtx.drawImage(video,0,0,w,h);overlayCtx.save();overlayCtx.globalAlpha=.58;overlayCtx.fillStyle='#20dc35';overlayCtx.fillRect(0,0,w,h);overlayCtx.globalCompositeOperation='destination-in';overlayCtx.globalAlpha=1;overlayCtx.drawImage(mask,0,0,w,h);overlayCtx.restore();const ctx=output.getContext('2d');feSAM2TaskDrawChecker(ctx,w,h);ctx.save();ctx.drawImage(video,0,0,w,h);ctx.globalCompositeOperation='destination-in';ctx.drawImage(mask,0,0,w,h);ctx.restore();const percent=Math.round(Number(coverage||0)*10000)/100,warning=percent<.05||percent>85;if(coverageEl){coverageEl.textContent='主体覆盖画面 '+percent+'%'+(warning?'：可能未选中主体或选到了背景，请取消并调整标注。':'：范围正常，可确认开始完整提取。');coverageEl.classList.toggle('warn',warning);}results.hidden=false;}
+function feSAM2TaskMaskAlphaCanvas(mask,w,h){const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d',{willReadFrequently:true});canvas.width=w;canvas.height=h;ctx.drawImage(mask,0,0,w,h);const pixels=ctx.getImageData(0,0,w,h),data=pixels.data;for(let i=0;i<data.length;i+=4){const alpha=Math.max(data[i],data[i+1],data[i+2])*data[i+3]/255;data[i]=255;data[i+1]=255;data[i+2]=255;data[i+3]=alpha;}ctx.putImageData(pixels,0,0);return canvas;}
+function feSAM2TaskRenderPreview(mask,coverage){const s=feSAM2TaskState,video=document.getElementById('sam2TaskVideo'),source=document.getElementById('sam2TaskPreviewSource'),overlay=document.getElementById('sam2TaskPreviewOverlay'),output=document.getElementById('sam2TaskPreviewOutput'),results=document.getElementById('sam2TaskPreviewResults'),coverageEl=document.getElementById('sam2TaskPreviewCoverage');if(!s||!video||!source||!overlay||!output||!results||!video.videoWidth)return;const scale=Math.min(1,960/video.videoWidth),w=Math.max(1,Math.round(video.videoWidth*scale)),h=Math.max(1,Math.round(video.videoHeight*scale)),alphaMask=feSAM2TaskMaskAlphaCanvas(mask,w,h),tint=document.createElement('canvas'),cutout=document.createElement('canvas');tint.width=cutout.width=w;tint.height=cutout.height=h;for(const canvas of [source,overlay,output]){canvas.width=w;canvas.height=h;}source.getContext('2d').drawImage(video,0,0,w,h);const tintCtx=tint.getContext('2d');tintCtx.fillStyle='#20dc35';tintCtx.fillRect(0,0,w,h);tintCtx.globalCompositeOperation='destination-in';tintCtx.drawImage(alphaMask,0,0);const overlayCtx=overlay.getContext('2d');overlayCtx.drawImage(video,0,0,w,h);overlayCtx.globalAlpha=.58;overlayCtx.drawImage(tint,0,0);const cutoutCtx=cutout.getContext('2d');cutoutCtx.drawImage(video,0,0,w,h);cutoutCtx.globalCompositeOperation='destination-in';cutoutCtx.drawImage(alphaMask,0,0);s.previewOutputAssetCanvas=cutout;const ctx=output.getContext('2d');feSAM2TaskDrawChecker(ctx,w,h);ctx.drawImage(cutout,0,0);const percent=Math.round(Number(coverage||0)*10000)/100,warning=percent<.05||percent>85;if(coverageEl){coverageEl.textContent='主体覆盖画面 '+percent+'%'+(warning?'：可能未选中主体或选到了背景，请取消并调整标注。':'：范围正常，可确认开始完整提取。');coverageEl.classList.toggle('warn',warning);}results.hidden=false;}
+function feSAM2TaskPreviewAssetCanvas(kind){const s=feSAM2TaskState;return kind==='overlay'?document.getElementById('sam2TaskPreviewOverlay'):kind==='output'?s&&s.previewOutputAssetCanvas:null;}
+function feSAM2TaskPreviewAssetFilename(s,kind){const base=getFsBasename(s.sourcePath).replace(/\.[^.]+$/,'').replace(/[^a-zA-Z0-9_-]+/g,'_').replace(/^_+|_+$/g,'')||'video';return 'images/'+base+'_sam2_'+(kind==='overlay'?'绿色覆盖':'提取结果')+'.png';}
+async function feSAM2TaskSavePreviewAsset(kind){const s=feSAM2TaskState;if(!s||!s.previewReady)throw new Error('请先完成首帧预览');s.previewAssets=s.previewAssets||{};s.previewAssetSaves=s.previewAssetSaves||{};if(s.previewAssets[kind])return s.previewAssets[kind];if(s.previewAssetSaves[kind])return s.previewAssetSaves[kind];const canvas=feSAM2TaskPreviewAssetCanvas(kind);if(!canvas||!canvas.width||!canvas.height)throw new Error('预览图尚未准备完成');const save=(async()=>{const data=canvas.toDataURL('image/png').split(',')[1],path=feSAM2TaskPreviewAssetFilename(s,kind),r=await fetch('/api/edit?agentId='+encodeURIComponent(s.agentId)+'&path='+encodeURIComponent(path)+'&saveAsNew=true',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:data})}),v=await r.json();if(!r.ok||!v||v.status!==0||!v.savedAs)throw new Error(v&&v.content||'保存预览图失败');if(feSAM2TaskState===s)s.previewAssets[kind]=String(v.savedAs);return String(v.savedAs);})();s.previewAssetSaves[kind]=save;try{return await save;}finally{if(feSAM2TaskState===s)delete s.previewAssetSaves[kind];}}
+async function feSAM2TaskDownloadPreviewAsset(kind){try{const path=await feSAM2TaskSavePreviewAsset(kind);triggerPathDownload(path);feSAM2TaskSetStatus('已开始下载'+(kind==='overlay'?'绿色覆盖图':'提取结果图'),false);}catch(e){feSAM2TaskSetStatus('下载预览图失败：'+((e&&e.message)||'请重试'),true);}}
+async function feSAM2TaskCopyPreviewAsset(kind){try{const path=await feSAM2TaskSavePreviewAsset(kind);await copyTextToClipboard(path);feSAM2TaskSetStatus((kind==='overlay'?'绿色覆盖图':'提取结果图')+'系统绝对路径已复制',false);}catch(e){feSAM2TaskSetStatus('复制预览图路径失败：'+((e&&e.message)||'请重试'),true);}}
 function feSAM2TaskUpdatePreviewCountdown(){const s=feSAM2TaskState;if(!s||!s.previewExpiresAt)return;const left=Math.max(0,Math.ceil((s.previewExpiresAt-Date.now())/1000)),el=document.getElementById('sam2TaskPreviewCountdown');if(el)el.textContent=left+' 秒后自动开始完整提取';if(left<=0){feSAM2TaskConfirmPreviewStart(true);}}
 function feSAM2TaskBeginPreviewCountdown(){const s=feSAM2TaskState;if(!s)return;if(s.previewStartTimer)window.clearInterval(s.previewStartTimer);const results=document.getElementById('sam2TaskPreviewResults');if(results)results.hidden=false;s.previewExpiresAt=Date.now()+30000;feSAM2TaskUpdatePreviewCountdown();s.previewStartTimer=window.setInterval(feSAM2TaskUpdatePreviewCountdown,250);}
-async function feSAM2TaskRequestPreview(){const s=feSAM2TaskState;if(!s||s.previewing||!s.sourcePath||!s.frameReady)return;feSAM2TaskInvalidatePreview();const requestID=s.previewRequestID,body=feSAM2TaskRequestData(s);s.previewing=true;feSAM2TaskSetStatus('正在用当前配置提取首帧，请稍候…',false);feSAM2TaskRender();try{const r=await fetch('/api/sam2/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),v=await r.json();if(!r.ok||!v||v.status!==0||!v.maskData)throw new Error(v&&v.content||'首帧预览失败');const image=new Image();await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=()=>reject(new Error('无法读取 SAM2 首帧掩码'));image.src=v.maskData;});if(feSAM2TaskState!==s||s.previewRequestID!==requestID)return;feSAM2TaskRenderPreview(image,v.coverage);s.previewReady=true;feSAM2TaskBeginPreviewCountdown();feSAM2TaskSetStatus('预览完成：不满意请取消本次并调整标注；未操作将自动开始。',false);}catch(e){if(feSAM2TaskState===s&&s.previewRequestID===requestID)feSAM2TaskSetStatus('首帧预览失败：'+((e&&e.message)||'请重试'),true);}finally{if(feSAM2TaskState===s){s.previewing=false;feSAM2TaskRender();}}}
+async function feSAM2TaskRequestPreview(){const s=feSAM2TaskState;if(!s||s.previewing||!s.sourcePath||!s.frameReady)return;feSAM2TaskInvalidatePreview();const requestID=s.previewRequestID;s.previewing=true;feSAM2TaskSetStatus('正在用当前配置提取首帧，请稍候…',false);feSAM2TaskRender();try{const body=await feSAM2TaskRequestData(s),r=await fetch('/api/sam2/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),v=await r.json();if(!r.ok||!v||v.status!==0||!v.maskData)throw new Error(v&&v.content||'首帧预览失败');const image=new Image();await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=()=>reject(new Error('无法读取 SAM2 首帧掩码'));image.src=v.maskData;});if(feSAM2TaskState!==s||s.previewRequestID!==requestID)return;feSAM2TaskRenderPreview(image,v.coverage);s.previewReady=true;feSAM2TaskBeginPreviewCountdown();feSAM2TaskSetStatus('预览完成：不满意请取消本次并调整标注；未操作将自动开始。',false);}catch(e){if(feSAM2TaskState===s&&s.previewRequestID===requestID)feSAM2TaskSetStatus('首帧预览失败：'+((e&&e.message)||'请重试'),true);}finally{if(feSAM2TaskState===s){s.previewing=false;feSAM2TaskRender();}}}
 function feSAM2TaskCancelPreviewStart(){const s=feSAM2TaskState;if(!s)return;feSAM2TaskInvalidatePreview();feSAM2TaskSetStatus('已取消自动开始，可调整标注后重新预览。',false);feSAM2TaskRender();}
 function feSAM2TaskConfirmPreviewStart(fromTimer=false){const s=feSAM2TaskState;if(!s||s.creating)return;feSAM2TaskInvalidatePreview();void feSAM2TaskStart(fromTimer);}
-async function feSAM2TaskStart(fromPreview=false){const s=feSAM2TaskState;if(!s||s.creating)return;if(!fromPreview)feSAM2TaskInvalidatePreview();const body=feSAM2TaskRequestData(s);s.creating=true;feSAM2TaskRender();try{const r=await fetch('/api/sam2/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),v=await r.json();if(!r.ok||!v||v.status!==0)throw new Error(v&&v.content||'创建任务失败');s.status='已加入队列。';s.error=false;await feSAM2TaskRefresh();}catch(e){feSAM2TaskSetStatus('创建任务失败：'+((e&&e.message)||'请重试'),true);}finally{if(feSAM2TaskState===s){s.creating=false;feSAM2TaskRender();}}}
+async function feSAM2TaskStart(fromPreview=false){const s=feSAM2TaskState;if(!s||s.creating)return;if(!fromPreview)feSAM2TaskInvalidatePreview();s.creating=true;feSAM2TaskRender();try{const body=await feSAM2TaskRequestData(s),r=await fetch('/api/sam2/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),v=await r.json();if(!r.ok||!v||v.status!==0)throw new Error(v&&v.content||'创建任务失败');s.status='已加入队列。';s.error=false;await feSAM2TaskRefresh();}catch(e){feSAM2TaskSetStatus('创建任务失败：'+((e&&e.message)||'请重试'),true);}finally{if(feSAM2TaskState===s){s.creating=false;feSAM2TaskRender();}}}
 async function feSAM2TaskAction(action,id){const s=feSAM2TaskState;try{const r=await fetch('/api/sam2/tasks/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agentId:s.agentId,id:Number(id)})}),v=await r.json();if(!r.ok||!v||v.status!==0)throw new Error(v&&v.content||'请求失败');await feSAM2TaskRefresh();}catch(e){feSAM2TaskSetStatus('请求失败：'+((e&&e.message)||'请重试'),true);}}
 async function feSAM2TaskCopy(id){const t=feSAM2TaskState&&feSAM2TaskState.tasks.find(x=>Number(x.id)===Number(id));if(t&&t.savedAs)try{await copyTextToClipboard(t.savedAs);feSAM2TaskSetStatus('视频绝对路径已复制',false);}catch(e){feSAM2TaskSetStatus('复制失败',true);}}
 async function feSAM2TaskPreview(id){const s=feSAM2TaskState,t=s&&s.tasks.find(x=>Number(x.id)===Number(id)),path=String(t&&t.outputPath||'').replace(/\.mov$/i,'.mp4');if(!s||!path)return;const root=await getWorkspaceForAgent(s.agentId);if(root)await feOpen(joinFsPath(root,path),{agentId:s.agentId,workspaceRoot:root});}
@@ -68803,7 +69100,7 @@ function feSAM2TaskCloseLog(){if(feSAM2TaskState)feSAM2TaskState.logID=0;documen
 let feSAM2InstallRequest='';
 function feShowSAM2InstallDialog(request){request=String(request||'').trim();if(!request){vfsShowUploadToast('SAM2 安装请求配置为空',true);return;}feSAM2InstallRequest=request;const dialog=document.getElementById('feSAM2InstallDialog'),button=document.getElementById('feSAM2InstallConfirmBtn');if(dialog)dialog.hidden=false;window.setTimeout(()=>button?.focus({preventScroll:true}),0);}
 function feCancelSAM2Install(){const dialog=document.getElementById('feSAM2InstallDialog');if(dialog)dialog.hidden=true;feSAM2InstallRequest='';}
-async function feConfirmSAM2Install(){const request=String(feSAM2InstallRequest||'').trim();if(!request)return;feCancelSAM2Install();const sent=await sendCenterMessage(request,{clearInputAfterSend:false,toastOnSuccess:'',requestSource:'sam2_install'});if(!sent)vfsShowUploadToast('未能发送 SAM2 安装请求，请检查当前 Chat',true);}
+async function feConfirmSAM2Install(){const request=String(feSAM2InstallRequest||'').trim(),agentId=feDependencyInstallAgentID(feSAM2TaskState&&feSAM2TaskState.agentId,feGetPreviewAgentID(),vfsAgentId);if(!request)return;feCancelSAM2Install();await feDispatchDependencyInstall(request,{label:'视频提取主体',checkURL:feDependencyInstallCheckURL('/api/sam2/check',agentId),requestSource:'sam2_install',closeCurrent:()=>{feSAM2TaskClose();feClose();}});}
 async function feOpenSAM2Task(){const agentId=String(feGetPreviewAgentID()||'').trim(),source=String(feAgentRelPath||'').trim();if(!agentId||!source||source.startsWith('/')){feSetMediaStatus('无法确定当前 Agent 工作目录中的视频文件');return;}try{const ff=await feCheckExternalDependency('/api/ffmpeg/check','正在检查 FFmpeg，请稍候…');if(!ff.available){feShowFFmpegInstallDialog(ff.install,'sam2-preview');return;}const sam2=await feCheckExternalDependency('/api/sam2/check?agentId='+encodeURIComponent(agentId),'正在检查 SAM2，请稍候…');if(!sam2.available){feShowSAM2InstallDialog(sam2.install);return;}feSAM2TaskOpen(agentId,source);}catch(e){feSetMediaStatus('依赖检查失败：'+((e&&e.message)||'请重试'));}}
 const feSAM2TaskRenderBase=feSAM2TaskRender;feSAM2TaskRender=function(){feSAM2TaskRenderBase();const source=document.getElementById('sam2TaskSource'),state=feSAM2TaskState;if(source)source.textContent=String(state&&state.sourcePath||'未选择视频');};
 const feUpdateRVMTaskButtonForSAM2=feUpdateRVMTaskButton;feUpdateRVMTaskButton=function(){feUpdateRVMTaskButtonForSAM2();feSAM2TaskUpdateButton();};

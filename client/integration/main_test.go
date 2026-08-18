@@ -4346,6 +4346,90 @@ func TestHandleMediaPreviewStreamsAgentScopedMedia(t *testing.T) {
 	}
 }
 
+func TestHandleMediaCopyCopiesAgentScopedMediaWithoutChangingSource(t *testing.T) {
+	agentRoot := t.TempDir()
+	sourceWorkspace := filepath.Join(agentRoot, "agent-a")
+	targetWorkspace := filepath.Join(agentRoot, "agent-b")
+	sourcePath := filepath.Join(sourceWorkspace, "tmp", "nested", "clip.mp4")
+	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
+		t.Fatalf("mkdir source media directory: %v", err)
+	}
+	if err := os.MkdirAll(targetWorkspace, 0o755); err != nil {
+		t.Fatalf("mkdir target workspace: %v", err)
+	}
+	sourceContent := []byte("source-video-bytes")
+	if err := os.WriteFile(sourcePath, sourceContent, 0o640); err != nil {
+		t.Fatalf("write source media: %v", err)
+	}
+
+	handler := handleMediaCopy(&Config{AgentDir: agentRoot})
+	resolvedTargetWorkspace, err := getWorkspaceByAgentID(&Config{AgentDir: agentRoot}, "agent-b")
+	if err != nil {
+		t.Fatalf("resolve target workspace: %v", err)
+	}
+	copyRequest := func(sourceAgentID, targetAgentID, path string) (*httptest.ResponseRecorder, mediaCopyResponse) {
+		payload, err := json.Marshal(mediaCopyRequest{SourceAgentID: sourceAgentID, TargetAgentID: targetAgentID, Path: path})
+		if err != nil {
+			t.Fatalf("marshal media copy request: %v", err)
+		}
+		req := httptest.NewRequest(http.MethodPost, "/api/media/copy", bytes.NewReader(payload))
+		rec := httptest.NewRecorder()
+		handler(rec, req)
+		var response mediaCopyResponse
+		if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+			t.Fatalf("decode media copy response: %v", err)
+		}
+		return rec, response
+	}
+
+	rec, first := copyRequest("agent-a", "agent-b", "tmp/nested/clip.mp4")
+	if rec.Code != http.StatusOK || first.Status != 0 {
+		t.Fatalf("first copy = HTTP %d, %#v", rec.Code, first)
+	}
+	if first.AgentID != "agent-b" || first.Path != "tmp/nested/clip.mp4" {
+		t.Fatalf("first copy target = %#v, want agent-b/tmp/nested/clip.mp4", first)
+	}
+	if want := filepath.Join(resolvedTargetWorkspace, "tmp", "nested", "clip.mp4"); first.SavedAs != want {
+		t.Fatalf("first savedAs = %q, want %q", first.SavedAs, want)
+	}
+	if copied, err := os.ReadFile(first.SavedAs); err != nil || !bytes.Equal(copied, sourceContent) {
+		t.Fatalf("copied data = %q, err=%v; want %q", copied, err, sourceContent)
+	}
+	if original, err := os.ReadFile(sourcePath); err != nil || !bytes.Equal(original, sourceContent) {
+		t.Fatalf("source data after copy = %q, err=%v; want unchanged %q", original, err, sourceContent)
+	}
+
+	rec, second := copyRequest("agent-a", "agent-b", "tmp/nested/clip.mp4")
+	if rec.Code != http.StatusOK || second.Status != 0 {
+		t.Fatalf("second copy = HTTP %d, %#v", rec.Code, second)
+	}
+	if second.Path == first.Path || second.SavedAs == first.SavedAs {
+		t.Fatalf("second copy did not use a distinct collision path: first=%#v second=%#v", first, second)
+	}
+	if matched, err := regexp.MatchString(`^tmp/nested/clip_\d{8}_\d{6}\.mp4$`, filepath.ToSlash(second.Path)); err != nil || !matched {
+		t.Fatalf("collision path = %q, want timestamp suffix (match=%v err=%v)", second.Path, matched, err)
+	}
+
+	for _, test := range []struct {
+		name          string
+		sourceAgentID string
+		targetAgentID string
+		path          string
+		wantStatus    int
+	}{
+		{name: "same Agent", sourceAgentID: "agent-a", targetAgentID: "agent-a", path: "tmp/nested/clip.mp4", wantStatus: http.StatusBadRequest},
+		{name: "path escape", sourceAgentID: "agent-a", targetAgentID: "agent-b", path: "../agent-b/clip.mp4", wantStatus: http.StatusBadRequest},
+		{name: "missing source", sourceAgentID: "agent-a", targetAgentID: "agent-b", path: "tmp/missing.mp4", wantStatus: http.StatusNotFound},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			rec, response := copyRequest(test.sourceAgentID, test.targetAgentID, test.path)
+			if rec.Code != test.wantStatus || response.Status != 1 {
+				t.Fatalf("copy = HTTP %d, %#v; want HTTP %d with failure", rec.Code, response, test.wantStatus)
+			}
+		})
+	}
+}
+
 func TestHandleEditSavesNewBinaryAudioWithoutChangingSource(t *testing.T) {
 	root := t.TempDir()
 	workspace := filepath.Join(root, "agent-a")
