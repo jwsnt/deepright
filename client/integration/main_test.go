@@ -3195,7 +3195,19 @@ func TestProxyChatCompletionsPrunesRedundantTopLevelAgentFieldsFromRequestMetada
 	if meta["hello"] != "world" {
 		t.Fatalf("metadata.hello = %#v, want %q", meta["hello"], "world")
 	}
-	for _, key := range []string{"workspace", "skills", "media", "soul", "user", "dir", "test"} {
+	if meta["workspace"] == "/tmp/fake-workspace" {
+		t.Fatalf("metadata.workspace should not keep forged value: %#v", meta["workspace"])
+	}
+	if meta["workspace"] != agentDir {
+		t.Fatalf("metadata.workspace = %#v, want %q", meta["workspace"], agentDir)
+	}
+	if meta["dir"] == "/tmp/fake-dir" {
+		t.Fatalf("metadata.dir should not keep forged value: %#v", meta["dir"])
+	}
+	if meta["dir"] != tmp {
+		t.Fatalf("metadata.dir = %#v, want %q", meta["dir"], tmp)
+	}
+	for _, key := range []string{"skills", "media", "soul", "user", "test"} {
 		if _, exists := meta[key]; exists {
 			t.Fatalf("metadata.%s should be removed, got %#v", key, meta[key])
 		}

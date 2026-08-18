@@ -89,6 +89,28 @@ func findAgent(agents []agentcore.Agent, agentID string) *agentcore.Agent {
 	return nil
 }
 
+func injectSelectedAgentWorkspaceMetadata(metaMap map[string]interface{}, metadata *AgentOutput) {
+	if metaMap == nil {
+		return
+	}
+	delete(metaMap, "workspace")
+	if metadata == nil {
+		return
+	}
+	agentID, _ := metaMap["agentId"].(string)
+	agentID = strings.TrimSpace(agentID)
+	if agentID == "" {
+		return
+	}
+	agent := findAgent(metadata.Agents, agentID)
+	if agent == nil {
+		return
+	}
+	if workspace := strings.TrimSpace(agent.Workspace); workspace != "" {
+		metaMap["workspace"] = workspace
+	}
+}
+
 func normalizeRouterRemoteList(input interface{}) []string {
 	switch value := input.(type) {
 	case []string:
@@ -17610,6 +17632,7 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 		if mm, ok := reqData["metadata"].(map[string]interface{}); ok {
 			mm["type"] = chatType
 			pruneForwardedChatMetadata(mm)
+			injectSelectedAgentWorkspaceMetadata(mm, metadata)
 			injectApplicationDataDirMetadata(mm, cfg.AgentDir)
 			if err := injectIntegrationConfigPathMetadata(mm, cfg); err != nil {
 				log.Printf("proxy: integration config unavailable: %v", err)
