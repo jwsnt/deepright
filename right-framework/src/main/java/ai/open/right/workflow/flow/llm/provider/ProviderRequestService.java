@@ -189,6 +189,7 @@ abstract public class ProviderRequestService<T extends ProviderRequest> {
         // 多论会话记忆记忆时间
         request.setExpired(this.buildExpired(request, llmConfig, llmQuery));
         /////////////////////
+        request.setHeaderKey(this.buildHeaderKey(request, llmConfig, llmQuery));
         request.setMetadata(this.buildMetadata(request, llmConfig, llmQuery));
         // 加载Token和Model
         request.setToken(this.buildToken(request, llmConfig, llmQuery));
@@ -280,6 +281,10 @@ abstract public class ProviderRequestService<T extends ProviderRequest> {
 
     protected String buildNotifier(T request, LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
         return MapUtils.getString(llmQuery.getMetadata(), ProviderRequestService.KEY_INTERNAL + "notifier", llmConfig.getNotifier());
+    }
+
+    protected String buildHeaderKey(T request, LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
+        return MapUtils.getString(llmQuery.getMetadata(), ProviderRequestService.KEY_INTERNAL + "headerKey");
     }
 
     protected Integer buildExpired(T request, LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {

@@ -8,6 +8,7 @@ import com.fasterxml.jackson.core.JacksonException;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.concurrent.FutureCallback;
@@ -23,12 +24,12 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executor;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Slf4j
 @Getter
@@ -172,6 +173,7 @@ public class ProviderReader<T extends ProviderRequest> extends AbstractAsyncResp
     protected void onResponseReceived(HttpResponse httpResponse) throws IOException {
         this.prepareMDC();
         this.code = httpResponse.getStatusLine().getStatusCode();
+        this.appendHeader(httpResponse);
         // 状态码检查,INFO 日志
         if (log.isInfoEnabled()) {
             log.info("The request took {} milliseconds to receive the response={}", this.request.getMessage().getConsuming(), this.code);
@@ -180,6 +182,17 @@ public class ProviderReader<T extends ProviderRequest> extends AbstractAsyncResp
 
     protected Boolean hasRemain(ContentDecoder decoder) throws Exception {
         return decoder.read(this.byteBuffer) > 0;
+    }
+
+    // 提取响应Header
+    protected void appendHeader(HttpResponse httpResponse) {
+        try {
+            this.request.appendHeaders(Optional.ofNullable(httpResponse.getAllHeaders())
+                    .map(Arrays::stream).orElseGet(Stream::empty)
+                    .collect(Collectors.toMap(header -> header.getName().toLowerCase(Locale.ROOT), Header::getValue, (oldVal, newVal) -> newVal)));
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+        }
     }
 
     @Override

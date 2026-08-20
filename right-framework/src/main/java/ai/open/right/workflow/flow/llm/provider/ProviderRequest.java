@@ -45,6 +45,9 @@ public class ProviderRequest {
     // 接管型Workflow FunCall
     protected Map<String, LLMTakeover> takeovers;
 
+    // 服务商的响应Header
+    protected Map<String, Object> providerHeaders;
+
     protected Map<String, Object> extendedConfig;
 
     protected List<MediaContext> mediaContext;
@@ -94,6 +97,9 @@ public class ProviderRequest {
     protected Boolean pureQuery = true;
 
     protected Boolean writeable;
+
+    // 服务商Header Key
+    protected String headerKey;
 
     protected Integer maxError;
 
@@ -185,6 +191,10 @@ public class ProviderRequest {
         return this.funCallData != null;
     }
 
+    public Boolean hasHeaderKey() {
+        return !StringUtils.isEmpty(this.headerKey);
+    }
+
     public Boolean hasFunCall() {
         return !CollectionUtils.isEmpty(this.funCalls);
     }
@@ -220,12 +230,26 @@ public class ProviderRequest {
         return StringUtils.equalsIgnoreCase(this.api, name);
     }
 
+    public void appendHeaders(Map<String, Object> headers) throws Exception {
+        if (!MapUtils.isEmpty(headers)) {
+            this.providerHeaders = this.providerHeaders != null ? this.providerHeaders : new HashMap<String, Object>();
+            this.providerHeaders.putAll(headers);
+        }
+    }
+
     public void appendResponse(String response) throws Exception {
         this.providerData.appendResponse(response);
     }
 
     public void appendRequest(String request) throws Exception {
         this.providerData.appendRequest(request);
+    }
+
+    public ProviderRequest putHeaders(Map<String, Object> headers) {
+        if (this.hasHeaderKey() && !MapUtils.isEmpty(this.getProviderHeaders()) && headers != null) {
+            headers.put(this.getHeaderKey(), this.getProviderHeaders());
+        }
+        return this;
     }
 
     public ProviderRequest putExtended(String key, Object value) {

@@ -104,7 +104,9 @@ public class ProviderReaderCallback implements Runnable, FutureCallback<Void> {
     protected void notifyException(WorkflowException exception) throws Exception {
         if (!this.notified) {
             // 仅通知一次
-            this.notifierService.notify(Segment.failed(this.workTask, exception.getMessage(), this.workTask.getNotifier(), exception.getCode()), this.workTask);
+            Segment segment = Segment.failed(this.workTask, exception.getMessage(), this.workTask.getNotifier(), exception.getCode());
+            this.request.putHeaders(segment.getMetadata());
+            this.notifierService.notify(segment, this.workTask);
             this.notified = true;
         } else if (log.isErrorEnabled()) {
             WorkflowException.dolog(exception);

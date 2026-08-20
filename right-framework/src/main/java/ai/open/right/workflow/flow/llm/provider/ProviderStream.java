@@ -133,6 +133,8 @@ abstract public class ProviderStream<T extends ProviderRequest> implements Signa
             }
             if (this.notify || finished) {
                 this.segment.reset(finished, this.index);
+                // 追加服务商的Header
+                this.addProviderHeaders(finished);
                 this.notifierService.notify(this.segment, this.request.getMessage(), this.request.getMessage());
                 this.offset = this.contentBuffer.length();
                 this.index++;
@@ -159,6 +161,14 @@ abstract public class ProviderStream<T extends ProviderRequest> implements Signa
     // 记录用量
     protected void tokenStatistic(Map<String, Object> body) throws Exception {
 
+    }
+
+    // 追加服务商Header
+    protected void addProviderHeaders(Boolean finished) throws Exception {
+        // 完成态 && 配置Key && 存在Header
+        if (finished) {
+            this.request.putHeaders(this.segment.getMetadata());
+        }
     }
 
     // 获取当前所有Fun Call Request的Response
