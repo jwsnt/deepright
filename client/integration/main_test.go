@@ -91,6 +91,226 @@ func TestIntegrationTaskContentParsesEchoFlag(t *testing.T) {
 	}
 }
 
+func withChatHistoryDatabase(t *testing.T) *sql.DB {
+	t.Helper()
+	withIntegrationChatHistoryConfig(t, 50, 168)
+	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "data"))
+	if err != nil {
+		t.Fatalf("open chat history db: %v", err)
+	}
+	ensureChatHistorySchema(db)
+	previous := cronDB
+	cronDB = db
+	t.Cleanup(func() {
+		cronDB = previous
+		_ = db.Close()
+	})
+	return db
+}
+
+func withIntegrationChatHistoryConfig(t *testing.T, restore, cleanHours int) {
+	t.Helper()
+	appDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(appDir, "config"), 0o755); err != nil {
+		t.Fatalf("create integration config dir: %v", err)
+	}
+	config := fmt.Sprintf(`{"chat":{"restore":%d,"clean":%d}}`, restore, cleanHours)
+	if err := os.WriteFile(filepath.Join(appDir, "config", "config.json"), []byte(config), 0o644); err != nil {
+		t.Fatalf("write integration chat config: %v", err)
+	}
+	previousExecutable := integrationExecutableFn
+	integrationExecutableFn = func() (string, error) {
+		return filepath.Join(appDir, "integration"), nil
+	}
+	t.Cleanup(func() {
+		integrationExecutableFn = previousExecutable
+	})
+}
+
+func TestReadIntegrationChatHistoryConfig(t *testing.T) {
+	withIntegrationChatHistoryConfig(t, 4, 72)
+	config, err := readIntegrationChatHistoryConfig()
+	if err != nil {
+		t.Fatalf("read chat config: %v", err)
+	}
+	if config.Restore != 4 || config.CleanHours != 72 {
+		t.Fatalf("chat config = %#v, want restore=4 cleanHours=72", config)
+	}
+}
+
+func TestEnsureChatHistorySchemaMigratesCreatedColumn(t *testing.T) {
+	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "data"))
+	if err != nil {
+		t.Fatalf("open chat history db: %v", err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`CREATE TABLE chat_history_message (id INTEGER PRIMARY KEY AUTOINCREMENT, agent_id TEXT NOT NULL DEFAULT '', chat_id TEXT NOT NULL, role TEXT NOT NULL, content_json TEXT NOT NULL, created_at TEXT NOT NULL)`); err != nil {
+		t.Fatalf("create legacy chat history schema: %v", err)
+	}
+
+	ensureChatHistorySchema(db)
+	if _, err := db.Exec(`INSERT INTO chat_history_message (agent_id, chat_id, role, content_json, created, created_at) VALUES ('agent-a', 'legacy-chat', 'user', '"legacy"', 123, '2026-08-27T12:00:00.000')`); err != nil {
+		t.Fatalf("insert migrated chat history row: %v", err)
+	}
+}
+
+func TestPersistCompletedChatHistoryStoresOpenAIUserAssistantPair(t *testing.T) {
+	db := withChatHistoryDatabase(t)
+	userCreated := int64(1_788_000_000_000)
+	assistantCreated := userCreated + 500
+	userContent := []interface{}{
+		map[string]interface{}{"type": "input_text", "text": "describe this image"},
+		map[string]interface{}{"type": "input_image", "image_url": "https://example.test/image.png"},
+	}
+	persistCompletedChatHistory("agent-a", "chat-history", userContent, userCreated, "The image contains a tree.", assistantCreated)
+	persistCompletedChatHistory("agent-a", "chat-history", "unfinished", userCreated, "", assistantCreated)
+
+	rows, err := db.Query(`SELECT role, content_json, created FROM chat_history_message WHERE chat_id = ? ORDER BY id`, "chat-history")
+	if err != nil {
+		t.Fatalf("query chat history: %v", err)
+	}
+	defer rows.Close()
+	var got []chatHistoryMessage
+	for rows.Next() {
+		var role, rawContent string
+		var created int64
+		if err := rows.Scan(&role, &rawContent, &created); err != nil {
+			t.Fatalf("scan chat history: %v", err)
+		}
+		var content interface{}
+		if err := json.Unmarshal([]byte(rawContent), &content); err != nil {
+			t.Fatalf("decode chat history content: %v", err)
+		}
+		got = append(got, chatHistoryMessage{Role: role, Content: content, Created: created})
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate chat history: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("history rows = %#v, want one user/assistant pair", got)
+	}
+	if got[0].Role != chatHistoryRoleUser || !reflect.DeepEqual(got[0].Content, userContent) {
+		t.Fatalf("user history = %#v, want %#v", got[0], userContent)
+	}
+	if got[1].Role != chatHistoryRoleAssistant || got[1].Content != "The image contains a tree." {
+		t.Fatalf("assistant history = %#v", got[1])
+	}
+	if got[0].Created != userCreated || got[1].Created != assistantCreated {
+		t.Fatalf("history timestamps = %#v, want user=%d assistant=%d", got, userCreated, assistantCreated)
+	}
+}
+
+func TestInjectChatHistoryMessagesOrdersPageMemoAndFeishuRequests(t *testing.T) {
+	withChatHistoryDatabase(t)
+	persistCompletedChatHistory("agent-a", "shared-chat", "first request", 1_788_000_000_000, "first response", 1_788_000_000_500)
+
+	for _, test := range []struct {
+		name     string
+		messages interface{}
+	}{
+		{
+			name: "page",
+			messages: []interface{}{
+				map[string]interface{}{"role": "system", "content": "follow policy"},
+				map[string]interface{}{"role": "developer", "content": "format markdown"},
+				map[string]interface{}{"role": "user", "content": "second page request"},
+			},
+		},
+		{
+			name:     "memo",
+			messages: []interface{}{map[string]interface{}{"role": "user", "content": "second memo request"}},
+		},
+		{
+			name:     "feishu",
+			messages: []interface{}{map[string]interface{}{"role": "user", "content": "second feishu request"}},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			reqData := map[string]interface{}{"messages": test.messages}
+			injectChatHistoryMessages(reqData, "shared-chat")
+			messages, ok := normalizedChatMessages(reqData["messages"])
+			if !ok {
+				t.Fatal("forwarded messages missing")
+			}
+			roles := make([]string, 0, len(messages))
+			contents := make([]interface{}, 0, len(messages))
+			for _, message := range messages {
+				roles = append(roles, chatMessageRole(message))
+				fields := message.(map[string]interface{})
+				contents = append(contents, fields["content"])
+			}
+			wantRoles := []string{chatHistoryRoleUser, chatHistoryRoleAssistant, chatHistoryRoleUser}
+			if test.name == "page" {
+				wantRoles = []string{"system", "developer", chatHistoryRoleUser, chatHistoryRoleAssistant, chatHistoryRoleUser}
+			}
+			if !reflect.DeepEqual(roles, wantRoles) {
+				t.Fatalf("roles = %#v, want %#v", roles, wantRoles)
+			}
+			if contents[len(contents)-1] == "first request" || contents[len(contents)-1] == "first response" {
+				t.Fatalf("latest request was not kept last: %#v", contents)
+			}
+			firstHistoryOffset := 0
+			if test.name == "page" {
+				firstHistoryOffset = 2
+			}
+			for offset, wantCreated := range []float64{1_788_000_000_000, 1_788_000_000_500} {
+				fields := messages[firstHistoryOffset+offset].(map[string]interface{})
+				if fields["created"] != wantCreated {
+					t.Fatalf("history created = %#v, want %v", fields["created"], wantCreated)
+				}
+			}
+		})
+	}
+}
+
+func TestLoadChatHistoryMessagesKeepsOnlyLatestConfiguredMessages(t *testing.T) {
+	withChatHistoryDatabase(t)
+	for index := 0; index < 3; index++ {
+		userCreated := int64(1_788_000_000_000 + index*1_000)
+		persistCompletedChatHistory("agent-a", "restore-limit", fmt.Sprintf("user-%d", index+1), userCreated, fmt.Sprintf("assistant-%d", index+1), userCreated+500)
+	}
+
+	messages, err := loadChatHistoryMessages("restore-limit", 4)
+	if err != nil {
+		t.Fatalf("load chat history: %v", err)
+	}
+	if len(messages) != 4 {
+		t.Fatalf("history length = %d, want 4", len(messages))
+	}
+	wantRoles := []string{chatHistoryRoleUser, chatHistoryRoleAssistant, chatHistoryRoleUser, chatHistoryRoleAssistant}
+	wantContents := []interface{}{"user-2", "assistant-2", "user-3", "assistant-3"}
+	for index, message := range messages {
+		if message.Role != wantRoles[index] || message.Content != wantContents[index] {
+			t.Fatalf("history[%d] = %#v, want role=%s content=%#v", index, message, wantRoles[index], wantContents[index])
+		}
+	}
+}
+
+func TestInjectChatHistoryMessagesUsesConfiguredRestoreLimit(t *testing.T) {
+	withChatHistoryDatabase(t)
+	withIntegrationChatHistoryConfig(t, 2, 168)
+	persistCompletedChatHistory("agent-a", "restore-limit", "user-1", 1_788_000_000_000, "assistant-1", 1_788_000_000_500)
+	persistCompletedChatHistory("agent-a", "restore-limit", "user-2", 1_788_000_001_000, "assistant-2", 1_788_000_001_500)
+
+	reqData := map[string]interface{}{
+		"messages": []interface{}{map[string]interface{}{"role": "user", "content": "current-user"}},
+	}
+	injectChatHistoryMessages(reqData, "restore-limit")
+	messages, ok := normalizedChatMessages(reqData["messages"])
+	if !ok {
+		t.Fatal("forwarded messages missing")
+	}
+	if len(messages) != 3 {
+		t.Fatalf("message count = %d, want 3", len(messages))
+	}
+	for index, wantContent := range []interface{}{"user-2", "assistant-2", "current-user"} {
+		fields := messages[index].(map[string]interface{})
+		if fields["content"] != wantContent {
+			t.Fatalf("message[%d] content = %#v, want %#v", index, fields["content"], wantContent)
+		}
+	}
+}
+
 func pluginParamJSON(keys ...string) string {
 	items := make([]map[string]string, 0, len(keys))
 	for _, key := range keys {

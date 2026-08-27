@@ -37,7 +37,7 @@ import java.util.*;
 public class ProviderRequestServiceTest {
 
     /**
-     * History 默认 created 为当前毫秒；internalHistory 会剔除 created &gt;= message.timestamp 的条目，测试中需显式设为早于消息时间
+     * 服务端 History 默认 created 为当前毫秒；internalHistory 会剔除 created &gt;= message.timestamp 的服务端条目，测试中需显式设为早于消息时间
      */
     private static void setHistoryStrictlyBeforeMessage(Message message, History... histories) {
         long ts = message.getCreated();
@@ -123,6 +123,48 @@ public class ProviderRequestServiceTest {
         Assert.assertEquals(1, result.size());
         Assert.assertEquals("restored-chat", result.get(0).getContent());
         Assert.assertFalse(result.stream().anyMatch(h -> h.isFunction(History.FUN_FUNCALL)));
+        EasyMock.verify(historyStore);
+    }
+
+    @Test
+    public void testInternalHistory_usesClientFallbackWithoutTimestampFiltering() throws Exception {
+        LLMQuery query = ObjectBuilder.buildLLMQuery();
+        History clientHistory = new History();
+        clientHistory.setReference(History.REFERENCE_CLIENT);
+        clientHistory.setRole(History.ROLE_USER);
+        clientHistory.setContent("client-history");
+        query.setHistories(new ArrayList<History>(Collections.singletonList(clientHistory)));
+
+        Message message = new MessageDelegate(query);
+        clientHistory.setCreated(message.getCreated() + 1L);
+        GoogleRequest request = new GoogleRequest();
+        request.setMessage(message);
+        request.setScene("WORKFLOW");
+        request.setClientDowngrade(true);
+        request.setClientHistories(true);
+        request.setContainHistories(true);
+        request.setRecallFunCall(true);
+
+        HistoryStore historyStore = EasyMock.createMock(HistoryStore.class);
+        EasyMock.expect(historyStore.restore(EasyMock.eq(message), EasyMock.eq("WORKFLOW"), EasyMock.anyInt(), EasyMock.anyBoolean(), EasyMock.anyLong(), EasyMock.anyLong())).andReturn(Collections.emptyList()).once();
+        EasyMock.replay(historyStore);
+
+        ProviderRequestService<ProviderRequest> service = new ProviderRequestService<ProviderRequest>() {
+            @Override
+            protected ProviderRequest build() {
+                return request;
+            }
+        };
+        service.setHistoryStore(historyStore);
+        LLMConfig llmConfig = new LLMConfig();
+        llmConfig.setHistories(10);
+        llmConfig.setRecallNums(10);
+        llmConfig.setRecallDesc(false);
+
+        service.internalHistory(request, llmConfig, query);
+
+        Assert.assertEquals(1, request.getMessage().getHistories().size());
+        Assert.assertSame(clientHistory, request.getMessage().getHistories().getFirst());
         EasyMock.verify(historyStore);
     }
 
@@ -2786,10 +2828,10 @@ public class ProviderRequestServiceTest {
     }
 
     /**
-     * internalHistory：剔除 created &gt;= message.timestamp 的恢复项（避免与当前轮/FunCall 重叠）
+     * internalHistory：剔除 created &gt;= message.timestamp 的服务端恢复项（避免与当前轮/FunCall 重叠）
      */
     @Test
-    public void internalHistory_removesHistoriesNotStrictlyBeforeMessageTimestamp() throws Exception {
+    public void internalHistory_removesServerHistoriesNotStrictlyBeforeMessageTimestamp() throws Exception {
         GoogleRequest request = new GoogleRequest();
         Message message = new MessageDelegate(ObjectBuilder.buildLLMQuery());
         long ts = message.getCreated();
@@ -2801,12 +2843,15 @@ public class ProviderRequestServiceTest {
         request.setClientDowngrade(false);
         request.setRecallFunCall(true);
         History oldEnough = new History();
+        oldEnough.setReference(History.REFERENCE_SERVER);
         oldEnough.setContent("keep");
         oldEnough.setCreated(ts - 10L);
         History sameTs = new History();
+        sameTs.setReference(History.REFERENCE_SERVER);
         sameTs.setContent("drop-same-ts");
         sameTs.setCreated(ts);
         History future = new History();
+        future.setReference(History.REFERENCE_SERVER);
         future.setContent("drop-future");
         future.setCreated(ts + 100L);
         List<History> restored = new ArrayList<>(Arrays.asList(oldEnough, sameTs, future));

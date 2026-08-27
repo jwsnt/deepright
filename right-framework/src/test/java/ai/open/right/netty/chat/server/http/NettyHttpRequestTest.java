@@ -161,6 +161,61 @@ public class NettyHttpRequestTest {
     }
 
     @Test
+    public void testHistoryKeepsUserAssistantAndSkipsUnsupportedRoles() throws Exception {
+        NettyHttpRequest nettyHttpRequest = new NettyHttpRequest();
+        Map<String, Object> user = new HashMap<String, Object>();
+        user.put("role", "user");
+        user.put("content", "HELLO");
+        user.put("created", 123L);
+        History userHistory = nettyHttpRequest.buildHistory(user);
+        Assert.assertNotNull(userHistory);
+        Assert.assertEquals(History.ROLE_USER, userHistory.getRole());
+        Assert.assertEquals(Long.valueOf(123L), userHistory.getCreated());
+
+        Map<String, Object> system = new HashMap<String, Object>();
+        system.put("role", "system");
+        system.put("content", "SYSTEM");
+        Assert.assertNull(nettyHttpRequest.buildHistory(system));
+        Map<String, Object> developer = new HashMap<String, Object>();
+        developer.put("role", "developer");
+        developer.put("content", "DEVELOPER");
+        Assert.assertNull(nettyHttpRequest.buildHistory(developer));
+        Map<String, Object> tool = new HashMap<String, Object>();
+        tool.put("role", "tool");
+        tool.put("content", "TOOL");
+        Assert.assertNull(nettyHttpRequest.buildHistory(tool));
+    }
+
+    @Test
+    public void testMessagesSkipUnsupportedRolesAndMarkHistoriesAsClientReferences() throws Exception {
+        NettyHttpRequest nettyHttpRequest = new NettyHttpRequest();
+        Map<String, Object> system = new HashMap<String, Object>();
+        system.put("role", "system");
+        system.put("content", "SYSTEM");
+        Map<String, Object> previousUser = new HashMap<String, Object>();
+        previousUser.put("role", "user");
+        previousUser.put("content", "previous-user");
+        previousUser.put("created", 101L);
+        Map<String, Object> previousAssistant = new HashMap<String, Object>();
+        previousAssistant.put("role", "assistant");
+        previousAssistant.put("content", "previous-assistant");
+        previousAssistant.put("created", 102L);
+        Map<String, Object> currentUser = new HashMap<String, Object>();
+        currentUser.put("role", "user");
+        currentUser.put("content", "current-user");
+        currentUser.put("created", 103L);
+        nettyHttpRequest.setMessages(Arrays.asList(system, previousUser, previousAssistant, currentUser));
+
+        NettyRequest nettyRequest = nettyHttpRequest.buildNettyRequest(null, null, null).init();
+
+        Assert.assertEquals("current-user", nettyRequest.getQuery());
+        Assert.assertEquals(2, nettyRequest.getHistories().size());
+        Assert.assertEquals(Long.valueOf(101L), nettyRequest.getHistories().get(0).getCreated());
+        Assert.assertEquals(Long.valueOf(102L), nettyRequest.getHistories().get(1).getCreated());
+        Assert.assertTrue(nettyRequest.getHistories().stream().allMatch(history -> history.isReference(History.REFERENCE_CLIENT)));
+    }
+
+    @Test
     public void testModel() throws Exception {
         NettyHttpRequest nettyHttpRequest = new NettyHttpRequest();
         List<Map<String, Object>> messages = new ArrayList<>();

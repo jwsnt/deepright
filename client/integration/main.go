@@ -9374,18 +9374,19 @@ func handleLogCleanupStatus() http.HandlerFunc {
 		snapshot := integrationLogRetentionManager.Snapshot()
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
-			"status":                 0,
-			"checked":                snapshot.Checked,
-			"running":                snapshot.Running,
-			"message":                firstNonEmpty(snapshot.Message, logretention.DefaultMessage),
-			"retentionDays":          snapshot.RetentionDays,
-			"cutoff":                 snapshot.Cutoff,
-			"startedAt":              snapshot.StartedAt,
-			"finishedAt":             snapshot.FinishedAt,
-			"deletedAgentMessageLog": snapshot.DeletedAgentMessageLog,
-			"deletedChatLog":         snapshot.DeletedChatLog,
-			"deletedCmdLog":          snapshot.DeletedCmdLog,
-			"error":                  snapshot.Error,
+			"status":                    0,
+			"checked":                   snapshot.Checked,
+			"running":                   snapshot.Running,
+			"message":                   firstNonEmpty(snapshot.Message, logretention.DefaultMessage),
+			"retentionHours":            snapshot.RetentionHours,
+			"cutoff":                    snapshot.Cutoff,
+			"startedAt":                 snapshot.StartedAt,
+			"finishedAt":                snapshot.FinishedAt,
+			"deletedAgentMessageLog":    snapshot.DeletedAgentMessageLog,
+			"deletedChatLog":            snapshot.DeletedChatLog,
+			"deletedCmdLog":             snapshot.DeletedCmdLog,
+			"deletedChatHistoryMessage": snapshot.DeletedChatHistoryMessage,
+			"error":                     snapshot.Error,
 		})
 	}
 }
@@ -17549,6 +17550,251 @@ func appendEventLogDB(agentID, chatID, content string, logType int, createdAt st
 		strings.TrimSpace(agentID), strings.TrimSpace(chatID), content, logType, createdAt)
 }
 
+const (
+	chatHistoryRoleUser      = "user"
+	chatHistoryRoleAssistant = "assistant"
+)
+
+type chatHistoryMessage struct {
+	Role    string
+	Content interface{}
+	Created int64
+}
+
+type chatHistoryConfig struct {
+	Restore    int
+	CleanHours int
+}
+
+func readIntegrationChatHistoryConfig() (chatHistoryConfig, error) {
+	raw, _, err := readIntegrationStartupConfigRaw()
+	if err != nil {
+		return chatHistoryConfig{}, fmt.Errorf("read config/config.json.chat: %w", err)
+	}
+	chatRaw, ok := raw["chat"]
+	if !ok {
+		return chatHistoryConfig{}, errors.New("config/config.json.chat is required")
+	}
+	chat, ok := chatRaw.(map[string]interface{})
+	if !ok || chat == nil {
+		return chatHistoryConfig{}, errors.New("config/config.json.chat must be an object")
+	}
+	restore, err := integrationChatPositiveInteger(chat["restore"], "config/config.json.chat.restore", int64(math.MaxInt))
+	if err != nil {
+		return chatHistoryConfig{}, err
+	}
+	cleanHours, err := integrationChatPositiveInteger(chat["clean"], "config/config.json.chat.clean", int64(math.MaxInt64/int64(time.Hour)))
+	if err != nil {
+		return chatHistoryConfig{}, err
+	}
+	return chatHistoryConfig{Restore: int(restore), CleanHours: int(cleanHours)}, nil
+}
+
+func integrationChatPositiveInteger(raw interface{}, label string, max int64) (int64, error) {
+	value, ok := raw.(json.Number)
+	if !ok {
+		return 0, fmt.Errorf("%s must be a positive integer", label)
+	}
+	parsed, err := value.Int64()
+	if err != nil || parsed < 1 || parsed > max {
+		return 0, fmt.Errorf("%s must be a positive integer", label)
+	}
+	return parsed, nil
+}
+
+func ensureChatHistorySchema(db *sql.DB) {
+	if db == nil {
+		return
+	}
+	db.Exec(`CREATE TABLE IF NOT EXISTS chat_history_message (id INTEGER PRIMARY KEY AUTOINCREMENT, agent_id TEXT NOT NULL DEFAULT '', chat_id TEXT NOT NULL, role TEXT NOT NULL, content_json TEXT NOT NULL, created INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL)`)
+	rows, err := db.Query(`PRAGMA table_info(chat_history_message)`)
+	if err == nil {
+		defer rows.Close()
+		hasCreated := false
+		for rows.Next() {
+			var columnID int
+			var name, columnType string
+			var notNull, primaryKey int
+			var defaultValue interface{}
+			if err := rows.Scan(&columnID, &name, &columnType, &notNull, &defaultValue, &primaryKey); err == nil && strings.EqualFold(name, "created") {
+				hasCreated = true
+				break
+			}
+		}
+		if !hasCreated {
+			db.Exec(`ALTER TABLE chat_history_message ADD COLUMN created INTEGER NOT NULL DEFAULT 0`)
+		}
+	}
+	db.Exec(`CREATE INDEX IF NOT EXISTS idx_chat_history_message_chat_id ON chat_history_message(chat_id, id)`)
+}
+
+func normalizedChatMessages(raw interface{}) ([]interface{}, bool) {
+	if raw == nil {
+		return nil, false
+	}
+	encoded, err := json.Marshal(raw)
+	if err != nil {
+		return nil, false
+	}
+	var messages []interface{}
+	if err := json.Unmarshal(encoded, &messages); err != nil || len(messages) == 0 {
+		return nil, false
+	}
+	return messages, true
+}
+
+func chatMessageRole(message interface{}) string {
+	fields, ok := message.(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	role, _ := fields["role"].(string)
+	return strings.ToLower(strings.TrimSpace(role))
+}
+
+func latestChatUserContent(raw interface{}) (interface{}, bool) {
+	messages, ok := normalizedChatMessages(raw)
+	if !ok {
+		return nil, false
+	}
+	for index := len(messages) - 1; index >= 0; index-- {
+		fields, ok := messages[index].(map[string]interface{})
+		if !ok || chatMessageRole(fields) != chatHistoryRoleUser {
+			continue
+		}
+		content, exists := fields["content"]
+		if exists && content != nil {
+			return content, true
+		}
+	}
+	return nil, false
+}
+
+func loadChatHistoryMessages(chatID string, restore int) ([]chatHistoryMessage, error) {
+	if cronDB == nil {
+		return nil, nil
+	}
+	chatID = strings.TrimSpace(chatID)
+	if chatID == "" || restore <= 0 {
+		return nil, nil
+	}
+	rows, err := cronDB.Query(`SELECT role, content_json, created, created_at FROM (SELECT role, content_json, created, created_at, id FROM chat_history_message WHERE chat_id = ? ORDER BY id DESC LIMIT ?) ORDER BY id`, chatID, restore)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	messages := make([]chatHistoryMessage, 0)
+	for rows.Next() {
+		var role, rawContent, createdAt string
+		var created int64
+		if err := rows.Scan(&role, &rawContent, &created, &createdAt); err != nil {
+			return nil, err
+		}
+		role = strings.ToLower(strings.TrimSpace(role))
+		if role != chatHistoryRoleUser && role != chatHistoryRoleAssistant {
+			continue
+		}
+		var content interface{}
+		if err := json.Unmarshal([]byte(rawContent), &content); err != nil || content == nil {
+			continue
+		}
+		messages = append(messages, chatHistoryMessage{Role: role, Content: content, Created: resolveChatHistoryCreated(created, createdAt)})
+	}
+	return messages, rows.Err()
+}
+
+func resolveChatHistoryCreated(created int64, createdAt string) int64 {
+	if created > 0 {
+		return created
+	}
+	parsed, err := time.ParseInLocation("2006-01-02T15:04:05.000", strings.TrimSpace(createdAt), time.Local)
+	if err == nil {
+		return parsed.UnixMilli()
+	}
+	return time.Now().UnixMilli()
+}
+
+func injectChatHistoryMessages(reqData map[string]interface{}, chatID string) {
+	if reqData == nil || strings.TrimSpace(chatID) == "" {
+		return
+	}
+	current, ok := normalizedChatMessages(reqData["messages"])
+	if !ok {
+		return
+	}
+	config, err := readIntegrationChatHistoryConfig()
+	if err != nil {
+		log.Printf("chat history config load failed: chat=%s err=%v", strings.TrimSpace(chatID), err)
+		return
+	}
+	history, err := loadChatHistoryMessages(chatID, config.Restore)
+	if err != nil {
+		log.Printf("chat history load failed: chat=%s err=%v", strings.TrimSpace(chatID), err)
+		return
+	}
+	if len(history) == 0 {
+		return
+	}
+
+	prefixEnd := 0
+	for prefixEnd < len(current) {
+		role := chatMessageRole(current[prefixEnd])
+		if role != "system" && role != "developer" {
+			break
+		}
+		prefixEnd++
+	}
+	merged := make([]interface{}, 0, len(current)+len(history))
+	merged = append(merged, current[:prefixEnd]...)
+	for _, item := range history {
+		merged = append(merged, map[string]interface{}{"role": item.Role, "content": item.Content, "created": item.Created})
+	}
+	merged = append(merged, current[prefixEnd:]...)
+	reqData["messages"] = merged
+}
+
+func persistCompletedChatHistory(agentID, chatID string, userContent interface{}, userCreated int64, assistantContent string, assistantCreated int64) {
+	if cronDB == nil || strings.TrimSpace(chatID) == "" || userContent == nil || strings.TrimSpace(assistantContent) == "" {
+		return
+	}
+	if userCreated <= 0 {
+		userCreated = time.Now().UnixMilli()
+	}
+	if assistantCreated <= 0 {
+		assistantCreated = time.Now().UnixMilli()
+	}
+	userJSON, err := json.Marshal(userContent)
+	if err != nil {
+		log.Printf("chat history encode user failed: chat=%s err=%v", strings.TrimSpace(chatID), err)
+		return
+	}
+	assistantJSON, err := json.Marshal(assistantContent)
+	if err != nil {
+		log.Printf("chat history encode assistant failed: chat=%s err=%v", strings.TrimSpace(chatID), err)
+		return
+	}
+	tx, err := cronDB.Begin()
+	if err != nil {
+		log.Printf("chat history begin failed: chat=%s err=%v", strings.TrimSpace(chatID), err)
+		return
+	}
+	userCreatedAt := time.UnixMilli(userCreated).In(time.Local).Format("2006-01-02T15:04:05.000")
+	assistantCreatedAt := time.UnixMilli(assistantCreated).In(time.Local).Format("2006-01-02T15:04:05.000")
+	_, err = tx.Exec(`INSERT INTO chat_history_message (agent_id, chat_id, role, content_json, created, created_at) VALUES (?,?,?,?,?,?)`, strings.TrimSpace(agentID), strings.TrimSpace(chatID), chatHistoryRoleUser, string(userJSON), userCreated, userCreatedAt)
+	if err == nil {
+		_, err = tx.Exec(`INSERT INTO chat_history_message (agent_id, chat_id, role, content_json, created, created_at) VALUES (?,?,?,?,?,?)`, strings.TrimSpace(agentID), strings.TrimSpace(chatID), chatHistoryRoleAssistant, string(assistantJSON), assistantCreated, assistantCreatedAt)
+	}
+	if err != nil {
+		_ = tx.Rollback()
+		log.Printf("chat history save failed: chat=%s err=%v", strings.TrimSpace(chatID), err)
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		log.Printf("chat history commit failed: chat=%s err=%v", strings.TrimSpace(chatID), err)
+	}
+}
+
 func queryEventLogs(agentID, chatID string, types ...int) ([]eventLogEntry, error) {
 	if cronDB == nil {
 		return nil, fmt.Errorf("db not ready")
@@ -17810,6 +18056,9 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		currentHistoryUserContent, hasCurrentHistoryUser := latestChatUserContent(reqData["messages"])
+		currentHistoryUserCreated := time.Now().UnixMilli()
+		injectChatHistoryMessages(reqData, chatID)
 
 		// Cancel any existing connection for this chat, even if the bound agent changed.
 		key := connKey(chatID)
@@ -17980,6 +18229,9 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 				}
 			}
 			if !errors.Is(ctx.Err(), context.Canceled) {
+				if sawDoneMarker && !abnormalStream && hasCurrentHistoryUser {
+					persistCompletedChatHistory(chatAgentID, chatID, currentHistoryUserContent, currentHistoryUserCreated, extractSSEAssistantText(payload), time.Now().UnixMilli())
+				}
 				sendSSECompletionNotification(chatType, "", extractCompletionNotificationPrompt(reqData), abnormalStream)
 			}
 			releaseActiveConn(key, active)
@@ -17989,6 +18241,7 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 
 		buf := make([]byte, 256)
 		logBuf := make([]byte, 0, 1024)
+		historySSE := make([]byte, 0, 1024)
 		var streamErr error
 		clientDisconnected := false
 		for {
@@ -18004,6 +18257,7 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 					}
 				}
 				logBuf = append(logBuf, buf[:n]...)
+				historySSE = append(historySSE, buf[:n]...)
 				for _, event := range splitCompleteSSEEvents(&logBuf) {
 					if sseEventHasDoneMarker(event) {
 						sawDoneMarker = true
@@ -18054,6 +18308,9 @@ func handleChatCompletions(cfg *Config, proxyClient *http.Client) http.HandlerFu
 			}
 		}
 		if !errors.Is(ctx.Err(), context.Canceled) {
+			if sawDoneMarker && !abnormalStream && hasCurrentHistoryUser {
+				persistCompletedChatHistory(chatAgentID, chatID, currentHistoryUserContent, currentHistoryUserCreated, extractSSEAssistantText(historySSE), time.Now().UnixMilli())
+			}
 			sendSSECompletionNotification(chatType, "", extractCompletionNotificationPrompt(reqData), abnormalStream)
 		}
 
@@ -24592,7 +24849,7 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 
 		reqData := map[string]interface{}{
 			"model":    t.Model,
-			"messages": []map[string]string{{"role": "user", "content": t.Content}},
+			"messages": []interface{}{map[string]interface{}{"role": chatHistoryRoleUser, "content": t.Content}},
 			"stream":   true,
 			"metadata": metaMap,
 		}
@@ -24607,7 +24864,9 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 			}
 		}
 		syncForwardedChatRequestFlags(reqData, metaMap)
+		injectChatHistoryMessages(reqData, chatID)
 		body, _ := json.Marshal(reqData)
+		userCreated := time.Now().UnixMilli()
 
 		// Log Q to chat_log
 		appendChatLogDB(t.AgentID, chatID, chatTypeScheduledTask, "Q", "normal", string(body))
@@ -24617,7 +24876,7 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 
 		// Send to upstream
 		detailID := t.ID
-		go func(agentID, cID string, reqBody []byte, dID int, token, taskType, deviceID string) {
+		go func(agentID, cID string, reqBody []byte, dID int, token, taskType, deviceID, userContent string, userCreated int64) {
 			targetURL := strings.TrimRight(cfg.currentHost(), "/") + "/v1/chat/completions"
 			req, err := http.NewRequest(http.MethodPost, targetURL, bytes.NewReader(reqBody))
 			if err != nil {
@@ -24673,7 +24932,8 @@ func cronExecuteOnce(cfg *Config, proxyClient *http.Client, connectSvc *connects
 				WHERE id = ?`, resultContent, resultContent, resultContent, resultContent, dID)
 			logCronDetailStatusByID(cronDB, dID, "complete")
 			sendSSECompletionNotification(chatTypeScheduledTask, taskType, "", abnormalStream)
-		}(t.AgentID, chatID, body, detailID, token, t.TaskType, deviceID)
+			persistCompletedChatHistory(agentID, cID, userContent, userCreated, resultContent, time.Now().UnixMilli())
+		}(t.AgentID, chatID, body, detailID, token, t.TaskType, deviceID, t.Content, userCreated)
 	}
 }
 
@@ -24713,6 +24973,7 @@ func initCronDB() {
 	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_agent_message_log_chat_time_id ON agent_message_log(chat_id, created_at, id)`)
 	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_agent_message_log_agent_chat_type_time ON agent_message_log(agent_id, chat_id, log_type, created_at)`)
 	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_agent_message_log_agent_chat_time ON agent_message_log(agent_id, chat_id, created_at)`)
+	ensureChatHistorySchema(cronDB)
 	cronDB.Exec(`CREATE TABLE IF NOT EXISTS cmd_log (id INTEGER PRIMARY KEY AUTOINCREMENT, agent_id TEXT NOT NULL, chat_id TEXT NOT NULL, tid TEXT NOT NULL, cmd TEXT NOT NULL, result TEXT NOT NULL DEFAULT '', status INTEGER NOT NULL DEFAULT -1, received_at TEXT NOT NULL, completed_at TEXT NOT NULL DEFAULT '')`)
 	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_cmd_agent_chat ON cmd_log(agent_id, chat_id)`)
 	cronDB.Exec(`CREATE INDEX IF NOT EXISTS idx_cmd_agent_chat_time ON cmd_log(agent_id, chat_id, received_at)`)
@@ -24728,12 +24989,17 @@ func ensureChatRecoveryIndexes(db *sql.DB) {
 }
 
 func startIntegrationLogRetentionCleanup(ctx context.Context) {
+	chatConfig, err := readIntegrationChatHistoryConfig()
+	if err != nil {
+		integrationLogRetentionManager.MarkCheckedWithRetentionHours(0, err)
+		return
+	}
 	if cronDB == nil {
-		integrationLogRetentionManager.MarkChecked(fmt.Errorf("log retention db not ready"))
+		integrationLogRetentionManager.MarkCheckedWithRetentionHours(chatConfig.CleanHours, fmt.Errorf("log retention db not ready"))
 		return
 	}
 	dbPath := resolveIntegrationDBPath()
-	integrationLogRetentionManager.StartAsyncWithDBOpener(ctx, logretention.DefaultRetentionDays, func() (*sql.DB, error) {
+	integrationLogRetentionManager.StartAsyncWithDBOpener(ctx, chatConfig.CleanHours, func() (*sql.DB, error) {
 		db, err := sql.Open("sqlite", dbPath)
 		if err != nil {
 			return nil, err

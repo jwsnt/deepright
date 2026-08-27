@@ -562,12 +562,17 @@ func getEventLogger() (*eventlog.Logger, error) {
 }
 
 func startProxyLogRetentionCleanup(ctx context.Context) {
-	path, err := getDataDBPath()
+	retentionHours, err := readProxyChatCleanHours()
 	if err != nil {
-		proxyLogRetentionManager.MarkChecked(err)
+		proxyLogRetentionManager.MarkCheckedWithRetentionHours(0, err)
 		return
 	}
-	proxyLogRetentionManager.StartAsyncWithDBOpener(ctx, logretention.DefaultRetentionDays, func() (*sql.DB, error) {
+	path, err := getDataDBPath()
+	if err != nil {
+		proxyLogRetentionManager.MarkCheckedWithRetentionHours(retentionHours, err)
+		return
+	}
+	proxyLogRetentionManager.StartAsyncWithDBOpener(ctx, retentionHours, func() (*sql.DB, error) {
 		db, err := sql.Open("sqlite", path)
 		if err != nil {
 			return nil, err
@@ -1817,6 +1822,26 @@ func readProxyStartupConfig() map[string]string {
 		out[key] = strings.TrimSpace(fmt.Sprint(value))
 	}
 	return out
+}
+
+func readProxyChatCleanHours() (int, error) {
+	raw, _, err := readProxyStartupConfigRaw()
+	if err != nil {
+		return 0, fmt.Errorf("read config/config.json.chat: %w", err)
+	}
+	chatRaw, ok := raw["chat"]
+	if !ok {
+		return 0, errors.New("config/config.json.chat is required")
+	}
+	chat, ok := chatRaw.(map[string]interface{})
+	if !ok || chat == nil {
+		return 0, errors.New("config/config.json.chat must be an object")
+	}
+	value, ok := chat["clean"].(float64)
+	if !ok || math.IsNaN(value) || math.IsInf(value, 0) || value != math.Trunc(value) || value < 1 || value > float64(math.MaxInt64/int64(time.Hour)) {
+		return 0, errors.New("config/config.json.chat.clean must be a positive integer")
+	}
+	return int(value), nil
 }
 
 func configuredProxyStringValue(key string) string {
@@ -4520,18 +4545,19 @@ func handleProxyLogCleanupStatus(w http.ResponseWriter, r *http.Request) {
 	snapshot := proxyLogRetentionManager.Snapshot()
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
-		"status":                 0,
-		"checked":                snapshot.Checked,
-		"running":                snapshot.Running,
-		"message":                firstNonEmpty(snapshot.Message, logretention.DefaultMessage),
-		"retentionDays":          snapshot.RetentionDays,
-		"cutoff":                 snapshot.Cutoff,
-		"startedAt":              snapshot.StartedAt,
-		"finishedAt":             snapshot.FinishedAt,
-		"deletedAgentMessageLog": snapshot.DeletedAgentMessageLog,
-		"deletedChatLog":         snapshot.DeletedChatLog,
-		"deletedCmdLog":          snapshot.DeletedCmdLog,
-		"error":                  snapshot.Error,
+		"status":                    0,
+		"checked":                   snapshot.Checked,
+		"running":                   snapshot.Running,
+		"message":                   firstNonEmpty(snapshot.Message, logretention.DefaultMessage),
+		"retentionHours":            snapshot.RetentionHours,
+		"cutoff":                    snapshot.Cutoff,
+		"startedAt":                 snapshot.StartedAt,
+		"finishedAt":                snapshot.FinishedAt,
+		"deletedAgentMessageLog":    snapshot.DeletedAgentMessageLog,
+		"deletedChatLog":            snapshot.DeletedChatLog,
+		"deletedCmdLog":             snapshot.DeletedCmdLog,
+		"deletedChatHistoryMessage": snapshot.DeletedChatHistoryMessage,
+		"error":                     snapshot.Error,
 	})
 }
 

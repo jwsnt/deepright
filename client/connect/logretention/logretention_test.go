@@ -54,6 +54,15 @@ func TestCleanupExpiredLogsDeletesOnlyExpiredRows(t *testing.T) {
 			received_at TEXT NOT NULL,
 			completed_at TEXT NOT NULL DEFAULT ''
 		);
+		CREATE TABLE chat_history_message (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			agent_id TEXT NOT NULL DEFAULT '',
+			chat_id TEXT NOT NULL,
+			role TEXT NOT NULL,
+			content_json TEXT NOT NULL,
+			created INTEGER NOT NULL DEFAULT 0,
+			created_at TEXT NOT NULL
+		);
 	`); err != nil {
 		t.Fatalf("create schema: %v", err)
 	}
@@ -81,8 +90,16 @@ func TestCleanupExpiredLogsDeletesOnlyExpiredRows(t *testing.T) {
 	); err != nil {
 		t.Fatalf("seed cmd logs: %v", err)
 	}
+	if _, err := db.Exec(
+		`INSERT INTO chat_history_message (agent_id, chat_id, role, content_json, created, created_at) VALUES
+			('a', 'chat-expired', 'user', '"old"', 1, ?),
+			('a', 'chat-kept', 'assistant', '"new"', 2, ?);`,
+		expired, kept,
+	); err != nil {
+		t.Fatalf("seed chat history: %v", err)
+	}
 
-	result, err := CleanupExpiredLogs(context.Background(), db, now, 30)
+	result, err := CleanupExpiredLogs(context.Background(), db, now, 30*24)
 	if err != nil {
 		t.Fatalf("CleanupExpiredLogs: %v", err)
 	}
@@ -95,8 +112,11 @@ func TestCleanupExpiredLogsDeletesOnlyExpiredRows(t *testing.T) {
 	if result.DeletedCmdLog != 1 {
 		t.Fatalf("DeletedCmdLog = %d, want 1", result.DeletedCmdLog)
 	}
+	if result.DeletedChatHistoryMessage != 1 {
+		t.Fatalf("DeletedChatHistoryMessage = %d, want 1", result.DeletedChatHistoryMessage)
+	}
 
-	var agentCount, chatCount, cmdCount int
+	var agentCount, chatCount, cmdCount, historyCount int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM agent_message_log`).Scan(&agentCount); err != nil {
 		t.Fatalf("count agent_message_log: %v", err)
 	}
@@ -105,6 +125,9 @@ func TestCleanupExpiredLogsDeletesOnlyExpiredRows(t *testing.T) {
 	}
 	if err := db.QueryRow(`SELECT COUNT(*) FROM cmd_log`).Scan(&cmdCount); err != nil {
 		t.Fatalf("count cmd_log: %v", err)
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM chat_history_message`).Scan(&historyCount); err != nil {
+		t.Fatalf("count chat_history_message: %v", err)
 	}
 	if agentCount != 1 {
 		t.Fatalf("agent_message_log rows = %d, want 1", agentCount)
@@ -115,6 +138,9 @@ func TestCleanupExpiredLogsDeletesOnlyExpiredRows(t *testing.T) {
 	if cmdCount != 1 {
 		t.Fatalf("cmd_log rows = %d, want 1", cmdCount)
 	}
+	if historyCount != 1 {
+		t.Fatalf("chat_history_message rows = %d, want 1", historyCount)
+	}
 }
 
 func TestManagerStartAsyncMarksCompletion(t *testing.T) {
@@ -124,7 +150,7 @@ func TestManagerStartAsyncMarksCompletion(t *testing.T) {
 	}
 
 	manager := NewManager()
-	if !manager.StartAsync(context.Background(), db, 30, nil) {
+	if !manager.StartAsync(context.Background(), db, 168, nil) {
 		t.Fatalf("StartAsync returned false")
 	}
 
@@ -132,8 +158,8 @@ func TestManagerStartAsyncMarksCompletion(t *testing.T) {
 	for time.Now().Before(deadline) {
 		status := manager.Snapshot()
 		if status.Checked && !status.Running {
-			if status.RetentionDays != 30 {
-				t.Fatalf("RetentionDays = %d, want 30", status.RetentionDays)
+			if status.RetentionHours != 168 {
+				t.Fatalf("RetentionHours = %d, want 168", status.RetentionHours)
 			}
 			return
 		}
@@ -155,7 +181,7 @@ func TestManagerStartAsyncWithDBOpenerMarksCompletion(t *testing.T) {
 	_ = db.Close()
 
 	manager := NewManager()
-	if !manager.StartAsyncWithDBOpener(context.Background(), 30, func() (*sql.DB, error) {
+	if !manager.StartAsyncWithDBOpener(context.Background(), 168, func() (*sql.DB, error) {
 		opened, err := sql.Open("sqlite", dbPath)
 		if err != nil {
 			return nil, err
@@ -171,8 +197,8 @@ func TestManagerStartAsyncWithDBOpenerMarksCompletion(t *testing.T) {
 	for time.Now().Before(deadline) {
 		status := manager.Snapshot()
 		if status.Checked && !status.Running {
-			if status.RetentionDays != 30 {
-				t.Fatalf("RetentionDays = %d, want 30", status.RetentionDays)
+			if status.RetentionHours != 168 {
+				t.Fatalf("RetentionHours = %d, want 168", status.RetentionHours)
 			}
 			return
 		}
@@ -206,7 +232,7 @@ func TestCleanupExpiredLogsDeletesInBatches(t *testing.T) {
 		t.Fatalf("insert fresh row: %v", err)
 	}
 
-	result, err := CleanupExpiredLogs(context.Background(), db, now, 30)
+	result, err := CleanupExpiredLogs(context.Background(), db, now, 30*24)
 	if err != nil {
 		t.Fatalf("CleanupExpiredLogs: %v", err)
 	}

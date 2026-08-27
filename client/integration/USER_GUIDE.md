@@ -3146,11 +3146,12 @@ GET /api/files?path=/Users/demo/agent/A/skills&chatId=chat-1
 
 ---
 
-## 迭代 20260711-1：日志表30天保留与启动异步清理
+## 日志与会话历史：按 `chat.clean` 小时异步清理
 
 ## 本次更新
 
-- 共享 sqlite 中的 `agent_message_log` 与 `chat_log` 新增了统一的 30 天保留策略
+- `integration` 与 `proxy` 均从各自 `config/config.json.chat.clean` 读取日志保留时长，单位为小时
+- 共享 sqlite 中的 `agent_message_log`、`chat_log`、`cmd_log` 与 `chat_history_message` 使用同一清理阈值
 - `integration` 与 `proxy` 在启动完成数据库初始化后，都会自动执行一次过期日志检查与物理删除
 - 清理任务改为使用独立 sqlite 连接异步执行，不阻塞首屏服务、页面初始化请求和主查询链路
 - 新增 `GET /api/log_cleanup_status`，用于查询当前启动阶段日志清理状态
@@ -3161,8 +3162,11 @@ GET /api/files?path=/Users/demo/agent/A/skills&chatId=chat-1
 - 清理范围固定为：
   - `agent_message_log`
   - `chat_log`
-- 过期判断字段统一为 `created_at`
-- 删除条件固定为 `created_at < 当前时间 - 30天`
+  - `cmd_log`
+  - `chat_history_message`
+- `agent_message_log`、`chat_log` 与 `chat_history_message` 按 `created_at` 判断；`cmd_log` 按 `received_at` 判断
+- 删除条件为时间字段早于 `当前时间 - chat.clean 小时`
+- 状态接口使用 `retentionHours` 与 `deletedChatHistoryMessage`，不再返回天数语义字段
 - 清理失败不会阻塞主服务启动，但会写入状态接口与标准日志，便于排查
 
 ## 相关需求目录
@@ -3715,3 +3719,13 @@ Wav2Lip 执行中如识别到 PyTorch `unexpected EOF`，会将原始堆栈转�
 `POST /api/media/copy` 只接受源 Agent、目标 Agent 和源工作区相对路径。服务端验证两个 Agent、文件类型及路径边界，仅复制图片、音频和视频；客户端提供的绝对路径不会参与解析。源与目标 Agent 必须不同。
 
 目标副本保留源文件的相对目录，缺失目录自动创建；无同名冲突时保留文件名，冲突时在扩展名前追加时间戳，且不覆盖已有文件。该接口只复制，不移动或删除源文件；失败时清除未完成的目标文件。成功响应返回目标 Agent、相对路径和绝对路径，供页面更新文件气泡并重新打开预览。完整说明见 [iteration/20260818-1/USER_GUIDE.md](iteration/20260818-1/USER_GUIDE.md)。
+
+---
+
+## 迭代 20260827-1：按会话注入 OpenAI 历史
+
+Integration 会为每个非空 `chatId` 的成功模型轮次单独保存 OpenAI Chat 兼容的 `user` 与 `assistant` 消息。用户 `content` 保留原 JSON 值，因此文本和多模态数组均可继续转发；assistant 内容来自完整 SSE 中聚合出的文本。
+
+下次由同一 `chatId` 发起的普通页面会话、备忘录任务或 Connect 即时任务（包括飞书）会自动带上此前完成的历史。上游 `messages` 由旧到新排列：请求开头连续的 `system`、`developer` 消息保持最前，历史 user/assistant 紧随其后，本次请求消息位于最后。
+
+只有 HTTP 成功、SSE 正常结束并包含 `data: [DONE]`、且能取得 assistant 文本的轮次才会写入历史。取消、网络失败、异常或不完整 SSE 不会进入下一次请求的上下文。该存储与 `/api/restore`、`/log_round` 使用的原始请求/SSE 日志分离，既有恢复和导出行为不变。完整说明见 [iteration/20260827-1/USER_GUIDE.md](iteration/20260827-1/USER_GUIDE.md)。

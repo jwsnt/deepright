@@ -6,6 +6,10 @@
     "new_tab": 931,
     "iframe": 932
   },
+  "chat": {
+    "restore": 50,
+    "clean": 168
+  },
   "get": {
     "sleep": 15000,
     "await": 30000,

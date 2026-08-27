@@ -67,7 +67,10 @@ public class NettyHttpRequest {
                 this.initMediaContext((List<Map<String, Object>>) content, nettyRequest);
             } else {
                 // 处理普通的多文本Query
-                nettyRequest.getHistories().add(this.buildHistory(each));
+                History history = this.buildHistory(each);
+                if (history != null) {
+                    nettyRequest.getHistories().add(history);
+                }
             }
             // 获取最后一条消息的会话
             currentConversation = MapUtils.getString(each, "conversation");
@@ -157,9 +160,14 @@ public class NettyHttpRequest {
         String role = String.class.cast(message.get("role"));
         if (StringUtils.containsIgnoreCase("assistant", role)) {
             history.setAssistant();
-        } else {
+        } else if (StringUtils.containsIgnoreCase("user", role)) {
             history.setUser();
         }
+        // system、developer、tool
+        if (history.getRole() == null) {
+            return null;
+        }
+        history.setCreated(MapUtils.getLong(message, "created", System.currentTimeMillis()));
         history.setContent(this.buildContent(message));
         if (log.isDebugEnabled()) {
             log.debug("Add history={}", history);

@@ -209,15 +209,6 @@ abstract public class ProviderRequestService<T extends ProviderRequest> {
         }
     }
 
-    protected Boolean buildRecallFunCall(T request, LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
-        return MapUtils.getBoolean(llmQuery.getMetadata(), ProviderRequestService.KEY_INTERNAL + "recallFunCall", llmConfig.getRecallFunCall());
-    }
-
-    protected Integer buildFunCallTimeout(T request, LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
-        // 如果没有Upstream且Deepness为1则使用FunCallWaiting（主线程等待）
-        return MapUtils.getInteger(llmQuery.getMetadata(), ProviderRequestService.KEY_INTERNAL + "funCallTimeout", request.getMessage().isEntry() ? llmConfig.getFunCallWaiting(this.funCallWaiting) : llmConfig.getFunCallTimeout(this.funCallTimeout != null ? this.funCallTimeout : llmConfig.getTimeout()));
-    }
-
     protected List<String> buildRepositories(T request, LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
         // 附加已经获得的Scene
         return List.class.cast(MapUtils.getObject(llmQuery.getMetadata(), ProviderRequestService.KEY_INTERNAL + "repositories", llmConfig.getRepositories()));
@@ -235,8 +226,9 @@ abstract public class ProviderRequestService<T extends ProviderRequest> {
         return MapUtils.getBoolean(llmQuery.getMetadata(), ProviderRequestService.KEY_INTERNAL + "clientHistories", llmConfig.getClientHistories());
     }
 
-    protected Boolean buildStoreCompleted(T request, LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
-        return MapUtils.getBoolean(llmQuery.getMetadata(), ProviderRequestService.KEY_INTERNAL + "storeCompleted", llmConfig.getStoreCompleted());
+    protected Integer buildFunCallTimeout(T request, LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
+        // 如果没有Upstream且Deepness为1则使用FunCallWaiting（主线程等待）
+        return MapUtils.getInteger(llmQuery.getMetadata(), ProviderRequestService.KEY_INTERNAL + "funCallTimeout", request.getMessage().isEntry() ? llmConfig.getFunCallWaiting(this.funCallWaiting) : llmConfig.getFunCallTimeout(this.funCallTimeout != null ? this.funCallTimeout : llmConfig.getTimeout()));
     }
 
     protected Integer buildUpstreamTimeout(T request, LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
@@ -245,6 +237,14 @@ abstract public class ProviderRequestService<T extends ProviderRequest> {
 
     protected Boolean buildFunCallHeritage(T request, LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
         return MapUtils.getBoolean(llmQuery.getMetadata(), ProviderRequestService.KEY_INTERNAL + "funCallHeritage", llmConfig.getFunCallHeritage());
+    }
+
+    protected Boolean buildStoreCompleted(T request, LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
+        return MapUtils.getBoolean(llmQuery.getMetadata(), ProviderRequestService.KEY_INTERNAL + "storeCompleted", llmConfig.getStoreCompleted());
+    }
+
+    protected Boolean buildRecallFunCall(T request, LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
+        return MapUtils.getBoolean(llmQuery.getMetadata(), ProviderRequestService.KEY_INTERNAL + "recallFunCall", llmConfig.getRecallFunCall());
     }
 
     protected Boolean buildStoreFunCall(T request, LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
@@ -579,7 +579,6 @@ abstract public class ProviderRequestService<T extends ProviderRequest> {
             Assert.notNull(this.historyStore, "The history store can not be empty, please config `history.enable`");
             long lastTime = request.hasRecallOffset() ? request.getMessage().getCreated() - TimeUnit.MILLISECONDS.convert(request.getRecallOffset(), TimeUnit.SECONDS) : 0;
             List<History> histories = new ArrayList<History>(this.historyStore.restore(request.getMessage(), request.getScene(), this.buildRecallNums(request, llmConfig, llmQuery), llmConfig.getRecallDesc(), -request.getMessage().getCreated(), -lastTime));
-            // 如果Histories为空，并且开启了ClientDowngrade，并且端侧记忆不为空，则替换
             histories = !CollectionUtils.isEmpty(histories) ? histories : (request.getClientDowngrade() && !CollectionUtils.isEmpty(clientHistories) ? clientHistories : histories);
             if (!CollectionUtils.isEmpty(histories)) {
                 this.discardHistory(request, llmConfig, histories);
@@ -600,9 +599,10 @@ abstract public class ProviderRequestService<T extends ProviderRequest> {
                 iterator.remove();
                 continue;
             }
-            // 创建时间在Message.timestamp之后的（一般已经存在与FunCall，避免重复加载）
             // 用于指定了负数Offset且使用Desc=True（获取过去时间之后的历史记录）与FunCall重叠部分
-            if (history.getCreated() >= request.getMessage().getCreated()) {
+            // 创建时间在Message.timestamp之后的（一般已经存在与FunCall，避免重复加载）
+            // 仅过滤服务端历史
+            if (history.isReference(History.REFERENCE_SERVER) && history.getCreated() >= request.getMessage().getCreated()) {
                 iterator.remove();
                 continue;
             }

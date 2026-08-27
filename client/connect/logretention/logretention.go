@@ -10,33 +10,35 @@ import (
 )
 
 const (
-	DefaultRetentionDays = 30
-	DefaultMessage       = "正在清理过期日志，请稍后"
-	timeLayout           = "2006-01-02T15:04:05.000"
+	DefaultRetentionHours = 30 * 24
+	DefaultMessage        = "正在清理过期日志，请稍后"
+	timeLayout            = "2006-01-02T15:04:05.000"
 )
 
 var cleanupDeleteBatchSize = 500
 
 type Result struct {
-	RetentionDays          int
-	Cutoff                 string
-	DeletedAgentMessageLog int64
-	DeletedChatLog         int64
-	DeletedCmdLog          int64
+	RetentionHours            int
+	Cutoff                    string
+	DeletedAgentMessageLog    int64
+	DeletedChatLog            int64
+	DeletedCmdLog             int64
+	DeletedChatHistoryMessage int64
 }
 
 type Status struct {
-	Checked                bool
-	Running                bool
-	Message                string
-	RetentionDays          int
-	Cutoff                 string
-	StartedAt              string
-	FinishedAt             string
-	DeletedAgentMessageLog int64
-	DeletedChatLog         int64
-	DeletedCmdLog          int64
-	Error                  string
+	Checked                   bool
+	Running                   bool
+	Message                   string
+	RetentionHours            int
+	Cutoff                    string
+	StartedAt                 string
+	FinishedAt                string
+	DeletedAgentMessageLog    int64
+	DeletedChatLog            int64
+	DeletedCmdLog             int64
+	DeletedChatHistoryMessage int64
+	Error                     string
 }
 
 type Manager struct {
@@ -48,8 +50,8 @@ type Manager struct {
 func NewManager() *Manager {
 	return &Manager{
 		status: Status{
-			Message:       DefaultMessage,
-			RetentionDays: DefaultRetentionDays,
+			Message:        DefaultMessage,
+			RetentionHours: DefaultRetentionHours,
 		},
 	}
 }
@@ -57,10 +59,10 @@ func NewManager() *Manager {
 func (m *Manager) Snapshot() Status {
 	if m == nil {
 		return Status{
-			Checked:       true,
-			Message:       DefaultMessage,
-			RetentionDays: DefaultRetentionDays,
-			Error:         "log retention manager is nil",
+			Checked:        true,
+			Message:        DefaultMessage,
+			RetentionHours: DefaultRetentionHours,
+			Error:          "log retention manager is nil",
 		}
 	}
 	m.mu.RLock()
@@ -69,6 +71,10 @@ func (m *Manager) Snapshot() Status {
 }
 
 func (m *Manager) MarkChecked(err error) {
+	m.MarkCheckedWithRetentionHours(DefaultRetentionHours, err)
+}
+
+func (m *Manager) MarkCheckedWithRetentionHours(retentionHours int, err error) {
 	if m == nil {
 		return
 	}
@@ -78,6 +84,7 @@ func (m *Manager) MarkChecked(err error) {
 	m.status.Checked = true
 	m.status.Running = false
 	m.status.Message = DefaultMessage
+	m.status.RetentionHours = retentionHours
 	m.status.FinishedAt = time.Now().Format(timeLayout)
 	if err != nil {
 		m.status.Error = strings.TrimSpace(err.Error())
@@ -86,23 +93,24 @@ func (m *Manager) MarkChecked(err error) {
 
 func (m *Manager) startAsyncRunner(
 	ctx context.Context,
-	retentionDays int,
+	retentionHours int,
 	logf func(string, ...any),
 	run func(context.Context, time.Time, int) (Result, error),
 ) bool {
 	if m == nil {
 		return false
 	}
-	if retentionDays <= 0 {
-		retentionDays = DefaultRetentionDays
+	if retentionHours <= 0 {
+		m.MarkCheckedWithRetentionHours(retentionHours, fmt.Errorf("log retention hours must be positive"))
+		return false
 	}
 	if run == nil {
-		m.MarkChecked(fmt.Errorf("log retention runner is nil"))
+		m.MarkCheckedWithRetentionHours(retentionHours, fmt.Errorf("log retention runner is nil"))
 		return false
 	}
 
 	startedAt := time.Now()
-	cutoff := startedAt.AddDate(0, 0, -retentionDays).Format(timeLayout)
+	cutoff := startedAt.Add(-time.Duration(retentionHours) * time.Hour).Format(timeLayout)
 
 	m.mu.Lock()
 	if m.started {
@@ -111,24 +119,24 @@ func (m *Manager) startAsyncRunner(
 	}
 	m.started = true
 	m.status = Status{
-		Checked:       false,
-		Running:       true,
-		Message:       DefaultMessage,
-		RetentionDays: retentionDays,
-		Cutoff:        cutoff,
-		StartedAt:     startedAt.Format(timeLayout),
+		Checked:        false,
+		Running:        true,
+		Message:        DefaultMessage,
+		RetentionHours: retentionHours,
+		Cutoff:         cutoff,
+		StartedAt:      startedAt.Format(timeLayout),
 	}
 	m.mu.Unlock()
 
 	go func() {
-		result, err := run(ctx, startedAt, retentionDays)
+		result, err := run(ctx, startedAt, retentionHours)
 		finishedAt := time.Now().Format(timeLayout)
 
 		m.mu.Lock()
 		m.status.Checked = true
 		m.status.Running = false
 		m.status.Message = DefaultMessage
-		m.status.RetentionDays = retentionDays
+		m.status.RetentionHours = retentionHours
 		m.status.Cutoff = result.Cutoff
 		if m.status.Cutoff == "" {
 			m.status.Cutoff = cutoff
@@ -137,6 +145,7 @@ func (m *Manager) startAsyncRunner(
 		m.status.DeletedAgentMessageLog = result.DeletedAgentMessageLog
 		m.status.DeletedChatLog = result.DeletedChatLog
 		m.status.DeletedCmdLog = result.DeletedCmdLog
+		m.status.DeletedChatHistoryMessage = result.DeletedChatHistoryMessage
 		if err != nil {
 			m.status.Error = strings.TrimSpace(err.Error())
 		}
@@ -150,65 +159,66 @@ func (m *Manager) startAsyncRunner(
 			return
 		}
 		logf(
-			"[log-retention] cleanup finished cutoff=%s retention_days=%d agent_message_log=%d chat_log=%d cmd_log=%d",
+			"[log-retention] cleanup finished cutoff=%s retention_hours=%d agent_message_log=%d chat_log=%d cmd_log=%d chat_history_message=%d",
 			result.Cutoff,
-			result.RetentionDays,
+			result.RetentionHours,
 			result.DeletedAgentMessageLog,
 			result.DeletedChatLog,
 			result.DeletedCmdLog,
+			result.DeletedChatHistoryMessage,
 		)
 	}()
 	return true
 }
 
-func (m *Manager) StartAsync(ctx context.Context, db *sql.DB, retentionDays int, logf func(string, ...any)) bool {
+func (m *Manager) StartAsync(ctx context.Context, db *sql.DB, retentionHours int, logf func(string, ...any)) bool {
 	if db == nil {
-		m.MarkChecked(fmt.Errorf("log retention db is nil"))
+		m.MarkCheckedWithRetentionHours(retentionHours, fmt.Errorf("log retention db is nil"))
 		return false
 	}
-	return m.startAsyncRunner(ctx, retentionDays, logf, func(ctx context.Context, startedAt time.Time, retentionDays int) (Result, error) {
-		return CleanupExpiredLogs(ctx, db, startedAt, retentionDays)
+	return m.startAsyncRunner(ctx, retentionHours, logf, func(ctx context.Context, startedAt time.Time, retentionHours int) (Result, error) {
+		return CleanupExpiredLogs(ctx, db, startedAt, retentionHours)
 	})
 }
 
-func (m *Manager) StartAsyncWithDBOpener(ctx context.Context, retentionDays int, openDB func() (*sql.DB, error), logf func(string, ...any)) bool {
+func (m *Manager) StartAsyncWithDBOpener(ctx context.Context, retentionHours int, openDB func() (*sql.DB, error), logf func(string, ...any)) bool {
 	if openDB == nil {
-		m.MarkChecked(fmt.Errorf("log retention db opener is nil"))
+		m.MarkCheckedWithRetentionHours(retentionHours, fmt.Errorf("log retention db opener is nil"))
 		return false
 	}
-	return m.startAsyncRunner(ctx, retentionDays, logf, func(ctx context.Context, startedAt time.Time, retentionDays int) (Result, error) {
+	return m.startAsyncRunner(ctx, retentionHours, logf, func(ctx context.Context, startedAt time.Time, retentionHours int) (Result, error) {
 		db, err := openDB()
 		if err != nil {
 			return Result{
-				RetentionDays: retentionDays,
-				Cutoff:        startedAt.AddDate(0, 0, -retentionDays).Format(timeLayout),
+				RetentionHours: retentionHours,
+				Cutoff:         startedAt.Add(-time.Duration(retentionHours) * time.Hour).Format(timeLayout),
 			}, err
 		}
 		if db == nil {
 			return Result{
-				RetentionDays: retentionDays,
-				Cutoff:        startedAt.AddDate(0, 0, -retentionDays).Format(timeLayout),
+				RetentionHours: retentionHours,
+				Cutoff:         startedAt.Add(-time.Duration(retentionHours) * time.Hour).Format(timeLayout),
 			}, fmt.Errorf("log retention db is nil")
 		}
 		defer db.Close()
-		return CleanupExpiredLogs(ctx, db, startedAt, retentionDays)
+		return CleanupExpiredLogs(ctx, db, startedAt, retentionHours)
 	})
 }
 
-func CleanupExpiredLogs(ctx context.Context, db *sql.DB, now time.Time, retentionDays int) (Result, error) {
+func CleanupExpiredLogs(ctx context.Context, db *sql.DB, now time.Time, retentionHours int) (Result, error) {
 	if db == nil {
 		return Result{}, fmt.Errorf("log retention db is nil")
 	}
-	if retentionDays <= 0 {
-		retentionDays = DefaultRetentionDays
+	if retentionHours <= 0 {
+		return Result{}, fmt.Errorf("log retention hours must be positive")
 	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
 	result := Result{
-		RetentionDays: retentionDays,
-		Cutoff:        now.AddDate(0, 0, -retentionDays).Format(timeLayout),
+		RetentionHours: retentionHours,
+		Cutoff:         now.Add(-time.Duration(retentionHours) * time.Hour).Format(timeLayout),
 	}
 
 	if exists, err := tableExists(ctx, db, "agent_message_log"); err != nil {
@@ -239,6 +249,16 @@ func CleanupExpiredLogs(ctx context.Context, db *sql.DB, now time.Time, retentio
 			return result, err
 		}
 		result.DeletedCmdLog = deleted
+	}
+
+	if exists, err := tableExists(ctx, db, "chat_history_message"); err != nil {
+		return result, err
+	} else if exists {
+		deleted, err := deleteBeforeCutoffBatched(ctx, db, "chat_history_message", "created_at", result.Cutoff)
+		if err != nil {
+			return result, err
+		}
+		result.DeletedChatHistoryMessage = deleted
 	}
 	return result, nil
 }

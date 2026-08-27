@@ -293,13 +293,10 @@ public class GitMemoryService extends BaseFunction implements GitPath, MemorySer
     protected CliPubData buildInitData(WorkflowTask workTask) throws Exception {
         // --before="2026-03-26 11:25:23"
         String file = " -- " + this.memory;
-        // 获取最旧的历史记录时间（与Short Memory做互补）
-        Long lastTimeline = History.buildFirstTimeline(workTask.getHistories());
         String path = FeatureUtils.escapeShell(workTask, this.buildGitPath(workTask));
-        String after = lastTimeline != null ? " --before " + FeatureUtils.escapeShell(workTask, GitMemoryService.DATE_FORMAT.format(lastTimeline)) + " " : "";
         StringBuffer buffer = new StringBuffer("cd ").append(path).append(" && ");
         // 如果没有LastTimeline表示没有短期记忆，就不需要过滤important
-        buffer.append(FeatureUtils.escapeShell(workTask, this.buildGitApp(workTask))).append(" log -n ").append(this.buildFetch(workTask)).append(after).append(" --pretty=format:'%s' ").append(file).append(lastTimeline != null ? " | grep '\\[important=1\\]'" : "");
+        buffer.append(FeatureUtils.escapeShell(workTask, this.buildGitApp(workTask))).append(" log -n ").append(this.buildFetch(workTask)).append(" --pretty=format:'%s' ").append(file).append(" | grep '\\[important=1\\]'");
         return this.cliSubFetcher.command(workTask, CliSubOps.builder()
                 .app(List.of("git"))
                 .r(List.of(path))
@@ -353,8 +350,8 @@ public class GitMemoryService extends BaseFunction implements GitPath, MemorySer
     }
 
     protected Boolean allowedRead(WorkflowTask workTask) throws Exception {
-        // 前提：当前没有服务端History召回时 客户端带了LastResponse（非新会话）或 非简单问题
-        return CollectionUtils.isEmpty(History.getReferenceHistory(workTask.getHistories(), History.REFERENCE_SERVER)) && (FeatureUtils.buildLastResponse(workTask) != null || !ComplexityMode.FAST_REPLY.equals(ComplexityUtils.result(workTask)));
+        // 当前没有History召回时 客户端带了LastResponse（非新会话）或 非简单问题
+        return CollectionUtils.isEmpty(workTask.getHistories()) && (FeatureUtils.buildLastResponse(workTask) != null || !ComplexityMode.FAST_REPLY.equals(ComplexityUtils.result(workTask)));
     }
 
     @Builder

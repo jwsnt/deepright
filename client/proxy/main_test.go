@@ -13122,3 +13122,28 @@ func TestValidateProxyCronCreateScheduleAcceptsPastFormattedTime(t *testing.T) {
 		t.Fatal("custom cron must reject rawTime")
 	}
 }
+
+func TestReadProxyChatCleanHours(t *testing.T) {
+	appDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(appDir, "config"), 0o755); err != nil {
+		t.Fatalf("create proxy config dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "config", "config.json"), []byte(`{"chat":{"restore":50,"clean":168}}`), 0o644); err != nil {
+		t.Fatalf("write proxy config: %v", err)
+	}
+	previousExecutable := proxyOsExecutable
+	proxyOsExecutable = func() (string, error) {
+		return filepath.Join(appDir, "proxy"), nil
+	}
+	t.Cleanup(func() {
+		proxyOsExecutable = previousExecutable
+	})
+
+	cleanHours, err := readProxyChatCleanHours()
+	if err != nil {
+		t.Fatalf("read proxy chat clean hours: %v", err)
+	}
+	if cleanHours != 168 {
+		t.Fatalf("chat.clean = %d, want 168", cleanHours)
+	}
+}

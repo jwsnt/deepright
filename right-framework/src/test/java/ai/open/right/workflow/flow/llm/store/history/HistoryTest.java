@@ -51,6 +51,16 @@ public class HistoryTest {
     }
 
     @Test
+    public void testIsReference() {
+        History history = new History();
+        history.setReference(History.REFERENCE_CLIENT);
+        Assert.assertTrue(history.isReference(History.REFERENCE_CLIENT));
+        Assert.assertFalse(history.isReference(History.REFERENCE_SERVER));
+        history.setReference(null);
+        Assert.assertFalse(history.isReference(History.REFERENCE_CLIENT));
+    }
+
+    @Test
     public void testGetContent() throws Exception {
         History history = new History();
         history.setContent(JsonUtils.write(ImmutableMap.of("A", "B")));

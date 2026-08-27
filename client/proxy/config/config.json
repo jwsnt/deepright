@@ -1,3 +1,7 @@
 {
-  "host": "https://staging.deepright.cn"
+  "host": "https://staging.deepright.cn",
+  "chat": {
+    "restore": 50,
+    "clean": 168
+  }
 }

@@ -9,8 +9,6 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 
-import java.util.List;
-
 @Slf4j
 public class ComplexityUtils {
 
@@ -96,10 +94,9 @@ public class ComplexityUtils {
 
     public static String buildQuery(WorkflowTask workTask) throws Exception {
         StringBuffer buffer = new StringBuffer();
-        // 获取所有服务端记录用户Query累加来判断复杂度
-        List<History> history = History.getReferenceHistory(workTask.getHistories(), History.REFERENCE_SERVER);
-        if (!CollectionUtils.isEmpty(history)) {
-            for (History current : history) {
+        // 获取所有上下文记录用户Query累加来判断复杂度
+        if (!CollectionUtils.isEmpty(workTask.getHistories())) {
+            for (History current : workTask.getHistories()) {
                 // 是用户提问则追加
                 if (current.isRole(History.ROLE_USER) && current.isType(History.TYPE_QUERY)) {
                     buffer.append(current.getContent()).append(System.lineSeparator());

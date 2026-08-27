@@ -2,8 +2,8 @@
 
 ## 本次更新
 
-- 共享 sqlite 中的 `agent_message_log` 与 `chat_log` 新增了统一的 30 天保留策略
-- `integration` 与 `proxy` 在启动完成数据库初始化后，都会自动检查并物理删除超过 30 天的日志
+- 共享 sqlite 的清理策略现由 `config/config.json.chat.clean` 控制，单位为小时
+- `integration` 与 `proxy` 在启动完成数据库初始化后，都会自动检查并物理删除超过 `chat.clean` 小时的日志与会话历史
 - 清理任务改为使用独立 sqlite 连接异步执行，不阻塞首屏服务、页面初始化请求和主查询链路
 - 新增 `GET /api/log_cleanup_status`，用于返回当前启动阶段日志清理状态
 - Site 在检测到清理正在进行时，会显示统一中心浮层并锁定界面，提示用户“正在清理过期日志，请稍后”
@@ -13,12 +13,14 @@
 - 清理范围固定为：
   - `agent_message_log`
   - `chat_log`
-- 过期判断字段统一为 `created_at`
+  - `cmd_log`
+  - `chat_history_message`
+- `agent_message_log`、`chat_log` 与 `chat_history_message` 按 `created_at` 判断；`cmd_log` 按 `received_at` 判断
 - 时间格式继续沿用日志表已有的 `2006-01-02T15:04:05.000`
 - 删除条件固定为：
 
 ```text
-created_at < 当前时间 - 30天
+时间字段 < 当前时间 - chat.clean 小时
 ```
 
 - `created_at` 为空字符串的历史数据不会被这次清理命中
@@ -43,12 +45,14 @@ GET /api/log_cleanup_status
 - `checked`
 - `running`
 - `message`
-- `retentionDays`
+- `retentionHours`
 - `cutoff`
 - `startedAt`
 - `finishedAt`
 - `deletedAgentMessageLog`
 - `deletedChatLog`
+- `deletedCmdLog`
+- `deletedChatHistoryMessage`
 - `error`
 
 ## 页面表现

@@ -43,14 +43,14 @@
 + 清理实现：
     + 需要抽出共享子模块，避免 `integration` 与 `proxy` 各写一份删除逻辑
     + 共享子模块需要同时负责：
-        + retention天数配置
+        + retention小时配置
         + cutoff计算
         + 状态记录
         + 事务内删除
     + 删除时需要在同一事务中完成：
         + 检查表是否存在
         + 删除 `agent_message_log` 过期数据
-        + 删除 `chat_log` 过期数据
+        + 删除 `chat_log`、`cmd_log` 与 `chat_history_message` 过期数据
     + 单表不存在时应自动跳过，不能因此让整个启动失败
 + 状态可观测性：
     + 需要新增统一状态接口 `/api/log_cleanup_status`
@@ -58,12 +58,14 @@
         + `checked`
         + `running`
         + `message`
-        + `retentionDays`
+        + `retentionHours`
         + `cutoff`
         + `startedAt`
         + `finishedAt`
         + `deletedAgentMessageLog`
         + `deletedChatLog`
+        + `deletedCmdLog`
+        + `deletedChatHistoryMessage`
         + `error`
     + 即使清理失败，也不能阻塞主服务启动；失败信息只记录在状态接口和标准日志
 + 前端交互：
@@ -84,8 +86,8 @@
     + 本次需求不要求为纯删除场景额外新增新索引，避免为低频启动任务增加额外写放大
 + 测试要求：
     + 需要补充共享清理模块测试，至少覆盖：
-        + 只删除30天之前的数据
-        + 30天内数据保留
+        + 只删除超过配置小时数的数据
+        + 配置小时数内的数据保留
         + 单表不存在时自动跳过
         + 管理器状态从 `running` 到 `checked` 正常收敛
         + 独立sqlite连接模式下也能完成清理并正确关闭连接

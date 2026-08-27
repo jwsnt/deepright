@@ -4,7 +4,6 @@ import ai.deepright.cli.CliPrinter;
 import ai.deepright.feature.FeatureFlag;
 import ai.deepright.feature.FeatureUtils;
 import ai.deepright.lang.XmlResourceLang;
-import ai.deepright.llm.notifier.MultiSourceFlag;
 import ai.deepright.llm.provider.RequestContextBuilder;
 import ai.deepright.utils.TemplateChecker;
 import ai.open.right.WorkflowException;
@@ -90,7 +89,8 @@ public class RequestExpiredRag extends RagCondition implements RagService {
 
     protected void buildConversationExpired(RagConfig ragConfig, RagData ragData) throws Exception {
         Long lastResponse = FeatureUtils.buildLastResponse(ragData.getQuery());
-        if (lastResponse != null && ragData.getQuery().isEntry() && (System.currentTimeMillis() - lastResponse) > this.offset) {
+        // 没有任何上下文，且最后的消息记录时间大于服务端的偏移时间
+        if (CollectionUtils.isEmpty(ragData.getRequest().getMessage().getHistories()) && (lastResponse != null && ragData.getQuery().isEntry() && (System.currentTimeMillis() - lastResponse) > this.offset)) {
             this.notifyExpired(ragConfig, ragData);
         }
     }

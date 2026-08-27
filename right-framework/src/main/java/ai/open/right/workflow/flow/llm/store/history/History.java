@@ -151,6 +151,10 @@ public class History {
         return "";
     }
 
+    public Boolean isReference(Integer reference) {
+        return this.reference != null && this.reference.equals(reference);
+    }
+
     public Boolean isFunction(Integer function) {
         return this.function != null && this.function.equals(function);
     }
