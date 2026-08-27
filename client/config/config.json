@@ -167,6 +167,7 @@
     },
     "deepseek": {
       "__url": "https://api.deepseek.com/v1/chat/completions",
+      "__model_multi_input": "deepseek-v4-flash-vision-exp",
       "__model_thinking": "deepseek-v4-pro",
       "__model_fast": "deepseek-v4-flash",
       "__model": "deepseek-v4-flash"

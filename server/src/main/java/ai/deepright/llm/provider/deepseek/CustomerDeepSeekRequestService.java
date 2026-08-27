@@ -26,6 +26,8 @@ public class CustomerDeepSeekRequestService extends DeepSeekRequestService {
 
     protected String thinkingHigh;
 
+    protected String multiInput;
+
     protected String thinking;
 
     protected String fast;
@@ -47,6 +49,7 @@ public class CustomerDeepSeekRequestService extends DeepSeekRequestService {
     protected void request(OpenAiRequest request, LLMConfig llmConfig, LLMQuery llmQuery) throws Exception {
         super.request(request, llmConfig, llmQuery);
         request.setModel(RequestModelSelect.select(llmQuery, RequestModelSelect.RequestModel.builder()
+                .multiInput(this.multiInput)
                 .thinking(this.thinking)
                 .fast(this.fast)
                 .base(this.base)
@@ -64,6 +67,9 @@ public class CustomerDeepSeekRequestService extends DeepSeekRequestService {
 
         @Value("${deepseek.model.thinkingHigh:high}")
         protected String thinkingHigh;
+
+        @Value("${deepseek.model.multiInput:deepseek-v4-flash-vision-exp}")
+        protected String multiInput;
 
         @Value("${deepseek.model.thinking:deepseek-v4-pro}")
         protected String thinking;
