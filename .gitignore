@@ -57,6 +57,7 @@ client/proxy/data*
 client/skills/skill-scanner*
 client/site/tmp/
 client/knowledge/_tmp_app_test
+client/sign.sh
 # IDE
 server/.vscode/
 .codex_write_check
